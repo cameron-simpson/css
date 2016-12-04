@@ -118,22 +118,22 @@ class Result(O):
         # state error
         raise RuntimeError(
             "<%s>.state not one of (AsynchState.pending, AsynchState.cancelled, AsynchState.running, AsynchState.ready): %r", self, state)
-    self._complete(None, None)
+      self._complete(None, None)
     return True
 
   @property
   def result(self):
-    with self._lock:
-      state = self.state
-      if state == AsynchState.cancelled:
-        raise CancellationError()
-      if state == AsynchState.ready:
-        return self._result
+    state = self.state
+    if state == AsynchState.cancelled:
+      raise CancellationError()
+    if state == AsynchState.ready:
+      return self._result
     raise AttributeError("%s not ready: no .result attribute" % (self,))
 
   @result.setter
   def result(self, new_result):
-    self._complete(new_result, None)
+    with self._lock:
+      self._complete(new_result, None)
 
   def put(self, value):
     ''' Store the value. Queue-like idiom.
@@ -142,17 +142,17 @@ class Result(O):
 
   @property
   def exc_info(self):
-    with self._lock:
-      state = self.state
-      if state == AsynchState.cancelled:
-        raise CancellationError()
-      if state == AsynchState.ready:
-        return self._exc_info
+    state = self.state
+    if state == AsynchState.cancelled:
+      raise CancellationError()
+    if state == AsynchState.ready:
+      return self._exc_info
     raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
 
   @exc_info.setter
   def exc_info(self, exc_info):
-    self._complete(None, exc_info)
+    with self._lock:
+      self._complete(None, exc_info)
 
   def raise_(self, exception=None):
     ''' Convenience wrapper for self.exc_info to store an exception result `exception`.
@@ -181,17 +181,24 @@ class Result(O):
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
+        Expect to be called _inside_ self._lock.
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
           "one of (result, exc_info) must be None, got (%r, %r)" % (result, exc_info))
-    with self._lock:
-      state = self.state
-      if state == AsynchState.cancelled or state == AsynchState.running or state == AsynchState.pending:
-        self._result = result
-        self._exc_info = exc_info
-        if state != AsynchState.cancelled:
-          self.state = AsynchState.ready
+    state = self.state
+    if state == AsynchState.cancelled or state == AsynchState.running or state == AsynchState.pending:
+      self._result = result
+      self._exc_info = exc_info
+      if state != AsynchState.cancelled:
+        XP("SET %s to READY", self)
+        self.state = AsynchState.ready
+    else:
+      if state == AsynchState.ready:
+        warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
+                self, result, exc_info)
+        raise RuntimeError("REPEATED _COMPLETE of %s: result=%r, exc_info=%r" % (self,result, exc_info))
+        return
       else:
         if state == AsynchState.ready:
           warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
