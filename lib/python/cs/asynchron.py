@@ -16,16 +16,21 @@ DISTINFO = {
 }
 
 import sys
+try:
+  from enum import Enum
+except ImportError:
+  from flufl.enum import Enum
 from cs.debug import Lock
 from cs.logutils import error, exception, warning, debug, D
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
 
-ASYNCH_PENDING = 0       # result not ready or considered
-ASYNCH_RUNNING = 1       # result function running
-ASYNCH_READY = 2         # result computed
-ASYNCH_CANCELLED = 3     # result computation cancelled
+class AsynchState(Enum):
+  pending = 'pending'
+  running = 'running'
+  ready = 'ready'
+  cancelled = 'cancelled'
 
 class CancellationError(RuntimeError):
   ''' Raised when accessing result or exc_info after cancellation.
@@ -61,7 +66,7 @@ class Result(O):
       name = "%s-%d" % (self.__class__.__name__, seq(),)
     self.name = name
     self.final = final
-    self.state = ASYNCH_PENDING
+    self.state = AsynchState.pending
     self.notifiers = []
     self._get_lock = Lock()
     self._get_lock.acquire()
@@ -69,23 +74,24 @@ class Result(O):
     if result is not None:
       self.result = result
 
-  def __repr__(self):
-    return str(self)
+  def __str__(self):
+    return "%s[%s]{state=%s}" % (self.__class__.__name__, self.name, self.state)
+  __repr__ = __str__
 
   @property
   def ready(self):
     state = self.state
-    return state == ASYNCH_READY or state == ASYNCH_CANCELLED
+    return state == AsynchState.ready or state == AsynchState.cancelled
 
   @property
   def cancelled(self):
     ''' Test whether this Result has been cancelled.
     '''
-    return self.state == ASYNCH_CANCELLED
+    return self.state == AsynchState.cancelled
 
   @property
   def pending(self):
-    return self.state == ASYNCH_PENDING
+    return self.state == AsynchState.pending
 
   def empty(self):
     ''' Analogue to Queue.empty().
@@ -94,24 +100,24 @@ class Result(O):
 
   def cancel(self):
     ''' Cancel this function.
-        If self.state is ASYNCH_PENDING or ASYNCH_CANCELLED, return True.
+        If self.state is AsynchState.pending or AsynchState.cancelled, return True.
         Otherwise return False (too late to cancel).
     '''
     with self._lock:
       state = self.state
-      if state == ASYNCH_CANCELLED:
+      if state == AsynchState.cancelled:
         # already cancelled - this is ok, no call to ._complete
         return True
-      if state == ASYNCH_READY:
+      if state == AsynchState.ready:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
+      if state == AsynchState.running or state == AsynchState.pending:
         # in progress or not commenced - change state to cancelled and fall through to ._complete
-        state = ASYNCH_CANCELLED
+        state = AsynchState.cancelled
       else:
         # state error
         raise RuntimeError(
-            "<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r", self, state)
+            "<%s>.state not one of (AsynchState.pending, AsynchState.cancelled, AsynchState.running, AsynchState.ready): %r", self, state)
     self._complete(None, None)
     return True
 
@@ -119,9 +125,9 @@ class Result(O):
   def result(self):
     with self._lock:
       state = self.state
-      if state == ASYNCH_CANCELLED:
+      if state == AsynchState.cancelled:
         raise CancellationError()
-      if state == ASYNCH_READY:
+      if state == AsynchState.ready:
         return self._result
     raise AttributeError("%s not ready: no .result attribute" % (self,))
 
@@ -138,9 +144,9 @@ class Result(O):
   def exc_info(self):
     with self._lock:
       state = self.state
-      if state == ASYNCH_CANCELLED:
+      if state == AsynchState.cancelled:
         raise CancellationError()
-      if state == ASYNCH_READY:
+      if state == AsynchState.ready:
         return self._exc_info
     raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
 
@@ -181,18 +187,18 @@ class Result(O):
           "one of (result, exc_info) must be None, got (%r, %r)" % (result, exc_info))
     with self._lock:
       state = self.state
-      if state == ASYNCH_CANCELLED or state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
+      if state == AsynchState.cancelled or state == AsynchState.running or state == AsynchState.pending:
         self._result = result
         self._exc_info = exc_info
         if state != ASYNCH_CANCELLED:
           self.state = ASYNCH_READY
       else:
-        if state == ASYNCH_READY:
-          warning("<%s>.state is ASYNCH_READY, ignoring result=%r, exc_info=%r",
+        if state == AsynchState.ready:
+          warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
                   self, result, exc_info)
           return
         else:
-          raise RuntimeError("<%s>.state is not one of (ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_PENDING, ASYNCH_READY): %r"
+          raise RuntimeError("<%s>.state is not one of (AsynchState.cancelled, AsynchState.running, AsynchState.pending, AsynchState.ready): %r"
                              % (self, state))
         return
     if self.final is not None:
@@ -335,10 +341,10 @@ class OnDemandFunction(_PendingFunction):
       state = self.state
       if state == ASYNC_CANCELLED:
         raise CancellationError()
-      if state == ASYNCH_PENDING:
-        self.state = ASYNCH_RUNNING
+      if state == AsynchState.pending:
+        self.state = AsynchState.running
       else:
-        raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
+        raise RuntimeError("state should be AsynchState.pending but is %s" % (self.state))
     result, exc_info = None, None
     try:
       result = self.func()
