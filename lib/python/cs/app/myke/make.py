@@ -630,6 +630,7 @@ class Action(O):
         M = target.maker
         mdebug = M.debug_make
         v = self.variant
+
         if v == 'shell':
           debug("shell command")
           shcmd = self.mexpr(self.context, target.namespaces)
@@ -647,6 +648,7 @@ class Action(O):
           mdebug("targets = %s", subtargets)
           subTs = [ M[subtarget] for subtarget in subtargets ]
           def _act_after_make():
+            # analyse success of targets, update R
             ok = True
             mdebug = M.debug_make
             for T in subTs:
@@ -655,12 +657,13 @@ class Action(O):
               else:
                 ok = False
                 mdebug("submake \"%s\" FAIL", T)
-            return ok
+            R.put(ok)
           for T in subTs:
             mdebug("submake \"%s\"", T)
             T.require()
-          target.maker.after(subTs, R, _act_after_make)
+          target.maker.after(subTs, _act_after_make)
           return
+
         raise NotImplementedError("unsupported variant: %s" % (self.variant,))
       except Exception as e:
         error("action failed: %s", e)
