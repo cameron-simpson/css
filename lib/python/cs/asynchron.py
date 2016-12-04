@@ -302,7 +302,7 @@ def after(Rs, R, func, *a, **kw):
     R.call(func, *a, **kw)
   else:
     countery = [count]  # to stop "count" looking like a local var inside the closure
-    def count_down(R):
+    def count_down(subR):
       ''' Notification function to submit `func` after sufficient invocations.
       '''
       with lock:
