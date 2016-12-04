@@ -13,6 +13,7 @@ ping_count=5
 sleep_time=30
 pingopts=
 setflag=
+flagname=
 upcmd=
 downcmd=
 quiet=
@@ -21,6 +22,7 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-c count] [-F] [-q] [-s sleep] [-V rtable] [-x] target down-shcmd up-shcmd
   -c count  Probe ping count. Default: $ping_count.
   -F        Set or clear flag PING_{TARGET}.
+  -f flagname Specify flag name.
   -q        Quiet.
   -s sleep  Sleep period between probes. Default: $sleep_time.
   -V rtable Passed to ping.
@@ -34,6 +36,7 @@ do
     -0) up= ;;
     -1) up=1 ;;
     -F) setflag=1 ;;
+    -f) setflag=1 flagname=$2; shift ;;
     -c) ping_count=$2; shift ;;
     -q) pingopts="$pingopts $1" quiet=1 ;;
     -s) sleep_time=$2; shift ;;
@@ -88,7 +91,7 @@ else  trace= setx=
 fi
 
 if [ $setflag ]
-then  flagname=PING_$( printf '%s\n' "$target" | tr '[.a-z]' '[_A-Z]' )
+then  : ${flagname:=PING_$( printf '%s\n' "$target" | tr '[.a-z]' '[_A-Z]' )}
 fi
 
 retry_upcmd=
