@@ -377,11 +377,12 @@ class Target(Result):
           `prereqs`: macro expression to produce prereqs.
           `postprereqs`: macro expression to produce post-inference prereqs.
           `actions`: a list of actions to build this Target
-        The same actions list is shared amongst all Targets defined
-        by a common clause in the Mykefile, and extends during the
-        Mykefile parse _after_ defining those Targets. So we do not modify it the class;
-        instead we extend .pending_actions when .require() is called the first time,
-        just as we for a :make directive.
+          The same actions list is shared amongst all Targets defined
+          by a common clause in the Mykefile, and extends during the
+          Mykefile parse _after_ defining those Targets. So we do not
+          modify it the class; instead we extend .pending_actions
+          when .require() is called the first time, just as we do for a
+          :make directive.
     '''
 
     Result.__init__(self, lock=RLock())
