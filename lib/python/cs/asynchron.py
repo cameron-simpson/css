@@ -241,8 +241,7 @@ class Result(O):
     return (self._result, self._exc_info)
 
   def get(self, default=None):
-    ''' Wait for the readiness.
-        Return the result if exc_info is None, otherwise `default`.
+    ''' Wait for readiness; return the result if exc_info is None, otherwise `default`.
     '''
     result, exc_info = self.join()
     if not self.cancelled and exc_info is None:
