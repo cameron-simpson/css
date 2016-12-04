@@ -190,8 +190,8 @@ class Result(O):
       if state == AsynchState.cancelled or state == AsynchState.running or state == AsynchState.pending:
         self._result = result
         self._exc_info = exc_info
-        if state != ASYNCH_CANCELLED:
-          self.state = ASYNCH_READY
+        if state != AsynchState.cancelled:
+          self.state = AsynchState.ready
       else:
         if state == AsynchState.ready:
           warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
