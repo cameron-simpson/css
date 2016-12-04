@@ -141,14 +141,14 @@ class Maker(MultiOpenMixin):
     if self.debug.parse:
       info(msg, *a, **kw)
 
-  def making(self, target):
+  def target_active(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as active", target.name)
     with self._active_lock:
       self.active.add(target)
 
-  def made(self, target, status):
+  def target_inactive(self, target):
     ''' Remove this target from the set of "in progress" targets.
     '''
     self.debug_make("note target %r as inactive (%s)", target.name, target.state)
