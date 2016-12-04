@@ -75,7 +75,7 @@ class Result(O):
       self.result = result
 
   def __str__(self):
-    return "%s[%s]{state=%s}" % (self.__class__.__name__, self.name, self.state)
+    return "%s[%s]{%s}" % (self.__class__.__name__, self.name, self.state)
   __repr__ = __str__
 
   @property
