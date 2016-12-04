@@ -1,26 +1,44 @@
 #!/bin/sh
 #
 # Monitor an IP target using ping.
-# Run commands on "up" and "down".
+# Run commands on "up" and "down"; repeat until successful or state change.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
 set -ue
 
-trace=set-x setx='set -x'
+up=
+dotrace=
 ping_count=5
 sleep_time=30
+pingopts=
+setflag=
+upcmd=
+downcmd=
+quiet=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c count] [-s sleep] target down-shcmd up-shcmd"
+usage="Usage: $cmd [-c count] [-F] [-q] [-s sleep] [-V rtable] [-x] target down-shcmd up-shcmd
+  -c count  Probe ping count. Default: $ping_count.
+  -F        Set or clear flag PING_{TARGET}.
+  -q        Quiet.
+  -s sleep  Sleep period between probes. Default: $sleep_time.
+  -V rtable Passed to ping.
+  -x        Trace execution."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -0) up= ;;
+    -1) up=1 ;;
+    -F) setflag=1 ;;
     -c) ping_count=$2; shift ;;
+    -q) pingopts="$pingopts $1" quiet=1 ;;
     -s) sleep_time=$2; shift ;;
+    -V) pingopts="$pingopts $1 $2"; shift ;;
+    -x) dotrace=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -39,8 +57,10 @@ else
   shift
   if [ $# = 0 ]
   then
-    echo "$cmd: missing down-shcmd" >&2
-    badopts=1
+    [ $setflag ] || \
+    { echo "$cmd: missing down-shcmd" >&2
+      badopts=1
+    }
   else
     downcmd=$1
     shift
@@ -62,25 +82,34 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-up=1
+if [ $dotrace ]
+then  trace=set-x setx='set -x'
+else  trace= setx=
+fi
+
+if [ $setflag ]
+then  flagname=PING_$( printf '%s\n' "$target" | tr '[.a-z]' '[_A-Z]' )
+fi
+
 retry_upcmd=
 retry_downcmd=
 
 while :
 do
-  if $trace ping -c "$ping_count" "$target"
+  if ( [ -z "$quiet" ] || exec >/dev/null; $trace ping $pingopts -c "$ping_count" "$target"; )
   then
     # up!
     if [ $up ]
     then
       # already up - retry cmd if still pending
       if [ $retry_upcmd ]
-      then $trace sh -c "$setx; $upcmd" && retry_upcmd=
+      then { [ -z "$upcmd" ] || $trace sh -c "$setx; $upcmd"; } && retry_upcmd=
       fi
     else
       # newly up - note new state and run upcmd
       up=1
-      if $trace sh -c "$setx; $upcmd"
+      [ $setflag ] && flag "$flagname" 1
+      if [ -z "$upcmd" ] || $trace sh -c "$setx; $upcmd"
       then retry_upcmd=
       else retry_upcmd=1
       fi
@@ -91,14 +120,14 @@ do
     then
       # newly down - note new state and run downcmd
       up=
-      if $trace sh -c "$setx; $downcmd"
+      if [ -z "$downcmd" ] || $trace sh -c "$setx; $downcmd"
       then retry_downcmd=
       else retry_downcmd=1
       fi
     else
-      # still down - retyr cmd if still pending
+      # still down - retry cmd if still pending
       if [ $retry_downcmd ]
-      then $trace sh -c "$setx; $downcmd" && retry_downcmd=
+      then { [ -z "$downcmd" ] || $trace sh -c "$setx; $downcmd"; } && retry_downcmd=
       fi
     fi
   fi
