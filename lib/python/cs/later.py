@@ -896,8 +896,10 @@ class Later(MultiOpenMixin):
     return self._after(LFs, R, func, *a, **kw)
 
   def _after(self, LFs, R, func, *a, **kw):
+    if not isinstance(LFs, list):
+      LFs = list(LFs)
     if R is None:
-      R = Result()
+      R = Result("Later.after(%s)" % (",".join(str(_) for _ in LFs)))
     elif not isinstance(R, Result):
       raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
     def put_func():
