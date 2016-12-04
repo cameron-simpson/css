@@ -17,8 +17,7 @@ from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
 from cs.queues import MultiOpenMixin
-from cs.asynchron import Result, report as report_LFs, \
-        ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
+from cs.asynchron import Result, report as report_LFs, AsynchState
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D, X, XP
 from cs.obj import O
@@ -152,7 +151,7 @@ class Maker(MultiOpenMixin):
   def made(self, target, status):
     ''' Remove this target from the set of "in progress" targets.
     '''
-    self.debug_make("note target \"%s\" as inactive (status=%s)", target.name, status)
+    self.debug_make("note target %r as inactive (%s)", target.name, target.state)
     with self._active_lock:
       self.active.remove(target)
 
@@ -408,7 +407,7 @@ class Target(Result):
     #  
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.madeness())
+    return "{}[{}]".format(self.name, self.state)
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
@@ -427,20 +426,6 @@ class Target(Result):
     self.mdebug("FAILED")
     self.failed = True
     self.result = False
-
-  def madeness(self):
-    ''' Report the status of this target as text.
-    '''
-    state = self.state
-    if state == ASYNCH_PENDING:
-      return "unconsidered"
-    if state == ASYNCH_RUNNING:
-      return "making"
-    if state == ASYNCH_CANCELLED:
-      return "cancelled"
-    if state != ASYNCH_READY:
-      raise RuntimeError("%s.madeness: unexpected state %s" % (self, state))
-    return "made" if self.result else "FAILED"
 
   @prop
   def namespaces(self):
