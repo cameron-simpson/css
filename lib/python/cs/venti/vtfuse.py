@@ -400,15 +400,6 @@ class Inodes(object):
     return inum
 
   @locked
-  def dirent2(self, inum):
-    ''' Locate the Dirent for inode `inum`, return it and its parent.
-        Raises ValueError if the `inum` is unknown.
-    '''
-    with Pfx("dirent2(%d)", inum):
-      I = self[inum]
-      return I.E, I.parentE
-
-  @locked
   def dirent(self, inum):
     ''' Locate the Dirent for inode `inum`, return it.
         Raises ValueError if the `inum` is unknown.
@@ -505,15 +496,10 @@ class _StoreFS_core(object):
         dump_Dirent(self.E, recurse=False)
         dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
-  def i2EP(self, inum):
-    ''' Return the Dirent and parent Dirent associated with the supplied `inum`.
-    '''
-    return self._inodes.dirent2(inum)
-
   def i2E(self, inum):
     ''' Return the Dirent associated with the supplied `inum`.
     '''
-    return self.i2EP(inum)[0]
+    return self._inodes.dirent(inum)
 
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
@@ -842,7 +828,7 @@ if FUSE_CLASS == 'llfuse':
     def link(self, inode, new_parent_inode, new_name_b, ctx):
       new_name = self._vt_str(new_name_b)
       # TODO: test for write access to new_parent_inode
-      Esrc, Psrc = self._vt_core.i2EP(inode)
+      Esrc = self._vt_core.i2E(inode)
       if not Esrc.isfile and not Esrc.ishardlink:
         raise FuseOSError(errno.EPERM)
       Pdst = self._vt_core.i2E(new_parent_inode)
@@ -863,7 +849,7 @@ if FUSE_CLASS == 'llfuse':
         src_name = Esrc.name
         inum0 = self._vt_core.E2i(Esrc)
         EsrcLink = self._vt_core.make_hardlink(Esrc)
-        Psrc[src_name] = EsrcLink
+        Esrc.parent[src_name] = EsrcLink
         inum = EsrcLink.inum
         if inum != inum0:
           raise RuntimeError("new hardlink: original inum %d != linked inum %d"
