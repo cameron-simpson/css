@@ -4,7 +4,8 @@
 from __future__ import print_function
 
 ''' Classes to support access to Beyonwiz TVWiz on disc data structures
-    and to Beyonwiz devices via the net.
+    and to access Beyonwiz devices via the net. Also support for
+    newer Beyonwiz devices running Enigma and their recording format.
 '''
 
 DISTINFO = {
@@ -14,7 +15,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'requires': ['cs.app.ffmpeg', 'cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
     'entry_points': {
       'console_scripts': [
           'beyonwiz = cs.app.beyonwiz:main',
@@ -23,6 +24,7 @@ DISTINFO = {
 }
 
 import sys
+import errno
 import os
 import os.path
 from collections import namedtuple
@@ -33,6 +35,7 @@ from subprocess import Popen, PIPE
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from xml.etree.ElementTree import XML
+from cs.app.ffmpeg import MetaData as FFmpegMetaData, convert as ffconvert
 from cs.logutils import Pfx, error, warning, info, setup_logging, X
 from cs.obj import O
 from cs.threads import locked_property
@@ -176,45 +179,38 @@ def main(argv):
         TVWiz(arg).copyto(stdout_bfp)
         stdoutp.bfp.close()
     elif op == "convert":
-      tvwizdir, outpath = args
-      TV = TVWiz(tvwizdir)
-      xit = TV.convert(outpath)
+      srcpath, dstpath = args
+      R = openRecording(srcpath)
+      xit = R.convert(dstpath)
     elif op == "header":
       for tvwizdir in args:
         with Pfx(tvwizdir):
           print(tvwizdir)
           TV = TVWiz(tvwizdir)
-          print(repr(TV.header()))
+          print(repr(TV.header))
     elif op == "mconvert":
-      for tvwizdir in args:
-        with Pfx(tvwizdir):
+      for srcpath in args:
+        with Pfx(srcpath):
           ok = True
-          TV = TVWiz(tvwizdir)
-          H = TV.header()
-          outleft = "{iso}--{evtName}--".format_map(H.__dict__)
-          outright = "--{svcName}.mp4".format_map(H.__dict__)
-          outmiddle = H.episode[:255-len(outleft)-len(outright)]
-          outpath = ( outleft + outmiddle + outright ) \
-                    .replace('/', '|') \
-                    .replace(' ', '-') \
-                    .replace('----', '--')
-          if os.path.exists(outpath):
-            outpfx, outext = os.path.splitext(outpath)
+          R = openRecording(srcpath)
+          dstpath = R.convertpath()
+          if os.path.exists(dstpath):
+            dstpfx, dstext = os.path.splitext(dstpath)
             ok = False
             for i in range(32):
-              outpath2 = "%s--%d%s" % (outpfx, i+1, outext)
-              if not os.path.exists(outpath2):
-                outpath = outpath2
+              dstpath2 = "%s--%d%s" % (dstpfx, i+1, dstext)
+              if not os.path.exists(dstpath2):
+                dstpath = dstpath2
                 ok = True
                 break
             if not ok:
-              error("file exists, and so do most -n flavours of it: %r", outpath)
+              error("file exists, and so do most --n flavours of it: %r", dstpath)
               xit = 1
           if ok:
             try:
-              ffxit = TV.convert(outpath)
+              ffxit = R.convert(dstpath)
             except ValueError as e:
-              error("%s: %s", outpath, e)
+              error("%s: %s", dstpath, e)
               xit = 1
     elif op == "meta":
       for filename in args:
@@ -253,9 +249,9 @@ def main(argv):
     elif op == "stat":
       for arg in args:
         TV = TVWiz(arg)
-        H = TV.header()
+        H = TV.header
         print(arg)
-        print("  %s %s: %s, %s" % (H.svcName, H.dt_start.isoformat(' '), H.evtName, H.episode))
+        print("  %s %s: %s, %s" % (H.svcName, H.start_dt.isoformat(' '), H.evtName, H.episode))
     elif op == "test":
       host = args.pop(0)
       print("host =", host, "args =", args)
@@ -335,7 +331,7 @@ class TnMovie(O):
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
-def parse_trunc(fp):
+def tvwiz_parse_trunc(fp):
   ''' An iterator to yield TruncRecord tuples.
   '''
   while True:
@@ -346,7 +342,7 @@ def parse_trunc(fp):
       raise ValueError("short buffer: %d bytes: %r" % (len(buf), buf))
     yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
-def parse_header_data(data, offset=0):
+def tvwiz_parse_header_data(data, offset=0):
   ''' Decode the data chunk from a TV or radio header chunk.
   '''
   h1, h2, h3, h4, h5, \
@@ -355,8 +351,6 @@ def parse_header_data(data, offset=0):
   offset += 1024
   svcName, evtName, \
   mjd, pad, start, last, sec, lastOff = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
-  unix_start = (mjd - 40587) * DAY + start
-  dt_start = datetime.datetime.fromtimestamp(unix_start)
   svcName = bytes0_to_str(svcName)
   evtName = bytes0_to_str(evtName)
   # advance to file offsets
@@ -372,11 +366,29 @@ def parse_header_data(data, offset=0):
   syn_b = syn_b.rstrip(b'\xff')
   episode = epi_b.decode('utf8', errors='replace')
   synopsis = syn_b.decode('utf8', errors='replace')
-  return NS(lock=lock, mediaType=mediaType, inRec=inRec,
+  return TVWiz_Header(lock=lock, mediaType=mediaType, inRec=inRec,
             svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
-            mjd=mjd, start=start, unix_start=unix_start, dt_start=dt_start,
-            iso=dt_start.isoformat(' '),
+            mjd=mjd, start=start,
             playtime=last*10+sec, lastOff=lastOff)
+
+class RecordingMeta(NS):
+
+  @property
+  def start_dt(self):
+    return datetime.datetime.fromtimestamp(self.start_unixtime)
+
+  @property
+  def start_dt_iso(self):
+    return self.start_dt.isoformat(' ')
+
+class TVWiz_Header(RecordingMeta):
+  
+  @property
+  def start_unixtime(self):
+    return (self.mjd - 40587) * DAY + self.start
+
+class Enigma2Meta(RecordingMeta):
+  pass
 
 def bytes0_to_str(bs0, encoding='utf8'):
   nulpos = bs0.find(0)
@@ -409,8 +421,75 @@ def trailing_nul(bs):
     start += 1
   return start, bs[start:]
 
-class TVWiz(O):
+def openRecording(path):
+  if path.endswith('.tvwiz'):
+    return TVWiz(path)
+  if path.endswith('.ts'):
+    return Enigma2(path)
+  raise ValueError("don't know how to open recording %r" % (path,))
+
+class Recording(O):
+  ''' Base class for video recordings.
+  '''
+
+  def __init__(self):
+    self._lock = Lock()
+
+  def copyto(self, output):
+    ''' Transcribe the uncropped content to a file named by output.
+        Requires the .data() generator method to yield video data chunks.
+    '''
+    if type(output) is str:
+      outpath = output
+      with open(outpath, "wb") as output:
+        self.copyto(output)
+    else:
+      for buf in self.data():
+        output.write(buf)
+
+  def convertpath(self, format='mp4'):
+    left, middle, right = self.path_parts()
+    # fixed length of the path
+    fixed_len = len(self.meta.start_dt_iso) \
+              + len(left) \
+              + len(right) \
+              + len(format) \
+              + 7
+    middle = middle[:255-fixed_len]
+    X("start_dt_iso=%r", self.start_dt_iso)
+    return '--'.join( (self.start_dt_iso, left, middle, right ) ) \
+               .replace('/', '|') \
+               .replace(' ', '-') \
+               .replace('----', '--') \
+           + '.' + format
+
+  def convert(self, outpath, format=None):
+    ''' Transcode video to `outpath` in FFMPEG `format`.
+    '''
+    if os.path.exists(outpath):
+      raise ValueError("outpath exists")
+    if format is None:
+      _, ext = os.path.splitext(outpath)
+      if not ext:
+        raise ValueError("can't infer format from outpath, no extension")
+      format = ext[1:]
+    # prevent output path looking like option or URL
+    if not os.path.isabs(outpath):
+      outpath = os.path.join('.', outpath)
+    ffmeta = self.ffmpeg_metadata(format)
+    P, ffargv = ffconvert(None, 'mpegts', outpath, format, ffmeta)
+    info("running %r", ffargv)
+    self.copyto(P.stdin)
+    P.stdin.close()
+    xit = P.wait()
+    if xit != 0:
+      warning("ffmpeg failed, exit status %d", xit)
+    return xit
+
+class TVWiz(Recording):
+
   def __init__(self, wizdir):
+    Recording.__init__(self)
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
 
@@ -436,16 +515,22 @@ class TVWiz(O):
   def header_path(self):
     return os.path.join(self.dirpath, TVHDR)
 
-  def header(self):
+  def read_header(self):
     with open(self.header_path, "rb") as hfp:
       data = hfp.read()
-    return parse_header_data(data)
+    return tvwiz_parse_header_data(data)
+
+  @locked_property
+  def header(self):
+    return self.read_header()
+
+  meta = header
 
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
     with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
-      for trec in parse_trunc(tfp):
+      for trec in tvwiz_parse_trunc(tfp):
         yield trec
 
   def data(self):
@@ -475,53 +560,146 @@ class TVWiz(O):
       if lastFileNum is not None:
         fp.close()
 
-  def copyto(self, output):
-    ''' Transcribe the uncropped content to a file named by output.
-    '''
-    if type(output) is str:
-      outpath = output
-      with open(outpath, "wb") as output:
-        self.copyto(output)
-    else:
-      for buf in self.data():
-        output.write(buf)
+  def path_parts(self):
+    H = self.header
+    return H.evtName, H.episode, H.svcName
 
-  def convert(self, outpath, format=None):
-    ''' Transcode video to `outpath` in FFMPEG `format`.
-    '''
-    if os.path.exists(outpath):
-      raise ValueError("outpath exists")
-    if format is None:
-      _, ext = os.path.splitext(outpath)
-      if not ext:
-        raise ValueError("can't infer format from outpath, no extension")
-      format = ext[1:]
-    # prevent output path looking like option or URL
-    if not os.path.isabs(outpath):
-      outpath = os.path.join('.', outpath)
-    H = self.header()
-    ffmpeg_argv = [ 'ffmpeg', '-f', 'mpegts', '-i', '-',
-                              '-f', format,
-                              '-metadata', 'title='
-                                           + ( H.evtName
-                                               if len(H.episode) == 0
-                                               else '%s: %s' % (H.evtName, H.episode)
-                                             ),
-                              '-metadata', 'show='+H.evtName,
-                              '-metadata', 'episode_id='+H.episode,
-                              '-metadata', 'synopsis='+H.synopsis,
-                              '-metadata', 'network='+H.svcName,
-                              '-metadata', 'comment=Transcoded from %r using ffmpeg. Recording date %s.' % (self.dirpath, H.iso),
-                              outpath]
-    info("running: %r", ffmpeg_argv)
-    P = Popen(ffmpeg_argv, stdin=PIPE)
-    self.copyto(P.stdin)
-    P.stdin.close()
-    xit = P.wait()
-    if xit != 0:
-      warning("ffmpeg failed, exit status %d", xit)
-    return xit
+  def ffmpeg_metadata(self, format='mp4'):
+    H = self.header
+    return FFmpegMetaData(format,
+                          title=( H.evtName
+                                  if len(H.episode) == 0
+                                  else '%s: %s' % (H.evtName, H.episode)
+                                ),
+                          show=H.evtName,
+                          episode_id=H.episode,
+                          synopsis=H.synopsis,
+                          network=H.svcName,
+                          comment='Transcoded from %r using ffmpeg. Recording date %s.'
+                                  % (self.dirpath, H.start_dt_iso),
+                         )
 
+class Enigma2(Recording):
+  ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
+      File format information from:
+        https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
+  '''
+
+  def __init__(self, tspath):
+    Recording.__init__(self)
+    self.tspath = tspath
+    self.metapath = tspath + '.meta'
+    self.appath = tspath + '.ap'
+    self.path_title, self.path_datetime, self.path_channel = self._parse_path()
+
+  def _parse_path(self):
+    basis, ext = os.path.splitext(self.tspath)
+    if ext != '.ts':
+      warning("does not end with .ts: %r", self.tspath)
+    ymd, hm, _, channel, _, title = basis.split(' ', 5)
+    dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
+    return title, dt, channel
+
+  APInfo = namedtuple('APInfo', 'offset pts')
+
+  @locked_property
+  def meta(self):
+    ''' Return the meta information from a recording's .meta associated file.
+    '''
+    path = self.metapath
+    data = {
+        'service_ref': None,
+        'title': self.path_title,
+        'description': None,
+        'channel': self.path_channel,
+        # start time of recording as a UNIX time
+        'start_unixtime': None,
+        'tags': set(),
+        # length in PTS units (1/9000s)
+        'length_pts': None,
+        'filesize': None,
+      }
+    with Pfx("meta %r", path):
+      try:
+        with open(path) as metafp:
+          data['service_ref'] = metafp.readline().rstrip()
+          data['title'] = metafp.readline().rstrip()
+          data['description'] = metafp.readline().rstrip()
+          data['start_unixtime'] = int(metafp.readline().rstrip())
+          data['tags'].update(metafp.readline().strip().split())
+          data['length_pts'] = int(metafp.readline().rstrip())
+          data['filesize'] = int(metafp.readline().rstrip())
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          warning("cannot open: %s", e)
+        else:
+          raise
+      return Enigma2Meta(**data)
+
+  
+  @property
+  def start_dt_iso(self):
+    return self.meta.start_dt_iso
+
+  def path_parts(self):
+    ''' The 3 components contributing to the .convertpath() method.
+        The middle component may be trimmed to fit into a legal filename.
+    '''
+    M = self.meta
+    return M.title, '-'.join(M.tags), M.channel
+
+  def ffmpeg_metadata(self, format='mp4'):
+    M = self.meta
+    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
+              % (self.tspath, M.start_dt_iso)
+    if M.tags:
+      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
+    return FFmpegMetaData(format,
+                          title=M.title,
+                          show=M.title,
+                          description=M.description,
+                          synopsis=M.description,
+                          network=M.channel,
+                          comment=comment,
+                         )
+
+    def ap(self):
+      ''' Read offsets and PTS information from a recording's .ap associated file.
+          Return a list of APInfo named tuples.
+      '''
+      path = self.appath
+      apdata = []
+      with Pfx("ap %r", path):
+        try:
+          with open(path, 'rb') as apfp:
+            while True:
+              data = apfp.read(16)
+              if not data:
+                break
+              if len(data) < 16:
+                warning("incomplete read (%d bytes) at offset %d",
+                        len(data), apfp.tell() - len(data))
+                break
+              offset, pts = struct.unpack('>QQ', data)
+              apdata.append(Enigma2.APInfo(offset, pts))
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            warning("cannot open: %s", e)
+          else:
+            raise
+        return apdata
+
+  def data(self):
+    ''' A generator that yields MPEG2 data from the stream.
+    '''
+    bufsize = 65536
+    with Pfx("data(%s)", self.tspath):
+      with open(self.tspath, 'rb') as tsfp:
+        while True:
+          chunk = tsfp.read(bufsize)
+          if len(chunk) == 0:
+            break
+          yield chunk
 
 class WizPnP(O):
   ''' Class to access a pre-T3 beyonwiz over HTTP.

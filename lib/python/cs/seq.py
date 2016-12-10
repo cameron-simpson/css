@@ -118,7 +118,7 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
-def imerge(*iters, reverse=False):
+def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
       `reverse`: if true, yield items in reverse order
                  this requires the iterables themselves to also be in
@@ -129,6 +129,9 @@ def imerge(*iters, reverse=False):
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
+  reverse = kw.get('reverse', False)
+  if kw:
+    raise ValueError("unexpected keyword arguments: %r", kw)
   if reverse:
     # tuples that compare in reverse order
     class _MergeHeapItem(tuple):
