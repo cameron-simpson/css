@@ -637,8 +637,8 @@ class _StoreFS_core(object):
           busy; might just need a list of released fds for reuse.
     '''
     fhs = self._file_handles
-    for fhndx in range(len(fhs)):
-      if fhs[fhndx] is None:
+    for fhndx, fh in enumerate(fhs):
+      if fh is None:
         fhs[fhndx] = file_handle
         return fhndx
     fhs.append(file_handle)
