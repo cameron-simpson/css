@@ -623,11 +623,9 @@ class _StoreFS_core(object):
     return fh
 
   def _fh_remove(self, fhndx):
-    X("DEL _file_handles[%s] (pre: %r)", fhndx, self._file_handles)
     self._file_handles[fhndx] = None
 
   def _fh_close(self, fhndx):
-    X("CLOSE _file_handles[%s] (pre: %r)", fhndx, self._file_handles)
     fh = self._fh(fhndx)
     fh.close()
     self._fh_remove(fhndx)
