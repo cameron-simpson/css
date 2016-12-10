@@ -191,21 +191,33 @@ class FileHandle(O):
     ## self.E.touch()
 
 class Inode(NS):
+  ''' An Inode associates an inode number and a Dirent.
+  '''
 
-  def __init__(self, **kw):
-    self.inum = None
+  def __init__(self, inum, E):
+    NS.__init__(self)
+    self.inum = inum
+    try:
+      Einum = E.inum
+    except AttributeError:
+      E.inum = inum
+    else:
+      raise AttributeError("Inode.__init__(inum=%d,...): Dirent %s already has a .inum: %d"
+                           % (inum, E, Einum))
+    self.E = E
     self.krefcount = 0
-    self.E = None
-    self.parentE = None
-    NS.__init__(self, **kw)
 
   def __iadd__(self, delta):
+    ''' Increment krefcount.
+    '''
     if delta < 1:
       raise ValueError("Inode.__iadd__(%d, delta=%s): expected delta >= 1"
                        % (self.inum, delta))
     self.krefcount += delta
 
   def __isub__(self, delta):
+    ''' Decrement krefcount.
+    '''
     if delta < 1:
       raise ValueError("Inode.__isub__(%d, delta=%s): expected delta >= 1"
                        % (self.inum, delta))
@@ -224,43 +236,39 @@ class Inodes(object):
   def __init__(self, fs, inodes_datatext=None):
     self.fs = fs                # main filesystem
     self.krefcount = {}         # kernel inode reference counts
-    self._info = {}              # mapping from inum->Inode record
-    self._freed = Range()       # freed inode numbers for reuse
-    self._mortal = Range()      # inode numbers which are not hardlinks
+    self._allocated = Range()   # range of allocated inode numbers
+    self._inode_map = {}        # mapping from inum->Inode record,
+                                # for all inodes which have been accessed
+                                # or instantiated
     if inodes_datatext is None:
-      self._init_empty()
+      # initialise an empty Dir
+      self._hardlinks_dir, self._hardlinked = Dir('inodes'), Range()
     else:
-      self._hardlinked, self._hardlinks_dir = self._decode_inode_data(inodes_datatext)
+      # Access the inode information (a Range and a Dir).
+      # Return the Dir and update ._allocated.
+      self._hardlinks_dir, self._hardlinked = self._load_inode_data(inodes_datatext, self._allocated)
+    X("Inodes.__init__: _hardlinks=%s", self._hardlinked)
     self._lock = RLock()
 
-  def _init_empty(self):
-    self._hardlinked = Range()
-    self._hardlinks_dir = Dir('inodes')
-
-  def _decode_inode_data(self, idatatext):
+  def _load_inode_data(self, idatatext, allocated):
     ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
     '''
     XP("decode idatatext: %r", idatatext)
     idata = untexthexify(idatatext)
+    # load the allocated hardlinked inode values
     taken_data, offset1 = get_bsdata(idata)
     offset = 0
-    _hardlinked = Range()
+    hardlinked = Range()
     while offset < len(taken_data):
       start, offset = get_bs(taken_data, offset)
       end, offset = get_bs(taken_data, offset)
-      _hardlinked.add(start, end)
-    _hardlinked_dir, offset1 = decode_Dirent(idata, offset1)
-    X("_hardlinked_dir = %s %s", type(_hardlinked_dir), _hardlinked_dir)
-    if _hardlinked_dir is None:
-      error("invalid Dirent for _hardlinked_dir, inodes LOST")
-      self._init_empty()
+      allocated.add(start, end)
+      hardlinked.add(start, end)
+    # load the Dir containing the hardlinked Dirents
+    hardlinked_dir, offset1 = decode_Dirent(idata, offset1)
     if offset1 < len(idata):
       warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
-    # record the hardlinked inodes in the inode map
-    for inum_name, inum_E in _hardlinked_dir.items():
-      inum = int(inum_name)
-      self[inum] = inum_E, None
-    return _hardlinked, _hardlinked_dir
+    return hardlinked_dir, hardlinked
 
   @locked
   def encode(self):
@@ -272,36 +280,123 @@ class Inodes(object):
     # ... and append the Dirent.
     return put_bsdata(taken) + self._hardlinks_dir.encode()
 
-  def ipathelems(self, inum):
+  def _ipathelems(self, inum):
+    ''' Path to an inode's Dirent.
+    '''
+    # this works because all leading bytes have a high bit, avoiding
+    # collision with final bytes
     return [ str(b) for b in put_bs(inum) ]
 
-  def ipath(self, inum):
-    return '/'.join(self.ipathelems(inum))
+  def new(self, E):
+    ''' Allocate a new Inode for the supplied Dirent `E`; return the Inode.
+    '''
+    try:
+      Einum = E.inum
+    except AttributeError:
+      span0 = self._allocated.span0
+      X("Inodes.new: span0=%s", span0)
+      next_inum = span0.end
+      return self._add_Dirent(next_inum, E)
+    raise ValueError("%s: already has .inum=%d" % (E, Einum))
+
+  @locked
+  def _add_Dirent(self, inum, E):
+    if inum in self._allocated:
+      raise ValueError("inum %d already allocated", inum)
+    try:
+      E = self._inode_map[inum]
+    except KeyError:
+      X("_add_Dirent: add inum %d for Dirent %s", inum, E)
+      I = Inode(inum, E)
+      self._allocated.add(inum)
+      X("after adding inum %d, .allocated=%s", inum, self._allocated)
+      self._inode_map[inum] = I
+      return I
+    raise ValueError("inum %d already in _inode_map (but not in _allocated?)", inum)
+
+  def _get_hardlink_Dirent(self, inum):
+    ''' Retrieve the Dirent associated with `inum` from the hard link directory.
+        Raises KeyError if the lookup fails.
+    '''
+    D = self._hardlinks_dir
+    X("_get_hardlink_Dirent=%r", self._hardlinks_dir)
+    pathelems = self._ipathelems(inum)
+    lastelem = pathelems.pop()
+    for elem in pathelems:
+      D = D[elem]
+    return D[lastelem]
+
+  def _add_hardlink_Dirent(self, inum, E):
+    ''' Add the Dirent `E` to the hard link directory.
+    '''
+    if E.isdir:
+      raise RuntimeError("cannot save Dir to hard link tree: %s" % (E,))
+    D = self._hardlinks_dir
+    pathelems = self._ipathelems(inum)
+    lastelem = pathelems.pop()
+    for elem in pathelems:
+      try:
+        D = D.chdir[elem]
+      except KeyError:
+        D = D.mkdir(elem)
+    if elem in D:
+      raise RuntimeError("inum %d already in hard link dir", inum)
+    D[lastelem] = E
+
+  @locked
+  def inode(self, inum):
+    I = self._inode_map.get(inum)
+    if I is None:
+      # not in the cache, must be in the hardlink tree
+      E = self._get_hardlink_Dirent(inum)
+      I = Inode(inum, E)
+      self._inode_map[inum] = I
+    return I
+
+  __getitem__ = inode
 
   def __contains__(self, inum):
-    return inum in self._info
-
-  def __getitem__(self, inum):
-    return self._info[inum]
-
-  def __setitem__(self, inum, EP):
-    E, P = EP
-    info = self._info
-    if inum in self._mortal:
-      raise KeyError("inum %d already in _mortal list", inum)
-    if inum in self._hardlinked:
-      raise KeyError("inum %d already in _hardlinked list", inum)
-    I = info.get(inum)
-    if I is not None:
-      raise KeyError("inum %d already taken by %s, rejected %s", inum, I.E, E)
-    info[inum] = Inode(inum=inum, E=E, parentE=P, krefcount=0)
-    if E.ishardlink:
-      self._hardlinked.add(inum)
+    try:
+      I = self.inode[inum]
+    except KeyError:
+      return False
     else:
-      self._mortal.add(inum)
+      return True
 
-  def get(self, inum):
-    return self._info.get(inum)
+  def hardlink_for(self, E):
+    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
+    '''
+    if E.ishardlink:
+      raise RuntimeError("attempt to make hardlink for existing hardlink E=%s" % (E,))
+    if E.type != D_FILE_T:
+      raise ValueError("may not hardlink Dirents of type %s" % (E.type,))
+    # use the inode number of the source Dirent
+    inum = self.fs.E2i(E)
+    if inum in self._hardlinked:
+      error("make_hardlink: inum %d of %s already in hardlinked: %s",
+            inum, E, self._hardlinked)
+    self._add_hardlink_Dirent(inum, E)
+    self._hardlinked.add(inum)
+    H = HardlinkDirent.to_inum(inum, E.name)
+    self._inode_map[inum] = Inode(inum, E)
+    E.meta.nlink = 1
+    return Edst
+
+  @locked
+  def inum_for_Dirent(self, E):
+    ''' Allocate a new inode number for Dirent `E` and return it.
+    '''
+    allocated = self._allocated
+    inum = None
+    for span in allocated.spans():
+      if span.start >= 2:
+        inum = span.start - 1
+        break
+    if inum is None:
+      inum = self.allocated.end
+    self._add_Dirent(inum, E)
+    self.allocated.add(inum)
+    return inum
 
   @locked
   def dirent2(self, inum):
@@ -319,69 +414,6 @@ class Inodes(object):
     '''
     with Pfx("dirent(%d)", inum):
       return self[inum].E
-
-  @locked
-  def _allocate_free_inum(self):
-    ''' Allocate an unused inode number and return it.
-        Use the lowest inum from ._freed, otherwise choose one above
-        ._mortal and ._hardlinked.
-    '''
-    freed = self._freed
-    if freed:
-      inum = freed.start
-      freed -= inum
-    else:
-      inum = max( (1, self._mortal.end, self._hardlinked.end) )
-    I = self.get(inum)
-    if I is not None:
-      raise RuntimeError("allocated inode number %d, but already in inode cache: %s"
-                         % (inum, I))
-    if inum in self._mortal:
-      raise RuntimeError("allocated inode number %d, but already in mortal inode list (%s)"
-                         % (inum, self._mortal))
-    return inum
-
-  @locked
-  def allocate_mortal_inode(self, E):
-    ''' Allocate an ephemeral inode number to survive only until umount; return the inum.
-    '''
-    inum = self._allocate_free_inum()
-    self[inum] = E, None
-    return inum
-
-  @locked
-  def make_hardlink(self, E):
-    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
-    '''
-    if E.type != D_FILE_T:
-      raise ValueError("may not hardlink Dirents of type %s", E.type)
-    # use the inode number of the source Dirent
-    inum = self.fs.E2i(E)
-    if inum not in self._mortal:
-      error("make_hardlink: inum %d not in _mortal: E=%s", inum, E)
-    E.meta.nlink = 1
-    Edst = HardlinkDirent.to_inum(inum, E.name)
-    # note the inum in the _hardlinked Range, remove from the _mortal Range
-    # TODO: on umount, if nlinks <= 1, discard
-    # TODO: on umount, build hardlink Dir from scratch? maybe not
-    self._hardlinked.add(inum)
-    self._mortal.remove(inum)
-    # file the Dirent away in the _hardlinks_dir
-    D = self._hardlinks_dir
-    pathelems = self.ipathelems(inum)
-    for name in pathelems[:-1]:
-      if name not in D:
-        D = D.mkdir(name)
-      else:
-        D = D.chdir1(name)
-    name = pathelems[-1]
-    X("HARDLINKS FINAL NAME %r", name)
-    if name in D:
-      raise RuntimeError("inum %d already allocated: %s", inum, D[name])
-    D[name] = E
-    self[inum] = E, D
-    # return the new HardlinkDirent
-    return Edst
 
 class _StoreFS_core(object):
   ''' The core functionality supporting FUSE operations.
