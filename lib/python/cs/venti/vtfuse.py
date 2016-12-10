@@ -887,23 +887,21 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def lookup(self, parent_inode, name_b, ctx):
-      X("lookup(parent_inode=%r, name+b=%r,...)...", parent_inode, name_b)
       name = self._vt_str(name_b)
       # TODO: test for permission to search parent_inode
-      if parent_inode == self.mnt_inum:
-        P = self.mntE
-        PP = P
+      if parent_inode == self._vt_core.mnt_inum:
+        P = self._vt_core.mntE
       else:
         P = self._vt_core.i2E(parent_inode)
-        if name == '.':
-          E = P
-        elif name == '..':
-          E.parent
-        else:
-          try:
-            E = P[name]
-          except KeyError:
-            raise FuseOSError(errno.ENOENT)
+      if name == '.':
+        E = P
+      elif name == '..':
+        E.parent
+      else:
+        try:
+          E = P[name]
+        except KeyError:
+          raise FuseOSError(errno.ENOENT)
       return self._vt_EntryAttributes(E)
 
     @trace_method
