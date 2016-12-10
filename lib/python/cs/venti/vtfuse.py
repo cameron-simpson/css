@@ -469,7 +469,8 @@ class _StoreFS_core(object):
     self._file_handles = []
     self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
     # preassign inode 1, llfuse seems to presume it :-(
-    self._inodes[1] = (self.mntE, mntP)
+    self._inodes._add_Dirent(1, self.mntE)
+    X("StoreFS.__init__: _inodes[1]=%s", self._inodes[1])
     X("StoreFS.__init__ COMPLETE")
 
   def __str__(self):
@@ -531,20 +532,18 @@ class _StoreFS_core(object):
     E, P = self._namei2(path)
     return E
 
+  @locked
   def E2i(self, E):
     ''' Compute the inode number for a Dirent.
         HardlinkDirents have a persistent .inum mapping to the Meta['iref'] field.
         Others do not and keep a private ._inum, not preserved after umount.
     '''
-    if E.ishardlink:
+    try:
       inum = E.inum
-    else:
-      # allocate transient inum
-      try:
-        inum = E._inum
-      except AttributeError:
-        inum = self._inodes.allocate_mortal_inode(E)
-        E._inum = inum
+    except AttributeError:
+      I = self._inodes.new(E)
+      inum = I.inum
+      warning("E2i: allocated new Inode with inum %d", inum)
     return inum
 
   def i2E(self, inum):
