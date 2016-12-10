@@ -469,8 +469,9 @@ class _StoreFS_core(object):
     self._file_handles = []
     self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
     # preassign inode 1, llfuse seems to presume it :-(
-    self._inodes._add_Dirent(1, self.mntE)
-    X("StoreFS.__init__: _inodes[1]=%s", self._inodes[1])
+    self.mnt_inum = 1
+    self._inodes._add_Dirent(self.mnt_inum, self.mntE)
+    X("StoreFS.__init__: _inodes[%d]=%s", self.mnt_inum, self._inodes[self.mnt_inum])
     X("StoreFS.__init__ COMPLETE")
 
   def __str__(self):
@@ -886,19 +887,23 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def lookup(self, parent_inode, name_b, ctx):
-      X("lookup %r...", name_b)
+      X("lookup(parent_inode=%r, name+b=%r,...)...", parent_inode, name_b)
       name = self._vt_str(name_b)
       # TODO: test for permission to search parent_inode
-      P, PP = self._vt_core.i2EP(parent_inode)
-      if name == '.':
-        E = P
-      elif name == '..':
-        E = PP
+      if parent_inode == self.mnt_inum:
+        P = self.mntE
+        PP = P
       else:
-        try:
-          E = P[name]
-        except KeyError:
-          raise FuseOSError(errno.ENOENT)
+        P = self._vt_core.i2E(parent_inode)
+        if name == '.':
+          E = P
+        elif name == '..':
+          E.parent
+        else:
+          try:
+            E = P[name]
+          except KeyError:
+            raise FuseOSError(errno.ENOENT)
       return self._vt_EntryAttributes(E)
 
     @trace_method
