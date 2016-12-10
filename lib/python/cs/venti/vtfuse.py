@@ -820,7 +820,12 @@ if FUSE_CLASS == 'llfuse':
       try:
         xattr = meta.xattrs[xattr_name]
       except KeyError:
-        raise FuseOSError(errno.ENOATTR)
+        # bit of a hack: pretend all attributes exist, empty if missing
+        # this is essentially to shut up llfuse, which otherwise reports ENOATTR
+        # with a stack trace
+        xattr = b''
+        ##warning("getxattr(%s): not present on %s", xattr_name, E)
+        ##raise FuseOSError(errno.ENOATTR)
       return xattr
 
     @trace_method
