@@ -23,6 +23,7 @@ DISTINFO = {
 import sys
 from bisect import bisect_left
 from collections import namedtuple
+from cs.seq import first
 from cs.logutils import ifdebug, X, XP
 
 def overlap(span1, span2):
@@ -133,6 +134,12 @@ class Range(object):
     for span in self._spans:
       yield Span(*span)
 
+  @property
+  def span0(self):
+    ''' Return the first Span; raises IndexError if there are no spans.
+    '''
+    return first(self.spans())
+
   def _check(self):
     self._check_spans()
 
@@ -207,9 +214,7 @@ class Range(object):
       start, end = list(x)
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
-    if ndx >= len(_spans):
-      return False
-    if ndx > 0 and start < _spans[ndx].start:
+    if ndx > 0 and _spans[ndx-1].end > start:
       ndx -= 1
     elif ndx >= len(_spans):
       return False
