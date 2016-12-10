@@ -150,7 +150,8 @@ class FileHandle(O):
     self._lock = lock
 
   def __str__(self):
-    return "<FileHandle %s>" % (self.E,)
+    fhndx = getattr(self, 'fhndx', None)
+    return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
   def write(self, data, offset):
     X("FH.write(data=%r, offset=%d)", data, offset)
@@ -597,6 +598,7 @@ class _StoreFS_core(object):
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
+    FH.fhndx = fhndx
     XP("OPEN: allocated new _file_handles[%s] => %s", fhndx, FH)
     return fhndx
 
