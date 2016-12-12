@@ -382,7 +382,7 @@ class RecordingMeta(NS):
     return self.start_dt.isoformat(' ')
 
 class TVWiz_Header(RecordingMeta):
-  
+
   @property
   def start_unixtime(self):
     return (self.mjd - 40587) * DAY + self.start
@@ -391,6 +391,8 @@ class Enigma2Meta(RecordingMeta):
   pass
 
 def bytes0_to_str(bs0, encoding='utf8'):
+  ''' Decode a NUL terminated chunk of bytes into a string.
+  '''
   nulpos = bs0.find(0)
   if nulpos >= 0:
     bs0 = bs0[:nulpos]
@@ -663,31 +665,31 @@ class Enigma2(Recording):
                           comment=comment,
                          )
 
-    def ap(self):
-      ''' Read offsets and PTS information from a recording's .ap associated file.
-          Return a list of APInfo named tuples.
-      '''
-      path = self.appath
-      apdata = []
-      with Pfx("ap %r", path):
-        try:
-          with open(path, 'rb') as apfp:
-            while True:
-              data = apfp.read(16)
-              if not data:
-                break
-              if len(data) < 16:
-                warning("incomplete read (%d bytes) at offset %d",
-                        len(data), apfp.tell() - len(data))
-                break
-              offset, pts = struct.unpack('>QQ', data)
-              apdata.append(Enigma2.APInfo(offset, pts))
-        except OSError as e:
-          if e.errno == errno.ENOENT:
-            warning("cannot open: %s", e)
-          else:
-            raise
-        return apdata
+  def read_ap(self):
+    ''' Read offsets and PTS information from a recording's .ap associated file.
+        Return a list of APInfo named tuples.
+    '''
+    path = self.appath
+    apdata = []
+    with Pfx("read_ap %r", path):
+      try:
+        with open(path, 'rb') as apfp:
+          while True:
+            data = apfp.read(16)
+            if not data:
+              break
+            if len(data) < 16:
+              warning("incomplete read (%d bytes) at offset %d",
+                      len(data), apfp.tell() - len(data))
+              break
+            offset, pts = struct.unpack('>QQ', data)
+            apdata.append(Enigma2.APInfo(offset, pts))
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          warning("cannot open: %s", e)
+        else:
+          raise
+      return apdata
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
