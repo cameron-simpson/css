@@ -57,6 +57,8 @@ USAGE = '''Usage:
         Convert the video content of the named tvwiz directories to
         automatically named .mp4 files in the current directory.
         Most metadata are preserved.
+    %s meta pathnames...
+        Report metadata for the supplied pathnames.
     %s scan tvwizdirs...
         Scan the data structures of the named tvwiz directories.
     %s stat tvwizdirs...
@@ -114,7 +116,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
