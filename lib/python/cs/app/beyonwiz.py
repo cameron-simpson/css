@@ -600,6 +600,7 @@ class Enigma2(Recording):
     basis, ext = os.path.splitext(self.tspath)
     if ext != '.ts':
       warning("does not end with .ts: %r", self.tspath)
+    basis = os.path.basename(basis)
     ymd, hm, _, channel, _, title = basis.split(' ', 5)
     dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
     return title, dt, channel
