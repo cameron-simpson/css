@@ -14,7 +14,7 @@ from threading import Thread
 import time
 from cs.excutils import logexc
 from cs.inttypes import Flags
-from cs.threads import Lock, RLock, Channel, locked_property
+from cs.threads import Lock, RLock, Channel, locked, locked_property
 from cs.later import Later
 from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, AsynchState
@@ -414,6 +414,7 @@ class Target(Result):
   def mdebug(self, msg, *a):
     return self.maker.debug_make(msg, *a)
 
+  @locked
   def succeed(self):
     ''' Mark target as successfully made.
     '''
@@ -421,10 +422,17 @@ class Target(Result):
     self.failed = False
     self.result = True
 
-  def fail(self):
+  @locked
+  def fail(self, msg=None):
     ''' Mark Target as failed.
     '''
-    self.mdebug("FAILED")
+    if msg is None:
+      msg = "FAILED"
+    self.mdebug(msg)
+    if self.ready:
+      if self.result:
+        raise RuntimeError("%s.fail: already completed OK" % (self.name,))
+      return
     self.failed = True
     self.result = False
 
