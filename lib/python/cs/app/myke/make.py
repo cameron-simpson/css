@@ -554,13 +554,20 @@ class Target(Result):
     ''' Invoked after the initial prerequisites have been run.
         Compute out_of_date etc, then run _make_next.
     '''
-    with Pfx("%s: after prereqs", self.name):
+    with Pfx("%s: after prereqs (Ts=%s)", self.name, ",".join(str(T) for T in Ts)):
       self.out_of_date = False
+      # it is possible we may have been marked as failed already
+      # because that has immediate effect
+      if self.ready:
+        return
       for T in Ts:
         if not T.ready:
           raise RuntimeError("not ready")
         self._apply_prereq(T)
-      if not self.failed and (self.was_missing or self.out_of_date):
+      if self.failed:
+        warning("FAILED, make no more")
+        return
+      if self.was_missing or self.out_of_date:
         # proceed to normal make process
         self.Rs = []
         return self._make_next()
