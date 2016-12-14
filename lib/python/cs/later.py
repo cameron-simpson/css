@@ -913,7 +913,7 @@ class Later(MultiOpenMixin):
       self._busy.dec("Later._after")
     self._busy.inc("Later._after")
     L = self.open()
-    return after(LFs, R, submit_func)
+    return after(LFs, None, submit_func)
 
   @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
