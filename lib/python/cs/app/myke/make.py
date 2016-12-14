@@ -175,8 +175,14 @@ class Maker(MultiOpenMixin):
   def after(self, LFs, func, *a, **kw):
     ''' Submit a function to be run after the supplied LateFunctions `LFs`, return a Result instance for collection.
     '''
+    if not isinstance(LFs, list):
+      LFs = list(LFs)
     self.debug_make("after %s call %s(*%r, **%r)" % (LFs, func, a, kw))
-    return self._makeQ.after(LFs, None, func, *a, **kw)
+    R = Result("Maker.after(%s):%s"
+               % (",".join(str(LF) for LF in LFs),
+                  func))
+    self._makeQ.after(LFs, R, func, *a, **kw)
+    return R
 
   def make(self, targets):
     ''' Synchronous call to make targets in series.
