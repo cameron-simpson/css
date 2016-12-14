@@ -565,7 +565,6 @@ class Target(Result):
           raise RuntimeError("not ready")
         self._apply_prereq(T)
       if self.failed:
-        warning("FAILED, make no more")
         return
       if self.was_missing or self.out_of_date:
         # proceed to normal make process
@@ -628,7 +627,7 @@ class Target(Result):
         self.mdebug("no actions remaining")
 
       if Rs:
-        self.mdebug("tasks still to do, requeuing")
+        self.mdebug("tasks still to do, requeuing: Rs=%s", ",".join(str(_) for _ in Rs))
         self.maker.after(Rs, self._make_next)
       else:
         # all done, record success
@@ -658,7 +657,7 @@ class Action(O):
         Return a Result which returns the success or failure
         of the action.
     '''
-    R = Result()
+    R = Result(name="%s.action(%s)" % (target, self))
     ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
     return R
 
