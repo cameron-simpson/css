@@ -12,64 +12,6 @@ from cs.app.ffmpeg import MetaData as FFmpegMetaData
 from cs.logutils import warning, Pfx
 from cs.threads import locked_property
 
-class TnMovie(object):
-  ''' A class that knows about a modern Beyonwiz T2, T3 etc recording.
-  '''
-
-  def __init__(self, filename):
-    ''' Initialise with `filename`, the recording's .ts file.
-    '''
-    if not filename.endswith('.ts'):
-      raise ValueError('not a .ts file')
-    self.filename = filename
-
-  @property
-  def meta_filename(self):
-    return self.filename + '.meta'
-
-  @property
-  def cuts_filename(self):
-    return self.filename + '.cuts'
-
-  def metadata(self):
-    ''' Information about the recording.
-    '''
-    meta = {}
-    base, ext = os.path.splitext(os.path.basename(self.filename))
-    fields = base.split(' - ', 2)
-    if len(fields) != 3:
-      warning('cannot parse into "time - channel - program": %r', base)
-    else:
-      time_field, channel, title = fields
-      meta['channel'] = channel
-      meta['title'] = title
-      time_fields = time_field.split()
-      if ( len(time_fields) != 2
-        or not all(_.isdigit() for _ in time_fields)
-        or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
-         ):
-        warning('mailformed time field: %r', time_field)
-      else:
-        ymd, hhmm = time_fields
-        meta['date'] = '-'.join( (ymd[:4], ymd[4:6], ymd[6:8]) )
-        meta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
-    mfname = self.meta_filename
-    with Pfx(mfname):
-      with open(mfname) as mfp:
-        hdr = mfp.readline()
-        title2 = mfp.readline().strip()
-        if title2 and title2 != title:
-          warning('override file title')
-          meta['title_from_filename'] = title
-          meta['title'] = title2
-        synopsis = mfp.readline().strip()
-        if synopsis:
-          meta['synopsis'] = synopsis
-        start_time_unix = mfp.readline().strip()
-        if start_time_unix.isdigit():
-          meta['start_time_unix'] = int(start_time_unix)
-    return meta
-
 class Enigma2Meta(RecordingMeta):
   pass
 
@@ -136,6 +78,29 @@ class Enigma2(_Recording):
   @property
   def start_dt_iso(self):
     return self.metadata.start_dt_iso
+
+  def filename_metadata(self):
+    ''' Information about the recording inferred from the filename.
+    '''
+    meta = {}
+    base, ext = os.path.splitext(os.path.basename(self.filename))
+    fields = base.split(' - ', 2)
+    if len(fields) != 3:
+      warning('cannot parse into "time - channel - program": %r', base)
+    else:
+      time_field, channel, title = fields
+      meta['channel'] = channel
+      meta['title'] = title
+      time_fields = time_field.split()
+      if ( len(time_fields) != 2
+        or not all(_.isdigit() for _ in time_fields)
+        or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
+         ):
+        warning('mailformed time field: %r', time_field)
+      else:
+        ymd, hhmm = time_fields
+        meta['date'] = '-'.join( (ymd[:4], ymd[4:6], ymd[6:8]) )
+        meta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
 
   def path_parts(self):
     ''' The 3 components contributing to the .convertpath() method.
