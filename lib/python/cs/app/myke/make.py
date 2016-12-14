@@ -600,15 +600,20 @@ class Target(Result):
         If we complete without blocking, put True or False onto self.made.
         Otherwise queue a background function to block and resume.
     '''
-    with Pfx(self.name):
+    with Pfx("_make_next(%r)", self.name):
       if not self.was_missing and not self.out_of_date:
         raise RuntimeError("not missing or out of date!")
       # evaluate the result of Actions or Targets we have just waited for
       for R in self.Rs:
-        if not R.result:
-          self.fail()
-        elif isinstance(R, Target):
-          self._apply_prereq(R)
+        with Pfx("checking %s", R):
+          if isinstance(R, Target):
+            self._apply_prereq(R)
+          elif R.result:
+            pass
+          else:
+            self.fail()
+          if self.ready:
+            break
       if self.failed:
         # failure, cease make
         return
