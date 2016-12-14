@@ -21,7 +21,7 @@ try:
 except ImportError:
   from flufl.enum import Enum
 from cs.debug import Lock
-from cs.logutils import error, exception, warning, debug, D
+from cs.logutils import error, exception, warning, debug
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
@@ -191,7 +191,6 @@ class Result(O):
       self._result = result
       self._exc_info = exc_info
       if state != AsynchState.cancelled:
-        XP("SET %s to READY", self)
         self.state = AsynchState.ready
     else:
       if state == AsynchState.ready:
@@ -200,14 +199,9 @@ class Result(O):
         raise RuntimeError("REPEATED _COMPLETE of %s: result=%r, exc_info=%r" % (self,result, exc_info))
         return
       else:
-        if state == AsynchState.ready:
-          warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
-                  self, result, exc_info)
-          return
-        else:
-          raise RuntimeError("<%s>.state is not one of (AsynchState.cancelled, AsynchState.running, AsynchState.pending, AsynchState.ready): %r"
-                             % (self, state))
-        return
+        raise RuntimeError("<%s>.state is not one of (AsynchState.cancelled, AsynchState.running, AsynchState.pending, AsynchState.ready): %r"
+                           % (self, state))
+      return
     if self.final is not None:
       try:
         final_result = self.final()
