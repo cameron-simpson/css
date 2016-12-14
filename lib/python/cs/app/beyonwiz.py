@@ -594,6 +594,7 @@ class Enigma2(Recording):
     self.tspath = tspath
     self.metapath = tspath + '.meta'
     self.appath = tspath + '.ap'
+    self.cutpath = tspath + '.cuts'
     self.path_title, self.path_datetime, self.path_channel = self._parse_path()
 
   def _parse_path(self):
@@ -606,6 +607,7 @@ class Enigma2(Recording):
     return title, dt, channel
 
   APInfo = namedtuple('APInfo', 'offset pts')
+  CutInfo = namedtuple('CutInfo', 'pts type')
 
   @locked_property
   def meta(self):
@@ -693,6 +695,30 @@ class Enigma2(Recording):
         else:
           raise
       return apdata
+
+  def read_cuts(self):
+    path = self.cutpath
+    cuts = []
+    with Pfx("read_cuts %r", path):
+      try:
+        with open(path, 'rb') as cutfp:
+          while True:
+            data = cutfp.read(12)
+            if not data:
+              break
+            if len(data) < 12:
+              warning("incomplete read (%d bytes) at offset %d",
+                      len(data), cutfp.tell() - len(data))
+              break
+            pts, cut_type = struct.unpack('>QL', data)
+            cuts.append(Enigma2.CutInfo(pts, cut_type)
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          warning("cannot open: %s", e)
+        else:
+          raise
+    X("cuts = %r", cuts)
+    return cuts
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
