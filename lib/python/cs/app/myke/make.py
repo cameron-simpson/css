@@ -19,7 +19,7 @@ from cs.later import Later
 from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, AsynchState
 import cs.logutils
-from cs.logutils import Pfx, info, error, debug, D, X, XP
+from cs.logutils import Pfx, debug, info, warning, error, D, X, XP
 from cs.obj import O
 from cs.py.func import prop
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
@@ -702,7 +702,7 @@ class Action(O):
           for T in subTs:
             mdebug("submake \"%s\"", T)
             T.require()
-          target.maker.after(subTs, _act_after_make)
+          M.after(subTs, _act_after_make)
           return
 
         raise NotImplementedError("unsupported variant: %s" % (self.variant,))
