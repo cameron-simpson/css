@@ -424,6 +424,10 @@ class Target(Result):
     ''' Mark target as successfully made.
     '''
     self.mdebug("OK")
+    if self.ready:
+      if not self.result:
+        raise RuntimeError("%s.succeed: already completed FAILED" % (self.name,))
+      return
     self.failed = False
     self.result = True
 
