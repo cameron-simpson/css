@@ -391,11 +391,10 @@ class Target(Result):
           :make directive.
     '''
 
-    Result.__init__(self, lock=RLock())
+    Result.__init__(self, name=name, lock=RLock())
     self._O_omit.extend(['actions', 'maker', 'namespaces'])
     self.maker = maker
     self.context = context
-    self.name = name
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
