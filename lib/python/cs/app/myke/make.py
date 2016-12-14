@@ -522,20 +522,32 @@ class Target(Result):
   def require(self):
     ''' Require this Target to be made.
     '''
-    with self._lock:
-      if self.pending:
-        self.state = ASYNCH_RUNNING
-        self.was_missing = self.mtime is None
-        self.pending_actions = list(self.actions)
-        Ts = []
-        for Pname in self.prereqs:
-          T = self.maker[Pname]
-          Ts.append(T)
-          T.require()
-          # fire fail action immediately
-          T.notify(lambda T: self.fail() if not T.result else None)
-        # queue the first unit of work
-        self.maker.after(Ts, self._make_after_prereqs, Ts)
+    with Pfx("%r.require()", self.name):
+      with self._lock:
+        if self.state == AsynchState.pending:
+          # commence make of this Target
+          self.maker.target_active(self)
+          self.notify(self.maker.target_inactive)
+          self.state = AsynchState.running
+          self.was_missing = self.mtime is None
+          self.pending_actions = list(self.actions)
+          Ts = []
+          for Pname in self.prereqs:
+            T = self.maker[Pname]
+            Ts.append(T)
+            T.require()
+            # fire fail action immediately
+            def f(T):
+              if T.result:
+                pass
+              else:
+                self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+            T.notify(f)
+          # queue the first unit of work
+          if Ts:
+            self.maker.after(Ts, self._make_after_prereqs, Ts)
+          else:
+            self._make_after_prereqs(Ts)
 
   @logexc
   def _make_after_prereqs(self, Ts):
