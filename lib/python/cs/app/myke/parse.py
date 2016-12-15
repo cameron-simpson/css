@@ -15,6 +15,7 @@ from string import whitespace, digits
 import unittest
 from cs.lex import get_other_chars, get_white, get_identifier
 from cs.logutils import Pfx, error, warning, info, debug, exception, D
+from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
@@ -329,7 +330,7 @@ class Macro(object):
 
   __repr__ = __str__
 
-  @property
+  @prop
   def mexpr(self):
     if self._mexpr is None:
       self._mexpr, offset = parseMacroExpression(self.context, self.text)
