@@ -98,16 +98,19 @@ class _Recording(object):
       for buf in self.data():
         output.write(buf)
 
-  def convertpath(self, outfmt='mp4'):
+  def convertpath(self, outfmt='mp4', ):
+    ''' Generate the output filename
+    '''
     left, middle, right = self.path_parts()
     # fixed length of the path
-    fixed_len = len(self.metadata.start_dt_iso) \
-              + len(left) \
+    fixed_len = len(left) \
               + len(right) \
+              + len(self.metadata.start_dt_iso) \
               + len(outfmt) \
               + 7
     middle = middle[:255-fixed_len]
-    return '--'.join( (self.start_dt_iso, left, middle, right ) ) \
+    return '--'.join( (left, middle, right, self.start_dt_iso ) ) \
+               .lower() \
                .replace('/', '|') \
                .replace(' ', '-') \
                .replace('----', '--') \
