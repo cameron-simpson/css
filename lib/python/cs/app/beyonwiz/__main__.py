@@ -19,14 +19,12 @@ USAGE = '''Usage:
         the named output file (typically MP4, though he ffmpeg
         output format chosen is based on the extension). Most
         metadata are preserved.
-    %s header tvwizdirs...
-        Print header information from the named tvwiz directories.
-    %s mconvert tvwizdirs...
-        Convert the video content of the named tvwiz directories to
+    %s mconvert recording...
+        Convert the video content of the named recording to an
         automatically named .mp4 files in the current directory.
         Most metadata are preserved.
-    %s meta pathnames...
-        Report metadata for the supplied pathnames.
+    %s meta recording...
+        Report metadata for the supplied recordings.
     %s scan tvwizdirs...
         Scan the data structures of the named tvwiz directories.
     %s stat tvwizdirs...
@@ -38,7 +36,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -61,10 +59,6 @@ def main(argv):
           badopts = True
         if len(args) > 2:
           warning("extra arguments after output: %s", " ".join(args))
-          badopts = True
-      elif op == "header":
-        if len(args) < 1:
-          error("missing tvwizdirs")
           badopts = True
       elif op == "mconvert":
         if len(args) < 1:
@@ -106,12 +100,6 @@ def main(argv):
       srcpath, dstpath = args
       R = Recording(srcpath)
       xit = R.convert(dstpath)
-    elif op == "header":
-      for tvwizdir in args:
-        with Pfx(tvwizdir):
-          print(tvwizdir)
-          TV = TVWiz(tvwizdir)
-          print(repr(TV.header))
     elif op == "mconvert":
       for srcpath in args:
         with Pfx(srcpath):
