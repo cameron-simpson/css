@@ -109,13 +109,13 @@ class Enigma2(_Recording):
     M = self.metadata
     return M.title, '-'.join(M.tags), M.channel
 
-  def ffmpeg_metadata(self, format='mp4'):
+  def ffmpeg_metadata(self, outfmt='mp4'):
     M = self.metadata
     comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
               % (self.tspath, M.start_dt_iso)
     if M.tags:
       comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
-    return FFmpegMetaData(format,
+    return FFmpegMetaData(outfmt,
                           title=M.title,
                           show=M.title,
                           description=M.description,
