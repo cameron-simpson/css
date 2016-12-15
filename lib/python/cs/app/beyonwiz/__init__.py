@@ -98,36 +98,39 @@ class _Recording(object):
       for buf in self.data():
         output.write(buf)
 
-  def convertpath(self, format='mp4'):
+  def convertpath(self, outfmt='mp4', ):
+    ''' Generate the output filename
+    '''
     left, middle, right = self.path_parts()
     # fixed length of the path
-    fixed_len = len(self.metadata.start_dt_iso) \
-              + len(left) \
+    fixed_len = len(left) \
               + len(right) \
-              + len(format) \
+              + len(self.metadata.start_dt_iso) \
+              + len(outfmt) \
               + 7
     middle = middle[:255-fixed_len]
-    return '--'.join( (self.start_dt_iso, left, middle, right ) ) \
+    return '--'.join( (left, middle, right, self.start_dt_iso ) ) \
+               .lower() \
                .replace('/', '|') \
                .replace(' ', '-') \
                .replace('----', '--') \
-           + '.' + format
+           + '.' + outfmt
 
-  def convert(self, outpath, format=None):
-    ''' Transcode video to `outpath` in FFMPEG `format`.
+  def convert(self, outpath, outfmt=None):
+    ''' Transcode video to `outpath` in FFMPEG `outfmt`.
     '''
     if os.path.exists(outpath):
       raise ValueError("outpath exists")
-    if format is None:
+    if outfmt is None:
       _, ext = os.path.splitext(outpath)
       if not ext:
-        raise ValueError("can't infer format from outpath, no extension")
-      format = ext[1:]
+        raise ValueError("can't infer output format from outpath, no extension")
+      outfmt = ext[1:]
     # prevent output path looking like option or URL
     if not os.path.isabs(outpath):
       outpath = os.path.join('.', outpath)
-    ffmeta = self.ffmpeg_metadata(format)
-    P, ffargv = ffconvert(None, 'mpegts', outpath, format, ffmeta)
+    ffmeta = self.ffmpeg_metadata(outfmt)
+    P, ffargv = ffconvert(None, 'mpegts', outpath, outfmt, ffmeta)
     info("running %r", ffargv)
     self.copyto(P.stdin)
     P.stdin.close()

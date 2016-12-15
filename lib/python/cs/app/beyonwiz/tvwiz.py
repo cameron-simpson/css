@@ -200,9 +200,9 @@ class TVWiz(_Recording):
     M = self.metadata
     return M.evtName, M.episode, M.svcName
 
-  def ffmpeg_metadata(self, format='mp4'):
+  def ffmpeg_metadata(self, outfmt='mp4'):
     H = self.header
-    return FFmpegMetaData(format,
+    return FFmpegMetaData(outfmt,
                           title=( H.evtName
                                   if len(H.episode) == 0
                                   else '%s: %s' % (H.evtName, H.episode)
