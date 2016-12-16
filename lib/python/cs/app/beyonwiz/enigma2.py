@@ -38,9 +38,6 @@ class Enigma2(_Recording):
     dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
     return title, dt, channel
 
-  APInfo = namedtuple('APInfo', 'offset pts')
-  CutInfo = namedtuple('CutInfo', 'pts type')
-
   @locked_property
   def metadata(self):
     ''' Return the meta information from a recording's .meta associated file.
@@ -124,6 +121,9 @@ class Enigma2(_Recording):
                           comment=comment,
                          )
 
+  APInfo = namedtuple('APInfo', 'pts offset')
+  CutInfo = namedtuple('CutInfo', 'pts type')
+
   def read_ap(self):
     ''' Read offsets and PTS information from a recording's .ap associated file.
         Return a list of APInfo named tuples.
@@ -141,8 +141,8 @@ class Enigma2(_Recording):
               warning("incomplete read (%d bytes) at offset %d",
                       len(data), apfp.tell() - len(data))
               break
-            offset, pts = struct.unpack('>QQ', data)
-            apdata.append(Enigma2.APInfo(offset, pts))
+            pts, offset = struct.unpack('>QQ', data)
+            apdata.append(Enigma2.APInfo(pts, offset))
       except OSError as e:
         if e.errno == errno.ENOENT:
           warning("cannot open: %s", e)
