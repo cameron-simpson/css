@@ -51,10 +51,12 @@ class RecordingMeta(NS):
   '''
 
   def as_dict(self):
-    return dict(self.__dict__)
+    d = dict(self.__dict__)
+    d["start_dt_iso"] = self.start_dt_iso
+    return d
 
-  def as_json(self):
-    return MetaJSONEncoder().encode(self.as_dict())
+  def as_json(self, indent=None):
+    return MetaJSONEncoder(indent=indent).encode(self.as_dict())
 
   @property
   def start_dt(self):
