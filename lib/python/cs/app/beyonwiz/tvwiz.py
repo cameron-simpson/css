@@ -84,6 +84,7 @@ class TVWiz(_Recording):
     _Recording.__init__(self)
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
+    self.headerpath = os.path.join(self.dirpath, TVHDR)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -102,10 +103,6 @@ class TVWiz(_Recording):
     to_parse = daytext + timetext
     dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
-
-  @property
-  def header_path(self):
-    return os.path.join(self.dirpath, TVHDR)
 
   @staticmethod
   def parse_header_data(data, offset=0):
@@ -140,7 +137,7 @@ class TVWiz(_Recording):
               playtime=last*10+sec, lastOff=lastOff)
 
   def read_header(self):
-    with open(self.header_path, "rb") as hfp:
+    with open(self.headerpath, "rb") as hfp:
       data = hfp.read()
     return self.parse_header_data(data)
 
