@@ -26,7 +26,7 @@ import os.path
 from threading import Lock
 from types import SimpleNamespace as NS
 from cs.app.ffmpeg import convert as ffconvert
-from cs.logutils import info
+from cs.logutils import info, warning, error
 
 # UNUSED
 def trailing_nul(bs):
