@@ -25,8 +25,8 @@ USAGE = '''Usage:
         Most metadata are preserved.
     %s meta recording...
         Report metadata for the supplied recordings.
-    %s scan tvwizdirs...
-        Scan the data structures of the named tvwiz directories.
+    %s scan recording...
+        Scan the data structures of the supplied recordings.
     %s stat tvwizdirs...
         Print some summary infomation for the named tvwiz directories.
     %s test
@@ -154,11 +154,12 @@ def main(argv):
           print("    final chunk of %d" % chunkSize)
         print("  total %d" % total)
     elif op == "stat":
-      for arg in args:
-        TV = TVWiz(arg)
-        H = TV.header
-        print(arg)
-        print("  %s %s: %s, %s" % (H.svcName, H.start_dt.isoformat(' '), H.evtName, H.episode))
+      for pathname in args:
+        R = Recording(pathname)
+        print(pathname)
+        for json_line in R.metadata.as_json(indent="  ").split("\n"):
+          if json_line:
+            print(" ", json_line)
     elif op == "test":
       host = args.pop(0)
       print("host =", host, "args =", args)
