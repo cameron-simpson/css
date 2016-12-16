@@ -4,15 +4,15 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
-from . import _Recording, RecordingMeta
+from . import _Recording, RecordingMetaData
 import os.path
 from collections import namedtuple
 import datetime
 from cs.app.ffmpeg import MetaData as FFmpegMetaData
-from cs.logutils import warning, Pfx
+from cs.logutils import warning, Pfx, X
 from cs.threads import locked_property
 
-class Enigma2Meta(RecordingMeta):
+class Enigma2MetaData(RecordingMetaData):
   pass
 
 class Enigma2(_Recording):
@@ -38,22 +38,9 @@ class Enigma2(_Recording):
     dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
     return title, dt, channel
 
-  @locked_property
-  def metadata(self):
-    ''' Return the meta information from a recording's .meta associated file.
-    '''
+  def read_meta(self):
     path = self.metapath
-    data = {
-        'service_ref': None,
-        'title': self.path_title,
-        'description': None,
-        'channel': self.path_channel,
-        # start time of recording as a UNIX time
-        'start_unixtime': None,
-        'tags': set(),
-        # length in PTS units (1/9000s)
-        'length_pts': None,
-        'filesize': None,
+    data = {'tags': set()
       }
     with Pfx("meta %r", path):
       try:
@@ -70,7 +57,26 @@ class Enigma2(_Recording):
           warning("cannot open: %s", e)
         else:
           raise
-      return Enigma2Meta(**data)
+    return Enigma2MetaData(**data)
+
+  @locked_property
+  def metadata(self):
+    ''' Return the meta information from a recording's .meta associated file.
+    '''
+    M = self.read_meta()
+    mdata = M._asdict()
+    mdata['pathname'] = self.metapath
+    data = {
+        'channel': self.path_channel,
+        'title': self.path_title,
+        'description': M.description,
+        'start_unixtime': M.start_unixtime,
+        'tags': set(),
+        'sources': {
+          'meta': mdata,
+        }
+      }
+    return Enigma2MetaData(**data)
   
   @property
   def start_dt_iso(self):

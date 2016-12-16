@@ -128,7 +128,7 @@ def main(argv):
       for filename in args:
         with Pfx(filename):
           R = Recording(filename)
-          print(filename, R.metadata.as_json(), sep='\t')
+          print(filename, R.metadata._asjson(), sep='\t')
     elif op == "scan":
       for arg in args:
         print(arg)
@@ -157,7 +157,7 @@ def main(argv):
       for pathname in args:
         R = Recording(pathname)
         print(pathname)
-        for json_line in R.metadata.as_json(indent="  ").split("\n"):
+        for json_line in R.metadata._asjson(indent="  ").split("\n"):
           if json_line:
             print(" ", json_line)
     elif op == "test":

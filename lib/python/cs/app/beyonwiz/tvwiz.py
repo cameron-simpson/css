@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from . import _Recording
+from . import _Recording, RecordingMetaData
 
 # constants related to headers
 #
@@ -72,11 +72,12 @@ def unrle(data, fmt, offset=0):
   offset += len(subdata)
   return subdata, offset
 
-class TVWiz_Header(RecordingMeta):
+class TVWizMetaData(RecordingMetaData):
 
   @property
   def start_unixtime(self):
-    return (self.mjd - 40587) * DAY + self.start
+    H = self.sources['header']
+    return (H['mjd'] - 40587) * DAY + H['start']
 
 class TVWiz(_Recording):
 
@@ -143,9 +144,21 @@ class TVWiz(_Recording):
 
   @locked_property
   def metadata(self):
-    return self.read_header()
-
-  meta = header
+    H = self.read_header()
+    hd = H._asdict()
+    hdata['pathname'] = self.headerpath
+    data = {
+        'channel': H.channel,
+        'title': H.evtName,
+        'episode': H.episode,
+        'synopsys': H.synopsis,
+        'start_unixtime':  H.start,
+        'tags': set(),
+        'sources': {
+          'header': hdata,
+        }
+      }
+    return TVWizMetaData(**data)
 
   @staticmethod
   def tvwiz_parse_trunc(fp):

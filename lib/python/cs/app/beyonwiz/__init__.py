@@ -46,17 +46,17 @@ class MetaJSONEncoder(json.JSONEncoder):
       return sorted(o)
     return json.JSONEncoder.default(self, o)
 
-class RecordingMeta(NS):
+class RecordingMetaData(NS):
   ''' Base class for recording metadata.
   '''
 
-  def as_dict(self):
+  def _asdict(self):
     d = dict(self.__dict__)
     d["start_dt_iso"] = self.start_dt_iso
     return d
 
-  def as_json(self, indent=None):
-    return MetaJSONEncoder(indent=indent).encode(self.as_dict())
+  def _asjson(self, indent=None):
+    return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
   @property
   def start_dt(self):
