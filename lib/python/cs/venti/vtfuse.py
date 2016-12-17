@@ -154,7 +154,6 @@ class FileHandle(O):
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
   def write(self, data, offset):
-    X("FH.write(data=%r, offset=%d)", data, offset)
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
@@ -248,7 +247,6 @@ class Inodes(object):
       # Access the inode information (a Range and a Dir).
       # Return the Dir and update ._allocated.
       self._hardlinks_dir, self._hardlinked = self._load_inode_data(inodes_datatext, self._allocated)
-    X("Inodes.__init__: _hardlinks=%s", self._hardlinked)
     self._lock = RLock()
 
   def _load_inode_data(self, idatatext, allocated):
@@ -295,7 +293,6 @@ class Inodes(object):
       Einum = E.inum
     except AttributeError:
       span0 = self._allocated.span0
-      X("Inodes.new: span0=%s", span0)
       next_inum = span0.end
       return self._add_Dirent(next_inum, E)
     raise ValueError("%s: already has .inum=%d" % (E, Einum))
@@ -307,10 +304,8 @@ class Inodes(object):
     try:
       E = self._inode_map[inum]
     except KeyError:
-      X("_add_Dirent: add inum %d for Dirent %s", inum, E)
       I = Inode(inum, E)
       self._allocated.add(inum)
-      X("after adding inum %d, .allocated=%s", inum, self._allocated)
       self._inode_map[inum] = I
       return I
     raise ValueError("inum %d already in _inode_map (but not in _allocated?)", inum)
@@ -320,7 +315,6 @@ class Inodes(object):
         Raises KeyError if the lookup fails.
     '''
     D = self._hardlinks_dir
-    X("_get_hardlink_Dirent=%r", self._hardlinks_dir)
     pathelems = self._ipathelems(inum)
     lastelem = pathelems.pop()
     for elem in pathelems:
@@ -424,7 +418,6 @@ class _StoreFS_core(object):
         `syncfp`: if not None, a file to which to write sync lines
         `subpath`: relative path to mount Dir
     '''
-    X("StoreFS.__init__(...)...")
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
@@ -463,8 +456,6 @@ class _StoreFS_core(object):
     # preassign inode 1, llfuse seems to presume it :-(
     self.mnt_inum = 1
     self._inodes._add_Dirent(self.mnt_inum, self.mntE)
-    X("StoreFS.__init__: _inodes[%d]=%s", self.mnt_inum, self._inodes[self.mnt_inum])
-    X("StoreFS.__init__ COMPLETE")
 
   def __str__(self):
     if self.subpath:
@@ -477,7 +468,6 @@ class _StoreFS_core(object):
 
   @trace_method
   def _sync(self):
-    X("pid %d: _sync ...", os.getpid())
     if defaults.S is None:
       raise RuntimeError("RUNTIME: defaults.S is None!")
     if self.syncfp is not None:
@@ -531,7 +521,6 @@ class _StoreFS_core(object):
     except AttributeError:
       I = self._inodes.new(E)
       inum = I.inum
-      warning("E2i: allocated new Inode with inum %d", inum)
     return inum
 
   def i2E(self, inum):
@@ -561,7 +550,6 @@ class _StoreFS_core(object):
     elif not flags & O_CREAT:
       raise FuseOSError(errno.ENOENT)
     else:
-      X("create %r", name)
       E = FileDirent(name)
       P[name] = E
     return self.open(E, flags, ctx)
@@ -577,15 +565,12 @@ class _StoreFS_core(object):
           for_read, for_write, for_append)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     inum = self.E2i(E)
-    X("open: inum=%s", inum)
     I = self._inodes[inum]
-    X("open: inode=%s", I)
     I += 1
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
     FH.fhndx = fhndx
-    XP("OPEN: allocated new _file_handles[%s] => %s", fhndx, FH)
     return fhndx
 
   def make_hardlink(self, E):
@@ -661,17 +646,17 @@ if FUSE_CLASS == 'llfuse':
       self.log = self._vt_core.log
       self.logQ = self._vt_core.logQ
       llf_opts = set(llfuse.default_options)
-      X("initial llf_opts from llfuse.default_options = %s", llf_opts)
       # Not available on OSX. TODO: detect 'darwin' and make conditional
-      X("drop 'nonempty' option, not available on OSX")
-      llf_opts.discard('nonempty')
+      if 'nonempty' in llf_opts:
+        warning("llf_opts=%r: drop 'nonempty' option, not available on OSX"
+                sorted(llf_opts))
+        llf_opts.discard('nonempty')
       if options is not None:
         for opt in options:
           if opt.startswith('-'):
             llf_opts.discard(opt[1:])
           else:
             llf_opts.add(opt)
-      X("final llf_opts = %s", llf_opts)
       self._vt_llf_opts = llf_opts
 
     # debugging aid
@@ -689,13 +674,9 @@ if FUSE_CLASS == 'llfuse':
       ''' Run the filesystem once.
       '''
       with self._vt_core.S:
-        X("llfuse.init(mnt=%r, %r)", mnt, self._vt_llf_opts)
         llfuse.init(self, mnt, self._vt_llf_opts)
-        X("llfuse.main...")
         llfuse.main()
-        X("llfuse.close...")
         llfuse.close()
-        X("llfuse.close DONE, leaving _VT_RUNFUSE")
 
     def _vt_i2E(self, inode):
       try:
@@ -763,7 +744,6 @@ if FUSE_CLASS == 'llfuse':
     def create(self, parent_inode, name_b, mode, flags, ctx):
       ''' Create a new file and open it. Return file handle index and EntryAttributes.
       '''
-      X("create: name_b=%r ...", name_b)
       name = self._vt_str(name_b)
       P = self._vt_i2E(parent_inode)
       if name in P:
@@ -953,7 +933,6 @@ if FUSE_CLASS == 'llfuse':
     @with_S
     def opendir(self, inode, ctx):
       # TODO: check for permission to read
-      X("opendir(inode=%s, ctx=%s)", inode, ctx)
       class _OpenDir:
         ''' An "open" Dir: keeps a list of the names from open time
             and a reference to the Dir so that it can validate the names
@@ -987,7 +966,6 @@ if FUSE_CLASS == 'llfuse':
     @with_S
     def readdir(self, fhndx, off):
       # TODO: if rootdir, generate '..' for parent of mount
-      X("readdir(fhndx=%d, off=%d)", fhndx, off)
       OD = self._vt_core._fh(fhndx)
       def entries():
         o = off
