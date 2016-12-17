@@ -563,14 +563,11 @@ class Dir(_Dirent):
                         for name in names
                         if name != '.' and name != '..'
                       )
-      # TODO: if len(data) >= 16384
+      # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self.changed = False
-      ##warning("Dir.block: computed Block %s", B)
-      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
