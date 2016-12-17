@@ -28,7 +28,7 @@ import traceback
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
+from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, Pfx, PrePfx, ifdebug, X
 from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.timeutils import sleep
