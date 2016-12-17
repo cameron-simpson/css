@@ -82,7 +82,7 @@ class TVWizMetaData(RecordingMetaData):
 class TVWiz(_Recording):
 
   def __init__(self, wizdir):
-    _Recording.__init__(self)
+    _Recording.__init__(self, wizdir)
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
     self.headerpath = os.path.join(self.dirpath, TVHDR)
@@ -205,22 +205,3 @@ class TVWiz(_Recording):
           size -= len(buf)
       if lastFileNum is not None:
         fp.close()
-
-  def path_parts(self):
-    M = self.metadata
-    return M.evtName, M.episode, M.svcName
-
-  def ffmpeg_metadata(self, outfmt='mp4'):
-    H = self.header
-    return FFmpegMetaData(outfmt,
-                          title=( H.evtName
-                                  if len(H.episode) == 0
-                                  else '%s: %s' % (H.evtName, H.episode)
-                                ),
-                          show=H.evtName,
-                          episode_id=H.episode,
-                          synopsis=H.synopsis,
-                          network=H.svcName,
-                          comment='Transcoded from %r using ffmpeg. Recording date %s.'
-                                  % (self.dirpath, H.start_dt_iso),
-                         )

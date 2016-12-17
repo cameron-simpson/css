@@ -25,7 +25,7 @@ import json
 import os.path
 from threading import Lock
 from types import SimpleNamespace as NS
-from cs.app.ffmpeg import convert as ffconvert
+from cs.app.ffmpeg import convert as ffconvert, MetaData as FFmpegMetaData
 from cs.logutils import info, warning, error
 
 # UNUSED
@@ -44,6 +44,8 @@ class MetaJSONEncoder(json.JSONEncoder):
   def default(self, o):
     if isinstance(o, set):
       return sorted(o)
+    if isinstance(o, datetime.datetime):
+      return o.isoformat(' ')
     return json.JSONEncoder.default(self, o)
 
 class RecordingMetaData(NS):
@@ -85,7 +87,8 @@ class _Recording(object):
   ''' Base class for video recordings.
   '''
 
-  def __init__(self):
+  def __init__(self, path):
+    self.path = path
     self._lock = Lock()
 
   def copyto(self, output):
@@ -99,6 +102,17 @@ class _Recording(object):
     else:
       for buf in self.data():
         output.write(buf)
+
+  def path_parts(self):
+    ''' The 3 components contributing to the .convertpath() method.
+        The middle component may be trimmed to fit into a legal filename.
+    '''
+    M = self.metadata
+    title = '--'.join([M.title, str(M.episode)]) if M.episode else M.title
+    return ( title,
+             '-'.join(sorted(M.tags)),
+             M.channel
+           )
 
   def convertpath(self, outfmt='mp4', ):
     ''' Generate the output filename
@@ -140,3 +154,21 @@ class _Recording(object):
     if xit != 0:
       warning("ffmpeg failed, exit status %d", xit)
     return xit
+
+  def ffmpeg_metadata(self, outfmt='mp4'):
+    M = self.metadata
+    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
+              % (self.path, M.start_dt_iso)
+    if M.tags:
+      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
+    return FFmpegMetaData(outfmt,
+                          title=( '%s: %s' % (M.title, M.episode)
+                                  if M.episode
+                                  else M.title
+                                ),
+                          show=M.title,
+                          episode_id=M.episode,
+                          synopsis=M.description,
+                          network=M.channel,
+                          comment=comment,
+                         )

@@ -8,7 +8,6 @@ from . import _Recording, RecordingMetaData
 import os.path
 from collections import namedtuple
 import datetime
-from cs.app.ffmpeg import MetaData as FFmpegMetaData
 from cs.logutils import warning, Pfx, X
 from cs.threads import locked_property
 
@@ -22,25 +21,17 @@ class Enigma2(_Recording):
   '''
 
   def __init__(self, tspath):
-    _Recording.__init__(self)
+    _Recording.__init__(self, tspath)
     self.tspath = tspath
     self.metapath = tspath + '.meta'
     self.appath = tspath + '.ap'
     self.cutpath = tspath + '.cuts'
-    self.path_title, self.path_datetime, self.path_channel = self._parse_path()
-
-  def _parse_path(self):
-    basis, ext = os.path.splitext(self.tspath)
-    if ext != '.ts':
-      warning("does not end with .ts: %r", self.tspath)
-    basis = os.path.basename(basis)
-    ymd, hm, _, channel, _, title = basis.split(' ', 5)
-    dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
-    return title, dt, channel
 
   def read_meta(self):
     path = self.metapath
-    data = {'tags': set()
+    data = {
+        'pathname': path,
+        'tags': set(),
       }
     with Pfx("meta %r", path):
       try:
@@ -65,14 +56,16 @@ class Enigma2(_Recording):
     '''
     M = self.read_meta()
     mdata = M._asdict()
-    mdata['pathname'] = self.metapath
+    fdata = self.filename_metadata()
     data = {
-        'channel': self.path_channel,
-        'title': self.path_title,
+        'channel': fdata['channel'],
+        'title': M.title,
+        'episode': None,
         'description': M.description,
         'start_unixtime': M.start_unixtime,
         'tags': set(),
         'sources': {
+          'filename': fdata,
           'meta': mdata,
         }
       }
@@ -85,15 +78,16 @@ class Enigma2(_Recording):
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.
     '''
-    meta = {}
-    base, ext = os.path.splitext(os.path.basename(self.filename))
+    path = self.tspath
+    fmeta = {'pathname': path}
+    base, ext = os.path.splitext(os.path.basename(path))
     fields = base.split(' - ', 2)
     if len(fields) != 3:
       warning('cannot parse into "time - channel - program": %r', base)
     else:
       time_field, channel, title = fields
-      meta['channel'] = channel
-      meta['title'] = title
+      fmeta['channel'] = channel
+      fmeta['title'] = title
       time_fields = time_field.split()
       if ( len(time_fields) != 2
         or not all(_.isdigit() for _ in time_fields)
@@ -102,30 +96,18 @@ class Enigma2(_Recording):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
-        meta['date'] = '-'.join( (ymd[:4], ymd[4:6], ymd[6:8]) )
-        meta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+        fmeta['datetime'] = datetime.datetime.strptime(ymd + hhmm, '%Y%m%d%H%M')
+        fmeta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+    return fmeta
 
-  def path_parts(self):
-    ''' The 3 components contributing to the .convertpath() method.
-        The middle component may be trimmed to fit into a legal filename.
-    '''
-    M = self.metadata
-    return M.title, '-'.join(M.tags), M.channel
-
-  def ffmpeg_metadata(self, outfmt='mp4'):
-    M = self.metadata
-    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
-              % (self.tspath, M.start_dt_iso)
-    if M.tags:
-      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
-    return FFmpegMetaData(outfmt,
-                          title=M.title,
-                          show=M.title,
-                          description=M.description,
-                          synopsis=M.description,
-                          network=M.channel,
-                          comment=comment,
-                         )
+  def _parse_path(self):
+    basis, ext = os.path.splitext(self.tspath)
+    if ext != '.ts':
+      warning("does not end with .ts: %r", self.tspath)
+    basis = os.path.basename(basis)
+    ymd, hm, _, channel, _, title = basis.split(' ', 5)
+    dt = datetime.datetime.strptime(ymd + hm, '%Y%m%d%H%M')
+    return title, dt, channel
 
   APInfo = namedtuple('APInfo', 'pts offset')
   CutInfo = namedtuple('CutInfo', 'pts type')
