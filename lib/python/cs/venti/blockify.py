@@ -16,6 +16,7 @@ MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded
 def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
   '''
+  # obtain stream of full indirect blocks from `blocks`
   blocks = indirect_blocks(blocks)
 
   # Fetch the first two indirect blocks from the generator.
