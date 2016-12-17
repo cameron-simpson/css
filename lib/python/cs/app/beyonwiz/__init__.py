@@ -124,13 +124,17 @@ class _Recording(object):
               + len(self.metadata.start_dt_iso) \
               + len(outfmt) \
               + 7
-    middle = middle[:255-fixed_len]
-    return '--'.join( (left, middle, right, self.start_dt_iso ) ) \
+    filename = '--'.join( (left,
+                           middle,
+                           right,
+                           self.start_dt_iso,
+                           self.metadata.description ) ) \
                .lower() \
                .replace('/', '|') \
                .replace(' ', '-') \
-               .replace('----', '--') \
-           + '.' + outfmt
+               .replace('----', '--')
+    filename = filename[:255 - (len(outfmt) + 1)]
+    return filename + '.' + outfmt
 
   def convert(self, outpath, outfmt=None):
     ''' Transcode video to `outpath` in FFMPEG `outfmt`.
