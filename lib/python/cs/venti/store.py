@@ -325,18 +325,21 @@ class MappingStore(BasicStoreSync):
 
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
+      mapping = self.mapping
       h = self.hash(data)
-      if h not in self.mapping:
-        self.mapping[h] = data
-      elif False:
-        with Pfx("EXISTING HASH"):
-          try:
-            data2 = self.mapping[h]
-          except Exception as e:
-            error("fetch FAILED: %s", e)
-          else:
-            if data != data2:
-              warning("data mismatch: .add data=%r, Store data=%r", data, data2)
+      if h not in mapping:
+        mapping[h] = data
+      else:
+        X("%s.add: hashcode %s already stored", self, h)
+        if False:
+          with Pfx("EXISTING HASH"):
+            try:
+              data2 = mapping[h]
+            except Exception as e:
+              error("fetch FAILED: %s", e)
+            else:
+              if data != data2:
+                warning("data mismatch: .add data=%r, Store data=%r", data, data2)
       return h
 
   def get(self, h, default=None):

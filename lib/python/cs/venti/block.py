@@ -587,7 +587,10 @@ class _SubBlock(_Block):
                         ))
 
   def __getitem__(self, index):
-    # TODO: what about slices?
+    if isinstance(index, slice):
+      return self.data[index]
+    if index < 0 or index >= self.span:
+      raise IndexError("index %d outside span %d" % (index, self.span))
     return self._superblock[self._offset+index]
 
 def chunksOf(B, start, stop=None):
