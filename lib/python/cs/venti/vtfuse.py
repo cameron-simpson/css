@@ -7,7 +7,7 @@
 
 from functools import partial
 from collections import namedtuple
-from logging import getLogger, FileHandler, Formatter
+from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFormatter
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
@@ -69,8 +69,8 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
-  handler = FileHandler(LOGGER_FILENAME)
-  formatter = Formatter(DEFAULT_BASE_FORMAT)
+  handler = LogFileHandler(LOGGER_FILENAME)
+  formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   handler.setFormatter(formatter)
   log.addHandler(handler)
   FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
@@ -892,6 +892,7 @@ if FUSE_CLASS == 'llfuse':
         try:
           E = P[name]
         except KeyError:
+          ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
           raise FuseOSError(errno.ENOENT)
       return self._vt_EntryAttributes(E)
 
