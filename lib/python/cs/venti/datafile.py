@@ -198,6 +198,7 @@ class DataFile(MultiOpenMixin):
     with self._lock:
       if not self.appending:
         self.appending = True
+        fp.flush()  # not necessary?
         fp.seek(0, SEEK_END)
       return write_chunk(fp, data, no_compress=no_compress)
 
@@ -342,7 +343,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
     '''
-    X("ENTER MONITOR")
     filemap = self._filemap
     indexQ = self._indexQ
     while not self._monitor_halt:
@@ -402,7 +402,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           if advanced:
             self._save_state()
       sleep(1)
-    X("EXIT MONITOR")
 
   def localpathto(self, rpath):
     return joinpath(self.statedirpath, rpath)
