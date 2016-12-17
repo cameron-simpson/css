@@ -54,6 +54,11 @@ def main(argv):
                 error('unrecognised subop')
                 badopts = True
         elif op == 'proxy.pac':
+          if argv and argv[0] == '-v':
+            argv.pop(0)
+            verbose = True
+          else:
+            verbose = False
           if argv:
             error('extra arguments: %s', ' '.join(argv))
             badopts = True
@@ -93,7 +98,7 @@ def main(argv):
       if subop == 'backends':
         return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
     if op == 'proxy.pac':
-      return cmd_proxy_pac(proxies)
+      return cmd_proxy_pac(proxies, verbose)
     if op == 'squid':
       if subop == 'acls':
         return cmd_squid_acls(proxies, proxy_name)
@@ -115,8 +120,8 @@ def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
 def haproxy_backend_name(proxy_names):
   return '__'.join(sorted(proxy_names))
 
-def cmd_proxy_pac(proxies):
-  for line in proxies.proxy_pac():
+def cmd_proxy_pac(proxies, verbose):
+  for line in proxies.proxy_pac(verbose):
     print(line)
 
 def cmd_squid_acls(proxies, proxy_name):
@@ -271,7 +276,7 @@ class Proxies(object):
     '''
     return self.by_name[proxy_name]
 
-  def proxy_pac(self):
+  def proxy_pac(self, verbose):
     proxies_to_patterns = {}
     default_proxy_names = []
     for pattern in self._patterns:
@@ -291,7 +296,8 @@ class Proxies(object):
                             )
       yield '  if (%s) {' % (jscond,)
       yield '    proxies = %r;' % (proxy_list,)
-      yield '    alert(url + " ==> " + proxies);'
+      if verbose:
+        yield '    alert(url + " ==> " + proxies);'
       yield '    return proxies;'
       yield '  }'
     if default_proxy_names:
@@ -299,7 +305,8 @@ class Proxies(object):
                               for proxy_name in default_proxy_names
                             )
       yield '  proxies = %r;' % (proxy_list,)
-      yield '  alert(url + " ==> DEFAULT " + proxies);'
+      if verbose:
+        yield '  alert(url + " ==> DEFAULT " + proxies);'
       yield '  return proxies;'
     yield '}'
 
