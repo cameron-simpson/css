@@ -290,13 +290,17 @@ class Proxies(object):
                               for proxy_name in proxy_set
                             )
       yield '  if (%s) {' % (jscond,)
-      yield '    return %r;' % (proxy_list,)
+      yield '    proxies = %r;' % (proxy_list,)
+      yield '    alert(url + " ==> " + proxies);'
+      yield '    return proxies;'
       yield '  }'
     if default_proxy_names:
       proxy_list = '; '.join( self.by_name[proxy_name].proxy_pac_hostport()
                               for proxy_name in default_proxy_names
                             )
-      yield '  return %r;' % (proxy_list,)
+      yield '  proxies = %r;' % (proxy_list,)
+      yield '  alert(url + " ==> DEFAULT " + proxies);'
+      yield '  return proxies;'
     yield '}'
 
   @property
