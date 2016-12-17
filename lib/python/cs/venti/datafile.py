@@ -660,28 +660,58 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   def startup(self):
     import dbm.gnu
     self._gdbm = dbm.gnu.open(self._gdbm_path, 'cf')
+    self._gdbm_lock = Lock()
+    self._written = False
 
   def shutdown(self):
-    self._gdbm.close()
-    self._gdbm = None
+    self.flush()
+    with self._gdbm_lock:
+      self._gdbm.close()
+      self._gdbm = None
+      del self._gdbm_lock
 
   def flush(self):
-    self._gdbm.sync()
+    if self._written:
+      with self._gdbm_lock:
+        if self._written:
+          self._gdbm.sync()
+          self._written = False
 
   def __iter__(self):
     mkhash = self.hashclass.from_hashbytes
-    hashcode = self._gdbm.firstkey()
+    self.flush()
+    with self._gdbm_lock:
+      hashcode = self._gdbm.firstkey()
     while hashcode is not None:
       yield mkhash(hashcode)
-      hashcode = self._gdbm.nextkey(hashcode)
+      self.flush()
+      with self._gdbm_lock:
+        hashcode = self._gdbm.nextkey(hashcode)
 
-  __contains__ = lambda self, hashcode: hashcode in self._gdbm
-  __getitem__  = lambda self, hashcode: decode_index_entry(self._gdbm[hashcode])
-  get          = lambda self, hashcode, default=None: \
-                    decode_index_entry(self._gdbm.get(hashcode, default))
+  def __contains__(self, hashcode):
+    self.flush()
+    with self._gdbm_lock:
+      return hashcode in self._gdbm
+
+  def __getitem__(self, hashcode):
+    self.flush()
+    with self._gdbm_lock:
+      entry = self._gdbm[hashcode]
+    return decode_index_entry(entry)
+
+  def get(self, hashcode, default=None):
+    self.flush()
+    with self._gdbm_lock:
+      entry = self._gdbm.get(hashcode, None)
+    if entry is None:
+      return default
+    return decode_index_entry(entry)
 
   def __setitem__(self, hashcode, value):
-    self._gdbm[hashcode] = encode_index_entry(*value)
+    entry = encode_index_entry(*value)
+    with self._gdbm_lock:
+      self._gdbm[hashcode] = entry
+      self._written = True
 
 class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' Kyoto Cabinet index for a DataDir.
