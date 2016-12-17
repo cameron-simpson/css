@@ -648,7 +648,7 @@ if FUSE_CLASS == 'llfuse':
       llf_opts = set(llfuse.default_options)
       # Not available on OSX. TODO: detect 'darwin' and make conditional
       if 'nonempty' in llf_opts:
-        warning("llf_opts=%r: drop 'nonempty' option, not available on OSX"
+        warning("llf_opts=%r: drop 'nonempty' option, not available on OSX",
                 sorted(llf_opts))
         llf_opts.discard('nonempty')
       if options is not None:
