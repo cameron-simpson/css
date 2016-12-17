@@ -306,8 +306,9 @@ do
 done
         
 # construct svcd "ok to ssh" test command
-test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
-             flag -w PORTFWD_DISABLE && exit 1'
+test_shcmd="{ flag -w DEBUG_PORTFWD || flag -w PORTFWD_${utarget}_DEBUG; } && set -x
+            flag -w PORTFWD_OVERRIDE && exit 0
+            flag -w PORTFWD_DISABLE && exit 1"
 
 # test if fwd already running
 for pfpidfile in $pfpidfiles
