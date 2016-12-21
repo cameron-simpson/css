@@ -12,7 +12,6 @@ from os import SEEK_SET, SEEK_END
 from os.path import join as joinpath, samefile, exists as existspath
 import errno
 import csv
-from subprocess import Popen, PIPE
 from threading import Lock, RLock, Thread
 from time import sleep
 from types import SimpleNamespace
