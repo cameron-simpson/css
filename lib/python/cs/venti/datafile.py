@@ -256,12 +256,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `datadirpath`: the directory containing the DataFiles.
           If this is shared by other clients then it should be
           different from the `statedirpath`.
+          If None, default to "statedirpath/data", which might be
+          a symlink to a shared area such as a NAS.
         `hashclass`: the hash class used to index chunk contents.
         `indexclass`: the IndexClass providing the index to chunks
           in the DataFiles.
         `rollover`: data file roll over size; if a data file grows
             beyond this a new datafile is commenced for new blocks.
     '''
+    if datadirpath is None:
+      datadirpath = joinpath(statedirpath, 'data')
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
