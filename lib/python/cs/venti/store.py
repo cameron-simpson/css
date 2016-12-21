@@ -234,67 +234,6 @@ class BasicStoreAsync(_BasicStoreCommon):
   def flush(self):
     return self.flush_bg()()
 
-def Store(store_spec):
-  ''' Factory function to return an appropriate BasicStore* subclass
-      based on its argument:
-
-        /path/to/store  A DataDirStore directory.
-
-        |command        A subprocess implementing the streaming protocol.
-
-        tcp:[host]:port Connect to a daemon implementing the streaming protocol.
-
-        ssh://host/[store-designator-as-above]
-
-        relative/path/to/store
-                        If the string doesn't start with /, | or foo:
-                        and specifies a directory then treat like
-                        /cwd/relative/path/to/store.
-  '''
-  assert type(store_spec) is str, "expected a str, got %s" % (store_spec,)
-  if store_spec.startswith('/'):
-    return Store("file:"+store_spec)
-  if store_spec.startswith('|'):
-    return Store("exec:"+store_spec)
-  if ':' not in store_spec:
-    return Store("file:"+store_spec)
-  scheme = store_spec[:store_spec.index(':')]
-  if not scheme.isalpha():
-    return Store("file:"+store_spec)
-  spec = store_spec[len(scheme)+1:]
-  if scheme == "file":
-    # TODO: after tokyocabinet available, probe for index file name
-    storepath = os.path.abspath(spec)
-    if os.path.isdir(storepath):
-      return DataDirStore(spec, os.path.abspath(spec), hashclass=DEFAULT_HASHCLASS)
-    raise ValueError("unsupported file store: %s" % (storepath,))
-  if scheme == "exec":
-    from .stream import StreamStore
-    from subprocess import Popen, PIPE
-    P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
-    return StreamStore("exec:"+spec, P.stdin, P.stdout)
-  if scheme == "tcp":
-    from .tcp import TCPStoreClient
-    host, port = spec.rsplit(':', 1)
-    if not host:
-      host = '127.0.0.1'
-    return TCPStoreClient((host, int(port)))
-  if scheme == "ssh":
-    # TODO: path to remote vt command
-    # TODO: $VT_SSH envvar
-    import cs.sh
-    from .stream import StreamStore
-    from subprocess import Popen, PIPE
-    if spec.startswith('//') and not spec.startswith('///'):
-      sshto, remotespec = spec[2:].split('/', 1)
-      rcmd = './bin/vt -S %s listen -' % (cs.sh.quotestr(remotespec),)
-      P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
-                 shell=False, stdin=PIPE, stdout=PIPE)
-      return StreamStore("ssh:"+spec, P.stdin, P.stdout)
-    else:
-      raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
-  raise ValueError("unsupported store scheme: %s" % (scheme,))
-
 class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''

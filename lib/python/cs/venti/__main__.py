@@ -20,6 +20,7 @@ from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
+from .compose import Store
 from .debug import dump_Dirent
 from .datafile import DataFile, DataDir, \
                       F_COMPRESSED, decompress, DataDir_from_spec
@@ -27,7 +28,7 @@ from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore, DataDirStore
+from .store import ProgressStore, DataDirStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
