@@ -9,7 +9,7 @@ set -ue
 
 up=
 dotrace=
-sleep_time=30
+sleep_time=11
 setflag=
 flagname=
 probecmd=
