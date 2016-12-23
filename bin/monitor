@@ -58,6 +58,7 @@ else
   then
     [ $setflag ] || \
     { echo "$cmd: missing up-shcmd" >&2
+      echo "$cmd: missing down-shcmd" >&2
       badopts=1
     }
   else
@@ -72,7 +73,7 @@ else
       shift
       if [ $# -gt 0 ]
       then
-        echo "$cmd: extra arguments after up-shcmd: $*" >&2
+        echo "$cmd: extra arguments after down-shcmd: $*" >&2
         badopts=1
       fi
     fi
