@@ -106,9 +106,14 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           in the DataFiles.
         `rollover`: data file roll over size; if a data file grows
             beyond this a new datafile is commenced for new blocks.
+            Default: DEFAULT_ROLLOVER
     '''
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    if indexclass is None:
+      indexclass = DEFAULT_INDEXCLASS
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
