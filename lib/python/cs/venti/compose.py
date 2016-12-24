@@ -8,7 +8,8 @@
 
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
-from cs.logutils import Pfx
+from cs.fileutils import longpath
+from cs.logutils import Pfx, X
 from cs.py.func import prop
 from .store import DataDirStore
 from .stream import StreamStore
@@ -35,6 +36,7 @@ def Store(store_spec, config=None):
             continue
           raise ValueError("unexpected separator %r at offset %d, expected ':'"
                            % (sep, offset-1))
+    X("stores = %r", stores)
     if not stores:
       raise ValueError("no stores in %r" % (store_spec,))
     if len(stores) == 1:
@@ -67,6 +69,7 @@ def parse_store_spec(s, offset, config=None):
                           /h/hashtype/hashcode  Block data by hashcode
                           /i/hashtype/hashcode  Indirect block by hashcode.
   '''
+  offset0 = offset
   if offset >= len(s):
     raise ValueError("empty string")
   if s.startswith('"', offset):
@@ -77,12 +80,15 @@ def parse_store_spec(s, offset, config=None):
   elif s.startswith('[', offset):
     offset += 1
     endpos = s.find(']', offset)
-    if endpos >= 0:
-      clause_name= store_spec[offset:endpos]
-      offset = endpos + 1
-      if config is None:
-        raise ValueError("no config supplied, rejecting %r" % (spec_text,))
-      S = config.Store(clause_name)
+    if endpos < 0:
+      raise ValueError("missing closing ']'")
+    clause_name = s[offset:endpos]
+    offset = endpos + 1
+    if config is None:
+      raise ValueError("no config supplied, rejecting %r" % (s[offset0:],))
+    S = config.Store(clause_name)
+    if S is None:
+      raise ValueError("no config clause [%s]" %(clause_name,))
   else:
     # /path/to/datadir
     if s.startswith('/', offset) or s.startswith('./', offset):
@@ -129,9 +135,25 @@ def CommandStore(shcmd, addif=False):
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
 
 class ConfigFile(ConfigWatcher):
-  ''' Live tracker of a 
+  ''' Live tracker of a vt configuration file.
   '''
 
-  def Store(self, clausename):
-    clause = self[clausename]
-    stype = clause['type']
+  def Store(self, clause_name):
+    store_name = "%s[%s]" % (self, clause_name)
+    with Pfx(store_name):
+      clause = self[clause_name]
+      stype = clause.get('type')
+      if stype is None:
+        raise ValueError("missing type")
+      if stype == "datadir":
+        path = clause.get('path')
+        if path is None:
+          raise ValueError("missing path")
+        path = longpath(path)
+        datapath = clause.get('data')
+        if datapath is not None:
+          datapath = longpath(datapath)
+        S = DataDirStore(store_name, path, datapath, None, None)
+      else:
+        raise ValueError("unsupported type %r", stype)
+      return S
