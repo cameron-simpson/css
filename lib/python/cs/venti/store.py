@@ -31,7 +31,7 @@ from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
-from .datafile import DataDir, DEFAULT_INDEXCLASS
+from .datadir import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
@@ -320,10 +320,6 @@ class DataDirStore(MappingStore):
   '''
 
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    if hashclass is None:
-      raise ValueError("hashclass is mandatory")
-    if indexclass is None:
-      indexclass = DEFAULT_INDEXCLASS
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, self._datadir, **kw)
 
