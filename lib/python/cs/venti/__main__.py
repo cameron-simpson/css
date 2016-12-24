@@ -22,8 +22,8 @@ from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .compose import Store
 from .debug import dump_Dirent
-from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDir_from_spec
+from .datadir import DataDir, DataDir_from_spec
+from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
