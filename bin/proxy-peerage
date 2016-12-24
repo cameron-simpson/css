@@ -210,6 +210,8 @@ class Pattern(_Pattern):
       if pattern.startswith('.'):
         return r'path_end %s || path_reg %s' \
                % ( haquote(pattern), haquote(escape(pattern + '?')))
+      if '*' in pattern:
+        return r'hdr_reg(host) ^%s$' % (pattern.replace('.', '\\.').replace('*', '.*'),)
       raise ValueError('unrecognised pattern')
 
   def squid_acl(self):
