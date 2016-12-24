@@ -10,8 +10,9 @@ from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.logutils import Pfx
 from cs.py.func import prop
-from .tcp import TCPStoreClient
+from .store import DataDirStore
 from .stream import StreamStore
+from .tcp import TCPStoreClient
 
 def Store(store_spec, config=None):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -85,7 +86,7 @@ def parse_store_spec(s, offset, config=None):
   else:
     # /path/to/datadir
     if s.startswith('/', offset) or s.startswith('./', offset):
-      S = DataDirStore(s)
+      S = DataDirStore(s, s, None, None, None)
       offset = len(s)
     # |shell command
     elif s.startswith('|', offset):
