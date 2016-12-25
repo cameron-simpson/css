@@ -3,8 +3,6 @@
 # The generic Store factory.
 #   - Cameron Simpson <cs@zip.com.au> 20dec2016
 #
-# 
-#
 
 from os.path import isabs as isabspath, abspath
 from subprocess import Popen, PIPE
