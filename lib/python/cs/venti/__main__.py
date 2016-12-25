@@ -13,6 +13,7 @@ import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
 from cs.debug import ifdebug, dump_debug_threads
+from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
@@ -20,14 +21,15 @@ from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
+from .compose import Store, ConfigFile
 from .debug import dump_Dirent
-from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDir_from_spec
+from .datadir import DataDir, DataDir_from_spec
+from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore, DataDirStore
+from .store import ProgressStore, DataDirStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -40,9 +42,10 @@ def main(argv):
                   "-" means no front end cache.
       -M          Don't use an additional MemoryCacheStore front end.
       -S store    Specify the store to use:
-                    /path/to/dir  GDBMStore
+                    [clause]        Specification from .vtrc.
+                    /path/to/dir    GDBMStore
                     tcp:[host]:port TCPStore
-                    |sh-command   StreamStore via sh-command
+                    |sh-command     StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
     Operations:
@@ -70,6 +73,7 @@ def main(argv):
   except:
     verbose = False
 
+  dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
   dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
@@ -104,6 +108,8 @@ def main(argv):
       verbose = True
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
+
+  config = ConfigFile(dflt_configpath)
 
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
@@ -146,7 +152,7 @@ def main(argv):
             badopts = True
           else:
             try:
-              S = Store(dflt_vt_store)
+              S = Store(dflt_vt_store, config)
             except Exception as e:
               exception("can't open store \"%s\": %s", dflt_vt_store, e)
               badopts = True
@@ -164,6 +170,7 @@ def main(argv):
                 if useMemoryCacheStore:
                   S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
                                  S, MemoryCacheStore("MemoryCacheStore"))
+                X("S = %s", S)
                 with S:
                   try:
                     xit = op_func(args, verbose=verbose, log=log)

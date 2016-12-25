@@ -31,7 +31,7 @@ from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
-from .datafile import DataDir, DEFAULT_INDEXCLASS
+from .datadir import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
@@ -234,67 +234,6 @@ class BasicStoreAsync(_BasicStoreCommon):
   def flush(self):
     return self.flush_bg()()
 
-def Store(store_spec):
-  ''' Factory function to return an appropriate BasicStore* subclass
-      based on its argument:
-
-        /path/to/store  A DataDirStore directory.
-
-        |command        A subprocess implementing the streaming protocol.
-
-        tcp:[host]:port Connect to a daemon implementing the streaming protocol.
-
-        ssh://host/[store-designator-as-above]
-
-        relative/path/to/store
-                        If the string doesn't start with /, | or foo:
-                        and specifies a directory then treat like
-                        /cwd/relative/path/to/store.
-  '''
-  assert type(store_spec) is str, "expected a str, got %s" % (store_spec,)
-  if store_spec.startswith('/'):
-    return Store("file:"+store_spec)
-  if store_spec.startswith('|'):
-    return Store("exec:"+store_spec)
-  if ':' not in store_spec:
-    return Store("file:"+store_spec)
-  scheme = store_spec[:store_spec.index(':')]
-  if not scheme.isalpha():
-    return Store("file:"+store_spec)
-  spec = store_spec[len(scheme)+1:]
-  if scheme == "file":
-    # TODO: after tokyocabinet available, probe for index file name
-    storepath = os.path.abspath(spec)
-    if os.path.isdir(storepath):
-      return DataDirStore(spec, os.path.abspath(spec), hashclass=DEFAULT_HASHCLASS)
-    raise ValueError("unsupported file store: %s" % (storepath,))
-  if scheme == "exec":
-    from .stream import StreamStore
-    from subprocess import Popen, PIPE
-    P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
-    return StreamStore("exec:"+spec, P.stdin, P.stdout)
-  if scheme == "tcp":
-    from .tcp import TCPStoreClient
-    host, port = spec.rsplit(':', 1)
-    if not host:
-      host = '127.0.0.1'
-    return TCPStoreClient((host, int(port)))
-  if scheme == "ssh":
-    # TODO: path to remote vt command
-    # TODO: $VT_SSH envvar
-    import cs.sh
-    from .stream import StreamStore
-    from subprocess import Popen, PIPE
-    if spec.startswith('//') and not spec.startswith('///'):
-      sshto, remotespec = spec[2:].split('/', 1)
-      rcmd = './bin/vt -S %s listen -' % (cs.sh.quotestr(remotespec),)
-      P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
-                 shell=False, stdin=PIPE, stdout=PIPE)
-      return StreamStore("ssh:"+spec, P.stdin, P.stdout)
-    else:
-      raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
-  raise ValueError("unsupported store scheme: %s" % (scheme,))
-
 class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
@@ -376,15 +315,98 @@ class MappingStore(BasicStoreSync):
       return HashCodeUtilsMixin.hashcodes_from(self, start_hashcode=start_hashcode, reverse=reverse)
     return hashcodes_method(start_hashcode=start_hashcode, reverse=reverse)
 
+class ChainStore(BasicStoreSync):
+  ''' A wrapper for a sequence of Stores.
+  '''
+
+  def __init__(self, name, stores, save_all=False, parallel=False):
+    ''' Initialise a ChainStore.
+        `name`: ChainSTore name.
+        `stores`: sequence of Stores
+        `save_all`: add new data to all Stores, not just the first one
+        `parallel`: run requests to the Stores in parallel instead of in sequence
+    '''
+    if not stores:
+      raise ValueError("stores may not be empty: %r" %(stores,))
+    BasicStoreSync.__init__(self, name)
+    self.stores = stores
+    self.save_all = save_all
+    self.parallel = parallel
+
+  def startup(self):
+    for S in self.stores:
+      S.open()
+
+  def shutdown(self):
+    for S in self.stores:
+      S.close()
+
+  def add(self, data):
+    ''' Add a block to the first subStore, or to all if elf.save_all.
+    '''
+    first = True
+    for result in self._multicall('add_bg', (data,),
+                                  parallel=self.parallel and not self.save_all):
+      if result is None:
+        raise RuntimeError("None returned from .add")
+      if first:
+        hashcode = result
+        if not self.save_all:
+          break
+        first = False
+      elif result != hashcode:
+        warning("different hashcodes returns from .add: %s vs %s", hashcode, result)
+    return hashcode
+
+  def get(self, h):
+    ''' Fetch a block from the first Store which has it.
+    '''
+    for result in self._multicall('get_bg', (h,), parallel=False):
+      return result
+
+  def contains(self, h):
+    ''' Is the hashcode `h` in any of the subStores?
+    '''
+    for result in self._multicall('contains_bg', (h,)):
+      if result:
+        return True
+    return False
+
+  def flush(self):
+    ''' Flush all the subStores.
+    '''
+    for result in self._multicall('flush_bg', (h,)):
+      pass
+
+  def _multicall(self, method_name, args, parallel=None):
+    ''' Generator yielding results of subcalls.
+        `method_name`: name of method on subStore, should return a Result
+        `args`: positional arguments for the method call
+        `parallel`: controls whether the subStores' methods are
+          called and waited for sequentially or in parallel; if
+          unspecified or None defaults to `self.parallel`
+    '''
+    if parallel is None:
+      parallel = self.parallel
+    LFs = []
+    for S in self.stores:
+      with Pfx(S):
+        LF = getattr(S, method_name)(*args)
+        LFs.append( (S, LF) )
+        if not parallel:
+          # yield early, allowing caller to prevent further calls
+          yield LF()
+    for S, LF in reportLFs(LFs):
+      with Pfx(S):
+        result = LF()
+        if self.parallel:
+          yield result
+
 class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
   '''
 
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    if hashclass is None:
-      raise ValueError("hashclass is mandatory")
-    if indexclass is None:
-      indexclass = DEFAULT_INDEXCLASS
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, self._datadir, **kw)
 
