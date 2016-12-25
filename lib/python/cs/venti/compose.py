@@ -10,8 +10,9 @@ from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath
 from cs.logutils import Pfx, X
+from cs.threads import locked
 from cs.py.func import prop
-from .store import DataDirStore
+from .store import ChainStore, DataDirStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
 
@@ -41,7 +42,7 @@ def Store(store_spec, config=None):
       raise ValueError("no stores in %r" % (store_spec,))
     if len(stores) == 1:
       return stores[0]
-    return ChainStore(stores)
+    return ChainStore(store_spec, stores)
 
 def parse_store_spec(s, offset, config=None):
   ''' Parse a single Store specification from a string.
@@ -138,22 +139,30 @@ class ConfigFile(ConfigWatcher):
   ''' Live tracker of a vt configuration file.
   '''
 
+  def __init__(self, config_path):
+    ConfigWatcher.__init__(self, config_path)
+    self._stores = {}
+
+  @locked
   def Store(self, clause_name):
-    store_name = "%s[%s]" % (self, clause_name)
-    with Pfx(store_name):
-      clause = self[clause_name]
-      stype = clause.get('type')
-      if stype is None:
-        raise ValueError("missing type")
-      if stype == "datadir":
-        path = clause.get('path')
-        if path is None:
-          raise ValueError("missing path")
-        path = longpath(path)
-        datapath = clause.get('data')
-        if datapath is not None:
-          datapath = longpath(datapath)
-        S = DataDirStore(store_name, path, datapath, None, None)
-      else:
-        raise ValueError("unsupported type %r", stype)
-      return S
+    S = self._stores.get(clause_name)
+    if S is None:
+      store_name = "%s[%s]" % (self, clause_name)
+      with Pfx(store_name):
+        clause = self[clause_name]
+        stype = clause.get('type')
+        if stype is None:
+          raise ValueError("missing type")
+        if stype == "datadir":
+          path = clause.get('path')
+          if path is None:
+            raise ValueError("missing path")
+          path = longpath(path)
+          datapath = clause.get('data')
+          if datapath is not None:
+            datapath = longpath(datapath)
+          S = DataDirStore(store_name, path, datapath, None, None)
+        else:
+          raise ValueError("unsupported type %r", stype)
+        self._stores[clause_name] = S
+    return S
