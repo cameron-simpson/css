@@ -80,7 +80,7 @@ def indirect_blocks(blocks):
     yield block
 
 def blockify(data_chunks, vocab=None):
-  ''' Collect data strings from the iterable data_chunks and yield data blocks with desirable boundaries.
+  ''' Collect data strings from the iterable data_chunks and yield data Blocks with desirable boundaries.
   '''
   # also accept a bare bytes value
   if isinstance(data_chunks, bytes):
@@ -335,6 +335,73 @@ def mp3frames(fp):
 
     yield chunk[:frame_len]
     chunk = chunk[frame_len:]
+
+def blocks_of(chunks, parser, min_block=None, max_block=None):
+  ''' Generator to connect a parser to a chunk stream to emit low level Blocks.
+      `chunks`: a source iterable of data chunks, handed to `parser`
+      `parser`: a callable accepting an iterable of data chunks and
+        returning two iterables: one of byte offsets into the chunk
+        stream and another of chunks.
+      `min_block`: the smallest amount of data that will be used
+        to create a Block, default MIN_BLOCKSIZE
+      `max_block`: the largest amount of data that will be used to
+        create a Block, default MAX_BLOCKSIZE
+
+      The two iterables received from `parser` are denoted `offsetQ`
+        and `chunkQ`. The parser must arrange that after an offset
+        is collected from `offsetQ` sufficient data chunks will be
+        available on `chunkQ` to reach that offset, allowing this
+        function to assemble complete Blocks. The offsets are parse
+        points from the chunk stream, representing suitable Block
+        boundaries.
+  '''
+  if min_block is None:
+    min_block = MIN_BLOCKSIZE
+  elif min_block < 8:
+    raise ValueError("rejecting min_block < 8: %s", min_block)
+  if max_block is None:
+    max_block = MIN_BLOCKSIZE
+  elif max_block >= 1024*1024:
+    raise ValueError("rejecting max_block >= 1024*1024: %s", max_block)
+  offsetQ, chunkQ = parser(chunks)
+  offset = 0
+  pending = []
+  pending_size = 0
+  for next_offset in offsetQ:
+    # gather chunks up to the next_offset potential Block boundary
+    while offset < next_offset:
+      try:
+        chunk = chunkQ.next()
+      except StopIteration as e:
+        error("unexpected StopIteration from chunkQ: %s", e)
+        break
+      chunk_len = len(chunk)
+      # see if this chunk would cause pending to overflow max_block
+      if pending_size + chunk_len > max_block:
+        # flush all current pending chunks as a Block
+        yield Block(data=b''.join(pending))
+        pending = []
+        pending_size = 0
+        # see if this chunk itself exceeds max_block and if so
+        # prune leading max_block sized chunks off this chunk and emit
+        chunk_offset = 0
+        while chunk_len - chunk_offset >= max_block:
+          yield Block(data=chunk[chunk_offset:chunk_offset+max_block])
+          chunk_offset += max_block
+        # stash anything that remains
+        if chunk_offset < chunk_len:
+          pending.append(chunk[chunk_offset:])
+          pending_size += chunk_len - chunk_offset
+      # advance offset for received chunk
+      offset += chunk_len
+    # flush the pending data if sufficiently large
+    if pending_size >= min_block:
+      yield Block(data=b''.join(pending))
+      pending = []
+      pending_size = 0
+  # flush the pending data if any
+  if pending_size > 0:
+    yield Block(data=b''.join(pending))
 
 if __name__ == '__main__':
   import cs.venti.blockify_tests
