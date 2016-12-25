@@ -6,6 +6,7 @@
 # 
 #
 
+from os.path import isabs as isabspath, abspath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath
@@ -156,8 +157,15 @@ class ConfigFile(ConfigWatcher):
         if stype == "datadir":
           path = clause.get('path')
           if path is None:
-            raise ValueError("missing path")
+            path = clause_name
           path = longpath(path)
+          if not isabspath(path):
+            if path.startswith('./'):
+              path = abspath(path)
+            else:
+              statedir = clause.get('statedir')
+              if statedir is None:
+                raise ValueError('relative path %r but no statedir' % (path,))
           datapath = clause.get('data')
           if datapath is not None:
             datapath = longpath(datapath)
