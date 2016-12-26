@@ -5,9 +5,11 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from functools import partial
 from itertools import chain
 import sys
 from cs.logutils import debug, warning, D, X
+from cs.queues import IterableQueue
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
@@ -80,6 +82,10 @@ def indirect_blocks(blocks):
     yield block
 
 def blockify(data_chunks, vocab=None):
+  parser = partial(rolling_hash_parser, vocab=vocab)
+  return blocks_of(data_chunks, parser)
+
+def rolling_hash_parser(data_chunks, vocab=None, min_block=None, max_block=None):
   ''' Collect data strings from the iterable data_chunks and yield data Blocks with desirable boundaries.
   '''
   # also accept a bare bytes value
@@ -87,61 +93,53 @@ def blockify(data_chunks, vocab=None):
     data_chunks = (data_chunks,)
   if vocab is None:
     vocab = DFLT_VOCAB
-
-  buf = []          # list of data chunks to assemble into a single Block
-  buflen = 0        # cumulative length of buf
-  hash_value = 0    # rolling hash value
-  def bufBlock():
-    # prepare and yield new Block then reset the buffer
-    # closure FTW!
-    B = Block(data=b''.join(buf))
-    buf[:] = []
-    buflen = 0
-    hash_value = 0
-    return B
-
+  if min_block is None:
+    min_block = MIN_BLOCKSIZE
+  elif min_block < 8:
+    raise ValueError("rejecting min_block < 8: %s", min_block)
+  if max_block is None:
+    max_block = MIN_BLOCKSIZE
+  elif max_block >= 1024*1024:
+    raise ValueError("rejecting max_block >= 1024*1024: %s", max_block)
+  chunkQ = IterableQueue()
+  yield chunkQ
+  hash_value = 0    # initial rolling hash value
+  offset = 0
+  last_offset = offset
   for data in data_chunks:
-    offset = 0
-    # loop to yield Blocks, one Block per iteration
-    while offset < len(data):
-      # note start of this chunk
-      start = offset
-      is_edge = False
-      # phase 1: just compute rolling hash over initial MIN_BLOCKSIZE
-      max_offset = min(len(data), offset + (MIN_BLOCKSIZE - buflen))
-      while offset < max_offset:
-        hash_value, is_edge = test_for_edge(data, offset, hash_value)
-        offset += 1
-      # phase 2: scan for rolling hash edge or vocab edge up to MAX_BLOCKSIZE
-      max_offset = min(len(data), start + (MAX_BLOCKSIZE - buflen))
-      while not is_edge and offset < max_offset:
-        hash_value, is_edge = test_for_edge(data, offset, hash_value)
-        if is_edge:
-          break
+    chunkQ.put(data)
+    end_offset = offset + len(data)
+    for data_offset, b in enumerate(data):
+      # advance the rolling hash function
+      hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                     )
+                   | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                     )
+                   )
+      offset += 1
+      if offset - last_offset >= min_block:
+        if hash_value % 4093 == 1:
+          yield offset
+          last_offset = offset
         else:
-          is_edge, edge_offset, subVocab = vocab.test_for_edge(data, offset)
+          # test against the current vocabulary
+          is_edge, edge_offset, subVocab = vocab.test_for_edge(data, data_offset)
           if is_edge:
-            offset += edge_offset
-            if offset < start or offset >= len(data):
-              raise RuntimeError("bad offset after test_for_vocab_edge")
+            if edge_offset < 0 or data_offset + edge_offset > len(data):
+              raise RuntimeError("len(data)=%d and edge_offset=%s; data=%r"
+                                 % (len(data), edge_offset, data))
+            # boundary offset is the current offset adjusted for the edge_offset
+            suboffset = offset + edge_offset
+            if suboffset > last_offset and suboffset <= end_offset:
+              # only emit this offset if it is in range:
+              # not before the previously emitted offset
+              # and not after the end of the data chunk we have
+              # provided to the parser handler
+              yield suboffset
+              last_offset = suboffset
             if subVocab is not None:
+              # switch to new vocabulary
               vocab = subVocab
-            break
-        offset += 1
-      # save this data slice
-      buf.append(data[start:offset])
-      yield bufBlock()
-
-def test_for_edge(data, offset, hash_value):
-  ''' Add the byte at `data[offset]` to the hash_value and test for the boundary condition; return (new_hash_value, is_boundary).
-  '''
-  b = data[offset]
-  hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                 )
-               | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                 )
-               )
-  return hash_value, hash_value % 4093 == 1
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
@@ -339,71 +337,93 @@ def mp3frames(fp):
     chunk = chunk[frame_len:]
 
 def blocks_of(chunks, parser, min_block=None, max_block=None):
-  ''' Generator to connect a parser to a chunk stream to emit low level Blocks.
+  ''' Wrapper for blocked_chunks_of which yields Blocks from the data chunks.
+  '''
+  for chunk in blocked_chunks_of(chunks, parser, min_block=min_block, max_block=max_block):
+    yield Block(data=chunk)
+
+def blocked_chunks_of(chunks, parser, min_block=None, max_block=None):
+  ''' Generator which connects to a parser of a chunk stream to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `parser`
       `parser`: a callable accepting an iterable of data chunks and
-        returning two iterables: one of byte offsets into the chunk
-        stream and another of chunks.
+        returning an iterable, such as a generator
       `min_block`: the smallest amount of data that will be used
         to create a Block, default MIN_BLOCKSIZE
       `max_block`: the largest amount of data that will be used to
         create a Block, default MAX_BLOCKSIZE
 
-      The two iterables received from `parser` are denoted `offsetQ`
-        and `chunkQ`. The parser must arrange that after an offset
-        is collected from `offsetQ` sufficient data chunks will be
-        available on `chunkQ` to reach that offset, allowing this
-        function to assemble complete Blocks. The offsets are parse
-        points from the chunk stream, representing suitable Block
-        boundaries.
+      The iterable returned from `parser(chunks)` is denoted `offsetQ`.
+      It first yields an iterable denoted `chunkQ` (which will
+      yield unaligned data chunks) and thereafter offsets which
+      represent desirable Block bounaries.
+      The parser must arrange that after an offset is
+      collected from `offsetQ` sufficient data chunks will be
+      available on `chunkQ` to reach that offset, allowing this
+      function to assemble complete well aligned data chunks.
+
+      The easiest `parser` functions to write are generators. One
+      can allocate and yield an IterableQueue for the data chunks
+      and then yield offsets directly. To coordinate with
+      blocked_chunks_of the easiest thing is probably to put data
+      onto `chunkQ` as soon as it is read, and then parse the read
+      data for boundary offsets.
   '''
   if min_block is None:
     min_block = MIN_BLOCKSIZE
   elif min_block < 8:
     raise ValueError("rejecting min_block < 8: %s", min_block)
   if max_block is None:
-    max_block = MIN_BLOCKSIZE
+    max_block = MAX_BLOCKSIZE
   elif max_block >= 1024*1024:
     raise ValueError("rejecting max_block >= 1024*1024: %s", max_block)
-  offsetQ, chunkQ = parser(chunks)
-  offset = 0
+  offsetQ = parser(chunks)
+  try:
+    chunkQ = next(offsetQ)
+  except StopIteration as e:
+    raise RuntimeError("chunkQ not received from offsetQ as first item: %s" % (e,))
   pending = []
-  pending_size = 0
+  pending_offset = 0
   for next_offset in offsetQ:
-    # gather chunks up to the next_offset potential Block boundary
-    while offset < next_offset:
-      try:
-        chunk = chunkQ.next()
-      except StopIteration as e:
-        error("unexpected StopIteration from chunkQ: %s", e)
+    if next_offset < pending_offset:
+      raise RuntimeError("pending_offset:%d ahead of next_offset:%d"
+                         % (pending_offset, next_offset))
+    # advance to next_offset
+    while pending_offset < next_offset:
+      # ignore blocks which are too small
+      if next_offset - pending_offset < min_block:
         break
-      chunk_len = len(chunk)
-      # see if this chunk would cause pending to overflow max_block
-      if pending_size + chunk_len > max_block:
-        # flush all current pending chunks as a Block
-        yield Block(data=b''.join(pending))
-        pending = []
-        pending_size = 0
-        # see if this chunk itself exceeds max_block and if so
-        # prune leading max_block sized chunks off this chunk and emit
-        chunk_offset = 0
-        while chunk_len - chunk_offset >= max_block:
-          yield Block(data=chunk[chunk_offset:chunk_offset+max_block])
-          chunk_offset += max_block
-        # stash anything that remains
-        if chunk_offset < chunk_len:
-          pending.append(chunk[chunk_offset:])
-          pending_size += chunk_len - chunk_offset
-      # advance offset for received chunk
-      offset += chunk_len
-    # flush the pending data if sufficiently large
-    if pending_size >= min_block:
-      yield Block(data=b''.join(pending))
-      pending = []
-      pending_size = 0
+      # compute next cutoff point
+      emit_to = min(next_offset, pending_offset + max_block)
+      # gather up an emission buffer
+      emit = []
+      emit_upto = pending_offset
+      while emit_upto < emit_to:
+        if not pending:
+          try:
+            chunk = next(chunkQ)
+          except StopIteration as e:
+            error("unexpected StopIteration from chunkQ: %s", e)
+            break
+          pending.append(chunk)
+        needed = emit_to - emit_upto
+        chunk = pending[0]
+        if needed < len(chunk):
+          emit_chunk = chunk[:needed]
+          pending[0] = chunk[needed:]
+          pending_offset += needed
+        else:
+          emit_chunk = chunk
+          pending.pop(0)
+          pending_offset += len(chunk)
+        emit.append(emit_chunk)
+        emit_upto += len(emit_chunk)
+      if emit_upto != emit_to:
+        raise RuntimeError("emit_upto:%d != emit_to:%d" % (emit_upto, emit_to))
+      yield b''.join(emit)
+      emit = [] # release consumed chunks
   # flush the pending data if any
-  if pending_size > 0:
-    yield Block(data=b''.join(pending))
+  if pending:
+    yield b''.join(pending)
 
 if __name__ == '__main__':
   import cs.venti.blockify_tests
