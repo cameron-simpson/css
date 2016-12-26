@@ -215,12 +215,14 @@ class Vocabulary(dict):
             break
     return matched
 
-# TODO: reform as list of (bytes, offset, sublist).
 DFLT_VOCAB = Vocabulary({
                 b"\ndef ": 1,         # python top level function
                 b"\n  def ": 1,       # python class method, 2 space indent
                 b"\n    def ": 1,     # python class method, 4 space indent
+                b"\n\tdef ": 1,       # python class method, TAB indent
                 b"\nclass ": 1,       # python top level class
+                b"\nfunc ": 1,        # Go function
+                b"\nfunction ": 1,    # JavaScript or shell function
                 b"\npackage ": 1,     # perl package
                 b"\n}\n\n": 3,        # C-ish function ending
                 b"\n};\n\n": 3,       # JavaScript method assignment ending
