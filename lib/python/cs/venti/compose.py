@@ -3,8 +3,6 @@
 # The generic Store factory.
 #   - Cameron Simpson <cs@zip.com.au> 20dec2016
 #
-# 
-#
 
 from os.path import isabs as isabspath, abspath
 from subprocess import Popen, PIPE
@@ -170,6 +168,14 @@ class ConfigFile(ConfigWatcher):
           if datapath is not None:
             datapath = longpath(datapath)
           S = DataDirStore(store_name, path, datapath, None, None)
+        elif stype == "tcp":
+          hostpart = clause.get("host")
+          if not hostpart:
+            raise ValueError('no "host"')
+          portpart = clause.get("port")
+          if not portpart:
+            raise ValueError('no "port"')
+          S = TCPStoreClient((hostpart, int(portpart)))
         else:
           raise ValueError("unsupported type %r", stype)
         self._stores[clause_name] = S
