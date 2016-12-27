@@ -4,12 +4,13 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
-from . import _Recording, RecordingMetaData
-import os.path
+import errno
 from collections import namedtuple
 import datetime
+import os.path
 from cs.logutils import warning, Pfx, X
 from cs.threads import locked_property
+from . import _Recording, RecordingMetaData
 
 class Enigma2MetaData(RecordingMetaData):
   pass

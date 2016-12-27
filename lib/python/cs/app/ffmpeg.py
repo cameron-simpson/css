@@ -62,28 +62,33 @@ class MetaData(O):
         opts.extend( ('-metadata', '='.join( (field, value) ) ) )
     return opts
 
-def convert(src, srcfmt, dst, dstfmt, meta=None):
+def convert(src, srcfmt, dst, dstfmt, meta=None, overwrite=False,
+            start_s=None, end_s=None):
     ''' Convert video `src` to `dst`, return a subprocess.Popen object and the ffmpeg argv.
-        If `src` is None, pass '-' as the input path and attach a
-          pipe to its standard input.
-        If `src` is a string it is considered to be a filename and
-          passed to ffmpeg's -i option.
-        Otherwise `src` is considered to be an open file and is attached
-          to ffmpeg's standard input.
-        `srcfmt` is the FFmpeg format string. It is required if
-          `src` is None or `src` is an open file.
-        If `dst` is None, pass '-' as the output path and attach a
-          pipe to its standard output.
-        If `dst` is a string it is considered to be a filename and
-          passed as ffmpeg's output argument.
-        Otherwise `dst` is considered to be an open file and is
-          attached to ffmpeg's standard output.
-        `dstfmt` is the FFmpeg format string. It is required if
-          `dst` is None or `dst` is an open file.
-        `meta` is MetaData object used to populate ffmpeg's -metadata
+        `src`: input source.
+          If `src` is None, pass '-' to ffmpeg(1) as the input path and
+          attach a pipe to its standard input.
+          If `src` is a string it is considered to be a filename and
+            passed to ffmpeg's -i option.
+          Otherwise `src` is considered to be an open file and is attached
+            to ffmpeg's standard input.
+        `srcfmt`: FFmpeg format string. It is required if `src` is None or
+          `src` is an open file.
+        `dst`: output destination.
+          If `dst` is None, pass '-' as the output path and attach a
+            pipe to its standard output.
+          If `dst` is a string it is considered to be a filename and
+            passed as ffmpeg's output argument.
+          Otherwise `dst` is considered to be an open file and is
+            attached to ffmpeg's standard output.
+        `dstfmt`: FFmpeg output format string. It is required if `dst` is
+          None or `dst` is an open file.
+        `meta`: a MetaData object used to populate ffmpeg's -metadata
           options. If meta is not None, meta.format must match
           `dstfmt` if that not None. If `dstfmt` is None, it is set
           from `meta.format`.
+        `start_s`: start offset in seconds. Used for cropping.
+        `end_s`: end offset in seconds. Used for cropping.
     '''
     if src is None:
       if srcfmt is None:
@@ -128,9 +133,18 @@ def convert(src, srcfmt, dst, dstfmt, meta=None):
     if isinstance(dst, str):
       dstpath = dst
       dstfp = None
-    argv = [ 'ffmpeg' ]
+    argv = [ 'ffmpeg',
+             '-y' if overwrite else '-n',
+           ]
     if srcfmt is not None:
       argv.extend( ('-f', srcfmt) )
+    duration = None
+    if start_s is not None and end_s is not None:
+      duration = end_s - start_s
+    if start_s is not None:
+      argv.extend( ('-ss', '%g' % (start_s,)) )
+    if duration is not None:
+      argv.extend( ('-t', '%g' % (duration,)) )
     argv.extend( ('-i', srcpath) )
     argv.extend( ('-f', dstfmt) )
     if meta is not None:
