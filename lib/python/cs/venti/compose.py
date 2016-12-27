@@ -168,6 +168,14 @@ class ConfigFile(ConfigWatcher):
           if datapath is not None:
             datapath = longpath(datapath)
           S = DataDirStore(store_name, path, datapath, None, None)
+        elif stype == "tcp":
+          hostpart = clause.get("host")
+          if not hostpart:
+            raise ValueError('no "host"')
+          portpart = clause.get("port")
+          if not portpart:
+            raise ValueError('no "port"')
+          S = TCPStoreClient((hostpart, int(portpart)))
         else:
           raise ValueError("unsupported type %r", stype)
         self._stores[clause_name] = S
