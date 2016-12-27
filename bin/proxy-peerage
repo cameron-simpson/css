@@ -13,13 +13,14 @@ from cs.lex import get_uc_identifier
 from cs.logutils import setup_logging, Pfx, X, error, warning, info
 
 USAGE = '''Usage:
-    %s haproxy backends frontend_name frontend_listen <peerage-file
-    %s squid acls proxy_name <peerage-file'''
+    %s haproxy backends frontend_name frontend_listen
+    %s proxy.pac
+    %s squid acls proxy_name'''
 
 def main(argv):
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd)
   with Pfx(cmd):
     badopts = False
     if not argv:
@@ -52,6 +53,15 @@ def main(argv):
               else:
                 error('unrecognised subop')
                 badopts = True
+        elif op == 'proxy.pac':
+          if argv and argv[0] == '-v':
+            argv.pop(0)
+            verbose = True
+          else:
+            verbose = False
+          if argv:
+            error('extra arguments: %s', ' '.join(argv))
+            badopts = True
         elif op == 'squid':
           if not argv:
             error('missing subop')
@@ -87,6 +97,8 @@ def main(argv):
       # haproxy does not handle DIRECT
       if subop == 'backends':
         return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
+    if op == 'proxy.pac':
+      return cmd_proxy_pac(proxies, verbose)
     if op == 'squid':
       if subop == 'acls':
         return cmd_squid_acls(proxies, proxy_name)
@@ -107,6 +119,10 @@ def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
 
 def haproxy_backend_name(proxy_names):
   return '__'.join(sorted(proxy_names))
+
+def cmd_proxy_pac(proxies, verbose):
+  for line in proxies.proxy_pac(verbose):
+    print(line)
 
 def cmd_squid_acls(proxies, proxy_name):
   proxy = proxies[proxy_name]
@@ -134,10 +150,15 @@ def cmd_squid_acls(proxies, proxy_name):
   else:
     raise ValueError(proxy_name)
 
-Proxy = namedtuple('Proxy', 'name defn_lineno hostname port patterns')
+_Proxy = namedtuple('Proxy', 'name defn_lineno hostname port patterns')
+class Proxy(_Proxy):
+
+  def proxy_pac_hostport(self):
+    if self.hostname is None:
+      return 'DIRECT'
+    return "%s:%d" % (self.hostname, self.port)
 
 _Pattern = namedtuple('Pattern', 'definition defn_lineno proxy_names')
-
 class Pattern(_Pattern):
   ''' Subclass of _Pattern with various computed properties.
   '''
@@ -189,6 +210,8 @@ class Pattern(_Pattern):
       if pattern.startswith('.'):
         return r'path_end %s || path_reg %s' \
                % ( haquote(pattern), haquote(escape(pattern + '?')))
+      if '*' in pattern:
+        return r'hdr_reg(host) ^%s$' % (pattern.replace('.', '\\.').replace('*', '.*'),)
       raise ValueError('unrecognised pattern')
 
   def squid_acl(self):
@@ -228,10 +251,21 @@ class Pattern(_Pattern):
         return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
       raise ValueError('unrecognised pattern')
 
+  def proxy_pac_condition(self, varname="host"):
+    ''' Return a javascript test to match this pattern.
+    '''
+    pattern = self.definition
+    if pattern == '*':
+      return 'true'
+    if '*' in pattern:
+      return 'shExpMatch(%s, %r)' % (varname, pattern)
+    return '%s == %r' % (varname, pattern)
+    ##raise ValueError("no proxy_pac_condition for pattern %r" % (pattern,))
+
 class Proxies(object):
 
   def __init__(self):
-    self.by_name = {}   # map from proxy name to Proxy
+    self.by_name = {}    # map from proxy name to Proxy
     self._patterns = []  # Patterns in order received
 
   def get(self, proxy_name):
@@ -243,6 +277,40 @@ class Proxies(object):
     ''' Fetch the named Proxy.
     '''
     return self.by_name[proxy_name]
+
+  def proxy_pac(self, verbose):
+    proxies_to_patterns = {}
+    default_proxy_names = []
+    for pattern in self._patterns:
+      if pattern.definition == '*':
+        default_proxy_names.extend(pattern.proxy_names)
+      else:
+        proxies_to_patterns \
+          .setdefault(tuple(sorted(pattern.proxy_names)), []) \
+          .append(pattern)
+    yield 'function FindProxyForURL(url, host) {'
+    for proxy_set, patterns in proxies_to_patterns.items():
+      jscond = '\n    || '.join( pattern.proxy_pac_condition("host")
+                                 for pattern in patterns
+                               )
+      proxy_list = '; '.join( self.by_name[proxy_name].proxy_pac_hostport()
+                              for proxy_name in proxy_set
+                            )
+      yield '  if (%s) {' % (jscond,)
+      yield '    proxies = %r;' % (proxy_list,)
+      if verbose:
+        yield '    alert(url + " ==> " + proxies);'
+      yield '    return proxies;'
+      yield '  }'
+    if default_proxy_names:
+      proxy_list = '; '.join( self.by_name[proxy_name].proxy_pac_hostport()
+                              for proxy_name in default_proxy_names
+                            )
+      yield '  proxies = %r;' % (proxy_list,)
+      if verbose:
+        yield '  alert(url + " ==> DEFAULT " + proxies);'
+      yield '  return proxies;'
+    yield '}'
 
   @property
   def patterns(self):

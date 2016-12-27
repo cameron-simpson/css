@@ -154,7 +154,7 @@ _deploy:
 
 _publish _pub:
         :make _publish_bitbucket
-        :make _publish_ezos
+        #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
