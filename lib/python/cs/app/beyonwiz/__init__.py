@@ -21,6 +21,7 @@ DISTINFO = {
 }
 
 import datetime
+import errno
 import json
 import os.path
 from threading import Lock
@@ -149,7 +150,7 @@ class _Recording(object):
         return path2
     raise ValueError("no available --0..--%d variations: %r", max_n-1, path)
 
-  def convert(self, dstpath, outfmt='mp4', max_n=None):
+  def convert(self, dstpath, outfmt='mp4', max_n=None, start_s=None, end_s=None):
     ''' Transcode video to `dstpath` in FFMPEG `outfmt`.
     '''
     ok = True
@@ -180,9 +181,14 @@ class _Recording(object):
         if not os.path.isabs(dstpath):
           dstpath = os.path.join('.', dstpath)
         ffmeta = self.ffmpeg_metadata(outfmt)
-        P, ffargv = ffconvert(None, 'mpegts', dstpath, outfmt, ffmeta, overwrite=False)
+        P, ffargv = ffconvert(None, 'mpegts', dstpath, outfmt, ffmeta,
+                              overwrite=False, start_s=start_s, end_s=end_s)
         info("running %r", ffargv)
-        self.copyto(P.stdin)
+        try:
+          self.copyto(P.stdin)
+        except OSError as e:
+          if e.errno == errno.EPIPE:
+            warning("broken pipe writing to ffmpeg")
         P.stdin.close()
         xit = P.wait()
         if xit == 0:

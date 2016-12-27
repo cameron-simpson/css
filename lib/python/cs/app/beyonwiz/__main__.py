@@ -6,7 +6,7 @@ from __future__ import print_function
 import sys
 import os.path
 import json
-from cs.logutils import setup_logging, warning, error, Pfx
+from cs.logutils import setup_logging, warning, error, Pfx, X
 from . import Recording
 
 TRY_N = 32
@@ -16,11 +16,13 @@ USAGE = '''Usage:
         Write the video content of the named tvwiz directories to
         standard output as MPEG2 transport Stream, acceptable to
         ffmpeg's "mpegts" format.
-    %s convert recording [output.mp4]
+    %s convert recording [start..end] [output.mp4]
         Convert the video content of the named recording to
         the named output file (typically MP4, though the ffmpeg
         output format chosen is based on the extension).
         Most metadata are preserved.
+        start..end: Optional start and end offsets in seconds, used
+          to crop the recording output.
     %s mconvert recording...
         Convert multiple named recordings to automatically named .mp4 files
         in the current directory.
@@ -56,7 +58,7 @@ def main(argv):
         if len(args) < 1:
           error("missing recording")
           badopts = True
-        if len(args) > 2:
+        if len(args) > 3:
           warning("extra arguments after output: %s", " ".join(args))
           badopts = True
       elif op == "mconvert":
@@ -98,12 +100,30 @@ def main(argv):
     elif op == "convert":
       srcpath = args.pop(0)
       with Pfx(srcpath):
+        # parse optional start..end argument
+        start_s = None
+        end_s = None
+        if args and '..' in args[0]:
+          try:
+            start, end = args[0].split('..')
+            start_s = float(start)
+            end_s = float(end)
+            if start_s > end_s:
+              raise ValueError("start:%s > end:%s" % (start, end))
+          except ValueError as e:
+            X("FAIL %r: %s", args[0], e)
+            pass
+          else:
+            args.pop(0)
+        else:
+          X("NOT %r", args[0])
+        # collect optional dstpath
         if args:
           dstpath = args.pop(0)
         else:
           dstpath = None
         R = Recording(srcpath)
-        xit = 0 if R.convert(dstpath, max_n=TRY_N) else 1
+        xit = 0 if R.convert(dstpath, max_n=TRY_N, start_s=start_s, end_s=end_s) else 1
     elif op == "mconvert":
       xit = 0
       for srcpath in args:
