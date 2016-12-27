@@ -16,17 +16,13 @@ DISTINFO = {
 }
 
 import sys
-try:
-  from enum import Enum
-except ImportError:
-  from flufl.enum import Enum
 from cs.debug import Lock
 from cs.logutils import error, exception, warning, debug
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
 
-class AsynchState(Enum):
+class AsynchState(object):
   pending = 'pending'
   running = 'running'
   ready = 'ready'
