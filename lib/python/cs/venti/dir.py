@@ -161,7 +161,7 @@ class _Dirent(object):
         self.meta.update_from_items(metatext.items())
 
   def __str__(self):
-    return self.textencode()
+    return "%s:%r:type=%s" % (self.__class__.__name__, self.name, self.type)
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
