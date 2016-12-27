@@ -180,7 +180,7 @@ class _Recording(object):
         if not os.path.isabs(dstpath):
           dstpath = os.path.join('.', dstpath)
         ffmeta = self.ffmpeg_metadata(outfmt)
-        P, ffargv = ffconvert(None, 'mpegts', dstpath, outfmt, ffmeta)
+        P, ffargv = ffconvert(None, 'mpegts', dstpath, outfmt, ffmeta, overwrite=False)
         info("running %r", ffargv)
         self.copyto(P.stdin)
         P.stdin.close()

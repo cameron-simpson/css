@@ -62,7 +62,7 @@ class MetaData(O):
         opts.extend( ('-metadata', '='.join( (field, value) ) ) )
     return opts
 
-def convert(src, srcfmt, dst, dstfmt, meta=None):
+def convert(src, srcfmt, dst, dstfmt, meta=None, overwrite=False):
     ''' Convert video `src` to `dst`, return a subprocess.Popen object and the ffmpeg argv.
         If `src` is None, pass '-' as the input path and attach a
           pipe to its standard input.
@@ -128,7 +128,9 @@ def convert(src, srcfmt, dst, dstfmt, meta=None):
     if isinstance(dst, str):
       dstpath = dst
       dstfp = None
-    argv = [ 'ffmpeg' ]
+    argv = [ 'ffmpeg',
+             '-y' if overwrite else '-n',
+           ]
     if srcfmt is not None:
       argv.extend( ('-f', srcfmt) )
     argv.extend( ('-i', srcpath) )
