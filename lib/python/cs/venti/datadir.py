@@ -82,8 +82,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       The directory may be maintained by multiple instances of this
       class as they will not try to add data to the same DataFile.
       This is intended to address shared Stores such as a Store on
-      a NAS or a Store replicated by an external file-level service
-      such as Dropbox or plain old rsync.
+      a NAS presented via NFS, or a Store replicated by an external
+      file-level service such as Dropbox or plain old rsync.
 
       A DataDir may be used as the Mapping for a MappingStore.
   '''
