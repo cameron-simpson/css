@@ -7,7 +7,7 @@
 from collections.abc import Mapping
 import csv
 import os
-from os.path import join as joinpath, samefile, exists as existspath
+from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
@@ -118,6 +118,10 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    if not isdirpath(statedirpath):
+      raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
+    if not isdirpath(datadirpath):
+      raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
     self.statedirpath = statedirpath
     self.datadirpath = datadirpath
     self.hashclass = hashclass
