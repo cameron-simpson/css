@@ -26,7 +26,9 @@ import json
 import os.path
 from threading import Lock
 from types import SimpleNamespace as NS
-from cs.app.ffmpeg import convert as ffconvert, MetaData as FFmpegMetaData
+from cs.app.ffmpeg import multiconvert as ffmconvert, \
+                          MetaData as FFmpegMetaData, \
+                          ConversionSource as FFSource
 from cs.logutils import info, warning, error, Pfx, X
 
 # UNUSED
@@ -150,13 +152,31 @@ class _Recording(object):
         return path2
     raise ValueError("no available --0..--%d variations: %r", max_n-1, path)
 
-  def convert(self, dstpath, outfmt='mp4', max_n=None, start_s=None, end_s=None):
-    ''' Transcode video to `dstpath` in FFMPEG `outfmt`.
+  def convert(self,
+              dstpath, dstfmt='mp4', max_n=None,
+              timespans=(),
+              do_copyto=False):
+    ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
-    ok = True
-    srcpath = self.path
+    if not timespans:
+      timespans = (None, None)
+    srcfmt = 'mpegts'
+    if do_copyto:
+      srcpath = None
+      if len(timespans) > 1:
+        raise ValueError("%d timespans but do_copyto is true"
+                         % (len(timespans,)))
+    else:
+      srcpath = self.path
+      # stop path looking like a URL
+      if not os.path.isabs(srcpath):
+        srcpath = os.path.join('.', srcpath)
     if dstpath is None:
-      dstpath = self.convertpath(outext=outfmt)
+      dstpath = self.convertpath(outext=dstfmt)
+    # stop path looking like a URL
+    if not os.path.isabs(dstpath):
+      dstpath = os.path.join('.', dstpath)
+    ok = True
     with Pfx(dstpath):
       if os.path.exists(dstpath):
         ok = False
@@ -172,24 +192,25 @@ class _Recording(object):
       if ok:
         if os.path.exists(dstpath):
           raise ValueError("dstpath exists")
-        if outfmt is None:
+        if dstfmt is None:
           _, ext = os.path.splitext(dstpath)
           if not ext:
             raise ValueError("can't infer output format from dstpath, no extension")
-          outfmt = ext[1:]
-        # prevent output path looking like option or URL
-        if not os.path.isabs(dstpath):
-          dstpath = os.path.join('.', dstpath)
-        ffmeta = self.ffmpeg_metadata(outfmt)
-        P, ffargv = ffconvert(None, 'mpegts', dstpath, outfmt, ffmeta,
-                              overwrite=False, start_s=start_s, end_s=end_s)
+          dstfmt = ext[1:]
+        ffmeta = self.ffmpeg_metadata(dstfmt)
+        sources = []
+        for timespan in timespans:
+          sources.append(FFSource(srcpath, srcfmt, timespan[0], timespan[1]))
+        P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
         info("running %r", ffargv)
-        try:
-          self.copyto(P.stdin)
-        except OSError as e:
-          if e.errno == errno.EPIPE:
-            warning("broken pipe writing to ffmpeg")
-        P.stdin.close()
+        if do_copyto:
+          # feed .copyto data to FFmpeg
+          try:
+            self.copyto(P.stdin)
+          except OSError as e:
+            if e.errno == errno.EPIPE:
+              warning("broken pipe writing to ffmpeg")
+          P.stdin.close()
         xit = P.wait()
         if xit == 0:
           ok = True
@@ -198,13 +219,13 @@ class _Recording(object):
           ok = False
         return ok
 
-  def ffmpeg_metadata(self, outfmt='mp4'):
+  def ffmpeg_metadata(self, dstfmt='mp4'):
     M = self.metadata
     comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
               % (self.path, M.start_dt_iso)
     if M.tags:
       comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
-    return FFmpegMetaData(outfmt,
+    return FFmpegMetaData(dstfmt,
                           title=( '%s: %s' % (M.title, M.episode)
                                   if M.episode
                                   else M.title
