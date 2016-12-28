@@ -16,7 +16,7 @@ USAGE = '''Usage:
         Write the video content of the named tvwiz directories to
         standard output as MPEG2 transport Stream, acceptable to
         ffmpeg's "mpegts" format.
-    %s convert recording [start..end] [output.mp4]
+    %s convert recording [start..end]... [output.mp4]
         Convert the video content of the named recording to
         the named output file (typically MP4, though the ffmpeg
         output format chosen is based on the extension).
@@ -58,9 +58,6 @@ def main(argv):
         if len(args) < 1:
           error("missing recording")
           badopts = True
-        if len(args) > 3:
-          warning("extra arguments after output: %s", " ".join(args))
-          badopts = True
       elif op == "mconvert":
         if len(args) < 1:
           error("missing tvwizdirs")
@@ -100,10 +97,9 @@ def main(argv):
     elif op == "convert":
       srcpath = args.pop(0)
       with Pfx(srcpath):
-        # parse optional start..end argument
-        start_s = None
-        end_s = None
-        if args and '..' in args[0]:
+        # parse optional start..end arguments
+        timespans = []
+        while args and '..' in args[0]:
           try:
             start, end = args[0].split('..')
             start_s = float(start)
@@ -115,15 +111,14 @@ def main(argv):
             pass
           else:
             args.pop(0)
-        else:
-          X("NOT %r", args[0])
+            timespans.append( (start_s, end_s) )
         # collect optional dstpath
         if args:
           dstpath = args.pop(0)
         else:
           dstpath = None
         R = Recording(srcpath)
-        xit = 0 if R.convert(dstpath, max_n=TRY_N, start_s=start_s, end_s=end_s) else 1
+        xit = 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
     elif op == "mconvert":
       xit = 0
       for srcpath in args:
