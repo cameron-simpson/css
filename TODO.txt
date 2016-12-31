@@ -1,0 +1,16 @@
+venti:
+  http
+    /h/hashcode.sha1 ==> raw block
+    /i/hashcode.sha1 ==> contents of indirect block
+    /fs/dirent ==> tree from dirent down
+      vt publish pathname
+        construct and Store Dir:{basename(pathname)=>tree} and recite dirent
+    support ranges on GET requests
+  ProgressStore
+    proxy for a single subStore with various Progress attributes .progress_*
+    convenient status line:
+      {progress_add_bytes|human}:{progress_add_count} {progress_get_bytes|human} {progress_outstanding}
+  SyncProcess: context manager object performing some long operation
+    .progress_{total|outstanding|done}
+    SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents
+    SyncDir(Dirent): pull in contents of dir, optionally incuding file contents
