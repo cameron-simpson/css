@@ -127,10 +127,8 @@ def main(argv):
     error("missing command")
     badopts = True
   else:
-    import signal
-    from cs.debug import thread_dump
-    signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+    signal(SIGHUP, lambda sig, frame: thread_dump())
+    signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
     op = args.pop(0)
     with Pfx(op):
       try:
