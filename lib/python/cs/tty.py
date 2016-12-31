@@ -5,6 +5,7 @@
 #
 
 from __future__ import print_function
+import os
 
 DISTINFO = {
     'description': "functions related to terminals",
@@ -68,16 +69,16 @@ def setupterm(*args):
     curses.setupterm(termstr, fd)
     _ti_setup = True
 
-def statusline_s(text, reverse=False, xpos=None, ypos=None):
-  ''' Return text to update the status line.
+def statusline_bs(text, reverse=False, xpos=None, ypos=None):
+  ''' Return a byte string to update the status line.
   '''
   from curses import tigetstr, tparm, tigetflag
   setupterm()
   if tigetflag('hs'):
     seq = ( tigetstr('tsl'),
             tigetstr('dsl'),
-            tigetstr('rev') if reverse else '',
-            text,
+            tigetstr('rev') if reverse else b'',
+            text.encode(),
             tigetstr('fsl')
           )
   else:
@@ -88,18 +89,16 @@ def statusline_s(text, reverse=False, xpos=None, ypos=None):
       ypos = 0
     seq = ( tigetstr('sc'),   # save cursor position
             tparm(tigetstr("cup"), xpos, ypos),
-            tigetstr('rev') if reverse else '',
-            text,
+            tigetstr('rev') if reverse else b'',
+            text.encode(),
             tigetstr('el'),
             tigetstr('rc')
           )
-  return ''.join(seq)
+  return b''.join(seq)
 
-def statusline(text, fp=None, reverse=False, xpos=None, ypos=None, noflush=False):
+def statusline(text, fd=None, reverse=False, xpos=None, ypos=None, noflush=False):
   ''' Update the status line.
   '''
-  if fp is None:
-    fp = sys.stdout
-  fp.write(statusline_s(text, reverse=reverse, xpos=xpos, ypos=ypos))
-  if not noflush:
-    fp.flush()
+  if fd is None:
+    fd = sys.stdout.fileno()
+  os.write(fd, statusline_bs(text, reverse=reverse, xpos=xpos, ypos=ypos))
