@@ -58,7 +58,7 @@ def main(argv):
       dump filerefs
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt mountpoint [subpath]
+      mount mountlog.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -453,11 +453,19 @@ def cmd_mount(args, verbose=None, log=None):
   except IndexError:
     error("missing special")
     badopts = True
-  try:
+  else:
+    if not os.path.isfile(special):
+      error("not a file: %r", special)
+      badopts = True
+  if args:
     mountpoint = args.pop(0)
-  except IndexError:
-    error("missing mountpoint")
-    badopts = True
+  else:
+    spfx, sext = os.path.splitext(special)
+    if sext != '.vt':
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      badopts = True
+    else:
+      mountpoint = spfx
   if args:
     subpath = args.pop(0)
   else:
@@ -467,10 +475,20 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
+  # import vtfuse before doing anything with side effects
   from .vtfuse import mount
-  if not os.path.isdir(mountpoint):
-    error("%s: mountpoint is not a directory", mountpoint)
-    return 1
+  with Pfx(mountpoint):
+    if not os.path.isdir(mountpoint):
+      # autocreate mountpoint
+      info('mkdir %r ...', mountpoint)
+      try:
+        os.mkdir(mountpoint)
+      except OSError as e:
+        if e.errno == errno.EEXIST:
+          error("mountpoint is not a directory", mountpoint)
+          return 1
+        else:
+          raise
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
