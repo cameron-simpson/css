@@ -20,7 +20,6 @@ import os
 import os.path
 import sys
 from threading import Lock, RLock
-from threading import Thread
 from time import sleep
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
@@ -438,86 +437,71 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, name, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
+  def __init__(self, name, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
     lock = kw.pop('lock', None)
     if lock is None:
       lock = S._lock
-    BasicStoreSync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
+    BasicStoreAsync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
     Ps = {}
-    for category in 'add', 'get', 'contains', 'requests', 'add_bytes', 'get_bytes':
-      # active actions
+    for category in 'adds', 'gets', 'contains', 'requests', 'bytes_stored', 'bytes_fetched':
       Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=4)
-      # cumulative actions
-      Ps[category+'_all'] = Progress(name='-'.join((str(S), category, 'all')), throughput_window=10)
     self._progress = Ps
-    self.run = True
-    self._last_status = ''
-    T = Thread(name='%s-status-line' % (self.S,), target=self._run_status_line)
-    T.daemon = True
-    T.start()
 
   def __str__(self):
-    return self.status_line()
+    return self.status_text()
+
+  def startup(self):
+    BasicStoreSync.startup(self)
+    self.S.open()
 
   def shutdown(self):
-    self.run = False
+    self.S.close()
     BasicStoreSync.shutdown(self)
 
-  def status_line(self, template=None):
+  def status_text(self, template=None):
     if template is None:
       template = self.template
     return template.format_map(self.template_mapping)
 
+  def add(self, data):
+    progress = self._progress
+    progress['requests'] += 1
+    size = len(data)
+    LF = self.S.add_bg(data)
+    del data
+    progress['adds'] += 1
+    progress['bytes_stored'] += size
+    return LF()
+
+  def get(self, h):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.get_bg(h)
+    progress['gets'] += 1
+    data = LF()
+    progress['bytes_fetched'] += len(data)
+    return data
+
+  def contains(self, h):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.contains_bg(h)
+    progress['contains'] += 1
+    return LF()
+
+  def flush(self):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.flush_bg()
+    progress['flushes'] += 1
+    return LF()
+
   @property
   def requests(self):
     return self._progress['requests'].position
-
-  @requests.setter
-  def requests(self, value):
-    return self._progress['requests'].update(value)
-
-  @contextmanager
-  def do_request(self, category):
-    Ps = self._progress
-    self.requests += 1
-    Ps['requests_all'] += 1
-    if category is not None:
-      Pactive = self._progress[category]
-      Pactive.update(Pactive.position + 1)
-      Pall = self._progress[category + '_all']
-      Pall.update(Pall.position + 1)
-    yield
-    if category is not None:
-      Pactive.update(Pactive.position - 1)
-    self.requests -= 1
-
-  def add(self, data):
-    with self.do_request('add'):
-      return self.S.add(data)
-
-  def get(self, hashcode):
-    with self.do_request('get'):
-      return self.S.get(hashcode)
-
-  def contains(self, hashcode):
-    with self.do_request('contains'):
-      return self.S.contains(hashcode)
-
-  def flush(self):
-    with self.do_request(None):
-      return self.S.flush()
-
-  def _run_status_line(self):
-    while self.run:
-      text = self.status_line()
-      old_text = self._last_status
-      if text != self._last_status:
-        self._last_status = text
-        status(text)
-      sleep(0.25)
 
 if __name__ == '__main__':
   import cs.venti.store_tests
