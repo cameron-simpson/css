@@ -122,6 +122,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
     if not isdirpath(datadirpath):
       raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
+    MultiOpenMixin.__init__(self, lock=RLock())
     self.statedirpath = statedirpath
     self.datadirpath = datadirpath
     self.hashclass = hashclass
@@ -131,7 +132,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self._extra_state = {}
     self._n = None
     self._load_state()
-    MultiOpenMixin.__init__(self)
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
