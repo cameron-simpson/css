@@ -632,7 +632,7 @@ if FUSE_CLASS == 'llfuse':
       warning("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
       def attrfunc(*a, **kw):
         warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
-        raise RuntimeError(attr)
+        raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)", attr, a, kw)
       return attrfunc
 
     def __str__(self):
