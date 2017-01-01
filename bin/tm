@@ -442,8 +442,8 @@ case "$op" in
     if [ -z "$detached" ]
     then
       if [ -n "$TMUX" ]
-      then  $trace tmux switch-client -t "$session_name"
-      else  $trace tmux attach-session -t "$session_name"
+      then  exec $trace tmux switch-client -t "$session_name"
+      else  exec $trace tmux attach-session -t "$session_name"
       fi
     fi
     ;;
