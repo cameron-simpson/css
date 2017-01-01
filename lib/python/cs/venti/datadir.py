@@ -504,7 +504,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     except KeyError:
       index = self.index
       try:
-        n, offset = index[hashcode]
+        with self._lock:
+          n, offset = index[hashcode]
       except KeyError:
         error("%s[%s]: hash not in index", self, hashcode)
         raise
