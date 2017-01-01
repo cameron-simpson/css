@@ -21,7 +21,7 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
-from .datafile import DataFile
+from .datafile import DataFile, read_chunk
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
