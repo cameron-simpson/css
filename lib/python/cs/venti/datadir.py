@@ -551,7 +551,6 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __iter__(self):
     mkhash = self.hashclass.from_hashbytes
-    self.flush()
     with self._gdbm_lock:
       hashcode = self._gdbm.firstkey()
     while hashcode is not None:
@@ -561,18 +560,15 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
         hashcode = self._gdbm.nextkey(hashcode)
 
   def __contains__(self, hashcode):
-    self.flush()
     with self._gdbm_lock:
       return hashcode in self._gdbm
 
   def __getitem__(self, hashcode):
-    self.flush()
     with self._gdbm_lock:
       entry = self._gdbm[hashcode]
     return decode_index_entry(entry)
 
   def get(self, hashcode, default=None):
-    self.flush()
     with self._gdbm_lock:
       entry = self._gdbm.get(hashcode, None)
     if entry is None:
