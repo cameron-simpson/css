@@ -160,7 +160,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexpath, self.hashclass)
+    self.index = self.indexclass(self.indexpath, self.hashclass, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
