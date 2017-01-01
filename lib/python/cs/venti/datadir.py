@@ -374,13 +374,14 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     filemap = self._filemap
     if filename in filemap:
       raise KeyError('already in filemap: %r' % (filename,))
-    if filenum is None:
-      filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
-    elif filenum in filemap:
-      raise KeyError('already in filemap: %r' % (filennum,))
-    F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
-    filemap[filenum] = F
-    filemap[filename] = F
+    with self._lock:
+      if filenum is None:
+        filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
+      elif filenum in filemap:
+        raise KeyError('already in filemap: %r' % (filennum,))
+      F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
+      filemap[filenum] = F
+      filemap[filename] = F
     if not no_save:
       self._save_state()
     return F
