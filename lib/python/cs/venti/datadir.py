@@ -440,9 +440,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         datafile has reached the rollover threshold.
     '''
     # save the data in the current datafile, record the file number and offset
-    n, D = self._current_output_datafile()
-    with D:
-      offset, offset2 = D.add(data)
+    with self._lock:
+      n, D = self._current_output_datafile()
+      with D:
+        offset, offset2 = D.add(data)
+        X("DataDir.add: added data: %d bytes => %d consumed", len(data), offset2-offset)
+      F = self._filemap[n]
+      if offset2 <= F.size:
+        raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
+                           % (F.filename, offset2, F.size))
+      F.size = offset2
     hashcode = self.hashclass.from_data(data)
     self._queue_index(hashcode, n, offset)
     rollover = self.rollover
@@ -451,11 +458,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         # we're still the current file? then advance to a new file
         if self.n == n:
           self.n = self.next_n()
-    F = self._filemap[n]
-    if offset2 <= F.size:
-      raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
-                         % (F.filename, offset2, F.size))
-    F.size = offset2
     return hashcode
 
   def __setitem__(self, hashcode, data):
