@@ -20,7 +20,7 @@ import time
 from types import SimpleNamespace as NS
 from cs.debug import DummyMap, TracingObject
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X, XP, debug, info, warning, error, Pfx, DEFAULT_BASE_FORMAT
+from cs.logutils import X, XP, debug, info, warning, error, exception, Pfx, DEFAULT_BASE_FORMAT
 from cs.obj import O, obj_as_dict
 from cs.py.func import funccite, funcname
 from cs.queues import IterableQueue
@@ -69,57 +69,29 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
-  handler = LogFileHandler(LOGGER_FILENAME)
-  formatter = LogFormatter(DEFAULT_BASE_FORMAT)
-  handler.setFormatter(formatter)
-  log.addHandler(handler)
+  log_handler = LogFileHandler(LOGGER_FILENAME)
+  log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
+  log_handler.setFormatter(log_formatter)
+  log.addHandler(log_handler)
   FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
   FS._vt_runfuse(mnt)
 
-def trace_method(method):
-  ## do nothing
-  return method
-  ##fname = '.'.join( (method.__module__, funccite(method)) )
-  fname = '.'.join( (method.__module__, funcname(method)) )
-  def traced_method(self, *a, **kw):
-    citation = fname
-    if a:
-      citation += " " + pformat(a, depth=1)
-    if kw:
-      citation += " " + pformat(kw, depth=2)
-    X("trace_method: %s ...", citation)
-    with Pfx(citation):
-      try:
-        ctx = fuse_get_context()
-      except NameError:
-        ctx = (None, None, None)
-      time0 = time.time()
-      ##self.log.info("CALL %s", citation)
-      try:
-        result = method(self, *a, **kw)
-      except FuseOSError as e:
-        elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, ctx, "FuseOSError %s", e) )
-        raise
-      except Exception as e:
-        elapsed = time.time() - time0
-        dolog(self.log.exception, citation, elapsed, ctx, "%s %s", type(e), e)
-        raise
-      else:
-        elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, ctx, "=> %r", result) )
-        return result
-  traced_method.__name__ = 'trace(%s)' % (fname,)
-  return traced_method
-
-def with_S(method):
-  ''' FUSE request methods may run in any worker thread; push _vt_core.S around each call.
+def handler(method):
+  ''' Decorator for FUSE handlers.
+      Prefixes exceptions with the method name, associated with the
+      Store, prevents anything other than a FUSEOSError being raised.
   '''
-  def inner(self, *a, **kw):
-    with Pfx(method.__name__):
-      with self._vt_core.S:
-        return method(self, *a, **kw)
-  return inner
+  def handle(self, *a, **kw):
+    try:
+      with Pfx(method.__name__):
+        with self._vt_core.S:
+          return method(self, *a, **kw)
+    except FuseOSError:
+      raise
+    except Exception as e:
+      exception("EXCEPTION from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
+      raise FuseOSError(errno.EINVAL)
+  return handle
 
 def log_traces_queued(Q):
   for logcall, citation, elapsed, ctx, msg, *a in Q:
@@ -173,18 +145,15 @@ class FileHandle(O):
         data = fp.read(size)
     return data
 
-  @trace_method
   def truncate(self, length):
     self.Eopen._open_file.truncate(length)
     self.E.touch()
 
-  @trace_method
   def flush(self):
     self.Eopen.flush()
     ## no touch, already done by any writes
     ## self.E.touch()
 
-  @trace_method
   def close(self):
     self.Eopen.close()
     ## no touch, already done by any writes
@@ -466,7 +435,6 @@ class _StoreFS_core(object):
   def __del__(self):
     self.logQ.close()
 
-  @trace_method
   def _sync(self):
     if defaults.S is None:
       raise RuntimeError("RUNTIME: defaults.S is None!")
@@ -733,14 +701,12 @@ if FUSE_CLASS == 'llfuse':
     ##############
     # FUSE support methods.
 
-    @trace_method
-    @with_S
+    @handler
     def access(self, inode, mode, ctx):
       E = self._vt_i2E(inode)
       return self._vt_core._Eaccess(E, mode, ctx)
 
-    @trace_method
-    @with_S
+    @handler
     def create(self, parent_inode, name_b, mode, flags, ctx):
       ''' Create a new file and open it. Return file handle index and EntryAttributes.
       '''
@@ -755,44 +721,38 @@ if FUSE_CLASS == 'llfuse':
       P[name] = E
       return fhndx, self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def destroy(self):
       # TODO: call self.forget with all kreffed inums?
       self._vt_core._sync()
 
-    @trace_method
-    @with_S
+    @handler
     def flush(self, fh):
       FH = self._vt_core._fh(fh)
       FH.flush()
       inum = self._vt_core.E2i(FH.E)
       self._vt_core.kref_dec(inum)
 
-    @with_S
+    @handler
     def forget(self, inode_list):
       for inode, nlookup in inode_list:
         self._vt_core.kref_dec(inode, nlookup)
 
-    @trace_method
-    @with_S
+    @handler
     def fsync(self, fh, datasync):
       self._fh(fh).flush()
 
-    @trace_method
-    @with_S
+    @handler
     def fsyncdir(self, fh, datasync):
       # TODO: commit dir? implies flushing the whole tree
       warning("fsyncdir does nothing at present")
 
-    @trace_method
-    @with_S
+    @handler
     def getattr(self, inode, ctx):
       E = self._vt_core.i2E(inode)
       return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def getxattr(self, inode, xattr_name, ctx):
       # TODO: test for permission to access inode?
       E = self._vt_core.i2E(inode)
@@ -801,8 +761,7 @@ if FUSE_CLASS == 'llfuse':
       # with a stack trace
       return E.meta.getxattr(xattr_name, b'')
 
-    @trace_method
-    @with_S
+    @handler
     def link(self, inode, new_parent_inode, new_name_b, ctx):
       new_name = self._vt_str(new_name_b)
       # TODO: test for write access to new_parent_inode
@@ -841,15 +800,13 @@ if FUSE_CLASS == 'llfuse':
       Esrc.meta.nlink += 1
       return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def listxattr(self, inode, ctx):
       # TODO: ctx allows to access inode?
       E = self._vt_core.i2E(inode)
       return list(E.meta.listxattrs())
 
-    @trace_method
-    @with_S
+    @handler
     def lookup(self, parent_inode, name_b, ctx):
       name = self._vt_str(name_b)
       # TODO: test for permission to search parent_inode
@@ -869,8 +826,7 @@ if FUSE_CLASS == 'llfuse':
           raise FuseOSError(errno.ENOENT)
       return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def mkdir(self, parent_inode, name_b, mode, ctx):
       name = self._vt_str(name_b)
       # TODO: test for permission to search and write parent_inode
@@ -886,8 +842,7 @@ if FUSE_CLASS == 'llfuse':
       P[name] = E
       return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def mknod(self, parent_inode, name_b, mode, rdev, ctx):
       name = self._vt_str(name_b)
       P = self._vt_core.i2E(parent_inode)
@@ -906,8 +861,7 @@ if FUSE_CLASS == 'llfuse':
       P[name] = E
       return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def open(self, inode, flags, ctx):
       ''' Open an existing file, return file handle index.
       '''
@@ -925,8 +879,7 @@ if FUSE_CLASS == 'llfuse':
         self._vt_core.E.change()
       return fhndx
 
-    @trace_method
-    @with_S
+    @handler
     def opendir(self, inode, ctx):
       # TODO: check for permission to read
       class _OpenDir:
@@ -944,8 +897,7 @@ if FUSE_CLASS == 'llfuse':
       fhndx = self._vt_core._new_file_handle_index(OD)
       return fhndx
 
-    @trace_method
-    @with_S
+    @handler
     def read(self, fhndx, off, size):
       FH = self._vt_core._fh(fhndx)
       chunks = []
@@ -958,8 +910,7 @@ if FUSE_CLASS == 'llfuse':
         size -= len(data)
       return b''.join(chunks)
 
-    @trace_method
-    @with_S
+    @handler
     def readdir(self, fhndx, off):
       # TODO: if rootdir, generate '..' for parent of mount
       OD = self._vt_core._fh(fhndx)
@@ -990,8 +941,7 @@ if FUSE_CLASS == 'llfuse':
           o += 1
       return entries()
 
-    @trace_method
-    @with_S
+    @handler
     def readlink(self, inode, ctx):
       # TODO: check for permission to read the link?
       E = self._vt_core.i2E(inode)
@@ -999,18 +949,15 @@ if FUSE_CLASS == 'llfuse':
         raise FuseOSError(errno.EINVAL)
       return E.pathref
 
-    @trace_method
-    @with_S
+    @handler
     def release(self, fhndx):
       self._vt_core._fh_close(fhndx)
 
-    @trace_method
-    @with_S
+    @handler
     def releasedir(self, fhndx):
       self._vt_core._fh_remove(fhndx)
 
-    @trace_method
-    @with_S
+    @handler
     def removexattr(self, inode, xattr_name, ctx):
       # TODO: test for inode ownership?
       E = self._vt_core.i2E(inode)
@@ -1020,8 +967,7 @@ if FUSE_CLASS == 'llfuse':
       except KeyError:
         raise FuseOSError(errno.ENOATTR)
 
-    @trace_method
-    @with_S
+    @handler
     def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
       name_old = self._vt_str(name_old_b)
       name_new = self._vt_str(name_new_b)
@@ -1038,8 +984,7 @@ if FUSE_CLASS == 'llfuse':
       E.name = name_new
       Pdst[name_new] = E
 
-    @trace_method
-    @with_S
+    @handler
     def rmdir(self, parent_inode, name_b, ctx):
       name = self._vt_str(name_b)
       P = self._vt_core.i2E(parent_inode)
@@ -1056,8 +1001,7 @@ if FUSE_CLASS == 'llfuse':
           raise FuseOSError(errno.ENOTEMPTY)
         del P[name]
 
-    @trace_method
-    @with_S
+    @handler
     def setattr(self, inode, attr, fields, fhndx, ctx):
       # TODO: test CTX for permission to chmod/chown/whatever
       # TODO: sanity check fields for other update_* flags?
@@ -1087,15 +1031,13 @@ if FUSE_CLASS == 'llfuse':
           warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
         return self._vt_EntryAttributes(E)
 
-    @trace_method
-    @with_S
+    @handler
     def setxattr(self, inode, xattr_name, value, ctx):
       # TODO: check perms (ownership?)
       E = self._vt_core.i2E(inode)
       E.meta.setxattr(xattr_name, value)
 
-    @trace_method
-    @with_S
+    @handler
     def statfs(self, ctx):
       # TODO: get free space from the current Store
       #       implies adding some kind of method to stores?
@@ -1105,8 +1047,7 @@ if FUSE_CLASS == 'llfuse':
         setattr(fst, attr, getattr(st, attr))
       return fst
 
-    @trace_method
-    @with_S
+    @handler
     def symlink(self, parent_inode, name_b, target, ctx):
       name = self._vt_str(name_b)
       # TODO: check search/write on P
@@ -1117,8 +1058,7 @@ if FUSE_CLASS == 'llfuse':
         raise FuseOSError(errno.EEXIST)
       P[name] = SymlinkDirent(name, {'pathref': target})
 
-    @trace_method
-    @with_S
+    @handler
     def unlink(self, parent_inode, name_b, ctx):
       name = self._vt_str(name_b)
       # TODO: check search/write on P
@@ -1130,7 +1070,7 @@ if FUSE_CLASS == 'llfuse':
       except KeyError:
         raise FuseOSError(errno.ENOENT)
 
-    @with_S
+    @handler
     def write(self, fhndx, off, buf):
       FH = self._vt_core._fh(fhndx)
       written = FH.write(buf, off)
