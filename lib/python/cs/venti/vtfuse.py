@@ -796,17 +796,10 @@ if FUSE_CLASS == 'llfuse':
     def getxattr(self, inode, xattr_name, ctx):
       # TODO: test for permission to access inode?
       E = self._vt_core.i2E(inode)
-      meta = E.meta
-      try:
-        xattr = meta.xattrs[xattr_name]
-      except KeyError:
-        # bit of a hack: pretend all attributes exist, empty if missing
-        # this is essentially to shut up llfuse, which otherwise reports ENOATTR
-        # with a stack trace
-        xattr = b''
-        ##warning("getxattr(%s): not present on %s", xattr_name, E)
-        ##raise FuseOSError(errno.ENOATTR)
-      return xattr
+      # bit of a hack: pretend all attributes exist, empty if missing
+      # this is essentially to shut up llfuse, which otherwise reports ENOATTR
+      # with a stack trace
+      return E.meta.getxattr(xattr_name, b'')
 
     @trace_method
     @with_S
@@ -853,7 +846,7 @@ if FUSE_CLASS == 'llfuse':
     def listxattr(self, inode, ctx):
       # TODO: ctx allows to access inode?
       E = self._vt_core.i2E(inode)
-      return list(E.meta.xattrs.keys())
+      return list(E.meta.listxattrs())
 
     @trace_method
     @with_S
@@ -1019,12 +1012,11 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def removexattr(self, inode, xattr_name, ctx):
-      raise FuseOSError(errno.ENOATTR)
       # TODO: test for inode ownership?
       E = self._vt_core.i2E(inode)
       meta = E.meta
       try:
-        del meta.xattrs[xattr_name]
+        meta.delxattr(xattr_name)
       except KeyError:
         raise FuseOSError(errno.ENOATTR)
 
@@ -1100,7 +1092,7 @@ if FUSE_CLASS == 'llfuse':
     def setxattr(self, inode, xattr_name, value, ctx):
       # TODO: check perms (ownership?)
       E = self._vt_core.i2E(inode)
-      E.meta.xattrs[xattr_name] = value
+      E.meta.setxattr(xattr_name, value)
 
     @trace_method
     @with_S
