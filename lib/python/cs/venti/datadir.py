@@ -417,11 +417,15 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     cache = self._cache
     D = cache.get(n)
     if D is None:
-      # not in the cache, open it
-      F = self._filemap[n]
-      readwrite = (n == self._n)
-      D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
-      D.open()
+      with self._lock:
+        # first, look again now that we have the _lock
+        D = cache.get(n)
+        if D is None:
+          # still not in the cache, open the DataFile and put into the cache
+          F = self._filemap[n]
+          readwrite = (n == self._n)
+          D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
+          D.open()
     return D
 
   @locked
