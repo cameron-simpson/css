@@ -380,6 +380,7 @@ def cmd_dump(args, verbose=None, log=None):
 def cmd_ftp(args, verbose=None, log=None):
   archive, = args
   ftp_archive(archive)
+  return 0
 
 # TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
