@@ -11,6 +11,7 @@ import shlex
 import stat
 import sys
 from cs.logutils import X, warning, error, exception, Pfx
+from cs.fileutils import shortpath
 from .archive import last_Dirent
 from .paths import resolve
 
@@ -20,7 +21,7 @@ def main(argv):
 def ftp_archive(archive):
   with Pfx(archive):
     when, E = last_Dirent(archive, missing_ok=True)
-    F = FTP(E)
+    F = FTP(E, prompt=shortpath(archive))
     F.cmdloop()
   
 def docmd(dofunc):
@@ -41,19 +42,35 @@ def docmd(dofunc):
         exception("%s", e)
         return None
   wrapped.__doc__ = dofunc.__doc__
-  print("wrapped.__doc__ =", repr(wrapped.__doc__))
   return wrapped
 
 class FTP(Cmd):
 
-  def __init__(self, D, sep=None, FS=None):
+  def __init__(self, D, sep=None, FS=None, prompt=None):
     Cmd.__init__(self)
+    self._prompt = prompt
     if sep is None:
       sep = '/' # NB: _not_ os.sep
     self.root = D
     self.cwd = D
     self.sep = sep
     self.fs = FS
+    self._set_prompt()
+
+  def _set_prompt(self):
+    prompt = self._prompt
+    pwd = '/' + self.op_pwd()
+    self.prompt = ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
+
+  def postcmd(self, stop, line):
+    self._set_prompt()
+
+  def do_EOF(self, args):
+    return True
+
+  @docmd
+  def do_quit(self, args):
+    return True
 
   @docmd
   def do_cd(self, args):
