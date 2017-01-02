@@ -30,6 +30,7 @@ from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
+from .vtftp import ftp_archive
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -56,9 +57,10 @@ def main(argv):
       datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
       datadir [indextype:[hashname:]]/dirpath push other-datadir
       dump filerefs
+      ftp archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt [mountpoint [subpath]]
+      mount archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -375,6 +377,11 @@ def cmd_dump(args, verbose=None, log=None):
     dump(path)
   return 0
 
+def cmd_ftp(args, verbose=None, log=None):
+  archive, = args
+  ftp_archive(archive)
+
+# TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
   ''' Initialise a directory for use as a store.
       Usage: init dirpath [datadir]
