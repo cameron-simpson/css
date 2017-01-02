@@ -64,12 +64,20 @@ class FTP(Cmd):
 
   def postcmd(self, stop, line):
     self._set_prompt()
+    return stop
+
+  def emptyline(self):
+    pass
 
   def do_EOF(self, args):
+    ''' Quit on end of input.
+    '''
     return True
 
   @docmd
   def do_quit(self, args):
+    ''' Usage: quit
+    '''
     return True
 
   @docmd
@@ -81,7 +89,7 @@ class FTP(Cmd):
     if len(argv) != 1:
       raise GetoptError("exactly one argument expected, received: %r" % (argv,))
     self.op_cd(argv[0])
-    print(self.op_pwd)
+    print(self.op_pwd())
 
   def op_cd(self, path):
     ''' Change working directory.
@@ -168,6 +176,27 @@ class FTP(Cmd):
     ''' Return a dict mapping current directories names to Dirents.
     '''
     return dict(self.cwd.entries)
+
+  def do_mkdir(self, args):
+    argv = shlex.split(args)
+    if not argv:
+      raise GetoptError("missing arguments")
+    for arg in argv:
+      with Pfx(arg):
+        E, P, tail = resolve(self.cwd, arg)
+        if not tail:
+          error("path exists")
+        elif len(tail) > 1:
+          error("missing superdirectory")
+        elif not E.isdir:
+          error("superpath is not a directory")
+        else:
+          subname = tail[0]
+          if subname in E:
+            error("%r exists", subname)
+          else:
+            E.mkdir(subname)
+        self.cwd
 
 def rwx(mode):
   return ( 'r' if mode&4 else '-' ) \
