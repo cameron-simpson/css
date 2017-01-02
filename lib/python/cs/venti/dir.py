@@ -169,6 +169,11 @@ class _Dirent(object):
                                self.name,
                                self.meta)
 
+  def __hash__(self):
+    ''' Allows collecting _Dirents in a set.
+    '''
+    return id(self)
+
   # TODO: support .block=None
   def __eq__(self, other):
     return ( self.name == other.name
