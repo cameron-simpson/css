@@ -5,6 +5,7 @@
 #
 
 from cmd import Cmd
+import errno
 from getopt import GetoptError
 import readline
 import shlex
@@ -62,7 +63,12 @@ class FTP(Cmd):
     pwd = '/' + self.op_pwd()
     self.prompt = ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
 
+  def precmd(self, line):
+    X("precmd: line=%r", line)
+    return line
+
   def postcmd(self, stop, line):
+    X("postcmd: stop=%s, line=%r", stop, line)
     self._set_prompt()
     return stop
 
@@ -107,6 +113,23 @@ class FTP(Cmd):
       else:
         D = D.chdir1(base)
     self.cwd = D
+
+  @docmd
+  def do_inspect(self, args):
+    ''' Usage: inspect name
+        Print VT level details about name.
+    '''
+    argv = shlex.split(args)
+    if len(argv) != 1:
+      raise GetoptError("invalid arguments: %r" % (argv,))
+    name, = argv
+    E, P, tail = resolve(self.cwd, name)
+    if tail:
+      raise OSError(errno.ENOENT)
+    print("%s: %s" % (name, E))
+    M = E.meta
+    print(M.textencode())
+    print("size=%d" % (len(E.block),))
 
   @docmd
   def do_pwd(self, args):
