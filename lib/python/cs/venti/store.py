@@ -19,13 +19,14 @@ from contextlib import contextmanager
 import os
 import os.path
 import sys
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from time import sleep
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
 from cs.progress import Progress
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
@@ -408,14 +409,66 @@ class DataDirStore(MappingStore):
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, self._datadir, **kw)
+    self._store_queued = {}
+    self._storeQ = IterableQueue(1024)
+    self._store_lock = Lock()
+    self._store_thread = Thread(name="%s-storer", target=self._storer)
+    self._store_thread.start()
 
   def open(self, **kw):
     self._datadir.open()
     return MappingStore.open(self, **kw)
 
   def close(self):
-    self._datadir.close()
     return MappingStore.close(self)
+    self._storeQ.close()
+    self._store_thread.join()
+    self._datadir.close()
+
+  def add(self, data):
+    ''' Accept data, cache it and queue it for storage. Return hashcode.
+    '''
+    ##X("ADD %d bytes", len(data))
+    h = self.hash(data)
+    X("ADD %d bytes => %s", len(data), h)
+    queued = self._store_queued
+    with self._store_lock:
+      if h in queued:
+        return h
+      queued[h] = data
+    self._storeQ.put(data)
+    return h
+
+  def get(self, h, default=None):
+    try:
+      data = self._store_queued[h]
+    except KeyError:
+      return MappingStore.get(self, h, default=default)
+    else:
+      return data
+
+  def contains(self, h):
+    if h in self._store_queued:
+      return True
+    return MappingStore.contains(self, h)
+
+  def _storer(self):
+    ''' Store queued data and flush the map of stored data items.
+    '''
+    X("STORER RUNNING")
+    Q = self._storeQ
+    lock = self._store_lock
+    queued = self._store_queued
+    for data in Q:
+      ##X("STORER: MappingSTore.add %d bytes", len(data))
+      h = MappingStore.add(self, data)
+      X("STORER: MappingStore.add %d bytes => %s", len(data), h)
+      with lock:
+        try:
+          del queued[h]
+        except KeyError:
+          pass
+      ##X("STORER: removed from queued")
 
 class _ProgressStoreTemplateMapping(object):
 
