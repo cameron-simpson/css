@@ -112,6 +112,8 @@ class DataFile(MultiOpenMixin):
     self.fp = None
 
   def flush(self):
+    ''' Flush any buffered writes to the filesystem.
+    '''
     with self._lock:
       if self.appending:
         self.fp.flush()
