@@ -10,7 +10,7 @@ trace=
 [ -t 2 ] && trace=set-x
 
 cmd=$0
-usage="Usage: $cmd prefix {set|clear}[-all]
+usage="Usage: $cmd prefix [{set|clear}[-all]]
   prefix    Prefix of flags involved: implies flags commencing {prefix}_
   set       Set all flags whose suffixes are named on the input.
   set-all   Set all flags whose suffixes are named on the input,
@@ -32,21 +32,21 @@ fi
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing operation" >&2
-  badopts=1
-else
-  op=$1
-  shift
-  case "$op" in
-    set)        do_set=1 do_all= ;;
-    set-all)    do_set=1 do_all=1 ;;
-    clear)      do_set= do_all= ;;
-    clear-all)  do_set= do_all=1 ;;
-    *)          echo "$cmd: unrecognised operation: $op" >&2
-                badopts=1
-                ;;
-  esac
+  flag | grep "^${pfx}_"
+  exit 0
 fi
+
+op=$1
+shift
+case "$op" in
+  set)        do_set=1 do_all= ;;
+  set-all)    do_set=1 do_all=1 ;;
+  clear)      do_set= do_all= ;;
+  clear-all)  do_set= do_all=1 ;;
+  *)          echo "$cmd: unrecognised operation: $op" >&2
+              badopts=1
+              ;;
+esac
 
 if [ $# -gt 0 ]
 then
