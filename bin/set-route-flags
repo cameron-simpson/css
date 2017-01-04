@@ -8,18 +8,57 @@ set -ue
 
 trace=
 [ -t 2 ] && trace=set-x
+do_monitor=
+interval=7
 
-set -- $( get-default-gateway )
-if [ $# = 0 ]
-then  $trace flag ROUTE_DEFAULT 0
-else  $trace flag ROUTE_DEFAULT 1
+cmd=$0
+usage="Usage: $cmd [--monitor [interval]]"
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    --monitor)
+        shift
+        do_monitor=1
+        if [ $# -gt 0 ]
+        then
+          case "$1" in
+            [1-9]|[1-9]*[0-9])
+                interval=$1
+                shift
+                ;;
+            *)  echo "$cmd: invalid interval: $1" >&2
+                badopts=1
+                ;;
+          esac
+        fi
+        ;;
+    *)  echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+  esac
 fi
 
-for gw
-do
-  echo "$gw"
-done | tr . _  | flagset ROUTE_GW set-all
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-netstat -rn \
-| sed -n '/^Internet:/,/^$/{ /^[1-9][^ ]* /!d; s/ .*//; y/./_/; s|/|__|; p; }' \
-| flagset ROUTE_TO set-all
+if [ $do_monitor ]
+then
+  while :; do $trace "$0"; sleep "$interval" || break; done
+else
+  set -- $( get-default-gateway )
+  if [ $# = 0 ]
+  then  $trace flag ROUTE_DEFAULT 0
+  else  $trace flag ROUTE_DEFAULT 1
+  fi
+
+  for gw
+  do
+    echo "$gw"
+  done | tr . _  | flagset ROUTE_GW set-all
+
+  netstat -rn \
+  | sed -n '/^Internet:/,/^$/{ /^[1-9][^ ]* /!d; s/ .*//; y/./_/; s|/|__|; p; }' \
+  | flagset ROUTE_TO set-all
+fi
