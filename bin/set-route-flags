@@ -49,8 +49,8 @@ then
 else
   set -- $( get-default-gateway )
   if [ $# = 0 ]
-  then  $trace flag ROUTE_DEFAULT 0
-  else  $trace flag ROUTE_DEFAULT 1
+  then  flag ROUTE_DEFAULT && $trace flag ROUTE_DEFAULT 0
+  else  flag ROUTE_DEFAULT || $trace flag ROUTE_DEFAULT 1
   fi
 
   for gw
