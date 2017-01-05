@@ -61,8 +61,8 @@ set -- $( sed "s^${pfx}_" )
 for flag
 do
   if [ $do_set ]
-  then  $trace flag -w "$flag" 1
-  else  $trace flag -w "$flag" 0
+  then  flag "$flag" || $trace flag -w "$flag" 1
+  else  flag "$flag" && $trace flag -w "$flag" 0
   fi
 done
 
