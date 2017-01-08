@@ -96,7 +96,7 @@ def main(argv):
     if op == 'haproxy':
       # haproxy does not handle DIRECT
       if subop == 'backends':
-        return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
+        return cmd_haproxy_backends(config, frontend_name, frontend_listen)
     if op == 'proxy.pac':
       return cmd_proxy_pac(config, verbose)
     if op == 'squid':
@@ -186,8 +186,6 @@ def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
     print(*ha_line_words)
   # define the backends
   for proxy_combo in sorted(proxies.proxy_combinations()):
-    if proxy_combo == ('DIRECT',):
-      continue
     print()
     for ha_line_words in proxies.haproxy_define_backend(proxy_combo):
       print(*ha_line_words)
@@ -249,8 +247,8 @@ class Config(_Config):
     ''' Compute the set of unique proxy combinations.
     '''
     combos = set()
-    for pattern in self.patterns:
-      combos.add(pattern.proxy_names_tuple())
+    for R in self.rules:
+      combos.add(R.proxy_names_tuple())
     return combos
 
   def haproxy_define_frontend(self, frontend_name, frontend_listen):
@@ -259,18 +257,17 @@ class Config(_Config):
     yield 'frontend', frontend_name
     yield '  bind', frontend_listen
     default_proxies = set()
-    for pattern in self.patterns:
-      defn = pattern.definition
-      proxy_names = [ _ for _ in pattern.proxy_names if _ != 'DIRECT' ]
-      if not proxy_names:
-        continue
-      # catch the wildcard last
-      if defn == '*':
-        default_proxies.update(proxy_names)
-        continue
-      yield ( '  use_backend %s if { %s }' \
-              % (haproxy_backend_name(pattern.proxy_names), pattern.haproxy_acl()),
-            )
+    for R in self.rules:
+      proxy_names = R.proxy_names
+      for pattern in R.patterns:
+        defn = pattern.pattern
+        # catch the wildcard last
+        if defn == '*':
+          default_proxies.update(proxy_names)
+          continue
+        yield ( '  use_backend %s if { %s }' \
+                % (haproxy_backend_name(proxy_names), pattern.haproxy_acl()),
+              )
     yield '  default_backend', haproxy_backend_name(default_proxies)
 
   def haproxy_define_backend(self, proxy_names):
@@ -280,9 +277,10 @@ class Config(_Config):
     yield '  option httpchk HEAD http://www.smh.com.au/ HTTP/1.0\\r\\n',
     for proxy_name in sorted(proxy_names):
       proxy = self.proxies[proxy_name]
-      yield ( '  server %s_%d %s:%d check' \
-              % (proxy.hostname, proxy.port, proxy.hostname, proxy.port),
-            )
+      if proxy.host is not None:
+        yield ( '  server %s_%d %s:%d check' \
+                % (proxy.host, proxy.port, proxy.host, proxy.port),
+              )
 
 _Proxy = namedtuple("Proxy", "name lineno host port")
 class Proxy(_Proxy):
@@ -294,20 +292,19 @@ class Proxy(_Proxy):
 
 _Rule = namedtuple('Rule', 'proxy_names lineno patterns')
 class Rule(_Rule):
-  pass
-
-_Pattern = namedtuple('Pattern', 'pattern lineno')
-class Pattern(_Pattern):
 
   def proxy_names_tuple(self):
     ''' Canonical proxy name tuple - sorted.
     '''
     return tuple(sorted(set(self.proxy_names)))
 
+_Pattern = namedtuple('Pattern', 'pattern lineno')
+class Pattern(_Pattern):
+
   def haproxy_acl(self):
     ''' Return the inline ACL condition for use in an haproxy backend selector.
     '''
-    pattern = self.definition
+    pattern = self.pattern
     with Pfx('haproxy_acl(%r)', self):
       if not pattern:
         raise ValueError('empty pattern')
@@ -332,7 +329,6 @@ class Pattern(_Pattern):
              ):
             raise ValueError('invalid ip-prefix')
           return 'hdr_beg(host) %s' % haquote('.'.join(words) + '.')
-        X("words = %r", words)
         if ( len(words) > 4
           or not(all(word.isdigit() and int(word) < 256 for word in words))
            ):
