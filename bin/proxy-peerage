@@ -88,22 +88,97 @@ def main(argv):
       print(usage, file=sys.stderr)
       return 2
     xit = 0
-    proxies = Proxies()
-    proxies.add_proxy(Proxy('DIRECT', None, None, None, []))
+    config = Config({'DIRECT': Proxy('DIRECT', None, None, None)}, [])
     with Pfx('stdin'):
-      if not proxies.load_proxies(sys.stdin):
+      config, ok = read_peerage(sys.stdin, config)
+      if not ok:
         xit=1
     if op == 'haproxy':
       # haproxy does not handle DIRECT
       if subop == 'backends':
         return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
     if op == 'proxy.pac':
-      return cmd_proxy_pac(proxies, verbose)
+      return cmd_proxy_pac(config, verbose)
     if op == 'squid':
       if subop == 'acls':
         return cmd_squid_acls(proxies, proxy_name)
     error('unimplemented op/subop: %s/%s', op, subop)
     return 2
+
+def read_peerage(fp, config=None):
+  ''' Read proxy peer information from a file `fp`. Return Config and ok.
+  '''
+  if config is None:
+    config = Config({}, [])
+  if isinstance(fp, str):
+    filename = fp
+    with Pfx(filename):
+      with open(filename) as fp:
+        return read_peerage(fp, config)
+  proxies = config.proxies
+  rules = config.rules
+  ok = True
+  R = None
+  for lineno, line in enumerate(fp, 1):
+    with Pfx(lineno):
+      if not line.endswith('\n'):
+        error("missing trailing newline")
+        ok = False
+      line = line.strip()
+      if not line:
+        continue
+      if line.startswith('#'):
+        continue
+      words = line.split()
+      word0 = words.pop(0)
+      proxy_name, offset = get_uc_identifier(word0)
+      if not proxy_name:
+        error("expected leading uppercase identifier")
+        ok = False
+        continue
+      with Pfx(proxy_name):
+        if word0.startswith('=', offset):
+          # proxy definition PROXY=host[:port]
+          defn = line[offset+1:]
+          try:
+            proxy_host, proxy_port = defn.rsplit(':', 1)
+          except ValueError:
+            proxy_host = defn
+            proxy_port = 3128
+          else:
+            with Pfx("port %r", proxy_port):
+              try:
+                proxy_port = int(proxy_port)
+              except ValueError as e:
+                error(e)
+                ok = False
+                continue
+          if words:
+            error('extra text after definition: %s', ' '.join(words))
+            ok = False
+            continue
+          if proxy_name in proxies:
+            error('repeated definition, first on line %d', proxy.defn_lineno)
+            ok = False
+            continue
+          proxies[proxy_name] = Proxy(proxy_name, lineno, proxy_host, proxy_port)
+          continue
+        # LABEL[,LABEL2...] pattern...
+        proxy_names = []
+        for proxy_name in word0.split(','):
+          if proxy_name not in proxies:
+            error("unknown proxy name %r", proxy_name)
+            ok = False
+            continue
+          proxy_names.append(proxy_name)
+        if R is None or proxy_names != R.proxy_names:
+          # commence new rule
+          R = Rule(proxy_names, lineno, [])
+          rules.append(R)
+        for pattern in words:
+          P = Pattern(pattern, lineno)
+          R.patterns.append(P)
+  return config, ok
 
 def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
   # define the frontend
@@ -120,8 +195,8 @@ def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
 def haproxy_backend_name(proxy_names):
   return '__'.join(sorted(proxy_names))
 
-def cmd_proxy_pac(proxies, verbose):
-  for line in proxies.proxy_pac(verbose):
+def cmd_proxy_pac(config, verbose):
+  for line in config.proxy_pac(verbose):
     print(line)
 
 def cmd_squid_acls(proxies, proxy_name):
@@ -150,21 +225,79 @@ def cmd_squid_acls(proxies, proxy_name):
   else:
     raise ValueError(proxy_name)
 
-_Proxy = namedtuple('Proxy', 'name defn_lineno hostname port patterns')
+_Config = namedtuple("Config", "proxies rules")
+class Config(_Config):
+
+  def proxy_pac(self, verbose):
+    yield 'function FindProxyForURL(url, host) {'
+    for R in self.rules:
+      jscond = '\n    || '.join( pattern.proxy_pac_condition("host")
+                                 for pattern in R.patterns
+                               )
+      proxy_list = '; '.join( self.proxies[proxy_name].proxy_pac_hostport()
+                              for proxy_name in R.proxy_names
+                            )
+      yield '  if (%s) {' % (jscond,)
+      yield '    proxies = %r;' % (proxy_list,)
+      if verbose:
+        yield '    alert(url + " ==> " + proxies);'
+      yield '    return proxies;'
+      yield '  }'
+    yield '}'
+
+  def proxy_combinations(self):
+    ''' Compute the set of unique proxy combinations.
+    '''
+    combos = set()
+    for pattern in self.patterns:
+      combos.add(pattern.proxy_names_tuple())
+    return combos
+
+  def haproxy_define_frontend(self, frontend_name, frontend_listen):
+    ''' Generator yielding words to define a frontend to choose amongst the proxies.
+    '''
+    yield 'frontend', frontend_name
+    yield '  bind', frontend_listen
+    default_proxies = set()
+    for pattern in self.patterns:
+      defn = pattern.definition
+      proxy_names = [ _ for _ in pattern.proxy_names if _ != 'DIRECT' ]
+      if not proxy_names:
+        continue
+      # catch the wildcard last
+      if defn == '*':
+        default_proxies.update(proxy_names)
+        continue
+      yield ( '  use_backend %s if { %s }' \
+              % (haproxy_backend_name(pattern.proxy_names), pattern.haproxy_acl()),
+            )
+    yield '  default_backend', haproxy_backend_name(default_proxies)
+
+  def haproxy_define_backend(self, proxy_names):
+    ''' Generator yielding words to define an haproxy backend.
+    '''
+    yield 'backend', haproxy_backend_name(proxy_names)
+    yield '  option httpchk HEAD http://www.smh.com.au/ HTTP/1.0\\r\\n',
+    for proxy_name in sorted(proxy_names):
+      proxy = self.proxies[proxy_name]
+      yield ( '  server %s_%d %s:%d check' \
+              % (proxy.hostname, proxy.port, proxy.hostname, proxy.port),
+            )
+
+_Proxy = namedtuple("Proxy", "name lineno host port")
 class Proxy(_Proxy):
 
   def proxy_pac_hostport(self):
-    if self.hostname is None:
+    if self.host is None:
       return 'DIRECT'
-    return "%s:%d" % (self.hostname, self.port)
+    return "%s:%d" % (self.host, self.port)
 
-_Pattern = namedtuple('Pattern', 'definition defn_lineno proxy_names')
+_Rule = namedtuple('Rule', 'proxy_names lineno patterns')
+class Rule(_Rule):
+  pass
+
+_Pattern = namedtuple('Pattern', 'pattern lineno')
 class Pattern(_Pattern):
-  ''' Subclass of _Pattern with various computed properties.
-  '''
-
-  def __str__(self):
-    return "Pattern(%s:%s)" % (self.definition, ','.join(sorted(self.proxy_names)))
 
   def proxy_names_tuple(self):
     ''' Canonical proxy name tuple - sorted.
@@ -254,205 +387,13 @@ class Pattern(_Pattern):
   def proxy_pac_condition(self, varname="host"):
     ''' Return a javascript test to match this pattern.
     '''
-    pattern = self.definition
+    pattern = self.pattern
     if pattern == '*':
       return 'true'
     if '*' in pattern:
       return 'shExpMatch(%s, %r)' % (varname, pattern)
     return '%s == %r' % (varname, pattern)
     ##raise ValueError("no proxy_pac_condition for pattern %r" % (pattern,))
-
-class Proxies(object):
-
-  def __init__(self):
-    self.by_name = {}    # map from proxy name to Proxy
-    self._patterns = []  # Patterns in order received
-
-  def get(self, proxy_name):
-    ''' Fetch the named Proxy or None.
-    '''
-    return self.by_name.get(proxy_name)
-
-  def __getitem__(self, proxy_name):
-    ''' Fetch the named Proxy.
-    '''
-    return self.by_name[proxy_name]
-
-  def proxy_pac(self, verbose):
-    proxies_to_patterns = {}
-    default_proxy_names = []
-    for pattern in self._patterns:
-      if pattern.definition == '*':
-        default_proxy_names.extend(pattern.proxy_names)
-      else:
-        proxies_to_patterns \
-          .setdefault(tuple(sorted(pattern.proxy_names)), []) \
-          .append(pattern)
-    yield 'function FindProxyForURL(url, host) {'
-    for proxy_set, patterns in proxies_to_patterns.items():
-      jscond = '\n    || '.join( pattern.proxy_pac_condition("host")
-                                 for pattern in patterns
-                               )
-      proxy_list = '; '.join( self.by_name[proxy_name].proxy_pac_hostport()
-                              for proxy_name in proxy_set
-                            )
-      yield '  if (%s) {' % (jscond,)
-      yield '    proxies = %r;' % (proxy_list,)
-      if verbose:
-        yield '    alert(url + " ==> " + proxies);'
-      yield '    return proxies;'
-      yield '  }'
-    if default_proxy_names:
-      proxy_list = '; '.join( self.by_name[proxy_name].proxy_pac_hostport()
-                              for proxy_name in default_proxy_names
-                            )
-      yield '  proxies = %r;' % (proxy_list,)
-      if verbose:
-        yield '  alert(url + " ==> DEFAULT " + proxies);'
-      yield '  return proxies;'
-    yield '}'
-
-  @property
-  def patterns(self):
-    return self._patterns
-
-  def add_pattern(self, pattern):
-    ''' Add a pattern, vet the proxy name.
-    '''
-    self._patterns.append(pattern)
-    for proxy_name in pattern.proxy_names:
-      proxy = self.by_name.get(proxy_name)
-      if proxy is None:
-        warning("unknown proxy name: %r", proxy_name)
-      else:
-        proxy.patterns.append(pattern)
-
-  def add_proxy(self, proxy):
-    ''' Record a Proxy object in this Proxies collection.
-    '''
-    proxies = self.by_name
-    if proxy.name in proxies:
-      raise ValueError('proxy %r already exists', proxy.name)
-    proxies[proxy.name] = proxy
-
-  def proxy_combinations(self):
-    ''' Compute the set of unique proxy combinations.
-    '''
-    combos = set()
-    for pattern in self.patterns:
-      combos.add(pattern.proxy_names_tuple())
-    return combos
-
-  def load_proxies(self, fp):
-    ''' Load proxy definitions from `fp`. Return success.
-        If `fp` is a str subclass, open the named file.
-    '''
-    if isinstance(fp, str):
-      with Pfx(fp):
-        return self.load_proxies(open(fp))
-    all_ok = True
-    for lineno, line in enumerate(fp, 1):
-      with Pfx(lineno):
-        ok = True
-        if not line.endswith('\n'):
-          error('missing newline')
-          all_ok = False
-          continue
-        line = line.strip()
-        if not line or line.startswith('#'):
-          # skip blank lines and comments
-          continue
-        label, offset = get_uc_identifier(line)
-        if not label:
-          error('expected leading uppercase identifier')
-          all_ok = False
-          continue
-        if line[offset:].startswith('='):
-          with Pfx(label):
-            defn = line[offset+1:]
-            if not defn:
-              error('missing definition')
-              all_ok = False
-              continue
-            words = defn.split()
-            defn = words[0]
-            if ':' in defn:
-              proxy_host, proxy_port = defn.rsplit(':', 1)
-              with Pfx('proxy_port: %r', proxy_port):
-                try:
-                  proxy_port = int(proxy_port)
-                except ValueError as e:
-                  error(e)
-                  ok = False
-                else:
-                  if proxy_port < 1 or proxy_port >= 65536:
-                    error('out of range')
-                    ok = False
-            else:
-              proxy_host, proxy_port = defn, 3128
-            if len(words) > 1:
-              error('extra text after definition: %s', ' '.join(words[1:]))
-              ok = False
-            proxy = self.get(label)
-            if proxy:
-              error('repeated definition, first on line %d', proxy.defn_lineno)
-              ok = False
-            if ok:
-              self.add_proxy(Proxy(label, lineno, proxy_host, proxy_port, []))
-            else:
-              all_ok = False
-        else:
-          # gather comma separated labels
-          labels = [label]
-          while offset < len(line) and line[offset] == ',':
-            label, offset = get_uc_identifier(line, offset + 1)
-            if not label:
-              error('expected uppercase identifier after comma, found: %r', line[offset:])
-              all_ok = False
-              continue
-            labels.append(label)
-          if offset == len(line) or not line[offset].isspace():
-            error('expected patterns after labels, found: %r', line[offset:])
-            all_ok = False
-            continue
-          words = line[offset:].split()
-          patterns = []
-          for word in words:
-            patterns.extend(_ for _ in word.split(',') if _)
-          for pattern in patterns:
-            self.add_pattern(Pattern(pattern, lineno, labels))
-    return all_ok
-
-  def haproxy_define_frontend(self, frontend_name, frontend_listen):
-    ''' Generator yielding words to define a frontend to choose amongst the proxies.
-    '''
-    yield 'frontend', frontend_name
-    yield '  bind', frontend_listen
-    default_proxies = set()
-    for pattern in self.patterns:
-      defn = pattern.definition
-      proxy_names = [ _ for _ in pattern.proxy_names if _ != 'DIRECT' ]
-      if not proxy_names:
-        continue
-      # catch the wildcard last
-      if defn == '*':
-        default_proxies.update(proxy_names)
-        continue
-      yield ( '  use_backend %s if { %s }' \
-              % (haproxy_backend_name(pattern.proxy_names), pattern.haproxy_acl()),
-            )
-    yield '  default_backend', haproxy_backend_name(default_proxies)
-
-  def haproxy_define_backend(self, proxy_names):
-    ''' Generator yielding words to define an haproxy backend.
-    '''
-    yield 'backend', haproxy_backend_name(proxy_names)
-    yield '  option httpchk HEAD http://www.smh.com.au/ HTTP/1.0\\r\\n',
-    for proxy_name in sorted(proxy_names):
-      proxy = self.by_name[proxy_name]
-      yield ( '  server %s_%d %s:%d check' \
-              % (proxy.hostname, proxy.port, proxy.hostname, proxy.port),
-            )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
