@@ -8,18 +8,12 @@
 
 set -ue
 
-if [ -z "${TMUX_TMPDIR:-}" ]
-then
-  if [ -d "$HOME/var/tmux/." ]
-  then
-    TMUX_TMPDIR=$HOME/var/tmux
-    export TMUX_TMPDIR
-  fi
-fi
 : ${TMUX:=''}
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
 : ${DEBUG:=''}
+: ${TMUX_TMPDIR:=$HOME/var/tmux}
+export TMUX_TMPDIR
 
 trace=
 setx=:
@@ -273,6 +267,8 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ -d "$TMUX_TMPDIR/." ] || set-x mkdir -p "$TMUX_TMPDIR"
+
 rcmd(){
   _rcmd_rhost=$1; shift
   $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
@@ -374,7 +370,7 @@ case "$op" in
     if [ $# = 0 ]
     then
       echo "$cmd: $op: no session names and nothing in \$HOME/.tmrc" >&2
-      badopts=1
+      exit 1
     else
       tmux start-server
       for session_name
