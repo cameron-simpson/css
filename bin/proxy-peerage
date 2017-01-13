@@ -229,7 +229,7 @@ class Config(_Config):
   def proxy_pac(self, verbose):
     yield 'function FindProxyForURL(url, host) {'
     for R in self.rules:
-      jscond = '\n    || '.join( pattern.proxy_pac_condition("host")
+      jscond = '\n    || '.join( pattern.proxy_pac_condition(url_varname="url", host_varname="host")
                                  for pattern in R.patterns
                                )
       proxy_list = '; '.join( self.proxies[proxy_name].proxy_pac_hostport()
@@ -380,15 +380,15 @@ class Pattern(_Pattern):
         return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
       raise ValueError('unrecognised pattern')
 
-  def proxy_pac_condition(self, varname="host"):
+  def proxy_pac_condition(self, url_varname="url", host_varname="host"):
     ''' Return a javascript test to match this pattern.
     '''
     pattern = self.pattern
     if pattern == '*':
       return 'true'
     if '*' in pattern:
-      return 'shExpMatch(%s, %r)' % (varname, pattern)
-    return '%s == %r' % (varname, pattern)
+      return 'shExpMatch(%s, %r)' % (host_varname, pattern)
+    return '%s == %r' % (host_varname, pattern)
     ##raise ValueError("no proxy_pac_condition for pattern %r" % (pattern,))
 
 if __name__ == '__main__':
