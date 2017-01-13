@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Trite FFMpeg incantation to merge multiple streams (eg a video
+# stream and an audio stream) to standard output.
+#   - Cameron Simpson <cs@zip.com.au> 13jan2017
+#
+
+set -ue
+
+first=1
+for f
+do
+  if [ $first ]
+  then  set -- ffmpeg -i "$f"; first=
+  else  set -- "$@" -i "$f"
+  fi
+done
+
+exec "$@" -acodec copy -vcodec copy -
