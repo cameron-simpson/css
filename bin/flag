@@ -188,7 +188,7 @@ then
     testflag "$flagname" || exit 0
     # it is ok for the file to be missing
     [ $debug ] && echo "$0: $flagfile -> ''" >&2
-    [ -d "$flagdir/." ] || mkdir -p "$flagdir" || exit 0
+    [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 0
     : >"$flagfile" || exit 0
   fi
   exit 0
