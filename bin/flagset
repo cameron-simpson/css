@@ -7,7 +7,7 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 
 cmd=$0
 usage="Usage: $cmd prefix [{set|clear}[-all]]
@@ -68,17 +68,18 @@ done
 
 if [ $do_all ]
 then
-  flag "^${pfx}_*" \
+  flag "${pfx}_*" \
   | \
   while read -r flag value
   do
     case " $* " in
-      *" $flag "*) ;;
-      *)  case "$do_set,$value" in
-            1,TRUE) $trace flag -v "$flag" 0 ;;
-            ,FALSE) $trace flag -v "$flag" 1 ;;
-          esac
-          ;;
+      *" $flag "*) ;; # skip "on" flags
+      *)
+        case "$do_set,$value" in
+          1,TRUE) $trace flag -v "$flag" 0 ;;
+          ,FALSE) $trace flag -v "$flag" 1 ;;
+        esac
+        ;;
     esac
   done
 fi
