@@ -15,8 +15,8 @@ flushflags=
 
 cmd=$0
 usage="Usage:
-  $cmd [options...]
-    List flags and values.
+  $cmd [options...] [glob]
+    List flags and values. If supplied, select names matching glob.
   $cmd [options...] [!] flagname
     Test flag for truth, or falsehood if \"!\" supplied.
   $cmd [options...] flagname {true|false|0|1}
@@ -50,6 +50,27 @@ do
   shift
 done
 
+testflag(){
+  [ -s "$flagdir/$1" ]
+}
+
+matchflag(){ return 0; }
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    *\**)
+      matchglob=$1
+      shift
+      eval "matchflag(){
+              case "\$1" in
+                $matchglob) return 0 ;;
+                *)          return 1 ;;
+              esac
+            }"
+      ;;
+  esac
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 debug=${DEBUG:+1}
@@ -61,8 +82,9 @@ then
   cd "$flagdir" || exit 1
   for flag in *
   do
+    matchflag "$flag" || continue
     [ "x$flag" = 'x*' ] && continue
-    if flag "$flag"
+    if testflag "$flag"
     then
       if [ $quiet ]
       then  echo "$flag"
@@ -157,23 +179,27 @@ if [ $setstate ]
 then
   if [ $newstate ]
   then
+    testflag "$flagname" && exit 0
     # not ok for file to be missing
     [ $debug ] && echo "$0: $flagfile -> 1" >&2
-    [ -d "$flagdir/." ] || needdir "$flagdir" || exit 1
+    [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 1
     echo 1 >"$flagfile" || exit 1
   else
+    testflag "$flagname" || exit 0
     # it is ok for the file to be missing
     [ $debug ] && echo "$0: $flagfile -> ''" >&2
-    [ -d "$flagdir/." ] || needdir "$flagdir" || exit 0
+    [ -d "$flagdir/." ] || mkdir -p "$flagdir" || exit 0
     : >"$flagfile" || exit 0
   fi
   exit 0
 fi
 
-if [ -s "$flagfile" ]
-then  [ $invert ] && exit 1
-      exit 0
-else  [ $makemissing ] && [ ! -f "$flagfile" ] && : >"$flagfile"
-      [ $invert ] && exit 0
-      exit 1
+if testflag "$flagname"
+then
+  [ $invert ] && exit 1
+  exit 0
+else
+  [ $makemissing ] && [ ! -f "$flagfile" ] && : >"$flagfile"
+  [ $invert ] && exit 0
+  exit 1
 fi
