@@ -12,6 +12,8 @@ qopt=
 invert=
 makemissing=
 flushflags=
+verbose=
+verbose_all=
 
 cmd=$0
 usage="Usage:
@@ -29,6 +31,8 @@ usage="Usage:
     -d flagdir  Specify directory to hold flag files.
     -F          Flush flags. Delete files for false flags.
     -q          Quiet. Do not report false flags in list mode.
+    -v          Verbose. Recite flag value changes.
+    -V          Very verbose. Recite all flag values set, even when not a change.
     -w          Update/create the flag file with the derived flag if missing.
     --          End options."
 
@@ -38,9 +42,11 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) flagdir=$2; shift ;;
-    -q) quiet=1 qopt=$1 ;;
-    -w) makemissing=1 ;;
     -F) flushflags=1 ;;
+    -q) quiet=1 qopt=$1 ;;
+    -v) verbose=1 ;;
+    -V) verbose=1 verbose_all=1 ;;
+    -w) makemissing=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -80,21 +86,21 @@ if [ $# = 0 ]
 then
   # no flag name; list flag values
   cd "$flagdir" || exit 1
-  for flag in *
+  for flagname in *
   do
-    matchflag "$flag" || continue
-    [ "x$flag" = 'x*' ] && continue
-    if testflag "$flag"
+    [ "x$flag" = 'x*' ] && [ ! -e "$flag" ] && continue
+    matchflag "$flagname" || continue
+    if testflag "$flagname"
     then
       if [ $quiet ]
-      then  echo "$flag"
-      else  echo "$flag	TRUE"
+      then  echo "$flagname"
+      else  echo "$flagname	TRUE"
       fi
     else
-      [ $quiet ] || echo "$flag	FALSE"
+      [ $quiet ] || echo "$flagname	FALSE"
       if [ $flushflags ]
       then
-        [ ! -f "$flag" ] || $trace rm0 $qopt "$flag"
+        [ ! -f "$flagname" ] || $trace rm0 $qopt "$flagname"
       fi
     fi
   done
@@ -179,15 +185,23 @@ if [ $setstate ]
 then
   if [ $newstate ]
   then
-    testflag "$flagname" && exit 0
-    # not ok for file to be missing
-    [ $debug ] && echo "$0: $flagfile -> 1" >&2
+    [ $debug ] && echo "$0: $flagfile -> 1" >&2 || :
+    if testflag "$flagname"
+    then
+      [ $verbose_all ] && echo "$flagname -> 1" || :
+      exit 0
+    fi
+    [ $verbose ] && echo "$flagname -> 1" || :
     [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 1
     echo 1 >"$flagfile" || exit 1
   else
-    testflag "$flagname" || exit 0
-    # it is ok for the file to be missing
-    [ $debug ] && echo "$0: $flagfile -> ''" >&2
+    [ $debug ] && echo "$0: $flagfile -> ''" >&2 || :
+    if ! testflag "$flagname"
+    then
+      [ $verbose_all ] && echo "$flagname -> 0" || :
+      exit 0
+    fi
+    [ $verbose ] && echo "$flagname -> 0" || :
     [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 0
     : >"$flagfile" || exit 0
   fi
