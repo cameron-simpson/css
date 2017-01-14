@@ -7,13 +7,14 @@
 from __future__ import print_function
 import sys
 from collections import namedtuple
+from getopt import GetoptError
 from re import escape
 from cs.app.haproxy import quote as haquote
 from cs.lex import get_uc_identifier
 from cs.logutils import setup_logging, Pfx, X, error, warning, info
 
 USAGE = '''Usage:
-    %s haproxy backends frontend_name frontend_listen
+    %s haproxy backends frontend_name frontend_listen direct_proxy
     %s proxy.pac [-v]
     %s squid acls proxy_name'''
 
@@ -30,39 +31,11 @@ def main(argv):
       op = argv.pop(0)
       with Pfx(op):
         if op == 'haproxy':
-          if not argv:
-            error('missing subop')
-            badopts = True
-          else:
-            subop = argv.pop(0)
-            with Pfx(subop):
-              if subop == 'backends':
-                if not argv:
-                  error('missing frontend_name')
-                  badopts = True
-                else:
-                  frontend_name = argv.pop(0)
-                  if not argv:
-                    error('missing frontend_listen')
-                    badopts = True
-                  else:
-                    frontend_listen = argv.pop(0)
-                    if argv:
-                      error('extra arguments: %s', ' '.join(argv))
-                      badopts = True
-              else:
-                error('unrecognised subop')
-                badopts = True
-        elif op == 'proxy.pac':
-          if argv and argv[0] == '-v':
-            argv.pop(0)
-            verbose = True
-          else:
-            verbose = False
-          if argv:
-            error('extra arguments: %s', ' '.join(argv))
-            badopts = True
+          cmd_func = cmd_haproxy
+        elif op == "proxy.pac":
+          cmd_func = cmd_proxy_pac
         elif op == 'squid':
+          cmd_func = cmd_squid
           if not argv:
             error('missing subop')
             badopts = True
@@ -84,26 +57,129 @@ def main(argv):
         else:
           error('unrecognised op')
           badopts = True
-    if badopts:
-      print(usage, file=sys.stderr)
-      return 2
-    xit = 0
-    config = Config({'DIRECT': Proxy('DIRECT', None, None, None)}, [])
-    with Pfx('stdin'):
-      config, ok = read_peerage(sys.stdin, config)
-      if not ok:
-        xit=1
-    if op == 'haproxy':
-      # haproxy does not handle DIRECT
-      if subop == 'backends':
-        return cmd_haproxy_backends(config, frontend_name, frontend_listen)
-    if op == 'proxy.pac':
-      return cmd_proxy_pac(config, verbose)
-    if op == 'squid':
-      if subop == 'acls':
-        return cmd_squid_acls(proxies, proxy_name)
-    error('unimplemented op/subop: %s/%s', op, subop)
-    return 2
+      if not badopts:
+        xit = 0
+        config = Config({'DIRECT': Proxy('DIRECT', None, None, None)}, [])
+        with Pfx('stdin'):
+          try:
+            config = read_peerage(sys.stdin, config)
+          except ValueError as e:
+            error("reading config: %s", e)
+            xit = 1
+        if xit == 0:
+          try:
+            xit = cmd_func(config, argv)
+          except GetoptError as e:
+            error("invalid arguments: %e", e)
+            badopts = True
+      if badopts:
+        print(usage, file=sys.stderr)
+        return 2
+      return xit
+
+def cmd_haproxy(config, argv):
+  if not argv:
+    raise GetoptError("missing subop")
+  subop = argv.pop(0)
+  with Pfx(subop):
+    if subop == 'backends':
+      cmd_func = cmd_haproxy_backends
+    else:
+      raise GetoptError("unrecognised subop")
+    return cmd_func(config, argv)
+
+def cmd_haproxy_backends(config, argv):
+  badopts = False
+  if not argv:
+    warning("missing frontend_name")
+    badopts = True
+  else:
+    frontend_name = argv.pop(0)
+  if not argv:
+    warning("missing frontend_listen")
+    badopts = True
+  else:
+    frontend_listen = argv.pop(0)
+  if not argv:
+    warning("missing direct_proxy")
+    badopts = True
+  else:
+    direct_proxy = argv.pop(0)
+  if argv:
+    warning("extra arguments: %s", ' '.join(argv))
+    badopts = True
+  if badopts:
+    raise GetoptError("invalid arguments")
+  # define the frontend
+  for ha_line_words in config.haproxy_define_frontend(frontend_name, frontend_listen):
+    print(*ha_line_words)
+  # define the backends
+  for proxy_combo in sorted(config.proxy_combinations()):
+    print()
+    for ha_line_words in config.haproxy_define_backend(proxy_combo):
+      print(*ha_line_words)
+  print()
+  print('server DIRECT')
+  print('  server', direct_proxy)
+  return 0
+
+def cmd_proxy_pac(config, argv):
+  badopts = False
+  if argv and argv[0] == '-v':
+    argv.pop(0)
+    verbose = True
+  else:
+    verbose = False
+  if argv:
+    warning("extra arguments: %s", ' '.join(argv))
+    badopts = True
+  if badopts:
+    raise GetoptError("invalid arguments")
+  for line in config.proxy_pac(verbose):
+    print(line)
+  return 0
+
+def cmd_squid(config, argv):
+  badopts = False
+  if not argv:
+    raise GetoptError("missing subop")
+  subop = argv.pop(0)
+  with Pfx(subop):
+    if subop == "acls":
+      return cmd_squid_acls(config, argv)
+    raise GetoptError("unrecognised subop")
+
+def cmd_squid_acls(config, argv):
+  if not argv:
+    raise GetoptError("missing proxy_name")
+  proxy_name = argv.pop(0)
+  if argv:
+    raise GetoptError("extra arguments: %s", " ".join(argv))
+  proxies = config.proxies
+  proxy = proxies[proxy_name]
+  patterns = proxy.patterns
+  allow_as_fallback = False
+  for n, pattern in enumerate(patterns):
+    defn = pattern.definition
+    if defn == '*':
+      allow_as_fallback = True
+    else:
+      print('acl', '_'.join( (proxy_name, str(n)) ), pattern.squid_acl())
+  if proxy_name == 'DIRECT':
+    # force these ACLs to be direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('always_direct allow', acl_name)
+    print('always_direct deny all')
+    # prevent these ACLs from being never_direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('never_direct deny', acl_name)
+    if not allow_as_fallback:
+      # prevent other ACLs from going direct
+      print('never_direct allow all')
+  else:
+    raise ValueError(proxy_name)
 
 def read_peerage(fp, config=None):
   ''' Read proxy peer information from a file `fp`. Return Config and ok.
@@ -178,50 +254,12 @@ def read_peerage(fp, config=None):
         for pattern in words:
           P = Pattern(pattern, lineno)
           R.patterns.append(P)
-  return config, ok
-
-def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
-  # define the frontend
-  for ha_line_words in proxies.haproxy_define_frontend(frontend_name, frontend_listen):
-    print(*ha_line_words)
-  # define the backends
-  for proxy_combo in sorted(proxies.proxy_combinations()):
-    print()
-    for ha_line_words in proxies.haproxy_define_backend(proxy_combo):
-      print(*ha_line_words)
+  if not ok:
+    raise ValueError("invalid configuration")
+  return config
 
 def haproxy_backend_name(proxy_names):
   return '__'.join(sorted(proxy_names))
-
-def cmd_proxy_pac(config, verbose):
-  for line in config.proxy_pac(verbose):
-    print(line)
-
-def cmd_squid_acls(proxies, proxy_name):
-  proxy = proxies[proxy_name]
-  patterns = proxy.patterns
-  allow_as_fallback = False
-  for n, pattern in enumerate(patterns):
-    defn = pattern.definition
-    if defn == '*':
-      allow_as_fallback = True
-    else:
-      print('acl', '_'.join( (proxy_name, str(n)) ), pattern.squid_acl())
-  if proxy_name == 'DIRECT':
-    # force these ACLs to be direct
-    for n, pattern in enumerate(patterns):
-      acl_name = '_'.join( (proxy_name, str(n)) )
-      print('always_direct allow', acl_name)
-    print('always_direct deny all')
-    # prevent these ACLs from being never_direct
-    for n, pattern in enumerate(patterns):
-      acl_name = '_'.join( (proxy_name, str(n)) )
-      print('never_direct deny', acl_name)
-    if not allow_as_fallback:
-      # prevent other ACLs from going direct
-      print('never_direct allow all')
-  else:
-    raise ValueError(proxy_name)
 
 _Config = namedtuple("Config", "proxies rules")
 class Config(_Config):
