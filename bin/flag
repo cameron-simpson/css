@@ -88,7 +88,7 @@ then
   cd "$flagdir" || exit 1
   for flagname in *
   do
-    [ "x$flag" = 'x*' ] && [ ! -e "$flag" ] && continue
+    [ "x$flagname" = 'x*' ] && [ ! -e "$flagname" ] && continue
     matchflag "$flagname" || continue
     if testflag "$flagname"
     then
