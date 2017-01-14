@@ -32,7 +32,7 @@ fi
 
 if [ $# = 0 ]
 then
-  flag | grep "^${pfx}_"
+  flag "${pfx}_*"
   exit 0
 fi
 
@@ -61,23 +61,22 @@ set -- $( sed "s^${pfx}_" )
 for flag
 do
   if [ $do_set ]
-  then  flag "$flag" || $trace flag -w "$flag" 1
-  else  flag "$flag" && $trace flag -w "$flag" 0
+  then  $trace flag -v -w "$flag" 1
+  else  $trace flag -v -w "$flag" 0
   fi
 done
 
 if [ $do_all ]
 then
-  flag \
-  | grep "^${pfx}_" \
+  flag "^${pfx}_*" \
   | \
   while read -r flag value
   do
     case " $* " in
       *" $flag "*) ;;
       *)  case "$do_set,$value" in
-            1,TRUE) $trace flag "$flag" 0 ;;
-            ,FALSE) $trace flag "$flag" 1 ;;
+            1,TRUE) $trace flag -v "$flag" 0 ;;
+            ,FALSE) $trace flag -v "$flag" 1 ;;
           esac
           ;;
     esac
