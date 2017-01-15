@@ -271,7 +271,11 @@ esac
 
 rcmd(){
   _rcmd_rhost=$1; shift
-  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
+  case "$_rcmd_rhost" in
+    *\!*)   _rcmd_ssh=sshto ;;
+    *)      _rcmd_ssh=ssh ;;
+  esac
+  $trace $_rcmd_ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
 }
 
 case "$op" in
