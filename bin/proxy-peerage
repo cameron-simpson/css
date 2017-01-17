@@ -246,7 +246,7 @@ class Config(_Config):
   def proxy_pac(self, verbose):
     yield 'function FindProxyForURL(url, host) {'
     for R in self.rules:
-      jscond = '\n    || '.join( pattern.proxy_pac_condition(url_varname="url", host_varname="host")
+      jscond = '\n    || '.join( pattern.proxy_pac_condition()
                                  for pattern in R.patterns
                                )
       proxy_list = '; '.join( self.proxies[proxy_name].proxy_pac_hostport()
@@ -338,6 +338,57 @@ class Rule(_Rule):
 _Pattern = namedtuple('Pattern', 'pattern lineno')
 class Pattern(_Pattern):
 
+  def condition(self, style):
+    pattern = self.pattern
+    with Pfx('condition:%s(%r)', style, pattern):
+      if not pattern:
+        raise ValueError('empty pattern')
+      # * - wildcard pattern
+      if pattern == '*':
+        if style == 'proxy.pac': return 'true'
+        if style == 'squid_acl': return 'dstdom_regex -n .'
+        raise ValueError('unsupported * pattern')
+      # *.dom.ain
+      if pattern.startswith('*.') and len(pattern) > 2:
+        if style == 'proxy.pac': return 'shExpMatch(hosts, %r)' % (pattern,)
+        if style == 'squid_acl': return 'dstdomain -i -n %s' % (pattern[1:],)
+        raise ValueError('unsupported .domain pattern')
+      # hostname or fqdn
+      if pattern[0].isalpha():
+        if style == 'proxy.pac': return 'host == %r' % (pattern,)
+        if style == 'squid_acl': return 'dstdomain -n %s' % (pattern,)
+        raise ValueError('unsupported isalpha domain pattern')
+      # *substr* - hostname substring
+      if len(pattern) > 2 and pattern.startswith('*') and pattern.endswith('*'):
+        if style == 'proxy.pac': return 'shExpMatch(host, %r)' % (pattern,)
+        if style == 'squid_acl': return 'dstdom_regex -i -n %s' % (pattern[1:-1],)
+        raise ValueError('unsupported *substring* pattern')
+      # n.* - ip-prefix
+      if pattern[0].isdigit() and '.' in pattern:
+        words = pattern.split('.')
+        if words[-1] == '*':
+          words.pop(-1)
+          if ( len(words) > 3
+            or not(all(word.isdigit() and int(word) < 256 for word in words))
+             ):
+            raise ValueError('invalid ip-prefix')
+          padwords = ( words + ['0', '0', '0'] ) [:4]
+          if style == 'squid_acl':
+            return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
+        if ( len(words) > 4
+          or not(all(word.isdigit() and int(word) < 256 for word in words))
+           ):
+          raise ValueError('invalid IPv4')
+        if style == 'proxy.pac': return 'isInNet(host, %r)' % (pattern,)
+        if style == 'squid_acl': return 'dstdomain %s' % (pattern,)
+        raise ValueError('unsupported ip-prefix pattern')
+      # .ext - file extension
+      if pattern.startswith('.'):
+        if style == 'proxy.pac': return 'substr(url, %d) == %r' % (-len(pattern), pattern)
+        if style == 'squid_acl': return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
+        raise ValueError('unsupported .ext pattern')
+      raise ValueError('unsupported pattern')
+
   def haproxy_acl(self):
     ''' Return the inline ACL condition for use in an haproxy backend selector.
     '''
@@ -383,53 +434,12 @@ class Pattern(_Pattern):
   def squid_acl(self):
     ''' Return the condition part of a squid ACL.
     '''
-    pattern = self.pattern
-    with Pfx('squid_acl(%r)', pattern):
-      if not pattern:
-        raise ValueError('empty pattern')
-      # * - wildcard pattern
-      if pattern == '*':
-        return 'dstdom_regex -n .'
-      # *.dom.ain
-      if pattern.startswith('*.') and len(pattern) > 2:
-        return 'dstdomain -i -n %s' % (pattern[1:],)
-      # hostname or fqdn
-      if pattern[0].isalpha():
-        return 'dstdomain -n %s' % (pattern,)
-      # *substr* - hostname substring
-      if len(pattern) > 2 and pattern.startswith('*') and pattern.endswith('*'):
-        return 'dstdom_regex -i -n %s' % (pattern[1:-1],)
-      # n.* - ip-prefix
-      if pattern[0].isdigit() and '.' in pattern:
-        words = pattern.split('.')
-        if words[-1] == '*':
-          words.pop(-1)
-          if ( len(words) > 3
-            or not(all(word.isdigit() and int(word) < 256 for word in words))
-             ):
-            raise ValueError('invalid ip-prefix')
-          padwords = ( words + ['0', '0', '0'] ) [:4]
-          return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
-        if ( len(words) > 4
-          or not(all(word.isdigit() and int(word) < 256 for word in words))
-           ):
-          raise ValueError('invalid IPv4')
-        return 'dstdomain %s' % (pattern,)
-      # .ext - file extension
-      if pattern.startswith('.'):
-        return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
-      raise ValueError('unrecognised pattern')
+    return self.condition('squid_acl')
 
-  def proxy_pac_condition(self, url_varname="url", host_varname="host"):
+  def proxy_pac_condition(self):
     ''' Return a javascript test to match this pattern.
     '''
-    pattern = self.pattern
-    if pattern == '*':
-      return 'true'
-    if '*' in pattern:
-      return 'shExpMatch(%s, %r)' % (host_varname, pattern)
-    return '%s == %r' % (host_varname, pattern)
-    ##raise ValueError("no proxy_pac_condition for pattern %r" % (pattern,))
+    return self.condition('proxy.pac')
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
