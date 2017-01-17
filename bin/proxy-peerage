@@ -345,23 +345,35 @@ class Pattern(_Pattern):
         raise ValueError('empty pattern')
       # * - wildcard pattern
       if pattern == '*':
+        if style == 'haproxy_acl': return None
         if style == 'proxy.pac': return 'true'
         if style == 'squid_acl': return 'dstdom_regex -n .'
         raise ValueError('unsupported * pattern')
       # *.dom.ain
       if pattern.startswith('*.') and len(pattern) > 2:
+        if style == 'haproxy_acl':
+          return r'hdr_end(host) %s || hdr_reg(host) %s:[1-9][0-9]*$' \
+                 % (haquote(pattern[1:]), haquote(escape(pattern[1:])))
         if style == 'proxy.pac': return 'shExpMatch(hosts, %r)' % (pattern,)
         if style == 'squid_acl': return 'dstdomain -i -n %s' % (pattern[1:],)
         raise ValueError('unsupported .domain pattern')
       # hostname or fqdn
       if pattern[0].isalpha():
+        if style == 'haproxy_acl':
+          return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
+                 % (haquote(pattern), haquote(escape(pattern)))
         if style == 'proxy.pac': return 'host == %r' % (pattern,)
         if style == 'squid_acl': return 'dstdomain -n %s' % (pattern,)
         raise ValueError('unsupported isalpha domain pattern')
       # *substr* - hostname substring
       if len(pattern) > 2 and pattern.startswith('*') and pattern.endswith('*'):
-        if style == 'proxy.pac': return 'shExpMatch(host, %r)' % (pattern,)
-        if style == 'squid_acl': return 'dstdom_regex -i -n %s' % (pattern[1:-1],)
+        if style == 'haproxy_acl':
+          return r'hdr_reg(host) ^%s$' \
+                 % (pattern.replace('.', '\\.').replace('*', '.*'),)
+        if style == 'proxy.pac':
+          return 'shExpMatch(host, %r)' % (pattern,)
+        if style == 'squid_acl':
+          return 'dstdom_regex -i -n %s' % (pattern[1:-1],)
         raise ValueError('unsupported *substring* pattern')
       # n.* - ip-prefix
       if pattern[0].isdigit() and '.' in pattern:
@@ -373,73 +385,51 @@ class Pattern(_Pattern):
              ):
             raise ValueError('invalid ip-prefix')
           padwords = ( words + ['0', '0', '0'] ) [:4]
+          if style == 'haproxy_acl':
+            return 'hdr_beg(host) %s' % haquote('.'.join(words) + '.')
           if style == 'squid_acl':
             return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
+          raise ValueError('unsupported ip-prefix.* pattern')
         if ( len(words) > 4
           or not(all(word.isdigit() and int(word) < 256 for word in words))
            ):
-          raise ValueError('invalid IPv4')
+          raise ValueError('invalid IPv4 pattern')
+        if style == 'haproxy_acl':
+          return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
+                 (haquote(pattern), haquote(escape(pattern)))
         if style == 'proxy.pac': return 'isInNet(host, %r)' % (pattern,)
         if style == 'squid_acl': return 'dstdomain %s' % (pattern,)
         raise ValueError('unsupported ip-prefix pattern')
       # .ext - file extension
       if pattern.startswith('.'):
-        if style == 'proxy.pac': return 'substr(url, %d) == %r' % (-len(pattern), pattern)
-        if style == 'squid_acl': return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
+        if style == 'haproxy_acl':
+          return r'path_end %s || path_reg %s' \
+                 % ( haquote(pattern), haquote(escape(pattern + '?')))
+        if style == 'proxy.pac':
+          return 'substr(url, %d) == %r' % (-len(pattern), pattern)
+        if style == 'squid_acl':
+          return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
         raise ValueError('unsupported .ext pattern')
       raise ValueError('unsupported pattern')
-
-  def haproxy_acl(self):
-    ''' Return the inline ACL condition for use in an haproxy backend selector.
-    '''
-    pattern = self.pattern
-    with Pfx('haproxy_acl(%r)', self):
-      if not pattern:
-        raise ValueError('empty pattern')
-      # * - wildcard pattern
-      if pattern == '*':
-        return None
-      # *.dom.ain
-      if pattern.startswith('*.') and len(pattern) > 2:
-        return r'hdr_end(host) %s || hdr_reg(host) %s:[1-9][0-9]*$' \
-               % (haquote(pattern[1:]), haquote(escape(pattern[1:])))
-      # hostname or fqdn
-      if pattern[0].isalpha():
-        return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
-               % (haquote(pattern), haquote(escape(pattern)))
-      # n.n.* - ip-prefix
-      if pattern[0].isdigit() and '.' in pattern:
-        words = pattern.split('.')
-        if words[-1] == '*':
-          words.pop(-1)
-          if ( len(words) > 3
-            or not(all(word.isdigit() and int(word) < 256 for word in words))
-             ):
-            raise ValueError('invalid ip-prefix')
-          return 'hdr_beg(host) %s' % haquote('.'.join(words) + '.')
-        if ( len(words) > 4
-          or not(all(word.isdigit() and int(word) < 256 for word in words))
-           ):
-          raise ValueError('invalid IPv4')
-        return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
-               (haquote(pattern), haquote(escape(pattern)))
-      # .ext - file extension
-      if pattern.startswith('.'):
-        return r'path_end %s || path_reg %s' \
-               % ( haquote(pattern), haquote(escape(pattern + '?')))
-      if '*' in pattern:
-        return r'hdr_reg(host) ^%s$' % (pattern.replace('.', '\\.').replace('*', '.*'),)
-      raise ValueError('unrecognised pattern')
 
   def squid_acl(self):
     ''' Return the condition part of a squid ACL.
     '''
     return self.condition('squid_acl')
+  def haproxy_acl(self):
+    ''' Return an haproxy test to match this pattern.
+    '''
+    return self.condition('haproxy_acl')
 
   def proxy_pac_condition(self):
     ''' Return a javascript test to match this pattern.
     '''
     return self.condition('proxy.pac')
+
+  def squid_acl(self):
+    ''' Return the condition part of a squid ACL.
+    '''
+    return self.condition('squid_acl')
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
