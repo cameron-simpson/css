@@ -54,6 +54,7 @@ do
     else
       echo "$cmd: target save file already exists: $saveas" >&2
       xit=1
+      pfx "$target" $trace openssl x509  -noout -fingerprint <"$saveas"
       continue
     fi
   fi
