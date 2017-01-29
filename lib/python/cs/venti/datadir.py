@@ -78,14 +78,14 @@ class _DataDirFile(SimpleNamespace):
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
+      A DataDir may be used as the Mapping for a MappingStore.
       NB: _not_ thread safe; callers must arrange that.
+
       The directory may be maintained by multiple instances of this
       class as they will not try to add data to the same DataFile.
       This is intended to address shared Stores such as a Store on
       a NAS presented via NFS, or a Store replicated by an external
       file-level service such as Dropbox or plain old rsync.
-
-      A DataDir may be used as the Mapping for a MappingStore.
   '''
 
   STATE_FILENAME_FORMAT = 'index-%s-state.csv'
