@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Mutt display filter, whosviour adjusts accoridng to some flags.
+# Mutt display filter, whose behaviour adjusts accoridng to some flags.
 #   - Cameron Simpson <cs@zip.com.au> 29jan2017
 #
 
