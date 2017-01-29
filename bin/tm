@@ -83,8 +83,8 @@ have_tmux(){
 dotmux(){
   case "$tmux_version" in
     ''|0.*|1.*|2.0|2.1)
-        TMPDIR=$TMUX_TMPDIR tmux ${1+"$@"} ;;
-    *)  tmux ${1+"$@"} ;;
+        TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
+    *)  $trace tmux ${1+"$@"} ;;
   esac
 }
 
@@ -296,10 +296,10 @@ rcmd(){
 }
 
 case "$op" in
-  up)    $trace dotmux select-pane -U ;;
-  down)  $trace dotmux select-pane -D ;;
-  left)  $trace dotmux select-pane -L ;;
-  right) $trace dotmux select-pane -R ;;
+  up)    dotmux select-pane -U ;;
+  down)  dotmux select-pane -D ;;
+  left)  dotmux select-pane -L ;;
+  right) dotmux select-pane -R ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
@@ -307,10 +307,10 @@ case "$op" in
     if [ "x$1" = x-n ]
     then
       shift
-      $trace dotmux list-sessions ${1+"$@"} \
+      dotmux list-sessions ${1+"$@"} \
       | awk '{ printf("%3d %s\n", NR, $0); }'
     else
-      $trace dotmux list-sessions ${1+"$@"}
+      dotmux list-sessions ${1+"$@"}
     fi
     ;;
   pick-new-prefix-session)
@@ -370,9 +370,9 @@ case "$op" in
         )
         ;;
     esac
-    if $trace dotmux has-session -t "$session_name"
+    if dotmux has-session -t "$session_name"
     then
-      $trace dotmux rename-session -t "$session_name" "$session_name_new"
+      dotmux rename-session -t "$session_name" "$session_name_new"
     else
       echo "$cmd: $op: no such session: $session_name" >&2
       exit 1
@@ -435,8 +435,9 @@ case "$op" in
       detached=1
       shift
     fi
-    if not $trace dotmux has-session -t "$session_name" 2>/dev/null
-    then
+    dotmux has-session -t "$session_name" 2>/dev/null \
+    || \
+    {
       cr=$( printf '\r' )
       keylines=
       while [ $# -gt 0 ] && [ "x$1" = x-K ]
@@ -453,14 +454,14 @@ case "$op" in
         fi
       fi
       shcmd=$( shqstr "$@" )
-      TMUX= $trace dotmux new-session -d -s "$session_name" "$shcmd"
-      [ -z "$keylines" ] || $trace dotmux send-keys -l -t "$session_name" -- "$keylines"
-    fi
+      TMUX= dotmux new-session -d -s "$session_name" "$shcmd"
+      [ -z "$keylines" ] || dotmux send-keys -l -t "$session_name" -- "$keylines"
+    }
     if [ -z "$detached" ]
     then
       if [ -n "$TMUX" ]
-      then  exec $trace dotmux switch-client -t "$session_name"
-      else  exec $trace dotmux attach-session -t "$session_name"
+      then  dotmux switch-client -t "$session_name"
+      else  dotmux attach-session -t "$session_name"
       fi
     fi
     ;;
