@@ -290,7 +290,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       for hashcode, n, offset in self._indexQ:
         if not busy:
           # take the lock; we hold it over the index updates
-          X("_index_updater: take lock")
           self._lock.acquire()
         X("_index_updater: add %s=>(%d,%d) to index", hashcode, n, offset)
         index[hashcode] = n, offset
@@ -303,7 +302,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         busy = not self._indexQ.empty()
         # we keep the lock until the queue is drained
         if not busy:
-          X("_index_updater: release lock")
           self._lock.release()
 
   def _load_state(self):
@@ -444,13 +442,14 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       n, D = self._current_output_datafile()
       with D:
         offset, offset2 = D.add(data)
-        X("DataDir.add: added data: %d bytes => %d consumed", len(data), offset2-offset)
+        ##X("DataDir.add: added data: %d bytes => %d consumed", len(data), offset2-offset)
       F = self._filemap[n]
       if offset2 <= F.size:
         raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
                            % (F.filename, offset2, F.size))
       F.size = offset2
     hashcode = self.hashclass.from_data(data)
+    ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, n, offset)
     rollover = self.rollover
     if rollover is not None and offset2 >= rollover:
