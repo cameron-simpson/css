@@ -69,6 +69,7 @@ class _DataDirFile(SimpleNamespace):
     ''' Scan this datafile from the supplied `offset` yielding (data, offset, post_offset).
         This is used by the monitor thread to add new third party data to the index.
     '''
+    X("_DataDirFile.scanfrom(offset=%d)...", offset)
     with open(self.pathname, "rb") as fp:
       fp.seek(offset)
       while True:
@@ -291,7 +292,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         if not busy:
           # take the lock; we hold it over the index updates
           self._lock.acquire()
-        X("_index_updater: add %s=>(%d,%d) to index", hashcode, n, offset)
+          batch_size = 0
+        batch_size += 1
         index[hashcode] = n, offset
         try:
           del unindexed[hashcode]
@@ -303,6 +305,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         # we keep the lock until the queue is drained
         if not busy:
           self._lock.release()
+          if batch_size > 1:
+            X("_index_updater: processed %d indices while holding lock", batch_size)
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
