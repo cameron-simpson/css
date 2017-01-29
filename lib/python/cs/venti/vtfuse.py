@@ -35,6 +35,7 @@ from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decod
 from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
+from .store import MissingHashcodeError
 
 # TODO: provide a hook to select the legacy fuse3 class
 FUSE_CLASS = 'llfuse'
@@ -88,9 +89,17 @@ def handler(method):
           return method(self, *a, **kw)
     except FuseOSError:
       raise
+    except MissingHashcodeError as e:
+      raise FuseOSError(errno.EIO) from e
+    except OSError as e:
+      raise FuseOSError(e.errno) from e
     except Exception as e:
+      error("BANG1: e=%s %s", type(e), e)
       exception("EXCEPTION from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
-      raise FuseOSError(errno.EINVAL)
+      raise FuseOSError(errno.EINVAL) from e
+    except:
+      error("UNCAUGHT EXCEPTION")
+      raise RuntimeError("UNCAUGHT EXCEPTION")
   return handle
 
 def log_traces_queued(Q):
