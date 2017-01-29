@@ -4,8 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 25sep2006
 #
 
-trace=
-[ -t 2 ] && trace=set-x
+trace=${DEBUG:+set-x}
+##[ -t 2 ] && trace=set-x
 flagdir=${FLAGDIR:-$HOME/var/flags}
 quiet=
 qopt=
