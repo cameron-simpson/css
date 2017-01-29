@@ -34,6 +34,15 @@ from . import defaults, totext
 from .datadir import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
+class MissingHashcodeError(KeyError):
+  ''' Subclass of KeyError raised when accessing a hashcode not present in the Store.
+  '''
+  def __init__(self, hashcode):
+    KeyError.__init__(self, str(hashcode))
+    self.hashcode = hashcode
+  def __str__(self):
+    return "missing hashcode: %s" % (self.hashcode,)
+
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -119,7 +128,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     '''
     block = self.get(h)
     if block is None:
-      raise KeyError("missing hash %r" % (h,))
+      raise MissingHashcodeError(h)
     return block
 
   def __enter__(self):
