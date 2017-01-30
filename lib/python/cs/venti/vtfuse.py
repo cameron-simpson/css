@@ -831,6 +831,11 @@ if FUSE_CLASS == 'llfuse':
         try:
           E = P[name]
         except KeyError:
+          ## llfuse.EntryAttributes.st_ino.__set__ rejects a negative st_ino
+          ##EA = llfuse.EntryAttributes()
+          ##EA.st_ino = -1
+          ##EA.entry_timeout = 1.0
+          ##return EA
           ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
           raise FuseOSError(errno.ENOENT)
       return self._vt_EntryAttributes(E)
@@ -956,7 +961,7 @@ if FUSE_CLASS == 'llfuse':
       E = self._vt_core.i2E(inode)
       if not E.issym:
         raise FuseOSError(errno.EINVAL)
-      return E.pathref
+      return self._vt_bytes(E.pathref)
 
     @handler
     def release(self, fhndx):
@@ -1057,15 +1062,23 @@ if FUSE_CLASS == 'llfuse':
       return fst
 
     @handler
-    def symlink(self, parent_inode, name_b, target, ctx):
-      name = self._vt_str(name_b)
-      # TODO: check search/write on P
-      P = self._vt_core.i2E(parent_inode)
-      if not P.isdir:
-        raise FuseOSError(errno.ENOTDIR)
-      if name in P:
-        raise FuseOSError(errno.EEXIST)
-      P[name] = SymlinkDirent(name, {'pathref': target})
+    def symlink(self, parent_inode, name_b, target_b, ctx):
+      with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
+        XP("ENTER")
+        name = self._vt_str(name_b)
+        target = self._vt_str(target_b)
+        # TODO: check search/write on P
+        P = self._vt_core.i2E(parent_inode)
+        XP("PARENT = %s", P)
+        if not P.isdir:
+          XP("PARENT IS NOT DIR")
+          raise FuseOSError(errno.ENOTDIR)
+        if name in P:
+          XP("name %r exists in parent", name)
+          raise FuseOSError(errno.EEXIST)
+        E = SymlinkDirent(name, {'pathref': target})
+        P[name] = E
+        return self._vt_EntryAttributes(E)
 
     @handler
     def unlink(self, parent_inode, name_b, ctx):
