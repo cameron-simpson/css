@@ -42,7 +42,6 @@ FUSE_CLASS = 'llfuse'
 
 if FUSE_CLASS == 'llfuse':
   import llfuse
-  from llfuse import FUSEError as FuseOSError
   FuseOSError = llfuse.FUSEError
 elif FUSE_CLASS == 'fuse3':
   # my slightly hacked python-fuse with crude python 3 porting hacks
