@@ -30,6 +30,7 @@ venti:
       link pathname to blockspec
       merge trees
   Dir:
+    rsync -a: setgid bit not preserved?
     vtftp command which accesses a Dir
       hook to vtfuse to run vtftp against live Dir
   datadir
