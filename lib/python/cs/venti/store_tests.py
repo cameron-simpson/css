@@ -17,7 +17,7 @@ cs.logutils.X_via_tty = True
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import randblock
 from . import _TestAdditionsMixin
-from .datafile import GDBMIndex, KyotoIndex
+from .datadir import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore
 from .hash import HashUtilDict, DEFAULT_HASHCLASS
 from .hash_tests import _TestHashCodeUtils
@@ -87,7 +87,10 @@ class TestMappingStore(_TestStore, unittest.TestCase):
 class TestProgressStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.S = ProgressStore("ProgressMappingStore", MappingStore("TestProgressStore", self.hashclass, {}).open()).open()
+    M = MappingStore("TestProgressStore", {}, hashclass=self.hashclass)
+    MO = M.open()
+    P = ProgressStore("ProgressMappingStore", MO)
+    self.S = P.open()
 
 class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a plain dict.
