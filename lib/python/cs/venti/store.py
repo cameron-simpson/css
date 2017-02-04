@@ -418,21 +418,21 @@ class DataDirStore(MappingStore):
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, self._datadir, **kw)
+
+  def startup(self, **kw):
+    self._datadir.open()
     self._store_queued = {}
     self._storeQ = IterableQueue(1024)
     self._store_lock = Lock()
     self._store_thread = Thread(name="%s-storer", target=self._storer)
     self._store_thread.start()
+    super().startup(**kw)
 
-  def open(self, **kw):
-    self._datadir.open()
-    return MappingStore.open(self, **kw)
-
-  def close(self):
-    return MappingStore.close(self)
+  def shutdown(self):
     self._storeQ.close()
     self._store_thread.join()
     self._datadir.close()
+    super().shutdown()
 
   def add(self, data):
     ''' Accept data, cache it and queue it for storage. Return hashcode.
