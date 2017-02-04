@@ -19,6 +19,7 @@ from cs.fileutils import makelockfile, shortpath, longpath
 from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from .datafile import DataFile, read_chunk
