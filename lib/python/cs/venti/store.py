@@ -259,7 +259,7 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       openmap()
-    BasicStoreSync.startup(self)
+    super().startup()
 
   def shutdown(self):
     mapping = self.mapping
@@ -269,7 +269,7 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       closemap()
-    BasicStoreSync.shutdown(self)
+    super().shutdown()
 
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
