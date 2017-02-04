@@ -41,7 +41,6 @@ def multitest(method):
             with self.S:
               method(self)
               self.S.flush()
-          X("TMPDIR REMOVED")
   return testMethod
 
 class TestStore(unittest.TestCase, _TestAdditionsMixin):
