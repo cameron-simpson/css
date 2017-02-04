@@ -2,8 +2,8 @@
 #
 # Run a command in a development environment.
 # This means using the current directory as $prefix,
-# prefixing lots of $fooPATH vars with it approriately,
-# sourcing .env.sh if present, then running command.
+# prefixing lots of $fooPATH vars with it appropriately,
+# sourcing the dev .env.sh if present, then running command.
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007
 #
 
