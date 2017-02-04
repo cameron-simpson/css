@@ -500,6 +500,8 @@ class _ProgressStoreTemplateMapping(object):
 class ProgressStore(BasicStoreSync):
 
   def __init__(self, name, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+    ''' Wrapper for a Store which collects statistics on use.
+    '''
     lock = kw.pop('lock', None)
     if lock is None:
       lock = S._lock
@@ -508,7 +510,9 @@ class ProgressStore(BasicStoreSync):
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
     Ps = {}
-    for category in 'adds', 'gets', 'contains', 'requests', 'bytes_stored', 'bytes_fetched':
+    for category in 'requests', \
+                    'adds', 'gets', 'contains', 'flushes', \
+                    'bytes_stored', 'bytes_fetched':
       Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=4)
     self._progress = Ps
 
@@ -516,14 +520,16 @@ class ProgressStore(BasicStoreSync):
     return self.status_text()
 
   def startup(self):
-    BasicStoreSync.startup(self)
+    super().startup()
     self.S.open()
 
   def shutdown(self):
     self.S.close()
-    BasicStoreSync.shutdown(self)
+    super().shutdown()
 
   def status_text(self, template=None):
+    ''' Return a status text utilising the progress statistics.
+    '''
     if template is None:
       template = self.template
     return template.format_map(self.template_mapping)
