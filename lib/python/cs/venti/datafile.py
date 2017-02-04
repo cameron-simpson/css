@@ -104,7 +104,8 @@ class DataFile(MultiOpenMixin):
     return "DataFile(%s)" % (self.pathname,)
 
   def startup(self):
-    self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
+    with Pfx("%s.startup: open(%r)", self, self.pathname):
+      self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
 
   def shutdown(self):
     self.flush()
