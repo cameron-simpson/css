@@ -93,7 +93,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   STATE_FILENAME_FORMAT = 'index-%s-state.csv'
   INDEX_FILENAME_FORMAT = 'index-%s.%s'
 
-  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None):
+  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
           about the DataFiles; this is the index-state.csv file and
@@ -109,9 +109,17 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `rollover`: data file roll over size; if a data file grows
             beyond this a new datafile is commenced for new blocks.
             Default: DEFAULT_ROLLOVER
+        `create_statedir`: os.mkdir the state directory if missing
+        `create_datadir`: os.mkdir the data directory if missing
     '''
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
+      # the "default" data dir may be created if the statedir exists
+      if ( create_datadir is None
+       and existspath(statedirpath)
+       and not existspath(datadirpath)
+         ):
+        create_datadir = True
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     if indexclass is None:
@@ -120,10 +128,24 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    if create_statedir is None:
+      create_statedir = False
+    if create_datadir is None:
+      create_datadir = False
     if not isdirpath(statedirpath):
-      raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
+      if create_statedir:
+        X("MKDIR STATE %r", statedirpath)
+        with Pfx("mkdir(%r)", statedirpath):
+          os.mkdir(statedirpath)
+      else:
+        raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
     if not isdirpath(datadirpath):
-      raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
+      if create_datadir:
+        X("MKDIR DATA %r", datadirpath)
+        with Pfx("mkdir(%r)", datadirpath):
+          os.mkdir(datadirpath)
+      else:
+        raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
     MultiOpenMixin.__init__(self, lock=RLock())
     self.statedirpath = statedirpath
     self.datadirpath = datadirpath
