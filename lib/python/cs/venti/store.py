@@ -19,20 +19,29 @@ from contextlib import contextmanager
 import os
 import os.path
 import sys
-from threading import Lock, RLock
-from threading import Thread
+from threading import Lock, RLock, Thread
 from time import sleep
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
 from cs.progress import Progress
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datadir import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+
+class MissingHashcodeError(KeyError):
+  ''' Subclass of KeyError raised when accessing a hashcode not present in the Store.
+  '''
+  def __init__(self, hashcode):
+    KeyError.__init__(self, str(hashcode))
+    self.hashcode = hashcode
+  def __str__(self):
+    return "missing hashcode: %s" % (self.hashcode,)
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   ''' Core functions provided by all Stores.
@@ -119,7 +128,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     '''
     block = self.get(h)
     if block is None:
-      raise KeyError("missing hash %r" % (h,))
+      raise MissingHashcodeError(h)
     return block
 
   def __enter__(self):
@@ -250,7 +259,7 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       openmap()
-    BasicStoreSync.startup(self)
+    super().startup()
 
   def shutdown(self):
     mapping = self.mapping
@@ -260,7 +269,7 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       closemap()
-    BasicStoreSync.shutdown(self)
+    super().shutdown()
 
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
@@ -410,13 +419,64 @@ class DataDirStore(MappingStore):
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, self._datadir, **kw)
 
-  def open(self, **kw):
+  def startup(self, **kw):
     self._datadir.open()
-    return MappingStore.open(self, **kw)
+    self._store_queued = {}
+    self._storeQ = IterableQueue(1024)
+    self._store_lock = Lock()
+    self._store_thread = Thread(name="%s-storer", target=self._storer)
+    self._store_thread.start()
+    super().startup(**kw)
 
-  def close(self):
+  def shutdown(self):
+    self._storeQ.close()
+    self._store_thread.join()
     self._datadir.close()
-    return MappingStore.close(self)
+    super().shutdown()
+
+  def add(self, data):
+    ''' Accept data, cache it and queue it for storage. Return hashcode.
+    '''
+    ##X("ADD %d bytes", len(data))
+    h = self.hash(data)
+    ##X("ADD %d bytes => %s", len(data), h)
+    queued = self._store_queued
+    with self._store_lock:
+      if h in queued:
+        return h
+      queued[h] = data
+    self._storeQ.put(data)
+    return h
+
+  def get(self, h, default=None):
+    try:
+      data = self._store_queued[h]
+    except KeyError:
+      return MappingStore.get(self, h, default=default)
+    else:
+      return data
+
+  def contains(self, h):
+    if h in self._store_queued:
+      return True
+    return MappingStore.contains(self, h)
+
+  def _storer(self):
+    ''' Store queued data and flush the map of stored data items.
+    '''
+    Q = self._storeQ
+    lock = self._store_lock
+    queued = self._store_queued
+    for data in Q:
+      ##X("STORER: MappingStore.add %d bytes", len(data))
+      h = MappingStore.add(self, data)
+      ##X("STORER: MappingStore.add %d bytes => %s", len(data), h)
+      with lock:
+        try:
+          del queued[h]
+        except KeyError:
+          pass
+      ##X("STORER: removed from queued")
 
 class _ProgressStoreTemplateMapping(object):
 
@@ -438,86 +498,77 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, name, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
+  def __init__(self, name, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+    ''' Wrapper for a Store which collects statistics on use.
+    '''
     lock = kw.pop('lock', None)
     if lock is None:
       lock = S._lock
-    BasicStoreSync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
+    BasicStoreAsync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
     Ps = {}
-    for category in 'add', 'get', 'contains', 'requests', 'add_bytes', 'get_bytes':
-      # active actions
+    for category in 'requests', \
+                    'adds', 'gets', 'contains', 'flushes', \
+                    'bytes_stored', 'bytes_fetched':
       Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=4)
-      # cumulative actions
-      Ps[category+'_all'] = Progress(name='-'.join((str(S), category, 'all')), throughput_window=10)
     self._progress = Ps
-    self.run = True
-    self._last_status = ''
-    T = Thread(name='%s-status-line' % (self.S,), target=self._run_status_line)
-    T.daemon = True
-    T.start()
 
   def __str__(self):
-    return self.status_line()
+    return self.status_text()
+
+  def startup(self):
+    super().startup()
+    self.S.open()
 
   def shutdown(self):
-    self.run = False
-    BasicStoreSync.shutdown(self)
+    self.S.close()
+    super().shutdown()
 
-  def status_line(self, template=None):
+  def status_text(self, template=None):
+    ''' Return a status text utilising the progress statistics.
+    '''
     if template is None:
       template = self.template
     return template.format_map(self.template_mapping)
 
+  def add(self, data):
+    progress = self._progress
+    progress['requests'] += 1
+    size = len(data)
+    LF = self.S.add_bg(data)
+    del data
+    progress['adds'] += 1
+    progress['bytes_stored'] += size
+    return LF()
+
+  def get(self, h):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.get_bg(h)
+    progress['gets'] += 1
+    data = LF()
+    progress['bytes_fetched'] += len(data)
+    return data
+
+  def contains(self, h):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.contains_bg(h)
+    progress['contains'] += 1
+    return LF()
+
+  def flush(self):
+    progress = self._progress
+    progress['requests'] += 1
+    LF = self.S.flush_bg()
+    progress['flushes'] += 1
+    return LF()
+
   @property
   def requests(self):
     return self._progress['requests'].position
-
-  @requests.setter
-  def requests(self, value):
-    return self._progress['requests'].update(value)
-
-  @contextmanager
-  def do_request(self, category):
-    Ps = self._progress
-    self.requests += 1
-    Ps['requests_all'] += 1
-    if category is not None:
-      Pactive = self._progress[category]
-      Pactive.update(Pactive.position + 1)
-      Pall = self._progress[category + '_all']
-      Pall.update(Pall.position + 1)
-    yield
-    if category is not None:
-      Pactive.update(Pactive.position - 1)
-    self.requests -= 1
-
-  def add(self, data):
-    with self.do_request('add'):
-      return self.S.add(data)
-
-  def get(self, hashcode):
-    with self.do_request('get'):
-      return self.S.get(hashcode)
-
-  def contains(self, hashcode):
-    with self.do_request('contains'):
-      return self.S.contains(hashcode)
-
-  def flush(self):
-    with self.do_request(None):
-      return self.S.flush()
-
-  def _run_status_line(self):
-    while self.run:
-      text = self.status_line()
-      old_text = self._last_status
-      if text != self._last_status:
-        self._last_status = text
-        status(text)
-      sleep(0.25)
 
 if __name__ == '__main__':
   import cs.venti.store_tests

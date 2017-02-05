@@ -427,11 +427,7 @@ class HashCodeBlock(_Block):
     '''
     S = defaults.S
     hashcode = self.hashcode
-    try:
-      return S[hashcode]
-    except KeyError as e:
-      error("%s: data for hashcode %s not available: %s", self, hashcode, e)
-      raise IOError("data for hashcode %s not available: %s" % (hashcode, e)) from e
+    return S[hashcode]
 
   def encode(self):
     flags = 0

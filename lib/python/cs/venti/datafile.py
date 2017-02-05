@@ -104,7 +104,8 @@ class DataFile(MultiOpenMixin):
     return "DataFile(%s)" % (self.pathname,)
 
   def startup(self):
-    self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
+    with Pfx("%s.startup: open(%r)", self, self.pathname):
+      self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
 
   def shutdown(self):
     self.flush()
@@ -112,37 +113,19 @@ class DataFile(MultiOpenMixin):
     self.fp = None
 
   def flush(self):
+    ''' Flush any buffered writes to the filesystem.
+    '''
     with self._lock:
       if self.appending:
         self.fp.flush()
 
-  def scan(self, do_decompress=False, offset=None):
-    ''' Scan the data file and yield (offset, flags, zdata, offset2) tuples.
-        `offset` is the start of the chunk and `offset2` is the
-        offset at the end of the chunk.
-        If `do_decompress` is true, decompress the data and strip
-        that flag value.
-        This can be used in parallel with other activity, though
-        it may impact performance.
-    '''
-    if offset is None:
-      offset = fp.tell()
-    with self:
-      fp = self.fp
-      while True:
-        with self._lock:
-          if self.appending:
-            fp.flush()
-            self.appending = False
-          fp.seek(offset, SEEK_SET)
-          try:
-            flags, data, offset = read_chunk(fp, do_decompress=do_decompress)
-          except EOFError:
-            break
-          offset2 = fp.tell()
-        yield offset, flags, data, offset2
-
   def fetch(self, offset):
+    flags, data, offset2 = self._fetch(offset, do_decompress=True)
+    if flags:
+      raise ValueError("unhandled flags: 0x%02x" % (flags,))
+    return data
+
+  def _fetch(self, offset, do_decompress=False):
     ''' Fetch data bytes from the supplied offset.
     '''
     fp = self.fp
@@ -150,11 +133,11 @@ class DataFile(MultiOpenMixin):
       if self.appending:
         fp.flush()
         self.appending = False
-      fp.seek(offset, SEEK_SET)
-      flags, data, offset2 = read_chunk(fp, do_decompress=True)
-    if flags:
-      raise ValueError("unhandled flags: 0x%02x" % (flags,))
-    return data
+      if fp.tell() != offset:
+        fp.flush()
+        fp.seek(offset, SEEK_SET)
+      flags, data, offset2 = read_chunk(fp, do_decompress=do_decompress)
+    return flags, data, offset2
 
   def add(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store start and end offsets.
@@ -165,9 +148,26 @@ class DataFile(MultiOpenMixin):
     with self._lock:
       if not self.appending:
         self.appending = True
-        fp.flush()  # not necessary?
-        fp.seek(0, SEEK_END)
+        fp.flush()
+      fp.seek(0, SEEK_END)
       return write_chunk(fp, data, no_compress=no_compress)
+
+  def scan(self, do_decompress=False, offset=0):
+    ''' Scan the data file and yield (start_offset, flags, zdata, end_offset) tuples.
+        Start the scan ot `offset`, default 0.
+        If `do_decompress` is true, decompress the data and strip
+        that flag value.
+        This can be used in parallel with other activity, though
+        it may impact performance.
+    '''
+    with self:
+      while True:
+        try:
+          flags, data, offset2 = self._fetch(offset, do_decompress=do_decompress)
+        except EOFError:
+          break
+        yield offset, flags, data, offset2
+        offset = offset2
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests

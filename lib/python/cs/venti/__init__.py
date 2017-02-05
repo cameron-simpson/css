@@ -22,6 +22,7 @@
 '''
 
 import re
+import os
 from os.path import abspath
 from string import ascii_letters, digits
 import tempfile
@@ -73,8 +74,8 @@ class _TestAdditionsMixin:
   '''
 
   @staticmethod
-  def mktmpdir():
-    return abspath(tempfile.mkdtemp(prefix="test-cs.venti", suffix=".tmpdir", dir='.'))
+  def mktmpdir(prefix="cs.venti"):
+    return tempfile.TemporaryDirectory(prefix="test-"+prefix+"-", suffix=".tmpdir", dir=os.getcwd())
 
   def assertLen(self, o, length, *a, **kw):
     ''' Test len(o) unless it raises NotImplementedError.

@@ -6,9 +6,21 @@
 
 import sys
 import unittest
+from unittest import skip
 from cs.logutils import D, X
-from .blockify import blockify
+from cs.randutils import rand0, randblock
+from .blockify import blockify, rolling_hash_parser, blocked_chunks_of, \
+                      blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
+
+def random_blocks(max_size=65536, count=64):
+  ''' Generate `count` blocks of random sizes from 1 to `max_size`.
+  '''
+  global rand_total
+  for i in range(count):
+    size = rand0(max_size) + 1
+    yield randblock(size)
+    rand_total += size
 
 class TestAll(unittest.TestCase):
 
@@ -18,7 +30,41 @@ class TestAll(unittest.TestCase):
   def tearDown(self):
     self.fp.close()
 
-  def test00blockifyAndRetrieve(self):
+  def test01parsers(self):
+    global rand_total
+    for parser in rolling_hash_parser,:
+      with self.subTest(parser.__name__):
+        rand_total = 0
+        offsetQ = parser(random_blocks())
+        chunkQ = next(offsetQ)
+        offset = 0
+        last_qoffset = 0
+        for qoffset in offsetQ:
+          self.assertTrue(last_qoffset < qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
+          while offset < qoffset:
+            chunk = next(chunkQ)
+            self.assertTrue(len(chunk) > 0)
+            offset += len(chunk)
+        self.assertEqual(rand_total, offset)
+        self.assertRaises(StopIteration, next, chunkQ)
+
+  def test02blocked_chunks_of(self):
+    global rand_total
+    for parser in rolling_hash_parser,:
+      with self.subTest(parser.__name__):
+        rand_total = 0
+        chunk_total = 0
+        for chunk in blocked_chunks_of(random_blocks(), parser):
+          chunk_total += len(chunk)
+          self.assertTrue(len(chunk) >= MIN_BLOCKSIZE,
+                          "len(chunk)=%d < MIN_BLOCKSIZE=%d"
+                          % (len(chunk), MIN_BLOCKSIZE))
+          self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
+                          "len(chunk)=%d > MAX_BLOCKSIZE=%d"
+                          % (len(chunk), MAX_BLOCKSIZE))
+        self.assertEqual(rand_total, chunk_total)
+
+  def test03blockifyAndRetrieve(self):
     with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
       data = self.fp.read()
       blocks = list(blockify([data]))

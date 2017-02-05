@@ -30,6 +30,7 @@ from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
+from .vtftp import ftp_archive
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -56,9 +57,10 @@ def main(argv):
       datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
       datadir [indextype:[hashname:]]/dirpath push other-datadir
       dump filerefs
+      ftp archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt mountpoint [subpath]
+      mount archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -127,10 +129,8 @@ def main(argv):
     error("missing command")
     badopts = True
   else:
-    import signal
-    from cs.debug import thread_dump
-    signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+    signal(SIGHUP, lambda sig, frame: thread_dump())
+    signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
     op = args.pop(0)
     with Pfx(op):
       try:
@@ -377,6 +377,12 @@ def cmd_dump(args, verbose=None, log=None):
     dump(path)
   return 0
 
+def cmd_ftp(args, verbose=None, log=None):
+  archive, = args
+  ftp_archive(archive)
+  return 0
+
+# TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
   ''' Initialise a directory for use as a store.
       Usage: init dirpath [datadir]
@@ -455,11 +461,19 @@ def cmd_mount(args, verbose=None, log=None):
   except IndexError:
     error("missing special")
     badopts = True
-  try:
+  else:
+    if not os.path.isfile(special):
+      error("not a file: %r", special)
+      badopts = True
+  if args:
     mountpoint = args.pop(0)
-  except IndexError:
-    error("missing mountpoint")
-    badopts = True
+  else:
+    spfx, sext = os.path.splitext(special)
+    if sext != '.vt':
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      badopts = True
+    else:
+      mountpoint = spfx
   if args:
     subpath = args.pop(0)
   else:
@@ -469,10 +483,20 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
+  # import vtfuse before doing anything with side effects
   from .vtfuse import mount
-  if not os.path.isdir(mountpoint):
-    error("%s: mountpoint is not a directory", mountpoint)
-    return 1
+  with Pfx(mountpoint):
+    if not os.path.isdir(mountpoint):
+      # autocreate mountpoint
+      info('mkdir %r ...', mountpoint)
+      try:
+        os.mkdir(mountpoint)
+      except OSError as e:
+        if e.errno == errno.EEXIST:
+          error("mountpoint is not a directory", mountpoint)
+          return 1
+        else:
+          raise
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
