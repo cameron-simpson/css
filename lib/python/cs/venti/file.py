@@ -171,6 +171,24 @@ class File(BackedFile):
           return data
     return b''
 
+  def readall(self):
+    ''' Concatenate all the data from the current offset to the end of the file.
+    '''
+    bss = []
+    for inside, span in self.front_range.slices(self._offset, len(self)):
+      if inside:
+        # data from the front file; return the spanned chunks
+        for chunk in filedata(self.front_file, start=span.start, end=span.end):
+          self._offset += len(chunk)
+          bss.append(chunk)
+      else:
+        # data from the backing block: return the first chunk
+        for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
+          chunk = B[Bstart:Bend]
+          self._offset += len(chunk)
+          bss.append(chunk)
+    return b''.join(bss)
+
   @locked
   def high_level_blocks(self, start=None, end=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
