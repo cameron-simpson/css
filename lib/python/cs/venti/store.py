@@ -439,7 +439,7 @@ class DataDirStore(MappingStore):
     '''
     ##X("ADD %d bytes", len(data))
     h = self.hash(data)
-    X("ADD %d bytes => %s", len(data), h)
+    ##X("ADD %d bytes => %s", len(data), h)
     queued = self._store_queued
     with self._store_lock:
       if h in queued:
@@ -464,14 +464,13 @@ class DataDirStore(MappingStore):
   def _storer(self):
     ''' Store queued data and flush the map of stored data items.
     '''
-    X("STORER RUNNING")
     Q = self._storeQ
     lock = self._store_lock
     queued = self._store_queued
     for data in Q:
-      ##X("STORER: MappingSTore.add %d bytes", len(data))
+      ##X("STORER: MappingStore.add %d bytes", len(data))
       h = MappingStore.add(self, data)
-      X("STORER: MappingStore.add %d bytes => %s", len(data), h)
+      ##X("STORER: MappingStore.add %d bytes => %s", len(data), h)
       with lock:
         try:
           del queued[h]
