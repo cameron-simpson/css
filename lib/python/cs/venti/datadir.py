@@ -134,14 +134,12 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       create_datadir = False
     if not isdirpath(statedirpath):
       if create_statedir:
-        X("MKDIR STATE %r", statedirpath)
         with Pfx("mkdir(%r)", statedirpath):
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
     if not isdirpath(datadirpath):
       if create_datadir:
-        X("MKDIR DATA %r", datadirpath)
         with Pfx("mkdir(%r)", datadirpath):
           os.mkdir(datadirpath)
       else:
