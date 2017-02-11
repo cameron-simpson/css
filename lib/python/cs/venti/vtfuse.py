@@ -830,13 +830,12 @@ if FUSE_CLASS == 'llfuse':
         try:
           E = P[name]
         except KeyError:
-          ## llfuse.EntryAttributes.st_ino.__set__ rejects a negative st_ino
-          ##EA = llfuse.EntryAttributes()
-          ##EA.st_ino = -1
-          ##EA.entry_timeout = 1.0
-          ##return EA
           ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
-          raise FuseOSError(errno.ENOENT)
+          ##raise FuseOSError(errno.ENOENT)
+          EA = llfuse.EntryAttributes()
+          EA.st_ino = 0
+          EA.entry_timeout = 1.0
+          return EA
       return self._vt_EntryAttributes(E)
 
     @handler
