@@ -82,6 +82,7 @@ def handler(method):
       Store, prevents anything other than a FUSEOSError being raised.
   '''
   def handle(self, *a, **kw):
+    ##X("OP %s %r %r", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
@@ -158,12 +159,16 @@ class FileHandle(O):
     self.E.touch()
 
   def flush(self):
+    X("FileHandle.flush: Eopen.flush...")
     self.Eopen.flush()
+    X("FileHandle.flush: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
   def close(self):
+    X("FileHandle.close: Eopen.close...")
     self.Eopen.close()
+    X("FileHandle.close: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 

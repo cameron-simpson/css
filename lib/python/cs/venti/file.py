@@ -109,7 +109,9 @@ class File(BackedFile):
       # Recompute the top Block from the current high level blocks.
       # As a side-effect of setting .backing_block we discard the
       # front file data, which are now saved to the Store.
+      X("%s.flush: update backing_block...", self)
       self.backing_block = top_block_for(self.high_level_blocks())
+      X("%s.flush: backing_block=%s", self, self.backing_block)
       # TODO: truncate the front file?
     return self.backing_block
 
