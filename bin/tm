@@ -12,6 +12,7 @@ set -ue
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
 : ${DEBUG:=''}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${TMUX_TMPDIR:=$HOME/var/tmux}
 export TMUX_TMPDIR
 
@@ -77,13 +78,21 @@ usage="Usage: $cmd [options...] [op [args...]]
 
 # Test if this system has tmux; did we get a version earlier?
 have_tmux(){
-  [ -n "$tmux_version" ]
+  [ -n "$tmux_version" ] || which tmux >/dev/null 2>&1
 }
 
-dotmux(){
+do_tmux(){
   case "$tmux_version" in
-    ''|0.*|1.*|2.0|2.1)
+    0.*|1.*|2.0|2.1)
         TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
+    '')
+        case "$OS" in
+          openbsd)
+            $trace tmux ${1+"$@"} ;;
+          *)
+            TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
+        esac
+        ;;
     *)  $trace tmux ${1+"$@"} ;;
   esac
 }
@@ -296,26 +305,26 @@ rcmd(){
 }
 
 case "$op" in
-  up)    dotmux select-pane -U ;;
-  down)  dotmux select-pane -D ;;
-  left)  dotmux select-pane -L ;;
-  right) dotmux select-pane -R ;;
+  up)    do_tmux select-pane -U ;;
+  down)  do_tmux select-pane -D ;;
+  left)  do_tmux select-pane -L ;;
+  right) do_tmux select-pane -R ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
-    dotmux start-server
+    do_tmux start-server
     if [ "x$1" = x-n ]
     then
       shift
-      dotmux list-sessions ${1+"$@"} \
+      do_tmux list-sessions ${1+"$@"} \
       | awk '{ printf("%3d %s\n", NR, $0); }'
     else
-      dotmux list-sessions ${1+"$@"}
+      do_tmux list-sessions ${1+"$@"}
     fi
     ;;
   pick-new-prefix-session)
-    dotmux start-server
-    echo "$session_prefix"$(dotmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
+    do_tmux start-server
+    echo "$session_prefix"$(do_tmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
     ;;
   pick-new-prefix-session-remote)
     # choose a new remote session name
@@ -370,9 +379,9 @@ case "$op" in
         )
         ;;
     esac
-    if dotmux has-session -t "$session_name"
+    if do_tmux has-session -t "$session_name"
     then
-      dotmux rename-session -t "$session_name" "$session_name_new"
+      do_tmux rename-session -t "$session_name" "$session_name_new"
     else
       echo "$cmd: $op: no such session: $session_name" >&2
       exit 1
@@ -393,7 +402,7 @@ case "$op" in
       echo "$cmd: $op: no session names and nothing in \$HOME/.tmrc" >&2
       exit 1
     else
-      dotmux start-server
+      do_tmux start-server
       for session_name
       do
         found=
@@ -420,7 +429,7 @@ case "$op" in
   use-session)
     # no tmux? use scr
     have_tmux || exec $trace scr "$session_name"
-    dotmux start-server
+    do_tmux start-server
     case "$session_name" in
       [1-9]*)
         session_name=$(
@@ -435,7 +444,7 @@ case "$op" in
       detached=1
       shift
     fi
-    dotmux has-session -t "$session_name" 2>/dev/null \
+    do_tmux has-session -t "$session_name" 2>/dev/null \
     || \
     {
       cr=$( printf '\r' )
@@ -454,14 +463,14 @@ case "$op" in
         fi
       fi
       shcmd=$( shqstr "$@" )
-      TMUX= dotmux new-session -d -s "$session_name" "$shcmd"
-      [ -z "$keylines" ] || dotmux send-keys -l -t "$session_name" -- "$keylines"
+      TMUX= do_tmux new-session -d -s "$session_name" "$shcmd"
+      [ -z "$keylines" ] || do_tmux send-keys -l -t "$session_name" -- "$keylines"
     }
     if [ -z "$detached" ]
     then
       if [ -n "$TMUX" ]
-      then  dotmux switch-client -t "$session_name"
-      else  dotmux attach-session -t "$session_name"
+      then  do_tmux switch-client -t "$session_name"
+      else  do_tmux attach-session -t "$session_name"
       fi
     fi
     ;;
