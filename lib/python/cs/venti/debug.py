@@ -32,7 +32,7 @@ def dump_Dirent(E, indent='', recurse=False, not_dir=False):
   else:
     details = hexify(E.block.hashcode)
   if E.isfile:
-    details += " %s  size=%d meta=%s" % (indent, len(E.block), E.meta.textencode())
+    details += " %s  size=%d meta=%s block=%s" % (indent, len(E.block), E.meta.textencode(), E.block)
   X("%s%s %r %s",
     indent,
     'd' if E.isdir else '-',
