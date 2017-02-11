@@ -41,7 +41,7 @@ sigcmd(){
   for linkflag
   do
     set -- $(echo "$linkflag" | tr : ' ')
-    flag "$1" && echo "$2" || :
+    flag "$2" && echo "$1" || :
   done \
   | tr '\012' ' '
 }
