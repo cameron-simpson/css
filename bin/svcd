@@ -272,7 +272,7 @@ do
   if ok
   then
     # dispatch actual service process
-    $trace $command_as "$@" &
+    $trace $command_as env "SVCD_SIGNATURE=$signature" "$@" &
     subpid=$!
     [ -z "$flag_running" ] || flag "$flag_running" 1
     lert "spawned pid $subpid: $*"
