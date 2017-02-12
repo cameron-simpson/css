@@ -60,6 +60,98 @@ def export_xml_to_plist(E, fp=None, fmt='binary1'):
   if retcode != 0:
     raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
 
+def ingest_plist_etree(plist_root):
+  ''' Recursively a plist's ElementTree into a native Python structure.
+      This returns a PListDict, a mapping of the plists's top dict
+      with attribute access to key values.
+  '''
+  if plist_root.tag != 'plist':
+    raise ValueError("root %r is not a plist" % (plist_root,))
+  return ingest_plist_dict(plist_root[0])
+
+def ingest_plist_elem(e):
+  ''' Ingest a plist Element, converting various types to native Python objects.
+      Unhandled types remain as the original Element.
+  '''
+  if e.tag == 'dict':
+    return ingest_plist_dict(e)
+  if e.tag == 'array':
+    return ingest_plist_array(e)
+  if e.tag == 'string' or e.tag == 'key':
+    return e.text
+  if e.tag == 'integer':
+    return int(e.text)
+  if e.tag == 'false':
+    return False
+  if e.tag == 'true':
+    return True
+  return e
+
+def ingest_plist_array(pa):
+  ''' Ingest a plist <array>, returning a Python list.
+  '''
+  if pa.tag != 'array':
+    raise ValueError("not an <array>: %r" % (pa,))
+  a = []
+  for i in range(len(pa)):
+    e = pa[i]
+    a.append(ingest_plist_elem(e))
+  return a
+
+def ingest_plist_dict(pd):
+  ''' Ingest a plist <dict> Element, returning a PListDict.
+  '''
+  if pd.tag != 'dict':
+    raise ValueError("not a <dict>: %r" % (pd,))
+  d = PListDict()
+  for i in range(len(pd)):
+    e = pd[i]
+    if i%2 == 0:
+      if e.tag == 'key':
+        key = e.text
+      else:
+        raise ValueError("unexpected key element %r" % (e,))
+    else:
+      value = ingest_plist_elem(e)
+      d[key] = value
+      key = None
+  if key is not None:
+    raise ValueError("no value for key %r" % (key,))
+  return d
+
+class PListDict(object):
+  ''' A mapping for a plist <dict>, which also allows access to the elements by attribute.
+  '''
+  def __init__(self):
+    self._d = {}
+  def __str__(self):
+    return "%s(len=%d)" % (self.__class__.__name__, len(self))
+  def __repr__(self):
+    return repr(self._d)
+    ##return "%s%r" % (self, self._d)
+  def __len__(self):
+    return len(self._d)
+  def _as_dict(self):
+    return dict(self._d)
+  def __getattr__(self, attr):
+    if attr[0].isalpha():
+      try:
+        return self._d[attr]
+      except KeyError:
+        raise AttributeError(attr)
+    raise AttributeError(attr)
+  def __setattr__(self, attr, value):
+    if attr == '_d':
+      self.__dict__[attr] = value
+    elif attr[0].isalpha():
+      self._d[attr] = value
+    else:
+      raise AttributeError(attr)
+  def __getitem__(self, key):
+    return self._d[key]
+  def __setitem__(self, key, value):
+    self._d[key] = value
+
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
 #
