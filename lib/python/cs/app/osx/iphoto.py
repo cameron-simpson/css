@@ -378,21 +378,23 @@ class iPhoto(O):
   def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
-    by_id = self.album_by_id = {}
-    ##by_uuid = self.album_by_uuid = {}
-    by_name = self.albums_by_name = {}
-    for album in self.read_albums():
-      by_id[album.modelId] = album
-      ##by_uuid[album.uuid] = album
-      name = album.name
-      if name is None:
-        warning("album has no name: %s", album.uuid)
-      else:
-        try:
-          albums = by_name[name]
-        except KeyError:
-          albums = by_name[name] = set()
-        albums.add(album)
+    with Pfx("_load_table_albums"):
+      by_id = self.album_by_id = {}
+      ##by_uuid = self.album_by_uuid = {}
+      by_name = self.albums_by_name = {}
+      for album in self.read_albums():
+        by_id[album.modelId] = album
+        ##by_uuid[album.uuid] = album
+        name = album.name
+        if name is None:
+          debug("album has no name: %s", album.uuid)
+          pass
+        else:
+          try:
+            albums = by_name[name]
+          except KeyError:
+            albums = by_name[name] = set()
+          albums.add(album)
 
   def album(self, album_id):
     self.load_albums()
