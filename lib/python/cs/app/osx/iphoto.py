@@ -286,7 +286,7 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_test(I, argv):
-  AD = I.albumdata
+  AD = I.load_albumdata()
   print('AlbumData.xml:')
   print(pprint.pformat(AD._as_dict(), indent=2, width=32))
   sys.exit(1)
@@ -432,11 +432,14 @@ class iPhoto(O):
     '''
     return self.pathto('AlbumData.xml')
 
-  @locked_property
-  def albumdata(self):
-    ''' Ingest the AlbumData.xml file.
-    '''
+  def load_albumdata(self):
     return ingest_plist_etree(import_plist(self.albumdata_path))
+
+  @locked_property
+  def albumdata_xml_plist(self):
+    ''' Ingest and cache the AlbumData.xml file.
+    '''
+    return self.load_albumdata()
 
   def _load_table_faces(self):
     ''' Load Faces.RKDetectedFace into memory and set up mappings.
