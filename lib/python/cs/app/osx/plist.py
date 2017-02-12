@@ -60,14 +60,15 @@ def export_xml_to_plist(E, fp=None, fmt='binary1'):
   if retcode != 0:
     raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
 
-def ingest_plist_etree(plist_root):
+def ingest_plist_etree(plist_etree):
   ''' Recursively a plist's ElementTree into a native Python structure.
       This returns a PListDict, a mapping of the plists's top dict
       with attribute access to key values.
   '''
-  if plist_root.tag != 'plist':
-    raise ValueError("root %r is not a plist" % (plist_root,))
-  return ingest_plist_dict(plist_root[0])
+  root = plist_etree.getroot()
+  if root.tag != 'plist':
+    raise ValueError("%r root Element is not a plist: %r" % (plist_root, root))
+  return ingest_plist_dict(root[0])
 
 def ingest_plist_elem(e):
   ''' Ingest a plist Element, converting various types to native Python objects.
