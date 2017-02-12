@@ -11,13 +11,14 @@ import os.path
 from collections import namedtuple
 from fnmatch import fnmatch
 from functools import partial
+import pprint
 from getopt import GetoptError
 import re
 import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import import_as_etree as import_plist, ingest_plist_etree
+from .plist import import_as_etree as import_plist, ingest_plist_etree, PListDict
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -174,7 +175,8 @@ def cmd_ls(I, argv):
               if obclass == 'albums' and column_name in ('filterData', 'queryData', 'viewData'):
                 et = import_plist(row[column_name])
                 album_filter = ingest_plist_etree(et)
-                print(' ', column_name+':', repr(album_filter))
+                objs = album_filter['$objects']
+                print(' ', column_name+':', resolve_object(objs, 1))
               else:
                 print(' ', column_name+':', row[column_name])
   return xit
@@ -1305,6 +1307,70 @@ SCHEMAE = {'Faces':
                 },
             }
           }
+
+def resolve_object(objs, i):
+  ''' Resolve an object definition from structures like an album
+      queryData object list.
+  '''
+  o = objs[i]
+  if isinstance(o, (str, int, bool, float, ClassDefinition, ClassInstance)):
+    return o
+  if isinstance(o, PListDict):
+    if '$class' in o:
+      # instance definition
+      class_id = o._pop('$class')['CF$UID']
+      class_def = resolve_object(objs, class_id)
+      if 'NS.string' in o:
+        value = o._pop('NS.string')
+      elif 'NS.objects' in o:
+        objects = []
+        for od in o._pop('NS.objects'):
+          obj_id = od._pop('CF$UID')
+          if od:
+            raise ValueError("other fields in obj ref: %r" % (od,))
+          objects.append(resolve_object(objs, obj_id))
+        if 'NS.keys' in o:
+          keys = []
+          for kd in o._pop('NS.keys'):
+            key_id = kd._pop('CF$UID')
+            if kd:
+              raise ValueError("other fields in key ref: %r" % (kd,))
+            keys.append(resolve_object(objs, key_id))
+          value = dict(zip(keys, objects))
+        else:
+          value = list(objects)
+      else:
+        warning("unhandled $class instance: %r", o)
+      o = ClassInstance(class_def, value)
+    elif '$classname' in o:
+      class_name = o._pop('$classname')
+      class_mro = o._pop('$classes')
+      o = ClassDefinition(class_name, class_mro)
+    else:
+      warning("unknown dict content: %r" % (o,))
+  else:
+    warning("unsupported value %r" % (o,))
+  objs[i] = o
+  return o
+
+class ClassDefinition(object):
+  def __init__(self, name, mro):
+    self.name = name
+    self.mro = mro
+  def __str__(self):
+    return "%s%r" % (self.name, self.mro)
+  __repr__ = __str__
+
+class ClassInstance(object):
+  def __init__(self, class_def, value):
+    self.class_def = class_def
+    self.value = value
+  @property
+  def name(self):
+    return self.class_def.name
+  def __str__(self):
+    return "%s%r" % (self.name, self.value)
+  __repr__ = __str__
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
