@@ -122,9 +122,17 @@ def cmd_info(I, argv):
 
 def cmd_ls(I, argv):
   xit = 0
+  get_row_map = {
+    'albums':   I.albums,
+    'events':   I.folders,
+    'folders':  I.folders,
+    'keywords': I.keywords,
+    'masters':  I.masters,
+    'people':   I.persons,
+  }
   if not argv:
-    for db_name in sorted(I.db_names()):
-      print(db_name)
+    for obclass_name in sorted(get_row_map.keys()):
+      print(obclass_name)
   else:
     obclass = argv.pop(0)
     with Pfx(obclass):
@@ -137,30 +145,30 @@ def cmd_ls(I, argv):
             pathname = version.master.pathname
             if pathname is not None:
               names.append(pathname)
-      elif obclass == 'albums':
-        I.load_albums()
-        names = I.album_names()
-      elif obclass == 'events':
-        I.load_folders()
-        names = I.event_names()
-      elif obclass == 'folders':
-        I.load_folders()
-        names = I.folder_names()
-      elif obclass == 'keywords':
-        I.load_keywords()
-        names = I.keyword_names()
-      elif obclass == 'masters':
-        I.load_masters()
-        names = I.master_pathnames()
-      elif obclass == 'people':
-        I.load_persons()
-        names = I.person_names()
-      else:
+      try:
+        get_rows = get_row_map[obclass]
+      except KeyError:
         raise GetoptError("unknown class")
-      if argv:
-        raise GetoptError("extra arguments: %s" % (' '.join(argv),))
-      for name in sorted(names):
-        print(name)
+      rows = get_rows()
+      if obclass == 'events':
+        if not argv:
+          argv = I.event_names()
+      elif obclass == 'folders':
+        if not argv:
+          argv = I.folder_names()
+      def row_key(row):
+        key = getattr(row, 'name', None)
+        if key is None:
+          key = str(row.modelId)
+        return key
+      for row in sorted(rows, key=row_key):
+        key = row_key(row)
+        if argv and key not in argv:
+          continue
+        print(key)
+        if argv:
+          for column_name in row.column_names:
+            print(' ', column_name+':', row[column_name])
   return xit
 
 def cmd_rename(I, argv):
