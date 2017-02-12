@@ -82,6 +82,8 @@ def ingest_plist_elem(e):
     return e.text
   if e.tag == 'integer':
     return int(e.text)
+  if e.tag == 'real':
+    return float(e.text)
   if e.tag == 'false':
     return False
   if e.tag == 'true':
