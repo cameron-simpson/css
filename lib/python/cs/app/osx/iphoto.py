@@ -420,6 +420,18 @@ class iPhoto(O):
     self.load_albums()
     return self.albums_by_name.keys()
 
+  @property
+  def albumdata_path(self):
+    ''' Pathname of the AlbumData.xml file, saved when iPhoto quits.
+    '''
+    return self.pathto('AlbumData.xml')
+
+  @locked_property
+  def albumdata(self):
+    ''' Ingest the AlbumData.xml file.
+    '''
+    return ingest_plist_etree(import_plist(self.albumdata_path))
+
   def _load_table_faces(self):
     ''' Load Faces.RKDetectedFace into memory and set up mappings.
     '''
