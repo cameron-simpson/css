@@ -136,6 +136,8 @@ class PListDict(object):
     return len(self._d)
   def _as_dict(self):
     return dict(self._d)
+  def _keys(self):
+    return self._d.keys()
   def __getattr__(self, attr):
     if attr[0].isalpha():
       try:
