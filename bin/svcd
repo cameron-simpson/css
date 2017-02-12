@@ -190,6 +190,7 @@ then
   : ${flag_disable:=${uname}_DISABLE}
   : ${flag_override:=${uname}_OVERRIDE}
   : ${flag_restart:=${uname}_RESTART}
+  : ${flag_running:=${uname}_RUNNING}
 fi
 
 # sanity check - is this process already active elsewhere?
@@ -271,8 +272,9 @@ do
   if ok
   then
     # dispatch actual service process
-    $trace $command_as "$@" &
+    $trace $command_as env "SVCD_SIGNATURE=$signature" "$@" &
     subpid=$!
+    [ -z "$flag_running" ] || flag "$flag_running" 1
     lert "spawned pid $subpid: $*"
     [ -n "$subp_pidfile" ] && echo "$subpid" >"$subp_pidfile"
 
@@ -292,6 +294,7 @@ do
     # or kill it (and wait)
     wait "$subpid" || not kill -0 "$subpid" 2>/dev/null || killsubproc
     subpid=
+    [ -z "$flag_running" ] || flag "$flag_running" 0
     [ -n "$subp_pidfile" ] && rm -f "$subp_pidfile"
 
     [ $once ] && break

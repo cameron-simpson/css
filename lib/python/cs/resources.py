@@ -64,7 +64,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._lock = lock
     self._finalise_later = finalise_later
-    self._finalise = Condition(self._lock)
+    self._finalise = None
 
   def __enter__(self):
     self.open(caller_frame=caller())
@@ -86,8 +86,10 @@ class MultiOpenMixin(O):
     self.opened = True
     with self._lock:
       self._opens += 1
-      if self._opens == 1:
-        self.startup()
+      opens = self._opens
+    if opens == 1:
+      self._finalise = Condition(self._lock)
+      self.startup()
     return self
 
   def close(self, enforce_final_close=False):
@@ -104,13 +106,14 @@ class MultiOpenMixin(O):
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      if self._opens == 0:
-        self.shutdown()
-        if not self._finalise_later:
-          self.finalise()
-      else:
-        if enforce_final_close:
-          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      opens = self._opens
+    if opens == 0:
+      self.shutdown()
+      if not self._finalise_later:
+        self.finalise()
+    else:
+      if enforce_final_close:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -118,13 +121,11 @@ class MultiOpenMixin(O):
         `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise is not None:
-        finalise = self._finalise
-        self._finalise = None
-        finalise.notify_all()
-        return
-    error("%s: finalised more than once" % (self,))
-    ##raise RuntimeError("%s: finalised more than once" % (self,))
+      finalise = self._finalise
+      if finalise is None:
+        raise RuntimeError("%s: finalised more than once" % (self,))
+      self._finalise = None
+      finalise.notify_all()
 
   @property
   def closed(self):

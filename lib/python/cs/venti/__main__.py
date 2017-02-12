@@ -13,6 +13,7 @@ import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
 from cs.debug import ifdebug, dump_debug_threads
+from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
@@ -20,14 +21,16 @@ from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
+from .compose import Store, ConfigFile
 from .debug import dump_Dirent
-from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDir_from_spec
+from .datadir import DataDir, DataDir_from_spec
+from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore, DataDirStore
+from .store import ProgressStore, DataDirStore
+from .vtftp import ftp_archive
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -40,9 +43,10 @@ def main(argv):
                   "-" means no front end cache.
       -M          Don't use an additional MemoryCacheStore front end.
       -S store    Specify the store to use:
-                    /path/to/dir  GDBMStore
+                    [clause]        Specification from .vtrc.
+                    /path/to/dir    GDBMStore
                     tcp:[host]:port TCPStore
-                    |sh-command   StreamStore via sh-command
+                    |sh-command     StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
     Operations:
@@ -53,9 +57,10 @@ def main(argv):
       datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
       datadir [indextype:[hashname:]]/dirpath push other-datadir
       dump filerefs
+      ftp archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt mountpoint [subpath]
+      mount archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -70,6 +75,7 @@ def main(argv):
   except:
     verbose = False
 
+  dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
   dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
@@ -105,6 +111,8 @@ def main(argv):
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
 
+  config = ConfigFile(dflt_configpath)
+
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
 
@@ -121,10 +129,8 @@ def main(argv):
     error("missing command")
     badopts = True
   else:
-    import signal
-    from cs.debug import thread_dump
-    signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+    signal(SIGHUP, lambda sig, frame: thread_dump())
+    signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
     op = args.pop(0)
     with Pfx(op):
       try:
@@ -146,7 +152,7 @@ def main(argv):
             badopts = True
           else:
             try:
-              S = Store(dflt_vt_store)
+              S = Store(dflt_vt_store, config)
             except Exception as e:
               exception("can't open store \"%s\": %s", dflt_vt_store, e)
               badopts = True
@@ -164,6 +170,7 @@ def main(argv):
                 if useMemoryCacheStore:
                   S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
                                  S, MemoryCacheStore("MemoryCacheStore"))
+                X("S = %s", S)
                 with S:
                   try:
                     xit = op_func(args, verbose=verbose, log=log)
@@ -370,6 +377,12 @@ def cmd_dump(args, verbose=None, log=None):
     dump(path)
   return 0
 
+def cmd_ftp(args, verbose=None, log=None):
+  archive, = args
+  ftp_archive(archive)
+  return 0
+
+# TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
   ''' Initialise a directory for use as a store.
       Usage: init dirpath [datadir]
@@ -448,11 +461,19 @@ def cmd_mount(args, verbose=None, log=None):
   except IndexError:
     error("missing special")
     badopts = True
-  try:
+  else:
+    if not os.path.isfile(special):
+      error("not a file: %r", special)
+      badopts = True
+  if args:
     mountpoint = args.pop(0)
-  except IndexError:
-    error("missing mountpoint")
-    badopts = True
+  else:
+    spfx, sext = os.path.splitext(special)
+    if sext != '.vt':
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      badopts = True
+    else:
+      mountpoint = spfx
   if args:
     subpath = args.pop(0)
   else:
@@ -462,10 +483,20 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
+  # import vtfuse before doing anything with side effects
   from .vtfuse import mount
-  if not os.path.isdir(mountpoint):
-    error("%s: mountpoint is not a directory", mountpoint)
-    return 1
+  with Pfx(mountpoint):
+    if not os.path.isdir(mountpoint):
+      # autocreate mountpoint
+      info('mkdir %r ...', mountpoint)
+      try:
+        os.mkdir(mountpoint)
+      except OSError as e:
+        if e.errno == errno.EEXIST:
+          error("mountpoint is not a directory", mountpoint)
+          return 1
+        else:
+          raise
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)

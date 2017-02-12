@@ -175,19 +175,21 @@ class File(BackedFile):
   def high_level_blocks(self, start=None, end=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
-    if start is None:
-      start = 0
-    if end is None:
-      end = self.front_range.end
-    for inside, span in self.front_range.slices(start, end):
-      if inside:
-        # blockify the new data and yield the top block
-        yield top_block_for(blockify(filedata(self.front_file,
+    with Pfx("File.high_level_blocks(%s..%s)", start, end):
+      if start is None:
+        start = 0
+      if end is None:
+        end = self.front_range.end
+      for in_front, span in self.front_range.slices(start, end):
+        if in_front:
+          # blockify the new data and yield the top block
+          B = top_block_for(blockify(filedata(self.front_file,
                                               start=span.start,
                                               end=span.end)))
-      else:
-        for B in self.backing_block.top_blocks(span.start, span.end):
           yield B
+        else:
+          for B in self.backing_block.top_blocks(span.start, span.end):
+            yield B
 
 def filedata(fp, rsize=8192, start=None, end=None):
   ''' A generator to yield chunks of data from a file.

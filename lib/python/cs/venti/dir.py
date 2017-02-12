@@ -161,13 +161,18 @@ class _Dirent(object):
         self.meta.update_from_items(metatext.items())
 
   def __str__(self):
-    return self.textencode()
+    return "%s:%r:type=%s" % (self.__class__.__name__, self.name, self.type)
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
                                D_type2str(self.type),
                                self.name,
                                self.meta)
+
+  def __hash__(self):
+    ''' Allows collecting _Dirents in a set.
+    '''
+    return id(self)
 
   # TODO: support .block=None
   def __eq__(self, other):
@@ -563,14 +568,11 @@ class Dir(_Dirent):
                         for name in names
                         if name != '.' and name != '..'
                       )
-      # TODO: if len(data) >= 16384
+      # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self.changed = False
-      ##warning("Dir.block: computed Block %s", B)
-      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
