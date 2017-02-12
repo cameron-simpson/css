@@ -857,6 +857,9 @@ class iPhotoRow(Row):
   def edit_string(self):
     return "%d:%s" % (self.modelId, self.name)
 
+class Album_Mixin(iPhotoRow):
+  pass
+
 class Master_Mixin(iPhotoRow):
 
   @prop
@@ -968,7 +971,7 @@ class Version_Mixin(iPhotoRow):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
-class Folder_Mixin(iPhotoRow):
+class Folder_Mixin(Album_Mixin):
   pass
 
 class Keyword_Mixin(iPhotoRow):
@@ -1259,6 +1262,7 @@ SCHEMAE = {'Faces':
                 },
               'album':
                 { 'table_name': 'RKAlbum',
+                  'mixin': Album_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
                       'serviceAccountName', 'serviceFullName', 'name', 'folderUuid',
