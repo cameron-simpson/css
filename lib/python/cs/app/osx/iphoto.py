@@ -17,6 +17,7 @@ import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from .plist import import_as_etree as import_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -26,6 +27,7 @@ from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked, locked_property
+from cs.xml import pprint as xml_pprint
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
@@ -163,12 +165,16 @@ def cmd_ls(I, argv):
         return key
       for row in sorted(rows, key=row_key):
         key = row_key(row)
-        if argv and key not in argv:
-          continue
-        print(key)
-        if argv:
-          for column_name in row.column_names:
-            print(' ', column_name+':', row[column_name])
+        with Pfx(key):
+          if argv and key not in argv:
+            continue
+          print(key)
+          if argv:
+            for column_name in row.column_names:
+              print(' ', column_name+':', row[column_name])
+              if obclass == 'albums' and column_name == 'filterData':
+                xml = import_plist(row[column_name])
+                xml_pprint(xml)
   return xit
 
 def cmd_rename(I, argv):
