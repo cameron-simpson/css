@@ -17,7 +17,7 @@ import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import import_as_etree as import_plist
+from .plist import import_as_etree as import_plist, ingest_plist_etree
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -170,11 +170,13 @@ def cmd_ls(I, argv):
             continue
           print(key)
           if argv:
-            for column_name in row.column_names:
-              print(' ', column_name+':', row[column_name])
-              if obclass == 'albums' and column_name == 'filterData':
-                xml = import_plist(row[column_name])
-                xml_pprint(xml)
+            for column_name in sorted(row.column_names):
+              if obclass == 'albums' and column_name in ('filterData', 'queryData', 'viewData'):
+                et = import_plist(row[column_name])
+                album_filter = ingest_plist_etree(et)
+                print(' ', column_name+':', repr(album_filter))
+              else:
+                print(' ', column_name+':', row[column_name])
   return xit
 
 def cmd_rename(I, argv):
