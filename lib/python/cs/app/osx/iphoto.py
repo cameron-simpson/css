@@ -11,6 +11,7 @@ import os.path
 from collections import namedtuple
 from fnmatch import fnmatch
 from functools import partial
+from getopt import GetoptError
 import re
 import sqlite3
 from threading import RLock
@@ -90,7 +91,7 @@ def main(argv=None):
           else:
             raise GetoptError("unrecognised op")
         except GetoptError as e:
-          warning(e)
+          warning("usage: %s", e)
           badopts = True
     if badopts:
       print(usage, file=sys.stderr)
@@ -157,7 +158,7 @@ def cmd_ls(I, argv):
       else:
         raise GetoptError("unknown class")
       if argv:
-        raise GetoptError("extra arguments: %r", argv)
+        raise GetoptError("extra arguments: %s" % (' '.join(argv),))
       for name in sorted(names):
         print(name)
   return xit
