@@ -41,6 +41,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   rename {events|keywords|people} {/regexp|name}...
                     Rename entities.
   select criteria... List masters with all specified criteria.
+  test [args...]    Whatever I'm testing at the moment...
 
 Criteria:
   [!]/regexp            Filename matches regexp.
@@ -75,178 +76,197 @@ def main(argv=None):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op == 'info':
-          if not argv:
-            warning("missing masters")
-            badopts = True
+        try:
+          if op == 'info':
+            xit = cmd_info(I, argv)
+          elif op == 'ls':
+            xit = cmd_ls(I, argv)
+          elif op == 'rename':
+            xit = cmd_rename(I, argv)
+          elif op == 'select':
+            xit = cmd_select(I, argv)
+          elif op == "test":
+            xit = cmd_test(I, argv)
           else:
-            obclass = argv.pop(0)
-            with Pfx(obclass):
-              if obclass == 'masters':
-                for master in sorted(I.masters(), key=lambda m: m.pathname):
-                  with Pfx(master.pathname):
-                    iminfo = master.image_info
-                    if iminfo is None:
-                      error("no info")
-                      xit = 1
-                    else:
-                      print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
-                            *[ 'kw:'+kwname for kwname in master.keyword_names ])
-              else:
-                warning("unknown class %r", obclass)
-                badopts = True
-        elif op == 'ls':
-          if not argv:
-            for db_name in sorted(I.db_names()):
-              print(db_name)
-          else:
-            obclass = argv.pop(0)
-            with Pfx(obclass):
-              if obclass.isdigit():
-                rating = int(obclass)
-                I.load_versions()
-                names = []
-                for version in I.versions():
-                  if version.mainRating == rating:
-                    pathname = version.master.pathname
-                    if pathname is not None:
-                      names.append(pathname)
-              elif obclass == 'albums':
-                I.load_albums()
-                names = I.album_names()
-              elif obclass == 'events':
-                I.load_folders()
-                names = I.event_names()
-              elif obclass == 'folders':
-                I.load_folders()
-                names = I.folder_names()
-              elif obclass == 'keywords':
-                I.load_keywords()
-                names = I.keyword_names()
-              elif obclass == 'masters':
-                I.load_masters()
-                names = I.master_pathnames()
-              elif obclass == 'people':
-                I.load_persons()
-                names = I.person_names()
-              else:
-                warning("unknown class %r", obclass)
-                badopts = True
-              if argv:
-                warning("extra arguments: %r", argv)
-                badopts = True
-              if not badopts:
-                for name in sorted(names):
-                  print(name)
-        elif op == 'rename':
-          if not argv:
-            warning("missing 'events'")
-            badopts = True
-          else:
-            obclass = argv.pop(0)
-            if obclass == 'events':
-              table = I.folder_table
-              I.load_folders()
-              get_items = I.events
-            elif obclass == 'keywords':
-              table = I.keyword_table
-              I.load_keywords()
-              get_items = I.read_keywords
-            elif obclass == 'people':
-              table = I.person_table
-              I.load_persons()
-              get_items = I.persons
-            else:
-              warning("known class %r", obclass)
-              badopts = True
-            all_names = set(item.name for item in get_items())
-            if argv:
-              edit_lines = set()
-              for arg in argv:
-                # TODO: select by regexp if /blah
-                if arg.startswith('/'):
-                  regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
-                  edit_lines.update(item.edit_string
-                                    for item in get_items()
-                                    if regexp.search(item.name))
-                elif '*' in arg or '?' in arg:
-                  edit_lines.update(item.edit_string
-                                    for item in get_items()
-                                    if fnmatch(item.name, arg))
-                elif arg in all_names:
-                  for item in get_items():
-                    if item.name == arg:
-                      edit_lines.add(item.edit_string)
-                else:
-                  warning("unknown item name: %s", arg)
-                  badopts = True
-            else:
-              edit_lines = set(item.edit_string for item in get_items())
-            if not badopts:
-              changes = edit_strings(sorted(edit_lines,
-                                            key=lambda _: _.split(':', 1)[1]),
-                                     errors=lambda msg: warning(msg + ', discarded')
-                                    )
-              for old_string, new_string in changes:
-                with Pfx("%s => %s", old_string, new_string):
-                  old_modelId, old_name = old_string.split(':', 1)
-                  old_modelId = int(old_modelId)
-                  try:
-                    new_modelId, new_name = new_string.split(':', 1)
-                    new_modelId = int(new_modelId)
-                  except ValueError as e:
-                    error("invalid edited string: %s", e)
-                    xit = 1
-                  else:
-                    if old_modelId != new_modelId:
-                      error("modelId changed")
-                      xit = 1
-                    elif new_name in all_names:
-                      if obclass == 'keywords':
-                        # TODO: merge keywords
-                        print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
-                        otherModelId = the(item.modelId
-                                           for item in get_items()
-                                           if item.name == new_name)
-                        I.replace_keywords(old_modelId, otherModelId)
-                        I.expunge_keyword(old_modelId)
-                      else:
-                        error("new name already in use: %r", new_name)
-                        xit = 1
-                    else:
-                      print("%d: %s => %s" % (old_modelId, old_name, new_name))
-                      table[old_modelId].name = new_name
-        elif op == 'select':
-          if not argv:
-            warning("missing selectors")
-            badopts = True
-          else:
-            selectors = []
-            for selection in argv:
-              try:
-                selector = I.parse_selector(selection)
-              except ValueError as e:
-                warning("invalid selector: %s", e)
-                badopts = True
-              else:
-                selectors.append(selector)
-          if not badopts:
-            masters = None
-            for selector in selectors:
-              masters = selector.select(masters)
-            for master in masters:
-              print(master.pathname)
-        elif op == "test":
-          test(argv, I)
-        else:
-          warning("unrecognised op")
+            raise GetoptError("unrecognised op")
+        except GetoptError as e:
+          warning(e)
           badopts = True
     if badopts:
       print(usage, file=sys.stderr)
       return 2
     return xit
 
-def test(argv, I):
+def cmd_info(I, argv):
+  ''' Usage: info masters...
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing masters")
+  obclass = argv.pop(0)
+  with Pfx(obclass):
+    if obclass == 'masters':
+      for master in sorted(I.masters(), key=lambda m: m.pathname):
+        with Pfx(master.pathname):
+          iminfo = master.image_info
+          if iminfo is None:
+            error("no info")
+            xit = 1
+          else:
+            print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
+                  *[ 'kw:'+kwname for kwname in master.keyword_names ])
+    else:
+      raise GetoptError("unknown class: %r" % (obclass,))
+  return xit
+
+def cmd_ls(I, argv):
+  xit = 0
+  if not argv:
+    for db_name in sorted(I.db_names()):
+      print(db_name)
+  else:
+    obclass = argv.pop(0)
+    with Pfx(obclass):
+      if obclass.isdigit():
+        rating = int(obclass)
+        I.load_versions()
+        names = []
+        for version in I.versions():
+          if version.mainRating == rating:
+            pathname = version.master.pathname
+            if pathname is not None:
+              names.append(pathname)
+      elif obclass == 'albums':
+        I.load_albums()
+        names = I.album_names()
+      elif obclass == 'events':
+        I.load_folders()
+        names = I.event_names()
+      elif obclass == 'folders':
+        I.load_folders()
+        names = I.folder_names()
+      elif obclass == 'keywords':
+        I.load_keywords()
+        names = I.keyword_names()
+      elif obclass == 'masters':
+        I.load_masters()
+        names = I.master_pathnames()
+      elif obclass == 'people':
+        I.load_persons()
+        names = I.person_names()
+      else:
+        raise GetoptError("unknown class")
+      if argv:
+        raise GetoptError("extra arguments: %r", argv)
+      for name in sorted(names):
+        print(name)
+  return xit
+
+def cmd_rename(I, argv):
+  ''' Usage: rename {events|keywords|people} {/regexp|name}...
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing events")
+  obclass = argv.pop(0)
+  with Pfx(obclass):
+    if obclass == 'events':
+      table = I.folder_table
+      I.load_folders()
+      get_items = I.events
+    elif obclass == 'keywords':
+      table = I.keyword_table
+      I.load_keywords()
+      get_items = I.read_keywords
+    elif obclass == 'people':
+      table = I.person_table
+      I.load_persons()
+      get_items = I.persons
+    else:
+      raise GetoptError("known class")
+    all_names = set(item.name for item in get_items())
+    if argv:
+      edit_lines = set()
+      for arg in argv:
+        with Pfx(arg):
+          # TODO: select by regexp if /blah
+          if arg.startswith('/'):
+            regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+            edit_lines.update(item.edit_string
+                              for item in get_items()
+                              if regexp.search(item.name))
+          elif '*' in arg or '?' in arg:
+            edit_lines.update(item.edit_string
+                              for item in get_items()
+                              if fnmatch(item.name, arg))
+          elif arg in all_names:
+            for item in get_items():
+              if item.name == arg:
+                edit_lines.add(item.edit_string)
+          else:
+            raise GetoptError("unknown item name")
+    else:
+      edit_lines = set(item.edit_string for item in get_items())
+    changes = edit_strings(sorted(edit_lines,
+                                  key=lambda _: _.split(':', 1)[1]),
+                           errors=lambda msg: warning(msg + ', discarded')
+                          )
+    for old_string, new_string in changes:
+      with Pfx("%s => %s", old_string, new_string):
+        old_modelId, old_name = old_string.split(':', 1)
+        old_modelId = int(old_modelId)
+        try:
+          new_modelId, new_name = new_string.split(':', 1)
+          new_modelId = int(new_modelId)
+        except ValueError as e:
+          error("invalid edited string: %s", e)
+          xit = 1
+        else:
+          if old_modelId != new_modelId:
+            error("modelId changed")
+            xit = 1
+          elif new_name in all_names:
+            if obclass == 'keywords':
+              # TODO: merge keywords
+              print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
+              otherModelId = the(item.modelId
+                                 for item in get_items()
+                                 if item.name == new_name)
+              I.replace_keywords(old_modelId, otherModelId)
+              I.expunge_keyword(old_modelId)
+            else:
+              error("new name already in use: %r", new_name)
+              xit = 1
+          else:
+            print("%d: %s => %s" % (old_modelId, old_name, new_name))
+            table[old_modelId].name = new_name
+  return xit
+
+def cmd_select(I, argv):
+  xit = 0
+  badopts = False
+  if not argv:
+    raise GetoptError("missing selectors")
+  selectors = []
+  for selection in argv:
+    with Pfx(selection):
+      try:
+        selector = I.parse_selector(selection)
+      except ValueError as e:
+        warning("invalid selector: %s", e)
+        badopts = True
+      else:
+        selectors.append(selector)
+  if badopts:
+    raise GetoptError("invalid arguments")
+  masters = None
+  for selector in selectors:
+    masters = selector.select(masters)
+    for master in masters:
+      print(master.pathname)
+  return xit
+
+def cmd_test(I, argv):
   ##for folder in I.read_folders():
   ##  print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
   ##for keyword in I.read_keywords():
@@ -278,6 +298,7 @@ def test(argv, I):
     FI.save(filename)
     FI.close()
     break
+  return 0
 
 Image_Info = namedtuple('Image_Info', 'dx dy format')
 
