@@ -8,9 +8,58 @@
 import os
 import plistlib
 import shutil
+import subprocess
 import tempfile
 import cs.sh
+from cs.xml import etree
 from .iphone import is_iphone
+
+def import_as_etree(plist):
+  ''' Load an Apple plist and return an etree.Element.
+      `plist`: the source plist: data if bytes, filename if str,
+          otherwise a file object open for binary read.
+  '''
+  if isinstance(plist, bytes):
+    # read bytes as a data stream
+    from io import BytesIO
+    E = etree.parse(BytesIO(plist))
+  elif isinstance(plist, str):
+    # presume plist is a filename
+    with open(plist, "rb") as pfp:
+      P = subprocess.Popen(['plutil', '-convert', 'xml1', '-o', '-', '-'],
+                           stdin=pfp,
+                           stdout=subprocess.PIPE)
+      E = etree.parse(P.stdout)
+      retcode = P.wait()
+      if retcode != 0:
+        raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
+  else:
+    # presume plist is a file
+    E = etree.parse(plist)
+  return E
+
+def export_xml_to_plist(E, fp=None, fmt='binary1'):
+  ''' Export the content of an etree.Element to a plist file.
+      `E`: the source etree.Element.
+      `fp`: the output file or filename (if a str).
+      `fmt`: the output format, default "binary1". The format must
+              be a valid value for the "-convert" option of plutil(1).
+  '''
+  if isinstance(fp, str):
+    with open(fp, "wb") as ofp:
+      return export_xml_as_plist(E, ofp, fmt=fmt)
+  P = subprocess.Popen(['plutil', '-convert', fmt, '-o', '-', '-'],
+                       stdin=subprocess.PIPE,
+                       stdout=fp)
+  P.stdin.write(etree.tostring(E))
+  P.stdin.close()
+  retcode = P.wait()
+  if retcode != 0:
+    raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
+
+####################################################################################
+# Old routines written for use inside my jailbroken iPhone.
+#
 
 def readPlist(path, binary=False):
   if not binary:
@@ -57,4 +106,3 @@ def writePlist(rootObj, path, binary=False):
   os.system("set -x; exec "+" ".join(cs.sh.quote(plargv)))
   if is_iphone():
     shutil.copyfile(tpath,path)
-  os.unlink(tpath)
