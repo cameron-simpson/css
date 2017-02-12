@@ -18,7 +18,7 @@ import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import import_as_etree as import_plist, ingest_plist_etree, PListDict
+from .plist import PListDict, ingest_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -433,7 +433,7 @@ class iPhoto(O):
     return self.pathto('AlbumData.xml')
 
   def load_albumdata(self):
-    return ingest_plist_etree(import_plist(self.albumdata_path))
+    return ingest_plist(self.albumdata_path)
 
   @locked_property
   def albumdata_xml_plist(self):
@@ -863,7 +863,12 @@ class iPhotoRow(Row):
     return "%d:%s" % (self.modelId, self.name)
 
 class Album_Mixin(iPhotoRow):
-  pass
+  @prop
+  def apalbum_path(self):
+    return self.iphoto.pathto(os.path.join('Database/Albums', self.uuid+'.apalbum'))
+
+  def load_apalbum_plist(self):
+    return ingest_plist(self.apalbum_path)
 
 class Master_Mixin(iPhotoRow):
 
