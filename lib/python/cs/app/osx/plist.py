@@ -138,6 +138,10 @@ class PListDict(object):
     return dict(self._d)
   def _keys(self):
     return self._d.keys()
+  def _pop(self, key):
+    return self._d.pop(key)
+  def __contains__(self, key):
+    return key in self._d
   def __getattr__(self, attr):
     if attr[0].isalpha():
       try:
