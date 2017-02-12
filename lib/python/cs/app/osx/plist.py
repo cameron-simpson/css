@@ -41,6 +41,12 @@ def import_as_etree(plist):
     raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
   return E
 
+def ingest_plist(plist):
+  ''' Ingest an Apple plist and return as a PListDict.
+      Trivial wrapper for import_as_etree and ingest_plist_etree.
+  '''
+  return ingest_plist_etree(import_as_etree(plist))
+
 def export_xml_to_plist(E, fp=None, fmt='binary1'):
   ''' Export the content of an etree.Element to a plist file.
       `E`: the source etree.Element.
