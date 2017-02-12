@@ -1,12 +1,22 @@
 #!/usr/bin/python
 #
-# Basic XML conveniences. Initially just imports etree.
+# Basic XML conveniences.
 #   - Cameron Simpson <cs@zip.com.au> 12feb2017
 #
 
+from __future__ import print_function
+import sys
 try:
   from lxml import etree
-  print("running with lxml.etree")
 except ImportError:
   import xml.etree.ElementTree as etree
-  print("running with ElementTree on Python 2.5+")
+
+def pprint(xml, fp=None):
+  ''' Directly derived from the suggestion at:
+       http://stackoverflow.com/questions/749796/pretty-printing-xml-in-python
+  '''
+  if fp is None:
+    fp = sys.stdout
+  if isinstance(xml, str):
+    xml = etree.fromstring(xml)
+  print(etree.tostring(xml, pretty_print=True), file=fp)
