@@ -19,4 +19,4 @@ def pprint(xml, fp=None):
     fp = sys.stdout
   if isinstance(xml, str):
     xml = etree.fromstring(xml)
-  print(etree.tostring(xml, pretty_print=True), file=fp)
+  print(etree.tostring(xml, pretty_print=True).decode(), file=fp)
