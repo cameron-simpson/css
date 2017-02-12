@@ -284,6 +284,10 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_test(I, argv):
+  AD = I.albumdata
+  print('AlbumData.xml:')
+  print(pprint.pformat(AD._as_dict(), indent=2, width=32))
+  sys.exit(1)
   ##for folder in I.read_folders():
   ##  print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
   ##for keyword in I.read_keywords():
