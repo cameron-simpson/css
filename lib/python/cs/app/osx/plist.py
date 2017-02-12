@@ -21,21 +21,24 @@ def import_as_etree(plist):
   '''
   if isinstance(plist, bytes):
     # read bytes as a data stream
-    from io import BytesIO
-    E = etree.parse(BytesIO(plist))
-  elif isinstance(plist, str):
+    # write to temp file, decode using plutil
+    with tempfile.NamedTemporaryFile() as tfp:
+      tfp.write(plist)
+      tfp.flush()
+      tfp.seek(0, 0)
+      return import_as_etree(tfp.file)
+  if isinstance(plist, str):
     # presume plist is a filename
     with open(plist, "rb") as pfp:
-      P = subprocess.Popen(['plutil', '-convert', 'xml1', '-o', '-', '-'],
-                           stdin=pfp,
-                           stdout=subprocess.PIPE)
-      E = etree.parse(P.stdout)
-      retcode = P.wait()
-      if retcode != 0:
-        raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
-  else:
-    # presume plist is a file
-    E = etree.parse(plist)
+      return import_as_etree(pfp)
+  # presume plist is a file
+  P = subprocess.Popen(['plutil', '-convert', 'xml1', '-o', '-', '-'],
+                       stdin=plist,
+                       stdout=subprocess.PIPE)
+  E = etree.parse(P.stdout)
+  retcode = P.wait()
+  if retcode != 0:
+    raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
   return E
 
 def export_xml_to_plist(E, fp=None, fmt='binary1'):
