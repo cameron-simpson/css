@@ -600,13 +600,8 @@ class iPhoto(O):
     self.load_keywords()
     return self.keyword_by_id.get(keyword_id)
 
-  @locked_property
-  def keywords(self):
-    self.load_keywords()
-    return self.keyword_by_name.values()
-
   def keyword_names(self):
-    return frozenset(kw.name for kw in self.keywords)
+    return frozenset(kw.name for kw in self.keywords())
 
   def match_keyword(self, kwname):
     ''' User convenience: match string against all keywords, return matches.
