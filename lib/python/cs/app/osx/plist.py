@@ -5,6 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import base64
 import os
 import plistlib
 import shutil
@@ -94,6 +95,8 @@ def ingest_plist_elem(e):
     return False
   if e.tag == 'true':
     return True
+  if e.tag == 'data':
+    return base64.b64decode(e.text)
   return e
 
 def ingest_plist_array(pa):
@@ -128,44 +131,21 @@ def ingest_plist_dict(pd):
     raise ValueError("no value for key %r" % (key,))
   return d
 
-class PListDict(object):
-  ''' A mapping for a plist <dict>, which also allows access to the elements by attribute.
+class PListDict(dict):
+  ''' A mapping for a plist, subclassing dict, which also allows access to the elements by attribute if that does not conflict with a dict method.
   '''
-  def __init__(self):
-    self._d = {}
-  def __str__(self):
-    return "%s(len=%d)" % (self.__class__.__name__, len(self))
-  def __repr__(self):
-    return repr(self._d)
-    ##return "%s%r" % (self, self._d)
-  def __len__(self):
-    return len(self._d)
-  def _as_dict(self):
-    return dict(self._d)
-  def _keys(self):
-    return self._d.keys()
-  def _pop(self, key):
-    return self._d.pop(key)
-  def __contains__(self, key):
-    return key in self._d
   def __getattr__(self, attr):
     if attr[0].isalpha():
       try:
-        return self._d[attr]
+        return self[attr]
       except KeyError:
         raise AttributeError(attr)
     raise AttributeError(attr)
   def __setattr__(self, attr, value):
-    if attr == '_d':
-      self.__dict__[attr] = value
-    elif attr[0].isalpha():
-      self._d[attr] = value
+    if attr in self:
+      self[attr] = value
     else:
-      raise AttributeError(attr)
-  def __getitem__(self, key):
-    return self._d[key]
-  def __setitem__(self, key, value):
-    self._d[key] = value
+      super().__setattr__(attr, value)
 
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
