@@ -172,11 +172,11 @@ def cmd_ls(I, argv):
           print(key)
           if argv:
             for column_name in sorted(row.column_names):
-              if obclass == 'albums' and column_name in ('filterData', 'queryData', 'viewData'):
-                et = import_plist(row[column_name])
-                album_filter = ingest_plist_etree(et)
-                objs = album_filter['$objects']
-                print(' ', column_name+':', resolve_object(objs, 1))
+              if column_name.endswith('Data'):
+                data_plist = ingest_plist(row[column_name])
+                obj = unpack_plist_object(data_plist)
+                print(' ', column_name+':')
+                pprint.pprint(obj.value)
               else:
                 print(' ', column_name+':', row[column_name])
   return xit
@@ -868,7 +868,11 @@ class Album_Mixin(iPhotoRow):
     return self.iphoto.pathto(os.path.join('Database/Albums', self.uuid+'.apalbum'))
 
   def load_apalbum_plist(self):
-    return ingest_plist(self.apalbum_path)
+    pd = ingest_plist(self.apalbum_path)
+    for key, value in list(pd.items()):
+      if isinstance(value, bytes):
+        pd[key] = unpack_plist_object(ingest_plist(value))
+    return pd
 
 class Master_Mixin(iPhotoRow):
 
@@ -1315,6 +1319,10 @@ SCHEMAE = {'Faces':
                 },
             }
           }
+
+def unpack_plist_object(plist):
+  # TODO: check that all object refs have been resolved?
+  return resolve_object(plist['$objects'], 1)
 
 def resolve_object(objs, i):
   ''' Resolve an object definition from structures like an album
