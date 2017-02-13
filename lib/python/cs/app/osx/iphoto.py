@@ -1326,21 +1326,21 @@ def resolve_object(objs, i):
   if isinstance(o, PListDict):
     if '$class' in o:
       # instance definition
-      class_id = o._pop('$class')['CF$UID']
+      class_id = o.pop('$class')['CF$UID']
       class_def = resolve_object(objs, class_id)
       if 'NS.string' in o:
-        value = o._pop('NS.string')
+        value = o.pop('NS.string')
       elif 'NS.objects' in o:
         objects = []
-        for od in o._pop('NS.objects'):
-          obj_id = od._pop('CF$UID')
+        for od in o.pop('NS.objects'):
+          obj_id = od.pop('CF$UID')
           if od:
             raise ValueError("other fields in obj ref: %r" % (od,))
           objects.append(resolve_object(objs, obj_id))
         if 'NS.keys' in o:
           keys = []
-          for kd in o._pop('NS.keys'):
-            key_id = kd._pop('CF$UID')
+          for kd in o.pop('NS.keys'):
+            key_id = kd.pop('CF$UID')
             if kd:
               raise ValueError("other fields in key ref: %r" % (kd,))
             keys.append(resolve_object(objs, key_id))
@@ -1351,8 +1351,8 @@ def resolve_object(objs, i):
         warning("unhandled $class instance: %r", o)
       o = ClassInstance(class_def, value)
     elif '$classname' in o:
-      class_name = o._pop('$classname')
-      class_mro = o._pop('$classes')
+      class_name = o.pop('$classname')
+      class_mro = o.pop('$classes')
       o = ClassDefinition(class_name, class_mro)
     else:
       warning("unknown dict content: %r" % (o,))
