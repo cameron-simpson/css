@@ -179,6 +179,9 @@ def cmd_ls(I, argv):
                 pprint.pprint(obj.value)
               else:
                 print(' ', column_name+':', row[column_name])
+        if obclass == 'albums':
+          print("apalbumpath =", row.apalbum_path)
+          print(repr(row.load_apalbum_plist()))
   return xit
 
 def cmd_rename(I, argv):
