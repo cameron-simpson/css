@@ -80,8 +80,8 @@ colors=$( tput colors ) || colors=
 set -- source-highlight \
         "--outlang-def=esc${colors}.outlang" \
         "--style-file=esc${colors}.style"
-[ -z "$src_lang" ] || set -- "$@" -s "$src_lang"
+[ -n "$src_lang" ] || src_lang=txt
+set -- "$@" -s "$src_lang"
 set -- "$@" -i "$filename" -o STDOUT
 
-set -x
 exec "$@"
