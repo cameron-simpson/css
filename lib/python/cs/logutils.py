@@ -352,6 +352,8 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# set to true to log as a warning
+X_via_log = False
 # set to true to write direct to /dev/tty
 X_via_tty = False
 
@@ -359,7 +361,13 @@ def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  if X_via_tty:
+  if X_via_log:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    warning(msg)
+  elif X_via_tty:
     # NB: ignores any kwargs
     msg = str(msg)
     if args:
