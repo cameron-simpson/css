@@ -439,6 +439,8 @@ class HashCodeBlock(_Block):
 
   @property
   def data(self):
+    ''' The direct data of this Block.
+    '''
     return self.stored_data()
 
 def Block(hashcode=None, data=None, span=None):
