@@ -74,7 +74,8 @@ def decodeBlock(bs, offset=0, length=None):
                 type 3: suboffset, super block
               }
   '''
-  with Pfx('decodeBlock(bs, offset=%d,length=%s)', offset, length):
+  with Pfx('decodeBlock(bs=%r,offset=%d,length=%s)',
+           bs[offset:offset+16], offset, length):
     if length is None:
       length, offset = get_bs(bs, offset)
       return decodeBlock(bs, offset, length)
