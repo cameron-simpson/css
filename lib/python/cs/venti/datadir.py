@@ -6,6 +6,7 @@
 
 from collections.abc import Mapping
 import csv
+import errno
 import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
@@ -225,12 +226,21 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     while not self._monitor_halt:
       # scan for new datafiles
       added = False
-      for filename in os.listdir(self.datadirpath):
-        if ( not filename.startswith('.')
-         and filename.endswith(DATAFILE_DOT_EXT)
-         and filename not in filemap):
-          self._add_datafile(filename, no_save=True)
-          added = True
+      with Pfx("listdir(%r)", self.datadirpath):
+        try:
+          listing = os.listdir(self.datadirpath)
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            error("listing failed: %s", e)
+            sleep(2)
+            continue
+          raise
+        for filename in os.listdir(self.datadirpath):
+          if ( not filename.startswith('.')
+           and filename.endswith(DATAFILE_DOT_EXT)
+           and filename not in filemap):
+            self._add_datafile(filename, no_save=True)
+            added = True
       if added:
         self._save_state()
       # now scan datafiles for new data
