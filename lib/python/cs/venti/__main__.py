@@ -19,14 +19,15 @@ import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
 from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
-from .block import Block, IndirectBlock, dump_block
+from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import CacheStore, MemoryCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
-from .dir import Dir
+from .dir import Dir, decode_Dirent_text
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .fsck import fsck_Block, fsck_dir
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
@@ -57,6 +58,7 @@ def main(argv):
       datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
       datadir [indextype:[hashname:]]/dirpath push other-datadir
       dump filerefs
+      fsck block blockref...
       ftp archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
@@ -376,6 +378,49 @@ def cmd_dump(args, verbose=None, log=None):
   for path in args:
     dump(path)
   return 0
+
+def cmd_fsck(args, verbose=None, log=None):
+  import cs.logutils
+  cs.logutils.X_via_log = True
+  if not args:
+    raise GetoptError("missing fsck type")
+  fsck_type = args.pop(0)
+  with Pfx(fsck_type):
+    try:
+      fsck_op = {
+        "block":    cmd_fsck_block,
+        "dir":      cmd_fsck_dir,
+      }[fsck_type]
+    except KeyError:
+      raise GetoptError("unsupported fsck type")
+    return fsck_op(args, verbose=verbose, log=log)
+
+def cmd_fsck_block(args, verbose=None, log=None):
+  xit = 0
+  if not args:
+    raise GetoptError("missing blockrefs")
+  for blockref in args:
+    with Pfx(blockref):
+      blockref_bs = fromtext(blockref)
+      B, offset = decodeBlock(blockref_bs)
+      if offset < len(blockref_bs):
+        raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
+      if not fsck_Block(B):
+        error("fsck failed")
+        xit = 1
+  return xit
+
+def cmd_fsck_dir(args, verbose=None, log=None):
+  xit = 0
+  if not args:
+    raise GetoptError("missing dirents")
+  for dirent_txt in args:
+    with Pfx(dirent_txt):
+      D = decode_Dirent_text(dirent_txt)
+      if not fsck_dir(D):
+        error("fsck failed")
+        xit = 1
+  return xit
 
 def cmd_ftp(args, verbose=None, log=None):
   archive, = args

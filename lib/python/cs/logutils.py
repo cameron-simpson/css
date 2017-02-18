@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3'],
+    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.upd'],
 }
 
 import codecs
@@ -39,6 +39,7 @@ from cs.lex import is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
+from cs.upd import Upd
 
 cmd = __file__
 
@@ -46,6 +47,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
+loginfo = O()
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -79,9 +81,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       If trace_mode is true, set the global trace_level to logging_level;
       otherwise it defaults to logging.DEBUG.
   '''
-  global cmd, logging_level, trace_level, D_mode
-
-  loginfo = O()
+  global cmd, logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level()
@@ -160,7 +160,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
@@ -352,6 +352,8 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# set to true to log as a warning
+X_via_log = False
 # set to true to write direct to /dev/tty
 X_via_tty = False
 
@@ -359,7 +361,13 @@ def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  if X_via_tty:
+  if X_via_log:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    warning(msg)
+  elif X_via_tty:
     # NB: ignores any kwargs
     msg = str(msg)
     if args:
@@ -626,11 +634,15 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
+    global loginfo
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
+    if loginfo.upd_mode:
+      info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
+    global loginfo
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
@@ -671,6 +683,8 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
+    if loginfo.upd_mode:
+      info(self._state.prefix)
     return False
 
   @property
@@ -848,7 +862,6 @@ class UpdHandler(StreamHandler):
         A true value causes the handler to colour certain logging levels
         using ANSI terminal sequences.
     '''
-    from cs.upd import Upd
     if strm is None:
       strm = sys.stderr
     if nlLevel is None:

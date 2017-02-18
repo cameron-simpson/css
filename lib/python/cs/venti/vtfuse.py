@@ -1,7 +1,9 @@
 #!/usr/bin/python
 #
 # Fuse interface to a Store.
-# Uses fusepy: https://github.com/terencehonles/fusepy
+# Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/
+# Formerly used fusepy: https://github.com/terencehonles/fusepy
+# but that doesn't work with Python 3 and has some other problems.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
@@ -82,6 +84,7 @@ def handler(method):
       Store, prevents anything other than a FUSEOSError being raised.
   '''
   def handle(self, *a, **kw):
+    ##X("OP %s %r %r", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
@@ -158,12 +161,16 @@ class FileHandle(O):
     self.E.touch()
 
   def flush(self):
+    X("FileHandle.flush: Eopen.flush...")
     self.Eopen.flush()
+    X("FileHandle.flush: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
   def close(self):
+    X("FileHandle.close: Eopen.close...")
     self.Eopen.close()
+    X("FileHandle.close: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
@@ -830,13 +837,12 @@ if FUSE_CLASS == 'llfuse':
         try:
           E = P[name]
         except KeyError:
-          ## llfuse.EntryAttributes.st_ino.__set__ rejects a negative st_ino
-          ##EA = llfuse.EntryAttributes()
-          ##EA.st_ino = -1
-          ##EA.entry_timeout = 1.0
-          ##return EA
           ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
-          raise FuseOSError(errno.ENOENT)
+          ##raise FuseOSError(errno.ENOENT)
+          EA = llfuse.EntryAttributes()
+          EA.st_ino = 0
+          EA.entry_timeout = 1.0
+          return EA
       return self._vt_EntryAttributes(E)
 
     @handler

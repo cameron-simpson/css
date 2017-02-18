@@ -161,7 +161,7 @@ class _Dirent(object):
         self.meta.update_from_items(metatext.items())
 
   def __str__(self):
-    return "%s:%r:type=%s" % (self.__class__.__name__, self.name, self.type)
+    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
@@ -445,7 +445,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
-    X("CLOSE %s: _block=%s", self, self._block)
+    X("CLOSE %s: _block=%s: length=%d", self, self._block, len(self._block))
     self._open_file = None
     self._check()
 
