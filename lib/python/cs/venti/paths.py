@@ -104,6 +104,8 @@ def walk(rootD, topdown=True, yield_status=False):
           try:
             subD = rootD.chdir1(dirname)
           except KeyError as e:
+            if not yield_status:
+              raise
             error("chdir1(%r): %s", dirname, e)
             ok = False
           else:
