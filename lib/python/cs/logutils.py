@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3'],
+    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.upd'],
 }
 
 import codecs
@@ -39,6 +39,7 @@ from cs.lex import is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
+from cs.upd import Upd
 
 cmd = __file__
 
@@ -848,7 +849,6 @@ class UpdHandler(StreamHandler):
         A true value causes the handler to colour certain logging levels
         using ANSI terminal sequences.
     '''
-    from cs.upd import Upd
     if strm is None:
       strm = sys.stderr
     if nlLevel is None:
