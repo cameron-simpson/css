@@ -102,7 +102,7 @@ def walk(rootD, topdown=True, yield_status=False):
       for dirname in reversed(dirnames):
         with Pfx("dirname=%r", dirname):
           try:
-            subD = rootD.chdir1(dirname)
+            subD = thisD.chdir1(dirname)
           except KeyError as e:
             if not yield_status:
               raise
