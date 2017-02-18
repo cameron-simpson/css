@@ -44,7 +44,11 @@ def ttysize(fd):
   if m:
     rows, columns = int(m.group(1)), int(m.group(2))
   else:
-    rows, columns = None, None
+    m = re.compile(r' (\d+) rows; (\d+) columns').search(stty)
+    if m:
+      rows, columns = int(m.group(1)), int(m.group(2))
+    else:
+      rows, columns = None, None
   return WinSize( rows, columns )
 
 _ti_setup = False
