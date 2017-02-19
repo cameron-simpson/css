@@ -47,7 +47,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
-loginfo = O()
+loginfo = O(upd_mode=False)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
