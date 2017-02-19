@@ -163,7 +163,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = True
+    if 'TRACE' in flags:
+      Pfx._state.trace = True
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -282,6 +283,7 @@ def infer_logging_level(env_debug=None, environ=None):
         numeric >= 1 and < 2: logging.INFO
         numeric >= 2 => logging.DEBUG
         "DEBUG" => logging.DEBUG
+        "TRACE" => Pfx issues log.info calls
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
@@ -324,14 +326,13 @@ def infer_logging_level(env_debug=None, environ=None):
       if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
         function_names.append( (module_name, func_name) )
     else:
-      uc_flag = flag.upper()
-      if uc_flag == 'DEBUG':
+      if flag == 'DEBUG':
         level = logging.DEBUG
-      elif uc_flag == 'INFO':
+      elif flag == 'INFO':
         level = logging.INFO
-      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
+      elif flag == 'WARN' or flag == 'WARNING':
         level = logging.WARNING
-      elif uc_flag == 'ERROR':
+      elif flag == 'ERROR':
         level = logging.ERROR
   return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
 
