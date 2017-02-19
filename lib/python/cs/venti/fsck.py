@@ -5,7 +5,8 @@
 #
 
 from cs.logutils import Pfx, error, warning, info, X
-from .block import HashCodeBlock
+from . import defaults
+from .block import HashCodeBlock, LiteralBlock
 from .paths import walk
 
 def fsck_dir(rootD):
@@ -26,12 +27,22 @@ def fsck_dir(rootD):
             E = D[filename]
           except KeyError as e:
             error("not in D")
+          else:
+            B = E.block
+            if not fsck_Block(B):
+              error("E.block fails fsck")
+              ok = False
       for dirname in sorted(dirnames):
         with Pfx("dirname=%r", dirname):
           try:
             subD = D[dirname]
           except KeyError as e:
             error("not in D")
+          else:
+            B = subD.block
+            if not fsck_Block(B):
+              error("E.block fails fsck")
+              ok = False
   return ok
 
 def fsck_Block(B):
@@ -50,7 +61,7 @@ def fsck_Block(B):
           ok = True
           if B.indirect:
             suboffset = 0
-            for i, subB in B.subblocks:
+            for i, subB in enumerate(B.subblocks):
               with Pfx("subblocks[%d]:%d..%d", i, suboffset, suboffset+len(subB)):
                 if not fsck_Block(subB):
                   ok = False
@@ -61,6 +72,12 @@ def fsck_Block(B):
             if len(B) != len(data):
               error("len(B)=%d, len(data)=%d", len(B), len(data))
               ok = False
+    elif isinstance(B, LiteralBlock):
+      ok = True
+      data = B.data
+      if len(B) != len(data):
+        error("len(B)=%d, len(data)=%d", len(B), len(data))
+        ok = False
     else:
       error("unsupported Block type: %s", B.__class__)
   return ok

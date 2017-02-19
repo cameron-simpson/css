@@ -162,6 +162,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if upd_mode:
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = True
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -522,6 +524,7 @@ class _PfxThreadState(threading.local):
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
+    self.trace = False
 
   @property
   def cur(self):
@@ -638,7 +641,7 @@ class Pfx(object):
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
-    if loginfo.upd_mode:
+    if _state.trace:
       info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
