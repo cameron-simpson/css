@@ -21,7 +21,7 @@ usage="Usage: $cmd [-a] [-d] [-t top] [-T top] {relpath|.} [{-c shcmd | testcmd 
         \$FINDUP_PATH is set to the test path (the test directory
         with \"relpath\" appended, unless \"relpath\" is \".\" or
         the empty string, in which case it will just be the test
-        directory."
+        directory)."
 
 all=
 dirmode=
