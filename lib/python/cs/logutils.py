@@ -163,7 +163,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    if 'TRACE' in flags:
+    if trace_mode:
       Pfx._state.trace = True
   else:
     main_handler = logging.StreamHandler(main_log)
@@ -687,7 +687,7 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
-    if loginfo.upd_mode:
+    if _state.trace:
       info(self._state.prefix)
     return False
 
