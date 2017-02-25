@@ -1390,6 +1390,21 @@ class ClassInstance(object):
   def __str__(self):
     return "%s%r" % (self.name, self.value)
   __repr__ = __str__
+  def __len__(self): return len(self.value)
+  def __getitem__(self, key): return self.value[key]
+  def __setitem__(self, key, value): self.value[key] = value
+  def __contains__(self, key): return key in self.value
+  def __getattr__(self, attr):
+    try:
+      return self.value[attr]
+    except KeyError:
+      raise AttributeError("not in self.value: %r" % (attr,))
+    except TypeError:
+      raise AttributeError("cannot index self.value: %r" % (attr,))
+    raise AttributeError(attr)
+  def keys(self): return self.value.keys()
+  def items(self): return self.value.items()
+  def values(self): return self.value.values()
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
