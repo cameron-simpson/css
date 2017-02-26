@@ -1,3 +1,6 @@
+iphoto:
+  decode album definitions
+  import keywords from /path/to/iphoto-library
 venti:
     support ranges on GET requests
   URIs:
