@@ -1,7 +1,9 @@
 ssh-opts: cononical capitalisation of option names
 cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
 venti:
-    support ranges on GET requests
+  BUG: new files forget their correct size on umount
+  rename cs.venti => cs.vt
+  support ranges on GET requests
   URIs:
     x-vt:[//host[:port]]/textblockref-of-Dir/path...
   vt publish pathname
@@ -18,6 +20,9 @@ venti:
     PUSH name   # needs peer    Export Blocks for name to peer
     join/merge live mount points
     QUIT => sync and recite top Dirref?
+  file
+    start syncing appended data immediately?
+      => better file-close behaviour
   vtfuse:
     OSX Finder name of mountpoint
     do not sync unlinked files
