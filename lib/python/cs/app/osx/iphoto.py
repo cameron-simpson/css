@@ -54,6 +54,8 @@ Criteria:
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
                         May also be writtens "who:...".
+  [!]attr{<,<=,=,>=,>}value
+                        Test image attribute eg "width>=1920".
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
 '''
@@ -701,6 +703,17 @@ class iPhoto(O):
       .delete_by_column('modelId', keyword_id)
 
   def parse_selector(self, selection):
+    ''' Parse a single image selection criterion.
+        Leading "!" or "-" inverts the test.
+        /regexp     Compare image filename against regexp.
+        kw:         Image has some keywords.
+        kw:kwname   Image has keyword "kwname".
+        who:, face: Image contains a face.
+        who:name, face:name
+                    Image contains the named face.
+        attr{<,<=,=,>=,>}value
+                    Test image attribute eg "width>=1920".
+    '''
     with Pfx(selection):
       selection0 = selection
       selector = None
