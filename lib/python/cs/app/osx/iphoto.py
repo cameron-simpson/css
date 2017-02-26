@@ -178,7 +178,7 @@ def cmd_ls(I, argv):
                 data_plist = ingest_plist(row[column_name])
                 obj = unpack_plist_object(data_plist)
                 print(' ', column_name+':')
-                pprint.pprint(obj.value)
+                pprint.pprint(obj.value, width=32)
               else:
                 print(' ', column_name+':', row[column_name])
         if obclass == 'albums':
