@@ -1,5 +1,6 @@
 venti:
-  BUG: new files forget their correct size on umount
+  FIXED? BUG: new files forget their correct size on umount
+  move to SHA-3, check hash size etc
   rename cs.venti => cs.vt
   support ranges on GET requests
   URIs:
