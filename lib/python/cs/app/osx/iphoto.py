@@ -1371,6 +1371,16 @@ def resolve_object(objs, i):
           value = dict(zip(keys, objects))
         else:
           value = list(objects)
+      elif 'NS.data' in o:
+        value = o['NS.data']
+      elif 'data' in o:
+        data = o['data']
+        key_id = data.pop('CF$UID')
+        if data:
+          raise ValueError("other fields in data: %r" % (data,))
+        data = resolve_object(objs, key_id)
+        o['data'] = data
+        value = data
       else:
         warning("unhandled $class instance: %r", o)
       o = ClassInstance(class_def, value)
