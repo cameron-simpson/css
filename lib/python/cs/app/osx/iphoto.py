@@ -184,6 +184,7 @@ def cmd_ls(I, argv):
         if obclass == 'albums':
           print("apalbumpath =", row.apalbum_path)
           print(repr(row.load_apalbum_plist()))
+          print("filter =", row.decode_filterData())
   return xit
 
 def cmd_rename(I, argv):
@@ -889,6 +890,25 @@ class Album_Mixin(iPhotoRow):
       if isinstance(value, bytes):
         pd[key] = unpack_plist_object(ingest_plist(value))
     return pd
+
+  def decode_filterData(self):
+    X("================= decode_filterData")
+    filterPList = ingest_plist(self.filterData)
+    filter = unpack_plist_object(filterPList)
+    for k, v in filter.items():
+      X("%s: %r", k, v)
+    queryClassName = filter.queryClassName
+    X("QUERY CLASS NAME = %r", queryClassName)
+    d = {'queryClassName': queryClassName}
+    if queryClassName == 'RKMultiItemQuery':
+      subQueries = []
+      for i, sq in enumerate(filter.querySubqueries):
+        X("SUBQUERY %d: %r", i, sq)
+        for sqk in sorted(sq.keys()):
+          X("  %s => %s", sqk, sq[sqk])
+    else:
+      X("===== UNSUPPORTED QUERY CLASS")
+    return d
 
 class Master_Mixin(iPhotoRow):
 
