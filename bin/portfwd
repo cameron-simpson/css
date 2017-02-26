@@ -183,11 +183,11 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 uppername()
-{ echo "$1" | tr -- '[a-z]-.' '[A-Z]__'
+{ echo "$1" | tr -- '[:lower:]\-.' '[:upper:]__'
 }
 
 lowername()
-{ echo "$1" | tr -- '[A-Z]_' '[a-z]-'
+{ echo "$1" | tr -- '[:upper:]_' '[:lower:]-'
 }
 
 if [ $setflag ]

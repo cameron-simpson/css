@@ -161,7 +161,7 @@ class _Dirent(object):
         self.meta.update_from_items(metatext.items())
 
   def __str__(self):
-    return "%s:%r:type=%s" % (self.__class__.__name__, self.name, self.type)
+    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
@@ -381,6 +381,32 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._block = block
     self._check()
 
+  @locked
+  def startup(self):
+    ''' Set up ._open_file on first open.
+    '''
+    self._check()
+    if self._open_file is not None:
+      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self._block is None:
+      raise RuntimeError("first open, but ._block is None")
+    self._open_file = File(self._block)
+    self._block = None
+    self._check()
+
+  @locked
+  def shutdown(self):
+    ''' On final close, close ._open_file and save result as ._block.
+    '''
+    X("FileDirent.CLOSE %s ...", self)
+    self._check()
+    if self._block is not None:
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
+    self._block = self._open_file.close()
+    X("CLOSE %s: _block=%s: length=%d", self, self._block, len(self._block))
+    self._open_file = None
+    self._check()
+
   def _check(self):
     # TODO: check ._block and ._open_file against MultiOpenMixin open count
     if self._block is None:
@@ -422,32 +448,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       return len(self._open_file)
     return len(self.block)
-
-  @locked
-  def startup(self):
-    ''' Set up ._open_file on first open.
-    '''
-    self._check()
-    if self._open_file is not None:
-      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-    if self._block is None:
-      raise RuntimeError("first open, but ._block is None")
-    self._open_file = File(self._block)
-    self._block = None
-    self._check()
-
-  @locked
-  def shutdown(self):
-    ''' On final close, close ._open_file and save result as ._block.
-    '''
-    X("FileDirent.CLOSE %s ...", self)
-    self._check()
-    if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
-    self._block = self._open_file.close()
-    X("CLOSE %s: _block=%s", self, self._block)
-    self._open_file = None
-    self._check()
 
   def flush(self):
     return self._open_file.flush()

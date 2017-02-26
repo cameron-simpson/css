@@ -36,7 +36,6 @@ def Store(store_spec, config=None):
             continue
           raise ValueError("unexpected separator %r at offset %d, expected ':'"
                            % (sep, offset-1))
-    X("stores = %r", stores)
     if not stores:
       raise ValueError("no stores in %r" % (store_spec,))
     if len(stores) == 1:

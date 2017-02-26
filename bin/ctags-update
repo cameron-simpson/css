@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Update the tags file from the specified files, or from all files.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [files...]"
+
+if [ -f tags ]
+then
+  prefix=
+else
+  wd=$(pwd)
+  tagdir=$(findup -d tags) || { echo "$cmd: no tags file" >&2; exit 1; }
+  # compute
+  tagdir_slash=$tagdir/
+  case "$wd" in
+    "$tagdir_slash"*)
+        prefix=${wd:${#tagdir_slash}} ;;
+    *)  prefix=$wd ;;
+  esac
+  cd "$tagdir"
+fi
+
+if [ $# = 0 ]
+then
+  set -- -R
+else
+  first=1
+  for file
+  do
+    [ $first ] && { set -- -a; first=; }
+    if [ -n "$prefix" ]
+    then
+      case "$file" in
+        /*) ;; *) file=$prefix/$file ;;
+      esac
+    else
+      case "$file" in
+        -*) file=./$file ;;
+      esac
+    fi
+    set -- "$@" "$file"
+  done
+fi
+
+exec ctags -o tags "$@"

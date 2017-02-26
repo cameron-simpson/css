@@ -1,3 +1,5 @@
+ssh-opts: cononical capitalisation of option names
+cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
 iphoto:
   decode album definitions
   import keywords from /path/to/iphoto-library
@@ -52,7 +54,7 @@ venti:
     /i/texthashcode.sha1 indirect block contents
     /d/textblockref/... Dir
       /d/textblockref/path/to/file content (internally retrieves content, presents with Content-Type)
-  CloundFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
+  CloudFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
   SyncProcess: context manager object performing some long operation
     .progress_{total|outstanding|done}
     SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents

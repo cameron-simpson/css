@@ -1,7 +1,9 @@
 #!/usr/bin/python
 #
 # Fuse interface to a Store.
-# Uses fusepy: https://github.com/terencehonles/fusepy
+# Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/
+# Formerly used fusepy: https://github.com/terencehonles/fusepy
+# but that doesn't work with Python 3 and has some other problems.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
@@ -37,15 +39,8 @@ from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
 from .store import MissingHashcodeError
 
-# TODO: provide a hook to select the legacy fuse3 class
-FUSE_CLASS = 'llfuse'
-
-if FUSE_CLASS == 'llfuse':
-  import llfuse
-  FuseOSError = llfuse.FUSEError
-elif FUSE_CLASS == 'fuse3':
-  # my slightly hacked python-fuse with crude python 3 porting hacks
-  from fuse3 import FUSEOSError
+import llfuse
+FuseOSError = llfuse.FUSEError
 
 LOGGER_NAME = 'cs.venti.vtfuse'     # __qualname__ ?
 LOGGER_FILENAME = 'vtfuse.log'
@@ -82,6 +77,7 @@ def handler(method):
       Store, prevents anything other than a FUSEOSError being raised.
   '''
   def handle(self, *a, **kw):
+    ##X("OP %s %r %r", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
@@ -158,12 +154,16 @@ class FileHandle(O):
     self.E.touch()
 
   def flush(self):
+    X("FileHandle.flush: Eopen.flush...")
     self.Eopen.flush()
+    X("FileHandle.flush: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
   def close(self):
+    X("FileHandle.close: Eopen.close...")
     self.Eopen.close()
+    X("FileHandle.close: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
@@ -380,9 +380,8 @@ class Inodes(object):
 
 class _StoreFS_core(object):
   ''' The core functionality supporting FUSE operations.
-      The StoreFS_LLFUSE and StoreFS_FUSE3 classes subclass the
-      appropriate FUSE module and present shims that call the logic
-      here.
+      The StoreFS_LLFUSE class subclasses the appropriate FUSE
+      module and present shims that call the logic here.
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
       or the like.
@@ -604,505 +603,499 @@ class _StoreFS_core(object):
       return E2.meta.access(amode, uid, gid,
                             default_uid=uid, default_gid=gid)
 
-if FUSE_CLASS == 'llfuse':
+class StoreFS_LLFUSE(llfuse.Operations):
+  ''' Class providing filesystem operations, suitable for passing
+      to a FUSE() constructor.
+  '''
 
-  class StoreFS_LLFUSE(llfuse.Operations):
-    ''' Class providing filesystem operations, suitable for passing
-        to a FUSE() constructor.
+  def __init__(self, E, S, syncfp=None, subpath=None, options=None):
+    ''' Initialise a new FUSE mountpoint.
+        `E`: the root directory reference
+        `S`: the backing Store
+        `syncfp`: if not None, a file to which to write sync lines
+        `subpath`: relative path to mount Dir
     '''
+    self._vt_core = _StoreFS_core(E, S, syncfp=syncfp, subpath=subpath)
+    self.log = self._vt_core.log
+    self.logQ = self._vt_core.logQ
+    llf_opts = set(llfuse.default_options)
+    # Not available on OSX. TODO: detect 'darwin' and make conditional
+    if 'nonempty' in llf_opts:
+      warning("llf_opts=%r: drop 'nonempty' option, not available on OSX",
+              sorted(llf_opts))
+      llf_opts.discard('nonempty')
+    if options is not None:
+      for opt in options:
+        if opt.startswith('-'):
+          llf_opts.discard(opt[1:])
+        else:
+          llf_opts.add(opt)
+    self._vt_llf_opts = llf_opts
 
-    def __init__(self, E, S, syncfp=None, subpath=None, options=None):
-      ''' Initialise a new FUSE mountpoint.
-          `E`: the root directory reference
-          `S`: the backing Store
-          `syncfp`: if not None, a file to which to write sync lines
-          `subpath`: relative path to mount Dir
-      '''
-      self._vt_core = _StoreFS_core(E, S, syncfp=syncfp, subpath=subpath)
-      self.log = self._vt_core.log
-      self.logQ = self._vt_core.logQ
-      llf_opts = set(llfuse.default_options)
-      # Not available on OSX. TODO: detect 'darwin' and make conditional
-      if 'nonempty' in llf_opts:
-        warning("llf_opts=%r: drop 'nonempty' option, not available on OSX",
-                sorted(llf_opts))
-        llf_opts.discard('nonempty')
-      if options is not None:
-        for opt in options:
-          if opt.startswith('-'):
-            llf_opts.discard(opt[1:])
-          else:
-            llf_opts.add(opt)
-      self._vt_llf_opts = llf_opts
+  # debugging aid
+  def __getattr__(self, attr):
+    warning("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
+    def attrfunc(*a, **kw):
+      warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
+      raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)", attr, a, kw)
+    return attrfunc
 
-    # debugging aid
-    def __getattr__(self, attr):
-      warning("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
-      def attrfunc(*a, **kw):
-        warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
-        raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)", attr, a, kw)
-      return attrfunc
+  def __str__(self):
+    return "<%s %s>" % (self.__class__.__name__, self._vt_core)
 
-    def __str__(self):
-      return "<%s %s>" % (self.__class__.__name__, self._vt_core)
+  def _vt_runfuse(self, mnt):
+    ''' Run the filesystem once.
+    '''
+    with self._vt_core.S:
+      llfuse.init(self, mnt, self._vt_llf_opts)
+      llfuse.main()
+      llfuse.close()
 
-    def _vt_runfuse(self, mnt):
-      ''' Run the filesystem once.
-      '''
-      with self._vt_core.S:
-        llfuse.init(self, mnt, self._vt_llf_opts)
-        llfuse.main()
-        llfuse.close()
+  def _vt_i2E(self, inode):
+    try:
+      E = self._vt_core.i2E(inode)
+    except ValueError as e:
+      warning("access(inode=%d): %s", inode, e)
+      raise FUSEOSError(errno.EINVAL)
+    return E
 
-    def _vt_i2E(self, inode):
+  def _vt_EntryAttributes(self, E):
+    ''' Compute an llfuse.EntryAttributes object from `E`.meta.
+    '''
+    st = self._vt_core._Estat(E)
+    EA = llfuse.EntryAttributes()
+    EA.st_ino = self._vt_core.E2i(E)
+    ## EA.generation
+    ## EA.entry_timeout
+    ## EA.attr_timeout
+    EA.st_mode = st.st_mode
+    EA.st_nlink = st.st_nlink
+    EA.st_uid = st.st_uid if st.st_uid >= 0 else self._vt_core._fs_uid
+    EA.st_gid = st.st_gid if st.st_gid >= 0 else self._vt_core._fs_gid
+    ## EA.st_rdev
+    EA.st_size = st.st_size
+    ## EA.st_blksize
+    ## EA.st_blocks
+    EA.st_atime_ns = int(st.st_atime * 1000000000)
+    EA.st_ctime_ns = int(st.st_ctime * 1000000000)
+    EA.st_mtime_ns = int(st.st_mtime * 1000000000)
+    return EA
+
+  @staticmethod
+  def _vt_str(bs):
+    if isinstance(bs, bytes):
       try:
-        E = self._vt_core.i2E(inode)
-      except ValueError as e:
-        warning("access(inode=%d): %s", inode, e)
-        raise FUSEOSError(errno.EINVAL)
-      return E
+        s = bs.decode('utf-8')
+      except UnicodeDecodeError as e:
+        warning("decode %r: %e, falling back to surrogateescape", bs, e)
+        s = bs.decode('utf-8', errors='surrogateescape')
+    else:
+      warning("_vt_str: expected bytes, got %s %r, passing unchanged", type(bs), bs)
+      s = bs
+    return s
 
-    def _vt_EntryAttributes(self, E):
-      ''' Compute an llfuse.EntryAttributes object from `E`.meta.
-      '''
-      st = self._vt_core._Estat(E)
-      EA = llfuse.EntryAttributes()
-      EA.st_ino = self._vt_core.E2i(E)
-      ## EA.generation
-      ## EA.entry_timeout
-      ## EA.attr_timeout
-      EA.st_mode = st.st_mode
-      EA.st_nlink = st.st_nlink
-      EA.st_uid = st.st_uid if st.st_uid >= 0 else self._vt_core._fs_uid
-      EA.st_gid = st.st_gid if st.st_gid >= 0 else self._vt_core._fs_gid
-      ## EA.st_rdev
-      EA.st_size = st.st_size
-      ## EA.st_blksize
-      ## EA.st_blocks
-      EA.st_atime_ns = int(st.st_atime * 1000000000)
-      EA.st_ctime_ns = int(st.st_ctime * 1000000000)
-      EA.st_mtime_ns = int(st.st_mtime * 1000000000)
-      return EA
+  @staticmethod
+  def _vt_bytes(s):
+    if isinstance(s, str):
+      bs = s.encode('utf-8')
+    else:
+      warning("_vt_bytes: expected str, got %s %r, passing unchanged", type(s), s)
+      bs = s
+    return bs
 
-    @staticmethod
-    def _vt_str(bs):
-      if isinstance(bs, bytes):
-        try:
-          s = bs.decode('utf-8')
-        except UnicodeDecodeError as e:
-          warning("decode %r: %e, falling back to surrogateescape", bs, e)
-          s = bs.decode('utf-8', errors='surrogateescape')
-      else:
-        warning("_vt_str: expected bytes, got %s %r, passing unchanged", type(bs), bs)
-        s = bs
-      return s
+  ##############
+  # FUSE support methods.
 
-    @staticmethod
-    def _vt_bytes(s):
-      if isinstance(s, str):
-        bs = s.encode('utf-8')
-      else:
-        warning("_vt_bytes: expected str, got %s %r, passing unchanged", type(s), s)
-        bs = s
-      return bs
+  @handler
+  def access(self, inode, mode, ctx):
+    E = self._vt_i2E(inode)
+    return self._vt_core._Eaccess(E, mode, ctx)
 
-    ##############
-    # FUSE support methods.
+  @handler
+  def create(self, parent_inode, name_b, mode, flags, ctx):
+    ''' Create a new file and open it. Return file handle index and EntryAttributes.
+    '''
+    name = self._vt_str(name_b)
+    P = self._vt_i2E(parent_inode)
+    if name in P:
+      warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
+              parent_inode, P, name)
+    fhndx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
+    E = self._vt_core._fh(fhndx).E
+    E.meta.chmod(mode)
+    P[name] = E
+    return fhndx, self._vt_EntryAttributes(E)
 
-    @handler
-    def access(self, inode, mode, ctx):
-      E = self._vt_i2E(inode)
-      return self._vt_core._Eaccess(E, mode, ctx)
+  @handler
+  def destroy(self):
+    # TODO: call self.forget with all kreffed inums?
+    self._vt_core._sync()
 
-    @handler
-    def create(self, parent_inode, name_b, mode, flags, ctx):
-      ''' Create a new file and open it. Return file handle index and EntryAttributes.
-      '''
-      name = self._vt_str(name_b)
-      P = self._vt_i2E(parent_inode)
-      if name in P:
-        warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
-                parent_inode, P, name)
-      fhndx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
-      E = self._vt_core._fh(fhndx).E
-      E.meta.chmod(mode)
-      P[name] = E
-      return fhndx, self._vt_EntryAttributes(E)
+  @handler
+  def flush(self, fh):
+    FH = self._vt_core._fh(fh)
+    FH.flush()
+    inum = self._vt_core.E2i(FH.E)
+    self._vt_core.kref_dec(inum)
 
-    @handler
-    def destroy(self):
-      # TODO: call self.forget with all kreffed inums?
-      self._vt_core._sync()
+  @handler
+  def forget(self, inode_list):
+    for inode, nlookup in inode_list:
+      self._vt_core.kref_dec(inode, nlookup)
 
-    @handler
-    def flush(self, fh):
-      FH = self._vt_core._fh(fh)
-      FH.flush()
-      inum = self._vt_core.E2i(FH.E)
-      self._vt_core.kref_dec(inum)
+  @handler
+  def fsync(self, fh, datasync):
+    self._fh(fh).flush()
 
-    @handler
-    def forget(self, inode_list):
-      for inode, nlookup in inode_list:
-        self._vt_core.kref_dec(inode, nlookup)
+  @handler
+  def fsyncdir(self, fh, datasync):
+    # TODO: commit dir? implies flushing the whole tree
+    warning("fsyncdir does nothing at present")
 
-    @handler
-    def fsync(self, fh, datasync):
-      self._fh(fh).flush()
+  @handler
+  def getattr(self, inode, ctx):
+    E = self._vt_core.i2E(inode)
+    return self._vt_EntryAttributes(E)
 
-    @handler
-    def fsyncdir(self, fh, datasync):
-      # TODO: commit dir? implies flushing the whole tree
-      warning("fsyncdir does nothing at present")
+  @handler
+  def getxattr(self, inode, xattr_name, ctx):
+    # TODO: test for permission to access inode?
+    E = self._vt_core.i2E(inode)
+    # bit of a hack: pretend all attributes exist, empty if missing
+    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
+    # with a stack trace
+    return E.meta.getxattr(xattr_name, b'')
 
-    @handler
-    def getattr(self, inode, ctx):
-      E = self._vt_core.i2E(inode)
-      return self._vt_EntryAttributes(E)
+  @handler
+  def link(self, inode, new_parent_inode, new_name_b, ctx):
+    new_name = self._vt_str(new_name_b)
+    # TODO: test for write access to new_parent_inode
+    Esrc = self._vt_core.i2E(inode)
+    if not Esrc.isfile and not Esrc.ishardlink:
+      raise FuseOSError(errno.EPERM)
+    Pdst = self._vt_core.i2E(new_parent_inode)
+    if new_name in Pdst:
+      raise FuseOSError(errno.EEXIST)
+    # the final component must be a directory in order to create the new link
+    if not Pdst.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    if Esrc.ishardlink:
+      # point Esrc at the master Dirent in ._inodes
+      inum = Esrc.inum
+      Esrc = self._vt_core.i2E(inum)
+    else:
+      # new hardlink, update the source
+      # keep Esrc as the master
+      # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
+      # put EsrcLink into the enclosing Dir, replacing Esrc
+      src_name = Esrc.name
+      inum0 = self._vt_core.E2i(Esrc)
+      EsrcLink = self._vt_core.make_hardlink(Esrc)
+      Esrc.parent[src_name] = EsrcLink
+      inum = EsrcLink.inum
+      if inum != inum0:
+        raise RuntimeError("new hardlink: original inum %d != linked inum %d"
+                           % (inum0, inum))
+    # install the destination hardlink
+    # make a new hardlink object referencing the inode
+    # and attach it to the target directory
+    EdstLink = HardlinkDirent.to_inum(inum, new_name)
+    Pdst[new_name] = EdstLink
+    # increment link count on underlying Dirent
+    Esrc.meta.nlink += 1
+    return self._vt_EntryAttributes(E)
 
-    @handler
-    def getxattr(self, inode, xattr_name, ctx):
-      # TODO: test for permission to access inode?
-      E = self._vt_core.i2E(inode)
-      # bit of a hack: pretend all attributes exist, empty if missing
-      # this is essentially to shut up llfuse, which otherwise reports ENOATTR
-      # with a stack trace
-      return E.meta.getxattr(xattr_name, b'')
+  @handler
+  def listxattr(self, inode, ctx):
+    # TODO: ctx allows to access inode?
+    E = self._vt_core.i2E(inode)
+    return list(E.meta.listxattrs())
 
-    @handler
-    def link(self, inode, new_parent_inode, new_name_b, ctx):
-      new_name = self._vt_str(new_name_b)
-      # TODO: test for write access to new_parent_inode
-      Esrc = self._vt_core.i2E(inode)
-      if not Esrc.isfile and not Esrc.ishardlink:
-        raise FuseOSError(errno.EPERM)
-      Pdst = self._vt_core.i2E(new_parent_inode)
-      if new_name in Pdst:
-        raise FuseOSError(errno.EEXIST)
-      # the final component must be a directory in order to create the new link
-      if not Pdst.isdir:
-        raise FuseOSError(errno.ENOTDIR)
-      if Esrc.ishardlink:
-        # point Esrc at the master Dirent in ._inodes
-        inum = Esrc.inum
-        Esrc = self._vt_core.i2E(inum)
-      else:
-        # new hardlink, update the source
-        # keep Esrc as the master
-        # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
-        # put EsrcLink into the enclosing Dir, replacing Esrc
-        src_name = Esrc.name
-        inum0 = self._vt_core.E2i(Esrc)
-        EsrcLink = self._vt_core.make_hardlink(Esrc)
-        Esrc.parent[src_name] = EsrcLink
-        inum = EsrcLink.inum
-        if inum != inum0:
-          raise RuntimeError("new hardlink: original inum %d != linked inum %d"
-                             % (inum0, inum))
-      # install the destination hardlink
-      # make a new hardlink object referencing the inode
-      # and attach it to the target directory
-      EdstLink = HardlinkDirent.to_inum(inum, new_name)
-      Pdst[new_name] = EdstLink
-      # increment link count on underlying Dirent
-      Esrc.meta.nlink += 1
-      return self._vt_EntryAttributes(E)
-
-    @handler
-    def listxattr(self, inode, ctx):
-      # TODO: ctx allows to access inode?
-      E = self._vt_core.i2E(inode)
-      return list(E.meta.listxattrs())
-
-    @handler
-    def lookup(self, parent_inode, name_b, ctx):
-      name = self._vt_str(name_b)
-      # TODO: test for permission to search parent_inode
-      if parent_inode == self._vt_core.mnt_inum:
-        P = self._vt_core.mntE
-      else:
-        P = self._vt_core.i2E(parent_inode)
-      if name == '.':
-        E = P
-      elif name == '..':
-        E.parent
-      else:
-        try:
-          E = P[name]
-        except KeyError:
-          ## llfuse.EntryAttributes.st_ino.__set__ rejects a negative st_ino
-          ##EA = llfuse.EntryAttributes()
-          ##EA.st_ino = -1
-          ##EA.entry_timeout = 1.0
-          ##return EA
-          ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
-          raise FuseOSError(errno.ENOENT)
-      return self._vt_EntryAttributes(E)
-
-    @handler
-    def mkdir(self, parent_inode, name_b, mode, ctx):
-      name = self._vt_str(name_b)
-      # TODO: test for permission to search and write parent_inode
+  @handler
+  def lookup(self, parent_inode, name_b, ctx):
+    name = self._vt_str(name_b)
+    # TODO: test for permission to search parent_inode
+    if parent_inode == self._vt_core.mnt_inum:
+      P = self._vt_core.mntE
+    else:
       P = self._vt_core.i2E(parent_inode)
-      if not P.isdir:
-        error("parent (%r) not a directory, raising ENOTDIR", P.name)
-        raise FuseOSError(errno.ENOTDIR)
-      if name in P:
-        raise FuseOSError(errno.EEXIST)
-      E = Dir(name, parent=P)
-      E.meta.chmod(mode & 0o7777)
-      E.touch()
-      P[name] = E
-      return self._vt_EntryAttributes(E)
-
-    @handler
-    def mknod(self, parent_inode, name_b, mode, rdev, ctx):
-      name = self._vt_str(name_b)
-      P = self._vt_core.i2E(parent_inode)
-      if not P.isdir:
-        error("parent (%r) not a directory, raising ENOTDIR", P.name)
-        raise FuseOSError(errno.ENOTDIR)
-      if name in P:
-        raise FuseOSError(errno.EEXIST)
-      if stat.S_ISREG(mode):
-        E = FileDirent(name)
-      else:
-        # TODO: support pipes'n'stuff one day...
-        raise FuseOSError(errno.ENOTSUP)
-      E.meta.chmod(mode & 0o7777)
-      E.touch()
-      P[name] = E
-      return self._vt_EntryAttributes(E)
-
-    @handler
-    def open(self, inode, flags, ctx):
-      ''' Open an existing file, return file handle index.
-      '''
-      E = self._vt_i2E(inode)
-      if flags & (O_CREAT|O_EXCL):
-        warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
-                inode, E, flags, O_CREAT, O_EXCL)
-        flags &= ~(O_CREAT|O_EXCL)
-      fhndx = self._vt_core.open(E, flags, ctx)
-      # TODO: mark parent, not root?
-      for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
-      for_append = (flags & O_APPEND) == O_APPEND
-      if for_write or for_append:
-        X("MARK ROOT AS CHANGED - NEED TO FIND PARENT INSTEAD")
-        self._vt_core.E.change()
-      return fhndx
-
-    @handler
-    def opendir(self, inode, ctx):
-      # TODO: check for permission to read
-      class _OpenDir:
-        ''' An "open" Dir: keeps a list of the names from open time
-            and a reference to the Dir so that it can validate the names
-            at readdir time.
-        '''
-        def __init__(self, D):
-          self.D = D
-          self.names = list(D.keys())
-      E = self._vt_core.i2E(inode)
-      if not E.isdir:
-        raise FuseOSError(errno.ENOTDIR)
-      OD = _OpenDir(E)
-      fhndx = self._vt_core._new_file_handle_index(OD)
-      return fhndx
-
-    @handler
-    def read(self, fhndx, off, size):
-      FH = self._vt_core._fh(fhndx)
-      chunks = []
-      while size > 0:
-        data = FH.read(off, size)
-        if len(data) == 0:
-          break
-        chunks.append(data)
-        off += len(data)
-        size -= len(data)
-      return b''.join(chunks)
-
-    @handler
-    def readdir(self, fhndx, off):
-      # TODO: if rootdir, generate '..' for parent of mount
-      OD = self._vt_core._fh(fhndx)
-      def entries():
-        o = off
-        D = OD.D
-        names = OD.names
-        while True:
-          if o == 0:
-            name = '.'
-            E = D[name]
-          elif o == 1:
-            name = '..'
-            E = D[name]
-          else:
-            o2 = o - 2
-            if o2 >= len(names):
-              break
-            name = names[o2]
-            if name == '.' or name == '..':
-              # already special cased
-              E = None
-            else:
-              E = D.get(name)
-          if E is not None:
-            # yield name, attributes and next offset
-            yield self._vt_bytes(name), self._vt_EntryAttributes(E), o + 1
-          o += 1
-      return entries()
-
-    @handler
-    def readlink(self, inode, ctx):
-      # TODO: check for permission to read the link?
-      E = self._vt_core.i2E(inode)
-      if not E.issym:
-        raise FuseOSError(errno.EINVAL)
-      return self._vt_bytes(E.pathref)
-
-    @handler
-    def release(self, fhndx):
-      self._vt_core._fh_close(fhndx)
-
-    @handler
-    def releasedir(self, fhndx):
-      self._vt_core._fh_remove(fhndx)
-
-    @handler
-    def removexattr(self, inode, xattr_name, ctx):
-      # TODO: test for inode ownership?
-      E = self._vt_core.i2E(inode)
-      meta = E.meta
-      try:
-        meta.delxattr(xattr_name)
-      except KeyError:
-        raise FuseOSError(errno.ENOATTR)
-
-    @handler
-    def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
-      name_old = self._vt_str(name_old_b)
-      name_new = self._vt_str(name_new_b)
-      Psrc = self._vt_core.i2E(parent_inode_old)
-      if name_old not in Psrc:
-        raise FuseOSError(errno.ENOENT)
-      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
-        raise FuseOSError(errno.EPERM)
-      Pdst = self._vt_core.i2E(parent_inode_new)
-      if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK, ctx):
-        raise FuseOSError(errno.EPERM)
-      E = Psrc[name_old]
-      del Psrc[name_old]
-      E.name = name_new
-      Pdst[name_new] = E
-
-    @handler
-    def rmdir(self, parent_inode, name_b, ctx):
-      name = self._vt_str(name_b)
-      P = self._vt_core.i2E(parent_inode)
-      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
-        raise FuseOSError(errno.EPERM)
+    if name == '.':
+      E = P
+    elif name == '..':
+      E.parent
+    else:
       try:
         E = P[name]
       except KeyError:
-        raise FuseOSError(errno.ENOENT)
-      else:
-        if not E.isdir:
-          raise FuseOSError(errno.ENOTDIR)
-        if E.entries:
-          raise FuseOSError(errno.ENOTEMPTY)
-        del P[name]
+        ##warning("lookup(parent_inode=%s, name=%r): ENOENT", parent_inode, name)
+        ##raise FuseOSError(errno.ENOENT)
+        EA = llfuse.EntryAttributes()
+        EA.st_ino = 0
+        EA.entry_timeout = 1.0
+        return EA
+    return self._vt_EntryAttributes(E)
 
-    @handler
-    def setattr(self, inode, attr, fields, fhndx, ctx):
-      # TODO: test CTX for permission to chmod/chown/whatever
-      # TODO: sanity check fields for other update_* flags?
-      E = self._vt_core.i2E(inode)
-      with Pfx(E):
-        M = E.meta
-        if fields.update_atime:
-          info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
-        if fields.update_mtime:
-          M.mtime = attr.st_mtime_ns / 1000000000.0
-        if fields.update_mode:
-          M.chmod(attr.st_mode&0o7777)
-          extra_mode = attr.st_mode & ~0o7777
-          typemode = stat.S_IFMT(extra_mode)
-          extra_mode &= ~typemode
-          if typemode != M.unix_typemode:
-            warning("update_mode: E.meta.typemode 0o%o != attr.st_mode&S_IFMT 0o%o",
-                    M.unix_typemode, typemode)
-          if extra_mode != 0:
-            warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
-        if fields.update_uid:
-          M.uid = attr.st_uid
-        if fields.update_gid:
-          M.gid = attr.st_gid
-        if fields.update_size:
-          # TODO: what calls this? do we sanity check file sizes etc?
-          warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
-        return self._vt_EntryAttributes(E)
+  @handler
+  def mkdir(self, parent_inode, name_b, mode, ctx):
+    name = self._vt_str(name_b)
+    # TODO: test for permission to search and write parent_inode
+    P = self._vt_core.i2E(parent_inode)
+    if not P.isdir:
+      error("parent (%r) not a directory, raising ENOTDIR", P.name)
+      raise FuseOSError(errno.ENOTDIR)
+    if name in P:
+      raise FuseOSError(errno.EEXIST)
+    E = Dir(name, parent=P)
+    E.meta.chmod(mode & 0o7777)
+    E.touch()
+    P[name] = E
+    return self._vt_EntryAttributes(E)
 
-    @handler
-    def setxattr(self, inode, xattr_name, value, ctx):
-      # TODO: check perms (ownership?)
-      E = self._vt_core.i2E(inode)
-      E.meta.setxattr(xattr_name, value)
+  @handler
+  def mknod(self, parent_inode, name_b, mode, rdev, ctx):
+    name = self._vt_str(name_b)
+    P = self._vt_core.i2E(parent_inode)
+    if not P.isdir:
+      error("parent (%r) not a directory, raising ENOTDIR", P.name)
+      raise FuseOSError(errno.ENOTDIR)
+    if name in P:
+      raise FuseOSError(errno.EEXIST)
+    if stat.S_ISREG(mode):
+      E = FileDirent(name)
+    else:
+      # TODO: support pipes'n'stuff one day...
+      raise FuseOSError(errno.ENOTSUP)
+    E.meta.chmod(mode & 0o7777)
+    E.touch()
+    P[name] = E
+    return self._vt_EntryAttributes(E)
 
-    @handler
-    def statfs(self, ctx):
-      # TODO: get free space from the current Store
-      #       implies adding some kind of method to stores?
-      st = os.statvfs(".")
-      fst = llfuse.StatvfsData()
-      for attr in 'f_bsize', 'f_frsize', 'f_blocks', 'f_bfree', 'f_bavail', 'f_files', 'f_ffree', 'f_favail':
-        setattr(fst, attr, getattr(st, attr))
-      return fst
+  @handler
+  def open(self, inode, flags, ctx):
+    ''' Open an existing file, return file handle index.
+    '''
+    E = self._vt_i2E(inode)
+    if flags & (O_CREAT|O_EXCL):
+      warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
+              inode, E, flags, O_CREAT, O_EXCL)
+      flags &= ~(O_CREAT|O_EXCL)
+    fhndx = self._vt_core.open(E, flags, ctx)
+    # TODO: mark parent, not root?
+    for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
+    for_append = (flags & O_APPEND) == O_APPEND
+    if for_write or for_append:
+      X("MARK ROOT AS CHANGED - NEED TO FIND PARENT INSTEAD")
+      self._vt_core.E.change()
+    return fhndx
 
-    @handler
-    def symlink(self, parent_inode, name_b, target_b, ctx):
-      with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
-        XP("ENTER")
-        name = self._vt_str(name_b)
-        target = self._vt_str(target_b)
-        # TODO: check search/write on P
-        P = self._vt_core.i2E(parent_inode)
-        XP("PARENT = %s", P)
-        if not P.isdir:
-          XP("PARENT IS NOT DIR")
-          raise FuseOSError(errno.ENOTDIR)
-        if name in P:
-          XP("name %r exists in parent", name)
-          raise FuseOSError(errno.EEXIST)
-        E = SymlinkDirent(name, {'pathref': target})
-        P[name] = E
-        return self._vt_EntryAttributes(E)
+  @handler
+  def opendir(self, inode, ctx):
+    # TODO: check for permission to read
+    class _OpenDir:
+      ''' An "open" Dir: keeps a list of the names from open time
+          and a reference to the Dir so that it can validate the names
+          at readdir time.
+      '''
+      def __init__(self, D):
+        self.D = D
+        self.names = list(D.keys())
+    E = self._vt_core.i2E(inode)
+    if not E.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    OD = _OpenDir(E)
+    fhndx = self._vt_core._new_file_handle_index(OD)
+    return fhndx
 
-    @handler
-    def unlink(self, parent_inode, name_b, ctx):
+  @handler
+  def read(self, fhndx, off, size):
+    FH = self._vt_core._fh(fhndx)
+    chunks = []
+    while size > 0:
+      data = FH.read(off, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      off += len(data)
+      size -= len(data)
+    return b''.join(chunks)
+
+  @handler
+  def readdir(self, fhndx, off):
+    # TODO: if rootdir, generate '..' for parent of mount
+    OD = self._vt_core._fh(fhndx)
+    def entries():
+      o = off
+      D = OD.D
+      names = OD.names
+      while True:
+        if o == 0:
+          name = '.'
+          E = D[name]
+        elif o == 1:
+          name = '..'
+          E = D[name]
+        else:
+          o2 = o - 2
+          if o2 >= len(names):
+            break
+          name = names[o2]
+          if name == '.' or name == '..':
+            # already special cased
+            E = None
+          else:
+            E = D.get(name)
+        if E is not None:
+          # yield name, attributes and next offset
+          yield self._vt_bytes(name), self._vt_EntryAttributes(E), o + 1
+        o += 1
+    return entries()
+
+  @handler
+  def readlink(self, inode, ctx):
+    # TODO: check for permission to read the link?
+    E = self._vt_core.i2E(inode)
+    if not E.issym:
+      raise FuseOSError(errno.EINVAL)
+    return self._vt_bytes(E.pathref)
+
+  @handler
+  def release(self, fhndx):
+    self._vt_core._fh_close(fhndx)
+
+  @handler
+  def releasedir(self, fhndx):
+    self._vt_core._fh_remove(fhndx)
+
+  @handler
+  def removexattr(self, inode, xattr_name, ctx):
+    # TODO: test for inode ownership?
+    E = self._vt_core.i2E(inode)
+    meta = E.meta
+    try:
+      meta.delxattr(xattr_name)
+    except KeyError:
+      raise FuseOSError(errno.ENOATTR)
+
+  @handler
+  def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
+    name_old = self._vt_str(name_old_b)
+    name_new = self._vt_str(name_new_b)
+    Psrc = self._vt_core.i2E(parent_inode_old)
+    if name_old not in Psrc:
+      raise FuseOSError(errno.ENOENT)
+    if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
+      raise FuseOSError(errno.EPERM)
+    Pdst = self._vt_core.i2E(parent_inode_new)
+    if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK, ctx):
+      raise FuseOSError(errno.EPERM)
+    E = Psrc[name_old]
+    del Psrc[name_old]
+    E.name = name_new
+    Pdst[name_new] = E
+
+  @handler
+  def rmdir(self, parent_inode, name_b, ctx):
+    name = self._vt_str(name_b)
+    P = self._vt_core.i2E(parent_inode)
+    if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
+      raise FuseOSError(errno.EPERM)
+    try:
+      E = P[name]
+    except KeyError:
+      raise FuseOSError(errno.ENOENT)
+    else:
+      if not E.isdir:
+        raise FuseOSError(errno.ENOTDIR)
+      if E.entries:
+        raise FuseOSError(errno.ENOTEMPTY)
+      del P[name]
+
+  @handler
+  def setattr(self, inode, attr, fields, fhndx, ctx):
+    # TODO: test CTX for permission to chmod/chown/whatever
+    # TODO: sanity check fields for other update_* flags?
+    E = self._vt_core.i2E(inode)
+    with Pfx(E):
+      M = E.meta
+      if fields.update_atime:
+        info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
+      if fields.update_mtime:
+        M.mtime = attr.st_mtime_ns / 1000000000.0
+      if fields.update_mode:
+        M.chmod(attr.st_mode&0o7777)
+        extra_mode = attr.st_mode & ~0o7777
+        typemode = stat.S_IFMT(extra_mode)
+        extra_mode &= ~typemode
+        if typemode != M.unix_typemode:
+          warning("update_mode: E.meta.typemode 0o%o != attr.st_mode&S_IFMT 0o%o",
+                  M.unix_typemode, typemode)
+        if extra_mode != 0:
+          warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
+      if fields.update_uid:
+        M.uid = attr.st_uid
+      if fields.update_gid:
+        M.gid = attr.st_gid
+      if fields.update_size:
+        # TODO: what calls this? do we sanity check file sizes etc?
+        warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
+      return self._vt_EntryAttributes(E)
+
+  @handler
+  def setxattr(self, inode, xattr_name, value, ctx):
+    # TODO: check perms (ownership?)
+    E = self._vt_core.i2E(inode)
+    E.meta.setxattr(xattr_name, value)
+
+  @handler
+  def statfs(self, ctx):
+    # TODO: get free space from the current Store
+    #       implies adding some kind of method to stores?
+    st = os.statvfs(".")
+    fst = llfuse.StatvfsData()
+    for attr in 'f_bsize', 'f_frsize', 'f_blocks', 'f_bfree', 'f_bavail', 'f_files', 'f_ffree', 'f_favail':
+      setattr(fst, attr, getattr(st, attr))
+    return fst
+
+  @handler
+  def symlink(self, parent_inode, name_b, target_b, ctx):
+    with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
+      XP("ENTER")
       name = self._vt_str(name_b)
+      target = self._vt_str(target_b)
       # TODO: check search/write on P
       P = self._vt_core.i2E(parent_inode)
+      XP("PARENT = %s", P)
       if not P.isdir:
+        XP("PARENT IS NOT DIR")
         raise FuseOSError(errno.ENOTDIR)
-      try:
-        del P[name]
-      except KeyError:
-        raise FuseOSError(errno.ENOENT)
+      if name in P:
+        XP("name %r exists in parent", name)
+        raise FuseOSError(errno.EEXIST)
+      E = SymlinkDirent(name, {'pathref': target})
+      P[name] = E
+      return self._vt_EntryAttributes(E)
 
-    @handler
-    def write(self, fhndx, off, buf):
-      FH = self._vt_core._fh(fhndx)
-      written = FH.write(buf, off)
-      if written != len(buf):
-        warning("only %d bytes written, %d supplied", written, len(buf))
-      return written
+  @handler
+  def unlink(self, parent_inode, name_b, ctx):
+    name = self._vt_str(name_b)
+    # TODO: check search/write on P
+    P = self._vt_core.i2E(parent_inode)
+    if not P.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    try:
+      del P[name]
+    except KeyError:
+      raise FuseOSError(errno.ENOENT)
 
-if FUSE_CLASS == 'llfuse':
-  StoreFS = StoreFS_LLFUSE
-elif FUSE_CLASS == 'fuse3':
-  StoreFS = StoreFS_FUSE3
+  @handler
+  def write(self, fhndx, off, buf):
+    FH = self._vt_core._fh(fhndx)
+    written = FH.write(buf, off)
+    if written != len(buf):
+      warning("only %d bytes written, %d supplied", written, len(buf))
+    return written
+
+StoreFS = StoreFS_LLFUSE
 
 if __name__ == '__main__':
   from cs.venti.vtfuse_tests import selftest
