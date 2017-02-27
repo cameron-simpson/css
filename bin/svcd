@@ -19,6 +19,7 @@ name=
 flag_disable=
 flag_override=
 flag_restart=
+flag_running=
 svcd_pidfile=
 subp_pidfile=
 trace=
