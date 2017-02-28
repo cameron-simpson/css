@@ -5,13 +5,13 @@
 #   - Cameron Simpson <cs@zip.com.au> 28feb2017
 #
 
-exec 3>&1 2>/dev/tty 1>&2
+exec 0</dev/null 3>&1 2>/dev/tty 1>&2
 if tags=$(findup tags)
 then
-  ctags-update -o "$tags" -- "$@" >&2
   echo "set tags=$tags" >&3
 else
   echo 'set tags=NO-TAGS' >&3
+  exit 0
 fi
-exec 1>&- 2>&- 3>&-
-sleep 5
+exec 3>&-
+ctags-update -o "$tags" -- "$@" &
