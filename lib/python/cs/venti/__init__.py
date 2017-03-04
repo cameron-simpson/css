@@ -61,8 +61,9 @@ def fromtext(s):
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
-# characters used for metadata.
-_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{}*/'
+# characters used for metadata, notably including the double quote
+# because it is heavily using in JSON.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
