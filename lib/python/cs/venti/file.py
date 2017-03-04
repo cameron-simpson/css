@@ -7,11 +7,12 @@ from __future__ import print_function, absolute_import
 from io import RawIOBase
 import os
 import sys
-from threading import Thread
+from threading import Thread, Lock
 from cs.threads import locked
 from cs.logutils import Pfx, info, X
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
+from . import defaults
 from .meta import Meta
 from .block import Block
 from .blockify import top_block_for, blockify
@@ -87,6 +88,9 @@ class File(BackedFile):
       backing_block = Block(data=b'')
     self._backing_block = backing_block
     BackedFile.__init__(self, BlockFile(backing_block))
+    # lock for file sync operations
+    # NB: _not_ an RLock, we do separate acquire/release in the sync itself
+    self._sync_lock = Lock()
 
   @property
   @locked
@@ -103,17 +107,41 @@ class File(BackedFile):
   @locked
   def flush(self):
     ''' Push the current state to the Store and update the current top block.
-        Returns the new top Block.
+        We dispatch the sync in the background within a lock.
     '''
-    if not self.front_range.isempty():
-      # Recompute the top Block from the current high level blocks.
-      # As a side-effect of setting .backing_block we discard the
-      # front file data, which are now saved to the Store.
-      X("%s.flush: update backing_block...", self)
-      self.backing_block = top_block_for(self.high_level_blocks())
-      X("%s.flush: backing_block=%s", self, self.backing_block)
-      # TODO: truncate the front file?
-    return self.backing_block
+    super().flush()
+    if self.front_range:
+      self._sync_lock.acquire()
+      if not self.front_range:
+        self._sync_lock.release()
+      else:
+        # push the current state as the backing file
+        # and initiate a sync to the Store
+        back_block = self.backing_block
+        front_file = self.front_file
+        front_range = self.front_range
+        new_back_file = self.push_file()
+        S = defaults.S
+        def update_store():
+          # Recompute the top Block from the current high level blocks.
+          # As a side-effect of setting .backing_block we discard the
+          # front file data, which are now saved to the Store.
+          with S:
+            B = top_block_for(
+                  self._high_level_blocks_from_front_back(
+                    front_file, back_block, front_range))
+          self._backing_block = B
+          self._sync_lock.release()
+        Thread(name="%s.flush():sync" % (self,), target=update_store).start()
+
+  def sync(self):
+    ''' Dispatch a flush, return the flushed backing block.
+        Wait for any flush to complete before returing the backing block.
+    '''
+    self.flush()
+    with self._sync_lock:
+      B = self.backing_block
+    return B
 
   @locked
   def truncate(self, length):
@@ -146,8 +174,8 @@ class File(BackedFile):
   def close(self):
     ''' Close the File, return the top Block.
     '''
-    B = self.flush()
-    BackedFile.close(self)
+    B = self.sync()
+    super().close()
     return B
 
   def read(self, size = -1):
@@ -195,20 +223,28 @@ class File(BackedFile):
   def high_level_blocks(self, start=None, end=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
+    return self._high_level_blocks_from_front_back(self.front_file, back_block, self.front_range, start, end)
+
+  @staticmethod
+  def _high_level_blocks_from_front_back(front_file, back_block, front_range, start=None, end=None):
+    ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
+    '''
     with Pfx("File.high_level_blocks(%s..%s)", start, end):
       if start is None:
         start = 0
       if end is None:
-        end = self.front_range.end
-      for in_front, span in self.front_range.slices(start, end):
+        end = front_range.end
+      ##X("_HLB: front_file=%s, back_block=%s, front_range=%s, start=%s, end=%s...",
+      ##  front_file, back_block, front_range, start, end)
+      for in_front, span in front_range.slices(start, end):
         if in_front:
           # blockify the new data and yield the top block
-          B = top_block_for(blockify(filedata(self.front_file,
+          B = top_block_for(blockify(filedata(front_file,
                                               start=span.start,
                                               end=span.end)))
           yield B
         else:
-          for B in self.backing_block.top_blocks(span.start, span.end):
+          for B in back_block.top_blocks(span.start, span.end):
             yield B
 
 def filedata(fp, rsize=8192, start=None, end=None):
