@@ -2,6 +2,15 @@ ssh-opts: cononical capitalisation of option names
 cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
 venti:
   FIXED? BUG: new files forget their correct size on umount
+  blockify
+    make local names for ord etc; should be faster
+    sniff files to infer high level syntax
+    strip vocab from default blockifier, move to higher layer
+      (should remove many str.find and dict lookups per char)
+      higher layer can assemble chunks by reading lines
+      accept lists of chunks (eg lists of byte-lines)?
+  control module
+    vtftp to be an API to it
   BackedFile to set change-on-close flag on write/truncate etc
   move to SHA-3, check hash size etc
   rename cs.venti => cs.vt
@@ -27,6 +36,9 @@ venti:
       => better file-close behaviour
   vtfuse:
     OSX Finder name of mountpoint
+    umount: drop inode_data if empty (no hard links)?
+            predrop of inodes with < 2 links?
+    open of symlink
     do not sync unlinked files
     include/exclude rules, like rsync?
       do not sync (or Store?) excluded items
@@ -39,7 +51,7 @@ venti:
       link pathname to blockspec
       merge trees
   Dir:
-    rsync -a: setgid bit not preserved?
+    rsync -a: setgid bit not preserved? possibly fuse nosetuid mount setting
     vtftp command which accesses a Dir
       hook to vtfuse to run vtftp against live Dir
   datadir
