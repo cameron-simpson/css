@@ -1,3 +1,5 @@
+ssh-opts: cononical capitalisation of option names
+cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
 venti:
   FIXED? BUG: new files forget their correct size on umount
   BackedFile to set change-on-close flag on write/truncate etc

@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Update the tags file from the specified files, or from all files.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+tags=
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-o tagfile] [--] [files...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -o) tags=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -n "$tags" ] || tags=$(findup tags) || {
+  echo "$cmd: no tags file located, aborting" >&2
+  exit 1
+}
+
+if [ -s "$tags" -a $# -gt 0 ]
+then
+  set -- -a "$@"
+else
+  set -- -R
+  cd "$(dirname "$tags")"
+fi
+
+set -- ctags -o "$tags" --tag-relative "$@"
+
+exec "$@"

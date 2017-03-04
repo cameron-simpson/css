@@ -1,4 +1,4 @@
-#!/usr/bin/env py3
+#!/usr/bin/env python3
 #
 # Bring up the named files in an editor for renaming.
 #   - Cameron Simpson <cs@zip.com.au> 22may2016

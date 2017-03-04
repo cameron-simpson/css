@@ -6,22 +6,26 @@ from __future__ import print_function
 import sys
 import os.path
 import json
-from cs.logutils import setup_logging, warning, error, Pfx
+from cs.logutils import setup_logging, warning, error, Pfx, X
 from . import Recording
+
+TRY_N = 32
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
         Write the video content of the named tvwiz directories to
         standard output as MPEG2 transport Stream, acceptable to
         ffmpeg's "mpegts" format.
-    %s convert tvwizdir output.mp4
-        Convert the video content of the named tvwiz directory to
-        the named output file (typically MP4, though he ffmpeg
-        output format chosen is based on the extension). Most
-        metadata are preserved.
+    %s convert recording [start..end]... [output.mp4]
+        Convert the video content of the named recording to
+        the named output file (typically MP4, though the ffmpeg
+        output format chosen is based on the extension).
+        Most metadata are preserved.
+        start..end: Optional start and end offsets in seconds, used
+          to crop the recording output.
     %s mconvert recording...
-        Convert the video content of the named recording to an
-        automatically named .mp4 files in the current directory.
+        Convert multiple named recordings to automatically named .mp4 files
+        in the current directory.
         Most metadata are preserved.
     %s meta recording...
         Report metadata for the supplied recordings.
@@ -52,13 +56,7 @@ def main(argv):
           badopts = True
       elif op == "convert":
         if len(args) < 1:
-          error("missing tvwizdir")
-          badopts = True
-        if len(args) < 2:
-          error("missing output.mp4")
-          badopts = True
-        if len(args) > 2:
-          warning("extra arguments after output: %s", " ".join(args))
+          error("missing recording")
           badopts = True
       elif op == "mconvert":
         if len(args) < 1:
@@ -97,33 +95,37 @@ def main(argv):
         TVWiz(arg).copyto(stdout_bfp)
         stdoutp.bfp.close()
     elif op == "convert":
-      srcpath, dstpath = args
-      R = Recording(srcpath)
-      xit = R.convert(dstpath)
+      srcpath = args.pop(0)
+      with Pfx(srcpath):
+        # parse optional start..end arguments
+        timespans = []
+        while args and '..' in args[0]:
+          try:
+            start, end = args[0].split('..')
+            start_s = float(start)
+            end_s = float(end)
+            if start_s > end_s:
+              raise ValueError("start:%s > end:%s" % (start, end))
+          except ValueError as e:
+            X("FAIL %r: %s", args[0], e)
+            pass
+          else:
+            args.pop(0)
+            timespans.append( (start_s, end_s) )
+        # collect optional dstpath
+        if args:
+          dstpath = args.pop(0)
+        else:
+          dstpath = None
+        R = Recording(srcpath)
+        xit = 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
     elif op == "mconvert":
+      xit = 0
       for srcpath in args:
         with Pfx(srcpath):
-          ok = True
           R = Recording(srcpath)
-          dstpath = R.convertpath()
-          if os.path.exists(dstpath):
-            dstpfx, dstext = os.path.splitext(dstpath)
-            ok = False
-            for i in range(32):
-              dstpath2 = "%s--%d%s" % (dstpfx, i+1, dstext)
-              if not os.path.exists(dstpath2):
-                dstpath = dstpath2
-                ok = True
-                break
-            if not ok:
-              error("file exists, and so do most --n flavours of it: %r", dstpath)
-              xit = 1
-          if ok:
-            try:
-              ffxit = R.convert(dstpath)
-            except ValueError as e:
-              error("%s: %s", dstpath, e)
-              xit = 1
+          if not R.convert(None, max_n=TRY_N):
+            xit = 1
     elif op == "meta":
       for filename in args:
         with Pfx(filename):

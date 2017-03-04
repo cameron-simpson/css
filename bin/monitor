@@ -91,7 +91,7 @@ if [ $setflag ]
 then
   qflagname=$( shqstr "$flagname" )
   upcmd="flag $qflagname 1; $upcmd"
-  downcmd="flag $qflagname 1; $downcmd"
+  downcmd="flag $qflagname 0; $downcmd"
 fi
 
 retry_upcmd=
