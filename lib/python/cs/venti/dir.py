@@ -448,7 +448,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is None:
       return self._block
     else:
-      return self._open_file.flush()
+      return self._open_file.sync()
 
   @block.setter
   @locked
