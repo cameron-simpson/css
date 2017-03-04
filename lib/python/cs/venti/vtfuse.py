@@ -161,9 +161,7 @@ class FileHandle(O):
 
   def close(self):
     self.Eopen.close()
-    X("FileHandle.close: Eopen=%s", self.Eopen)
-    ## no touch, already done by any writes
-    ## self.E.touch()
+    self.E.parent.change()
 
 class Inode(NS):
   ''' An Inode associates an inode number and a Dirent.
@@ -882,8 +880,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
     if for_write or for_append:
-      X("MARK ROOT AS CHANGED - NEED TO FIND PARENT INSTEAD")
-      self._vt_core.E.change()
+      E.change()
     return fhndx
 
   @handler
