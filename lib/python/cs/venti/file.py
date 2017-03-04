@@ -95,12 +95,16 @@ class File(BackedFile):
   @property
   @locked
   def backing_block(self):
+    ''' Return the current backing block.
+        The backing block may be out of date with respect to any
+        pending flushes; call .sync() to obtain an up to date flushed
+        block.
+    '''
     return self._backing_block
 
   @backing_block.setter
   @locked
   def backing_block(self, new_block):
-    X("File: update _backing_block to %s from %s", new_block, self._backing_block)
     self._backing_block = new_block
     self._reset(BlockFile(new_block))
 
@@ -184,7 +188,7 @@ class File(BackedFile):
     if size == -1:
       return self.readall()
     if size < 1:
-      raise ValueError("%s.read: size(%r) < 0 but not -1", self, size)
+      raise ValueError("%s.read: size(%r) < 1 but not -1", self, size)
     start = self._offset
     end = start + size
     for inside, span in self.front_range.slices(start, end):
