@@ -155,14 +155,11 @@ class FileHandle(O):
     self.E.touch()
 
   def flush(self):
-    X("FileHandle.flush: Eopen.flush...")
     self.Eopen.flush()
-    X("FileHandle.flush: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
     ## self.E.touch()
 
   def close(self):
-    X("FileHandle.close: Eopen.close...")
     self.Eopen.close()
     X("FileHandle.close: Eopen=%s", self.Eopen)
     ## no touch, already done by any writes
@@ -230,7 +227,6 @@ class Inodes(object):
   def _load_inode_data(self, idatatext, allocated):
     ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
     '''
-    XP("decode idatatext: %r", idatatext)
     idata = untexthexify(idatatext)
     # load the allocated hardlinked inode values
     taken_data, offset1 = get_bsdata(idata)
@@ -1062,17 +1058,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def symlink(self, parent_inode, name_b, target_b, ctx):
     with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
-      XP("ENTER")
       name = self._vt_str(name_b)
       target = self._vt_str(target_b)
       # TODO: check search/write on P
       P = self._vt_core.i2E(parent_inode)
-      XP("PARENT = %s", P)
       if not P.isdir:
-        XP("PARENT IS NOT DIR")
         raise FuseOSError(errno.ENOTDIR)
       if name in P:
-        XP("name %r exists in parent", name)
         raise FuseOSError(errno.EEXIST)
       E = SymlinkDirent(name, {'pathref': target})
       P[name] = E
