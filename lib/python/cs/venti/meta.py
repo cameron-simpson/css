@@ -277,7 +277,7 @@ class Meta(dict):
       # use the more verbose safe JSON encoding
       d = dict(self)
       try:
-        encoded = json.dumps(d)
+        encoded = json.dumps(d, separators=(',', ':'))
       except Exception as e:
         exception("json.dumps: %s: d=%r", e, d)
         raise

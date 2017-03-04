@@ -47,7 +47,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
-loginfo = O(upd_mode=False)
+loginfo = O(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -163,8 +163,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    if trace_mode:
-      Pfx._state.trace = True
+    Pfx._state.trace = True
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -283,7 +282,6 @@ def infer_logging_level(env_debug=None, environ=None):
         numeric >= 1 and < 2: logging.INFO
         numeric >= 2 => logging.DEBUG
         "DEBUG" => logging.DEBUG
-        "TRACE" => Pfx issues log.info calls
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
@@ -326,13 +324,14 @@ def infer_logging_level(env_debug=None, environ=None):
       if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
         function_names.append( (module_name, func_name) )
     else:
-      if flag == 'DEBUG':
+      uc_flag = flag.upper()
+      if uc_flag == 'DEBUG':
         level = logging.DEBUG
-      elif flag == 'INFO':
+      elif uc_flag == 'INFO':
         level = logging.INFO
-      elif flag == 'WARN' or flag == 'WARNING':
+      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
         level = logging.WARNING
-      elif flag == 'ERROR':
+      elif uc_flag == 'ERROR':
         level = logging.ERROR
   return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
 
@@ -687,7 +686,7 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
-    if _state.trace:
+    if loginfo.upd_mode:
       info(self._state.prefix)
     return False
 

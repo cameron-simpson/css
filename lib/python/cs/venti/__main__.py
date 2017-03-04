@@ -8,15 +8,18 @@ from __future__ import with_statement
 import sys
 import os
 import os.path
+import errno
 from getopt import getopt, GetoptError
 import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
-from cs.debug import ifdebug, dump_debug_threads
+from threading import Thread
+from time import sleep
+from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.env import envsub
 from cs.lex import hexify
-import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
+from cs.logutils import Pfx, exception, error, warning, info, debug, setup_logging, logTo, X, nl
+from cs.tty import statusline
 from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
@@ -172,13 +175,31 @@ def main(argv):
                 if useMemoryCacheStore:
                   S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
                                  S, MemoryCacheStore("MemoryCacheStore"))
-                X("S = %s", S)
+                if False and sys.stdout.isatty():
+                  X("wrap in a ProgressStore")
+                  run_ticker = True
+                  S = ProgressStore("ProgressStore(%s)" % (S,), S)
+                  def ticker():
+                    old_text = ''
+                    while run_ticker:
+                      text = S.status_text()
+                      if text != old_text:
+                        statusline(text)
+                        old_text = text
+                      sleep(0.25)
+                  T = Thread(name='%s-status-line' % (S,), target=ticker)
+                  T.daemon = True
+                  T.start()
+                else:
+                  run_ticker = False
                 with S:
                   try:
                     xit = op_func(args, verbose=verbose, log=log)
                   except GetoptError as e:
                     error("%s", e)
                     badopts = True
+                if run_ticker:
+                  run_ticker = False
 
   if badopts:
     sys.stderr.write(usage)
