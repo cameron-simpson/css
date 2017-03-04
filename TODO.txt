@@ -1,5 +1,6 @@
 venti:
   FIXED? BUG: new files forget their correct size on umount
+  BackedFile to set change-on-close flag on write/truncate etc
   move to SHA-3, check hash size etc
   rename cs.venti => cs.vt
   support ranges on GET requests
