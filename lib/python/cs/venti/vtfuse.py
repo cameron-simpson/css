@@ -85,12 +85,13 @@ def handler(method):
     except FuseOSError:
       raise
     except MissingHashcodeError as e:
+      error("raising IOError from missing hashcode: %s", e)
       raise FuseOSError(errno.EIO) from e
     except OSError as e:
+      error("raising FuseOSError from OSError: %s", e)
       raise FuseOSError(e.errno) from e
     except Exception as e:
-      error("BANG1: e=%s %s", type(e), e)
-      exception("EXCEPTION from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
+      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
       raise FuseOSError(errno.EINVAL) from e
     except:
       error("UNCAUGHT EXCEPTION")
@@ -443,23 +444,24 @@ class _StoreFS_core(object):
     self.logQ.close()
 
   def _sync(self):
-    if defaults.S is None:
-      raise RuntimeError("RUNTIME: defaults.S is None!")
-    if self.syncfp is not None:
-      with self._lock:
-        # update the inode table state
-        self.E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
-        text = strfor_Dirent(self.E)
-        last_text = self._syncfp_last_dirent_text
-        if last_text is not None and text == last_text:
-          text = None
-      if text is not None:
-        write_Dirent_str(self.syncfp, text, etc=self.E.name)
-        self.syncfp.flush()
-        self._syncfp_last_dirent_text = text
-        # debugging
-        dump_Dirent(self.E, recurse=False)
-        dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
+    with Pfx("_sync"):
+      if defaults.S is None:
+        raise RuntimeError("RUNTIME: defaults.S is None!")
+      # update the inode table state
+      self.E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
+      text = strfor_Dirent(self.E)
+      if self.syncfp is not None:
+        with self._lock:
+          last_text = self._syncfp_last_dirent_text
+          if last_text is not None and text == last_text:
+            text = None
+        if text is not None:
+          write_Dirent_str(self.syncfp, text, etc=self.E.name)
+          self.syncfp.flush()
+          self._syncfp_last_dirent_text = text
+          # debugging
+          dump_Dirent(self.E, recurse=False)
+          dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
   def i2E(self, inum):
     ''' Return the Dirent associated with the supplied `inum`.
@@ -960,7 +962,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def release(self, fhndx):
-    self._vt_core._fh_close(fhndx)
+    with Pfx("_fh_close(fhndx=%d)", fhndx):
+      self._vt_core._fh_close(fhndx)
 
   @handler
   def releasedir(self, fhndx):
