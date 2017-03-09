@@ -22,8 +22,8 @@ def main(argv):
     names = argv
   else:
     names = [ name for name in os.listdir('.')
-             if name and not name.startswith('.')
-           ]
+              if name and not name.startswith('.')
+            ]
     if not names:
       error("%s: no suitable names in the current directory", cmd)
       badopts = True
