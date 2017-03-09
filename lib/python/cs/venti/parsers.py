@@ -5,6 +5,25 @@
 #   - Cameron Simpson <cs@zip.com.au> 05mar2017
 #
 
+def chunks_to_lines(chunks):
+  ''' Process binary chunks, yield binary lines ending in '\n'.
+      The final line might not have a trailing newline.
+  '''
+  pending = []
+  for chunk in chunks:
+    upto = 0
+    nlpos = chunk.find('\n')
+    while nlpos >= 0:
+      pending.append(chunk[upto:nlpos+1])
+      yield ''.join(pending)
+      pending = []
+      upto = nlpos + 1
+      nlpos = chunk.find('\n', upto)
+    if upto < len(chunk):
+      pending.append(chunk[upto:])
+  if pending:
+    yield b''.join(pending)
+
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
   '''
