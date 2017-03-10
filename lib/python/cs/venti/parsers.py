@@ -45,22 +45,16 @@ def parse_text(chunks, prefixes=None):
   yield chunkQ
   offset = 0
   for line in linesof(chunks):
-    next_offset = None
     chunkQ.put(line)
+    next_offset = None
     for prefix in prefixes:
       if line.startswith(prefix):
         next_offset = offset
         break
     if next_offset is not None:
-      ##X("offset %d: %r", line.rstrip())
-      X("yield next_offset:%d", next_offset)
       yield next_offset
     offset += len(line)
-  X("yield final offset:%d", offset)
-  yield offset
-  X("close output chunkQ")
   chunkQ.close()
-  X("exit parse_text")
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
