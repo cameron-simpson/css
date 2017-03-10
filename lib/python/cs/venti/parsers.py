@@ -46,8 +46,6 @@ def parse_text(chunks, prefixes=None):
   offset = 0
   for line in linesof(chunks):
     next_offset = None
-    ##X("chunkQ <= %d byte line", len(line))
-    X("scan and block...")
     chunkQ.put(line)
     for prefix in prefixes:
       if line.startswith(prefix):
@@ -59,8 +57,10 @@ def parse_text(chunks, prefixes=None):
       yield next_offset
     offset += len(line)
   X("yield final offset:%d", offset)
-  ##yield offset
+  yield offset
+  X("close output chunkQ")
   chunkQ.close()
+  X("exit parse_text")
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
@@ -79,8 +79,8 @@ PREFIXES_SH = (
 
 PREFIXES_ALL = (
     PREFIXES_MAIL
-    + PREFIXES_PYTHON 
-    + PREFIXES_GO 
-    + PREFIXES_PERL 
+    + PREFIXES_PYTHON
+    + PREFIXES_GO
+    + PREFIXES_PERL
     + PREFIXES_SH
 )
