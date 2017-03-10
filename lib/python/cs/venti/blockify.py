@@ -9,7 +9,6 @@ from functools import partial
 from itertools import chain
 import sys
 from cs.logutils import debug, warning, D, X
-from cs.queues import IterableQueue
 from .block import Block, IndirectBlock, dump_block
 ##from .parsers import rolling_hash_parser
 
