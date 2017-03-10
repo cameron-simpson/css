@@ -13,15 +13,14 @@ from cs.randutils import rand0, randblock
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
+from .parsers import parse_text
 
 def random_blocks(max_size=65536, count=64):
   ''' Generate `count` blocks of random sizes from 1 to `max_size`.
   '''
-  global rand_total
   for i in range(count):
     size = rand0(max_size) + 1
     yield randblock(size)
-    rand_total += size
 
 class TestAll(unittest.TestCase):
 
@@ -51,38 +50,54 @@ class TestAll(unittest.TestCase):
 
   def test02blocked_chunks_of(self):
     global rand_total
-    for parser in (None,):
-      with self.subTest('None' if parser is None else parser.__name__):
-        rand_total = 0
-        chunk_total = 0
-        nchunks = 0
-        X("prepare random input blocks")
-        source_chunks = list(random_blocks(max_size=12000, count=1280))
-        all_chunks = []
-        X("scan and block...")
-        start_time = time.time()
-        for chunk in blocked_chunks_of(source_chunks, parser):
-          ##X("BLOCKED_CHUNK len=%d", len(chunk))
-          nchunks += 1
-          chunk_total += len(chunk)
-          all_chunks.append(chunk)
-          # the pending.flush operation can return short blocks
-          ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE,
-          ##                "len(chunk)=%d < MIN_BLOCKSIZE=%d"
-          ##                % (len(chunk), MIN_BLOCKSIZE))
-          self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
-                          "len(chunk)=%d > MAX_BLOCKSIZE=%d"
-                          % (len(chunk), MAX_BLOCKSIZE))
-          self.assertTrue(chunk_total <= rand_total,
-                          "chunk_total:%d > rand_total:%d"
-                          % (chunk_total, rand_total))
-        end_time = time.time()
-        X("%d chunks in %gs, %d bytes at %g B/s",
-          nchunks, end_time-start_time, chunk_total,
-          float(chunk_total) / (end_time-start_time))
-        self.assertEqual(rand_total, chunk_total)
-        self.assertEqual(b''.join(source_chunks),
-                         b''.join(all_chunks))
+    with open(__file__, 'rb') as myfp:
+      mycode = myfp.read()
+    for parser in (parse_text,):
+      parser_desc = 'None' if parser is None else parser.__name__
+      for input_desc, input_chunks in (
+          ##('random data', random_blocks(max_size=12000, count=1280)),
+          (__file__, [ mycode for _ in range(100) ]),
+        ):
+        with self.subTest("blocked_chunks_of",
+                          parser=parser_desc, input_chunks=input_desc):
+          X("test parser %s vs %s...", parser, input_desc)
+          X("prepare input blocks")
+          src_total = 0
+          source_chunks = list(input_chunks)
+          for chunk in source_chunks:
+            src_total += len(chunk)
+          X("scan and block...")
+          chunk_total = 0
+          nchunks = 0
+          all_chunks = []
+          start_time = time.time()
+          offset = 0
+          for chunk in blocked_chunks_of(source_chunks, parser):
+            X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
+            offset += len(chunk)
+            if parser is not None:
+              X("  chunk=%r", chunk)
+            nchunks += 1
+            chunk_total += len(chunk)
+            all_chunks.append(chunk)
+            # the pending.flush operation can return short blocks
+            ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE,
+            ##                "len(chunk)=%d < MIN_BLOCKSIZE=%d"
+            ##                % (len(chunk), MIN_BLOCKSIZE))
+            self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
+                            "len(chunk)=%d > MAX_BLOCKSIZE=%d"
+                            % (len(chunk), MAX_BLOCKSIZE))
+            self.assertTrue(chunk_total <= src_total,
+                            "chunk_total:%d > src_total:%d"
+                            % (chunk_total, src_total))
+          end_time = time.time()
+          X("%s|%s: %d chunks in %gs, %d bytes at %g B/s",
+            input_desc, parser_desc,
+            nchunks, end_time-start_time, chunk_total,
+            float(chunk_total) / (end_time-start_time))
+          self.assertEqual(src_total, chunk_total)
+          self.assertEqual(b''.join(source_chunks),
+                           b''.join(all_chunks))
 
   def test03blockifyAndRetrieve(self):
     with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
