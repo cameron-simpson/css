@@ -5,24 +5,59 @@
 #   - Cameron Simpson <cs@zip.com.au> 05mar2017
 #
 
-def chunks_to_lines(chunks):
+from cs.logutils import X
+from cs.queues import IterableQueue
+
+def linesof(chunks):
   ''' Process binary chunks, yield binary lines ending in '\n'.
       The final line might not have a trailing newline.
   '''
   pending = []
   for chunk in chunks:
+    mv_chunk = memoryview(chunk)
     upto = 0
-    nlpos = chunk.find('\n')
+    nlpos = chunk.find(b'\n')
     while nlpos >= 0:
-      pending.append(chunk[upto:nlpos+1])
-      yield ''.join(pending)
+      pending.append(mv_chunk[upto:nlpos+1])
+      yield b''.join(pending)
       pending = []
       upto = nlpos + 1
-      nlpos = chunk.find('\n', upto)
+      nlpos = chunk.find(b'\n', upto)
     if upto < len(chunk):
-      pending.append(chunk[upto:])
+      pending.append(mv_chunk[upto:])
   if pending:
     yield b''.join(pending)
+
+def parse_text(chunks):
+  chunkQ = IterableQueue()
+  yield chunkQ
+  offset = 0
+  prev_line = b''
+  for line in linesof(chunks):
+    next_offset = None
+    ##X("chunkQ <= %d byte line", len(line))
+    X("scan and block...")
+    chunkQ.put(line)
+    for prefix in ( b'def ', b'  def ', b'    def ', b'\tdef ',
+      ):
+      if line.startswith(prefix):
+        next_offset = offset
+        break
+    if next_offset is None:
+      for prev_suffix, prefix in ( ( b'}\n', b'\n' ),
+        ):
+        if prev_line.endswith(prev_suffix) and line.startswith(prefix):
+          next_offset = offset
+          break
+    if next_offset is not None:
+      ##X("offset %d: %r", line.rstrip())
+      X("yield next_offset:%d", next_offset)
+      yield next_offset
+    offset += len(line)
+    prev_line = line
+  X("yield final offset:%d", offset)
+  ##yield offset
+  chunkQ.close()
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
