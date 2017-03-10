@@ -5,6 +5,7 @@
 #   - Cameron Simpson <cs@zip.com.au> 05mar2017
 #
 
+import sys
 from cs.logutils import X
 from cs.queues import IterableQueue
 
@@ -96,38 +97,59 @@ _mp3_sr_m1     = [ 44100, 48000, 32000, None ]
 _mp3_sr_m2     = [ 22050, 24000, 16000, None ]
 _mp3_sr_m25    = [ 11025, 12000, 8000, None ]
 
-def mp3frames(fp):
+def parse_mp3(chunks):
   ''' Read MP3 data from `fp` and yield frame data chunks.
       Based on:
         http://www.mp3-tech.org/programmer/frame_header.html
   '''
-  chunk = ''
+  chunkQ = IterableQueue()
+  yield chunkQ
+  chunk = memoryview(b'')
+  def accrue(current_chunk, chunks, min_size):
+    ''' Gather data until len(current_chunk) >= min_size.
+    '''
+    chunks = iter(chunks)
+    if len(current_chunk) < min_size:
+      glom = [bytes(current_chunk)]
+      glommed = len(current_chunk)
+      while glommed < min_size:
+        X("mp3: next chunk...")
+        try:
+          next_chunk = next(chunks)
+        except StopIteration:
+          break
+        X("parse_mp3: chunkQ.put %d bytes", len(next_chunk))
+        chunkQ.put(next_chunk)
+        glom.append(next_chunk)
+        glommed += len(next_chunk)
+      current_chunk = memoryview(b''.join(glom))
+    return current_chunk
+  offset = 0
   while True:
-    while len(chunk) < 4:
-      bs = fp.read(4-len(chunk))
-      if len(bs) == 0:
-        break
-      chunk += bs
-    if len(chunk) == 0:
-      return
-    assert len(chunk) >= 4, "short data at end of fp"
-
-    if chunk.startswith("TAG"):
-      frame_len = 128
-    elif chunk.startswith("ID3"):
-      D("ID3")
+    advance_by = None
+    chunk = accrue(chunk, chunks, 3)
+    if len(chunk) < 3:
+      break
+    if chunk[:3] == b'TAG':
+      X("TAG frame, 128 bytes")
+      chunk = accrue(chunk, chunks, 128)
+      yield offset + 128
+      advance_by = 128
+    elif chunk[:3] == b'ID3':
       # TODO: suck up a few more bytes and compute length
-      return
+      raise RuntimeError("ID3 not implemented")
     else:
-      hdr_bytes = map(ord, chunk[:4])
-      ##D("%r", hdr_bytes)
-      assert hdr_bytes[0] == 255 and (hdr_bytes[1]&224) == 224, "not a frame header: %s" % (chunk,)
-      audio_vid = _mp3_audio_ids[ (hdr_bytes[1]&24) >> 3 ]
-      layer = _mp3_layer[ (hdr_bytes[1]&6) >> 1 ]
-
-      has_crc = not _mp3_crc[ hdr_bytes[1]&1 ]
-
-      bri = (hdr_bytes[2]&240) >> 4
+      # 4 byte header
+      chunk = accrue(chunk, chunks, 4)
+      b0, b1, b2, b3 = chunk[:4].tolist()
+      if b0 != 255:
+        raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
+      if (b1 & 224) != 224:
+        raise ValueError("offset %d: expected b&224 == 224, found 0x%02x" % (offset+1, b1))
+      audio_vid = _mp3_audio_ids[ (b1&24)>>3 ]
+      layer = _mp3_layer[ (b1&6)>>1 ]
+      has_crc = not _mp3_crc[ b1&1 ]
+      bri = (b2&240)>>4
       if audio_vid == 1:
         if layer == 1:
           bitrate = _mp3_br_v1_l1[bri]
@@ -136,18 +158,17 @@ def mp3frames(fp):
         elif layer == 3:
           bitrate = _mp3_br_v1_l3[bri]
         else:
-          assert False, "bogus layer (%s)" % (layer,)
+          raise ValueError("offset %d: bogus layer %s" % (offset, layer))
       elif audio_vid == 2 or audio_vid == 2.5:
         if layer == 1:
           bitrate = _mp3_br_v2_l1[bri]
         elif layer == 2 or layer == 3:
           bitrate = _mp3_br_v2_l23[bri]
         else:
-          assert False, "bogus layer (%s)" % (layer,)
+          raise ValueError("offset %d: bogus layer %s" % (offset, layer))
       else:
-        assert False, "bogus audio_vid (%s)" % (audio_vid,)
-
-      sri = (hdr_bytes[2]&12) >> 2
+        raise ValueError("offset %d: bogus audio_vid %s" % (offset, audio_vid))
+      sri = (b2&12) >> 2
       if audio_vid == 1:
         samplingrate = _mp3_sr_m1[sri]
       elif audio_vid == 2:
@@ -155,29 +176,26 @@ def mp3frames(fp):
       elif audio_vid == 2.5:
         samplingrate = _mp3_sr_m25[sri]
       else:
-        assert False, "unsupported id (%s)" % (audio_vid,)
-
-      padding = (hdr_bytes[2]&2) >> 1
-
+        raise ValueError("offset %d: unsupported audio_vid %s" % (offset, audio_vid))
+      padding = (b2&2) >> 1
       # TODO: surely this is wrong? seems to include header in audio sample
       if layer == 1:
-        data_len = (12 * bitrate * 1000 / samplingrate + padding) * 4
+        data_len = (12 * bitrate * 1000 // samplingrate + padding) * 4
       elif layer == 2 or layer == 3:
-        data_len = 144 * bitrate * 1000 / samplingrate + padding
+        data_len = 144 * bitrate * 1000 // samplingrate + padding
       else:
-        assert False, "layer=%s" % (layer,)
-
+        raise ValueError("offset %d: cannot compute data_len for layer=%s" % (offset, data_len))
       frame_len = data_len
       if has_crc:
         frame_len += 2
-
-    ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-    while len(chunk) < frame_len:
-      bs = fp.read(frame_len - len(chunk))
-      if len(bs) == 0:
-        break
-      chunk += bs
-    assert len(chunk) >= frame_len
-
-    yield chunk[:frame_len]
-    chunk = chunk[frame_len:]
+      print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
+      X("extend chunk to len frame_len=%d", frame_len)
+      chunk = accrue(chunk, chunks, frame_len)
+      yield offset + frame_len
+      advance_by = frame_len
+    assert advance_by > 0
+    chunk = chunk[advance_by:]
+    offset += advance_by
+  X("close chunkQ")
+  chunkQ.close()
+  X("end mp3 parse")
