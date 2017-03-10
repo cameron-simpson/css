@@ -202,6 +202,8 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
         offsetQ = None
         next_offset = None
         break
+      if not isinstance(next_offset2, int):
+        raise ValueError("blocked_chunks_of: get_next_offset: next_offset2 is not an int: %r" % (next_offset2,))
       if next_offset2 <= next_offset:
         warning("ignoring new offset %d <= current next_offset %d",
                 next_offset2, next_offset)
@@ -229,6 +231,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
   first_possible_point, next_rolling_point, max_possible_point \
     = new_offsets(last_offset)
   offset = 0
+  # unblocked outbound data
   pending = _PendingBuffer(max_block)
   # Read data chunks and locate desired boundaries.
   while True:
@@ -253,10 +256,16 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
         if next_offset is not None:
           scan_to = min(scan_to, next_offset-min_block)
         if scan_to > offset:
-          ##X("scan %d bytes with rolling hash...", scan)
+          scan_len = scan_to-offset
+          X("scan %d bytes with rolling hash: offset=%d, scan_to=%d",
+            scan_len, offset, scan_to)
           hash_value = 0
           found_offset = None
-          for upto, b in enumerate(chunk[:scan_to-offset]):
+          X("scan_len=%r", scan_len)
+          X("chunk=%r", chunk)
+          chunk_prefix = chunk[:scan_len]
+          X("chunk_prefix=%r", chunk_prefix)
+          for upto, b in enumerate(chunk[:scan_len]):
             hash_value = ( ( ( hash_value & 0x001fffff ) << 7
                            )
                          | ( ( b & 0x7f )^( (b & 0x80)>>7 )
@@ -277,7 +286,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
                 = new_offsets(last_offset)
               break
           if advance_by is None:
-            advance_by = scan_to - offset
+            advance_by = scan_len
         else:
           # nothing to skip, nothing to hash scan
           # ==> take everything up to next_offset
