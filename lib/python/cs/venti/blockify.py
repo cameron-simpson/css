@@ -285,7 +285,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     raise ValueError("rejecting min_block:%d >= max_block:%d"
                      % (min_block, max_block))
   if parser is None:
-    offsetQ = ( iter(chunks), )
+    offsetQ = iter( (iter(chunks),) )
     min_autoblock = min_block   # start the rolling hash earlier
   else:
     offsetQ = parser(chunks)
