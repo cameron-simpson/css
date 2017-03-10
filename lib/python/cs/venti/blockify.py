@@ -285,16 +285,14 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     raise ValueError("rejecting min_block:%d >= max_block:%d"
                      % (min_block, max_block))
   if parser is None:
-    ##X("no parser, using chunks directly")
-    offsetQ = iter(())
-    chunkQ = iter(chunks)
+    offsetQ = ( iter(chunks), )
     min_autoblock = min_block   # start the rolling hash earlier
   else:
     offsetQ = parser(chunks)
-    try:
-      chunkQ = next(offsetQ)
-    except StopIteration as e:
-      raise RuntimeError("chunkQ not received from offsetQ as first item: %s" % (e,))
+  try:
+    chunkQ = next(offsetQ)
+  except StopIteration as e:
+    raise RuntimeError("chunkQ not received from offsetQ as first item: %s" % (e,))
   def new_offsets(next_offset, offsetQ):
     ''' Compute relevant offsets from the block parameters.
         The first_possible_point is last_offset+min_block,
