@@ -55,8 +55,8 @@ class TestAll(unittest.TestCase):
     for parser in (parse_text,):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
-          ##('random data', random_blocks(max_size=12000, count=1280)),
-          (__file__, [ mycode for _ in range(100) ]),
+          ('random data', random_blocks(max_size=12000, count=1280)),
+          (__file__, [ mycode for _ in range(1000) ]),
         ):
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc, input_chunks=input_desc):
@@ -72,24 +72,28 @@ class TestAll(unittest.TestCase):
           all_chunks = []
           start_time = time.time()
           offset = 0
+          prev_chunk = None
           for chunk in blocked_chunks_of(source_chunks, parser):
-            X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
+            if prev_chunk is not None:
+              # this avoids issues with the final block, which may be short
+              self.assertTrue(len(prev_chunk) >= MIN_BLOCKSIZE,
+                              "len(prev_chunk)=%d < MIN_BLOCKSIZE=%d"
+                              % (len(prev_chunk), MIN_BLOCKSIZE))
+            ##X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
             offset += len(chunk)
-            if parser is not None:
-              X("  chunk=%r", chunk)
+            ##if parser is not None:
+            ##  X("  CHUNK=%r", chunk)
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
             # the pending.flush operation can return short blocks
-            ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE,
-            ##                "len(chunk)=%d < MIN_BLOCKSIZE=%d"
-            ##                % (len(chunk), MIN_BLOCKSIZE))
             self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
                             "len(chunk)=%d > MAX_BLOCKSIZE=%d"
                             % (len(chunk), MAX_BLOCKSIZE))
             self.assertTrue(chunk_total <= src_total,
                             "chunk_total:%d > src_total:%d"
                             % (chunk_total, src_total))
+            prev_chunk = chunk
           end_time = time.time()
           X("%s|%s: %d chunks in %gs, %d bytes at %g B/s",
             input_desc, parser_desc,
