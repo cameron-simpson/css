@@ -99,37 +99,36 @@ def parse_mp3(chunks):
       Based on:
         http://www.mp3-tech.org/programmer/frame_header.html
   '''
-  chunkQ = IterableQueue()
-  yield chunkQ
-  chunk = memoryview(b'')
-  def accrue(current_chunk, chunks, min_size):
+  chunks = iter(chunks)
+  chunkage = [b'']
+  def accrue(chunks, min_size):
     ''' Gather data until len(current_chunk) >= min_size.
     '''
-    chunks = iter(chunks)
-    if len(current_chunk) < min_size:
-      glom = [bytes(current_chunk)]
-      glommed = len(current_chunk)
+    current_chunk = chunkage[0]
+    glommed = len(current_chunk)
+    if glommed < min_size:
+      glom = [current_chunk]
       while glommed < min_size:
         X("mp3: next chunk...")
         try:
           next_chunk = next(chunks)
         except StopIteration:
           break
-        X("parse_mp3: chunkQ.put %d bytes", len(next_chunk))
-        chunkQ.put(next_chunk)
+        yield next_chunk
         glom.append(next_chunk)
         glommed += len(next_chunk)
-      current_chunk = memoryview(b''.join(glom))
-    return current_chunk
+      chunkage[0] = b''.join(glom)
   offset = 0
   while True:
     advance_by = None
-    chunk = accrue(chunk, chunks, 3)
+    yield from accrue(chunks, 3)
+    chunk = memoryview(chunkage[0])
     if len(chunk) < 3:
       break
     if chunk[:3] == b'TAG':
-      X("TAG frame, 128 bytes")
-      chunk = accrue(chunk, chunks, 128)
+      ##X("mp3: TAG frame, 128 bytes")
+      yield from accrue(chunks, 128)
+      chunk = memoryview(chunkage[0])
       yield offset + 128
       advance_by = 128
     elif chunk[:3] == b'ID3':
@@ -137,7 +136,8 @@ def parse_mp3(chunks):
       raise RuntimeError("ID3 not implemented")
     else:
       # 4 byte header
-      chunk = accrue(chunk, chunks, 4)
+      yield from accrue(chunks, 4)
+      chunk = memoryview(chunkage[0])
       b0, b1, b2, b3 = chunk[:4].tolist()
       if b0 != 255:
         raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
@@ -185,14 +185,16 @@ def parse_mp3(chunks):
       frame_len = data_len
       if has_crc:
         frame_len += 2
-      print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-      X("extend chunk to len frame_len=%d", frame_len)
-      chunk = accrue(chunk, chunks, frame_len)
+      ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
+      ##X("mp3: extend chunk to len frame_len=%d", frame_len)
+      yield from accrue(chunks, frame_len)
+      chunk = memoryview(chunkage[0])
       yield offset + frame_len
       advance_by = frame_len
     assert advance_by > 0
-    chunk = chunk[advance_by:]
+    chunkage[0] = chunk[advance_by:]
     offset += advance_by
-  X("close chunkQ")
-  chunkQ.close()
-  X("end mp3 parse")
+  X("mp3: end mp3 parse")
+  if chunk:
+    X("mp3: unparsed chunk data: %r", chunk)
+    yield chunk
