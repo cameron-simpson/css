@@ -144,24 +144,15 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       `min_autoblock`: the smallest amount of data that will be
         used for the rolling hash fallback if `parser` is not None,
         default MIN_AUTOBLOCK
-      The iterable returned from `parser(chunks)` is denoted `offsetQ`.
-      It first yields an iterable denoted `chunkQ` (which will
-      yield unaligned data chunks) and thereafter offsets which
-      represent desirable Block bounaries.
 
-      The parser must arrange that after a next_offset is collected
-      from `offsetQ` sufficient data chunks will be available on
-      `chunkQ` to reach that offset, allowing this function to
-      assemble complete well aligned data chunks.
+      The iterable returned from `parser(chunks)` returns either
+      ints, which are considered desirable block boundaries, or
+      bytes/memoryview objects which contain data from `chunks`.
 
-      The easiest `parser` functions to write are generators. One
-      can allocate and yield an IterableQueue for the data chunks
-      and then yield offsets directly. To coordinate with
-      blocked_chunks_of the easiest thing is probably to put data
-      onto `chunkQ` as soon as it is read, and then parse the read
-      data for boundary offsets. The IterableQueue should have
-      enough capacity to hold whatever chunks arrive before an
-      offset is emitted.
+      The easiest `parser` functions to write are generators and
+      one simple method of processing is to yield items from `chunks`
+      as soon as they are collected, and then to parse data yielding
+      edge offsets if found.
   '''
   if min_block is None:
     min_block = MIN_BLOCKSIZE
@@ -256,11 +247,9 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       chunk = memoryview(in_chunks.pop(0))
       # process current chunk
       while chunk:
-
         chunk_end_offset = offset + len(chunk)
         advance_by = None
         release = False   # becomes true if we should flush after taking data
-
         # see if we can skip some data completely
         # we don't care where the nnext_offset is if offset < first_possible_point
         if first_possible_point > offset:
@@ -285,7 +274,6 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
                 next_offset = next_offset2
             else:
               next_offset = None
-
           ##X("skip=%d, nothing to skip", skip)
           # how far to scan with the rolling hash, being from here to
           # next_offset minus a min_block buffer, capped by the length of
@@ -320,7 +308,6 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
             else:
               take_to = min(next_offset, chunk_end_offset)
             advance_by = take_to - offset
-
         # advance through this chunk
         # buffer the advance
         # release ==> flush the buffer and update last_offset
@@ -336,7 +323,6 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
           first_possible_point, next_rolling_point, max_possible_point \
             = new_offsets(last_offset)
           hash_value = 0
-
   # yield any left over data
   yield from pending.flush()
 
