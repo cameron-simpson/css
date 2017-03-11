@@ -180,14 +180,10 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     raise ValueError("rejecting min_block:%d >= max_block:%d"
                      % (min_block, max_block))
   if parser is None:
-    offsetQ = iter( (iter(chunks),) )
+    parseQ = iter(chunks)
     min_autoblock = min_block   # start the rolling hash earlier
   else:
-    offsetQ = parser(chunks)
-  try:
-    chunkQ = next(offsetQ)
-  except StopIteration as e:
-    raise RuntimeError("chunkQ not received from offsetQ as first item: %s" % (e,))
+    parseQ = parser(chunks)
   def get_next_offset(offsetQ, next_offset, required_offset):
     ''' Fetch the next offset from `offsetQ`.
         Set `offsetQ` to None at end of iteration.
@@ -210,6 +206,21 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       else:
         next_offset = next_offset2
     return offsetQ, next_offset
+  def get_parse(parseQ):
+    ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
+        Returns `parseQ` or None if the end of the queue is reached.
+        Use: parseQ = get_parse(parseQ)
+    '''
+    try:
+      parsed = next(parseQ)
+    except StopIteration:
+      parseQ = None
+    else:
+      if isinstance(parsed, int):
+        in_offsets.append(parsed)
+      else:
+        in_chunks.append(parsed)
+    return parseQ
   def new_offsets(last_offset):
     ''' Compute relevant offsets from the block parameters.
         The first_possible_point is last_offset+min_block,
@@ -230,86 +241,102 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
   last_offset = 0
   first_possible_point, next_rolling_point, max_possible_point \
     = new_offsets(last_offset)
+  hash_value = 0
   offset = 0
+  # inbound chunks and offsets
+  in_chunks = []
+  in_offsets = []
   # unblocked outbound data
   pending = _PendingBuffer(max_block)
   # Read data chunks and locate desired boundaries.
-  while True:
-    offsetQ, next_offset = get_next_offset(offsetQ, next_offset, offset+1)
-    try:
-      chunk = next(chunkQ)
-    except StopIteration:
-      break
-    chunk = memoryview(chunk)
-    while chunk:
-      chunk_end_offset = offset + len(chunk)
-      advance_by = None
-      # see if we can skip some data completely
-      if first_possible_point > offset:
-        advance_by = min(first_possible_point - offset, len(chunk))
-      else:
-        ##X("skip=%d, nothing to skip", skip)
-        # how far to scan with the rolling hash, being from here to
-        # next_offset minus a min_block buffer, capped by the length of
-        # the current chunk
-        scan_to = min(max_possible_point, chunk_end_offset)
-        if next_offset is not None:
-          scan_to = min(scan_to, next_offset-min_block)
-        if scan_to > offset:
-          scan_len = scan_to-offset
-          X("scan %d bytes with rolling hash: offset=%d, scan_to=%d",
-            scan_len, offset, scan_to)
+  while parseQ is not None or in_chunks:
+    while parseQ is not None and not in_chunks:
+      parseQ = get_parse(parseQ)
+    if in_chunks:
+      chunk = memoryview(in_chunks.pop(0))
+      # process current chunk
+      while chunk:
+
+        chunk_end_offset = offset + len(chunk)
+        advance_by = None
+        release = False   # becomes true if we should flush after taking data
+
+        # see if we can skip some data completely
+        # we don't care where the nnext_offset is if offset < first_possible_point
+        if first_possible_point > offset:
+          advance_by = min(first_possible_point - offset, len(chunk))
           hash_value = 0
-          found_offset = None
-          X("scan_len=%r", scan_len)
-          X("chunk=%r", chunk)
-          chunk_prefix = chunk[:scan_len]
-          X("chunk_prefix=%r", chunk_prefix)
-          for upto, b in enumerate(chunk[:scan_len]):
-            hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                           )
-                         | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                           )
-                         )
-            if hash_value % 4093 == 1:
-              # found an edge with the rolling hash
-              # yield the pending data
-              # advance pointers, recompute new scan points
-              ##X("rolling hash found edge at %d bytes", upto)
-              yield from pending.append(chunk[:upto])
-              yield from pending.flush()
-              chunk = chunk[upto:]
-              offset += upto
-              advance_by = 0
-              last_offset = offset
-              first_possible_point, next_rolling_point, max_possible_point \
-                = new_offsets(last_offset)
-              break
-          if advance_by is None:
-            advance_by = scan_len
+        elif next_offset == offset:
+          # flush buffer if any but zero advance
+          release = True
+          advance_by = 0
         else:
-          # nothing to skip, nothing to hash scan
-          # ==> take everything up to next_offset
-          if next_offset is None:
-            take_to = chunk_end_offset
+          # advance next_offset to something useful > offset
+          while next_offset is not None and next_offset <= offset:
+            while parseQ is not None and not in_offsets:
+              parseQ = get_parse(parseQ)
+            if in_offsets:
+              next_offset2 = in_offsets.pop(0)
+              assert isinstance(next_offset2, int)
+              if next_offset2 < next_offset:
+                warning("next offset %d < current next_offset:%d",
+                        next_offset2, next_offset)
+              else:
+                next_offset = next_offset2
+            else:
+              next_offset = None
+
+          ##X("skip=%d, nothing to skip", skip)
+          # how far to scan with the rolling hash, being from here to
+          # next_offset minus a min_block buffer, capped by the length of
+          # the current chunk
+          scan_to = min(max_possible_point, chunk_end_offset)
+          if next_offset is not None:
+            scan_to = min(scan_to, next_offset-min_block)
+          if scan_to > offset:
+            scan_len = scan_to - offset
+            found_offset = None
+            chunk_prefix = chunk[:scan_len]
+            for upto, b in enumerate(chunk[:scan_len]):
+              hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                             )
+                           | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                             )
+                           )
+              if hash_value % 4093 == 1:
+                # found an edge with the rolling hash
+                ##X("rolling hash found edge at %d bytes", upto)
+                release = True
+                advance_by = upto + 1
+                break
+            if advance_by is None:
+              advance_by = scan_len
           else:
-            take_to = min(next_offset, chunk_end_offset)
-          advance_by = take_to - offset
-          if take_to == next_offset:
-            take = take_to - offset
-            yield from pending.append(chunk[:take])
-            yield from pending.flush()
-            chunk = chunk[take:]
-            offset += take
-            advance_by = 0
-            last_offset = offset
-            first_possible_point, next_rolling_point, max_possible_point \
-              = new_offsets(last_offset)
-      assert advance_by <= len(chunk)
-      if advance_by > 0:
+            # nothing to skip, nothing to hash scan
+            # ==> take everything up to next_offset
+            # (and reset the hash)
+            if next_offset is None:
+              take_to = chunk_end_offset
+            else:
+              take_to = min(next_offset, chunk_end_offset)
+            advance_by = take_to - offset
+
+        # advance through this chunk
+        # buffer the advance
+        # release ==> flush the buffer and update last_offset
+        assert advance_by is not None
+        assert advance_by >= 0
+        assert advance_by <= len(chunk)
         yield from pending.append(chunk[:advance_by])
         offset += advance_by
         chunk = chunk[advance_by:]
+        if release:
+          yield from pending.flush()
+          last_offset = offset
+          first_possible_point, next_rolling_point, max_possible_point \
+            = new_offsets(last_offset)
+          hash_value = 0
+
   # yield any left over data
   yield from pending.flush()
 
