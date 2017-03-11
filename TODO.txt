@@ -1,5 +1,7 @@
 ssh-opts: cononical capitalisation of option names
 cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
+mp4/iso14496
+  STTSBox (_GenericSampleBox): shorter redition of .samples
 venti:
   FIXED? BUG: new files forget their correct size on umount
   BackedFile to set change-on-close flag on write/truncate etc

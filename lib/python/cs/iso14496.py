@@ -27,7 +27,7 @@ B0_256 = bytes(256)
 SIZE_16MB = 1024*1024*16
 
 def get_box(bs, offset=0):
-  ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
+  ''' Decode a box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
   '''
   offset0 = offset
   usertype = None
@@ -45,7 +45,7 @@ def get_box(bs, offset=0):
     if offset + 8 > len(bs):
       raise ValueError("not enough bytes at offset %d for largesize, only %d remaining"
                        % (offset, len(bs) - offset))
-    length = unpack('>Q', bs[offset:offset+8])
+    length, = unpack('>Q', bs[offset:offset+8])
     offset += 8
   elif box_size < 8:
     raise ValueError("box size too low: %d, expected at least 8"
@@ -205,6 +205,11 @@ def get_utf8_nul(bs, offset=0):
     raise ValueError('no NUL in data: %r' % (bs[offset:],))
   return bs[offset:endpos].decode('utf-8'), endpos + 1
 
+def put_utf8_nul(s):
+  ''' Return bytes encoding a string in UTF-8 with a trailing NUL.
+  '''
+  return s.encode('utf-8') + b'\0'
+
 class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
   '''
@@ -252,8 +257,8 @@ class Box(object):
     klass_name = klass.__name__
     if len(klass_name) == 7 and klass_name.endswith('Box'):
       klass_prefix = klass_name[:4]
-      if klass_prefix.isupper():
-        return klass_prefix.lower().encode('ascii')
+      if klass_prefix.rstrip('_').isupper():
+        return klass_prefix.replace('_', ' ').lower().encode('ascii')
     raise AttributeError("no automatic box type for %s" % (klass,))
 
   # NB: a @property instead of @prop to preserve AttributeError
@@ -264,6 +269,8 @@ class Box(object):
     return type(self).box_type_from_klass()
 
   def attribute_summary(self):
+    ''' Comma separator list of attribute values honouring format strings.
+    '''
     strs = []
     for attr in self.ATTRIBUTES:
       if isinstance(attr, str):
@@ -277,10 +284,10 @@ class Box(object):
   def __str__(self):
     if self._box_data is None:
       # do not load the data just for __str__
-      return 'Box(%r,box_data=%s())' \
-             % (self.box_type, self._fetch_box_data)
-    return 'Box(%r,box_data=%d:%r%s)' \
-           % (self.box_type, len(self._box_data),
+      return '%s(%r,box_data=%s())' \
+             % (type(self).__name__, self.box_type, self._fetch_box_data)
+    return '%s(%r,box_data=%d:%r%s)' \
+           % (type(self).__name__, self.box_type, len(self._box_data),
               self._box_data[:32],
               '...' if len(self._box_data) > 32 else '')
 
@@ -298,7 +305,6 @@ class Box(object):
           look up the box_type in KNOWN_BOX_CLASSES and use that class
           or Box if not present.
     '''
-    ##TODO: use read_box_header and skip things like mdat data block
     length, box_type, box_data_length = read_box_header(fp)
     if length is None and box_type is None and box_data_length is None:
       return None
@@ -334,7 +340,6 @@ class Box(object):
                          % (box_data_length, len(fetch_data)))
     if cls is None:
       cls = pick_box_class(box_type)
-      ##X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     return cls(box_type, fetch_data)
 
   @staticmethod
@@ -358,11 +363,9 @@ class Box(object):
     if offset > len(bs):
       raise RuntimeError("box length=%d, but that exceeds the size of bs (%d bytes, offset=%d)"
                          % (length, len(bs), offset0))
-    fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
       cls = pick_box_class(box_type)
-      ##X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
-    B = cls(box_type, fetch_box_data)
+    B = cls(box_type, bs[tail_offset:tail_offset+tail_length])
     return B, offset
 
   def _load_box_data(self):
@@ -375,26 +378,65 @@ class Box(object):
   def _set_box_data(self, data):
     ''' Set the private attribute ._box_data to `data`.
         This may be used by subclasses to discard loaded data after
-        processing if they override the .box_data_chunks method.
+        processing if they override the .data_chunks method.
     '''
     self._box_data = data
 
-  def box_data_chunks(self):
+  def _advance_box_data(self, advance):
+    ''' Advance/crop _box_data to allow for ingested parsed fields.
+        This requires matching subclass .data_chunks to extrude the parsed fields.
+    '''
+    if advance <= 0:
+      raise ValueError("_parsed_box_data: advance should be > 0: %d" % (advance,))
+    if advance > len(self._box_data):
+      raise ValueError("_parsed_box_data: advance beyond len(_box_data:%d): %d" % (len(self._box_data), advance))
+    self._set_box_data(self._box_data[advance:])
+
+  def parsed_data_chunks(self):
+    ''' Stub parsed_data_chunks to return chunks derived from parsed data fields.
+        Any unparsed data remain in self._box_data and are transcribed
+        after these chunks.
+    '''
+    return ()
+
+  @staticmethod
+  def _unfold_chunks(chunks):
+    ''' Unfold `chunks` into an iterable of bytes.
+        This exists to allow subclass methods to easily return ASCII
+        strings or bytes or iterables, in turn allowing them to
+        simply return their subperclass' chunks iterators directly
+        instead of having to unpack them.
+    '''
+    if isinstance(chunk, bytes):
+      yield chunk
+    elif isinstance(chunk, str):
+      yield chunk.encode('ascii')
+    else:
+      for subchunk in chunk:
+        for unfolded_chunk in self._unfold_chunks(subchunk):
+          yield unfolded_chunk
+
+  def data_chunks(self):
     ''' Return an iterable of bytes objects comprising the data section of this Box.
         This method should be overridden by subclasses which decompose data sections.
+        If they also call ._parsed_box_data to advance past the
+        ingested fields they can then call this method to emit the
+        trailing unparsed data if any.
     '''
+    for chunk in self._unfolded_chunks(self.parsed_data_chunks()):
+      yield chunk
     yield self._load_box_data()
 
   @prop
   def box_data(self):
     ''' A bytes object containing the data section for this Box.
     '''
-    return b''.join(self.box_data_chunks())
+    return b''.join(self.data_chunks())
 
   def transcribe(self):
     ''' Generator yielding bytes objects which together comprise a serialisation of this box.
     '''
-    return transcribe_box(self.box_type, self.box_data_chunks())
+    return transcribe_box(self.box_type, self.data_chunks())
 
   def write(self, fp):
     ''' Transcribe this box to a file in serialised form.
@@ -432,7 +474,7 @@ def add_box_subclass(superclass, box_type, section, desc):
     classname = box_type.decode('ascii').upper() + 'Box'
   else:
     classname = box_type.upper() + 'Box'
-    box_type = box_type.decode('ascii')
+    box_type = box_type.encode('ascii')
   K = type(classname, (superclass,), {})
   K.__doc__ = "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
   add_box_class(K)
@@ -453,12 +495,14 @@ class FullBox(Box):
       ISO14496 section 4.2.
   '''
 
+  ATTRIBUTES = ()
+
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.version = box_data[0]
     self.flags = (box_data[1]<<16) | (box_data[2]<<8) | box_data[3]
-    self._set_box_data(box_data[4:])
+    self._advance_box_data(4)
 
   def __str__(self):
     prefix = '%s(%r-v%d-0x%02x' % (self.__class__.__name__,
@@ -468,16 +512,13 @@ class FullBox(Box):
     attr_summary = self.attribute_summary()
     return prefix + ',' + attr_summary + ')'
 
-  @prop
-  def box_vf_data_chunk(self):
-    ''' Return the leading version and flags.
-        Subclasses need to yield this first from .box_data_chunks().
-    '''
-    return bytes([ self.version,
-                   (self.flags>>16) & 0xff,
-                   (self.flags>>8) & 0xff,
-                   self.flags & 0xff
-                 ])
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks(self)
+    yield bytes([ self.version,
+                  (self.flags>>16) & 0xff,
+                  (self.flags>>8) & 0xff,
+                  self.flags & 0xff
+                ])
 
 class FREEBox(Box):
   ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
@@ -497,8 +538,9 @@ class FREEBox(Box):
     return 'FREEBox(free_size=%d)' \
            % (self.free_size,)
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
     global B0_256
+    yield Box.parsed_data_chunks(self)
     free_bytes = self.free_size
     len256 = len(B0_256)
     while free_bytes > len256:
@@ -534,7 +576,8 @@ class FTYPBox(Box):
     return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
            % (self.major_brand, self.minor_version, self.compatible_brands)
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks(self)
     yield self.major_brand
     yield pack('>L', self.minor_version)
     for brand in self.compatible_brands:
@@ -562,13 +605,12 @@ class PDINBox(FullBox):
     self.pdinfo = [ PDInfo(unpack('>LL', box_data[offset:offset+8]))
                     for offset in range(0, len(box_data), 8)
                   ]
-    # forget data bytes
     self._set_box_data(b'')
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     for pdinfo in self.pdinfo:
-      yield pack('>LL', pdinfo.rate, pdinfo.initial_delay)
+      yield pack('>LL', *pdinfo)
 
 add_box_class(PDINBox)
 
@@ -618,10 +660,10 @@ class ContainerBox(Box):
     for B in self.boxes:
       B.dump(indent, fp)
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks()
     for B in self.boxes:
-      for chunk in B.box_data_chunks():
-        yield chunk
+      yield B.data_chunks()
 
 class MOOVBox(ContainerBox):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
@@ -667,6 +709,7 @@ class MVHDBox(FullBox):
     if offset != len(box_data):
       raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
                        % (offset, len(box_data)))
+    self._advance_box_data(offset)
 
   @prop
   def rate(self):
@@ -682,7 +725,8 @@ class MVHDBox(FullBox):
     _volume = self._volume
     return (_volume>>8) + (_volume&0xff)/256.0
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks()
     yield self.box_vf_data_chunk
     if self.version == 0:
       yield pack('>LLLL',
@@ -706,14 +750,7 @@ class MVHDBox(FullBox):
     yield pack('>L', self.next_track_id)
 
 add_box_class(MVHDBox)
-
-class TRAKBox(ContainerBox):
-  ''' A 'trak' Track box - ISO14496 section 8.3.1.
-      Decode the contained boxes.
-  '''
-  pass
-
-add_box_class(TRAKBox)
+add_box_subclass(ContainerBox, 'trak', '8.3.1', 'Track')
 
 class TKHDBox(FullBox):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
@@ -765,6 +802,7 @@ class TKHDBox(FullBox):
     offset += 36
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
+    self._advance_box_data(offset)
 
   @prop
   def track_enabled(self):
@@ -782,8 +820,8 @@ class TKHDBox(FullBox):
   def track_size_is_aspect_ratio(self):
     return (self.flags&0x8) != 0
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     if self.version == 0:
       yield pack('>LLLLL',
                  self.creation_time,
@@ -810,13 +848,7 @@ class TKHDBox(FullBox):
     yield pack('>LL', self.width, self.height)
 
 add_box_class(TKHDBox)
-
-class TREFBox(ContainerBox):
-  ''' An 'tref' Track Reference box - ISO14496 section 8.3.3.
-      Decode the contained boxes.
-  '''
-  pass
-add_box_class(TREFBox)
+add_box_subclass(ContainerBox, 'tref', '8.3.3', 'track Reference')
 
 class TrackReferenceTypeBox(Box):
   ''' A TrackReferenceTypeBox continas references to other tracks - ISO14496 section 8.3.3.2.
@@ -831,25 +863,18 @@ class TrackReferenceTypeBox(Box):
     for track_id, in iter_unpack('>L', box_data):
       track_ids.append(track_id)
     self.track_ids = track_id
+    self._set_box_data(b'')
 
   def __str__(self):
     return '%s(type=%r,track_ids=%r)' % (self.__class__.__name__, self.box_type, self.track_ids)
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks(self)
     for track_id in self.track_ids:
       yield pack('>L', track_id)
 
-for box_type in TrackReferenceTypeBox.BOX_TYPES:
-  KNOWN_BOX_CLASSES[box_type] = TrackReferenceTypeBox
-del box_type
-
-class TRGRBox(ContainerBox):
-  ''' An 'trgr' Track Group box - ISO14496 section 8.3.4.
-      Decode the contained boxes.
-  '''
-  pass
-
-add_box_class(TRGRBox)
+add_box_class(TrackReferenceTypeBox)
+add_box_subclass(ContainerBox, 'trgr', '8.3.4', 'Track Group')
 
 class TrackGroupTypeBox(FullBox):
   ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
@@ -861,28 +886,14 @@ class TrackGroupTypeBox(FullBox):
     # obtain box data after version and flags decode
     box_data = self._box_data
     self.track_group_id, = unpack('>L', box_data[:4])
-    if len(box_data) > 4:
-      warning('%s: %d bytes of unparsed data after track_group_id: %r',
-              self.__class__.__name__, len(box_data)-4, box_data[4:])
+    self._advance_box_data(4)
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     yield pack('>L', self.track_group_id)
 
-class MSRCBox(TrackGroupTypeBox):
-  ''' Multi-source presentation TrackGroupTypeBox - ISO14496 section 8.3.4.3.
-  '''
-  pass
-
-add_box_class(MSRCBox)
-
-class MDIABox(ContainerBox):
-  ''' An 'mdia' Media box - ISO14496 section 8.4.1.
-      Decode the contained boxes.
-  '''
-  pass
-
-add_box_class(MDIABox)
+add_box_subclass(TrackGroupTypeBox, 'msrc', '8.3.4.3', 'Multi-source presentation Track Group')
+add_box_subclass(ContainerBox, 'mdia', '8.4.1', 'Media')
 
 class MDHDBox(FullBox):
   ''' A MDHDBox is a Media Header box - ISO14496 section 8.4.2.
@@ -918,9 +929,10 @@ class MDHDBox(FullBox):
     if offset != len(box_data):
       warning("MDHD: %d unparsed bytes after pre_defined: %r",
               len(box_data)-offset, box_data[offset:])
+    self._advance_box_data(offset)
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     if self.version == 0:
       yield pack('>LLLL',
                  self.creation_time,
@@ -971,39 +983,21 @@ class HDLRBox(FullBox):
     self.name, offset = get_utf8_nul(box_data, offset1)
     if offset < len(box_data):
       raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset1:],))
+    self._advance_box_data(offset)
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     yield pack('>L4sLLL',
                self.pre_defined,
                self.handler_type,
                self.reserved1,
                self.reserved2,
                self.reserved3)
-    yield self.name.encode('utf-8')
-    yield b'\0'
+    yield put_utf8_nul(self.name)
 
 add_box_class(HDLRBox)
-
 add_box_subclass(ContainerBox, b'minf', '8.4.4', 'Media Information')
-
-class NMHDBox(FullBox):
-  ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
-  '''
-
-  ATTRIBUTES = ()
-
-  def __init__(self, box_type, box_data):
-    FullBox.__init__(self, box_type, box_data)
-    # obtain box data after version and flags decode
-    box_data = self._box_data
-    if len(box_data) > 0:
-      raise ValueError("NMHD: unexpected data: %r" % (box_data,))
-
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
-
-add_box_class(NMHDBox)
+add_box_subclass(FullBox, 'nmhd', '8.4.5.2', 'Null Media Header')
 
 class ELNGBox(FullBox):
   ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
@@ -1019,14 +1013,13 @@ class ELNGBox(FullBox):
     self.extended_language, offset = get_utf8_nul(box_data)
     if offset < len(box_data):
       raise ValueError("ELNG: unexpected data: %r" % (box_data[offset:],))
+    self._advance_box_data(offset)
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
-    yield self.extended_language.encode('utf-8')
-    yield b'\0'
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield put_utf8_nul(self.extended_language)
 
 add_box_class(ELNGBox)
-
 add_box_subclass(ContainerBox, b'stbl', '8.5.1', 'Sample Table')
 
 class _SampleTableContainerBox(FullBox):
@@ -1044,6 +1037,7 @@ class _SampleTableContainerBox(FullBox):
     if len(self.boxes) != entry_count:
       raise ValueError('expected %d contained Boxes but parsed %d'
                        % (entry_count, len(self.boxes)))
+    self._set_box_data(b'')
 
   def __str__(self):
     return '%s(%s)' \
@@ -1059,11 +1053,11 @@ class _SampleTableContainerBox(FullBox):
     for B in self.boxes:
       B.dump(indent, fp)
 
-  def box_data_chunks(self):
-    yield self.box_vf_data_chunk
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
     yield pack('>L', len(self.boxes))
     for B in self.boxes:
-      for chunk in B.box_data_chunks():
+      for chunk in B.data_chunks():
         yield chunk
 
 add_box_subclass(_SampleTableContainerBox, b'stsd', '8.5.2', 'Sample Description')
@@ -1076,7 +1070,7 @@ class _SampleEntry(Box):
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.reserved, self.data_reference_index = unpack('>6sH', box_data[:8])
-    self._set_box_data(box_data[8:])
+    self._advance_box_data(8)
 
   def __str__(self):
     prefix = '%s(%r-%r,data_reference_index=%d' \
@@ -1087,12 +1081,12 @@ class _SampleEntry(Box):
     attr_summary = self.attribute_summary()
     return prefix + ',' + attr_summary + ')'
 
-  @prop
-  def box_se_data_chunk(self):
+  def parsed_data_chunks(self):
     ''' Return the leading reserved bytes and data_reference_index.
-        Subclasses need to yield this first from .box_data_chunks().
+        Subclasses need to yield this first from .data_chunks().
     '''
-    return pack('>6sH', self.reserved, self.data_reference_index)
+    yield Box.parsed_data_chunks(self)
+    yield pack('>6sH', self.reserved, self.data_reference_index)
 
 class BTRTBox(Box):
   ''' BitRateBox - section 8.5.2.2.
@@ -1105,19 +1099,20 @@ class BTRTBox(Box):
     self.bufferSizeDB, \
     self.maxBitrate, \
     self.avgBitrate = unpack('>LLL', box_data)
+    self._advance_box_data(12)
 
   def __str__(self):
     attr_summary = self.attribute_summary()
     return self.__class__.__name__ + '(' + attr_summary + ')'
 
-  def box_data_chunks(self):
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks(self)
     yield pack('>LLL',
                self.bufferSizeDB,
                self.maxBitrate,
                self.avgBitrate)
 
 add_box_class(BTRTBox)
-
 add_box_subclass(_SampleTableContainerBox, b'stdp', '8.5.3', 'Degradation Priority')
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
@@ -1128,7 +1123,7 @@ class _GenericSampleBox(FullBox):
 
   ATTRIBUTES = ( ('samples', '%r'), )
 
-  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None):
+  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None, inferred_entry_count=False):
     if sample_struct_format_v1 is None:
       sample_struct_format_v1 = sample_struct_format_v0
     FullBox.__init__(self, box_type, box_data)
@@ -1139,18 +1134,37 @@ class _GenericSampleBox(FullBox):
     else:
       warning("unsupported version %d, treating like version 1", self.version)
       S = Struct(sample_struct_format_v1)
+    self.sample_struct = S
     sample_type = namedtuple(type(self).__name__ + '_Sample',
                              sample_fields)
+    self.sample_type = sample_type
+    self.inferred_entry_count = inferred_entry_count
     # obtain box data after version and flags decode
     box_data = self._box_data
-    entry_count, = unpack('>L', box_data[:4])
-    bd_offset = 4
+    if inferred_entry_count:
+      entry_count = len(box_data) // S.size
+      remainder = len(box_data) % S.size
+      if remainder != 0:
+        warning("box_data length %d is not a multiple of len(%s), %d bytes left over: %r",
+                len(box_data), S.size, remainder, box_data[-remainder:])
+      bd_offset = 0
+    else:
+      entry_count, = unpack('>L', box_data[:4])
+      bd_offset = 4
     samples = []
     for i in range(entry_count):
       sample = sample_type(*S.unpack(box_data[bd_offset:bd_offset+S.size]))
       samples.append(sample)
       bd_offset += S.size
     self.samples = samples
+    self._advance_box_data(bd_offset)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunk(self)
+    if not self.inferred_entry_count:
+      yield pack('>L', len(self.samples))
+    for sample in self.samples:
+      yield self.sample_struct.pack(*sample)
 
 class _TimeToSampleBox(_GenericSampleBox):
   ''' Time to Sample box - section 8.6.1.
@@ -1188,13 +1202,23 @@ class CSLGBox(FullBox):
     else:
       warning("unsupported version %d, treating like version 1")
       struct_format = '>qqqqq'
-    S = Struct(struct_format)
+    S = self.struct = Struct(struct_format)
     self.compositionToDTSShift, \
     self.leastDecodeToDisplayDelta, \
     self.greatestDecodeToDisplayDelta, \
     self.compositionStartTime, \
     self.compositionEndTime \
       = S.unpack(struct_format, box_data[:S.size])
+    self._advance_box_data(S.size)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield self.struct.pack(
+      self.compositionToDTSShift,
+      self.leastDecodeToDisplayDelta,
+      self.greatestDecodeToDisplayDelta,
+      self.compositionStartTime,
+      self.compositionEndTime)
 
 add_box_class(CSLGBox)
 
@@ -1204,6 +1228,104 @@ class STSSBox(_GenericSampleBox):
   def __init__(self, box_type, box_data):
     _GenericSampleBox.__init__(self, box_type, box_data, '>L', 'number')
 add_box_class(STSSBox)
+
+class STSHBox(_GenericSampleBox):
+  ''' A 'stsh' Shadow Sync Table box - section 8.6.3.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL',
+                               'shadowed_sample_number sync_sample_number')
+add_box_class(STSHBox)
+
+class SDTPBox(_GenericSampleBox):
+  ''' A 'sdtp' Independent and Disposable Samples box - section 8.6.4.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>HHHH',
+                               'is_leading sample_depends_on sample_is_depended_on sample_has_redundancy',
+                               inferred_entry_count=True)
+add_box_class(SDTPBox)
+add_box_subclass(Box, b'edts', '8.6.5.1', 'Edit')
+
+class ELSTBox(_GenericSampleBox):
+  ''' A 'elst' Edit List box - section 8.6.6.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>Ll',
+                               'segment_duration media_time',
+                               sample_struct_format_v1='>Qq')
+add_box_class(ELSTBox)
+add_box_subclass(Box, b'dinf', '8.7.1', 'Data Information')
+
+class URL_Box(FullBox):
+  ''' An 'url ' Data Entry URL Box - section 8.7.2.1.
+  '''
+
+  ATTRIBUTES = ('location',)
+
+  def __init__(self, box_type, box_data):
+    self.location, offset = get_utf8_nul(self._box_data, offset=0)
+    self._advance_box_data(offset)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield put_utf8_nul(self.location)
+
+add_box_class(URL_Box)
+
+class URN_Box(FullBox):
+  ''' An 'urn ' Data Entry URL Box - section 8.7.2.1.
+  '''
+
+  ATTRIBUTES = ('name', 'location',)
+
+  def __init__(self, box_type, box_data):
+    self.name, offset = get_utf8_nul(self._box_data, offset=0)
+    self.location, offset = get_utf8_nul(self._box_data, offset=offset)
+    self._advance_box_data(offset)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield put_utf8_nul(self.name)
+    yield put_utf8_nul(self.location)
+
+add_box_class(URN_Box)
+
+class DREFBox(FullBox):
+  ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
+  '''
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    entry_count = unpack('>L', self._box_data[:4])
+    offset = 4
+    boxes = []
+    for i in enumerate(entry_count):
+      B, offset = Box.from_bytes(self._box_data, offset)
+      boxes.append(B)
+    self.boxes = boxes
+    self._advance_box_data(offset)
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
+
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks()
+    for B in self.boxes:
+      yield B.data_chunks()
+
+add_box_class(DREFBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
