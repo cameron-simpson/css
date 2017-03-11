@@ -27,7 +27,7 @@ B0_256 = bytes(256)
 SIZE_16MB = 1024*1024*16
 
 def get_box(bs, offset=0):
-  ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
+  ''' Decode a box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
   '''
   offset0 = offset
   usertype = None
@@ -45,7 +45,7 @@ def get_box(bs, offset=0):
     if offset + 8 > len(bs):
       raise ValueError("not enough bytes at offset %d for largesize, only %d remaining"
                        % (offset, len(bs) - offset))
-    length = unpack('>Q', bs[offset:offset+8])
+    length, = unpack('>Q', bs[offset:offset+8])
     offset += 8
   elif box_size < 8:
     raise ValueError("box size too low: %d, expected at least 8"
@@ -305,7 +305,6 @@ class Box(object):
           look up the box_type in KNOWN_BOX_CLASSES and use that class
           or Box if not present.
     '''
-    ##TODO: use read_box_header and skip things like mdat data block
     length, box_type, box_data_length = read_box_header(fp)
     if length is None and box_type is None and box_data_length is None:
       return None
@@ -341,7 +340,6 @@ class Box(object):
                          % (box_data_length, len(fetch_data)))
     if cls is None:
       cls = pick_box_class(box_type)
-      ##X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     return cls(box_type, fetch_data)
 
   @staticmethod
@@ -367,7 +365,6 @@ class Box(object):
                          % (length, len(bs), offset0))
     if cls is None:
       cls = pick_box_class(box_type)
-      ##X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     B = cls(box_type, bs[tail_offset:tail_offset+tail_length])
     return B, offset
 
@@ -613,7 +610,7 @@ class PDINBox(FullBox):
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
     for pdinfo in self.pdinfo:
-      yield pack('>LL', pdinfo.rate, pdinfo.initial_delay)
+      yield pack('>LL', *pdinfo)
 
 add_box_class(PDINBox)
 
@@ -1304,7 +1301,7 @@ class DREFBox(FullBox):
     offset = 4
     boxes = []
     for i in enumerate(entry_count):
-      B, offset = Box.from_bytes(bs, offset)
+      B, offset = Box.from_bytes(self._box_data, offset)
       boxes.append(B)
     self.boxes = boxes
     self._advance_box_data(offset)
