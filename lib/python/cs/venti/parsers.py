@@ -109,7 +109,6 @@ def parse_mp3(chunks):
     if glommed < min_size:
       glom = [current_chunk]
       while glommed < min_size:
-        X("mp3: next chunk...")
         try:
           next_chunk = next(chunks)
         except StopIteration:
@@ -126,7 +125,6 @@ def parse_mp3(chunks):
     if len(chunk) < 3:
       break
     if chunk[:3] == b'TAG':
-      ##X("mp3: TAG frame, 128 bytes")
       yield from accrue(chunks, 128)
       chunk = memoryview(chunkage[0])
       yield offset + 128
@@ -186,7 +184,6 @@ def parse_mp3(chunks):
       if has_crc:
         frame_len += 2
       ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-      ##X("mp3: extend chunk to len frame_len=%d", frame_len)
       yield from accrue(chunks, frame_len)
       chunk = memoryview(chunkage[0])
       yield offset + frame_len
@@ -194,7 +191,5 @@ def parse_mp3(chunks):
     assert advance_by > 0
     chunkage[0] = chunk[advance_by:]
     offset += advance_by
-  X("mp3: end mp3 parse")
   if chunk:
-    X("mp3: unparsed chunk data: %r", chunk)
     yield chunk
