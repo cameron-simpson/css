@@ -45,8 +45,8 @@ class CacheStore(BasicStoreSync):
     self.cache.open()
 
   def shutdown(self):
-    self.cache.shutdown()
-    self.backend.shutdown()
+    self.cache.close()
+    self.backend.close()
     BasicStoreSync.shutdown(self)
 
   def flush(self):
@@ -69,25 +69,20 @@ class CacheStore(BasicStoreSync):
   def contains(self, h):
     if h in self.cache:
       return True
-    if h in self.backend:
-      return True
-    return False
+    return h in self.backend
 
   def get(self, h):
-    if h in self.cache:
-      return self.cache[h]
-    return self.backend.get(h)
+    try:
+      h = self.cache[h]
+    except KeyError:
+      h = self.backend.get(h)
+    return h
 
   def add(self, data):
     ''' Add the data to the local cache and queue a task to add to the backend.
     '''
-    h = self.cache.add(data)
-    def add_backend():
-      h2 = self.backend.add(data)
-      if h != h2:
-        raise RuntimeError("hash mismatch: h=%r, h2=%r, backend=%s, data=%r" % (h, h2, self.backend.__class__, data))
-    self._defer(add_backend)
-    return h
+    self.backend.add_bg(data)
+    return self.cache.add(data)
 
 class MemoryCacheStore(BasicStoreSync):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
@@ -99,9 +94,9 @@ class MemoryCacheStore(BasicStoreSync):
   '''
 
   def __init__(self, name, maxchunks=1024, **kw):
+    if maxchunks < 1:
+      raise ValueError("maxchunks < 1: %s" % (maxchunks,))
     BasicStoreSync.__init__(self, "MemoryCacheStore(%s)" % (name,), **kw)
-    # TODO: fails if maxchunks == 0
-    assert maxchunks > 0
     self.hashlist = [None for _ in range(maxchunks)]
     self.low = 0                    # offset to oldest hash
     self.used = 0

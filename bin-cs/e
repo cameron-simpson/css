@@ -8,7 +8,8 @@ set -ue
 
 if [ $# = 1 ] && [ -d "$1/." ]
 then
-  erename "$1"/*
+  cd "$1"
+  erename
 else
   if [ -n "${ITERM_SESSION_ID:-}" ]
   then

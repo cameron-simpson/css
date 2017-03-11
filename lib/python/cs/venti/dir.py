@@ -146,7 +146,7 @@ class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, metatext=None):
+  def __init__(self, type_, name, metatext=None, parent=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -159,15 +159,31 @@ class _Dirent(object):
         self.meta.update_from_text(metatext)
       else:
         self.meta.update_from_items(metatext.items())
+    self.parent = parent
 
   def __str__(self):
-    return self.textencode()
+    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
                                D_type2str(self.type),
                                self.name,
                                self.meta)
+
+  def __hash__(self):
+    ''' Allows collecting _Dirents in a set.
+    '''
+    return id(self)
+
+  def pathto(self):
+    ''' Return the path to this element if known.
+    '''
+    E = self
+    path = []
+    while E is not None:
+      path.append(E.name)
+      E = E.parent
+    return os.path.join(*reversed(path))
 
   # TODO: support .block=None
   def __eq__(self, other):
@@ -238,6 +254,15 @@ class _Dirent(object):
     if when is None:
       when = time.time()
     self.mtime = when
+
+  @locked
+  def change(self):
+    ''' Mark this dirent as changed; propagate to parent Dir if present.
+    '''
+    E = self
+    while E is not None:
+      E.changed = True
+      E = E.parent
 
   def stat(self):
     from pwd import getpwnam
@@ -376,48 +401,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._block = block
     self._check()
 
-  def _check(self):
-    # TODO: check ._block and ._open_file against MultiOpenMixin open count
-    if self._block is None:
-      if self._open_file is None:
-        raise ValueError("both ._block and ._open_file are None")
-    ## both are allowed to be set
-    ##elif self._open_file is not None:
-    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
-
-  @property
-  @locked
-  def block(self):
-    ''' Obtain the top level Block.
-        If open, sync the file to update ._block.
-    '''
-    self._check()
-    ##X("access FileDirent.block from:")
-    ##stack_dump(indent=2)
-    if self._open_file is None:
-      return self._block
-    else:
-      return self._open_file.flush()
-
-  @block.setter
-  @locked
-  def block(self, B):
-    if self._open_file is not None:
-      raise RuntimeError("tried to set .block directly while open")
-    self._block = B
-
-  @property
-  @locked
-  def size(self):
-    ''' Return the size of this file.
-        If open, use the open file's size.
-        Otherwise get the length of the top Block.
-    '''
-    self._check()
-    if self._open_file is not None:
-      return len(self._open_file)
-    return len(self.block)
-
   @locked
   def startup(self):
     ''' Set up ._open_file on first open.
@@ -440,9 +423,51 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
-    X("CLOSE %s: _block=%s", self, self._block)
+    X("CLOSE %s: _block=%s: length=%d", self, self._block, len(self._block))
     self._open_file = None
     self._check()
+
+  def _check(self):
+    # TODO: check ._block and ._open_file against MultiOpenMixin open count
+    if self._block is None:
+      if self._open_file is None:
+        raise ValueError("both ._block and ._open_file are None")
+    ## both are allowed to be set
+    ##elif self._open_file is not None:
+    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
+
+  @property
+  @locked
+  def block(self):
+    ''' Obtain the top level Block.
+        If open, sync the file to update ._block.
+    '''
+    self._check()
+    ##X("access FileDirent.block from:")
+    ##stack_dump(indent=2)
+    if self._open_file is None:
+      return self._block
+    else:
+      return self._open_file.sync()
+
+  @block.setter
+  @locked
+  def block(self, B):
+    if self._open_file is not None:
+      raise RuntimeError("tried to set .block directly while open")
+    self._block = B
+
+  @property
+  @locked
+  def size(self):
+    ''' Return the size of this file.
+        If open, use the open file's size.
+        Otherwise get the length of the top Block.
+    '''
+    self._check()
+    if self._open_file is not None:
+      return len(self._open_file)
+    return len(self.block)
 
   def flush(self):
     return self._open_file.flush()
@@ -519,16 +544,6 @@ class Dir(_Dirent):
     self.changed = False
     self._lock = RLock()
 
-  @locked
-  def change(self):
-    ''' Mark this Dir as changed; propagate to parent Dir if present.
-    '''
-    ##XP("Dir %r: changed=True", self.name)
-    ##stack_dump(indent=2)
-    self.changed = True
-    if self.parent:
-      self.parent.change()
-
   @property
   @locked
   def entries(self):
@@ -563,14 +578,11 @@ class Dir(_Dirent):
                         for name in names
                         if name != '.' and name != '..'
                       )
-      # TODO: if len(data) >= 16384
+      # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self.changed = False
-      ##warning("Dir.block: computed Block %s", B)
-      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
@@ -625,20 +637,21 @@ class Dir(_Dirent):
     self.touch()
     self.change()
     E.name = name
-    if E.isdir:
-      Eparent = E.parent
-      if Eparent is None:
-        E.parent = D
-      elif Eparent is not self:
-        warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
-        E.parent = self
+    Eparent = E.parent
+    if Eparent is None:
+      E.parent = self
+    elif Eparent is not self:
+      warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
+      E.parent = self
 
   def __delitem__(self, name):
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
+    E = self.entries[name]
     del self.entries[name]
+    E.parent = None
     self.touch()
     self.change()
 

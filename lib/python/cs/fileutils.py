@@ -785,20 +785,46 @@ class BackedFile(object):
   ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front file.
   '''
 
-  def __init__(self, back_file):
+  def __init__(self, back_file, front_file=None):
     ''' Initialise the BackedFile using `back_file` for the backing data.
     '''
     self._offset = 0
     self._lock = RLock()
-    self._reset(back_file, _no_front_close=True)
+    self._reset(back_file, new_front_file=front_file)
 
   @locked
-  def _reset(self, new_back_file, _no_front_close=False):
-    if not _no_front_close:
-      self.front_file.close()
+  def _reset(self, new_back_file, new_front_file):
+    ''' Reset the state of this BackedFile.
+        Set the front_file and back_file.
+        Note that the former front abd back files are not closed.
+    '''
+    if new_front_file is None:
+      new_front_file = TemporaryFile()
+      self._need_close_front = True
+    else:
+      self._need_close_front = False
     self.back_file = new_back_file
-    self.front_file = TemporaryFile()
+    self.front_file = new_front_file
     self.front_range = Range()
+
+  @locked
+  def push_file(self, new_front_file=None):
+    ''' Push a new front file onto this BackedFile. Return the new back file.
+        If `new_front_file` is None, allocate a TemporaryFile.
+    '''
+    if new_front_file is None:
+      new_front_file = TemporaryFile()
+    new_back_file = BackedFile(self.back_file, front_file=new_front_file)
+    self._reset(new_back_file, new_front_file)
+    return self.back_file
+
+  @locked
+  def switch_back_file(self, new_back_file):
+    ''' Switch out one back file for another. Return the old back file.
+    '''
+    old_back_file = self.back_file
+    self.back_file = new_back_file
+    return old_back_file
 
   def __enter__(self):
     ''' BackedFile instances offer a context manager that takes the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
@@ -810,7 +836,8 @@ class BackedFile(object):
 
   def close(self):
     self.flush()
-    self.front_file.close()
+    if self._need_close_front:
+      self.front_file.close()
     self.front_file = None
 
   def tell(self):

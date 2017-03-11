@@ -28,7 +28,7 @@ import traceback
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
+from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, Pfx, PrePfx, ifdebug, X
 from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.timeutils import sleep
@@ -50,6 +50,18 @@ def RLock():
     return threading.RLock()
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
+
+class TraceSuite(object):
+  ''' Context manager to trace start and end of a code suite.
+  '''
+  def __init__(self, msg, *a):
+    if a:
+      msg = msg % a
+    self.msg = msg
+  def __enter__(self):
+    X("TraceSuite ENTER %s", self.msg)
+  def __exit__(self, exc_type, exc_value, traceback):
+    X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
 def Thread(*a, **kw):
   if not ifdebug():

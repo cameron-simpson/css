@@ -778,7 +778,7 @@ class iPhotoTable(Table):
     table_name = schema['table_name']
     column_names = schema['columns']
     row_class = schema.get('mixin', iPhotoRow)
-    Table.__init__(self, db, table_name, column_names=column_names, row_class=row_class)
+    Table.__init__(self, db, table_name, column_names=column_names, id_column='modelId', row_class=row_class)
     self.nickname = nickname
     self.schema = schema
 
@@ -791,7 +791,7 @@ class iPhotoTable(Table):
     return self.db.conn
 
   def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
-    return self.update('%s=?' % (upd_column,), [upd_value], '%s %s ?' % (sel_column, sel_op), sel_value)
+    return self.update_columns((upd_column,), (upd_value,), '%s %s ?' % (sel_column, sel_op), sel_value)
 
   def delete_by_column(self, sel_column, sel_value, sel_op='='):
     return self.delete('%s %s ?' % (sel_column, sel_op), sel_value)
@@ -814,7 +814,7 @@ class Master_Mixin(iPhotoRow):
 
   @locked_property
   def versions(self):
-    I = self.I
+    I = self.iphoto
     I.load_versions()
     return I.versions_by_master_id.get(self.modelId, ())
 
@@ -835,13 +835,13 @@ class Master_Mixin(iPhotoRow):
 
   @locked_property
   def faces(self):
-    I = self.I
+    I = self.iphoto
     I.load_faces()
     return I.faces_by_master_id.get(self.modelId, ())
 
   @locked_property
   def vfaces(self):
-    I = self.I
+    I = self.iphoto
     I.load_vfaces()
     return I.vfaces_by_master_id.get(self.modelId, ())
 
@@ -901,7 +901,7 @@ class Version_Mixin(iPhotoRow):
 
   @prop
   def master(self):
-    master = self.I.master(self.masterId)
+    master = self.iphoto.master(self.masterId)
     if master is None:
       raise ValueError("version %d masterId %d matches no master"
                        % (self.modelId, self.masterId))
@@ -911,7 +911,7 @@ class Version_Mixin(iPhotoRow):
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    return frozenset(self.I.keywords_by_version(self.modelId))
+    return frozenset(self.iphoto.keywords_by_version(self.modelId))
 
   @prop
   def keyword_names(self):
@@ -925,7 +925,7 @@ class Keyword_Mixin(iPhotoRow):
   def versions(self):
     ''' Return the versions with this keyword.
     '''
-    I = self.I
+    I = self.iphoto
     I.load_keywordForVersions()
     for vid in I.kw4v_version_ids_by_keyword_id.get(self.modelId, ()):
       yield I.version(vid)
@@ -953,12 +953,12 @@ class VFace_Mixin(iPhotoRow):
 
   @prop
   def master(self):
-    return self.I.master(self.masterId)
+    return self.iphoto.master(self.masterId)
 
   def person(self):
     if not self.isNamed:
       return None
-    return self.I.person(self.faceKey)
+    return self.iphoto.person(self.faceKey)
 
   def Image(self, padfactor=1.0):
     ''' Return an Image of this face.

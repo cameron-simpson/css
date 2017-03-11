@@ -1,0 +1,4 @@
+#!/bin/sh
+#
+# Print the default gateway
+netstat -rn | awk '$1 == "default" || $1 == "0.0.0.0" { print $2 }'

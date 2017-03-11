@@ -48,6 +48,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+which source-highlight >/dev/null || {
+  echo "$cmd: no source highlight, using cat" >&2
+  exec cat "$filename"
+}
+
 # match_lang ext
 match_lang() {
   source-highlight --lang-list | awk -v "ext=$1" '$1 == ext { print($1); }'
@@ -80,8 +85,8 @@ colors=$( tput colors ) || colors=
 set -- source-highlight \
         "--outlang-def=esc${colors}.outlang" \
         "--style-file=esc${colors}.style"
-[ -z "$src_lang" ] || set -- "$@" -s "$src_lang"
+[ -n "$src_lang" ] || src_lang=txt
+set -- "$@" -s "$src_lang"
 set -- "$@" -i "$filename" -o STDOUT
 
-set -x
 exec "$@"
