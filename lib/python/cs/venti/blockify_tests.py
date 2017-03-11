@@ -13,7 +13,7 @@ from cs.randutils import rand0, randblock
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
-from .parsers import parse_text
+from .parsers import parse_text, parse_mp3
 
 def random_blocks(max_size=65536, count=64):
   ''' Generate `count` blocks of random sizes from 1 to `max_size`.
@@ -52,12 +52,28 @@ class TestAll(unittest.TestCase):
     global rand_total
     with open(__file__, 'rb') as myfp:
       mycode = myfp.read()
-    for parser in (parse_text,):
+    for parser in (
+        None,
+        parse_text,
+        parse_mp3,
+      ):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
           ('random data', random_blocks(max_size=12000, count=1280)),
-          (__file__, [ mycode for _ in range(1000) ]),
+          (__file__, [ mycode for _ in range(100) ]),
         ):
+        if parser is parse_mp3:
+          X("mp3 parse: replace input data with chunks from TEST.mp3")
+          def read_input_chunks():
+            with open('TEST.mp3', 'rb') as mp3fp:
+              while True:
+                chunk = mp3fp.read(1024)
+                if chunk:
+                  yield chunk
+                else:
+                  break
+          input_chunks = read_input_chunks()
+          input_desc = 'TEST.mp3'
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc, input_chunks=input_desc):
           X("test parser %s vs %s...", parser, input_desc)
@@ -79,7 +95,12 @@ class TestAll(unittest.TestCase):
               self.assertTrue(len(prev_chunk) >= MIN_BLOCKSIZE,
                               "len(prev_chunk)=%d < MIN_BLOCKSIZE=%d"
                               % (len(prev_chunk), MIN_BLOCKSIZE))
-            ##X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
+            if parser is parse_text:
+              ##X("BLOCKED_CHUNK offset=%d len=%d: %r", offset, len(chunk), chunk)
+              pass
+            else:
+              ##X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
+              pass
             offset += len(chunk)
             ##if parser is not None:
             ##  X("  CHUNK=%r", chunk)
