@@ -10,11 +10,12 @@ import time
 import unittest
 from unittest import skip
 from cs.logutils import D, X
+from cs.mp3 import parse_mp3
 from cs.randutils import rand0, randblock
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
-from .parsers import parse_text, parse_mp3
+from .parsers import parse_text
 
 def random_blocks(max_size=65536, count=64):
   ''' Generate `count` blocks of random sizes from 1 to `max_size`.
