@@ -42,11 +42,9 @@ def parse_text(chunks, prefixes=None):
                )
                for prefix in prefixes
              ]
-  chunkQ = IterableQueue()
-  yield chunkQ
   offset = 0
   for line in linesof(chunks):
-    chunkQ.put(line)
+    yield line
     next_offset = None
     for prefix in prefixes:
       if line.startswith(prefix):
@@ -55,7 +53,6 @@ def parse_text(chunks, prefixes=None):
     if next_offset is not None:
       yield next_offset
     offset += len(line)
-  chunkQ.close()
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
