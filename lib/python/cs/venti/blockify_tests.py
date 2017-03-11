@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import os.path
 import sys
 import time
 import unittest
@@ -62,7 +63,7 @@ class TestAll(unittest.TestCase):
           ('random data', random_blocks(max_size=12000, count=1280)),
           (__file__, [ mycode for _ in range(100) ]),
         ):
-        if parser is parse_mp3:
+        if parser is parse_mp3 and os.path.exists('TEST.mp3'):
           X("mp3 parse: replace input data with chunks from TEST.mp3")
           def read_input_chunks():
             with open('TEST.mp3', 'rb') as mp3fp:
