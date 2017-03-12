@@ -33,27 +33,29 @@ class TestAll(unittest.TestCase):
     self.fp.close()
 
   def test01parsers(self):
-    global rand_total
-    for parser in ():
+    random_data = list(random_blocks())
+    rand_total = sum(len(chunk) for chunk in random_data)
+    for parser in (parse_text, parse_mp3):
       with self.subTest(parser.__name__):
-        rand_total = 0
-        offsetQ = parser(random_blocks())
-        chunkQ = next(offsetQ)
+        Q = parser(random_data)
         offset = 0
         last_qoffset = 0
-        for qoffset in offsetQ:
-          self.assertTrue(last_qoffset < qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
-          while offset < qoffset:
-            chunk = next(chunkQ)
+        for qitem in Q:
+          if isinstance(qitem, int):
+            qoffset = qitem
+            self.assertTrue(last_qoffset < qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
+            last_qoffset = qoffset
+          else:
+            chunk = qitem
             self.assertTrue(len(chunk) > 0)
             offset += len(chunk)
         self.assertEqual(rand_total, offset)
-        self.assertRaises(StopIteration, next, chunkQ)
 
   def test02blocked_chunks_of(self):
     global rand_total
     with open(__file__, 'rb') as myfp:
       mycode = myfp.read()
+    random_data = list(random_blocks(max_size=12000, count=1280))
     for parser in (
         None,
         parse_text,
@@ -61,25 +63,27 @@ class TestAll(unittest.TestCase):
       ):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
-          ('random data', random_blocks(max_size=12000, count=1280)),
+          ('random data', random_data),
           (__file__, [ mycode for _ in range(100) ]),
         ):
-        if parser is parse_mp3 and os.path.exists('TEST.mp3'):
-          X("mp3 parse: replace input data with chunks from TEST.mp3")
-          def read_input_chunks():
-            with open('TEST.mp3', 'rb') as mp3fp:
-              while True:
-                chunk = mp3fp.read(1024)
-                if chunk:
-                  yield chunk
-                else:
-                  break
-          input_chunks = read_input_chunks()
-          input_desc = 'TEST.mp3'
+        if parser is parse_mp3:
+          if os.path.exists('TEST.mp3'):
+            X("mp3 parse: replace input data with chunks from TEST.mp3")
+            def read_input_chunks():
+              with open('TEST.mp3', 'rb') as mp3fp:
+                while True:
+                  chunk = mp3fp.read(1024)
+                  if chunk:
+                    yield chunk
+                  else:
+                    break
+            input_chunks = read_input_chunks()
+            input_desc = 'TEST.mp3'
+          else:
+            X("no TEST.mp3 in ".os.getcwd())
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc, input_chunks=input_desc):
           X("test parser %s vs %s...", parser, input_desc)
-          X("prepare input blocks")
           src_total = 0
           source_chunks = list(input_chunks)
           for chunk in source_chunks:
