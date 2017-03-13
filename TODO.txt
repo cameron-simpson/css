@@ -1,4 +1,6 @@
-ssh-opts: cononical capitalisation of option names
+ssh-opts: canonical capitalisation of option names
+portfwd: fix handling of CLAUSE with only one lowercase member
+portfwd: mkdir log directory if missing
 cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter redition of .samples
