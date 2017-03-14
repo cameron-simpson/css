@@ -29,6 +29,6 @@ esac
 
 if [ $# = 0 ]
 then  $pt
-else  $pt | grepall -i "$@"
+else  $pt | grepall -H -i "$@"
 fi \
 | entilde
