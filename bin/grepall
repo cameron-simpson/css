@@ -14,13 +14,16 @@ usage="Usage: $cmd [-i] [-o] sed-regexps...
 any=
 icase=
 header=
+trace=
 
 badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -H) header=1 ;;
     -i)	icase=1 ;;
     -o)	any=1 ;;
+    -x) trace=set-x ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -62,9 +65,9 @@ done
 
 [ $ok ] || exit 1
 
+[ $header ] && set -- -e '1{p;d;}' ${1+"$@"}
 [ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
 
-##set -x
-exec sed "$@"
+exec $trace sed "$@"
