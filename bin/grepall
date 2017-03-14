@@ -4,25 +4,28 @@
 #	- Cameron Simpson <cs@zip.com.au> 12nov2001
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [-i] [-o] sed-regexps...
 	-i	Ignore case.
 	-o	OR words instead of AND."
 
-
 any=
 icase=
+header=
 
 badopts=
-while :
-do  case $1 in
-      -i)	icase=1 ;;
-      -o)	any=1 ;;
-      --)	shift; break ;;
-      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-      *)	break ;;
-    esac
-    shift
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i)	icase=1 ;;
+    -o)	any=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 if [ $# = 0 ]
@@ -38,7 +41,7 @@ ok=1
 first=1
 for word
 do
-  [ $first ] && { set x; shift; }
+  [ $first ] && set --
 
   case "$word" in
     */*)  word=`echo "$word" | sed 's;/;\\\\/;g'`
