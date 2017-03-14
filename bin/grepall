@@ -65,9 +65,9 @@ done
 
 [ $ok ] || exit 1
 
-[ $header ] && set -- -e '1{p;d;}' ${1+"$@"}
 [ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
+[ $header ] && set -- -e '1{p;d;}' ${1+"$@"}
 
 exec $trace sed "$@"
