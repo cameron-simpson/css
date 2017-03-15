@@ -10,7 +10,8 @@ cmd=$0
 usage="Usage: $cmd [-H] [-i] [-o] sed-regexps...
     -H  Always print the first (header) line.
     -i  Ignore case.
-    -o  OR words instead of AND."
+    -o  OR words instead of AND.
+    -x  Trace execution."
 
 any=
 icase=
