@@ -35,8 +35,8 @@ done
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missing sed-regexps" >&2
-    badopts=1
+  echo "$cmd: missing sed-regexps" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -52,10 +52,11 @@ do
     */*)  word=`echo "$word" | sed 's;/;\\\\/;g'`
   esac
   case "$word" in
-    !*)   word=`expr "x$word" : 'x.\(.*\)'`
+    !*)
+      word=`expr "x$word" : 'x.\(.*\)'`
       set -- -e "/$word/d" ${1+"$@"}
       ;;
-    *)    if [ $any ]
+    *)if [ $any ]
       then set -- ${1+"$@"} -e "/$word/b ok"
       else set -- ${1+"$@"} -e "/$word/!d"
       fi
