@@ -686,7 +686,7 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
-    if loginfo.upd_mode:
+    if _state.trace:
       info(self._state.prefix)
     return False
 
