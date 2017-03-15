@@ -637,7 +637,6 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
-    global loginfo
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -645,7 +644,6 @@ class Pfx(object):
       info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
-    global loginfo
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
