@@ -175,28 +175,6 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     min_autoblock = min_block   # start the rolling hash earlier
   else:
     parseQ = parser(chunks)
-  def get_next_offset(offsetQ, next_offset, required_offset):
-    ''' Fetch the next offset from `offsetQ`.
-        Set `offsetQ` to None at end of iteration.
-    '''
-    while ( offsetQ is not None
-        and next_offset is not None
-        and (required_offset is None or next_offset < required_offset)
-    ):
-      try:
-        next_offset2 = next(offsetQ)
-      except StopIteration:
-        offsetQ = None
-        next_offset = None
-        break
-      if not isinstance(next_offset2, int):
-        raise ValueError("blocked_chunks_of: get_next_offset: next_offset2 is not an int: %r" % (next_offset2,))
-      if next_offset2 <= next_offset:
-        warning("ignoring new offset %d <= current next_offset %d",
-                next_offset2, next_offset)
-      else:
-        next_offset = next_offset2
-    return offsetQ, next_offset
   def get_parse(parseQ):
     ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
         Returns `parseQ` or None if the end of the queue is reached.
