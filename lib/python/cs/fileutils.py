@@ -148,7 +148,7 @@ def rewrite(filepath, data,
     if isinstance(data, list):
       I = data
     else:
-      I = chunks_of(data)
+      I = read_from(data)
     for chunk in I:
       T.write(chunk)
     T.flush()
@@ -1161,9 +1161,9 @@ class SharedAppendFile(object):
     '''
     debug("READ_TO_EOF...")
     count = 0
-    for chunk in chunks_of(self.fp):
+    for chunk in read_from(self.fp):
       if len(chunk) == 0:
-        warning("empty chunk received from chunks_of(%s)", self.fp)
+        warning("empty chunk received from read_from(%s)", self.fp)
       else:
         self.importer(chunk)
         count += 1
@@ -1368,7 +1368,7 @@ def read_data(fp, nbytes, rsize=None):
   else:
     return b''.join(bss)
 
-def chunks_of(fp, rsize=None):
+def read_from(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
   '''
   if rsize is None:
@@ -1385,7 +1385,7 @@ def lines_of(fp, partials=None):
   '''
   if partials is None:
     partials = []
-  return as_lines(chunks_of(fp), partials)
+  return as_lines(read_from(fp), partials)
 
 class SavingFile(object):
   ''' A simple file-like object with .write and .close methods used
