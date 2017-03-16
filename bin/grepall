@@ -8,6 +8,7 @@ set -ue
 
 cmd=$0
 usage="Usage: $cmd [-H] [-i] [-o] sed-regexps...
+    -C  Highlight regexp matches in colour. Default if stdout is a tty.
     -H  Always print the first (header) line.
     -i  Ignore case.
     -o  OR words instead of AND.
@@ -17,11 +18,14 @@ any=
 icase=
 header=
 trace=
+colour=
+[ -t 1 ] && colour=1
 
 badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -C) colour=1 ;;
     -H) header=1 ;;
     -i) icase=1 ;;
     -o) any=1 ;;
@@ -41,9 +45,12 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ $colour ] && replsubst=$( with-colour cyan printf '%s' '&' | sed 's|;|\\&|g' )
+
 ok=1
 
 first=1
+replwords=
 for word
 do
   [ $first ] && set --
@@ -60,6 +67,11 @@ do
       then set -- ${1+"$@"} -e "/$word/b ok"
       else set -- ${1+"$@"} -e "/$word/!d"
       fi
+      if [ $colour ]
+      then
+        [ -z "$replwords" ] || replwords="$replwords; "
+        replwords="${replwords}s${word}${replsubst}g"
+      fi
       ;;
   esac
 
@@ -71,6 +83,7 @@ done
 [ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
+[ $colour ] && set -- ${1+"$@"} -e "$replwords"
 [ $header ] && set -- -e '1{p;d;}' ${1+"$@"}
 
 exec $trace sed "$@"
