@@ -9,6 +9,7 @@ import sys
 import time
 import unittest
 from unittest import skip
+from cs.fileutils import read_from
 from cs.logutils import D, X
 from cs.mp3 import parse_mp3
 from cs.randutils import rand0, randblock
@@ -69,15 +70,7 @@ class TestAll(unittest.TestCase):
         if parser is parse_mp3:
           if os.path.exists('TEST.mp3'):
             X("mp3 parse: replace input data with chunks from TEST.mp3")
-            def read_input_chunks():
-              with open('TEST.mp3', 'rb') as mp3fp:
-                while True:
-                  chunk = mp3fp.read(1024)
-                  if chunk:
-                    yield chunk
-                  else:
-                    break
-            input_chunks = read_input_chunks()
+            input_chunks = read_from(open('TEST.mp3', 'rb'))
             input_desc = 'TEST.mp3'
           else:
             X("no TEST.mp3 in ".os.getcwd())
