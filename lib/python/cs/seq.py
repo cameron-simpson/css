@@ -97,6 +97,16 @@ def get0(iterable, default=None):
   else:
     return i
 
+def tee(iterable, *Qs):
+  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
+      `Qs`: the queues, objects accepting a .put method.
+      Note: the item is .put onto every queue before being yielded from this generator.
+  '''
+  for item in iterable:
+    for Q in Qs:
+      Q.put(item)
+    yield item
+
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
       coming in Python 2.6/3.0.
