@@ -145,8 +145,8 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
         used for the rolling hash fallback if `parser` is not None,
         default MIN_AUTOBLOCK
 
-      The iterable returned from `parser(chunks)` returns either
-      ints, which are considered desirable block boundaries, or
+      The iterable returned from `parser(chunks)` returns a mix of
+      ints, which are considered desirable block boundaries, and
       bytes/memoryview objects which contain data from `chunks`.
 
       The easiest `parser` functions to write are generators and
@@ -174,12 +174,12 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     parseQ = iter(chunks)
     min_autoblock = min_block   # start the rolling hash earlier
   else:
-    parseQ = parser(chunks)
-  def get_parse(parseQ):
+    parseQ = parser(chunk_iter)
+  def get_parse():
     ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
-        Returns `parseQ` or None if the end of the queue is reached.
-        Use: parseQ = get_parse(parseQ)
+        Sets parseQ to None if the end of the iterable is reached.
     '''
+    nonlocal parseQ, in_offsets, in_chunks
     try:
       parsed = next(parseQ)
     except StopIteration:
@@ -189,9 +189,12 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
         in_offsets.append(parsed)
       else:
         in_chunks.append(parsed)
-    return parseQ
-  def new_offsets(last_offset):
-    ''' Compute relevant offsets from the block parameters.
+  last_offset = None
+  first_possible_point = None
+  next_rolling_point = None
+  max_possible_point = None
+  def recompute_offsets():
+    ''' Recompute relevant offsets from the block parameters.
         The first_possible_point is last_offset+min_block,
           the earliest point at which we will accept a block boundary.
         The next_rolling_point is the offset at which we should
@@ -201,15 +204,14 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
           is further to give more opportunity for a parser boundary
           to be used in preference to an automatic boundary.
     '''
+    nonlocal last_offset, first_possible_point, next_rolling_point, max_possible_point
     first_possible_point = last_offset + min_block
     next_rolling_point = last_offset + min_autoblock
     max_possible_point = last_offset + max_block
-    return first_possible_point, next_rolling_point, max_possible_point
   # prepare initial state
   next_offset = 0
   last_offset = 0
-  first_possible_point, next_rolling_point, max_possible_point \
-    = new_offsets(last_offset)
+  recompute_offsets()
   hash_value = 0
   offset = 0
   # inbound chunks and offsets
@@ -220,7 +222,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
   # Read data chunks and locate desired boundaries.
   while parseQ is not None or in_chunks:
     while parseQ is not None and not in_chunks:
-      parseQ = get_parse(parseQ)
+      get_parse()
     if in_chunks:
       chunk = memoryview(in_chunks.pop(0))
       # process current chunk
@@ -241,7 +243,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
           # advance next_offset to something useful > offset
           while next_offset is not None and next_offset <= offset:
             while parseQ is not None and not in_offsets:
-              parseQ = get_parse(parseQ)
+              get_parse()
             if in_offsets:
               next_offset2 = in_offsets.pop(0)
               assert isinstance(next_offset2, int)
@@ -298,8 +300,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
         if release:
           yield from pending.flush()
           last_offset = offset
-          first_possible_point, next_rolling_point, max_possible_point \
-            = new_offsets(last_offset)
+          recompute_offsets()
           hash_value = 0
   # yield any left over data
   yield from pending.flush()
