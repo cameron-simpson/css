@@ -181,33 +181,35 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
   # if for example chunks is a sequence
   chunk_iter = iter(chunks)
   if parser is None:
+    # no parser, consume the chunks directly
     parseQ = chunk_iter
     min_autoblock = min_block   # start the rolling hash earlier
-  elif dup_chunks:
+  else:
+    # consume the chunks via a queue
     parseQ = IterableQueue();
+    chunk_iter = tee(chunk_iter, parseQ)
     def run_parser():
-      nonlocal chunk_iter, parseQ, parser
       try:
-        for offset in parser(tee(chunk_iter, parseQ)):
-          assert isinstance(offset, int), \
-                  "expected ints from parser %s, received %r" \
-                  % (parser, offset)
-          parseQ.put(offset)
+        for parsed in parser(chunk_iter):
+          if dup_chunks:
+            # the parser should yield only offsets, not chunks and offsets
+            if not isinstance(parsed, int):
+              warning("discarding non-int from parser %s: %s", parser, parsed)
+            else:
+              parseQ.put(parsed)
       except Exception as e:
         exception("exception from parser %s: %s", parser, e)
-      # issue any chunks not consumed by the parser,
-      # which may exception out or stop early for other reasons
+      # consume the remained of chunk_iter
+      # the tee() will copy it to parseQ
       for chunk in chunk_iter:
-        parseQ.put(chunk)
+        pass
       parseQ.close()
     Thread(target=run_parser).run()
-  else:
-    parseQ = parser(chunk_iter)
   def get_parse():
     ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
         Sets parseQ to None if the end of the iterable is reached.
     '''
-    nonlocal parseQ, in_offsets, in_chunks
+    nonlocal parseQ
     try:
       parsed = next(parseQ)
     except StopIteration:
