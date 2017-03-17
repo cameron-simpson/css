@@ -8,7 +8,10 @@
 from functools import partial
 from itertools import chain
 import sys
-from cs.logutils import debug, warning, D, X
+from threading import Thread
+from cs.logutils import debug, warning, exception, D, X
+from cs.queues import IterableQueue
+from cs.seq import tee
 from .block import Block, IndirectBlock, dump_block
 ##from .parsers import rolling_hash_parser
 
@@ -130,7 +133,7 @@ class _PendingBuffer(object):
     if self.pending_room == 0:
       yield from self.flush()
 
-def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None):
+def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None, dup_chunks=False):
   ''' Generator which connects to a parser of a chunk stream to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `parser`
       `parser`: a callable accepting an iterable of data chunks and
@@ -144,10 +147,14 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       `min_autoblock`: the smallest amount of data that will be
         used for the rolling hash fallback if `parser` is not None,
         default MIN_AUTOBLOCK
+      `dup_chunks`: default false; if true, the parser is not
+        expected to yield the chunk data; instead a queue is made and
+        the input chunks are tee()d to the parser and the queue.
 
       The iterable returned from `parser(chunks)` returns a mix of
       ints, which are considered desirable block boundaries, and
       bytes/memoryview objects which contain data from `chunks`.
+      If `dup_chunks` is true, the parser should only yield offsets.
 
       The easiest `parser` functions to write are generators and
       one simple method of processing is to yield items from `chunks`
@@ -170,9 +177,30 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
   if min_block >= max_block:
     raise ValueError("rejecting min_block:%d >= max_block:%d"
                      % (min_block, max_block))
+  # obtain iterator of chunks; avoids accidentally reusing chunks
+  # if for example chunks is a sequence
+  chunk_iter = iter(chunks)
   if parser is None:
-    parseQ = iter(chunks)
+    parseQ = chunk_iter
     min_autoblock = min_block   # start the rolling hash earlier
+  elif dup_chunks:
+    parseQ = IterableQueue();
+    def run_parser():
+      nonlocal chunk_iter, parseQ, parser
+      try:
+        for offset in parser(tee(chunk_iter, parseQ)):
+          assert isinstance(offset, int), \
+                  "expected ints from parser %s, received %r" \
+                  % (parser, offset)
+          parseQ.put(offset)
+      except Exception as e:
+        exception("exception from parser %s: %s", parser, e)
+      # issue any chunks not consumed by the parser,
+      # which may exception out or stop early for other reasons
+      for chunk in chunk_iter:
+        parseQ.put(chunk)
+      parseQ.close()
+    Thread(target=run_parser).run()
   else:
     parseQ = parser(chunk_iter)
   def get_parse():
