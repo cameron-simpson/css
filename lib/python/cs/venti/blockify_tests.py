@@ -35,6 +35,8 @@ def nochunks(parser):
         ##X("parser2(%s): skip %d byte chunk", parser, len(parsed))
         pass
       else:
+        if not isinstance(parsed, int):
+          warning("nochunks.parser2: yielding non-int: %r", parsed)
         ##X("parser2(%s): yield offset %d", parser, parsed)
         yield parsed
   return parser2
@@ -123,6 +125,9 @@ class TestAll(unittest.TestCase):
             offset = 0
             prev_chunk = None
             for chunk in blocked_chunks_of(source_chunks, parser, dup_chunks=dup_chunks):
+              nchunks += 1
+              chunk_total += len(chunk)
+              all_chunks.append(chunk)
               if prev_chunk is not None:
                 # this avoids issues with the final block, which may be short
                 self.assertTrue(len(prev_chunk) >= MIN_BLOCKSIZE,
@@ -135,11 +140,6 @@ class TestAll(unittest.TestCase):
                 ##X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
                 pass
               offset += len(chunk)
-              ##if parser is not None:
-              ##  X("  CHUNK=%r", chunk)
-              nchunks += 1
-              chunk_total += len(chunk)
-              all_chunks.append(chunk)
               # the pending.flush operation can return short blocks
               self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
                               "len(chunk)=%d > MAX_BLOCKSIZE=%d"
