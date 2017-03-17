@@ -1,7 +1,13 @@
-ssh-opts: cononical capitalisation of option names
+ssh-opts: canonical capitalisation of option names
+portfwd: fix handling of CLAUSE with only one lowercase member
+portfwd: mkdir log directory if missing
 cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
+mp4/iso14496
+  STTSBox (_GenericSampleBox): shorter redition of .samples
 venti:
-  BUG: new files forget their correct size on umount
+  FIXED? BUG: new files forget their correct size on umount
+  BackedFile to set change-on-close flag on write/truncate etc
+  move to SHA-3, check hash size etc
   rename cs.venti => cs.vt
   support ranges on GET requests
   URIs:

@@ -136,14 +136,14 @@ group_members()
 }
 
 # transmute group names into hosts
-if [ -n "$sshcfg" ]
-then
-  first=1
-  for target
-  do
-    [ $first ] && { set --; first=; }
-    case "$target" in
-      [A-Z]*)
+first=1
+for target
+do
+  [ $first ] && { set --; first=; }
+  case "$target" in
+    [A-Z]*)
+      if [ -n "$sshcfg" ]
+      then
         # match all targets with the uppercase label
         gtargets=$(group_members "$target")
         if [ -z "$gtargets" ]
@@ -153,16 +153,19 @@ then
         else
           set -- ${1+"$@"} $gtargets
         fi
-        ;;
-      [a-z]*)
-        set -- ${1+"$@"} "$target"
-        ;;
-      *)echo "$cmd: invalid target name: $target" >&2
+      else
+        echo "$cmd: no ssh config file, no way to resolve uppercase names: $target" >&2
         badtargets=1
-        ;;
-    esac
-  done
-fi
+      fi
+      ;;
+    [a-z]*)
+      set -- ${1+"$@"} "$target"
+      ;;
+    *)echo "$cmd: invalid target name: $target" >&2
+      badtargets=1
+      ;;
+  esac
+done
 
 if [ $badtargets ]
 then
