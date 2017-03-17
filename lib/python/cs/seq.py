@@ -18,7 +18,7 @@ DISTINFO = {
 import heapq
 import itertools
 from threading import Lock, Condition
-from cs.logutils import warning, debug, D
+from cs.logutils import warning, debug, D, X
 from cs.py.stack import caller
 from cs.py3 import exec_code
 
