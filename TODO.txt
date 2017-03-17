@@ -4,6 +4,7 @@ cs.fileutils:
   tail() with blocking and nonblocking mode; follow mode?
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter redition of .samples
+cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.blockify
 venti:
   FIXED? BUG: new files forget their correct size on umount
   blockify
