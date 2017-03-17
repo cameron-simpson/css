@@ -41,7 +41,7 @@ def main(argv):
   if cmd.endswith('.py'):
     cmd = 'vt'
   setup_logging(cmd_name=cmd)
-  usage = '''Usage: %s [options...] operation [args...]
+  usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
       -C store    Use this as a front end cache store.
                   "-" means no front end cache.
@@ -130,76 +130,14 @@ def main(argv):
   xit = None
   S = None
 
-  if len(args) < 1:
-    error("missing command")
+  signal(SIGHUP, lambda sig, frame: thread_dump())
+  signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+
+  try:
+    xit = cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore)
+  except GetoptError as e:
+    error("%s", e)
     badopts = True
-  else:
-    signal(SIGHUP, lambda sig, frame: thread_dump())
-    signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-    op = args.pop(0)
-    with Pfx(op):
-      try:
-        op_func = getattr(sys.modules[__name__], "cmd_" + op)
-      except AttributeError:
-        error("unknown operation \"%s\"", op)
-        badopts = True
-      else:
-        if op in ("scan", "datadir", "init"):
-          # run without a context store
-          try:
-            xit = op_func(args)
-          except GetoptError as e:
-            error("%s", e)
-            badopts = True
-        else:
-          if dflt_vt_store is None:
-            error("no $VT_STORE and no -S option")
-            badopts = True
-          else:
-            try:
-              S = Store(dflt_vt_store, config)
-            except Exception as e:
-              exception("can't open store \"%s\": %s", dflt_vt_store, e)
-              badopts = True
-            else:
-              if dflt_cache is not None:
-                try:
-                  C = Store(dflt_cache)
-                except:
-                  exception("can't open cache store \"%s\"", dflt_cache)
-                  badopts = True
-                else:
-                  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-              if not badopts:
-                # put an in-memory cache in front of the main cache
-                if useMemoryCacheStore:
-                  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-                                 S, MemoryCacheStore("MemoryCacheStore"))
-                if False and sys.stdout.isatty():
-                  X("wrap in a ProgressStore")
-                  run_ticker = True
-                  S = ProgressStore("ProgressStore(%s)" % (S,), S)
-                  def ticker():
-                    old_text = ''
-                    while run_ticker:
-                      text = S.status_text()
-                      if text != old_text:
-                        statusline(text)
-                        old_text = text
-                      sleep(0.25)
-                  T = Thread(name='%s-status-line' % (S,), target=ticker)
-                  T.daemon = True
-                  T.start()
-                else:
-                  run_ticker = False
-                with S:
-                  try:
-                    xit = op_func(args, verbose=verbose, log=log)
-                  except GetoptError as e:
-                    error("%s", e)
-                    badopts = True
-                if run_ticker:
-                  run_ticker = False
 
   if badopts:
     sys.stderr.write(usage)
@@ -211,6 +149,83 @@ def main(argv):
   if ifdebug():
     dump_debug_threads()
 
+  return xit
+
+def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore):
+  try:
+    op = args.pop(0)
+  except IndexError:
+    raise GetoptError("missing command")
+  with Pfx(op):
+    if op == "profile":
+      return cmd_profile(args, verbose, log, config,
+                         dflt_vt_store, dflt_cache, useMemoryCacheStore)
+    try:
+      op_func = getattr(sys.modules[__name__], "cmd_" + op)
+    except AttributeError:
+      raise GetoptError("unknown operation \"%s\"" % (op,))
+    # these commands run without a context Store
+    if op in ("scan", "datadir", "init"):
+      return op_func(args)
+    # open the default Store
+    if dflt_vt_store is None:
+      raise GetoptError("no $VT_STORE and no -S option")
+    try:
+      S = Store(dflt_vt_store, config)
+    except Exception as e:
+      exception("can't open store \"%s\": %s", dflt_vt_store, e)
+      raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
+    # optional CacheStore
+    if dflt_cache is not None:
+      try:
+        C = Store(dflt_cache)
+      except:
+        exception("can't open cache store \"%s\"", dflt_cache)
+        raise GetoptError("can't open cache: %s" % (dflt_cache,))
+      S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
+    # put an in-memory cache in front of the main cache
+    if useMemoryCacheStore:
+      S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+                     S, MemoryCacheStore("MemoryCacheStore"))
+    # start the status ticker
+    if False and sys.stdout.isatty():
+      X("wrap in a ProgressStore")
+      run_ticker = True
+      S = ProgressStore("ProgressStore(%s)" % (S,), S)
+      def ticker():
+        old_text = ''
+        while run_ticker:
+          text = S.status_text()
+          if text != old_text:
+            statusline(text)
+            old_text = text
+          sleep(0.25)
+      T = Thread(name='%s-status-line' % (S,), target=ticker)
+      T.daemon = True
+      T.start()
+    else:
+      run_ticker = False
+    with S:
+      xit = op_func(args, verbose=verbose, log=log)
+    if run_ticker:
+      run_ticker = False
+    return xit
+
+def cmd_profile(*a, **kw):
+  try:
+    import cProfile as profile
+  except ImportError:
+    import profile
+  P = profile.Profile()
+  P.enable()
+  try:
+    xit = cmd_op(*a, **kw)
+  except Exception as e:
+    P.disable()
+    raise
+  P.disable()
+  P.create_stats()
+  P.print_stats(sort='cumulative')
   return xit
 
 def cmd_ar(args, verbose=None, log=None):

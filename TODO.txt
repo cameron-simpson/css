@@ -1,13 +1,35 @@
-ssh-opts: canonical capitalisation of option names
-portfwd: fix handling of CLAUSE with only one lowercase member
-portfwd: mkdir log directory if missing
-cs.fileutils: tail() with blocking and nonblocking mode; follow mode?
+ssh-opts: cononical capitalisation of option names
+cs.fileutils:
+  subfile: a file-like object proxying a byte range of another file
+  tail() with blocking and nonblocking mode; follow mode?
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter redition of .samples
 venti:
   FIXED? BUG: new files forget their correct size on umount
+  blockify
+    sniff files to infer high level syntax
+    parsers:
+      blockify should cope with parsers which exception
+      should blockify dup the source chunks and verify that the
+        chunks from the parser match the chunks from the source?
+      would that imply the parsers need only consume the chunks and
+        emit offsets, and not need to emit chunks?
+        that would avoid needing verification, and possibly avoid
+          some chunk reblocking a parser might do, and also allow
+          us to cope with parsers that exception out
+        * still need to accomodate data generation with offsets, eg big
+          Dirents being emitted with Dirent boundaries
+  control module
+    vtftp to be an API to it
   BackedFile to set change-on-close flag on write/truncate etc
-  move to SHA-3, check hash size etc
+  move to SHA-3-256, check hash size etc
+    v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
+      for k in S1: S2.add[S1[k]
+      for E in S1.walk(D):
+        E2 = copy of E using S2
+        flush E2
+      think about ways to work against 2 Stores, current per thread
+        default store doesn't work here; pipe info to another thread?
   rename cs.venti => cs.vt
   support ranges on GET requests
   URIs:
@@ -31,11 +53,16 @@ venti:
       => better file-close behaviour
   vtfuse:
     OSX Finder name of mountpoint
+    umount: drop inode_data if empty (no hard links)?
+            predrop of inodes with < 2 links?
+    open of symlink
     do not sync unlinked files
     include/exclude rules, like rsync?
+      * use a context when computing Dir.block etc, thus usable outside vtfuse
       do not sync (or Store?) excluded items
       need to promote unbacked files to backed at fs sync time based on name?
     include/exclude mount options
+      include/exclude general syntax?
     support multiple mount points?
       off a single "live" antecedant Dir?
     control:
@@ -43,12 +70,13 @@ venti:
       link pathname to blockspec
       merge trees
   Dir:
-    rsync -a: setgid bit not preserved?
+    rsync -a: setgid bit not preserved? possibly fuse nosetuid mount setting
     vtftp command which accesses a Dir
       hook to vtfuse to run vtftp against live Dir
   datadir
     ticker to sync gdbm index? or just on _indexQ empty?
     report degree of gdbm batching
+    maxsize setting, to be used for caches
   ProgressStore
     proxy for a single subStore with various Progress attributes .progress_*
     convenient status line:

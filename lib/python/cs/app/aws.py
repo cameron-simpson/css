@@ -39,7 +39,7 @@ from urllib.parse import quote, unquote
 from urllib.error import HTTPError
 from cs.env import envsub
 from cs.excutils import logexc
-from cs.fileutils import chunks_of
+from cs.fileutils import read_from
 from cs.later import Later
 from cs.logutils import setup_logging, D, X, XP, error, warning, info, Pfx
 from cs.obj import O, O_str
@@ -837,7 +837,7 @@ def hash_fp(fp, hashname, h=None, rsize=16384):
     filename = fp
     with open(filename, 'rb') as fp:
       return hash_fp(fp, hashname, h=h, rsize=rsize)
-  return hash_byteses(chunks_of(fp, rsize=rsize), hashname, h=h)
+  return hash_byteses(read_from(fp, rsize=rsize), hashname, h=h)
 
 def mimetype(filename):
   global MAGIC
