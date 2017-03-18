@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.seq', 'cs.excutils', 'cs.debug', 'cs.logutils', 'cs.obj', 'cs.queues', 'cs.py.func', 'cs.py3'],
+    'install_requires': ['cs.seq', 'cs.excutils', 'cs.debug', 'cs.logutils', 'cs.obj', 'cs.queues', 'cs.py.func', 'cs.py3'],
 }
 
 from collections import namedtuple
@@ -33,7 +33,7 @@ from cs.debug import Lock, RLock, Thread
 from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D, X
 from cs.obj import O
 from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
-from cs.py.func import funcname
+from cs.py.func import funcname, prop
 from cs.py3 import raise3, Queue, PriorityQueue
 
 def bg(func, daemon=None, name=None):
@@ -440,7 +440,7 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
       ##debug("outside lock, already computed %s", prop_name)
       pass
     return p
-  return property(getprop)
+  return prop(getprop)
 
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a

@@ -31,17 +31,26 @@ cd || exit 1
 
 stripslashes=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
 
-# dosync files_from from to
-dosync()
-{ [ $# -ge 3 ] || { echo "$cmd: dosync expects at least 3 args" >&2; exit 1; }
+# dosync files_from from to [rsync-options...]
+dosync_files()
+{ [ $# -ge 3 ] || { echo "$cmd: dosync_files expects at least 3 args" >&2; exit 1; }
   _ds_files=$1
   _ds_from=$2
   _ds_to=$3
   shift; shift; shift
+  dosync "$_ds_from" "$_ds_to" "--files-from=$_ds_files" "$@"
+}
+
+# dosync from to [rsync-options...]
+dosync()
+{ [ $# -ge 2 ] || { echo "$cmd: dosync expects at least 2 args" >&2; exit 1; }
+  _ds_from=$1
+  _ds_to=$2
+  shift; shift
 
   $trace \
     mrsync -rlptOHCi --delete \
-        "--files-from=$_ds_files" \
+        '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.*.swp' \
         '--exclude=*~' \
@@ -52,9 +61,33 @@ dosync()
         "$_ds_from." "$_ds_to."
 }
 
-dosync "$syncset" "$from" "$to" ${1+"$@"}
+# common files
+dosync_files "$syncset" "$from" "$to" ${1+"$@"} &
+
+# host specific files
 for host in $(hostlist "$tohosts")
 do
   ss=$syncset-$host
-  [ ! -s "$ss" ] || dosync "$ss" "$from" "$host:" ${1+"$@"}
+  [ ! -s "$ss" ] || dosync_files "$ss" "$from" "$host:" ${1+"$@"} &
 done
+
+# var subtree
+dosync "${from}" "${to}" \
+    --include=/bin-local/ \
+    --include=/tmp/ \
+    --include=/p \
+    --include=/private/ \
+    --include=/var/ \
+    --include=/var/locks/ \
+    --include=/var/log/ \
+    --include=/var/flags/ \
+    --include=/var/haproxy/ \
+    --include=/var/idsets/ \
+    --include=/var/m4conv/ \
+    --include=/var/run/ \
+    --include=/var/tmux/ \
+    --include=/var/vagrant/ \
+    --include=/var/venv/ \
+    '--exclude=*' &
+
+wait

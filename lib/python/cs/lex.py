@@ -9,7 +9,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.py3'],
+    'install_requires': ['cs.py3'],
 }
 
 import base64
@@ -274,6 +274,12 @@ def get_white(s, offset=0):
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
+
+def skipwhite(s, offset):
+  ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
+  '''
+  _, offset = get_white(s, offset=offset)
+  return offset
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at

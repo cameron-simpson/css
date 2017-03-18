@@ -22,11 +22,14 @@
 '''
 
 import re
+import os
 from os.path import abspath
 from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
+from cs.logutils import X
+from cs.seq import isordered
 
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
@@ -41,10 +44,13 @@ class _ventiDefaults(threading.local):
       return oldS
     raise AttributeError("no .%s attribute" % attr)
   def pushStore(self, newS):
+    ##X("PUSH STORE %s => %s", defaults.S, newS)
     defaults.oldS.append(defaults.S)
     defaults.S = newS
   def popStore(self):
-    defaults.S = defaults.oldS.pop()
+    oldS = defaults.oldS.pop()
+    ##X("POP STORE %s => %s", defaults.S, oldS)
+    defaults.S = oldS
 
 defaults = _ventiDefaults()
 
@@ -55,31 +61,34 @@ def fromtext(s):
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
-# characters used for metadata.
-# Note: no path separator ("/") because we may accept this as a
-#       path pseudocomponent.
-_texthexify_white_chars = ascii_letters + digits + '_+-.,=:;{}*/'
+# characters used for metadata, notably including the double quote
+# because it is heavily using in JSON.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
   '''
-  return texthexify(data, whitelist=_texthexify_white_chars)
+  return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
 class _TestAdditionsMixin:
   ''' Some common methods uses in tests.
   '''
 
   @staticmethod
-  def mktmpdir():
-    return abspath(tempfile.mkdtemp(prefix="test-cs.venti", suffix=".tmpdir", dir='.'))
+  def mktmpdir(prefix="cs.venti"):
+    return tempfile.TemporaryDirectory(prefix="test-"+prefix+"-", suffix=".tmpdir", dir=os.getcwd())
 
   def assertLen(self, o, length, *a, **kw):
     ''' Test len(o) unless it raises NotImplementedError.
     '''
     try:
       olen = len(o)
-    except NotImplementedError as e:
-      ##warning("skip test of len(%s) == %r: %s", o, length, e)
+    except TypeError:
+      import cs.logutils
+      cs.logutils.debug("skip assertLen(o, %d): no len(%s)", length, type(o))
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
+
+  def assertIsOrdered(self, s, reverse, strict=False):
+    return isordered(s, reverse, strict)

@@ -1,22 +1,20 @@
-#!/bin/sh -u
+#!/bin/sh
 #
-# As with t, v and x, edit a file.
-#	- Cameron Simpson <cs@zip.com.au> 04may2002
+# Edit something.
+#   - Cameron Simpson <cs@zip.com.au> 02jun2016
 #
 
-: ${dirname:=${PWD:-`pwd`}}
-: ${HOST:=`hostname | sed 's/\\.//'`}
+set -ue
 
-asyncopt=
-if [ $# -gt 0 ] && [ "x$1" = x+a ]
+if [ $# = 1 ] && [ -d "$1/." ]
 then
-  asyncopt=+a
-  shift
+  cd "$1"
+  erename
+else
+  if [ -n "${ITERM_SESSION_ID:-}" ]
+  then
+    subl ${1+"$@"}
+  else
+    $EDITOR ${1+"$@"}
+  fi
 fi
-
-exec \
-term $asyncopt \
-     -window \
-     -g M \
-     -n "E [$dirname]@$HOST $*" \
-     -e edit ${1+"$@"}

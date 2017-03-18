@@ -20,23 +20,43 @@ class CacheStore(BasicStoreSync):
       the backend. A block store is stored to the cache and then
       asynchronously to the backend.
   '''
-  def __init__(self, backend, cache):
-    BasicStoreSync.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
-    backend.open()
+  def __init__(self, name, backend, cache, **kw):
+    hashclass = kw.pop('hashclass', None)
+    if hashclass is None:
+      hashclass = backend.hashclass
+    elif hashclass is not backend.hashclass:
+      raise ValueError("hashclass and backend.hashclass are not the same (%s vs %s)"
+                       % (hashclass, backend.hashclass))
+    if hashclass is not cache.hashclass:
+      raise ValueError("backend and cache hashclasses are not the same (%s vs %s)"
+                       % (backend.hashclass, cache.hashclass))
+    kw['hashclass'] = hashclass
+    BasicStoreSync.__init__(self,
+                            "CacheStore(backend=%s,cache=%s)"
+                            % (backend.name, cache.name),
+                            **kw)
     self.backend = backend
-    cache.open()
     self.cache = cache
     # secondary queue to process background self.backend operations
     self.__closing = False
 
+  def startup(self):
+    self.backend.open()
+    self.cache.open()
+
   def shutdown(self):
-    self.cache.shutdown()
-    self.backend.shutdown()
+    self.cache.close()
+    self.backend.close()
     BasicStoreSync.shutdown(self)
 
   def flush(self):
-    self.cache.flush()
-    self.backend.flush()
+    # dispatch flushes in parallel
+    LFs = [ self.cache.flush_bg(),
+            self.backend.flush_bg()
+          ]
+    # wait for the cache flush and then the backend flush
+    for LF in LFs:
+      LF()
 
   def keys(self):
     cache = self.cache
@@ -49,35 +69,20 @@ class CacheStore(BasicStoreSync):
   def contains(self, h):
     if h in self.cache:
       return True
-    if h in self.backend:
-      return True
-    return False
+    return h in self.backend
 
   def get(self, h):
-    if h in self.cache:
-      return self.cache[h]
-    return self.backend.get(h)
+    try:
+      h = self.cache[h]
+    except KeyError:
+      h = self.backend.get(h)
+    return h
 
   def add(self, data):
     ''' Add the data to the local cache and queue a task to add to the backend.
     '''
-    h = self.cache.add(data)
-    def add_backend():
-      h2 = self.backend.add(data)
-      if h != h2:
-        raise RuntimeError("hash mismatch: h=%r, h2=%r, backend=%s, data=%r" % (h, h2, self.backend.__class__, data))
-    self._defer(add_backend)
-    return h
-
-  def prefetch(self, hs):
-    ''' Request from the backend those hashes from 'hs'
-        which do not occur in the cache.
-    '''
-    self.backend.prefetch(self.missing(hs))
-
-  def sync(self):
-    for _ in cs.later.report([ self.cache.flush_bg(), self.backend.flush_bg() ]):
-      pass
+    self.backend.add_bg(data)
+    return self.cache.add(data)
 
 class MemoryCacheStore(BasicStoreSync):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
@@ -87,10 +92,11 @@ class MemoryCacheStore(BasicStoreSync):
       chunks to keep in memory; it defaults to 1024. Specifying 0 keeps
       all chunks in memory.
   '''
-  def __init__(self, maxchunks=1024):
-    BasicStoreSync.__init__(self, "MemoryCacheStore")
-    # TODO: fails if maxchunks == 0
-    assert maxchunks > 0
+
+  def __init__(self, name, maxchunks=1024, **kw):
+    if maxchunks < 1:
+      raise ValueError("maxchunks < 1: %s" % (maxchunks,))
+    BasicStoreSync.__init__(self, "MemoryCacheStore(%s)" % (name,), **kw)
     self.hashlist = [None for _ in range(maxchunks)]
     self.low = 0                    # offset to oldest hash
     self.used = 0

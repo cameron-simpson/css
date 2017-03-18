@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Remove nroff-style underlining and overstriking.
 # Works for other stuff, too.

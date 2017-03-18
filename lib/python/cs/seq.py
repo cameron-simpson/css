@@ -12,13 +12,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.py.stack'],
+    'install_requires': ['cs.logutils', 'cs.py.stack', 'cs.py3'],
 }
 
 import heapq
 import itertools
 from threading import Lock, Condition
-from cs.logutils import warning, debug, D
+from cs.logutils import warning, debug, D, X
 from cs.py.stack import caller
 from cs.py3 import exec_code
 
@@ -97,6 +97,16 @@ def get0(iterable, default=None):
   else:
     return i
 
+def tee(iterable, *Qs):
+  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
+      `Qs`: the queues, objects accepting a .put method.
+      Note: the item is .put onto every queue before being yielded from this generator.
+  '''
+  for item in iterable:
+    for Q in Qs:
+      Q.put(item)
+    yield item
+
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
       coming in Python 2.6/3.0.
@@ -118,18 +128,30 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
-class _MergeHeapItem(tuple):
-  def __lt__(self, other):
-    return self[0] < other[0]
-
-def imerge(*iters):
+def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
+      `reverse`: if true, yield items in reverse order
+                 this requires the iterables themselves to also be in
+                 reversed order
       It relies on the source iterables being ordered and their elements
       being comparable, through slightly misordered iterables (for example,
       as extracted from web server logs) will produce only slightly
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
+  reverse = kw.get('reverse', False)
+  if kw:
+    raise ValueError("unexpected keyword arguments: %r", kw)
+  if reverse:
+    # tuples that compare in reverse order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] > other[0]
+  else:
+    # tuples that compare in forward order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] < other[0]
   # prime the list of head elements with (value, iter)
   heap = []
   for I in iters:
@@ -182,6 +204,21 @@ def onetomany(func):
   def gather(self, *a, **kw):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
+
+def isordered(s, reverse=False, strict=False):
+  first = True
+  for i, item in enumerate(s):
+    if not first:
+      if reverse:
+        ordered = item < prev if strict else item <= prev
+      else:
+        ordered = item > prev if strict else item >= prev
+      if not ordered:
+        raise AssertionError(
+                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
+                % (reverse, strict, i-1, i, prev, item))
+    prev = item
+    first = False
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.

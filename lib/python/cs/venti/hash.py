@@ -8,6 +8,7 @@ if sys.hexversion < 0x02060000:
 from bisect import bisect_left, bisect_right
 from cs.lex import hexify
 from cs.logutils import D, X
+from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
 from .pushpull import missing_hashcodes
 
@@ -115,12 +116,32 @@ DEFAULT_HASHCLASS = Hash_SHA1
 
 class HashCodeUtilsMixin(object):
   ''' Utility methods for classes which use hashcodes as keys.
+      Subclasses will generally override .hashcodes_from, which
+        returns an iterator that yields hashcodes until none remains.
+        The default implementation presumes the class is iterable and
+        that that iteration yields hashcodes; this works for mappings,
+        for example. However, because of the need for sorted output
+        the default implementation is expensive. A subclass built on
+        some kind of database will often have an efficient key iteration
+        that can be used instead.
+      The other methods include:
+        .hashcodes, the big brother of hashcodes_from with more
+          options; the default implentation uses .hashcodes_from and
+          is roughly as efficient or inefficient. Classes like
+          StreamStore provide their own implementation, but this is
+          usually not necessary.
+        .hash_of_hashcodes, used for comparing Store contents efficiently
+        .hashcodes_missing, likewise
   '''
 
-  def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
-    hs = list(self.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
+    if length is not None and length < 1:
+      raise ValueError("length < 1: %r" % (length,))
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
+    hs = list(self.hashcodes(start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
     else:
@@ -134,26 +155,23 @@ class HashCodeUtilsMixin(object):
     '''
     return missing_hashcodes(self, other, window_size=window_size)
 
-  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
         This implementation starts by fetching and sorting all the
         keys, so for large mappings this implementation is memory
         expensive and also runtime expensive if only a few hashcodes
         are desired.
-        `hashclass`: hashclass for yielded hashcodes; default from .first().
         `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
                           if None start the sequences from the smallest
                           hashcode or from the largest if `reverse` is true
         `reverse`: yield hashcodes in reverse order (counting down instead of up).
     '''
-    if hashclass is None:
-      first_hashcode = self.first()
-      hashclass = first_hashcode.__class__
-    elif start_hashcode is not None:
+    hashclass = self.hashclass
+    if start_hashcode is not None:
       if not isinstance(start_hashcode, hashclass):
         raise TypeError("hashclass %s does not match start_hashcode %r"
                         % (hashclass, start_hashcode))
-    ks = self._sorted_keys(hashclass=hashclass)
+    ks = sorted(hashcode for hashcode in iter(self) if isinstance(hashcode, hashclass))
     if not ks:
       return
     if start_hashcode is None:
@@ -187,16 +205,15 @@ class HashCodeUtilsMixin(object):
         break
       yield hashcode
       if reverse:
-        ndx -= 1
-        if ndx < 0:
+        if ndx == 0:
           break
+        ndx -= 1
       else:
         ndx += 1
 
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=False, after=False, length=None):
+  def hashcodes(self, start_hashcode=None, reverse=False, after=False, length=None):
     ''' Generator yielding up to `length` hashcodes >=`start_hashcode`.
         This relies on .hashcodes_from as the source of hashcodes.
-        `hashclass`: hashclass for yielded hashcodes; default from .first().
         `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
                           if None start the sequences from the smallest
                           hashcode or from the largest if `reverse` is true
@@ -206,18 +223,23 @@ class HashCodeUtilsMixin(object):
     '''
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
-    if not len(self):
-      return
-    if hashclass is None:
-      first_hashcode = self.first()
-      hashclass = first_hashcode.__class__
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
+    # try to short circuit if there are no hashcodes
+    try:
+      nhashcodes = len(self)
+    except TypeError:
+      pass
+    else:
+      if nhashcodes == 0:
+        return
     first = True
-    for hashcode in self.hashcodes_from(hashclass=hashclass,
-                                        start_hashcode=start_hashcode,
+    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
                                         reverse=reverse):
       if first:
         first = False
-        if after and start_hashcode is not None and hashcode == start_hashcode:
+        if after and hashcode == start_hashcode:
+          # skip start_hashcode if present
           continue
       yield hashcode
       if length is not None:
@@ -225,35 +247,35 @@ class HashCodeUtilsMixin(object):
         if length < 1:
           break
 
-class HashUtilDict(dict, HashCodeUtilsMixin):
+  def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
+    return self._defer(self.hashcodes, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
+
+class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
+
+  def __init__(self):
+    dict.__init__(self)
+    MultiOpenMixin.__init__(self)
+    self.hashclass = DEFAULT_HASHCLASS
+
+  def __str__(self):
+    return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
 
   def add(self, data):
     hashcode = Hash_SHA1.from_data(data)
     self[hashcode] = data
     return hashcode
 
-  def open(self):
+  def startup(self):
     ''' Dummy method to support unit tests with open/close.
     '''
     pass
 
-  def close(self):
+  def shutdown(self):
     ''' Dummy method to support unit tests with open/close.
     '''
     pass
-
-  def _sorted_keys(self, hashclass=None):
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    return sorted(h for h in self.keys() if isinstance(h, hashclass))
-
-  def first(self, hashclass=None):
-    ks = self._sorted_keys(hashclass=hashclass)
-    if ks:
-      return ks[0]
-    return None
 
 if __name__ == '__main__':
   import cs.venti.hash_tests
