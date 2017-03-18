@@ -186,7 +186,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       min_autoblock = min_block   # start the rolling hash earlier
     else:
       # consume the chunks via a queue
-      parseQ = IterableQueue();
+      parseQ = IterableQueue(16);
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
         try:
