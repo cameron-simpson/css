@@ -616,7 +616,7 @@ add_box_class(PDINBox)
 
 def get_boxes(bs, offset=0, max_offset=None):
   ''' Generator collecting Boxes from the supplied data `bs`, starting at `offset` (default: 0) and ending at `max_offset` (default: end of `bs`).
-      Postcondition: all data up to `max_offset` has been collectewd into Boxes.
+      Postcondition: all data up to `max_offset` have been collectewd into Boxes.
   '''
   if max_offset is None:
     max_offset = len(bs)
