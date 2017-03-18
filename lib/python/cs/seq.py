@@ -18,7 +18,7 @@ DISTINFO = {
 import heapq
 import itertools
 from threading import Lock, Condition
-from cs.logutils import warning, debug, D
+from cs.logutils import warning, debug, D, X
 from cs.py.stack import caller
 from cs.py3 import exec_code
 
@@ -96,6 +96,16 @@ def get0(iterable, default=None):
     return default
   else:
     return i
+
+def tee(iterable, *Qs):
+  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
+      `Qs`: the queues, objects accepting a .put method.
+      Note: the item is .put onto every queue before being yielded from this generator.
+  '''
+  for item in iterable:
+    for Q in Qs:
+      Q.put(item)
+    yield item
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples

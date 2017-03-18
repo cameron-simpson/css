@@ -32,7 +32,7 @@ import stat
 import sys
 import time
 import threading
-from threading import Lock
+from threading import Lock, Thread
 import traceback
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
@@ -163,7 +163,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = True
+    Pfx._state.trace = trace_mode
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -637,7 +637,6 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
-    global loginfo
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -645,7 +644,6 @@ class Pfx(object):
       info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
-    global loginfo
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
@@ -686,7 +684,7 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
-    if loginfo.upd_mode:
+    if _state.trace:
       info(self._state.prefix)
     return False
 
@@ -796,6 +794,16 @@ class PfxCallInfo(Pfx):
                  "at %s:%d %s(), called from %s:%d %s()",
                  caller[0], caller[1], caller[2],
                  grandcaller[0], grandcaller[1], grandcaller[2])
+
+def PfxThread(target=None, **kw):
+  ''' Factory function returning a Thread which presents the current prefix  ascontext.
+  '''
+  current_prefix = prefix()
+  def run(*a, **kw):
+    with Pfx(current_prefix):
+      if target is not None:
+        target(*a, **kw)
+  return Thread(target=run, **kw)
 
 # Logger public functions
 def exception(msg, *args):

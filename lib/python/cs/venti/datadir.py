@@ -487,11 +487,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, n, offset)
     rollover = self.rollover
-    if rollover is not None and offset2 >= rollover:
-      with self._lock:
-        # we're still the current file? then advance to a new file
-        if self.n == n:
-          self.n = self.next_n()
+    with self._lock:
+      if rollover is not None and offset2 >= rollover:
+        self._n = None
     return hashcode
 
   def __setitem__(self, hashcode, data):

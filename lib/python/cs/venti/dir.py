@@ -418,12 +418,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
-    X("FileDirent.CLOSE %s ...", self)
     self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
-    X("CLOSE %s: _block=%s: length=%d", self, self._block, len(self._block))
     self._open_file = None
     self._check()
 
