@@ -32,7 +32,7 @@ import stat
 import sys
 import time
 import threading
-from threading import Lock
+from threading import Lock, Thread
 import traceback
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
@@ -794,6 +794,16 @@ class PfxCallInfo(Pfx):
                  "at %s:%d %s(), called from %s:%d %s()",
                  caller[0], caller[1], caller[2],
                  grandcaller[0], grandcaller[1], grandcaller[2])
+
+def PfxThread(target=None, **kw):
+  ''' Factory function returning a Thread which presents the current prefix  ascontext.
+  '''
+  current_prefix = prefix()
+  def run(*a, **kw):
+    with Pfx(current_prefix):
+      if target is not None:
+        target(*a, **kw)
+  return Thread(target=run, **kw)
 
 # Logger public functions
 def exception(msg, *args):
