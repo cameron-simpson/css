@@ -8,7 +8,7 @@
 from functools import partial
 from itertools import chain
 import sys
-from cs.logutils import PfxThread, debug, warning, exception, D, X
+from cs.logutils import Pfx, PfxThread, debug, warning, exception, D, X
 from cs.queues import IterableQueue
 from cs.seq import tee
 from .block import Block, IndirectBlock, dump_block
@@ -186,7 +186,7 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       min_autoblock = min_block   # start the rolling hash earlier
     else:
       # consume the chunks via a queue
-      parseQ = IterableQueue(16);
+      parseQ = IterableQueue();
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
         try:
