@@ -29,19 +29,21 @@ def parse_mp3(chunks):
   '''
   bfr = CornuCopyBuffer(iter(chunks))
   chunk = b''
-  def accrue(min_size):
+  def accrue(min_size, short_ok=False):
     nonlocal bfr, chunk
     new_chunks = []
     length0 = len(chunk)
-    bfr.extend(min_size, copy_chunks=new_chunks.append)
+    bfr.extend(min_size, copy_chunks=new_chunks.append, short_ok=short_ok)
     chunk = bfr.buf
     yield from iter(new_chunks)
-  offset = 0
   while True:
+    offset = bfr.offset
     advance_by = None
-    yield from accrue(3)
-    if len(chunk) < 3:
+    yield from accrue(3, short_ok=True)
+    if not chunk:
       break
+    if len(chunk) < 3:
+      raise ValueError("less than 3 bytes from input: %r" % (chunk,))
     if chunk[:3] == b'TAG':
       yield from accrue(128)
       yield offset + 128
@@ -104,7 +106,4 @@ def parse_mp3(chunks):
       yield offset + frame_len
       advance_by = frame_len
     assert advance_by > 0
-    chunkage[0] = chunk[advance_by:]
-    offset += advance_by
-  if chunk:
-    yield chunk
+    bfr.skip(advance_by)
