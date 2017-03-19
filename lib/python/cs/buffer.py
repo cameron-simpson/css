@@ -100,6 +100,7 @@ class CornuCopyBuffer(object):
     if toskip > 0:
       # advance the rest of the way
       seek = None
+      chunks = self.input_data
       if copy_skip is None:
         try:
           seek = chunks.seek
@@ -111,7 +112,6 @@ class CornuCopyBuffer(object):
         offset = new_offset
       else:
         # no seek, consume chunks until new_offset
-        chunks = self.input_data
         while toskip > 0:
           try:
             buf = next(chunks)
