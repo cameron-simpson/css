@@ -75,7 +75,18 @@ class CornuCopyBuffer(object):
     offset = self.offset
     if new_offset < offset:
       raise ValueError("skipto: new_offset:%d < offset:%d" % (new_offset, offset))
-    toskip = new_offset - offset
+    return self.skip(new_offset - offset, copy_skip=copy_skip, short_ok=short_ok)
+
+  def skip(self, toskip, copy_skip=None, short_ok=False):
+    ''' Advance position by `skip_to`. Return the new offset.
+        `skipto`: the distance to advance
+        `copy_skip`: callable to receive skipped data.
+        `short_ok`: default False; f true then skipto may return before
+          `new_offset` if there are insufficient chunks.
+        Return values:
+        `buf`: the new state of `buf`
+        `offset`: the final offset; this may be short if `short_ok`.
+    '''
     # consume any bytes in buf before new_offset
     buf = self.buf
     offset = self.offset
