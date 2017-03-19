@@ -233,6 +233,10 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
             as first_possible_point, but if there is a parser then it
             is further to give more opportunity for a parser boundary
             to be used in preference to an automatic boundary.
+          The max_possible_point is last_offset+max_block,
+            the latest point at which we will accept a block boundary;
+            we will choose this if no next_offset or hash offset
+            is found earlier.
       '''
       nonlocal last_offset, first_possible_point, next_rolling_point, max_possible_point
       first_possible_point = last_offset + min_block
