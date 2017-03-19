@@ -1146,17 +1146,24 @@ class DREFBox(FullBox):
 
 add_box_class(DREFBox)
 
+def parse_file(fp, discard=False, copy_offsets=None):
+  return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
+
+def parse_chunks(chunks, discard=False, copy_offsets=None):
+  return parse_buffer(CornuCopyBuffer(chunks), discard=discard, copy_offsets=copy_offsets)
+
+def parse_buffer(bfr, discard=False, copy_offsets=None):
+  while True:
+    B = Box.from_buffer(bfr, discard_data=discard, copy_offsets=copy_offsets)
+    if B is None:
+      break
+    yield B
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
   from cs.logutils import setup_logging
   setup_logging(__file__)
   stdin = fdopen(sys.stdin.fileno(), 'rb')
-  bfr = CornuCopyBuffer(read_from(stdin))
-  while True:
-    B = Box.from_buffer(bfr)
-    if B is None:
-      break
-    B._skip_data(bfr, discard=True)
+  for B in parse_file(stdin, discard=True):
     B.dump()
-    ##print(B)
