@@ -5,7 +5,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.buffer import extend
+from cs.buffer import CornuCopyBuffer
 
 _mp3_audio_ids = [ 2.5, None, 2, 1 ]
 _mp3_layer     = [ None, 3, 2, 1 ]
@@ -27,12 +27,14 @@ _mp3_sr_m25    = [ 11025, 12000, 8000, None ]
 def parse_mp3(chunks):
   ''' Read MP3 data from `fp` and yield frame data chunks.
   '''
-  chunks = iter(chunks)
+  bfr = CornuCopyBuffer(iter(chunks))
   chunk = b''
   def accrue(min_size):
-    nonlocal chunk
+    nonlocal bfr, chunk
     new_chunks = []
-    chunk = extend(chunk, min_size, chunks, new_chunks.append)
+    length0 = len(chunk)
+    bfr.extend(min_size, copy_chunks=new_chunks.append)
+    chunk = bfr.buf
     yield from iter(new_chunks)
   offset = 0
   while True:
