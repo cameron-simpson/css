@@ -232,7 +232,7 @@ class Box(object):
     fp.write('\n')
 
   @staticmethod
-  def from_buffer(bfr, cls=None, discard_data=False):
+  def from_buffer(bfr, cls=None, discard_data=False, copy_offsets=None):
     ''' Decode a Box from `bfr`. Return the Box or None at end of input.
         `cls`: the Box class; if not None, use to construct the instance.
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
@@ -240,6 +240,8 @@ class Box(object):
         `discard_data`: if false (default), keep the unparsed data portion as
           a list of data chunk in the attribute .data_chunks; if true,
           discard the unparsed data
+        `copy_offsets`: if not None, call `copy_offsets` with each
+          Box starting offset
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
@@ -252,6 +254,8 @@ class Box(object):
     B.offset = offset0
     # further parse some or all of the data
     B.parse_data(bfr)
+    if copy_offsets is not None:
+      copy_offsets(offset0)
     # record the offset of any unparsed data portion
     B.unparsed_offset = bfr.offset
     # advance over the remaining data, optionally keeping it
