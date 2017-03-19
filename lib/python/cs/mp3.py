@@ -1,9 +1,11 @@
 #!/usr/bin/python
 #
-# Crude parser for MP3 data  ased on:
+# Crude parser for MP3 data based on:
 #   http://www.mp3-tech.org/programmer/frame_header.html
 # - Cameron Simpson <cs@zip.com.au>
 #
+
+from cs.buffer import CornuCopyBuffer
 
 _mp3_audio_ids = [ 2.5, None, 2, 1 ]
 _mp3_layer     = [ None, 3, 2, 1 ]
@@ -25,34 +27,25 @@ _mp3_sr_m25    = [ 11025, 12000, 8000, None ]
 def parse_mp3(chunks):
   ''' Read MP3 data from `fp` and yield frame data chunks.
   '''
-  chunks = iter(chunks)
-  chunkage = [b'']
-  def accrue(chunks, min_size):
-    ''' Gather data until len(current_chunk) >= min_size.
-    '''
-    current_chunk = chunkage[0]
-    glommed = len(current_chunk)
-    if glommed < min_size:
-      glom = [current_chunk]
-      while glommed < min_size:
-        try:
-          next_chunk = next(chunks)
-        except StopIteration:
-          break
-        yield next_chunk
-        glom.append(next_chunk)
-        glommed += len(next_chunk)
-      chunkage[0] = b''.join(glom)
-  offset = 0
+  bfr = CornuCopyBuffer(iter(chunks))
+  chunk = b''
+  def accrue(min_size, short_ok=False):
+    nonlocal bfr, chunk
+    new_chunks = []
+    length0 = len(chunk)
+    bfr.extend(min_size, copy_chunks=new_chunks.append, short_ok=short_ok)
+    chunk = bfr.buf
+    yield from iter(new_chunks)
   while True:
+    offset = bfr.offset
     advance_by = None
-    yield from accrue(chunks, 3)
-    chunk = memoryview(chunkage[0])
-    if len(chunk) < 3:
+    yield from accrue(3, short_ok=True)
+    if not chunk:
       break
+    if len(chunk) < 3:
+      raise ValueError("less than 3 bytes from input: %r" % (chunk,))
     if chunk[:3] == b'TAG':
-      yield from accrue(chunks, 128)
-      chunk = memoryview(chunkage[0])
+      yield from accrue(128)
       yield offset + 128
       advance_by = 128
     elif chunk[:3] == b'ID3':
@@ -60,8 +53,7 @@ def parse_mp3(chunks):
       raise RuntimeError("ID3 not implemented")
     else:
       # 4 byte header
-      yield from accrue(chunks, 4)
-      chunk = memoryview(chunkage[0])
+      yield from accrue(4)
       b0, b1, b2, b3 = chunk[:4].tolist()
       if b0 != 255:
         raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
@@ -110,12 +102,8 @@ def parse_mp3(chunks):
       if has_crc:
         frame_len += 2
       ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-      yield from accrue(chunks, frame_len)
-      chunk = memoryview(chunkage[0])
+      yield from accrue(frame_len)
       yield offset + frame_len
       advance_by = frame_len
     assert advance_by > 0
-    chunkage[0] = chunk[advance_by:]
-    offset += advance_by
-  if chunk:
-    yield chunk
+    bfr.skip(advance_by)
