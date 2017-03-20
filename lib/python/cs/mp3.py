@@ -24,37 +24,27 @@ _mp3_sr_m1     = [ 44100, 48000, 32000, None ]
 _mp3_sr_m2     = [ 22050, 24000, 16000, None ]
 _mp3_sr_m25    = [ 11025, 12000, 8000, None ]
 
-def parse_mp3(chunks):
-  ''' Read MP3 data from `fp` and yield frame data chunks.
+def framesof(chunks):
+  ''' Read MP3 data from `fp` and yield data frames.
   '''
   bfr = CornuCopyBuffer(iter(chunks))
-  chunk = b''
-  def accrue(min_size, short_ok=False):
-    nonlocal bfr, chunk
-    new_chunks = []
-    length0 = len(chunk)
-    bfr.extend(min_size, copy_chunks=new_chunks.append, short_ok=short_ok)
-    chunk = bfr.buf
-    yield from iter(new_chunks)
   while True:
     offset = bfr.offset
     advance_by = None
-    yield from accrue(3, short_ok=True)
-    if not chunk:
+    bfr.extend(3, short_ok=True)
+    if not bfr:
       break
-    if len(chunk) < 3:
-      raise ValueError("less than 3 bytes from input: %r" % (chunk,))
-    if chunk[:3] == b'TAG':
-      yield from accrue(128)
-      yield offset + 128
+    if len(bfr) < 3:
+      raise ValueError("less than 3 bytes from input: %r" % (bfr.buf,))
+    if bfr[:3] == b'TAG':
       advance_by = 128
-    elif chunk[:3] == b'ID3':
+    elif bfr[:3] == b'ID3':
       # TODO: suck up a few more bytes and compute length
       raise RuntimeError("ID3 not implemented")
     else:
       # 4 byte header
-      yield from accrue(4)
-      b0, b1, b2, b3 = chunk[:4].tolist()
+      bfr.extend(4)
+      b0, b1, b2, b3 = bfr.buf[:4].tolist()
       if b0 != 255:
         raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
       if (b1 & 224) != 224:
@@ -102,8 +92,8 @@ def parse_mp3(chunks):
       if has_crc:
         frame_len += 2
       ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-      yield from accrue(frame_len)
-      yield offset + frame_len
       advance_by = frame_len
     assert advance_by > 0
+    bfr.extend(advance_by)
+    yield bfr.buf[:advance_by]
     bfr.skip(advance_by)
