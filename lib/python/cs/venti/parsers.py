@@ -68,6 +68,11 @@ PREFIXES_PERL = (
 PREFIXES_SH = (
     'function ',
 )
+PREFIXES_SQL_DUMP = (
+    'INSERT INTO ',
+    'DROP TABLE ',
+    'CREATE TABLE ',
+)
 
 PREFIXES_ALL = (
     PREFIXES_MAIL
@@ -75,4 +80,5 @@ PREFIXES_ALL = (
     + PREFIXES_GO
     + PREFIXES_PERL
     + PREFIXES_SH
+    + PREFIXES_SQL_DUMP
 )
