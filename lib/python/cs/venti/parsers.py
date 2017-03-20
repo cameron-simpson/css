@@ -7,6 +7,8 @@
 
 import sys
 from cs.logutils import X
+from cs.iso14496 import parse_chunks as parse_chunks_mp4
+from cs.mp3 import framesof as mp3_frames
 from cs.queues import IterableQueue
 
 def linesof(chunks):
@@ -30,6 +32,9 @@ def linesof(chunks):
     yield b''.join(pending)
 
 def parse_text(chunks, prefixes=None):
+  ''' Scan textual data, yielding offsets of lines starting with
+      useful prefixes, such as function definitions.
+  '''
   if prefixes is None:
     prefixes = PREFIXES_ALL
   prefixes = [ ( prefix
@@ -44,7 +49,6 @@ def parse_text(chunks, prefixes=None):
              ]
   offset = 0
   for line in linesof(chunks):
-    yield line
     next_offset = None
     for prefix in prefixes:
       if line.startswith(prefix):
@@ -53,6 +57,23 @@ def parse_text(chunks, prefixes=None):
     if next_offset is not None:
       yield next_offset
     offset += len(line)
+
+def parse_mp3(chunks, offset=0):
+  for frame in mp3_frames(chunks):
+    yield offset
+    offset += len(frame)
+
+def parse_mp4(chunks):
+  ''' Scan ISO14496 input and yield Box start offsets.
+  '''
+  with Pfx("parse_mp4"):
+    offsetQ = IterableQueue()
+    def run_parser():
+      for B in parse_chunks_mp4(chunks, discard=True, copy_offsets=offsetQ.put):
+        pass
+    T = PfxThread(target=run_parser)
+    T.start()
+    return offsetQ
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
