@@ -132,7 +132,7 @@ class _PendingBuffer(object):
     if self.pending_room == 0:
       yield from self.flush()
 
-def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None, dup_chunks=False):
+def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None):
   ''' Generator which connects to a parser of a chunk stream to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `parser`
       `parser`: a callable accepting an iterable of data chunks and
@@ -146,19 +146,9 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       `min_autoblock`: the smallest amount of data that will be
         used for the rolling hash fallback if `parser` is not None,
         default MIN_AUTOBLOCK
-      `dup_chunks`: default false; if true, the parser is not
-        expected to yield the chunk data; instead a queue is made and
-        the input chunks are tee()d to the parser and the queue.
 
-      The iterable returned from `parser(chunks)` returns a mix of
-      ints, which are considered desirable block boundaries, and
-      bytes/memoryview objects which contain data from `chunks`.
-      If `dup_chunks` is true, the parser should only yield offsets.
-
-      The easiest `parser` functions to write are generators and
-      one simple method of processing is to yield items from `chunks`
-      as soon as they are collected, and then to parse data yielding
-      edge offsets if found.
+      The iterable returned from `parser(chunks)` yields ints which are
+      considered desirable block boundaries.
   '''
   with Pfx("blocked_chunks_of"):
     if min_block is None:
@@ -185,24 +175,27 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       parseQ = chunk_iter
       min_autoblock = min_block   # start the rolling hash earlier
     else:
-      # consume the chunks via a queue
+      # Consume the chunks and offsets via a queue.
+      # The parser puts offsets onto the queue.
+      # When the parser fetches from the chunks, those chunks are copied to the queue.
+      # When the parser terminates, any remaining chunks are also copied to the queue.
       parseQ = IterableQueue();
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
         try:
-          for parsed in parser(chunk_iter):
-            if dup_chunks:
-              # the parser should yield only offsets, not chunks and offsets
-              if not isinstance(parsed, int):
-                warning("discarding non-int from parser %s: %s", parser, parsed)
-              else:
-                parseQ.put(parsed)
+          for offset in parser(chunk_iter):
+            # the parser should yield only offsets, not chunks and offsets
+            if not isinstance(offset, int):
+              warning("discarding non-int from parser %s: %s", parser, offset)
+            else:
+              parseQ.put(offset)
         except Exception as e:
           exception("exception from parser %s: %s", parser, e)
-        # consume the remained of chunk_iter
+        # consume the remainder of chunk_iter
         # the tee() will copy it to parseQ
         for chunk in chunk_iter:
           pass
+        # end of offsets and chunks
         parseQ.close()
       PfxThread(target=run_parser).run()
     def get_parse():
