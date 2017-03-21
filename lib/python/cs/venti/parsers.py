@@ -6,8 +6,8 @@
 #
 
 import sys
-from cs.logutils import X
 from cs.iso14496 import parse_chunks as parse_chunks_mp4
+from cs.logutils import X, Pfx, PfxThread
 from cs.mp3 import framesof as mp3_frames
 from cs.queues import IterableQueue
 
