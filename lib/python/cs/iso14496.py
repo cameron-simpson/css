@@ -1002,11 +1002,11 @@ class _TimeToSampleBox(_GenericSampleBox):
     super().parse_data(bfr, '>LL', 'count delta')
 add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
-class CTTSBox(FullBox):
+class CTTSBox(_GenericSampleBox):
   ''' A 'ctts' Composition Time to Sample box - section 8.6.1.3.
   '''
   def parse_data(self, bfr):
-    super().parse_data(bfr, '>LL', 'count delta', '>Ll')
+    super().parse_data(bfr, '>LL', 'count offset', '>Ll')
 add_box_class(CTTSBox)
 
 class CSLGBox(FullBox):
