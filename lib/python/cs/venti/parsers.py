@@ -35,33 +35,35 @@ def parse_text(chunks, prefixes=None):
   ''' Scan textual data, yielding offsets of lines starting with
       useful prefixes, such as function definitions.
   '''
-  if prefixes is None:
-    prefixes = PREFIXES_ALL
-  prefixes = [ ( prefix
-                 if isinstance(prefix, bytes)
-                 else bytes(prefix)
-                      if isinstance(prefix, memoryview)
-                      else prefix.encode('utf-8')
-                           if isinstance(prefix, str)
-                           else prefix
-               )
-               for prefix in prefixes
-             ]
-  offset = 0
-  for line in linesof(chunks):
-    next_offset = None
-    for prefix in prefixes:
-      if line.startswith(prefix):
-        next_offset = offset
-        break
-    if next_offset is not None:
-      yield next_offset
-    offset += len(line)
+  with Pfx("parse_text"):
+    if prefixes is None:
+      prefixes = PREFIXES_ALL
+    prefixes = [ ( prefix
+                   if isinstance(prefix, bytes)
+                   else bytes(prefix)
+                        if isinstance(prefix, memoryview)
+                        else prefix.encode('utf-8')
+                             if isinstance(prefix, str)
+                             else prefix
+                 )
+                 for prefix in prefixes
+               ]
+    offset = 0
+    for line in linesof(chunks):
+      next_offset = None
+      for prefix in prefixes:
+        if line.startswith(prefix):
+          next_offset = offset
+          break
+      if next_offset is not None:
+        yield next_offset
+      offset += len(line)
 
 def parse_mp3(chunks, offset=0):
-  for frame in mp3_frames(chunks):
-    yield offset
-    offset += len(frame)
+  with Pfx("parse_mp3"):
+    for frame in mp3_frames(chunks):
+      yield offset
+      offset += len(frame)
 
 def parse_mp4(chunks):
   ''' Scan ISO14496 input and yield Box start offsets.
