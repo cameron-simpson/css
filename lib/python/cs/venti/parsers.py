@@ -73,6 +73,7 @@ def parse_mp4(chunks):
     def run_parser():
       for B in parse_chunks_mp4(chunks, discard=True, copy_offsets=offsetQ.put):
         pass
+      offsetQ.close()
     T = PfxThread(target=run_parser)
     T.start()
     return offsetQ
