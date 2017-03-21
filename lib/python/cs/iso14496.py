@@ -34,7 +34,7 @@ SIZE_16MB = 1024*1024*16
 BoxHeader = namedtuple('BoxHeader', 'type user_type length header_length')
 
 def parse_box_header(bfr):
-  ''' Decode a box header from the CornuzCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
+  ''' Decode a box header from the CornuCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
   '''
   # return BoxHeader=None if at the end of the data
   bfr.extend(1, short_ok=True)
