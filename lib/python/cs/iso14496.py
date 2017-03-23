@@ -232,7 +232,7 @@ class Box(object):
     fp.write('\n')
 
   @staticmethod
-  def from_buffer(bfr, cls=None, discard_data=False, copy_offsets=None):
+  def from_buffer(bfr, cls=None, discard_data=False):
     ''' Decode a Box from `bfr`. Return the Box or None at end of input.
         `cls`: the Box class; if not None, use to construct the instance.
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
@@ -252,10 +252,9 @@ class Box(object):
     X("Box.from_chunks: cls=%s", cls)
     B = cls(box_header)
     B.offset = offset0
+    bfr.report_offset(offset0)
     # further parse some or all of the data
     B.parse_data(bfr)
-    if copy_offsets is not None:
-      copy_offsets(offset0)
     # record the offset of any unparsed data portion
     B.unparsed_offset = bfr.offset
     # advance over the remaining data, optionally keeping it
@@ -1150,11 +1149,14 @@ def parse_file(fp, discard=False, copy_offsets=None):
   return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
 
 def parse_chunks(chunks, discard=False, copy_offsets=None):
-  return parse_buffer(CornuCopyBuffer(chunks), discard=discard, copy_offsets=copy_offsets)
+  return parse_buffer(CornuCopyBuffer(chunks, copy_offsets=copy_offsets),
+                      discard=discard)
 
 def parse_buffer(bfr, discard=False, copy_offsets=None):
+  if copy_offsets is not None:
+    bfr.copy_offsets = copy_offsets
   while True:
-    B = Box.from_buffer(bfr, discard_data=discard, copy_offsets=copy_offsets)
+    B = Box.from_buffer(bfr, discard_data=discard)
     if B is None:
       break
     yield B
