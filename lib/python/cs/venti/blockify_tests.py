@@ -33,7 +33,7 @@ class TestAll(unittest.TestCase):
 
   X("generate random test data")
   random_data = list(random_blocks(max_size=12000, count=1280))
-  ## quicker ## random_data = list(random_blocks(max_size=1200, count=12))
+  ##random_data = list(random_blocks(max_size=1200, count=12))
 
   def setUp(self):
     self.fp = open(__file__, "rb")
@@ -74,19 +74,25 @@ class TestAll(unittest.TestCase):
         None,
         parse_text,
         parse_mp3,
+        parse_mp4,
       ):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
           ('random data', self.random_data),
           (__file__, [ self.mycode for _ in range(100) ]),
         ):
+        testfile = None
         if parser is parse_mp3:
-          if os.path.exists('TEST.mp3'):
-            X("mp3 parse: replace input data with chunks from TEST.mp3")
-            input_chunks = read_from(open('TEST.mp3', 'rb'))
-            input_desc = 'TEST.mp3'
+          testfile = 'TEST.mp3'
+        elif parser is parse_mp4:
+          testfile = 'TEST.mp4'
+        if testfile is not None:
+          if os.path.exists(testfile):
+            X("%s: replace input data with chunks from %s", parser, testfile)
+            input_chunks = read_from(open(testfile, 'rb'))
+            input_desc = testfile
           else:
-            X("no TEST.mp3 in %s", os.getcwd())
+            X("%s: no %s in %s", parser, testfile, os.getcwd())
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc,
                           input_chunks=input_desc):
@@ -94,6 +100,7 @@ class TestAll(unittest.TestCase):
           src_total = 0
           for chunk in source_chunks:
             src_total += len(chunk)
+          X("%d source chunks, %d bytes in total", len(source_chunks), src_total)
           chunk_total = 0
           nchunks = 0
           all_chunks = []
@@ -109,12 +116,6 @@ class TestAll(unittest.TestCase):
               self.assertTrue(len(prev_chunk) >= MIN_BLOCKSIZE,
                               "len(prev_chunk)=%d < MIN_BLOCKSIZE=%d"
                               % (len(prev_chunk), MIN_BLOCKSIZE))
-            if parser is parse_text:
-              ##X("BLOCKED_CHUNK offset=%d len=%d: %r", offset, len(chunk), chunk)
-              pass
-            else:
-              ##X("BLOCKED_CHUNK offset=%d len=%d", offset, len(chunk))
-              pass
             offset += len(chunk)
             # the pending.flush operation can return short blocks
             self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
@@ -125,7 +126,7 @@ class TestAll(unittest.TestCase):
                             % (chunk_total, src_total))
             prev_chunk = chunk
           end_time = time.time()
-          X("%s|%s: %d chunks in %gs, %d bytes at %g B/s",
+          X("%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
             input_desc, parser_desc,
             nchunks, end_time-start_time, chunk_total,
             float(chunk_total) / (end_time-start_time))
