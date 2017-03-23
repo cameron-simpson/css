@@ -96,11 +96,15 @@ class TestAll(unittest.TestCase):
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc,
                           input_chunks=input_desc):
-          source_chunks = list(input_chunks)
-          src_total = 0
-          for chunk in source_chunks:
-            src_total += len(chunk)
-          X("%d source chunks, %d bytes in total", len(source_chunks), src_total)
+          if True:
+            source_chunks = input_chunks
+            src_total = None
+          else:
+            source_chunks = list(input_chunks)
+            src_total = 0
+            for chunk in source_chunks:
+              src_total += len(chunk)
+            X("%d source chunks, %d bytes in total", len(source_chunks), src_total)
           chunk_total = 0
           nchunks = 0
           all_chunks = []
@@ -121,18 +125,20 @@ class TestAll(unittest.TestCase):
             self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
                             "len(chunk)=%d > MAX_BLOCKSIZE=%d"
                             % (len(chunk), MAX_BLOCKSIZE))
-            self.assertTrue(chunk_total <= src_total,
-                            "chunk_total:%d > src_total:%d"
-                            % (chunk_total, src_total))
+            if src_total is not None:
+              self.assertTrue(chunk_total <= src_total,
+                              "chunk_total:%d > src_total:%d"
+                              % (chunk_total, src_total))
             prev_chunk = chunk
           end_time = time.time()
           X("%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
             input_desc, parser_desc,
             nchunks, end_time-start_time, chunk_total,
             float(chunk_total) / (end_time-start_time))
-          self.assertEqual(src_total, chunk_total)
-          self.assertEqual(b''.join(source_chunks),
-                           b''.join(all_chunks))
+          if src_total is not None:
+            self.assertEqual(src_total, chunk_total)
+            self.assertEqual(b''.join(source_chunks),
+                             b''.join(all_chunks))
 
   def test03blockifyAndRetrieve(self):
     with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
