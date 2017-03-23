@@ -6,9 +6,8 @@
 #
 
 import sys
-from cs.iso14496 import parse_chunks as parse_chunks_mp4
+from cs.buffer import CornuCopyBuffer
 from cs.logutils import X, Pfx, PfxThread
-from cs.mp3 import framesof as mp3_frames
 from cs.queues import IterableQueue
 
 def linesof(chunks):
@@ -59,24 +58,42 @@ def parse_text(chunks, prefixes=None):
         yield next_offset
       offset += len(line)
 
-def parse_mp3(chunks, offset=0):
-  with Pfx("parse_mp3"):
-    for frame in mp3_frames(chunks):
-      yield offset
-      offset += len(frame)
+def report_offsets(run_parser, chunks, offset=0):
+  ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
+      `run_parser`: a callable with runs the parser; it should
+        accept a CornuCopyBuffer as its sole argument.
+      `chunks`: an iterable yielding parser input data chunks.
+      `offset`: initial logical offset for the buffer, default 0.
+      This function allocates an IterableQueue to receive the parser offset
+      reports and a CornuCopyBuffer for the parser with report_offset copying
+      offsets to the queue.
+  '''
+  offsetQ = IterableQueue()
+  bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=offsetQ.put)
+  def thread_body():
+    run_parser(bfr)
+    offsetQ.close()
+  T = PfxThread(target=thread_body)
+  T.start()
+  return offsetQ
 
-def parse_mp4(chunks):
+def parse_mp3(chunks, offset=0):
+  from cs.mp3 import framesof as parse_mp3_from_buffer
+  with Pfx("parse_mp3"):
+    def run_parser(bfr):
+      for frame in parse_mp3_from_buffer(bfr):
+        pass
+    return report_offsets(run_parser, chunks, offset=offset)
+
+def parse_mp4(chunks, offset=0):
   ''' Scan ISO14496 input and yield Box start offsets.
   '''
+  from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
   with Pfx("parse_mp4"):
-    offsetQ = IterableQueue()
-    def run_parser():
-      for B in parse_chunks_mp4(chunks, discard=True, copy_offsets=offsetQ.put):
+    def run_parser(bfr):
+      for B in parse_mp4_from_buffer(bfr, discard=True):
         pass
-      offsetQ.close()
-    T = PfxThread(target=run_parser)
-    T.start()
-    return offsetQ
+    return report_offsets(run_parser, chunks, offset=offset)
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
