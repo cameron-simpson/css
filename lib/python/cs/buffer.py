@@ -9,12 +9,19 @@ class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing of data streams.
   '''
 
-  def __init__(self, input_data, buf=None, offset=0):
+  def __init__(self, input_data, buf=None, offset=0, copy_offsets=None):
+    ''' Prepare the buffer.
+        `input_data`: an iterator yielding data chunks
+        `buf`: if not None, the initial state of the parse buffer
+        `offset`: logical offset of the start of the buffer, default 0
+        `copy_offsets`: if not None, a callable for parsers to report pertinent offsets via the buffer's .copy_offset method
+    '''
     if buf is None:
       buf = b''
     self.buf = buf
     self.offset = offset
     self.input_data = input_data
+    self.copy_offsets = copy_offsets
 
   def __len__(self):
     return len(self.buf)
@@ -25,6 +32,13 @@ class CornuCopyBuffer(object):
 
   def __getitem__(self, index):
     return self.buf[index]
+
+  def report_offset(self, offset):
+    ''' Report a pertinent offset.
+    '''
+    copy_offsets = self.copy_offsets
+    if copy_offsets is not None:
+      copy_offsets(offset)
 
   def extend(self, min_size, copy_chunks=None, short_ok=False):
     ''' Extend the buffer to at least `min_size` bytes.
