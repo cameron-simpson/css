@@ -249,7 +249,6 @@ class Box(object):
       return None
     if cls is None:
       cls = pick_box_class(box_header.type)
-    X("Box.from_chunks: cls=%s", cls)
     B = cls(box_header)
     B.offset = offset0
     bfr.report_offset(offset0)
