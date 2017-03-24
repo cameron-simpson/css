@@ -33,6 +33,20 @@ class CornuCopyBuffer(object):
   def __getitem__(self, index):
     return self.buf[index]
 
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    ''' Fetch a data chunk from the buffer.
+    '''
+    chunk = self.buf
+    if chunk:
+      self.buf = b''
+    else:
+      chunk = next(self.input_data)
+    self.offset += len(chunk)
+    return chunk
+
   def report_offset(self, offset):
     ''' Report a pertinent offset.
     '''
