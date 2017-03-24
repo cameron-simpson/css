@@ -157,3 +157,14 @@ class CornuCopyBuffer(object):
             offset += bufskip
     self.buf = buf
     self.offset = offset
+
+def chunky(bfr_func):
+  ''' Decorator for a function acceptig a leading CornuCopyBuffer parameter. Returns a function accepting a leading data `chunks` parameter and optional `offset` and 'copy_offsets` keywords parameters.
+
+      @chunky
+      def func(bfr, ...):
+  '''
+  def chunks_func(chunks, *a, offset=0, copy_offsets=None, **kw):
+    bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
+    return bfr_func(bfr, *a, **kw)
+  return chunks_func
