@@ -5,8 +5,9 @@
 #   - Cameron Simpson <cs@zip.com.au> 05mar2017
 #
 
+from functools import partial
 import sys
-from cs.buffer import CornuCopyBuffer
+from cs.buffer import CornuCopyBuffer, chunky
 from cs.logutils import X, Pfx, PfxThread
 from cs.queues import IterableQueue
 
@@ -30,7 +31,7 @@ def linesof(chunks):
   if pending:
     yield b''.join(pending)
 
-def parse_text(chunks, prefixes=None):
+def parse_text(bfr, prefixes=None):
   ''' Scan textual data, yielding offsets of lines starting with
       useful prefixes, such as function definitions.
   '''
@@ -48,7 +49,7 @@ def parse_text(chunks, prefixes=None):
                  for prefix in prefixes
                ]
     offset = 0
-    for line in linesof(chunks):
+    for line in linesof(bfr):
       next_offset = None
       for prefix in prefixes:
         if line.startswith(prefix):
@@ -58,34 +59,41 @@ def parse_text(chunks, prefixes=None):
         yield next_offset
       offset += len(line)
 
-def report_offsets(run_parser, chunks, offset=0):
+parse_text_from_chunks = chunky(parse_text)
+
+def report_offsets(bfr, parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
+      `bfr`: a CornuCopyBuffer
       `run_parser`: a callable with runs the parser; it should
         accept a CornuCopyBuffer as its sole argument.
-      `chunks`: an iterable yielding parser input data chunks.
-      `offset`: initial logical offset for the buffer, default 0.
       This function allocates an IterableQueue to receive the parser offset
-      reports and a CornuCopyBuffer for the parser with report_offset copying
+      reports and sets the CornuCopyBuffer with report_offset copying
       offsets to the queue.
   '''
   offsetQ = IterableQueue()
-  bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=offsetQ.put)
+  if bfr.copy_offsets is not None:
+    warning("bfr %s already has copy_offsets, replacing", bfr)
+  bfr.copy_offsets = offsetQ.put
   def thread_body():
-    run_parser(bfr)
+    parser(bfr)
     offsetQ.close()
   T = PfxThread(target=thread_body)
   T.start()
   return offsetQ
 
-def parse_mp3(chunks, offset=0):
+report_offsets_from_chunks = chunky(report_offsets)
+
+def parse_mp3(bfr):
   from cs.mp3 import framesof as parse_mp3_from_buffer
   with Pfx("parse_mp3"):
     def run_parser(bfr):
       for frame in parse_mp3_from_buffer(bfr):
         pass
-    return report_offsets(run_parser, chunks, offset=offset)
+    return report_offsets(bfr, run_parser)
 
-def parse_mp4(chunks, offset=0):
+parse_mp3_from_chunks = chunky(parse_mp3)
+
+def parse_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
   '''
   from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
@@ -93,7 +101,21 @@ def parse_mp4(chunks, offset=0):
     def run_parser(bfr):
       for B in parse_mp4_from_buffer(bfr, discard=True):
         pass
-    return report_offsets(run_parser, chunks, offset=offset)
+    return report_offsets(bfr, run_parser)
+
+parse_mp4_from_chunks = chunky(parse_mp4)
+
+def parser_from_filename(filename):
+  ''' Choose a parser based a filename.
+      Returns None if these is no special parser.
+  '''
+  root, ext = splitext(basename(filename))
+  if ext:
+    assert ext.startswith('.')
+    parser = PARSERS_BY_EXT[lcext]
+    if parser is not None:
+      return parser
+  return None
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
@@ -114,6 +136,17 @@ PREFIXES_SQL_DUMP = (
     'DROP TABLE ',
     'CREATE TABLE ',
 )
+
+PARSERS_BY_EXT = {
+  'go':     partial(parse_text, prefixes=PREFIXES_GO),
+  'mp3':    parse_mp3,
+  'mp4':    parse_mp4,
+  'pl':     partial(parse_text, prefixes=PREFIXES_PERL),
+  'pm':     partial(parse_text, prefixes=PREFIXES_PERL),
+  'py':     partial(parse_text, prefixes=PREFIXES_PYTHON),
+  'sh':     partial(parse_text, prefixes=PREFIXES_SH),
+  'sql':    partial(parse_text, prefixes=PREFIXES_SQL_DUMP),
+}
 
 PREFIXES_ALL = (
     PREFIXES_MAIL
