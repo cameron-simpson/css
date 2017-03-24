@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Functions associated with bytes, bytearrays, memoryviews and buffers in general.
-# Also functions for managing a buffer and an input source.
+# Also CornuCopyBuffer for managing a buffer and an input source.
 #   - Cameron Simpson <cs@zip.com.au> 18mar2017
 #
 
