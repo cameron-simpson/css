@@ -10,6 +10,7 @@ import sys
 import time
 import unittest
 from unittest import skip
+from cs.buffer import chunky
 from cs.fileutils import read_from
 from cs.logutils import D, X
 from cs.randutils import rand0, randblock
@@ -17,6 +18,8 @@ from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
 from .parsers import parse_text, parse_mp3, parse_mp4
+
+QUICK = len(os.environ.get('QUICK', '')) > 0
 
 def random_blocks(max_size=65536, count=64):
   ''' Generate `count` blocks of random sizes from 1 to `max_size`.
@@ -32,8 +35,10 @@ class TestAll(unittest.TestCase):
     mycode = myfp.read()
 
   X("generate random test data")
-  random_data = list(random_blocks(max_size=12000, count=1280))
-  ##random_data = list(random_blocks(max_size=1200, count=12))
+  if QUICK:
+    random_data = list(random_blocks(max_size=1200, count=12))
+  else:
+    random_data = list(random_blocks(max_size=12000, count=1280))
 
   def setUp(self):
     self.fp = open(__file__, "rb")
@@ -111,7 +116,8 @@ class TestAll(unittest.TestCase):
           start_time = time.time()
           offset = 0
           prev_chunk = None
-          for chunk in blocked_chunks_of(source_chunks, parser):
+          chunky_parser = chunky(parser) if parser else None
+          for chunk in blocked_chunks_of(source_chunks, chunky_parser):
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
