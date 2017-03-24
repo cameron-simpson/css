@@ -1,4 +1,6 @@
 ssh-opts: cononical capitalisation of option names
+cs.buffer
+  unit tests
 cs.fileutils:
   subfile: a file-like object proxying a byte range of another file
   tail() with blocking and nonblocking mode; follow mode? emits chunks
