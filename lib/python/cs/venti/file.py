@@ -7,9 +7,9 @@ from __future__ import print_function, absolute_import
 from io import RawIOBase
 import os
 import sys
-from threading import Thread, Lock
+from threading import Lock
 from cs.threads import locked
-from cs.logutils import Pfx, info, X
+from cs.logutils import Pfx, PfxThread, info, X
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 from . import defaults
@@ -136,7 +136,7 @@ class File(BackedFile):
                     front_file, back_block, front_range))
           self._backing_block = B
           self._sync_lock.release()
-        Thread(name="%s.flush():sync" % (self,), target=update_store).start()
+        PfxThread(name="%s.flush(): update_store" % (self,), target=update_store).start()
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
