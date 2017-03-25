@@ -93,9 +93,9 @@ def handler(method):
     except Exception as e:
       exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
       raise FuseOSError(errno.EINVAL) from e
-    except:
+    except BaseException as e:
       error("UNCAUGHT EXCEPTION")
-      raise RuntimeError("UNCAUGHT EXCEPTION")
+      raise RuntimeError("UNCAUGHT EXCEPTION") from e
   return handle
 
 def log_traces_queued(Q):
