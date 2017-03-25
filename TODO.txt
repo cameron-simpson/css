@@ -1,3 +1,4 @@
+foo
 ssh-opts: cononical capitalisation of option names
 cs.fileutils:
   subfile: a file-like object proxying a byte range of another file
