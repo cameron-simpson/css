@@ -127,9 +127,10 @@ _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
-      `whitelist`: a bytes or string object indicating byte values which may be represented directly in text; string objects are converted to 
-      hexify() and texthexify() output strings may be freely
-      concatenated and decoded with untexthexify().
+      `whitelist`: a bytes or string object indicating byte values
+        which may be represented directly in text; string objects are
+        converted to hexify() and texthexify() output strings may be
+        freely concatenated and decoded with untexthexify().
   '''
   if sys.hexversion < 0x03000000:
     bschr = lambda bs, ndx: bs[ndx]
@@ -179,6 +180,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   return ''.join(chunks)
 
 def untexthexify(s, shiftin='[', shiftout=']'):
+  ''' Decode a textual representation of binary data into binary data.
+      Outside of the `shiftin`/`shiftout` markers the binary data
+      are represented as hexadecimal. Within the markers the bytes
+      have the values of the ordinals of the characters.
+  '''
   chunks = []
   while len(s) > 0:
     hexlen = s.find(shiftin)
