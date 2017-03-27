@@ -24,10 +24,17 @@ merged=DONE
 
 xit=0
 
-for audio in *.m4a
+for audio in *.m4a *.ogg
 do
   [ -s "$audio" ] || continue
-  video=$(basename "$audio" .m4a).mp4
+  case "$audio" in
+    *.ogg)  video=$(basename "$audio" .ogg).webm ;;
+    *.m4a)  video=$(basename "$audio" .m4a).mp4 ;;
+    *)      echo "$cmd: unsupported audio extension: $audio" >&2
+            xit=1
+            continue
+            ;;
+  esac
   if [ ! -s "$video" ]
   then
     echo "$cmd: $audio: missing video: $video" >&2
