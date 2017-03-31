@@ -731,8 +731,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def flush(self, fh):
     FH = self._vt_core._fh(fh)
     FH.flush()
-    inum = self._vt_core.E2i(FH.E)
-    self._vt_core.kref_dec(inum)
+    ## DONE BY FORGET? ## inum = self._vt_core.E2i(FH.E)
+    ## DONE BY FORGET? ## self._vt_core.kref_dec(inum)
 
   @handler
   def forget(self, inode_list):
