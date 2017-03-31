@@ -1,3 +1,4 @@
+histograms on blockify block sizes
 ssh-opts: cononical capitalisation of option names
 cs.buffer
   unit tests
