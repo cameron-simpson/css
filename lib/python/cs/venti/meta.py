@@ -116,6 +116,13 @@ def permbits_to_allow_deny(bits):
       sub += c
   return add, sub
 
+def rwx(mode):
+  ''' Transcribe 3 bits of a UNIX mode in 'rwx' form.
+  '''
+  return ( 'r' if mode&4 else '-' ) \
+       + ( 'w' if mode&2 else '-' ) \
+       + ( 'x' if mode&1 else '-' )
+
 class AC(object):
   __slots__ = ('prefix', 'allow', 'deny')
 
