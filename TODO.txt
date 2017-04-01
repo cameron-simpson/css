@@ -1,3 +1,4 @@
+merge cs.fileutils.shortpath and bin-cs/shortpath-prompt
 myke: support +=
 foo
 ssh-opts: cononical capitalisation of option names
