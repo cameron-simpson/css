@@ -5,6 +5,19 @@
 #   - Cameron Simpson <cs@zip.com.au> 18mar2017
 #
 
+import os
+
+DISTINFO = {
+    'description': "CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Development Status :: 5 - Production/Stable",
+        ],
+    'install_requires': [],
+}
+
 class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing of data streams.
   '''
@@ -90,12 +103,51 @@ class CornuCopyBuffer(object):
     self.offset += size
     return taken
 
+  def read(self, size):
+    ''' Compatibility method to allow using the buffer like a file.
+    '''
+    return self.take(size, short_ok=True)
+
+  def tell(self, size):
+    ''' Compatibility method to allow using the buffer like a file.
+    '''
+    return self.offset
+
+  def seek(self, offset, whence, short_ok=False):
+    ''' Compatibility method to allow using the buffer like a file.
+        This returns the resulting absolute offset.
+        Parameters are as for io.seek except as noted below:
+        `short_ok`: (default False). If true, the seek may not reach
+          the target if there are insufficent `input_data` - the
+          position will be the end of the `input_data`, and the
+          `input_data` will have been consumed; the caller must check
+          the returned offset to check that it is as expected. If
+          false, a ValueError will be raised; however, note that the
+          `input_data` will still have been consumed.
+        `whence`: this method only supports os.SEEK_SET and
+          os.SEEK_CUR, and does not support seeking to a lower offset
+          than the current buffer offset.
+    '''
+    if whence == os.SEEK_SET:
+      pass
+    elif whence == os.SEE_CUR:
+      offset += self.offset
+    else:
+      raise ValueError("seek: unsupported whence value %s, must be os.SEEK_SET or os.SEEK_CUR"
+                       % (whence,))
+    if offset < self.offset:
+      raise ValueError("seek: target offset %s < buffer offset %s; may not seek backwards"
+                       % (offset, self.offset))
+    if offset > self.offset:
+      self.skipto(offset, short_ok=short_ok)
+    return self.offset
+
   def skipto(self, new_offset, copy_skip=None, short_ok=False):
     ''' Advance to position `new_offset`. Return the new offset.
         `new_offset`: the target offset.
         `copy_skip`: callable to receive skipped data.
         `short_ok`: default False; f true then skipto may return before
-          `new_offset` if there are insufficient chunks.
+          `new_offset` if there are insufficient `input_data`.
         Return values:
         `buf`: the new state of `buf`
         `offset`: the final offset; this may be short if `short_ok`.
@@ -110,7 +162,7 @@ class CornuCopyBuffer(object):
         `skipto`: the distance to advance
         `copy_skip`: callable to receive skipped data.
         `short_ok`: default False; f true then skipto may return before
-          `new_offset` if there are insufficient chunks.
+          `new_offset` if there are insufficient `input_data`.
         Return values:
         `buf`: the new state of `buf`
         `offset`: the final offset; this may be short if `short_ok`.
