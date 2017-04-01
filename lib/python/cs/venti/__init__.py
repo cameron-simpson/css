@@ -31,6 +31,8 @@ from cs.lex import texthexify, untexthexify
 from cs.logutils import X
 from cs.seq import isordered
 
+SEP = '/'
+
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
       A Store's __enter__/__exit__ methods push/pop that store

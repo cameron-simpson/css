@@ -14,7 +14,7 @@ from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
-from . import totext, fromtext
+from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta
@@ -594,7 +594,7 @@ class Dir(_Dirent):
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
-    return len(name) > 0 and name.find('/') < 0
+    return len(name) > 0 and name.find(SEP) < 0
 
   def get(self, name, dflt=None):
     if name not in self:
@@ -691,7 +691,7 @@ class Dir(_Dirent):
     ''' Change directory to `path`, return the ending directory.
     '''
     D = self
-    for name in path.split('/'):
+    for name in path.split(SEP):
       if len(name) == 0:
         continue
       D = D.chdir1(name)
