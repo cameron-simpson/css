@@ -9,17 +9,20 @@ class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing of data streams.
   '''
 
-  def __init__(self, input_data, buf=None, offset=0, copy_offsets=None):
+  def __init__(self, input_data, buf=None, offset=0, copy_offsets=None, copy_chunks=None):
     ''' Prepare the buffer.
         `input_data`: an iterator yielding data chunks
         `buf`: if not None, the initial state of the parse buffer
         `offset`: logical offset of the start of the buffer, default 0
-        `copy_offsets`: if not None, a callable for parsers to report pertinent offsets via the buffer's .copy_offset method
+        `copy_offsets`: if not None, a callable for parsers to report pertinent offsets via the buffer's .report_offset method
+        `copy_chunks`: if not None, every fetched data chunk is copied to this callable
     '''
     if buf is None:
       buf = b''
     self.buf = buf
     self.offset = offset
+    if copy_chunks is not None:
+      input_data = CopyingIterator(input_data, copy_chunks)
     self.input_data = input_data
     self.copy_offsets = copy_offsets
 
@@ -54,12 +57,11 @@ class CornuCopyBuffer(object):
     if copy_offsets is not None:
       copy_offsets(offset)
 
-  def extend(self, min_size, copy_chunks=None, short_ok=False):
+  def extend(self, min_size, short_ok=False):
     ''' Extend the buffer to at least `min_size` bytes.
         If there are insufficient data available then a ValueError
         will be raised unless `short_ok` is true (default false)
         in which case the updated buffer will be short.
-        If `copy_chunks` is not None, pass every new data chunk to `copy_chunks`.
     '''
     length = len(self.buf)
     if length < min_size:
@@ -73,17 +75,15 @@ class CornuCopyBuffer(object):
             break
           raise ValueError("insufficient chunks, wanted %d but only found %d"
                            % (min_size, length)) from e
-        if copy_chunks:
-          copy_chunks(next_chunk)
         bufs.append(next_chunk)
         length += len(next_chunk)
       self.buf = memoryview(b''.join(bufs))
 
-  def take(self, size, copy_chunks=None, short_ok=False):
+  def take(self, size, short_ok=False):
     ''' Return the next `size` bytes.
         Other arguments are as for extend().
     '''
-    self.extend(size, copy_chunks=copy_chunks, short_ok=short_ok)
+    self.extend(size, short_ok=short_ok)
     buf = self.buf
     taken = buf[:size]
     self.buf = buf[size:]
@@ -157,6 +157,21 @@ class CornuCopyBuffer(object):
             offset += bufskip
     self.buf = buf
     self.offset = offset
+
+def CopyingIterator(object):
+  ''' Wrapper for an iterator that copies every item retrieved to a callable.
+  '''
+  def __init__(self, I, copy_to):
+    ''' Initialise with the iterator `I` and the callable `copy_to`.
+    '''
+    self.I = I
+    self.copy_to = copy_to
+  def __iter__(self):
+    return self
+  def __next__(self):
+    item = next(self.I)
+    self.copy_to(item)
+    return item
 
 def chunky(bfr_func):
   ''' Decorator for a function acceptig a leading CornuCopyBuffer parameter. Returns a function accepting a leading data `chunks` parameter and optional `offset` and 'copy_offsets` keywords parameters.
