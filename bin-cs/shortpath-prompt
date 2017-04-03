@@ -62,7 +62,7 @@ def short_path(path, no_tilde=False, no_symlinks=False):
       try:
         pw = pwd.getpwuid(uid)
       except KeyError as e:
-        warning("getpwuid(%d): %s", uid, e)
+        ##warning("getpwuid(%d): %s", uid, e)
         homedirs[uid] = None
         continue
       homedirs[uid] = (pw, PathInfo(pw.pw_dir))
