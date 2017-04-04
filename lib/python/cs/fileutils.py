@@ -66,6 +66,17 @@ except ImportError:
     data = b''.join(chunks)
     return data
 
+def fdreader(fd, readsize=None):
+  ''' Generator yielding data chunks from a file descriptor until EOF.
+  '''
+  if readsize is None:
+    readsize = 1024
+  while True:
+    bs = os.read(fd, readsize)
+    if not bs:
+      break
+    yield bs
+
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
       First try the .seekable method from IOBase, otherwise try
