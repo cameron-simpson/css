@@ -5,13 +5,16 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-import sys
 from collections import namedtuple
 import os
-from os import SEEK_SET, SEEK_END
+from os import SEEK_SET, SEEK_CUR, SEEK_END
 import errno
+import sys
+from threading import Lock
 from zlib import compress, decompress
+from cs.buffer import CornuCopyBuffer
 from cs.excutils import LogExceptions
+from cs.fileutils import fdreader
 import cs.logutils; cs.logutils.X_via_tty = True
 from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
@@ -60,22 +63,6 @@ def read_chunk(fp, do_decompress=False):
     flags &= ~F_COMPRESSED
   return flags, data, offset
 
-def write_chunk(fp, data, no_compress=False):
-  ''' Write a data chunk to a file at the current position, return the starting and ending offsets.
-      If not no_compress, try to compress the chunk.
-      Note: does _not_ call .flush().
-  '''
-  flags = 0
-  if not no_compress:
-    data2 = compress(data)
-    if len(data2) < len(data):
-      data = data2
-      flags |= F_COMPRESSED
-    offset = fp.tell()
-    fp.write(put_bs(flags))
-    fp.write(put_bsdata(data))
-  return offset, fp.tell()
-
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local venti Store.
@@ -105,19 +92,20 @@ class DataFile(MultiOpenMixin):
 
   def startup(self):
     with Pfx("%s.startup: open(%r)", self, self.pathname):
-      self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
+      rfd = os.open(self.pathname, os.O_RDONLY)
+      self._rfd = rfd
+      self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384))
+      self._rlock = Lock()
+      if self.readwrite:
+        self._wfd = os.open(self.pathname, os.O_WRONLY)
+        self._wlock = Lock()
 
   def shutdown(self):
-    self.flush()
-    self.fp.close()
-    self.fp = None
-
-  def flush(self):
-    ''' Flush any buffered writes to the filesystem.
-    '''
-    with self._lock:
-      if self.appending:
-        self.fp.flush()
+    if self.readwrite:
+      os.close(self._wfd)
+      del self._wfd
+    os.close(self._rfd)
+    del self._rfd
 
   def fetch(self, offset):
     flags, data, offset2 = self._fetch(offset, do_decompress=True)
@@ -128,15 +116,13 @@ class DataFile(MultiOpenMixin):
   def _fetch(self, offset, do_decompress=False):
     ''' Fetch data bytes from the supplied offset.
     '''
-    fp = self.fp
-    with self._lock:
-      if self.appending:
-        fp.flush()
-        self.appending = False
-      if fp.tell() != offset:
-        fp.flush()
-        fp.seek(offset, SEEK_SET)
-      flags, data, offset2 = read_chunk(fp, do_decompress=do_decompress)
+    rfd = self._rfd
+    bfr = self._rbuf
+    with self._rlock:
+      if bfr.offset != offset:
+        os.lseek(rfd, offset, SEEK_SET)
+        bfr = self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384), offset=offset)
+      flags, data, offset2 = read_chunk(bfr, do_decompress=do_decompress)
     return flags, data, offset2
 
   def add(self, data, no_compress=False):
@@ -144,13 +130,17 @@ class DataFile(MultiOpenMixin):
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
-    fp = self.fp
-    with self._lock:
-      if not self.appending:
-        self.appending = True
-        fp.flush()
-      fp.seek(0, SEEK_END)
-      return write_chunk(fp, data, no_compress=no_compress)
+    data2 = compress(data)
+    flags = 0
+    if len(data2) < len(data):
+      data = data2
+      flags |= F_COMPRESSED
+    bs = put_bs(flags) + put_bsdata(data)
+    wfd = self._wfd
+    with self._wlock:
+      offset = os.lseek(wfd, 0, SEEK_CUR)
+      os.write(wfd, bs)
+    return offset, offset + len(bs)
 
   def scan(self, do_decompress=False, offset=0):
     ''' Scan the data file and yield (start_offset, flags, zdata, end_offset) tuples.
