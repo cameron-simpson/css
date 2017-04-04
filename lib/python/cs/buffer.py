@@ -108,7 +108,7 @@ class CornuCopyBuffer(object):
     '''
     return self.take(size, short_ok=True)
 
-  def tell(self, size):
+  def tell(self):
     ''' Compatibility method to allow using the buffer like a file.
     '''
     return self.offset
