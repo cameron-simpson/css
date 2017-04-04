@@ -1,3 +1,4 @@
+datafile: use os.open(O_APPEND) and raw fds, no buffering, no seek, no flush, separate fd for read
 stats in new vs existing blocks when adding blocks
 histograms on blockify block sizes
 ssh-opts: cononical capitalisation of option names
