@@ -113,10 +113,13 @@ class CornuCopyBuffer(object):
     '''
     return self.offset
 
-  def seek(self, offset, whence, short_ok=False):
+  def seek(self, offset, whence=None, short_ok=False):
     ''' Compatibility method to allow using the buffer like a file.
         This returns the resulting absolute offset.
         Parameters are as for io.seek except as noted below:
+        `whence`: (default os.SEEK_SET). This method only supports
+          os.SEEK_SET and os.SEEK_CUR, and does not support seeking to a
+          lower offset than the current buffer offset.
         `short_ok`: (default False). If true, the seek may not reach
           the target if there are insufficent `input_data` - the
           position will be the end of the `input_data`, and the
@@ -124,10 +127,9 @@ class CornuCopyBuffer(object):
           the returned offset to check that it is as expected. If
           false, a ValueError will be raised; however, note that the
           `input_data` will still have been consumed.
-        `whence`: this method only supports os.SEEK_SET and
-          os.SEEK_CUR, and does not support seeking to a lower offset
-          than the current buffer offset.
     '''
+    if whence is None:
+      whence == os.SEEK_SET
     if whence == os.SEEK_SET:
       pass
     elif whence == os.SEE_CUR:
