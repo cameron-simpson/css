@@ -6,5 +6,5 @@
 
 while read -r line
 do  now=$(date)
-    printf '%s: %s' "$now" "$line"
+    printf '%s: %s\n' "$now" "$line"
 done
