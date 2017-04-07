@@ -102,6 +102,14 @@ retry_downcmd=
 
 while :
 do
+  # if we're controlling a flag, use it to track state stages
+  if [ $setflag ]
+  then
+    if flag "$flagname"
+    then  up=1
+    else  up=
+    fi
+  fi
   if ( [ -z "$quiet" ] || exec >/dev/null
        $trace sh -c "$setx; $probecmd"
      )
