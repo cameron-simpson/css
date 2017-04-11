@@ -1,3 +1,4 @@
+venti datafile parser
 flat file cache - keep multiple caches, set of hashes per file, pper limit, drop oldest file once set empty
 datafile: use os.open(O_APPEND) and raw fds, no buffering, no seek, no flush, separate fd for read
 stats in new vs existing blocks when adding blocks
