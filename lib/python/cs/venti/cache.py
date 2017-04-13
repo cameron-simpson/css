@@ -166,14 +166,11 @@ class FileDataCache(object):
       also to the backend storage.
   '''
 
-  def __init__(self, get, put, dir=None):
+  def __init__(self, backend, dir=None):
     ''' Initialise the cache.
-        `get`: callable to return data from the backend given a key `h`.
-               This should raise KeyError for a missing key.
-        `put`: callable to store data into the backend given the key `h` and `data`.
+        `backend`: mapping underlying us
     '''
-    self.get = get
-    self.put = put
+    self.backend = backend
     self.cached = {}    # map h => data
     self.saved = {}     # map h => offset, length
     self.lock = Lock()
@@ -190,8 +187,33 @@ class FileDataCache(object):
     self.worker.join()
     self.file_cache.close()
 
+  def __contains__(self, h):
+    ''' Mapping method supporting "in".
+    '''
+    with self._lock:
+      if h in self.cached:
+        return True
+      if h in self.saved:
+        return True
+    return h in self.backend
+
+  def keys(self):
+    ''' Mapping method for .keys.
+    '''
+    seen = set()
+    for k in self.cached.keys():
+      yield k
+      seen.add(k)
+    for k in self.saved.keys():
+      if k not in seen:
+        yield k
+        seen.add(k)
+    for k in self.backend.keys():
+      if k not in seen:
+        yield k
+
   def __getitem__(self, h):
-    ''' Fetch the data with key `h`. Raise KeyError is missing.
+    ''' Fetch the data with key `h`. Raise KeyError if missing.
     '''
     with self.lock:
       # fetch from memory
@@ -210,7 +232,7 @@ class FileDataCache(object):
       # fetch from backend
       return self.file_cache.get(offset, length)
     # fetch from backend, queue store into cache
-    data = self.get(h)
+    data = self.backend[h]
     with self._lock:
       self.cache[h] = data
     self.workQ.put( (h, data) )
@@ -240,7 +262,7 @@ class FileDataCache(object):
         except KeyError:
           pass
       # store into the backend
-      self.put(h, data)
+      self.backend[h] = data
 
 if __name__ == '__main__':
   import cs.venti.cache_tests
