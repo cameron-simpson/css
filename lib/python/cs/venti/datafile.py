@@ -22,6 +22,9 @@ from cs.resources import MultiOpenMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 
+DATAFILE_EXT = 'vtd'
+DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
+
 F_COMPRESSED = 0x01
 
 class DataFlags(int):
