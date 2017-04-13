@@ -6,8 +6,12 @@
 
 from __future__ import with_statement
 import sys
+from tempfile import mkstemp
+from threading import RLock
+from cs.fileutils import RWFileBlockCache
 import cs.later
 from cs.lex import hexify
+from .file import DATAFILE_DOT_EXT
 from .store import BasicStoreSync
 
 class CacheStore(BasicStoreSync):
@@ -154,6 +158,89 @@ class MemoryCacheStore(BasicStoreSync):
       H = self.hash(data)
       self._hit(H, data)
     return H
+
+class FileDataCache(object):
+  ''' Mapping like to cache data chunks to bypass gdbm indices and the like.
+      Data are saved immediately into an in memory cache and an
+      asynchronous worker copies new data into a cache file and
+      also to the backend storage.
+  '''
+
+  def __init__(self, get, put, dir=None):
+    ''' Initialise the cache.
+        `get`: callable to return data from the backend given a key `h`.
+               This should raise KeyError for a missing key.
+        `put`: callable to store data into the backend given the key `h` and `data`.
+    '''
+    self.get = get
+    self.put = put
+    self.cached = {}    # map h => data
+    self.saved = {}     # map h => offset, length
+    self.lock = Lock()
+    self.file_cache = RWFileBlockCache(dir=dir)
+    self.workQ = IterableQueue()
+    self.worker = Thread(target=self._worker)
+    self.worker.start()
+
+  def close(self):
+    ''' Shut down the cache.
+        Stop the worker, close the file cache.
+    '''
+    self.workQ.close()
+    self.worker.join()
+    self.file_cache.close()
+
+  def __getitem__(self, h):
+    ''' Fetch the data with key `h`. Raise KeyError is missing.
+    '''
+    with self.lock:
+      # fetch from memory
+      try:
+        data = self.cached[h]
+      except KeyError:
+        data = None
+        # fetch from file
+        try:
+          offset, length = self.saved[h]
+        except KeyError:
+          offset = None
+    if data is not None:
+      return data
+    if offset is not None:
+      # fetch from backend
+      return self.file_cache.get(offset, length)
+    # fetch from backend, queue store into cache
+    data = self.get(h)
+    with self._lock:
+      self.cache[h] = data
+    self.workQ.put( (h, data) )
+    return data
+
+  def __setitem__(self, h, data):
+    ''' Store `data` against key `h`.
+    '''
+    with self._lock:
+      if h in self.cache or h in self.saved:
+        return
+      self.cached[h] = data
+    self.workQ.put(h, data)
+
+  def _worker(self):
+    for h, data in self.workQ:
+      with self._lock:
+        if h not in self.cache:
+          return
+        if h in self.saved:
+          return
+      offset = self.file_cache.put(data)
+      with self._lock:
+        self.saved[h] = offset, len(data)
+        try:
+          del self.cache[h]
+        except KeyError:
+          pass
+      # store into the backend
+      self.put(h, data)
 
 if __name__ == '__main__':
   import cs.venti.cache_tests
