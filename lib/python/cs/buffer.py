@@ -88,8 +88,15 @@ class CornuCopyBuffer(object):
             break
           raise ValueError("insufficient chunks, wanted %d but only found %d"
                            % (min_size, length)) from e
-        bufs.append(next_chunk)
-        length += len(next_chunk)
+        if chunk:
+          # nonempty chunk, stash it
+          bufs.append(next_chunk)
+          length += len(next_chunk)
+        elif short_ok:
+          # this supports reading from a tail
+          # which returns an empty chunk at the current EOF
+          # but can continue iteration
+          break
       self.buf = memoryview(b''.join(bufs))
 
   def take(self, size, short_ok=False):
