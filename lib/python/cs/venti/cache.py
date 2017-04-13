@@ -159,7 +159,54 @@ class MemoryCacheStore(BasicStoreSync):
       self._hit(H, data)
     return H
 
-class FileDataCache(object):
+class FileCacheStore(BasicStoreSync):
+  ''' A Store wrapping another Store that provides fast access to
+      previously fetched data and fast storage of new data with
+      asynchronous updates to the backing Store.
+  '''
+
+  def __init__(self, name, backend, dir=None):
+    BasicStoreSync.__init__(self, "%s(%s)" % (self.__class__.__name__, name,), **kw)
+    self.backend = backend
+    self.cache = FileDataMappingProxy(backend, dir=dir)
+
+  def __getattr__(self, attr):
+    return getattr(self.backend, attr)
+
+  def get(self, h):
+    return self.cache[h]
+
+  def add(self, data):
+    backend = self.backend
+    h = backend.hash(data)
+    self.cache[h] = data
+    return h
+
+  def flush(self):
+    pass
+
+  def sync(self):
+    pass
+
+  def keys(self):
+    return self.cache.keys()
+
+  def contains(self, h):
+    return h in self.cache
+
+  def get(self, h):
+    try:
+      data = self.cache[h]
+    except KeyError:
+      data = None
+    return data
+
+  def add(self, data):
+    h = self.hash(data)
+    self.cache[h] = data
+    return h
+
+class FileDataMappingProxy(object):
   ''' Mapping like to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an
       asynchronous worker copies new data into a cache file and
