@@ -131,6 +131,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       raise MissingHashcodeError(h)
     return block
 
+  def __setitem__(self, h, data):
+    ''' Save `data` against hash key `h`.
+        Actually saves the data against the Store's hash function
+        and raises ValueError if that does not match the supplied
+        `h`.
+    '''
+    h2 = self.add(data)
+    if h != h2:
+      raise ValueError("h:%s != hash(data):%s" % (h, h2))
+
   def __enter__(self):
     defaults.pushStore(self)
     return MultiOpenMixin.__enter__(self)
