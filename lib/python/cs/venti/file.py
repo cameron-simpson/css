@@ -70,7 +70,7 @@ class BlockFile(RawIOBase):
     nread = 0
     for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
       Blen = end - start
-      b[nread:nread+Blen] = B[start:end]
+      b[nread:nread + Blen] = B[start:end]
       nread += Blen
     self._offset += nread
     return nread
@@ -133,7 +133,7 @@ class File(BackedFile):
           with S:
             B = top_block_for(
                   self._high_level_blocks_from_front_back(
-                    front_file, back_block, front_range))
+                      front_file, back_block, front_range))
           self._backing_block = B
           self._sync_lock.release()
         PfxThread(name="%s.flush(): update_store" % (self,), target=update_store).start()
@@ -168,7 +168,7 @@ class File(BackedFile):
         # should be the partial direct block at the end of the range, and
         # whatever new indirect blocks get made to span things
         self.backing_block \
-          = top_block_for(backing_block0.top_blocks(0, length))
+            = top_block_for(backing_block0.top_blocks(0, length))
     elif length > cur_len:
       # extend the front_file and front_range
       self.front_file.truncate(length)
@@ -182,7 +182,7 @@ class File(BackedFile):
     super().close()
     return B
 
-  def read(self, size = -1):
+  def read(self, size=-1):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
     if size == -1:
