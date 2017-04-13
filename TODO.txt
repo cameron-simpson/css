@@ -21,6 +21,12 @@ venti:
       * all parsers should accept chunks and return only offsets
         now that blockify reads a copy of the chunks
   blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
+  File.close:
+    get a preferred parser in from outside
+    pass the parser to blockify
+    keep a partial_block bytes for use at the front of the filedata
+    modify the backing data part to examine the last B
+      update partial_block with it instead of yielding it if it is a partial
   decode-Dir: use copy buffer and leaf blocks
   decode binary stream: use copy buffer
   control module
