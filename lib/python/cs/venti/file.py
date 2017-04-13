@@ -91,6 +91,7 @@ class File(BackedFile):
     # lock for file sync operations
     # NB: _not_ an RLock, we do separate acquire/release in the sync itself
     self._sync_lock = Lock()
+    self.filename = None
 
   @property
   @locked
