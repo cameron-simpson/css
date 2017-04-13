@@ -51,7 +51,8 @@ class CacheStore(BasicStoreSync):
 
   def flush(self):
     # dispatch flushes in parallel
-    LFs = [ self.cache.flush_bg(),
+    LFs = [
+            self.cache.flush_bg(),
             self.backend.flush_bg()
           ]
     # wait for the cache flush and then the backend flush
@@ -126,7 +127,7 @@ class MemoryCacheStore(BasicStoreSync):
         del hmap[oldh]
       else:
         hmap[oldh][0] -= 1
-      self.low = (self.low+1)%len(hlist)
+      self.low = (self.low + 1) % len(hlist)
       self.used -= 1
 
     if h in self.hmap:
