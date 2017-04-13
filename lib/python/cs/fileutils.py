@@ -1456,6 +1456,61 @@ class SavingFile(object):
       warning("replacing existing %r", path)
     os.rename(self.tmppath, path)
 
+class RWFileBlockCache(object):
+  ''' A scratch file for storing data.
+  '''
+
+  def __init__(self, pathname=None, dir=None, lock=None):
+    ''' Initialise the file.
+        `pathname`: path of file. If None, create a new file with
+          tempfile.mkstemp using dir=`dir` and unlink that file once
+          opened.
+        `dir`: location for the file if made by mkstemp as above.
+        `lock`: an object to use as a mutex, allowing sharing with
+          some outer system. A Lock will be allocated if omitted.
+    '''
+    opathname = pathname
+    if pathname is None:
+      pathname = mkstemp(suffix=DATAFILE_DOT_EXT, dir=dir)
+    self.rfd = os.open(pathname, os.O_RDONLY)
+    self.wfd = os.open(pathname, os.O_WRONLY)
+    if opathname is None:
+      os.remove(pathname)
+      self.pathname = None
+    else:
+      self.pathname = pathname
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+
+  def close(self):
+    ''' Close the file descriptors, unlink the file if self mode.
+    '''
+    os.close(self.wfd)
+    os.close(self.rfd)
+
+  def put(self, data):
+    ''' Store `data`, return offset.
+    '''
+    assert len(data) > 0
+    wfd = self.wfd
+    with self._lock:
+      offset = wfd.tell()
+      length = wfd.write(data)
+    assert length == len(data)
+    return offset
+
+  def get(self, offset, length):
+    ''' Get data from `offset` of length `length`.
+    '''
+    assert length > 0
+    rfd = self.rfd
+    with self._lock:
+      os.lseek(rfd, offset)
+      data = os.read(rfd, length)
+    assert len(data) == length
+    return data
+
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)
