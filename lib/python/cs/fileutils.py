@@ -47,6 +47,10 @@ from cs.timeutils import TimeoutError
 from cs.obj import O
 from cs.py3 import ustr, bytes
 
+DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
+DEFAULT_TAIL_PAUSE = 0.1
+
 try:
   from os import pread
 except ImportError:
@@ -92,9 +96,6 @@ def seekable(fp):
       return False
     test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
   return test()
-
-DEFAULT_POLL_INTERVAL = 1.0
-DEFAULT_READSIZE = 8192
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -1379,16 +1380,24 @@ def read_data(fp, nbytes, rsize=None):
   else:
     return b''.join(bss)
 
-def read_from(fp, rsize=None):
+def read_from(fp, rsize=None, tail_mode=False):
   ''' Generator to present text or data from an open file until EOF.
+      `rsize`: read size, default: DEFAULT_READSIZE
+      `tail_mode`: yield an empty chunk at EOF, allowing resumption
+        of the file grows
   '''
   if rsize is None:
     rsize = DEFAULT_READSIZE
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
-      break
-    yield chunk
+      if tail_mode:
+        yield chunk
+        time.sleep(DEFAULT_TAIL_PAUSE)
+      else:
+        break
+    else:
+      yield chunk
 
 def lines_of(fp, partials=None):
   ''' Generator yielding lines from a file until EOF.
