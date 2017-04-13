@@ -1,3 +1,4 @@
+vbox: support remote device import for mkvdi
 str: strace/ktrace wrapper, spawn ktrace + kdump -l
 vbox ls, status
 compare curses calls between cs.logutils and cs.tty
