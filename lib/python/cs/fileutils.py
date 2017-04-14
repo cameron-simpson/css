@@ -31,8 +31,8 @@ from itertools import takewhile
 import shutil
 import socket
 import stat
-from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import RLock, Thread
+from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
+from threading import Lock, RLock, Thread
 import time
 import unittest
 from cs.asynchron import Result
@@ -1460,7 +1460,7 @@ class RWFileBlockCache(object):
   ''' A scratch file for storing data.
   '''
 
-  def __init__(self, pathname=None, dir=None, lock=None):
+  def __init__(self, pathname=None, dir=None, suffix=None, lock=None):
     ''' Initialise the file.
         `pathname`: path of file. If None, create a new file with
           tempfile.mkstemp using dir=`dir` and unlink that file once
@@ -1471,11 +1471,12 @@ class RWFileBlockCache(object):
     '''
     opathname = pathname
     if pathname is None:
-      pathname = mkstemp(suffix=DATAFILE_DOT_EXT, dir=dir)
+      tmpfd, pathname = mkstemp(suffix=None, dir=dir)
     self.rfd = os.open(pathname, os.O_RDONLY)
     self.wfd = os.open(pathname, os.O_WRONLY)
     if opathname is None:
       os.remove(pathname)
+      os.close(tmpfd)
       self.pathname = None
     else:
       self.pathname = pathname
@@ -1495,8 +1496,8 @@ class RWFileBlockCache(object):
     assert len(data) > 0
     wfd = self.wfd
     with self._lock:
-      offset = wfd.tell()
-      length = wfd.write(data)
+      offset = os.lseek(wfd, 0, 1)
+      length = os.write(wfd, data)
     assert length == len(data)
     return offset
 
@@ -1506,7 +1507,7 @@ class RWFileBlockCache(object):
     assert length > 0
     rfd = self.rfd
     with self._lock:
-      os.lseek(rfd, offset)
+      os.lseek(rfd, offset, 0)
       data = os.read(rfd, length)
     assert len(data) == length
     return data
