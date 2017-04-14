@@ -173,6 +173,13 @@ class FileCacheStore(BasicStoreSync):
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
 
+  def startup(self):
+    self.backend.open()
+
+  def shutdown(self):
+    self.cache.close()
+    self.backend.close()
+
   def get(self, h):
     return self.cache[h]
 
