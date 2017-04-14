@@ -6,12 +6,12 @@
 
 from __future__ import with_statement
 import sys
-from tempfile import mkstemp
-from threading import RLock
+from threading import Lock, Thread
 from cs.fileutils import RWFileBlockCache
 import cs.later
 from cs.lex import hexify
-from .file import DATAFILE_DOT_EXT
+from cs.queues import IterableQueue
+from .datafile import DATAFILE_DOT_EXT
 from .store import BasicStoreSync
 
 class CacheStore(BasicStoreSync):
@@ -165,7 +165,7 @@ class FileCacheStore(BasicStoreSync):
       asynchronous updates to the backing Store.
   '''
 
-  def __init__(self, name, backend, dir=None):
+  def __init__(self, name, backend, dir=None, **kw):
     BasicStoreSync.__init__(self, "%s(%s)" % (self.__class__.__name__, name,), **kw)
     self.backend = backend
     self.cache = FileDataMappingProxy(backend, dir=dir)
@@ -220,8 +220,8 @@ class FileDataMappingProxy(object):
     self.backend = backend
     self.cached = {}    # map h => data
     self.saved = {}     # map h => offset, length
-    self.lock = Lock()
-    self.file_cache = RWFileBlockCache(dir=dir)
+    self._lock = Lock()
+    self.file_cache = RWFileBlockCache(dir=dir, suffix=DATAFILE_DOT_EXT)
     self.workQ = IterableQueue()
     self.worker = Thread(target=self._worker)
     self.worker.start()
@@ -262,7 +262,7 @@ class FileDataMappingProxy(object):
   def __getitem__(self, h):
     ''' Fetch the data with key `h`. Raise KeyError if missing.
     '''
-    with self.lock:
+    with self._lock:
       # fetch from memory
       try:
         data = self.cached[h]
@@ -281,7 +281,7 @@ class FileDataMappingProxy(object):
     # fetch from backend, queue store into cache
     data = self.backend[h]
     with self._lock:
-      self.cache[h] = data
+      self.cached[h] = data
     self.workQ.put( (h, data) )
     return data
 
@@ -289,15 +289,15 @@ class FileDataMappingProxy(object):
     ''' Store `data` against key `h`.
     '''
     with self._lock:
-      if h in self.cache or h in self.saved:
+      if h in self.cached or h in self.saved:
         return
       self.cached[h] = data
-    self.workQ.put(h, data)
+    self.workQ.put( (h, data) )
 
   def _worker(self):
     for h, data in self.workQ:
       with self._lock:
-        if h not in self.cache:
+        if h not in self.cached:
           return
         if h in self.saved:
           return
@@ -305,7 +305,7 @@ class FileDataMappingProxy(object):
       with self._lock:
         self.saved[h] = offset, len(data)
         try:
-          del self.cache[h]
+          del self.cached[h]
         except KeyError:
           pass
       # store into the backend
