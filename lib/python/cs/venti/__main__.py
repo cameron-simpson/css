@@ -25,7 +25,7 @@ from cs.tty import statusline
 from . import totext, fromtext, defaults
 from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import CacheStore, MemoryCacheStore
+from .cache import CacheStore, MemoryCacheStore, FileCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
@@ -129,8 +129,6 @@ def main(argv):
     log = silent
 
   xit = None
-  S = None
-
   signal(SIGHUP, lambda sig, frame: thread_dump())
   signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
 
@@ -176,18 +174,19 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
     except Exception as e:
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    # optional CacheStore
-    if dflt_cache is not None:
-      try:
-        C = Store(dflt_cache)
-      except:
-        exception("can't open cache store \"%s\"", dflt_cache)
-        raise GetoptError("can't open cache: %s" % (dflt_cache,))
-      S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-    # put an in-memory cache in front of the main cache
-    if useMemoryCacheStore:
-      S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-                     S, MemoryCacheStore("MemoryCacheStore"))
+    S = FileCacheStore("vtfuse", S)
+    ### optional CacheStore
+    ##if dflt_cache is not None:
+    ##  try:
+    ##    C = Store(dflt_cache)
+    ##  except:
+    ##    exception("can't open cache store \"%s\"", dflt_cache)
+    ##    raise GetoptError("can't open cache: %s" % (dflt_cache,))
+    ##  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
+    ### put an in-memory cache in front of the main cache
+    ##if useMemoryCacheStore:
+    ##  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+    ##                 S, MemoryCacheStore("MemoryCacheStore"))
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
@@ -598,6 +597,7 @@ def cmd_mount(args, verbose=None, log=None):
     # no "last entry" (==> first use) - make an empty directory
     if E is None:
       E = Dir('/')
+      X("cmd_mount: new E=%s", E)
     else:
       ##dump_Dirent(E, recurse=True)
       if not E.isdir:
