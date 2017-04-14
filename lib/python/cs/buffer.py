@@ -88,7 +88,7 @@ class CornuCopyBuffer(object):
             break
           raise ValueError("insufficient chunks, wanted %d but only found %d"
                            % (min_size, length)) from e
-        if chunk:
+        if next_chunk:
           # nonempty chunk, stash it
           bufs.append(next_chunk)
           length += len(next_chunk)
