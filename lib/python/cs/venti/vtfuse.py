@@ -69,7 +69,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  FS = StoreFS(E, FileCacheStore("vtfuse", S), syncfp=syncfp, subpath=subpath)
+  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
   FS._vt_runfuse(mnt)
 
 def handler(method):
