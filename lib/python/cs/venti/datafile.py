@@ -7,7 +7,8 @@
 
 from collections import namedtuple
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END
+from os import SEEK_SET, SEEK_CUR, SEEK_END, \
+               O_CREAT, O_EXCL, O_RDWR, O_RDONLY, O_WRONLY, O_APPEND
 import errno
 import sys
 from threading import Lock
@@ -87,7 +88,7 @@ class DataFile(MultiOpenMixin):
       raise ValueError("do_create=true requires readwrite=true")
     self.appending = False
     if do_create:
-      fd = os.open(pathname, os.O_CREAT|os.O_EXCL|os.O_RDWR)
+      fd = os.open(pathname, O_CREAT|O_EXCL|O_WRONLY)
       os.close(fd)
 
   def __str__(self):
@@ -95,12 +96,13 @@ class DataFile(MultiOpenMixin):
 
   def startup(self):
     with Pfx("%s.startup: open(%r)", self, self.pathname):
-      rfd = os.open(self.pathname, os.O_RDONLY)
+      rfd = os.open(self.pathname, O_RDONLY)
       self._rfd = rfd
       self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384))
       self._rlock = Lock()
       if self.readwrite:
-        self._wfd = os.open(self.pathname, os.O_WRONLY)
+        self._wfd = os.open(self.pathname, O_WRONLY|O_APPEND)
+        os.lseek(self._wfd, 0, SEEK_END)
         self._wlock = Lock()
 
   def shutdown(self):
