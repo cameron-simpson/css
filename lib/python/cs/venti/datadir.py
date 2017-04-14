@@ -315,26 +315,15 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     with Pfx("_index_updater"):
       index = self.index
       unindexed = self._unindexed
-      busy = False
       for hashcode, n, offset in self._indexQ:
-        if not busy:
-          # take the lock; we hold it over the index updates
-          self._lock.acquire()
-          batch_size = 0
-        batch_size += 1
-        index[hashcode] = n, offset
-        try:
-          del unindexed[hashcode]
-        except KeyError:
-          # this can happens when the same key is indexed twice
-          # entirely plausible if a new datafile is added to the datadir
-          pass
-        busy = not self._indexQ.empty()
-        # we keep the lock until the queue is drained
-        if not busy:
-          self._lock.release()
-          if batch_size > 1:
-            X("_index_updater: processed %d indices while holding lock", batch_size)
+        with self._lock:
+          index[hashcode] = n, offset
+          try:
+            del unindexed[hashcode]
+          except KeyError:
+            # this can happens when the same key is indexed twice
+            # entirely plausible if a new datafile is added to the datadir
+            pass
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
