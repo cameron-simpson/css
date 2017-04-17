@@ -20,12 +20,12 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
+from cs.py3 import bytes, unicode, ustr, sorted, StringTypes, joinbytes
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
   def hexify(bs):
-    return binascii.hexlify(bs).decode()
+    return binascii.hexlify(bs.as_str()).decode()
 else:
   hexify = binascii.hexlify
 
@@ -202,7 +202,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if len(s) % 2 != 0:
       raise TypeError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
-  return b''.join(chunks)
+  return joinbytes(chunks)
 
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
