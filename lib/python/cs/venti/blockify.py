@@ -97,10 +97,11 @@ class _PendingBuffer(object):
   ''' Class to manage the unbound chunks accrued by blocked_chunks_of below.
   '''
 
-  def __init__(self, max_block):
+  def __init__(self, max_block, offset=0):
     if max_block < 1:
       raise ValueError("max_block must be >= 1, received: %s" % (max_block,))
     self.max_block = max_block
+    self.offset = offset
     self._reset()
 
   def _reset(self):
@@ -109,28 +110,30 @@ class _PendingBuffer(object):
 
   def flush(self):
     ''' Yield the pending chunks joined together, if any.
+        Advance the offset.
     '''
     if self.pending:
       assert self.pending_room < self.max_block
-      yield b''.join(self.pending)
-      self.pending = []
-      self.pending_room = self.max_block
+      chunk = b''.join(self.pending)
+      self._reset()
+      self.offset += len(chunk)
+      ##X("_PendingBuffer.flush: yield %d bytes", len(chunk))
+      yield chunk
 
   def append(self, chunk):
     ''' Append `chunk` to the pending buffer.
         Yield any overflow.
     '''
     pending_room = self.pending_room
-    while len(chunk) > pending_room:
+    while len(chunk) >= pending_room:
       self.pending.append(chunk[:pending_room])
       self.pending_room = 0
       yield from self.flush()
       chunk = chunk[pending_room:]
       pending_room = self.pending_room
-    self.pending.append(chunk)
-    self.pending_room -= len(chunk)
-    if self.pending_room == 0:
-      yield from self.flush()
+    if chunk:
+      self.pending.append(chunk)
+      self.pending_room -= len(chunk)
 
 def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None):
   ''' Generator which connects to a parser of a chunk stream to emit low level edge aligned data chunks.
@@ -235,6 +238,8 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       first_possible_point = last_offset + min_block
       next_rolling_point = last_offset + min_autoblock
       max_possible_point = last_offset + max_block
+      ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, next_rolling_point=%d, max_possible_point=%d",
+      ##  last_offset, first_possible_point, next_rolling_point, max_possible_point)
     # prepare initial state
     next_offset = 0
     last_offset = 0
@@ -258,17 +263,13 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
           advance_by = None
           release = False   # becomes true if we should flush after taking data
           # see if we can skip some data completely
-          # we don't care where the nnext_offset is if offset < first_possible_point
+          # we don't care where the next_offset is if offset < first_possible_point
           if first_possible_point > offset:
             advance_by = min(first_possible_point - offset, len(chunk))
             hash_value = 0
-          elif next_offset == offset:
-            # flush buffer if any but zero advance
-            release = True
-            advance_by = 0
           else:
-            # advance next_offset to something useful > offset
-            while next_offset is not None and next_offset <= offset:
+            # advance next_offset to something useful >= offset
+            while next_offset is not None and next_offset < offset:
               while parseQ is not None and not in_offsets:
                 get_parse()
               if in_offsets:
@@ -281,7 +282,6 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
                   next_offset = next_offset2
               else:
                 next_offset = None
-            ##X("skip=%d, nothing to skip", skip)
             # how far to scan with the rolling hash, being from here to
             # next_offset minus a min_block buffer, capped by the length of
             # the current chunk
@@ -300,12 +300,15 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
                              )
                 if hash_value % 4093 == 1:
                   # found an edge with the rolling hash
-                  ##X("rolling hash found edge at %d bytes", upto)
                   release = True
                   advance_by = upto + 1
                   break
               if advance_by is None:
                 advance_by = scan_len
+                ##X("rolling hash found no match, advance by %d bytes", advance_by)
+              else:
+                ##X("rolling hash found match, advance by %d bytes", advance_by)
+                pass
             else:
               # nothing to skip, nothing to hash scan
               # ==> take everything up to next_offset
@@ -322,13 +325,15 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
           assert advance_by >= 0
           assert advance_by <= len(chunk)
           yield from pending.append(chunk[:advance_by])
+          last_offset = pending.offset
           offset += advance_by
           chunk = chunk[advance_by:]
+          recompute_offsets()
           if release:
             yield from pending.flush()
-            last_offset = offset
-            recompute_offsets()
+            last_offset = pending.offset
             hash_value = 0
+            recompute_offsets()
     # yield any left over data
     yield from pending.flush()
 
