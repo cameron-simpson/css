@@ -1,3 +1,4 @@
+setenv: remove cs.logutils, not py2.5 compatible
 vbox: support remote device import for mkvdi
 str: strace/ktrace wrapper, spawn ktrace + kdump -l
 vbox ls, status
