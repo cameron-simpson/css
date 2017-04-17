@@ -16,6 +16,7 @@ from cs.cmdutils import run
 from cs.logutils import setup_logging, warning, Pfx
 
 USAGE = r'''Usage:
+  %s [ls [VBoxManage list options...]]
   %s mkimg {path.vdi|uuid} [VBoxManage clonemedium options...]
   %s mkvdi img [VBoxManage convertfromraw options...]
   %s pause vmname [VBoxManage controlvm options...]
@@ -27,14 +28,15 @@ VBOXMANAGE = 'VBoxManage'
 
 def main(argv):
   cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
   setup_logging(cmd)
   badopts = False
   try:
     if not argv:
-      raise GetoptError("missing op")
+      argv.append('ls')
     op = argv.pop(0)
     with Pfx(op):
+      if op == "ls":      return cmd_ls(argv)
       if op == "mkimg":   return cmd_mkimg(argv)
       if op == "mkvdi":   return cmd_mkvdi(argv)
       if op == "pause":   return cmd_pause(argv)
@@ -48,6 +50,11 @@ def main(argv):
   if badopts:
     print(usage, file=sys.stderr)
     return 2
+
+def cmd_ls(argv):
+  if not argv:
+    argv.append('vms')
+  return run([VBOXMANAGE, 'list'] + argv)
 
 def cmd_mkimg(argv):
   if not argv:
