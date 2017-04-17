@@ -67,6 +67,8 @@ class bytes(object):
       return self.__s == other.__s
     if len(other) != len(self):
       return False
+    if isinstance(other, str):
+      other = bytes(other)
     for i, b in enumerate(self):
       if b != other[i]:
         return False
@@ -86,7 +88,7 @@ class bytes(object):
     return self.__s
   @staticmethod
   def join(bss):
-    return bytes(str.join(bss))
+    return bytes(''.join(bss))
   def decode(self, encoding='ascii', errors='strict'):
     return self.__s.decode(encoding, errors)
   def find(self, sub, *start_end):
@@ -133,6 +135,8 @@ class BytesFile(object):
 
   def close(self):
     return self.fp.close()
+
+joinbytes = bytes.join
 
 from struct import pack as _pack, unpack as _unpack
 
