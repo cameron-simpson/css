@@ -42,19 +42,12 @@ else:
 
   globals()['unicode'] = unicode
   from types import StringTypes
-  def ustr(s, e='utf-8', errors='strict'):
-    ''' Upgrade str to unicode, if it is a str. Leave other types alone.
-    '''
-    if isinstance(s, str):
-      try:
-        s = s.decode(e, errors)
-      except UnicodeDecodeError as ude:
-        from cs.logutils import warning
-        warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
-        s = s.decode(e, 'replace')
-    return s
   bytesjoin = ''.join
-  from Queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty
+  try:
+    from Queue import PriorityQueue
+  except ImportError:
+    pass
   from ConfigParser import SafeConfigParser as ConfigParser
   def iteritems(o):
     return o.iteritems()
@@ -68,7 +61,9 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-  from .py3_for2 import raise3, exec_code, bytes, BytesFile, joinbytes, pack, unpack
+  from .py3_for2 import raise3, exec_code, ustr, \
+                        bytes, BytesFile, joinbytes, \
+                        pack, unpack
 
 try:
   from struct import iter_unpack
