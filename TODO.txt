@@ -1,3 +1,4 @@
+setenv: remove cs.logutils, not py2.5 compatible
 ssh-opts: canonical capitalisation of option names
 portfwd: fix handling of CLAUSE with only one lowercase member
 portfwd: mkdir log directory if missing
