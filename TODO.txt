@@ -1,3 +1,4 @@
+is ctypes.addressof any use for i/o
 parser for .gz possible?
 venti: parser for .vtd files
 venti stream protocol: error flag, json flag (implies JSON additional payload)
