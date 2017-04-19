@@ -11,6 +11,7 @@ cmd=$0
 usage="Usage: $cmd filename"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+filename=$1; shift
 
 exec <"$filename"
 case "$filename" in
