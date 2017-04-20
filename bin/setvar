@@ -22,13 +22,16 @@ import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import error, warning, info, debug, Pfx, setup_logging
 import cs.sh
 
+cmd = None
+prefixes = []
+
 def main(argv):
+  global cmd
+  global prefixes
   cmd = os.path.basename(argv[0])
   args = argv[1:]
-  setup_logging(cmd)
 
   # load up the environ mapping
   environ = EnvMapping()
@@ -71,6 +74,36 @@ def main(argv):
       raise
     else:
       print "%s=%s; export %s;" % (var, cs.sh.quotestr(value), var)
+
+class Pfx(object):
+  def __init__(self, msg, *a):
+    self.msg = msg
+    self.args = a
+  def __enter__(self):
+    global prefixes
+    prefixes.append( (self.msg, self.args) )
+  def __exit__(self, *a):
+    prefixes.pop()
+
+def error(msg, *a):
+  errmsg(msg, *a)
+
+def warning(msg, *a):
+  errmsg('warning: '+msg, *a)
+
+def errmsg(msg, *a):
+  global cmd, prefixes
+  if a:
+    msg = msg % a
+  if prefixes:
+    msgs = []
+    for prefix, pa in prefixes:
+      if pa:
+        prefix = prefix % pa
+      msgs.append(prefix)
+    msgs.append(msg)
+    msg = ': '.join(msgs)
+  sys.stderr.write(cmd+': '+msg+'\n')
 
 def filevars(path):
   ''' Return a list of (var, value) tuples from the specific file.
@@ -173,7 +206,7 @@ def doCommand(argv, environ, named_vars):
         try:
           setvar(var, None, environ, named_vars)
         except ValueError, e:
-          error(str(e))
+          error("%s: %s", var, e)
   else:
     error("unsupported operation: %s", op)
 
