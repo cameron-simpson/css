@@ -49,7 +49,7 @@ from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
-DEFAULT_TAIL_PAUSE = 0.1
+DEFAULT_TAIL_PAUSE = 0.25
 
 try:
   from os import pread
@@ -1380,7 +1380,7 @@ def read_data(fp, nbytes, rsize=None):
   else:
     return b''.join(bss)
 
-def read_from(fp, rsize=None, tail_mode=False):
+def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
   ''' Generator to present text or data from an open file until EOF.
       `rsize`: read size, default: DEFAULT_READSIZE
       `tail_mode`: yield an empty chunk at EOF, allowing resumption
@@ -1388,12 +1388,16 @@ def read_from(fp, rsize=None, tail_mode=False):
   '''
   if rsize is None:
     rsize = DEFAULT_READSIZE
+  if tail_delay is None:
+    tail_delay = DEFAULT_TAIL_PAUSE
+  elif not tail_mode:
+    raise ValueError("tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay))
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
       if tail_mode:
         yield chunk
-        time.sleep(DEFAULT_TAIL_PAUSE)
+        time.sleep(tail_delay)
       else:
         break
     else:
