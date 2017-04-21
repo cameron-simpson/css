@@ -76,6 +76,8 @@ class CornuCopyBuffer(object):
         will be raised unless `short_ok` is true (default false)
         in which case the updated buffer will be short.
     '''
+    if min_size < 1:
+      raise ValueError("min_size must be >= 1, got %r" % (min_size,))
     length = len(self.buf)
     if length < min_size:
       bufs = [self.buf]
@@ -98,6 +100,16 @@ class CornuCopyBuffer(object):
           # but can continue iteration
           break
       self.buf = memoryview(b''.join(bufs))
+
+  def tail_extend(self, min_size):
+    ''' Extend method for parsers reading "tail"-like chunk streams,
+        typically raw reads from a growing file. These may read 0 bytes
+        at EOF, but a future read may read more bytes of the file grows.
+        Such an iterator can be obtained from
+        cs.fileutils.read_from(..,tail_mode=True).
+    '''
+    while min_size < self.length:
+      self.extend(min_size, short_ok=True)
 
   def take(self, size, short_ok=False):
     ''' Return the next `size` bytes.
