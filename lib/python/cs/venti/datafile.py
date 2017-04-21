@@ -147,22 +147,21 @@ class DataFile(MultiOpenMixin):
       os.write(wfd, bs)
     return offset, offset + len(bs)
 
-  def scan(self, do_decompress=False, offset=0):
-    ''' Scan the data file and yield (start_offset, flags, zdata, end_offset) tuples.
-        Start the scan ot `offset`, default 0.
-        If `do_decompress` is true, decompress the data and strip
-        that flag value.
-        This can be used in parallel with other activity, though
-        it may impact performance.
-    '''
-    with self:
-      while True:
-        try:
-          flags, data, offset2 = self._fetch(offset, do_decompress=do_decompress)
-        except EOFError:
-          break
-        yield offset, flags, data, offset2
-        offset = offset2
+def scan_datafile(pathname, offset=0, do_decompress=False):
+  ''' Scan a data file and yield (start_offset, flags, zdata, end_offset) tuples.
+      Start the scan ot `offset`, default 0.
+      If `do_decompress` is true, decompress the data and strip
+      that flag value.
+  '''
+  D = DataFile(pathname)
+  with D:
+    while True:
+      try:
+        flags, data, offset2 = self._fetch(offset, do_decompress=do_decompress)
+      except EOFError:
+        break
+      yield offset, flags, data, offset2
+      offset = offset2
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
