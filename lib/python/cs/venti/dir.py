@@ -177,12 +177,13 @@ class _Dirent(object):
     '''
     return id(self)
 
-  def pathto(self):
+  def pathto(self, R=None):
     ''' Return the path to this element if known.
+        `R`: optional root Dirent, default None.
     '''
     E = self
     path = []
-    while E is not None:
+    while E is not R:
       path.append(E.name)
       E = E.parent
     return os.path.join(*reversed(path))
