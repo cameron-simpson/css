@@ -10,6 +10,7 @@ import sys
 from cs.buffer import CornuCopyBuffer, chunky
 from cs.logutils import X, Pfx, PfxThread
 from cs.queues import IterableQueue
+from .datafile import scan_chunks
 
 def linesof(chunks):
   ''' Process binary chunks, yield binary lines ending in '\n'.
@@ -17,8 +18,10 @@ def linesof(chunks):
   '''
   pending = []
   for chunk in chunks:
+    # get a memoryview so that we can cheaply queue bits of it
     mv_chunk = memoryview(chunk)
     upto = 0
+    # but scan the chunk, because memoryviews do not have .find
     nlpos = chunk.find(b'\n')
     while nlpos >= 0:
       pending.append(mv_chunk[upto:nlpos+1])
@@ -26,16 +29,17 @@ def linesof(chunks):
       pending = []
       upto = nlpos + 1
       nlpos = chunk.find(b'\n', upto)
+    # stash incomplete line in pending
     if upto < len(chunk):
       pending.append(mv_chunk[upto:])
   if pending:
     yield b''.join(pending)
 
-def parse_text(bfr, prefixes=None):
+def scan_text(bfr, prefixes=None):
   ''' Scan textual data, yielding offsets of lines starting with
       useful prefixes, such as function definitions.
   '''
-  with Pfx("parse_text"):
+  with Pfx("scan_text"):
     if prefixes is None:
       prefixes = PREFIXES_ALL
     prefixes = [ ( prefix
@@ -59,23 +63,25 @@ def parse_text(bfr, prefixes=None):
         yield next_offset
       offset += len(line)
 
-parse_text_from_chunks = chunky(parse_text)
+scan_text_from_chunks = chunky(scan_text)
 
-def report_offsets(bfr, parser):
+def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
       `bfr`: a CornuCopyBuffer
-      `run_parser`: a callable with runs the parser; it should
-        accept a CornuCopyBuffer as its sole argument.
+      `run_parser`: a callable which runs the parser; it should accept a
+        CornuCopyBuffer as its sole argument.
       This function allocates an IterableQueue to receive the parser offset
       reports and sets the CornuCopyBuffer with report_offset copying
       offsets to the queue.
+      It is the task of the parser to call `bfr.report_offset` as
+      necessary to indicate suitable offsets.
   '''
   offsetQ = IterableQueue()
   if bfr.copy_offsets is not None:
     warning("bfr %s already has copy_offsets, replacing", bfr)
   bfr.copy_offsets = offsetQ.put
   def thread_body():
-    parser(bfr)
+    run_parser(bfr)
     offsetQ.close()
   T = PfxThread(target=thread_body)
   T.start()
@@ -83,17 +89,28 @@ def report_offsets(bfr, parser):
 
 report_offsets_from_chunks = chunky(report_offsets)
 
-def parse_mp3(bfr):
+def scan_vtd(bfr):
+  ''' Scan a datafile from `bfr` and yield chunk start offsets.
+  '''
+  with Pfx("scan_vtd"):
+    def run_parser(bfr):
+      for offset, *etc in scan_chunks(bfr):
+        bfr.report_offset(offset)
+    return report_offsets(bfr, run_parser)
+
+def scan_mp3(bfr):
+  ''' Scan MP3 data from `bfr` and yield frame start offsets.
+  '''
   from cs.mp3 import framesof as parse_mp3_from_buffer
-  with Pfx("parse_mp3"):
+  with Pfx("scan_mp3"):
     def run_parser(bfr):
       for frame in parse_mp3_from_buffer(bfr):
         pass
     return report_offsets(bfr, run_parser)
 
-parse_mp3_from_chunks = chunky(parse_mp3)
+scan_mp3_from_chunks = chunky(scan_mp3)
 
-def parse_mp4(bfr):
+def scan_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
   '''
   from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
@@ -103,16 +120,16 @@ def parse_mp4(bfr):
         pass
     return report_offsets(bfr, run_parser)
 
-parse_mp4_from_chunks = chunky(parse_mp4)
+parse_mp4_from_chunks = chunky(scan_mp4)
 
-def parser_from_filename(filename):
-  ''' Choose a parser based a filename.
-      Returns None if these is no special parser.
+def scanner_from_filename(filename):
+  ''' Choose a scanner based a filename.
+      Returns None if these is no special scanner.
   '''
   root, ext = splitext(basename(filename))
   if ext:
     assert ext.startswith('.')
-    parser = PARSERS_BY_EXT[lcext]
+    parser = SCANNERS_BY_EXT[lcext]
     if parser is not None:
       return parser
   return None
@@ -137,15 +154,16 @@ PREFIXES_SQL_DUMP = (
     'CREATE TABLE ',
 )
 
-PARSERS_BY_EXT = {
-  'go':     partial(parse_text, prefixes=PREFIXES_GO),
-  'mp3':    parse_mp3,
-  'mp4':    parse_mp4,
-  'pl':     partial(parse_text, prefixes=PREFIXES_PERL),
-  'pm':     partial(parse_text, prefixes=PREFIXES_PERL),
-  'py':     partial(parse_text, prefixes=PREFIXES_PYTHON),
-  'sh':     partial(parse_text, prefixes=PREFIXES_SH),
-  'sql':    partial(parse_text, prefixes=PREFIXES_SQL_DUMP),
+SCANNERS_BY_EXT = {
+  'go':     partial(scan_text, prefixes=PREFIXES_GO),
+  'mp3':    scan_mp3,
+  'mp4':    scan_mp4,
+  'pl':     partial(scan_text, prefixes=PREFIXES_PERL),
+  'pm':     partial(scan_text, prefixes=PREFIXES_PERL),
+  'py':     partial(scan_text, prefixes=PREFIXES_PYTHON),
+  'sh':     partial(scan_text, prefixes=PREFIXES_SH),
+  'sql':    partial(scan_text, prefixes=PREFIXES_SQL_DUMP),
+  'vtd':    scan_vtd,
 }
 
 PREFIXES_ALL = (
