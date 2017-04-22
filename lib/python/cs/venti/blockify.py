@@ -135,11 +135,11 @@ class _PendingBuffer(object):
       self.pending.append(chunk)
       self.pending_room -= len(chunk)
 
-def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autoblock=None):
-  ''' Generator which connects to a parser of a chunk stream to emit low level edge aligned data chunks.
-      `chunks`: a source iterable of data chunks, handed to `parser`
-      `parser`: a callable accepting an iterable of data chunks and
-        returning an iterable, such as a generator. `parser` may
+def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autoblock=None):
+  ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
+      `chunks`: a source iterable of data chunks, handed to `scanner`
+      `scanner`: a callable accepting an iterable of data chunks and
+        returning an iterable, such as a generator. `scanner` may
         be None, in which case only the rolling hash is used to
         locate boundaries.
       `min_block`: the smallest amount of data that will be used
@@ -147,10 +147,10 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
       `max_block`: the largest amount of data that will be used to
         create a Block, default MAX_BLOCKSIZE
       `min_autoblock`: the smallest amount of data that will be
-        used for the rolling hash fallback if `parser` is not None,
+        used for the rolling hash fallback if `scanner` is not None,
         default MIN_AUTOBLOCK
 
-      The iterable returned from `parser(chunks)` yields ints which are
+      The iterable returned from `scanner(chunks)` yields ints which are
       considered desirable block boundaries.
   '''
   with Pfx("blocked_chunks_of"):
@@ -170,32 +170,39 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
     if min_block >= max_block:
       raise ValueError("rejecting min_block:%d >= max_block:%d"
                        % (min_block, max_block))
-    # obtain iterator of chunks; avoids accidentally reusing chunks
+    # obtain iterator of chunks; this avoids accidentally reusing the chunks
     # if for example chunks is a sequence
     chunk_iter = iter(chunks)
-    if parser is None:
-      # no parser, consume the chunks directly
+    # Set up parseQ, an iterable yielding a mix of source data and
+    # offsets representing desirable block boundaries.
+    # If there is no scanner, this is just chunk_iter.
+    # If there is a scanner we dispatch the scanner in a separate
+    # Thread and feed it a tee() of chunk_iter, which copies chunks
+    # to the parseQ when chunks are obtained by the scanner. The
+    # Thread runs the scanner and copies its output offsets to the
+    # parseQ.
+    if scanner is None:
+      # No scanner, consume the chunks directly.
       parseQ = chunk_iter
       min_autoblock = min_block   # start the rolling hash earlier
     else:
       # Consume the chunks and offsets via a queue.
-      # The parser puts offsets onto the queue.
-      # When the parser fetches from the chunks, those chunks are copied to the queue.
-      # When the parser terminates, any remaining chunks are also copied to the queue.
+      # The scanner puts offsets onto the queue.
+      # When the scanner fetches from the chunks, those chunks are copied to the queue.
+      # When the scanner terminates, any remaining chunks are also copied to the queue.
       parseQ = IterableQueue();
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
         try:
-          for offset in parser(chunk_iter):
-            # the parser should yield only offsets, not chunks and offsets
+          for offset in scanner(chunk_iter):
+            # the scanner should yield only offsets, not chunks and offsets
             if not isinstance(offset, int):
-              warning("discarding non-int from parser %s: %s", parser, offset)
+              warning("discarding non-int from scanner %s: %s", scanner, offset)
             else:
               parseQ.put(offset)
         except Exception as e:
-          exception("exception from parser %s: %s", parser, e)
-        # consume the remainder of chunk_iter
-        # the tee() will copy it to parseQ
+          exception("exception from scanner %s: %s", scanner, e)
+        # Consume the remainder of chunk_iter; the tee() will copy it to parseQ.
         for chunk in chunk_iter:
           pass
         # end of offsets and chunks
@@ -225,9 +232,9 @@ def blocked_chunks_of(chunks, parser, min_block=None, max_block=None, min_autobl
             the earliest point at which we will accept a block boundary.
           The next_rolling_point is the offset at which we should
             start looking for automatic boundaries with the rolling
-            hash algorithm. Without an upstream parser this is the same
-            as first_possible_point, but if there is a parser then it
-            is further to give more opportunity for a parser boundary
+            hash algorithm. Without an upstream scanner this is the same
+            as first_possible_point, but if there is a scanner then it
+            is further to give more opportunity for a scanner boundary
             to be used in preference to an automatic boundary.
           The max_possible_point is last_offset+max_block,
             the latest point at which we will accept a block boundary;
