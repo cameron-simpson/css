@@ -37,6 +37,7 @@ from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
+from .parsers import scanner_from_filename
 from .paths import resolve
 from .store import MissingHashcodeError
 
@@ -162,7 +163,11 @@ class FileHandle(O):
     self.E.touch()
 
   def flush(self):
-    self.Eopen.flush()
+    ''' Commit file contents to Store.
+        Chooses a scanner based on the Dirent.name.
+    '''
+    scanner = scanner_from_filename(self.E.name)
+    self.Eopen.flush(scanner)
     ## no touch, already done by any writes
 
   def close(self):

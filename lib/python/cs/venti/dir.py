@@ -424,7 +424,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
-    self._block = self._open_file.close()
+    Eopen = self._open_file
+    Eopen.filename = self.name
+    self._block = Eopen.close()
     self._open_file = None
     self._check()
 
@@ -470,8 +472,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
       return len(self._open_file)
     return len(self.block)
 
-  def flush(self):
-    return self._open_file.flush()
+  def flush(self, scanner=None):
+    return self._open_file.flush(scanner)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
