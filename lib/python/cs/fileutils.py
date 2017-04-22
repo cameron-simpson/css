@@ -808,7 +808,7 @@ class BackedFile(object):
   def _reset(self, new_back_file, new_front_file):
     ''' Reset the state of this BackedFile.
         Set the front_file and back_file.
-        Note that the former front abd back files are not closed.
+        Note that the former front and back files are not closed.
     '''
     if new_front_file is None:
       new_front_file = TemporaryFile()
@@ -847,16 +847,23 @@ class BackedFile(object):
     self._lock.release()
 
   def close(self):
+    ''' Close the BackedFile.
+        Flush contents. Close the front_file  is necessary.
+    '''
     self.flush()
     if self._need_close_front:
       self.front_file.close()
     self.front_file = None
 
   def tell(self):
+    ''' Report the current file pointer offset.
+    '''
     return self._offset
 
   @locked
   def flush(self):
+    ''' Flush the I/O buffer of the front_file.
+    '''
     self.front_file.flush()
 
   @locked
@@ -867,6 +874,8 @@ class BackedFile(object):
 
   @locked
   def seek(self, pos, whence=SEEK_SET):
+    ''' Adjust the current file pointer offset.
+    '''
     if whence == SEEK_SET:
       self._offset = pos
     elif whence == SEEK_CUR:
@@ -914,6 +923,8 @@ class BackedFile(object):
 
   @locked
   def readinto(self, b):
+    ''' Read data into a bytearray.
+    '''
     start = self._offset
     end = start + len(b)
     back_file = self.back_file
@@ -943,6 +954,8 @@ class BackedFile(object):
 
   @locked
   def write(self, b):
+    ''' Write data to the front_file.
+    '''
     front_file = self.front_file
     start = self._offset
     front_file.seek(start)
