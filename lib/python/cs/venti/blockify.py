@@ -12,7 +12,6 @@ from cs.logutils import Pfx, PfxThread, debug, warning, exception, D, X
 from cs.queues import IterableQueue
 from cs.seq import tee
 from .block import Block, IndirectBlock, dump_block
-##from .parsers import rolling_hash_parser
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
@@ -84,13 +83,13 @@ def indirect_blocks(blocks):
       block = IndirectBlock(subblocks)
     yield block
 
-def blockify(data_chunks, parser=None):
-  return blocks_of(data_chunks, parser)
+def blockify(data_chunks, scanner=None):
+  return blocks_of(data_chunks, scanner)
 
-def blocks_of(chunks, parser, min_block=None, max_block=None):
+def blocks_of(chunks, scanner, min_block=None, max_block=None):
   ''' Wrapper for blocked_chunks_of which yields Blocks from the data chunks.
   '''
-  for chunk in blocked_chunks_of(chunks, parser, min_block=min_block, max_block=max_block):
+  for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block, max_block=max_block):
     yield Block(data=chunk)
 
 class _PendingBuffer(object):
