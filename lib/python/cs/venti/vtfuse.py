@@ -92,7 +92,7 @@ def handler(method):
       error("raising FuseOSError from OSError: %s", e)
       raise FuseOSError(e.errno) from e
     except Exception as e:
-      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
+      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s", method.__name__, a, kw, type(e), e)
       raise FuseOSError(errno.EINVAL) from e
     except BaseException as e:
       error("UNCAUGHT EXCEPTION")
@@ -164,7 +164,6 @@ class FileHandle(O):
   def flush(self):
     self.Eopen.flush()
     ## no touch, already done by any writes
-    ## self.E.touch()
 
   def close(self):
     ''' Close the file, mark its parent directory as changed.
