@@ -46,8 +46,11 @@ def encode_index_entry(n, offset):
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
   '''
-  self._last_scan_offset = 0
-  self._last_stat_size = 0
+
+  def __init__(self, **kw):
+    self._last_scan_offset = 0
+    self._last_stat_size = 0
+    SimpleNamespace.__init__(self, **kw)
 
   @property
   def pathname(self):
@@ -76,9 +79,9 @@ class _DataDirFile(SimpleNamespace):
       osize = self._last_stat_size
       if osize is None or size > osize:
         for offset, flags, data, offset2 \
-            in self.scan(offset=self.last_scan_offset, do_decompress=do_decompress):
+            in self.scan(offset=self._last_scan_offset, do_decompress=do_decompress):
           yield offset, flags, data, offset2
-        self.last_scan_offset = offset2
+        self._last_scan_offset = offset2
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
