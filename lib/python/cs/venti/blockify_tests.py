@@ -17,7 +17,7 @@ from cs.randutils import rand0, randblock
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore
-from .parsers import parse_text, parse_mp3, parse_mp4
+from .parsers import scan_text, scan_mp3, scan_mp4
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
@@ -49,16 +49,17 @@ class TestAll(unittest.TestCase):
   @skip
   def test01parsers(self):
     rand_total = sum(len(chunk) for chunk in random_data)
-    for parser in (parse_text, parse_mp3):
+    for parser in (scan_text, scan_mp3):
       with self.subTest(parser.__name__):
         input_chunks = self.random_data
-        if parser is parse_mp3:
+        if parser is scan_mp3:
           if os.path.exists('TEST.mp3'):
-            X("mp3 parse: replace input data with chunks from TEST.mp3")
+            ##X("mp3 parse: replace input data with chunks from TEST.mp3")
             input_chunks = read_from(open('TEST.mp3', 'rb'))
             input_desc = 'TEST.mp3'
           else:
-            X("no TEST.mp3 in ".os.getcwd())
+            ##X("no TEST.mp3 in ".os.getcwd())
+            pass
         Q = parser(input_chunks)
         offset = 0
         last_qoffset = 0
@@ -77,30 +78,32 @@ class TestAll(unittest.TestCase):
   def test02blocked_chunks_of(self):
     for parser in (
         None,
-        parse_text,
-        parse_mp3,
-        parse_mp4,
+        scan_text,
+        scan_mp3,
+        scan_mp4,
       ):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
           ('random data', self.random_data),
-          (__file__, [ self.mycode for _ in range(100) ]),
+          ('100 x ' + __file__, [ self.mycode for _ in range(100) ]),
         ):
         testfile = None
-        if parser is parse_mp3:
+        rfp = None
+        if parser is scan_mp3:
           testfile = 'TEST.mp3'
-        elif parser is parse_mp4:
+        elif parser is scan_mp4:
           testfile = 'TEST.mp4'
         if testfile is not None:
           if os.path.exists(testfile):
             X("%s: replace input data with chunks from %s", parser, testfile)
-            input_chunks = read_from(open(testfile, 'rb'))
+            rfp = open(testfile, 'rb')
+            input_chunks = read_from(rfp)
             input_desc = testfile
           else:
             X("%s: no %s in %s", parser, testfile, os.getcwd())
         with self.subTest("blocked_chunks_of",
                           parser=parser_desc,
-                          input_chunks=input_desc):
+                          source=input_desc):
           if True:
             source_chunks = input_chunks
             src_total = None
@@ -145,6 +148,9 @@ class TestAll(unittest.TestCase):
             self.assertEqual(src_total, chunk_total)
             self.assertEqual(b''.join(source_chunks),
                              b''.join(all_chunks))
+        if rfp is not None:
+          rfp.close()
+          rfp = None
 
   def test03blockifyAndRetrieve(self):
     with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
