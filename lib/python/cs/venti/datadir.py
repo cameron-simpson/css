@@ -23,7 +23,7 @@ from cs.resources import MultiOpenMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
-from .datafile import DataFile, read_chunk, DATAFILE_DOT_EXT
+from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
@@ -64,17 +64,12 @@ class _DataDirFile(SimpleNamespace):
     '''
     return os.stat(self.pathname).st_size
 
-  def scan_from(self, offset):
-    ''' Scan this datafile from the supplied `offset` yielding (data, offset, post_offset).
+  def scan(self, offset=0, do_decompress=False):
+    ''' Scan this datafile from the supplied `offset` (default 0) yielding (data, offset, post_offset).
         This is used by the monitor thread to add new third party data to the index.
     '''
     X("_DataDirFile.scanfrom(offset=%d)...", offset)
-    with open(self.pathname, "rb") as fp:
-      fp.seek(offset)
-      while True:
-        flags, data, post_offset = read_chunk(fp, do_decompress=True)
-        yield data, offset, post_offset
-        offset = post_offset
+    return scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
