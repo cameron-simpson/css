@@ -132,6 +132,8 @@ class FileHandle(O):
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
   def write(self, data, offset):
+    ''' Write data to the file.
+    '''
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
@@ -141,6 +143,8 @@ class FileHandle(O):
     return written
 
   def read(self, offset, size):
+    ''' Read data from the file.
+    '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
     fp = self.Eopen._open_file
@@ -152,6 +156,8 @@ class FileHandle(O):
     return data
 
   def truncate(self, length):
+    ''' Truncate the file, mark it as modified.
+    '''
     self.Eopen._open_file.truncate(length)
     self.E.touch()
 
@@ -161,6 +167,8 @@ class FileHandle(O):
     ## self.E.touch()
 
   def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
     self.Eopen.close()
     self.E.parent.change()
 
@@ -730,6 +738,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def flush(self, fh):
+    ''' Handle close() system call.
+    '''
     FH = self._vt_core._fh(fh)
     FH.flush()
     ## DONE BY FORGET? ## inum = self._vt_core.E2i(FH.E)
