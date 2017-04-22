@@ -6,6 +6,7 @@
 #
 
 from functools import partial
+from os.path import basename, splitext
 import sys
 from cs.buffer import CornuCopyBuffer, chunky
 from cs.logutils import X, Pfx, PfxThread
@@ -129,7 +130,7 @@ def scanner_from_filename(filename):
   root, ext = splitext(basename(filename))
   if ext:
     assert ext.startswith('.')
-    parser = SCANNERS_BY_EXT[lcext]
+    parser = SCANNERS_BY_EXT.get(ext[1:].lower())
     if parser is not None:
       return parser
   return None
