@@ -67,6 +67,16 @@ def read_chunk(fp, do_decompress=False):
     flags &= ~F_COMPRESSED
   return flags, data, offset
 
+def scan_chunks(fp, do_decompress=False):
+  ''' Read data chunks from `fp` and yield (offset, flags, data, offset2).
+      Raises EOFError on premature end of file.
+  '''
+  fp = fp.tell()
+  while True:
+    flags, data, offset2 = read_chunk(fp)
+    yield offset, flags, data, offset2
+    offset = offset2
+
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local venti Store.
