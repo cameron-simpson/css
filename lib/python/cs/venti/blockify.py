@@ -275,8 +275,8 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
             advance_by = min(first_possible_point - offset, len(chunk))
             hash_value = 0
           else:
-            # advance next_offset to something useful >= offset
-            while next_offset is not None and next_offset < offset:
+            # advance next_offset to something useful > offset
+            while next_offset is not None and next_offset <= offset:
               while parseQ is not None and not in_offsets:
                 get_parse()
               if in_offsets:
