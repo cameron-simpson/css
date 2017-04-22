@@ -264,9 +264,9 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
         get_parse()
       if in_chunks:
         chunk = memoryview(in_chunks.pop(0))
+        chunk_end_offset = offset + len(chunk)
         # process current chunk
         while chunk:
-          chunk_end_offset = offset + len(chunk)
           advance_by = None
           release = False   # becomes true if we should flush after taking data
           # see if we can skip some data completely
