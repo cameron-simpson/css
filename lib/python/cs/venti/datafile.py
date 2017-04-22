@@ -159,7 +159,7 @@ def scan_datafile(pathname, offset=None, do_decompress=False):
   with D:
     while True:
       try:
-        flags, data, offset2 = self._fetch(offset, do_decompress=do_decompress)
+        flags, data, offset2 = D._fetch(offset, do_decompress=do_decompress)
       except EOFError:
         break
       yield offset, flags, data, offset2
