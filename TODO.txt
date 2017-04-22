@@ -1,3 +1,4 @@
+blocked_chunks_of: restructure loop to advance at the top, use continue internally
 vtfuse.FileHandle use raw file instead of stdio
 is ctypes.addressof any use for i/o
 parser for .gz possible?
