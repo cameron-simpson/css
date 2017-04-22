@@ -8,6 +8,7 @@
 from functools import partial
 from itertools import chain
 import sys
+from cs.buffer import CornuCopyBuffer
 from cs.logutils import Pfx, PfxThread, debug, warning, exception, D, X
 from cs.queues import IterableQueue
 from cs.seq import tee
@@ -193,7 +194,7 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
         try:
-          for offset in scanner(chunk_iter):
+          for offset in scanner(CornuCopyBuffer(chunk_iter)):
             # the scanner should yield only offsets, not chunks and offsets
             if not isinstance(offset, int):
               warning("discarding non-int from scanner %s: %s", scanner, offset)
