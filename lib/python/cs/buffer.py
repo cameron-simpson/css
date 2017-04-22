@@ -148,10 +148,10 @@ class CornuCopyBuffer(object):
           `input_data` will still have been consumed.
     '''
     if whence is None:
-      whence == os.SEEK_SET
-    if whence == os.SEEK_SET:
+      whence = os.SEEK_SET
+    elif whence == os.SEEK_SET:
       pass
-    elif whence == os.SEE_CUR:
+    elif whence == os.SEEK_CUR:
       offset += self.offset
     else:
       raise ValueError("seek: unsupported whence value %s, must be os.SEEK_SET or os.SEEK_CUR"
@@ -200,6 +200,7 @@ class CornuCopyBuffer(object):
       offset += bufskip
     if toskip > 0:
       # advance the rest of the way
+      new_offset = offset + toskip
       seek = None
       chunks = self.input_data
       if copy_skip is None:
