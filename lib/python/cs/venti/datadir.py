@@ -46,18 +46,12 @@ def encode_index_entry(n, offset):
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
   '''
+  self._last_scan_offset = 0
+  self._last_stat_size = 0
 
   @property
   def pathname(self):
     return self.datadir.datapathto(self.filename)
-
-  @property
-  def last_stat_size(self):
-    return getattr(self, '_last_stat_size', None)
-
-  @last_stat_size.setter
-  def last_stat_size(self, new_size):
-    self._last_stat_size = new_size
 
   def stat_size(self):
     ''' Stat the datafile, return its size.
@@ -66,10 +60,25 @@ class _DataDirFile(SimpleNamespace):
 
   def scan(self, offset=0, do_decompress=False):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (data, offset, post_offset).
+    '''
+    X("_DataDirFile.scan(%r, offset=%d)...", self.pathname, offset)
+    return scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
+
+  def scan_new(self, do_decompress=False):
+    ''' Scan this datafile for new data.
         This is used by the monitor thread to add new third party data to the index.
     '''
-    X("_DataDirFile.scanfrom(offset=%d)...", offset)
-    return scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
+    try:
+      size = self.stat_size()
+    except OSError as e:
+      warning("%s: stat: %s", self.pathname, e)
+    else:
+      osize = self._last_stat_size
+      if osize is None or size > osize:
+        for offset, flags, data, offset2 \
+            in self.scan(offset=self.last_scan_offset, do_decompress=do_decompress):
+          yield offset, flags, data, offset2
+        self.last_scan_offset = offset2
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
@@ -250,36 +259,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         except KeyError:
           warning("missing entry %d in filemap", filenum)
           continue
-        try:
-          new_size = F.stat_size()
-        except OSError as e:
-          warning("%s: could not get file size: %s", F.pathname, e)
-          continue
-        old_size = F.last_stat_size
-        if ( new_size > F.size
-         and ( old_size is None or old_size < new_size )
-           ):
-          # scan data file for more blocks
-          try:
-            scan_data = F.scan_from(F.size)
-          except OSError as e:
-            warning("%s: could not scan: %s", F.pathname, e)
-            continue
-          advanced = False
-          try:
-            for data, offset, post_offset in scan_data:
-              hashcode = self.hashclass.from_data(data)
-              indexQ.put( (hashcode, filenum, offset) )
-              F.size = post_offset
-              advanced = True
-              if self._monitor_halt:
-                break
-          except EOFError as e:
-            warning("%s: EOF interrupts scan: %s", F.pathname, e)
-          F.last_stat_size = new_size
-          # update state after completion of a scan
-          if advanced:
-            self._save_state()
+        advanced = False
+        for offset, flags, data, offset2 in F.scan_new():
+          hashcode = self.hashclass.from_data(data)
+          indexQ.put( (hashcode, filenum, offset) )
+          advanced = True
+          if self._monitor_halt:
+            break
+        # update state after completion of a scan
+        if advanced:
+          self._save_state()
       sleep(1)
 
   def localpathto(self, rpath):
