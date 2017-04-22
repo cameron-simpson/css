@@ -147,12 +147,14 @@ class DataFile(MultiOpenMixin):
       os.write(wfd, bs)
     return offset, offset + len(bs)
 
-def scan_datafile(pathname, offset=0, do_decompress=False):
+def scan_datafile(pathname, offset=None, do_decompress=False):
   ''' Scan a data file and yield (start_offset, flags, zdata, end_offset) tuples.
       Start the scan ot `offset`, default 0.
       If `do_decompress` is true, decompress the data and strip
       that flag value.
   '''
+  if offset is None:
+    offset = 0
   D = DataFile(pathname)
   with D:
     while True:
