@@ -281,7 +281,6 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
                 get_parse()
               if in_offsets:
                 next_offset2 = in_offsets.pop(0)
-                assert isinstance(next_offset2, int)
                 if next_offset2 < next_offset:
                   warning("next offset %d < current next_offset:%d",
                           next_offset2, next_offset)
