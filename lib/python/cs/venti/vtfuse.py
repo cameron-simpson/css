@@ -76,14 +76,16 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
 def handler(method):
   ''' Decorator for FUSE handlers.
       Prefixes exceptions with the method name, associated with the
-      Store, prevents anything other than a FUSEOSError being raised.
+      Store, prevents anything other than a FuseOSError being raised.
   '''
   def handle(self, *a, **kw):
-    ##X("OP %s %r %r", method.__name__, a, kw)
+    ##X("OP %s %r %r ...", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
-          return method(self, *a, **kw)
+          result = method(self, *a, **kw)
+          ##X("OP %s %r %r => %r", method.__name__, a, kw, result)
+          return result
     except FuseOSError:
       raise
     except MissingHashcodeError as e:
