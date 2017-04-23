@@ -25,6 +25,7 @@ usage="Usage: $cmd [-c count] [{-F|-f flagname}] [-q] [-s sleep] [-V rtable] [-x
   -q        Quiet.
   -s sleep  Sleep period between probes.
   -V rtable Passed to ping.
+  -v        Verbose; passed to monitor(1cs).
   -x        Trace execution."
 
 badopts=
@@ -40,6 +41,7 @@ do
     -c) ping_count=$2; shift ;;
     -q) pingopts="$pingopts $1" mopts="$mopts $1" ;;
     -V) pingopts="$pingopts $1 $2"; shift ;;
+    -v) mopts="$mopts -v" ;;
     -x) dotrace=1; mopts="$mopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -98,4 +100,4 @@ then
   mopts="$mopts -f $flagname"
 fi
 
-exec $trace monitor $mopts "ping $pingopts $target" "$upcmd" "$downcmd"
+exec $trace monitor $mopts "ping $pingopts $target 2>/dev/null" "$upcmd" "$downcmd"

@@ -389,15 +389,19 @@ pidfile=`sshpidfile "$target"`
 
 # reload config on every pass
 # default command tails var/log/alert-local and wait for the parent sshd to exit
-cfg_command='pids=
+cfg_command='set -x
+             pids=
              [ ! -s var/log/alert-local ] || { tail -F var/log/alert-local & pids="$pids $!"; }
              exec >&2
+             trap "echo SIGNAL 1" 1
+             trap "echo SIGNAL 15" 15
              while kill -0 "$PPID"
              do
                sleep 5
              done
              [ -z "$pids" ] || kill $pids
             '
+cfg_command=
 cfg_outlog=alert-$target
 cfg_errlog=portfwd-$target
 getconfig "$target"
@@ -421,14 +425,15 @@ set --  \
     ssh $sshopts -F "$sshcfg" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert -t 'PORTFWD ${utarget}' CONNECTED: $target &" \
-      "$target" "$cfg_command" \
+      "$target"
+[ -z "$cfg_command" ] || set -- "$@" "$cfg_command"
 
 [ $doit ] || exec echo "$*"
 
 flag -w "$flag_connected" 0
 alert "STARTING: $target"
-tag_fd 2 "$target" \
-  $trace_dated \
+##tag_fd 2 "$target" \
+##  $trace_dated \
     "$@" \
     >>"$cfg_outlog" 2>>"$cfg_errlog" </dev/null &
 sshpid=$!
