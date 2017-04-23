@@ -78,10 +78,12 @@ class _DataDirFile(SimpleNamespace):
     else:
       osize = self._last_stat_size
       if osize is None or size > osize:
+        offset2 = self._last_scan_offset
         for offset, flags, data, offset2 \
             in self.scan(offset=self._last_scan_offset, do_decompress=do_decompress):
           yield offset, flags, data, offset2
         self._last_scan_offset = offset2
+        self._last_stat_size = size
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
