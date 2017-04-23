@@ -1,14 +1,4 @@
-blocked_chunks_of: restructure loop to advance at the top, use continue internally
-vtfuse.FileHandle use raw file instead of stdio
-is ctypes.addressof any use for i/o
-parser for .gz possible?
-venti: parser for .vtd files
-venti stream protocol: error flag, json flag (implies JSON additional payload)
-venti datafile parser
-flat file cache - keep multiple caches, set of hashes per file, pper limit, drop oldest file once set empty
-datafile: use os.open(O_APPEND) and raw fds, no buffering, no seek, no flush, separate fd for read
-stats in new vs existing blocks when adding blocks
-histograms on blockify block sizes
+is ctypes.addressof any use for i/o?
 ssh-opts: cononical capitalisation of option names
 cs.buffer
   unit tests
@@ -21,12 +11,16 @@ cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.block
 venti:
   daemon: listen on UNIX domain socket
   FIXED? BUG: new files forget their correct size on umount
+  stats in new vs existing blocks when adding blocks
+  flat file cache - keep multiple caches, set of hashes per file, pper limit, drop oldest file once set empty
+  datafile: use os.open(O_APPEND) and raw fds, no buffering, no seek, no flush, separate fd for read
   blockify
     sniff files to infer high level syntax
-    parsers:
-      * all parsers should accept chunks and return only offsets
-        now that blockify reads a copy of the chunks
+    histograms on blockify block sizes
+    parser for .gz possible?
+  stream protocol: error flag, json flag (implies JSON additional payload)
   blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
+  vtfuse.FileHandle use raw file instead of stdio
   File.close:
     get a preferred parser in from outside
     pass the parser to blockify
