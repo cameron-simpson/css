@@ -266,14 +266,34 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
         chunk = memoryview(in_chunks.pop(0))
         chunk_end_offset = offset + len(chunk)
         # process current chunk
+        advance_by = 0
+        release = False
         while chunk:
+          if advance_by > 0:
+            # advance through this chunk
+            # buffer the advance
+            # release ==> flush the buffer and update last_offset
+            assert advance_by is not None
+            assert advance_by >= 0
+            assert advance_by <= len(chunk)
+            yield from pending.append(chunk[:advance_by])
+            last_offset = pending.offset
+            offset += advance_by
+            chunk = chunk[advance_by:]
+            recompute_offsets()
+            if release:
+              yield from pending.flush()
+              last_offset = pending.offset
+              hash_value = 0
+              recompute_offsets()
+              release = False   # becomes true if we should flush after taking data
           advance_by = None
-          release = False   # becomes true if we should flush after taking data
           # see if we can skip some data completely
           # we don't care where the next_offset is if offset < first_possible_point
           if first_possible_point > offset:
             advance_by = min(first_possible_point - offset, len(chunk))
             hash_value = 0
+            continue
           else:
             # advance next_offset to something useful > offset
             while next_offset is not None and next_offset <= offset:
@@ -324,22 +344,7 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
               else:
                 take_to = min(next_offset, chunk_end_offset)
               advance_by = take_to - offset
-          # advance through this chunk
-          # buffer the advance
-          # release ==> flush the buffer and update last_offset
-          assert advance_by is not None
-          assert advance_by >= 0
-          assert advance_by <= len(chunk)
-          yield from pending.append(chunk[:advance_by])
-          last_offset = pending.offset
-          offset += advance_by
-          chunk = chunk[advance_by:]
-          recompute_offsets()
-          if release:
-            yield from pending.flush()
-            last_offset = pending.offset
-            hash_value = 0
-            recompute_offsets()
+
     # yield any left over data
     yield from pending.flush()
 
