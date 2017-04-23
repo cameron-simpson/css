@@ -307,6 +307,12 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
                 next_offset = next_offset2
             else:
               next_offset = None
+          # if the next_offset preceeds the next_rolling_point
+          # use the next_offfset immediately
+          if next_offset is not None and next_offset <= next_rolling_point:
+            advance_by = min(next_offset, chunk_end_offset) - offset
+            release = True
+            continue
           # how far to scan with the rolling hash, being from here to
           # next_offset minus a min_block buffer, capped by the length of
           # the current chunk
