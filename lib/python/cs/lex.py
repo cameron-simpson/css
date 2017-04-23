@@ -25,7 +25,7 @@ from cs.py3 import bytes, unicode, ustr, sorted, StringTypes, joinbytes
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
   def hexify(bs):
-    return binascii.hexlify(bs.as_str()).decode()
+    return binascii.hexlify(bs).decode()
 else:
   hexify = binascii.hexlify
 
