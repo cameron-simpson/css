@@ -82,8 +82,12 @@ def report_offsets(bfr, run_parser):
     warning("bfr %s already has copy_offsets, replacing", bfr)
   bfr.copy_offsets = offsetQ.put
   def thread_body():
-    run_parser(bfr)
-    offsetQ.close()
+    try:
+      run_parser(bfr)
+    except Exception:
+      raise
+    finally:
+      offsetQ.close()
   T = PfxThread(target=thread_body)
   T.start()
   return offsetQ
