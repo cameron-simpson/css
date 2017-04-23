@@ -294,56 +294,55 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
             advance_by = min(first_possible_point - offset, len(chunk))
             hash_value = 0
             continue
-          else:
-            # advance next_offset to something useful > offset
-            while next_offset is not None and next_offset <= offset:
-              while parseQ is not None and not in_offsets:
-                get_parse()
-              if in_offsets:
-                next_offset2 = in_offsets.pop(0)
-                if next_offset2 < next_offset:
-                  warning("next offset %d < current next_offset:%d",
-                          next_offset2, next_offset)
-                else:
-                  next_offset = next_offset2
+          # advance next_offset to something useful > offset
+          while next_offset is not None and next_offset <= offset:
+            while parseQ is not None and not in_offsets:
+              get_parse()
+            if in_offsets:
+              next_offset2 = in_offsets.pop(0)
+              if next_offset2 < next_offset:
+                warning("next offset %d < current next_offset:%d",
+                        next_offset2, next_offset)
               else:
-                next_offset = None
-            # how far to scan with the rolling hash, being from here to
-            # next_offset minus a min_block buffer, capped by the length of
-            # the current chunk
-            scan_to = min(max_possible_point, chunk_end_offset)
-            if next_offset is not None:
-              scan_to = min(scan_to, next_offset-min_block)
-            if scan_to > offset:
-              scan_len = scan_to - offset
-              found_offset = None
-              chunk_prefix = chunk[:scan_len]
-              for upto, b in enumerate(chunk[:scan_len]):
-                hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                               )
-                             | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                               )
-                             )
-                if hash_value % 4093 == 1:
-                  # found an edge with the rolling hash
-                  release = True
-                  advance_by = upto + 1
-                  break
-              if advance_by is None:
-                advance_by = scan_len
-                ##X("rolling hash found no match, advance by %d bytes", advance_by)
-              else:
-                ##X("rolling hash found match, advance by %d bytes", advance_by)
-                pass
+                next_offset = next_offset2
             else:
-              # nothing to skip, nothing to hash scan
-              # ==> take everything up to next_offset
-              # (and reset the hash)
-              if next_offset is None:
-                take_to = chunk_end_offset
-              else:
-                take_to = min(next_offset, chunk_end_offset)
-              advance_by = take_to - offset
+              next_offset = None
+          # how far to scan with the rolling hash, being from here to
+          # next_offset minus a min_block buffer, capped by the length of
+          # the current chunk
+          scan_to = min(max_possible_point, chunk_end_offset)
+          if next_offset is not None:
+            scan_to = min(scan_to, next_offset-min_block)
+          if scan_to > offset:
+            scan_len = scan_to - offset
+            found_offset = None
+            chunk_prefix = chunk[:scan_len]
+            for upto, b in enumerate(chunk[:scan_len]):
+              hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                             )
+                           | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                             )
+                           )
+              if hash_value % 4093 == 1:
+                # found an edge with the rolling hash
+                release = True
+                advance_by = upto + 1
+                break
+            if advance_by is None:
+              advance_by = scan_len
+              ##X("rolling hash found no match, advance by %d bytes", advance_by)
+            else:
+              ##X("rolling hash found match, advance by %d bytes", advance_by)
+              pass
+          else:
+            # nothing to skip, nothing to hash scan
+            # ==> take everything up to next_offset
+            # (and reset the hash)
+            if next_offset is None:
+              take_to = chunk_end_offset
+            else:
+              take_to = min(next_offset, chunk_end_offset)
+            advance_by = take_to - offset
 
     # yield any left over data
     yield from pending.flush()
