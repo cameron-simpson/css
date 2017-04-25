@@ -6,6 +6,7 @@
 
 from collections.abc import Mapping
 import csv
+import errno
 import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
@@ -19,9 +20,10 @@ from cs.fileutils import makelockfile, shortpath, longpath
 from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
-from .datafile import DataFile
+from .datafile import DataFile, read_chunk
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
@@ -69,6 +71,7 @@ class _DataDirFile(SimpleNamespace):
     ''' Scan this datafile from the supplied `offset` yielding (data, offset, post_offset).
         This is used by the monitor thread to add new third party data to the index.
     '''
+    X("_DataDirFile.scanfrom(offset=%d)...", offset)
     with open(self.pathname, "rb") as fp:
       fp.seek(offset)
       while True:
@@ -78,20 +81,20 @@ class _DataDirFile(SimpleNamespace):
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
+      A DataDir may be used as the Mapping for a MappingStore.
       NB: _not_ thread safe; callers must arrange that.
+
       The directory may be maintained by multiple instances of this
       class as they will not try to add data to the same DataFile.
       This is intended to address shared Stores such as a Store on
       a NAS presented via NFS, or a Store replicated by an external
       file-level service such as Dropbox or plain old rsync.
-
-      A DataDir may be used as the Mapping for a MappingStore.
   '''
 
   STATE_FILENAME_FORMAT = 'index-%s-state.csv'
   INDEX_FILENAME_FORMAT = 'index-%s.%s'
 
-  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None):
+  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
           about the DataFiles; this is the index-state.csv file and
@@ -107,9 +110,17 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `rollover`: data file roll over size; if a data file grows
             beyond this a new datafile is commenced for new blocks.
             Default: DEFAULT_ROLLOVER
+        `create_statedir`: os.mkdir the state directory if missing
+        `create_datadir`: os.mkdir the data directory if missing
     '''
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
+      # the "default" data dir may be created if the statedir exists
+      if ( create_datadir is None
+       and existspath(statedirpath)
+       and not existspath(datadirpath)
+         ):
+        create_datadir = True
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     if indexclass is None:
@@ -118,10 +129,23 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    if create_statedir is None:
+      create_statedir = False
+    if create_datadir is None:
+      create_datadir = False
     if not isdirpath(statedirpath):
-      raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
+      if create_statedir:
+        with Pfx("mkdir(%r)", statedirpath):
+          os.mkdir(statedirpath)
+      else:
+        raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
     if not isdirpath(datadirpath):
-      raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
+      if create_datadir:
+        with Pfx("mkdir(%r)", datadirpath):
+          os.mkdir(datadirpath)
+      else:
+        raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
+    MultiOpenMixin.__init__(self, lock=RLock())
     self.statedirpath = statedirpath
     self.datadirpath = datadirpath
     self.hashclass = hashclass
@@ -131,7 +155,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self._extra_state = {}
     self._n = None
     self._load_state()
-    MultiOpenMixin.__init__(self)
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
@@ -160,7 +183,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexpath, self.hashclass)
+    self.index = self.indexclass(self.indexpath, self.hashclass, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
@@ -203,12 +226,21 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     while not self._monitor_halt:
       # scan for new datafiles
       added = False
-      for filename in os.listdir(self.datadirpath):
-        if ( not filename.startswith('.')
-         and filename.endswith(DATAFILE_DOT_EXT)
-         and filename not in filemap):
-          self._add_datafile(filename, no_save=True)
-          added = True
+      with Pfx("listdir(%r)", self.datadirpath):
+        try:
+          listing = os.listdir(self.datadirpath)
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            error("listing failed: %s", e)
+            sleep(2)
+            continue
+          raise
+        for filename in os.listdir(self.datadirpath):
+          if ( not filename.startswith('.')
+           and filename.endswith(DATAFILE_DOT_EXT)
+           and filename not in filemap):
+            self._add_datafile(filename, no_save=True)
+            added = True
       if added:
         self._save_state()
       # now scan datafiles for new data
@@ -286,15 +318,26 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     with Pfx("_index_updater"):
       index = self.index
       unindexed = self._unindexed
+      busy = False
       for hashcode, n, offset in self._indexQ:
+        if not busy:
+          # take the lock; we hold it over the index updates
+          self._lock.acquire()
+          batch_size = 0
+        batch_size += 1
         index[hashcode] = n, offset
-        with self._lock:
-          try:
-            del unindexed[hashcode]
-          except KeyError:
-            # this can happens when the same key is indexed twice
-            # entirely plausible if a new datafile is added to the datadir
-            pass
+        try:
+          del unindexed[hashcode]
+        except KeyError:
+          # this can happens when the same key is indexed twice
+          # entirely plausible if a new datafile is added to the datadir
+          pass
+        busy = not self._indexQ.empty()
+        # we keep the lock until the queue is drained
+        if not busy:
+          self._lock.release()
+          if batch_size > 1:
+            X("_index_updater: processed %d indices while holding lock", batch_size)
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
@@ -364,13 +407,14 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     filemap = self._filemap
     if filename in filemap:
       raise KeyError('already in filemap: %r' % (filename,))
-    if filenum is None:
-      filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
-    elif filenum in filemap:
-      raise KeyError('already in filemap: %r' % (filennum,))
-    F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
-    filemap[filenum] = F
-    filemap[filename] = F
+    with self._lock:
+      if filenum is None:
+        filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
+      elif filenum in filemap:
+        raise KeyError('already in filemap: %r' % (filennum,))
+      F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
+      filemap[filenum] = F
+      filemap[filename] = F
     if not no_save:
       self._save_state()
     return F
@@ -406,11 +450,15 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     cache = self._cache
     D = cache.get(n)
     if D is None:
-      # not in the cache, open it
-      F = self._filemap[n]
-      readwrite = (n == self._n)
-      D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
-      D.open()
+      with self._lock:
+        # first, look again now that we have the _lock
+        D = cache.get(n)
+        if D is None:
+          # still not in the cache, open the DataFile and put into the cache
+          F = self._filemap[n]
+          readwrite = (n == self._n)
+          D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
+          D.open()
     return D
 
   @locked
@@ -425,22 +473,23 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         datafile has reached the rollover threshold.
     '''
     # save the data in the current datafile, record the file number and offset
-    n, D = self._current_output_datafile()
-    with D:
-      offset, offset2 = D.add(data)
+    with self._lock:
+      n, D = self._current_output_datafile()
+      with D:
+        offset, offset2 = D.add(data)
+        ##X("DataDir.add: added data: %d bytes => %d consumed", len(data), offset2-offset)
+      F = self._filemap[n]
+      if offset2 <= F.size:
+        raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
+                           % (F.filename, offset2, F.size))
+      F.size = offset2
     hashcode = self.hashclass.from_data(data)
+    ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, n, offset)
     rollover = self.rollover
-    if rollover is not None and offset2 >= rollover:
-      with self._lock:
-        # we're still the current file? then advance to a new file
-        if self.n == n:
-          self.n = self.next_n()
-    F = self._filemap[n]
-    if offset2 <= F.size:
-      raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
-                         % (F.filename, offset2, F.size))
-    F.size = offset2
+    with self._lock:
+      if rollover is not None and offset2 >= rollover:
+        self._n = None
     return hashcode
 
   def __setitem__(self, hashcode, data):
@@ -487,7 +536,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     except KeyError:
       index = self.index
       try:
-        n, offset = index[hashcode]
+        with self._lock:
+          n, offset = index[hashcode]
       except KeyError:
         error("%s[%s]: hash not in index", self, hashcode)
         raise
@@ -533,7 +583,6 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __iter__(self):
     mkhash = self.hashclass.from_hashbytes
-    self.flush()
     with self._gdbm_lock:
       hashcode = self._gdbm.firstkey()
     while hashcode is not None:
@@ -543,18 +592,15 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
         hashcode = self._gdbm.nextkey(hashcode)
 
   def __contains__(self, hashcode):
-    self.flush()
     with self._gdbm_lock:
       return hashcode in self._gdbm
 
   def __getitem__(self, hashcode):
-    self.flush()
     with self._gdbm_lock:
       entry = self._gdbm[hashcode]
     return decode_index_entry(entry)
 
   def get(self, hashcode, default=None):
-    self.flush()
     with self._gdbm_lock:
       entry = self._gdbm.get(hashcode, None)
     if entry is None:

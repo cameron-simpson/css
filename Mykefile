@@ -59,6 +59,11 @@ _help:
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
 
+_tags:  tags
+
+tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
+        ctags -R -o tags cs/
+
 _updcss:
         ./bin-cs/updcss
 

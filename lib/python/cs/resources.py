@@ -86,9 +86,10 @@ class MultiOpenMixin(O):
     self.opened = True
     with self._lock:
       self._opens += 1
-      if self._opens == 1:
-        self._finalise = Condition(self._lock)
-        self.startup()
+      opens = self._opens
+    if opens == 1:
+      self._finalise = Condition(self._lock)
+      self.startup()
     return self
 
   def close(self, enforce_final_close=False):
@@ -105,13 +106,14 @@ class MultiOpenMixin(O):
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      if self._opens == 0:
-        self.shutdown()
-        if not self._finalise_later:
-          self.finalise()
-      else:
-        if enforce_final_close:
-          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      opens = self._opens
+    if opens == 0:
+      self.shutdown()
+      if not self._finalise_later:
+        self.finalise()
+    else:
+      if enforce_final_close:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().

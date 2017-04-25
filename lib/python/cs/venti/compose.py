@@ -4,11 +4,11 @@
 #   - Cameron Simpson <cs@zip.com.au> 20dec2016
 #
 
-from os.path import isabs as isabspath, abspath
+from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath
-from cs.logutils import Pfx, X
+from cs.logutils import Pfx, X, debug
 from cs.threads import locked
 from cs.py.func import prop
 from .store import ChainStore, DataDirStore
@@ -36,7 +36,6 @@ def Store(store_spec, config=None):
             continue
           raise ValueError("unexpected separator %r at offset %d, expected ':'"
                            % (sep, offset-1))
-    X("stores = %r", stores)
     if not stores:
       raise ValueError("no stores in %r" % (store_spec,))
     if len(stores) == 1:
@@ -144,6 +143,7 @@ class ConfigFile(ConfigWatcher):
 
   @locked
   def Store(self, clause_name):
+    debug("ConfigFile.Store(clause_name=%r)...", clause_name)
     S = self._stores.get(clause_name)
     if S is None:
       store_name = "%s[%s]" % (self, clause_name)
@@ -156,14 +156,22 @@ class ConfigFile(ConfigWatcher):
           path = clause.get('path')
           if path is None:
             path = clause_name
+            debug("path from clausename: %r", path)
           path = longpath(path)
+          debug("longpath(path) ==> %r", path)
           if not isabspath(path):
             if path.startswith('./'):
               path = abspath(path)
+              debug("abspath ==> %r", path)
             else:
               statedir = clause.get('statedir')
+              debug("statedir=%r", statedir)
               if statedir is None:
                 raise ValueError('relative path %r but no statedir' % (path,))
+              statedir = longpath(statedir)
+              debug("longpath(statedir) ==> %r", statedir)
+              path = joinpath(statedir, path)
+              debug("path ==> %r", path)
           datapath = clause.get('data')
           if datapath is not None:
             datapath = longpath(datapath)

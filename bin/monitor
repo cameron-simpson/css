@@ -12,6 +12,7 @@ dotrace=
 sleep_time=11
 setflag=
 flagname=
+flagopts=
 probecmd=
 upcmd=
 downcmd=
@@ -24,6 +25,7 @@ usage="Usage: $cmd [-0] [-1] [-f flagname] [-q] [-s sleep] [-x] probe-shcmd [up-
   -f flagname Specify flag name.
             If specified, up-shcmd and down-shcmd may be omitted.
   -q        Quiet.
+  -v        Verbose.
   -s sleep  Sleep period between probes. Default: $sleep_time.
   -x        Trace execution."
 
@@ -37,6 +39,7 @@ do
     -f) setflag=1 flagname=$2; shift ;;
     -q) quiet=1 ;;
     -s) sleep_time=$2; shift ;;
+    -v) flagopts="$flagopts -v" ;;
     -x) dotrace=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -90,8 +93,8 @@ fi
 if [ $setflag ]
 then
   qflagname=$( shqstr "$flagname" )
-  upcmd="flag $qflagname 1; $upcmd"
-  downcmd="flag $qflagname 1; $downcmd"
+  upcmd="flag $flagopts $qflagname 1; $upcmd"
+  downcmd="flag $flagopts $qflagname 0; $downcmd"
 fi
 
 retry_upcmd=
@@ -99,6 +102,14 @@ retry_downcmd=
 
 while :
 do
+  # if we're controlling a flag, use it to track state stages
+  if [ $setflag ]
+  then
+    if flag "$flagname"
+    then  up=1
+    else  up=
+    fi
+  fi
   if ( [ -z "$quiet" ] || exec >/dev/null
        $trace sh -c "$setx; $probecmd"
      )
@@ -113,7 +124,6 @@ do
     else
       # newly up - note new state and run upcmd
       up=1
-      [ $setflag ] && flag "$flagname" 1
       if [ -z "$upcmd" ] || $trace sh -c "$setx; $upcmd"
       then retry_upcmd=
       else retry_upcmd=1

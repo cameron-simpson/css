@@ -74,7 +74,8 @@ def decodeBlock(bs, offset=0, length=None):
                 type 3: suboffset, super block
               }
   '''
-  with Pfx('decodeBlock(bs, offset=%d,length=%s)', offset, length):
+  with Pfx('decodeBlock(bs=%r,offset=%d,length=%s)',
+           bs[offset:offset+16], offset, length):
     if length is None:
       length, offset = get_bs(bs, offset)
       return decodeBlock(bs, offset, length)
@@ -427,11 +428,7 @@ class HashCodeBlock(_Block):
     '''
     S = defaults.S
     hashcode = self.hashcode
-    try:
-      return S[hashcode]
-    except KeyError as e:
-      error("%s: data for hashcode %s not available: %s", self, hashcode, e)
-      raise IOError("data for hashcode %s not available: %s" % (hashcode, e)) from e
+    return S[hashcode]
 
   def encode(self):
     flags = 0
@@ -443,6 +440,8 @@ class HashCodeBlock(_Block):
 
   @property
   def data(self):
+    ''' The direct data of this Block.
+    '''
     return self.stored_data()
 
 def Block(hashcode=None, data=None, span=None):

@@ -173,6 +173,11 @@ class Range(object):
       for x in range( *_span ):
         yield x
 
+  def __bool__(self):
+    return len(self._spans) > 0
+
+  __nonzero__ = __bool__
+
   def __len__(self):
     return sum( [ end-start for start, end in self._spans ] )
 
@@ -197,18 +202,21 @@ class Range(object):
       return 0
 
   def isempty(self):
-    ''' Test if the Range is empty; it has no spans.
+    ''' Test if the Range is empty.
     '''
-    return len(self._spans) == 0
+    return not self
 
   def __contains__(self, x):
     ''' Test `x` to see if it is wholly contained in this Range.
-        `x` may be another Range, a single int or an iterable
+        `x` may be another Range, a Span, or a single int or an iterable
         yielding a pair of ints.
     '''
     if isinstance(x, Range):
       return self.issuperset(x)
-    if isinstance(x, int):
+    if isinstance(x, Span):
+      start = x.start
+      end = x.end
+    elif isinstance(x, int):
       start, end = x, x+1
     else:
       start, end = list(x)
