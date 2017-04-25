@@ -1,3 +1,4 @@
+meta: user.mime_type
 is ctypes.addressof any use for i/o?
 ssh-opts: cononical capitalisation of option names
 cs.buffer
@@ -10,6 +11,7 @@ mp4/iso14496
 cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.blockify
 venti:
   daemon: listen on UNIX domain socket
+    test access to socket via ssh forwarding
   FIXED? BUG: new files forget their correct size on umount
   stats in new vs existing blocks when adding blocks
   flat file cache - keep multiple caches, set of hashes per file, pper limit, drop oldest file once set empty
@@ -20,7 +22,9 @@ venti:
     parser for .gz possible?
   stream protocol: error flag, json flag (implies JSON additional payload)
   blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
-  vtfuse.FileHandle use raw file instead of stdio
+  vtfuse
+    store content-type in xattrs
+    FileHandle use raw file instead of stdio
   File.close:
     get a preferred parser in from outside
     pass the parser to blockify
