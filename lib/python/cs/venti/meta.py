@@ -721,10 +721,12 @@ class Meta(dict):
 
   @staticmethod
   def _xattrify(xkv):
+    ''' Convert value `xkv` to bytes.
+    '''
     if isinstance(xkv, bytes):
       return xkv
     if isinstance(xkv, str):
-      return xkv.encode('iso8859-1')
+      return xkv.encode('uft-8')
     raise TypeError("cannot convert to bytes: %r" % (xkv,))
 
   def getxattr(self, xk, xv_default):
@@ -742,3 +744,15 @@ class Meta(dict):
 
   def listxattrs(self):
     return self._xattrs.keys()
+
+  @property
+  def mime_type(self):
+    return self.getxattr('user.mime_type', None)
+
+  @mime_type.setter
+  def mime_type(self, new_type):
+    self.setxattr('user.mime_type', value)
+
+  @mime_type.deleter
+  def mime_type(self):
+    self.delxattr('user.mime_type')
