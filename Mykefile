@@ -146,9 +146,19 @@ _bin_$((bin_suffixes)):
     @sfx=$(@S[_]) \
     base=bin-$$sfx \
     target=$(HOME)/$$base \
-    echo "update $$target ..." \
-    skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
-    pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/"
+    if [ -d "$$target/" ] \
+    then \
+      if [ -d "$$base/" ] \
+      then \
+        echo "update $$target ..." \
+        skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
+        pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/" \
+      else \
+        echo "WARNING: no $$base" >&2 \
+      fi \
+    else \
+      echo "WARNING: no $$target" >&2 \
+    fi
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
