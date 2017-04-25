@@ -139,6 +139,11 @@ def scanner_from_filename(filename):
       return parser
   return None
 
+def scanner_from_mime_type(mime_type):
+  ''' Choose a scanner based a mime_type.
+  '''
+  return SCANNERS_BY_MIME_TYPE.get(mime_type)
+
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
     'def ', '  def ', '    def ', '\tdef ',
@@ -169,6 +174,16 @@ SCANNERS_BY_EXT = {
   'sh':     partial(scan_text, prefixes=PREFIXES_SH),
   'sql':    partial(scan_text, prefixes=PREFIXES_SQL_DUMP),
   'vtd':    scan_vtd,
+}
+
+SCANNERS_BY_MIME_TYPE = {
+  'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
+  'audio/mpeg':    scan_mp3,
+  'video/mp4':     scan_mp4,
+  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
+  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
+  'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
+  'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),
 }
 
 PREFIXES_ALL = (
