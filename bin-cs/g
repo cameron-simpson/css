@@ -39,12 +39,14 @@ else
     shift
 fi
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
 # no files? read from stdin: must not be a tty
-[ $# = 0 -a -t 0 ] && { echo "$cmd: I expect filenames if stdin is a tty!" >&2
-			exit 2
-		      }
+if [ $# = 0 -a -t 0 ]
+then
+  echo "$cmd: I expect filenames if stdin is a tty!" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -- "$grep" -in $flags "$ptn" ${1+"$@"}
 
