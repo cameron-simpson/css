@@ -8,6 +8,9 @@ set -ue
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 
 ptopts=
+gaopts=
+[ -t 1 ] && gaopts=-C
+
 while [ $# -gt 0 ]
 do
   case $1 in
@@ -29,6 +32,6 @@ esac
 
 if [ $# = 0 ]
 then  $pt
-else  $pt | grepall "$@"
+else  $pt | grepall -H -i $gaopts "$@"
 fi \
 | entilde

@@ -15,13 +15,13 @@ needoptcss=
 pfxstderr=
 dotrace=
 trace=
-if [ -t 2 ]
-then
-  needoptcss=1
-  pfxstderr=1
-  dotrace=1
-  trace=set-x
-fi
+##if [ -t 2 ]
+##then
+##  needoptcss=1
+##  pfxstderr=1
+##  dotrace=1
+##  trace=set-x
+##fi
 
 cmd=$0
 usage="Usage: $cmd host1\!host2... [ssh-options...]"
