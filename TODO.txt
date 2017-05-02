@@ -1,3 +1,4 @@
+portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
 e: sort entries
 rename shortpath-prompt to short-path, make path breaking shortenings options (for prompt mode), make it work with relative paths and files as endpoints
