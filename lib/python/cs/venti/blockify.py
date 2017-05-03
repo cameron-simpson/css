@@ -135,7 +135,9 @@ class _PendingBuffer(object):
       self.pending.append(chunk)
       self.pending_room -= len(chunk)
 
-def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autoblock=None):
+def blocked_chunks_of(chunks, scanner,
+        min_block=None, max_block=None, min_autoblock=None,
+        histogram=None):
   ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `scanner`
       `scanner`: a callable accepting an iterable of data chunks and
@@ -149,6 +151,9 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
       `min_autoblock`: the smallest amount of data that will be
         used for the rolling hash fallback if `scanner` is not None,
         default MIN_AUTOBLOCK
+      `histogram`: if not None, a defaultdict(int) to collate counts.
+        Integer indices count block sizes and string indices are used
+        for 'bytes_total' and 'bytes_hash_scanned'.
 
       The iterable returned from `scanner(chunks)` yields ints which are
       considered desirable block boundaries.
@@ -276,13 +281,25 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
             assert advance_by is not None
             assert advance_by >= 0
             assert advance_by <= len(chunk)
-            yield from pending.append(chunk[:advance_by])
+            # save the advance bytes and yield any overflow
+            for out_chunk in pending.append(chunk[:advance_by]):
+              yield out_chunk
+              if histogram:
+                out_chunk_size = len(out_chunk)
+                histogram['bytes_total'] += out_chunk_size
+                histogram[out_chunk_size] += 1
             last_offset = pending.offset
             offset += advance_by
             chunk = chunk[advance_by:]
             recompute_offsets()
             if release:
-              yield from pending.flush()
+              # yield the current pending data
+              for out_chunk in pending.flush():
+                yield out_chunk
+                if histogram:
+                  out_chunk_size = len(out_chunk)
+                  histogram['bytes_total'] += out_chunk_size
+                  histogram[out_chunk_size] += 1
               last_offset = pending.offset
               hash_value = 0
               recompute_offsets()
@@ -333,6 +350,8 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
                 # found an edge with the rolling hash
                 release = True
                 advance_by = upto + 1
+                if histogram:
+                  histogram['bytes_hash_scanned'] += upto + 1
                 break
             if advance_by is None:
               advance_by = scan_len
@@ -351,7 +370,12 @@ def blocked_chunks_of(chunks, scanner, min_block=None, max_block=None, min_autob
             advance_by = take_to - offset
 
     # yield any left over data
-    yield from pending.flush()
+    for out_chunk in pending.flush():
+      yield out_chunk
+      if histogram:
+        out_chunk_size = len(out_chunk)
+        histogram['bytes_total'] += out_chunk_size
+        histogram[out_chunk_size] += 1
 
 if __name__ == '__main__':
   import cs.venti.blockify_tests
