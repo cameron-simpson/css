@@ -207,6 +207,7 @@ def onetomany(func):
 
 def isordered(s, reverse=False, strict=False):
   first = True
+  prev = None
   for i, item in enumerate(s):
     if not first:
       if reverse:
