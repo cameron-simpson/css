@@ -7,6 +7,7 @@
 from __future__ import with_statement
 import sys
 from threading import Lock, Thread
+from cs.asynchron import Result
 from cs.fileutils import RWFileBlockCache
 import cs.later
 from cs.lex import hexify
