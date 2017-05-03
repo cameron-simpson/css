@@ -200,6 +200,10 @@ class FileCacheStore(BasicStoreSync):
     self.cache[h] = data
     return h
 
+  # add is very fast, don't bother with the Later scheduler
+  def add_bg(self, data):
+    return Result(result=self.add(data))
+
   def get(self, h):
     try:
       data = self.cache[h]
