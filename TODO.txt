@@ -1,3 +1,4 @@
+vt ar yields .vtd file whose first block is a LiteralDirent and all dependent Blocks are in the vtd file
 mbox look for nn and rnrn
 meta: user.mime_type
 is ctypes.addressof any use for i/o?
