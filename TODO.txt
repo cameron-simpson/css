@@ -1,3 +1,4 @@
+colourise command highlighing multiple regexps and line ranges
 mailfiler: prepend received lines on pickup and filing
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
