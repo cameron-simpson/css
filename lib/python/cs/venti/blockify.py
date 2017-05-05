@@ -292,6 +292,7 @@ def blocked_chunks_of(chunks, scanner,
               out_chunk_size = len(out_chunk)
               histogram['bytes_total'] += out_chunk_size
               histogram[out_chunk_size] += 1
+              histogram['buffer_overflow_chunks'] += 1
           offset += advance_by
           chunk = chunk[advance_by:]
           if last_offset != pending.offset:
