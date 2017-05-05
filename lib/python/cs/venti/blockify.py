@@ -284,7 +284,7 @@ def blocked_chunks_of(chunks, scanner,
             # save the advance bytes and yield any overflow
             for out_chunk in pending.append(chunk[:advance_by]):
               yield out_chunk
-              if histogram:
+              if histogram is not None:
                 out_chunk_size = len(out_chunk)
                 histogram['bytes_total'] += out_chunk_size
                 histogram[out_chunk_size] += 1
@@ -296,7 +296,7 @@ def blocked_chunks_of(chunks, scanner,
               # yield the current pending data
               for out_chunk in pending.flush():
                 yield out_chunk
-                if histogram:
+                if histogram is not None:
                   out_chunk_size = len(out_chunk)
                   histogram['bytes_total'] += out_chunk_size
                   histogram[out_chunk_size] += 1
@@ -329,7 +329,7 @@ def blocked_chunks_of(chunks, scanner,
           if next_offset is not None and next_offset <= next_rolling_point:
             advance_by = min(next_offset, chunk_end_offset) - offset
             release = True
-            if histogram:
+            if histogram is not None:
               histogram['offsets_from_scanner'] += 1
             continue
           # how far to scan with the rolling hash, being from here to
@@ -352,7 +352,7 @@ def blocked_chunks_of(chunks, scanner,
                 # found an edge with the rolling hash
                 release = True
                 advance_by = upto + 1
-                if histogram:
+                if histogram is not None:
                   histogram['offsets_from_hash_scan'] += 1
                   histogram['bytes_hash_scanned'] += upto + 1
                 break
@@ -375,7 +375,7 @@ def blocked_chunks_of(chunks, scanner,
     # yield any left over data
     for out_chunk in pending.flush():
       yield out_chunk
-      if histogram:
+      if histogram is not None:
         out_chunk_size = len(out_chunk)
         histogram['bytes_total'] += out_chunk_size
         histogram[out_chunk_size] += 1
