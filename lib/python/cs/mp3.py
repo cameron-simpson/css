@@ -105,3 +105,7 @@ def framesof(bfr):
     bfr.extend(advance_by)
     yield bfr.buf[:advance_by]
     bfr.skip(advance_by)
+
+if __name__ == '__main__':
+  import cs.mp3_tests
+  cs.mp3_tests.selftest(sys.argv)
