@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from collections import defaultdict
 import os
 import os.path
 import sys
@@ -120,7 +121,8 @@ class TestAll(unittest.TestCase):
           offset = 0
           prev_chunk = None
           chunky_parser = chunky(parser) if parser else None
-          for chunk in blocked_chunks_of(source_chunks, chunky_parser):
+          histogram = defaultdict(int)
+          for chunk in blocked_chunks_of(source_chunks, chunky_parser, histogram=histogram):
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
@@ -144,6 +146,9 @@ class TestAll(unittest.TestCase):
             input_desc, parser_desc,
             nchunks, end_time-start_time, chunk_total,
             float(chunk_total) / (end_time-start_time))
+          X("    %d offsets from parser, %d offsets from hash scan",
+            histogram['offsets_from_hash_scan'],
+            histogram['offsets_from_scanner'])
           if src_total is not None:
             self.assertEqual(src_total, chunk_total)
             self.assertEqual(b''.join(source_chunks),
