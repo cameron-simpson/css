@@ -206,6 +206,10 @@ def onetomany(func):
   return gather
 
 def isordered(s, reverse=False, strict=False):
+  ''' Test whether an iterable is ordered.
+      Note that the iterable is iterated, so this is a destructive
+      test for nonsequences.
+  '''
   first = True
   prev = None
   for i, item in enumerate(s):
@@ -215,11 +219,10 @@ def isordered(s, reverse=False, strict=False):
       else:
         ordered = item > prev if strict else item >= prev
       if not ordered:
-        raise AssertionError(
-                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
-                % (reverse, strict, i-1, i, prev, item))
+        return False
     prev = item
     first = False
+  return True
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
