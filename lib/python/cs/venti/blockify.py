@@ -275,8 +275,8 @@ def blocked_chunks_of(chunks, scanner,
       chunk = memoryview(in_chunks.pop(0))
       chunk_end_offset = offset + len(chunk)
       # process current chunk
-      advance_by = 0
-      release = False
+      advance_by = 0    # how much data to add to the pending buffer
+      release = False   # whether we hit a boundary ==> flush the buffer
       while chunk:
         if advance_by > 0:
           # advance through this chunk
