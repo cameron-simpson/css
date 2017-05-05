@@ -9,7 +9,7 @@ from functools import partial
 from os.path import basename, splitext
 import sys
 from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import X, Pfx, PfxThread
+from cs.logutils import X, Pfx, PfxThread, exception
 from cs.queues import IterableQueue
 from .datafile import scan_chunks
 
@@ -77,20 +77,23 @@ def report_offsets(bfr, run_parser):
       It is the task of the parser to call `bfr.report_offset` as
       necessary to indicate suitable offsets.
   '''
-  offsetQ = IterableQueue()
-  if bfr.copy_offsets is not None:
-    warning("bfr %s already has copy_offsets, replacing", bfr)
-  bfr.copy_offsets = offsetQ.put
-  def thread_body():
-    try:
-      run_parser(bfr)
-    except Exception:
-      raise
-    finally:
-      offsetQ.close()
-  T = PfxThread(target=thread_body)
-  T.start()
-  return offsetQ
+  with Pfx("report_offsets(bfr,run_parser=%s)", run_parser):
+    offsetQ = IterableQueue()
+    if bfr.copy_offsets is not None:
+      warning("bfr %s already has copy_offsets, replacing", bfr)
+    bfr.copy_offsets = offsetQ.put
+    def thread_body():
+      with Pfx("parser-thread"):
+        try:
+          run_parser(bfr)
+        except Exception as e:
+          exception("exception: %s", e)
+          raise
+        finally:
+          offsetQ.close()
+    T = PfxThread(target=thread_body)
+    T.start()
+    return offsetQ
 
 report_offsets_from_chunks = chunky(report_offsets)
 
