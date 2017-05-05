@@ -292,10 +292,11 @@ def blocked_chunks_of(chunks, scanner,
               out_chunk_size = len(out_chunk)
               histogram['bytes_total'] += out_chunk_size
               histogram[out_chunk_size] += 1
-          last_offset = pending.offset
           offset += advance_by
           chunk = chunk[advance_by:]
-          recompute_offsets()
+          if last_offset != pending.offset:
+            last_offset = pending.offset
+            recompute_offsets()
           if release:
             # yield the current pending data
             for out_chunk in pending.flush():
