@@ -337,9 +337,16 @@ def blocked_chunks_of(chunks, scanner,
         # use the next_offfset immediately
         if next_offset is not None and next_offset <= next_rolling_point:
           advance_by = min(next_offset, chunk_end_offset) - offset
-          release = True
-          if histogram is not None:
-            histogram['offsets_from_scanner'] += 1
+          # flush if we actually got to the next_offset
+          if next_offset <= chunk_end_offset:
+            release = True
+            if histogram is not None:
+              histogram['offsets_from_scanner'] += 1
+          X("next_offset=%d: advance_by %d bytes from %d to %d (chunk_end_offset=%d)",
+            next_offset, advance_by, offset, offset+advance_by, chunk_end_offset)
+          if release:
+            X("  releasing because next_offset:%d <= chunk_end_offset:%d",
+              next_offset, chunk_end_offset)
           continue
         # how far to scan with the rolling hash, being from here to
         # next_offset minus a min_block buffer, capped by the length of
