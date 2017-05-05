@@ -310,6 +310,9 @@ def blocked_chunks_of(chunks, scanner,
             hash_value = 0
             recompute_offsets()
             release = False   # becomes true if we should flush after taking data
+          if not chunk:
+            # consumed the end of the chunk, need a new one
+            break
         advance_by = None
         # see if we can skip some data completely
         # we don't care where the next_offset is if offset < first_possible_point
