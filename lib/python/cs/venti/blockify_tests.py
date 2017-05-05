@@ -147,8 +147,8 @@ class TestAll(unittest.TestCase):
             nchunks, end_time-start_time, chunk_total,
             float(chunk_total) / (end_time-start_time))
           X("    %d offsets from parser, %d offsets from hash scan",
-            histogram['offsets_from_hash_scan'],
-            histogram['offsets_from_scanner'])
+            histogram['offsets_from_scanner'],
+            histogram['offsets_from_hash_scan'])
           if src_total is not None:
             self.assertEqual(src_total, chunk_total)
             self.assertEqual(b''.join(source_chunks),
