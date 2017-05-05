@@ -213,6 +213,8 @@ def blocked_chunks_of(chunks, scanner,
         # end of offsets and chunks
         parseQ.close()
       PfxThread(target=run_parser).run()
+    X("blocked_chunks_of: min_block=%d, min_autoblock=%d, max_block=%d",
+        min_block, min_autoblock, max_block)
     def get_parse():
       ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
           Sets parseQ to None if the end of the iterable is reached.
@@ -248,8 +250,8 @@ def blocked_chunks_of(chunks, scanner,
       '''
       nonlocal last_offset, first_possible_point, next_rolling_point, max_possible_point
       first_possible_point = last_offset + min_block
-      next_rolling_point = last_offset + min_autoblock
-      max_possible_point = last_offset + max_block
+      next_rolling_point   = last_offset + min_autoblock
+      max_possible_point   = last_offset + max_block
       ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, next_rolling_point=%d, max_possible_point=%d",
       ##  last_offset, first_possible_point, next_rolling_point, max_possible_point)
     # prepare initial state
@@ -267,110 +269,112 @@ def blocked_chunks_of(chunks, scanner,
     while parseQ is not None or in_chunks:
       while parseQ is not None and not in_chunks:
         get_parse()
-      if in_chunks:
-        chunk = memoryview(in_chunks.pop(0))
-        chunk_end_offset = offset + len(chunk)
-        # process current chunk
-        advance_by = 0
-        release = False
-        while chunk:
-          if advance_by > 0:
-            # advance through this chunk
-            # buffer the advance
-            # release ==> flush the buffer and update last_offset
-            assert advance_by is not None
-            assert advance_by >= 0
-            assert advance_by <= len(chunk)
-            # save the advance bytes and yield any overflow
-            for out_chunk in pending.append(chunk[:advance_by]):
+      if not in_chunks:
+        # no more data
+        break
+      chunk = memoryview(in_chunks.pop(0))
+      chunk_end_offset = offset + len(chunk)
+      # process current chunk
+      advance_by = 0
+      release = False
+      while chunk:
+        if advance_by > 0:
+          # advance through this chunk
+          # buffer the advance
+          # release ==> flush the buffer and update last_offset
+          assert advance_by is not None
+          assert advance_by >= 0
+          assert advance_by <= len(chunk)
+          # save the advance bytes and yield any overflow
+          for out_chunk in pending.append(chunk[:advance_by]):
+            yield out_chunk
+            if histogram is not None:
+              out_chunk_size = len(out_chunk)
+              histogram['bytes_total'] += out_chunk_size
+              histogram[out_chunk_size] += 1
+          last_offset = pending.offset
+          offset += advance_by
+          chunk = chunk[advance_by:]
+          recompute_offsets()
+          if release:
+            # yield the current pending data
+            for out_chunk in pending.flush():
               yield out_chunk
               if histogram is not None:
                 out_chunk_size = len(out_chunk)
                 histogram['bytes_total'] += out_chunk_size
                 histogram[out_chunk_size] += 1
             last_offset = pending.offset
-            offset += advance_by
-            chunk = chunk[advance_by:]
-            recompute_offsets()
-            if release:
-              # yield the current pending data
-              for out_chunk in pending.flush():
-                yield out_chunk
-                if histogram is not None:
-                  out_chunk_size = len(out_chunk)
-                  histogram['bytes_total'] += out_chunk_size
-                  histogram[out_chunk_size] += 1
-              last_offset = pending.offset
-              hash_value = 0
-              recompute_offsets()
-              release = False   # becomes true if we should flush after taking data
-          advance_by = None
-          # see if we can skip some data completely
-          # we don't care where the next_offset is if offset < first_possible_point
-          if first_possible_point > offset:
-            advance_by = min(first_possible_point - offset, len(chunk))
             hash_value = 0
-            continue
-          # advance next_offset to something useful > offset
-          while next_offset is not None and next_offset <= offset:
-            while parseQ is not None and not in_offsets:
-              get_parse()
-            if in_offsets:
-              next_offset2 = in_offsets.pop(0)
-              if next_offset2 < next_offset:
-                warning("next offset %d < current next_offset:%d",
-                        next_offset2, next_offset)
-              else:
-                next_offset = next_offset2
+            recompute_offsets()
+            release = False   # becomes true if we should flush after taking data
+        advance_by = None
+        # see if we can skip some data completely
+        # we don't care where the next_offset is if offset < first_possible_point
+        if first_possible_point > offset:
+          advance_by = min(first_possible_point - offset, len(chunk))
+          hash_value = 0
+          continue
+        # advance next_offset to something useful > offset
+        while next_offset is not None and next_offset <= offset:
+          while parseQ is not None and not in_offsets:
+            get_parse()
+          if in_offsets:
+            next_offset2 = in_offsets.pop(0)
+            if next_offset2 < next_offset:
+              warning("next offset %d < current next_offset:%d",
+                      next_offset2, next_offset)
             else:
-              next_offset = None
-          # if the next_offset preceeds the next_rolling_point
-          # use the next_offfset immediately
-          if next_offset is not None and next_offset <= next_rolling_point:
-            advance_by = min(next_offset, chunk_end_offset) - offset
-            release = True
-            if histogram is not None:
-              histogram['offsets_from_scanner'] += 1
-            continue
-          # how far to scan with the rolling hash, being from here to
-          # next_offset minus a min_block buffer, capped by the length of
-          # the current chunk
-          scan_to = min(max_possible_point, chunk_end_offset)
-          if next_offset is not None:
-            scan_to = min(scan_to, next_offset-min_block)
-          if scan_to > offset:
-            scan_len = scan_to - offset
-            found_offset = None
-            chunk_prefix = chunk[:scan_len]
-            for upto, b in enumerate(chunk[:scan_len]):
-              hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                             )
-                           | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                             )
-                           )
-              if hash_value % 4093 == 1:
-                # found an edge with the rolling hash
-                release = True
-                advance_by = upto + 1
-                if histogram is not None:
-                  histogram['offsets_from_hash_scan'] += 1
-                  histogram['bytes_hash_scanned'] += upto + 1
-                break
-            if advance_by is None:
-              advance_by = scan_len
-              ##X("rolling hash found no match, advance by %d bytes", advance_by)
-            else:
-              ##X("rolling hash found match, advance by %d bytes", advance_by)
-              pass
+              next_offset = next_offset2
           else:
-            # nothing to skip, nothing to hash scan
-            # ==> take everything up to next_offset
-            # (and reset the hash)
-            if next_offset is None:
-              take_to = chunk_end_offset
-            else:
-              take_to = min(next_offset, chunk_end_offset)
-            advance_by = take_to - offset
+            next_offset = None
+        # if the next_offset preceeds the next_rolling_point
+        # use the next_offfset immediately
+        if next_offset is not None and next_offset <= next_rolling_point:
+          advance_by = min(next_offset, chunk_end_offset) - offset
+          release = True
+          if histogram is not None:
+            histogram['offsets_from_scanner'] += 1
+          continue
+        # how far to scan with the rolling hash, being from here to
+        # next_offset minus a min_block buffer, capped by the length of
+        # the current chunk
+        scan_to = min(max_possible_point, chunk_end_offset)
+        if next_offset is not None:
+          scan_to = min(scan_to, next_offset-min_block)
+        if scan_to > offset:
+          scan_len = scan_to - offset
+          found_offset = None
+          chunk_prefix = chunk[:scan_len]
+          for upto, b in enumerate(chunk[:scan_len]):
+            hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                           )
+                         | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                           )
+                         )
+            if hash_value % 4093 == 1:
+              # found an edge with the rolling hash
+              release = True
+              advance_by = upto + 1
+              if histogram is not None:
+                histogram['offsets_from_hash_scan'] += 1
+                histogram['bytes_hash_scanned'] += upto + 1
+              break
+          if advance_by is None:
+            advance_by = scan_len
+            ##X("rolling hash found no match, advance by %d bytes", advance_by)
+          else:
+            ##X("rolling hash found match, advance by %d bytes", advance_by)
+            pass
+        else:
+          # nothing to skip, nothing to hash scan
+          # ==> take everything up to next_offset
+          # (and reset the hash)
+          if next_offset is None:
+            take_to = chunk_end_offset
+          else:
+            take_to = min(next_offset, chunk_end_offset)
+          advance_by = take_to - offset
 
     # yield any left over data
     for out_chunk in pending.flush():
