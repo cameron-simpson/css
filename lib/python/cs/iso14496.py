@@ -1168,3 +1168,7 @@ if __name__ == '__main__':
   stdin = fdopen(sys.stdin.fileno(), 'rb')
   for B in parse_file(stdin, discard=True):
     B.dump()
+
+if __name__ == '__main__':
+  import cs.iso14496_tests
+  cs.iso14496_tests.selftest(sys.argv)
