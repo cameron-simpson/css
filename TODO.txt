@@ -1,3 +1,4 @@
+cs.numeric add histograms, function the evaluate a rolling hash against all possible permutations
 blockifier to keep stats on offsets from parser or hasher and histogram of block sizes, and count of bytes hash scanned
 blockifier: offset/chunk queue uses mutexes to store at most 1 offset or chunk - in fact maybe not a queue at all - general queuelike thingy with - maybe a 2 element heap with 1 element queues feeding it or a pair with channels feeding it
 vt ar yields .vtd file whose first block is a LiteralDirent and all dependent Blocks are in the vtd file
