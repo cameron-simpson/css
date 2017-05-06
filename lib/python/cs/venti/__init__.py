@@ -93,4 +93,4 @@ class _TestAdditionsMixin:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
-    return isordered(s, reverse, strict)
+    self.assertTrue(isordered(s, reverse, strict), "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))

@@ -159,7 +159,7 @@ class _Recording(object):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if not timespans:
-      timespans = (None, None)
+      timespans = ( (None, None), )
     srcfmt = 'mpegts'
     if do_copyto:
       srcpath = None

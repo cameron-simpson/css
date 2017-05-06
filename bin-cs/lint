@@ -21,7 +21,7 @@ do
   case "$lintfile" in
     *.php)
       { $trace php -l "$lintfile" \
-        && $trace phpcs --standard=PSR2 --severity=error "$lintfile"
+        && $trace phpcs --standard=PSR2 --report=emacs "$lintfile"
       } || xit=1
       ;;
     *.py)
