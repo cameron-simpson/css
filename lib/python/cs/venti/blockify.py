@@ -213,8 +213,8 @@ def blocked_chunks_of(chunks, scanner,
         # end of offsets and chunks
         parseQ.close()
       PfxThread(target=run_parser).run()
-    X("blocked_chunks_of: min_block=%d, min_autoblock=%d, max_block=%d",
-        min_block, min_autoblock, max_block)
+    ##X("blocked_chunks_of: min_block=%d, min_autoblock=%d, max_block=%d",
+    ##    min_block, min_autoblock, max_block)
     def get_parse():
       ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
           Sets parseQ to None if the end of the iterable is reached.
@@ -285,6 +285,7 @@ def blocked_chunks_of(chunks, scanner,
           assert advance_by is not None
           assert advance_by >= 0
           assert advance_by <= len(chunk)
+          ##X("ADVANCE_BY %d: %s", advance_by, why)
           # save the advance bytes and yield any overflow
           for out_chunk in pending.append(chunk[:advance_by]):
             yield out_chunk
@@ -307,6 +308,7 @@ def blocked_chunks_of(chunks, scanner,
                 histogram['bytes_total'] += out_chunk_size
                 histogram[out_chunk_size] += 1
             last_offset = pending.offset
+            ##X("RELEASED: "+release)
             hash_value = 0
             recompute_offsets()
             release = False   # becomes true if we should flush after taking data
@@ -314,6 +316,17 @@ def blocked_chunks_of(chunks, scanner,
             # consumed the end of the chunk, need a new one
             break
         advance_by = None
+        why = None
+        if False:
+          Xoffsets( { 'pending': pending.offset,
+                      'offset': offset,
+                      'last_offset': last_offset,
+                      'next_offset': next_offset,
+                      'first_point': first_possible_point,
+                      'next_rolling': next_rolling_point,
+                      'max_point': max_possible_point,
+                      'chunk_end': chunk_end_offset,
+                    } )
         # see if we can skip some data completely
         # we don't care where the next_offset is if offset < first_possible_point
         if first_possible_point > offset:
@@ -332,7 +345,9 @@ def blocked_chunks_of(chunks, scanner,
                       next_offset2, next_offset)
             else:
               next_offset = next_offset2
+              ##X("NEXT_OFFSET = %d", next_offset)
           else:
+            ##X("END OF OFFSETS")
             next_offset = None
         # if the next_offset preceeds the next_rolling_point
         # use the next_offfset immediately
@@ -344,12 +359,9 @@ def blocked_chunks_of(chunks, scanner,
             release = "next_offset <= chunk_end_offset"
             if histogram is not None:
               histogram['offsets_from_scanner'] += 1
-          X("next_offset=%d: advance_by %d bytes from %d to %d (chunk_end_offset=%d)",
-            next_offset, advance_by, offset, offset+advance_by, chunk_end_offset)
-          if release:
-            X("  releasing because next_offset:%d <= chunk_end_offset:%d",
-              next_offset, chunk_end_offset)
           continue
+        ##X("SCANNING: last_offset=%d, offset=%d, next_offset=%s, next_rolling_point=%d",
+        ##    last_offset, offset, next_offset, next_rolling_point)
         # how far to scan with the rolling hash, being from here to
         # next_offset minus a min_block buffer, capped by the length of
         # the current chunk
@@ -360,6 +372,7 @@ def blocked_chunks_of(chunks, scanner,
           scan_len = scan_to - offset
           found_offset = None
           chunk_prefix = chunk[:scan_len]
+          ##X("SCAN %d bytes...", scan_len)
           for upto, b in enumerate(chunk[:scan_len]):
             hash_value = ( ( ( hash_value & 0x001fffff ) << 7
                            )
@@ -368,7 +381,12 @@ def blocked_chunks_of(chunks, scanner,
                          )
             if hash_value % 4093 == 4091:
               # found an edge with the rolling hash
-              release = True
+              ##left = upto-3
+              ##if left < 0: left=0
+              ##right = upto+1
+              ##release = "rolling hash hit at %s of %s" % (bytes(chunk[left:right]),bytes(chunk[left:]))
+              ##release = "rolling hash hit at %s" % (bytes(chunk[left:right]),)
+              release = "rolling hash hit"
               advance_by = upto + 1
               why = "rolling hash hit"
               if histogram is not None:
@@ -398,6 +416,9 @@ def blocked_chunks_of(chunks, scanner,
         out_chunk_size = len(out_chunk)
         histogram['bytes_total'] += out_chunk_size
         histogram[out_chunk_size] += 1
+
+def Xoffsets(d):
+  X(' => '.join([ "%s:%s" % (k2,v2) for v2, k2 in sorted([ ((-1 if v is None else v), k) for k, v in d.items() ]) ]))
 
 if __name__ == '__main__':
   import cs.venti.blockify_tests
