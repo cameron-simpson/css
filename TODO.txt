@@ -1,3 +1,17 @@
+mailfiler: prepend received lines on pickup and filing
+portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
+pf activate new-pf-clause
+e: sort entries
+rename shortpath-prompt to short-path, make path breaking shortenings options (for prompt mode), make it work with relative paths and files as endpoints
+setenv: remove cs.logutils, not py2.5 compatible
+vbox: support remote device import for mkvdi
+str: strace/ktrace wrapper, spawn ktrace + kdump -l
+vbox status
+vbox info
+vbox: list vms is needed by some op and missing
+compare curses calls between cs.logutils and cs.tty
+merge cs.fileutils.shortpath and bin-cs/shortpath-prompt
+myke: support +=
 cs.numeric
   add histograms
   function the evaluate a rolling hash against all possible permutations
