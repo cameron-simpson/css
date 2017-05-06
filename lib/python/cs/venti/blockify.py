@@ -233,6 +233,7 @@ def blocked_chunks_of(chunks, scanner,
     first_possible_point = None
     next_rolling_point = None
     max_possible_point = None
+    max_rolling_point = None
     def recompute_offsets():
       ''' Recompute relevant offsets from the block parameters.
           The first_possible_point is last_offset+min_block,
@@ -345,17 +346,21 @@ def blocked_chunks_of(chunks, scanner,
                       next_offset2, next_offset)
             else:
               next_offset = next_offset2
+              max_rolling_point = next_offset - min_autoblock
               ##X("NEXT_OFFSET = %d", next_offset)
           else:
             ##X("END OF OFFSETS")
             next_offset = None
-        # if the next_offset preceeds the next_rolling_point
-        # use the next_offfset immediately
-        if next_offset is not None and next_offset <= next_rolling_point:
+        # if we're beyond the max_rolling_point (next_offset-min_autoblock)
+        # then just take data until the next_offset
+        if next_offset is not None and offset >= max_rolling_point:
+          ##X("next_offset=%d, next_rolling_point=%d, chunk_end_offset=%d",
+          ##  next_offset, next_rolling_point, chunk_end_offset)
           advance_by = min(next_offset, chunk_end_offset) - offset
-          why = "next_offset <= next_rolling_point"
+          why = "offset >= next_rolling_point"
           # flush if we actually got to the next_offset
           if next_offset <= chunk_end_offset:
+            ##X("USE PARSER OFFSET next_offset=%d", next_offset)
             release = "next_offset <= chunk_end_offset"
             if histogram is not None:
               histogram['offsets_from_scanner'] += 1
@@ -367,7 +372,7 @@ def blocked_chunks_of(chunks, scanner,
         # the current chunk
         scan_to = min(max_possible_point, chunk_end_offset)
         if next_offset is not None:
-          scan_to = min(scan_to, next_offset-min_block)
+          scan_to = min(scan_to, max_rolling_point)
         if scan_to > offset:
           scan_len = scan_to - offset
           found_offset = None
