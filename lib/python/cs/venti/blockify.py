@@ -318,6 +318,7 @@ def blocked_chunks_of(chunks, scanner,
         # we don't care where the next_offset is if offset < first_possible_point
         if first_possible_point > offset:
           advance_by = min(first_possible_point - offset, len(chunk))
+          why = "first_possible_point > offset"
           hash_value = 0
           continue
         # advance next_offset to something useful > offset
@@ -337,9 +338,10 @@ def blocked_chunks_of(chunks, scanner,
         # use the next_offfset immediately
         if next_offset is not None and next_offset <= next_rolling_point:
           advance_by = min(next_offset, chunk_end_offset) - offset
+          why = "next_offset <= next_rolling_point"
           # flush if we actually got to the next_offset
           if next_offset <= chunk_end_offset:
-            release = True
+            release = "next_offset <= chunk_end_offset"
             if histogram is not None:
               histogram['offsets_from_scanner'] += 1
           X("next_offset=%d: advance_by %d bytes from %d to %d (chunk_end_offset=%d)",
@@ -368,25 +370,26 @@ def blocked_chunks_of(chunks, scanner,
               # found an edge with the rolling hash
               release = True
               advance_by = upto + 1
+              why = "rolling hash hit"
               if histogram is not None:
                 histogram['offsets_from_hash_scan'] += 1
                 histogram['bytes_hash_scanned'] += upto + 1
               break
           if advance_by is None:
             advance_by = scan_len
-            ##X("rolling hash found no match, advance by %d bytes", advance_by)
-          else:
-            ##X("rolling hash found match, advance by %d bytes", advance_by)
-            pass
+            why = "scanned to %d with no hit" % (scan_to,)
+            ##X("SCAN: no match, advance by %d bytes", advance_by)
+          continue
+        # nothing to skip, nothing to hash scan
+        # ==> take everything up to next_offset
+        # (and reset the hash)
+        if next_offset is None or next_offset > chunk_end_offset:
+          take_to = chunk_end_offset
+          why = "chunk_end_offset very close"
         else:
-          # nothing to skip, nothing to hash scan
-          # ==> take everything up to next_offset
-          # (and reset the hash)
-          if next_offset is None:
-            take_to = chunk_end_offset
-          else:
-            take_to = min(next_offset, chunk_end_offset)
-          advance_by = take_to - offset
+          take_to = next_offset
+          why = "next_offset very close"
+        advance_by = take_to - offset
 
     # yield any left over data
     for out_chunk in pending.flush():
