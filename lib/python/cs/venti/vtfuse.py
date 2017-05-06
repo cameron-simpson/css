@@ -32,10 +32,12 @@ from cs.threads import locked
 from . import defaults
 from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
+from .cache import FileCacheStore
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
+from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 from .store import MissingHashcodeError
 
@@ -74,14 +76,16 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
 def handler(method):
   ''' Decorator for FUSE handlers.
       Prefixes exceptions with the method name, associated with the
-      Store, prevents anything other than a FUSEOSError being raised.
+      Store, prevents anything other than a FuseOSError being raised.
   '''
   def handle(self, *a, **kw):
-    ##X("OP %s %r %r", method.__name__, a, kw)
+    ##X("OP %s %r %r ...", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
-          return method(self, *a, **kw)
+          result = method(self, *a, **kw)
+          ##X("OP %s %r %r => %r", method.__name__, a, kw, result)
+          return result
     except FuseOSError:
       raise
     except MissingHashcodeError as e:
@@ -91,11 +95,11 @@ def handler(method):
       error("raising FuseOSError from OSError: %s", e)
       raise FuseOSError(e.errno) from e
     except Exception as e:
-      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
+      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s", method.__name__, a, kw, type(e), e)
       raise FuseOSError(errno.EINVAL) from e
-    except:
+    except BaseException as e:
       error("UNCAUGHT EXCEPTION")
-      raise RuntimeError("UNCAUGHT EXCEPTION")
+      raise RuntimeError("UNCAUGHT EXCEPTION") from e
   return handle
 
 def log_traces_queued(Q):
@@ -131,6 +135,8 @@ class FileHandle(O):
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
   def write(self, data, offset):
+    ''' Write data to the file.
+    '''
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
@@ -140,6 +146,8 @@ class FileHandle(O):
     return written
 
   def read(self, offset, size):
+    ''' Read data from the file.
+    '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
     fp = self.Eopen._open_file
@@ -151,15 +159,26 @@ class FileHandle(O):
     return data
 
   def truncate(self, length):
+    ''' Truncate the file, mark it as modified.
+    '''
     self.Eopen._open_file.truncate(length)
     self.E.touch()
 
   def flush(self):
-    self.Eopen.flush()
+    ''' Commit file contents to Store.
+        Chooses a scanner based on the Dirent.name.
+    '''
+    mime_type = E.meta.mime_type
+    if mime_type is not None:
+      scanner = scanner_from_mime_type(mime_type)
+    if scanner is None:
+      scanner = scanner_from_filename(self.E.name)
+    self.Eopen.flush(scanner)
     ## no touch, already done by any writes
-    ## self.E.touch()
 
   def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
     self.Eopen.close()
     self.E.parent.change()
 
@@ -729,10 +748,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def flush(self, fh):
+    ''' Handle close() system call.
+    '''
     FH = self._vt_core._fh(fh)
     FH.flush()
-    inum = self._vt_core.E2i(FH.E)
-    self._vt_core.kref_dec(inum)
+    ## DONE BY FORGET? ## inum = self._vt_core.E2i(FH.E)
+    ## DONE BY FORGET? ## self._vt_core.kref_dec(inum)
 
   @handler
   def forget(self, inode_list):

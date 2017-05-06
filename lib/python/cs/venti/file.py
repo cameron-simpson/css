@@ -7,9 +7,9 @@ from __future__ import print_function, absolute_import
 from io import RawIOBase
 import os
 import sys
-from threading import Thread, Lock
+from threading import Lock
 from cs.threads import locked
-from cs.logutils import Pfx, info, X
+from cs.logutils import Pfx, PfxThread, info, X
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 from . import defaults
@@ -70,7 +70,7 @@ class BlockFile(RawIOBase):
     nread = 0
     for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
       Blen = end - start
-      b[nread:nread+Blen] = B[start:end]
+      b[nread:nread + Blen] = B[start:end]
       nread += Blen
     self._offset += nread
     return nread
@@ -91,6 +91,7 @@ class File(BackedFile):
     # lock for file sync operations
     # NB: _not_ an RLock, we do separate acquire/release in the sync itself
     self._sync_lock = Lock()
+    self.filename = None
 
   @property
   @locked
@@ -109,9 +110,10 @@ class File(BackedFile):
     self._reset(BlockFile(new_block))
 
   @locked
-  def flush(self):
+  def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
         We dispatch the sync in the background within a lock.
+        `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
     super().flush()
     if self.front_range:
@@ -133,10 +135,11 @@ class File(BackedFile):
           with S:
             B = top_block_for(
                   self._high_level_blocks_from_front_back(
-                    front_file, back_block, front_range))
+                      front_file, back_block, front_range,
+                      scanner=scanner))
           self._backing_block = B
           self._sync_lock.release()
-        Thread(name="%s.flush():sync" % (self,), target=update_store).start()
+        PfxThread(name="%s.flush(): update_store" % (self,), target=update_store).start()
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
@@ -168,7 +171,7 @@ class File(BackedFile):
         # should be the partial direct block at the end of the range, and
         # whatever new indirect blocks get made to span things
         self.backing_block \
-          = top_block_for(backing_block0.top_blocks(0, length))
+            = top_block_for(backing_block0.top_blocks(0, length))
     elif length > cur_len:
       # extend the front_file and front_range
       self.front_file.truncate(length)
@@ -182,7 +185,7 @@ class File(BackedFile):
     super().close()
     return B
 
-  def read(self, size = -1):
+  def read(self, size=-1):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
     if size == -1:
@@ -227,10 +230,14 @@ class File(BackedFile):
   def high_level_blocks(self, start=None, end=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
-    return self._high_level_blocks_from_front_back(self.front_file, back_block, self.front_range, start, end)
+    return self._high_level_blocks_from_front_back(
+                  self.front_file, back_block, self.front_range,
+                  start, end, scanner=scanner)
 
   @staticmethod
-  def _high_level_blocks_from_front_back(front_file, back_block, front_range, start=None, end=None):
+  def _high_level_blocks_from_front_back(
+        front_file, back_block, front_range,
+        start=None, end=None, scanner=None):
     ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
     '''
     with Pfx("File.high_level_blocks(%s..%s)", start, end):
@@ -245,7 +252,8 @@ class File(BackedFile):
           # blockify the new data and yield the top block
           B = top_block_for(blockify(filedata(front_file,
                                               start=span.start,
-                                              end=span.end)))
+                                              end=span.end),
+                                     scanner))
           yield B
         else:
           for B in back_block.top_blocks(span.start, span.end):

@@ -6,8 +6,15 @@
 
 from __future__ import with_statement
 import sys
+from threading import Lock, Thread
+from cs.asynchron import Result
+from cs.fileutils import RWFileBlockCache
 import cs.later
 from cs.lex import hexify
+from cs.logutils import X
+from cs.progress import Progress
+from cs.queues import IterableQueue
+from .datafile import DATAFILE_DOT_EXT
 from .store import BasicStoreSync
 
 class CacheStore(BasicStoreSync):
@@ -51,7 +58,8 @@ class CacheStore(BasicStoreSync):
 
   def flush(self):
     # dispatch flushes in parallel
-    LFs = [ self.cache.flush_bg(),
+    LFs = [
+            self.cache.flush_bg(),
             self.backend.flush_bg()
           ]
     # wait for the cache flush and then the backend flush
@@ -126,7 +134,7 @@ class MemoryCacheStore(BasicStoreSync):
         del hmap[oldh]
       else:
         hmap[oldh][0] -= 1
-      self.low = (self.low+1)%len(hlist)
+      self.low = (self.low + 1) % len(hlist)
       self.used -= 1
 
     if h in self.hmap:
@@ -153,6 +161,161 @@ class MemoryCacheStore(BasicStoreSync):
       H = self.hash(data)
       self._hit(H, data)
     return H
+
+class FileCacheStore(BasicStoreSync):
+  ''' A Store wrapping another Store that provides fast access to
+      previously fetched data and fast storage of new data with
+      asynchronous updates to the backing Store.
+  '''
+
+  def __init__(self, name, backend, dir=None, **kw):
+    BasicStoreSync.__init__(self, "%s(%s)" % (self.__class__.__name__, name,), **kw)
+    self.backend = backend
+    self.cache = FileDataMappingProxy(backend, dir=dir)
+
+  def __getattr__(self, attr):
+    return getattr(self.backend, attr)
+
+  def startup(self):
+    self.backend.open()
+
+  def shutdown(self):
+    self.cache.close()
+    self.backend.close()
+
+  def flush(self):
+    pass
+
+  def sync(self):
+    pass
+
+  def keys(self):
+    return self.cache.keys()
+
+  def contains(self, h):
+    return h in self.cache
+
+  def add(self, data):
+    backend = self.backend
+    h = backend.hash(data)
+    self.cache[h] = data
+    return h
+
+  # add is very fast, don't bother with the Later scheduler
+  def add_bg(self, data):
+    return Result(result=self.add(data))
+
+  def get(self, h):
+    try:
+      data = self.cache[h]
+    except KeyError:
+      data = None
+    else:
+      pass
+    return data
+
+class FileDataMappingProxy(object):
+  ''' Mapping-like to cache data chunks to bypass gdbm indices and the like.
+      Data are saved immediately into an in memory cache and an
+      asynchronous worker copies new data into a cache file and
+      also to the backend storage.
+  '''
+
+  def __init__(self, backend, dir=None):
+    ''' Initialise the cache.
+        `backend`: mapping underlying us
+    '''
+    self.backend = backend
+    self.cached = {}    # map h => data
+    self.saved = {}     # map h => offset, length
+    self._lock = Lock()
+    self.file_cache = RWFileBlockCache(dir=dir, suffix=DATAFILE_DOT_EXT)
+    self.workQ = IterableQueue()
+    self.worker = Thread(target=self._worker)
+    self.worker.start()
+
+  def close(self):
+    ''' Shut down the cache.
+        Stop the worker, close the file cache.
+    '''
+    self.workQ.close()
+    self.worker.join()
+    self.file_cache.close()
+
+  def __contains__(self, h):
+    ''' Mapping method supporting "in".
+    '''
+    with self._lock:
+      if h in self.cached:
+        return True
+      if h in self.saved:
+        return True
+    return h in self.backend
+
+  def keys(self):
+    ''' Mapping method for .keys.
+    '''
+    seen = set()
+    for k in self.cached.keys():
+      yield k
+      seen.add(k)
+    for k in self.saved.keys():
+      if k not in seen:
+        yield k
+        seen.add(k)
+    for k in self.backend.keys():
+      if k not in seen:
+        yield k
+
+  def __getitem__(self, h):
+    ''' Fetch the data with key `h`. Raise KeyError if missing.
+    '''
+    with self._lock:
+      # fetch from memory
+      try:
+        data = self.cached[h]
+      except KeyError:
+        data = None
+        # fetch from file
+        try:
+          offset, length = self.saved[h]
+        except KeyError:
+          offset = None
+    if data is None:
+      if offset is None:
+        # fetch from backend, queue store into cache
+        data = self.backend[h]
+        with self._lock:
+          self.cached[h] = data
+        self.workQ.put( (h, data) )
+      else:
+        # fetch from the file cache
+        data = self.file_cache.get(offset, length)
+    return data
+
+  def __setitem__(self, h, data):
+    ''' Store `data` against key `h`.
+    '''
+    with self._lock:
+      if h in self.cached or h in self.saved:
+        return
+      self.cached[h] = data
+    self.workQ.put( (h, data) )
+
+  def _worker(self):
+    for h, data in self.workQ:
+      with self._lock:
+        if h in self.saved:
+          return
+      offset = self.file_cache.put(data)
+      with self._lock:
+        self.saved[h] = offset, len(data)
+        try:
+          del self.cached[h]
+        except KeyError:
+          pass
+      # store into the backend
+      self.backend[h] = data
 
 if __name__ == '__main__':
   import cs.venti.cache_tests

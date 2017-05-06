@@ -31,6 +31,8 @@ from cs.lex import texthexify, untexthexify
 from cs.logutils import X
 from cs.seq import isordered
 
+SEP = '/'
+
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
       A Store's __enter__/__exit__ methods push/pop that store
@@ -91,4 +93,4 @@ class _TestAdditionsMixin:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
-    return isordered(s, reverse, strict)
+    self.assertTrue(isordered(s, reverse, strict), "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
