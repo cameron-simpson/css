@@ -1,10 +1,6 @@
-cs.numeric add histograms, function the evaluate a rolling hash against all possible permutations
-blockifier to keep stats on offsets from parser or hasher and histogram of block sizes, and count of bytes hash scanned
-blockifier: offset/chunk queue uses mutexes to store at most 1 offset or chunk - in fact maybe not a queue at all - general queuelike thingy with - maybe a 2 element heap with 1 element queues feeding it or a pair with channels feeding it
-vt ar yields .vtd file whose first block is a LiteralDirent and all dependent Blocks are in the vtd file
-mbox look for nn and rnrn
-meta: user.mime_type
-is ctypes.addressof any use for i/o?
+cs.numeric
+  add histograms
+  function the evaluate a rolling hash against all possible permutations
 ssh-opts: cononical capitalisation of option names
 cs.buffer
   unit tests
@@ -13,20 +9,35 @@ cs.fileutils:
   tail() with blocking and nonblocking mode; follow mode? emits chunks
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter rendition of .samples
-cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.blockify
+  how is video stored? decoder for common formats
 venti:
+  vt ar yields .vtd file whose first block is a LiteralDirent and
+    all dependent Blocks are in the vtd file
+  "raw datafile store": point at a datafile and kick off a scanner,
+    fetch blocks until scanned if missing hash
+    for use with "vt ar"
+    "file:datafile.vtd" Store scheme
   daemon: listen on UNIX domain socket
     test access to socket via ssh forwarding
-  FIXED? BUG: new files forget their correct size on umount
   stats in new vs existing blocks when adding blocks
-  flat file cache - keep multiple caches, set of hashes per file, pper limit, drop oldest file once set empty
-  datafile: use os.open(O_APPEND) and raw fds, no buffering, no seek, no flush, separate fd for read
+  flat file cache - keep multiple caches, set of hashes per file,
+    pper limit, drop oldest file once set empty and >8 files
+  datafile: use os.open(O_APPEND) and raw fds, no buffering, no
+    seek, no flush, separate fd for read
+  parsers:
+    mbox look for nn and rnrn
+  is ctypes.addressof any use for i/o?
   blockify
     sniff files to infer high level syntax
     histograms on blockify block sizes
     parser for .gz possible?
+    offset/chunk queue uses mutexes to store at most 1 offset or
+      chunk - in fact maybe not a queue at all - general queuelike
+      thingy with - maybe a 2 element heap with 1 element queues
+      feeding it or a pair with channels feeding it
+      problem: offset many chunks in the future?
+    blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
   stream protocol: error flag, json flag (implies JSON additional payload)
-  blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
   vtfuse
     store content-type in xattrs
     FileHandle use raw file instead of stdio
@@ -41,6 +52,7 @@ venti:
   control module
     vtftp to be an API to it
   BackedFile to set change-on-close flag on write/truncate etc
+  meta: user.mime_type
   move to SHA-3-256, check hash size etc
     v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
       for k in S1: S2.add[S1[k]
