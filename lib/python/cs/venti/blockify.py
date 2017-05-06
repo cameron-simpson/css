@@ -366,7 +366,7 @@ def blocked_chunks_of(chunks, scanner,
                          | ( ( b & 0x7f )^( (b & 0x80)>>7 )
                            )
                          )
-            if hash_value % 4093 == 1:
+            if hash_value % 4093 == 4091:
               # found an edge with the rolling hash
               release = True
               advance_by = upto + 1
