@@ -240,12 +240,20 @@ class Box(object):
     '''
     strs = []
     for attr in self.ATTRIBUTES:
+      # use str(self.attr)
       if isinstance(attr, str):
-        fmt = '%s'
+        value = getattr(self, attr)
+        s = str(value)
       else:
         # an (attr, fmt) tuple
         attr, fmt = attr
-      strs.append(attr + '=' + fmt % (getattr(self, attr),))
+        value = getattr(self, attr)
+        if isinstance(fmt, str):
+          s = fmt % (value,)
+        else:
+          # should be a callable
+          s = fmt(value)
+      strs.append(attr + '=' + s)
     return ','.join(strs)
 
   def __str__(self):
