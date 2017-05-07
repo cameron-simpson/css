@@ -11,15 +11,49 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from os import SEEK_CUR
+from os import fdopen, SEEK_CUR
+from os.path import basename
 from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_data, read_from, pread, seekable
+from cs.logutils import setup_logging, warning, X, Pfx
 from cs.py.func import prop
 from cs.py3 import bytes, pack, unpack, iter_unpack
-# DEBUG
-from cs.logutils import warning, X, Pfx
+
+USAGE = '''Usage:
+  %s parse [{-|filename}]...
+            Parse the named files (or stdin for "-").
+  %s test   Run unit tests.'''
+
+def main(argv):
+  cmd = basename(argv.pop(0))
+  setup_logging(cmd)
+  if not argv:
+    argv = ['parse']
+  badopts = False
+  op = argv.pop(0)
+  with Pfx(op):
+    if op == 'parse':
+      if not argv:
+        argv = ['-']
+      for spec in argv:
+        with Pfx(spec):
+          if spec == '-':
+            fp = fdopen(sys.stdin.fileno(), 'rb')
+          else:
+            fp = open(spec, 'rb')
+          for B in parse_file(fp, discard=True):
+            B.dump()
+    elif op == 'test':
+      import cs.iso14496_tests
+      cs.iso14496_tests.selftest(sys.argv)
+    else:
+      warning("unknown op")
+      badopts = True
+  if badopts:
+    print(USAGE % (cmd, cmd), file=sys.stderr)
+    return 2
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -217,10 +251,10 @@ class Box(object):
   def __str__(self):
     if self.data_chunks is None:
       return '%s(%r,box_data=DISCARDED)' \
-             % (type(self).__name__, self.box_type)
+             % (type(self).__name__, bytes(self.box_type))
     box_data = b''.join(self.data_chunks)
     return '%s(%r,box_data=%d:%r%s)' \
-           % (type(self).__name__, self.box_type, len(box_data),
+           % (type(self).__name__, bytes(self.box_type), len(box_data),
               box_data[:32],
               '...' if len(box_data) > 32 else '')
 
@@ -459,7 +493,7 @@ class FTYPBox(Box):
 
   def __str__(self):
     return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
-           % (self.major_brand, self.minor_version, self.compatible_brands)
+           % (bytes(self.major_brand), self.minor_version, self.compatible_brands)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -908,7 +942,7 @@ class _SampleEntry(Box):
   def __str__(self):
     prefix = '%s(%r-%r,data_reference_index=%d' \
            % (self.__class__.__name__,
-              self.box_type,
+              bytes(self.box_type),
               self.reserved,
               self.data_reference_index)
     attr_summary = self.attribute_summary()
@@ -1162,14 +1196,4 @@ def parse_buffer(bfr, discard=False, copy_offsets=None):
     yield B
 
 if __name__ == '__main__':
-  # parse media stream from stdin as test
-  from os import fdopen
-  from cs.logutils import setup_logging
-  setup_logging(__file__)
-  stdin = fdopen(sys.stdin.fileno(), 'rb')
-  for B in parse_file(stdin, discard=True):
-    B.dump()
-
-if __name__ == '__main__':
-  import cs.iso14496_tests
-  cs.iso14496_tests.selftest(sys.argv)
+  sys.exit(main(sys.argv))
