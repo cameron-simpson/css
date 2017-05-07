@@ -47,7 +47,7 @@ def main(argv):
             B.dump()
     elif op == 'test':
       import cs.iso14496_tests
-      cs.iso14496_tests.selftest(sys.argv)
+      cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
     else:
       warning("unknown op")
       badopts = True
