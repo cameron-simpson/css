@@ -737,7 +737,7 @@ add_box_class(TKHDBox)
 add_box_subclass(ContainerBox, 'tref', '8.3.3', 'track Reference')
 
 class TrackReferenceTypeBox(Box):
-  ''' A TrackReferenceTypeBox continas references to other tracks - ISO14496 section 8.3.3.2.
+  ''' A TrackReferenceTypeBox contains references to other tracks - ISO14496 section 8.3.3.2.
   '''
 
   BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
