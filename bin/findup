@@ -92,13 +92,12 @@ do
     *)          path=$dir/$relpath ;;
   esac
   if
-    if [ $# = 0 ]
-    then
-      [ -e "$path" ]
+    if [ $shmode ]
+    then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
     else
-      if [ $shmode ]
-      then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
-      else  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
+      if [ $# -gt 0 ]
+      then  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
+      else  [ -e "$path" ]
       fi
     fi
   then
