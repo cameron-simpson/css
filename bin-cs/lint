@@ -19,6 +19,9 @@ xit=0
 for lintfile
 do
   case "$lintfile" in
+    *.go)
+      $trace go tool vet -all -shadowstrict "$lintfile" || xit=1
+      ;;
     *.php)
       { $trace php -l "$lintfile" \
         && $trace phpcs --standard=PSR2 --report=emacs "$lintfile"
