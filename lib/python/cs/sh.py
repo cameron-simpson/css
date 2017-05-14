@@ -21,6 +21,7 @@ DISTINFO = {
 }
 
 import string
+import sys
 
 # characters than do not need to be quoted
 SAFECHARS = string.digits + string.ascii_letters + '-+_./:'
@@ -71,7 +72,10 @@ def quotestr(s):
   flush()
   return ''.join(qparts)
 
-def main_shqstr(argv):
+def main(argv):
   cmd = argv.pop(0)
   qstr = ' '.join(quote(argv))
   print(qstr)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
