@@ -72,10 +72,14 @@ def quotestr(s):
   flush()
   return ''.join(qparts)
 
+def quotecmd(argv):
+  ''' Quote strings, assemble into command string.
+  '''
+  return ' '.join(quote(argv))
+
 def main(argv):
   cmd = argv.pop(0)
-  qstr = ' '.join(quote(argv))
-  print(qstr)
+  print(quotecmd(argv))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
