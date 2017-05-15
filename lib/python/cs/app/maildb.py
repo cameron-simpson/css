@@ -692,6 +692,7 @@ class _MailDB(NodeDB):
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    X("RECOMPUTED ADDRESS_GROUPS: %d groups", len(agroups.keys()))
     return agroups
 
   @locked_property
