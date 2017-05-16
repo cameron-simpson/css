@@ -6,6 +6,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 24oct2009
 #
 
+from __future__ import print_function
 import errno
 import os
 import sys
@@ -23,41 +24,41 @@ badopts = False
 try:
   opts, argv = getopt(sys.argv[1:], 'r:')
 except GetoptError, e:
-  print >>sys.stderr, "%s: unrecognised option: %s: %s" % (cmd, e.opt, e.msg)
+  print("%s: unrecognised option: %s: %s" % (cmd, e.opt, e.msg), file=sys.stderr)
   badopts=True
 
 for opt, val in opts:
   if opt == '-r':
     rev = val
   else:
-    print >>sys.stderr, "%s: unsupported option: %s" % (cmd, opt)
+    print("%s: unsupported option: %s" % (cmd, opt), file=sys.stderr)
     badopts = True
 
 if len(argv) == 0:
-  print >>sys.stderr, "%s: missing target-dir" % (cmd,)
+  print("%s: missing target-dir" % (cmd,), file=sys.stderr)
   badopts=True
 else:
   target = argv.pop(0)
   subpaths = argv
 
 if badopts:
-  print >>sys.stderr, usage
+  print(usage, sys.stderr)
   sys.exit(2)
 
 repo = hg.repository(ui.ui(), '.')
-ctx = repo['tip'] # or repo[None] for dirstate or whatever
+ctx = repo[rev] # or repo[None] for dirstate or whatever
 if not subpaths:
   subpaths = ctx
 for path in subpaths:
   try:
     rev = ctx[path].linkrev()
   except hgerror.LookupError, e:
-    print >>sys.stderr, "%s: %s: can't look up revision: %s" % (cmd, path, e)
+    print("%s: %s: can't look up revision: %s" % (cmd, path, e), file=sys.stderr)
   ctxtime, tzoffset = repo[rev].date()
   tpath = os.path.join(target, path)
   try:
     S = os.stat(tpath)
-  except OSError, e:
+  except OSError as e:
     if e.errno == errno.ENOENT:
       continue
     raise e

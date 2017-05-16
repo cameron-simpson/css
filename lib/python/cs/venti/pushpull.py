@@ -97,13 +97,14 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
     window_size = 1024
   # latest hashcode already compared
   start_hashcode = None
+  after = False
   while True:
     # collect checksum of hashcodes after start_hashcode from S1 and S2
-    hash1, h_final1 = S1.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
+    hash1, h_final1 = S1.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=after)
     if h_final1 is None:
       # end of S1 hashcodes - return all following S2 hashcodes
       break
-    hash2, h_final2 = S2.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
+    hash2, h_final2 = S2.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=after)
     if h_final2 is None:
       # end of S2 hashcodes - done - return from function
       return
@@ -121,11 +122,11 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       window_size //= 2
       continue
     # fetch the actual hashcodes
-    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes2:
       # maybe some entires removed? - anyway, no more S2 so return
       return
-    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes1:
       # maybe some entries removed? - anyway, no more S1 so return all following S2 hashcodes
       break
@@ -145,32 +146,42 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
         yield hashcode
     # resume scan from here
     start_hashcode = hashcodes2[-1]
+    after = True
   # collect all following S2 hashcodes
   while True:
-    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes2:
       break
     for hashcode in hashcodes2:
       yield hashcode
     start_hashcode = hashcodes2[-1]
 
-def pull_indirect(S1, S2, block):
-  ''' Pull `block` and any indirect children from `S2` if not in `S1`.
-      TODO: asynchronous prefetch of subblocks to reduce latency.
+def complete_Block(B, S, S2):
+  ''' Complete storage of this Block in `S` from alternative Store `S2`.
+      If `S` does not contain the Block, fetch data from `S2`.
+      If indirect, repeat for all children.
   '''
-  h = block.hashcode
-  if h not in S1:
-    S1.add(S2.get(h))
-  if block.indirect:
-    for subB in block.subblocks:
-      pull_indirect(S1, S2, subB)
-
-def pull_Dirent(S1, S2, E):
-  pull_indirect(E.block)
-  if E.isdir:
-    for name, entry in E.entries.items():
-      if name != '.' and name != '..':
-        pull_Dirent(S1, S2, entry)
+  L = S.later
+  with L.pool() as LP:
+    LFs = []
+    try:
+      h = B.hashcode
+    except AttributeError:
+      # Blocks with no hashcode are considered Stored, because they
+      # aren't kept in Stores
+      pass
+    else:
+      if h not in S:
+        # dispatch fetch for missing data
+        X("complete: fetch S2[%s]...", h)
+        LP.add(L.with_result_of(partial(S2.get, h), S.add))
+    if B.indirect:
+      for subB in B.subbblocks():
+        X("complete: complete subblock %s...", subB)
+        LP.defer(complete, subB, S, S2)
+  X("complete: join...")
+  LP.join()
+  X("complete: completed")
 
 if __name__ == '__main__':
   from cs.debug import selftest

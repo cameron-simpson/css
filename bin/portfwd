@@ -9,7 +9,7 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_CONFIG:=$HOME/rc/ssh/portfwd}
-: ${PORTFWD_SSH_CONFIG:=$HOME/.ssh/config-pf}
+: ${PORTFWD_SSH_CONFIG:=''}
 : ${USER:=`id -un`}
 
 trace=set-x
@@ -24,6 +24,8 @@ doit=1
 
 cmd=`basename "$0"`
 usage="Usage:
+  $cmd -T target
+        Print test shell command for target to standard output.
   $cmd -d [targets...]
         Disable portfwd for targets, setting PORTFWD_TARGET_DISABLE.
         If no targets are specified, set PORTFWD_DISABLE.
@@ -39,7 +41,8 @@ usage="Usage:
   $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
-        Default from \$PORTFWD_SSH_CONFIG: $sshcfg
+        Default from \$PORTFWD_SSH_CONFIG,
+        otherwise ~/.ssh/config-pf, otherwise ~/.ssh/config.
   -n    No action. Recite final command.
   -P pfname
         Require the named portfwd instance to have its CONNECTED
@@ -55,6 +58,8 @@ the group name appended. Example: \"Host home ALL\""
 setflag=
 opts=
 badopts=
+badtargets=
+print_test=
 
 while [ $# -gt 0 ]
 do
@@ -67,6 +72,7 @@ do
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -n) doit= opts="$opts $1" ;;
     -P) pf_prereqnames="$pf_prereqnames $2" opts="$opts $1 $2"; shift ;;
+    -T) print_test=1 ;;
     -v) opts="$opts $1"; sshopts="$sshopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -77,13 +83,38 @@ do
   shift
 done
 
+if [ -z "$sshcfg" ]
+then
+  # look for an ssh config
+  for f in "$PORTFWD_SSH_CONFIG" \
+           "$HOME/.ssh/config-pf" \
+           "$HOME/.ssh/config"
+  do
+    [ -n "$f" ] && [ -s "$f" ] && { sshcfg=$f; break; }
+  done
+  [ -n "$sshcfg" ] || { echo "$cmd: no ssh config found" >&2; badopts=1; }
+else
+  if [ ! -f "$sshcfg" ]
+  then
+    echo "$cmd: ssh config is not a file: $sshcfg" >&2
+    badopts=1
+  fi
+fi
+
 if [ -z "$setflag" ]
 then
   if [ $# = 0 ]
   then
     echo "$cmd: no targets supplied" >&2
-    sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-    echo >&2
+    badtargets=1
+  fi
+fi
+
+if [ $print_test ]
+then
+  if [ $# != 1 ]
+  then
+    echo "$cmd: -T: exactly one target expected, received: $*" >&2
     badopts=1
   fi
 fi
@@ -94,12 +125,9 @@ group_members()
 { for _gm_target
   do
     case "$_gm_target" in
-      [A-Z]*)
-            sed -n 'y/	/ /
-                    s/$/ /
-                    s/^  *//
-                    s/  */  /g
-                    /^[Hh][Oo][Ss][Tt] .*'"$_gm_target"' /s/^[^ ]*  *\([^ A-Z][^ ]*\).*/\1/p' "$sshcfg"
+      [A-Z][A-Z0-9_]*)
+            sed -n "s/^#  *$_gm_target: *//p" "$sshcfg" \
+            | sed 's/#.*//' | tr ' ' '\012' | sort -u
             ;;
       *)    printf '%s\n' "$_gm_target"
             ;;
@@ -114,31 +142,55 @@ do
   [ $first ] && { set --; first=; }
   case "$target" in
     [A-Z]*)
-      # match all targets with the uppercase label
-      gtargets=$(group_members "$target")
-      if [ -z "$gtargets" ]
+      if [ -n "$sshcfg" ]
       then
-        echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
-        sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-        echo >&2
-        badopts=1
+        # match all targets with the uppercase label
+        gtargets=$(group_members "$target")
+        if [ -z "$gtargets" ]
+        then
+          echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
+          badtargets=1
+        else
+          set -- ${1+"$@"} $gtargets
+        fi
       else
-        set -- ${1+"$@"} $gtargets
+        echo "$cmd: no ssh config file, no way to resolve uppercase names: $target" >&2
+        badtargets=1
       fi
       ;;
-    *)set -- ${1+"$@"} "$target"
+    [a-z]*)
+      set -- ${1+"$@"} "$target"
+      ;;
+    *)echo "$cmd: invalid target name: $target" >&2
+      badtargets=1
       ;;
   esac
 done
 
+if [ $badtargets ]
+then
+  if [ -n "$sshcfg" ]
+  then
+    echo "$cmd: host lines from $sshcfg:"  >&2
+    sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" \
+    | tr '\011 ' '\012\012' \
+    | grep '^[^*][^*]*$' \
+    | sort -uf \
+    | fmt \
+    | sed 's/^/  /' \
+    >&2
+  fi
+  badopts=1
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 uppername()
-{ echo "$1" | tr -- '-[a-z]' '_[A-Z]'
+{ echo "$1" | tr -- '[:lower:]\-.' '[:upper:]__'
 }
 
 lowername()
-{ echo "$1" | tr -- '_[A-Z]' '-[a-z]'
+{ echo "$1" | tr -- '[:upper:]_' '[:lower:]-'
 }
 
 if [ $setflag ]
@@ -159,6 +211,106 @@ then
   exit $xit
 fi
 
+if [ $print_test ]
+then
+  target=$1
+  utarget=$( uppername "$target" )
+
+  echo "{ flag -w DEBUG_PORTFWD || flag -w PORTFWD_${utarget}_DEBUG; } && set -x
+        flag -w PORTFWD_OVERRIDE && exit 0
+        flag -w PORTFWD_DISABLE && exit 1
+        flag -w PORTFWD_${utarget}_DISABLE && exit 1
+        flag -w ROUTE_DEFAULT || exit 1"
+
+  # extract "# F: pfname condition
+  sed -n "s/^#  *F:  *$target  *//p" < "$sshcfg" \
+  | \
+  while read -r word args
+  do
+    case "$word" in
+      # require specific gateway
+      gw) for arg in $args
+          do
+            case "$arg" in
+              !*) invert=1 arg=${arg#!} ;;
+              *)  invert= ;;
+            esac
+            flag=ROUTE_GW_$(uppername "$arg")
+            if [ $invert ]
+            then  echo "flag -w $flag && exit 1"
+            else  echo "flag -w $flag || exit 1"
+            fi
+          done
+          ;;
+      # ping [!]host
+      ping)
+          for arg in $args
+          do
+            case "$arg" in
+              !*) invert=1 arg=${arg#!} ;;
+              *)  invert= ;;
+            esac
+            if [ $invert ]
+            then  echo "ping -c 1 -t 3 $arg >/dev/null 2>&1 && exit 1"
+            else  echo "ping -c 1 -t 3 $arg >/dev/null 2>&1 || exit 1"
+            fi
+          done
+          ;;
+      # require specific route
+      route)
+          for arg in $args
+          do
+            case "$arg" in
+              !*) invert=1 arg=${arg#!} ;;
+              *)  invert= ;;
+            esac
+            flag=ROUTE_TO_$(uppername "$arg" | sed 's|/|__|')
+            if [ $invert ]
+            then  echo "flag -w $flag && exit 1"
+            else  echo "flag -w $flag || exit 1"
+            fi
+          done
+          ;;
+      # test [!]shcmd
+      test)
+          case "$args" in
+            !*) invert=1 args=${args#!} ;;
+            *)  invert= ;;
+          esac
+          if [ $invert ]
+          then  echo "{ $args; } && exit 1"
+          else  echo "{ $args; } || exit 1"
+          fi
+          ;;
+      needs)
+          for arg in $args
+          do
+            case "$arg" in
+              !*) invert=1 arg=${arg#!} ;;
+              *)  invert= ;;
+            esac
+            flag=PORTFWD_$(uppername "$arg")_CONNECTED
+            if [ $invert ]
+            then  echo "flag -w $flag && exit 1"
+            else  echo "flag -w $flag || exit 1"
+            fi
+          done
+          ;;
+      *)  echo "$cmd: rc_test_commands: $target: unrecognised condition: $word $args" >&2
+          ;;
+    esac
+  done
+
+  echo 'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
+        [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
+        "$HOME/bin-local/do-portfwd"'
+  
+  exit 0
+else
+  test_shcmd="$0 -T $target | sh"
+fi
+
+
 target=
 
 abort() {
@@ -178,9 +330,6 @@ pidfile=
 subpids=
 flag_connected=
 trap 'abort' 1 2 3 15
-
-# dispatch default route monitor if not already running
-$trace monitor-default-route &
 
 if [ $# -gt 1 ]
 then
@@ -211,56 +360,6 @@ flag_connected=PORTFWD_${utarget}_CONNECTED
 ALERT_GROUP=PORTFWD_${utarget}
 export ALERT_GROUP
 
-pfflags=
-pfpidfiles=
-
-# extract "# F: pfname needs other-pfname"
-# add PORTFWD_OTHER_PFNAME_CONNECTED to flags
-for rc_target in $( sed -n "s/^#  *F:  *${target}  *needs  *\\([a-z][-a-z0-9]*\\) *$/\\1/p" "$sshcfg" )
-do
-  rc_utarget=$(uppername "$rc_target")
-  pfflags="$pfflags PORTFWD_${rc_utarget}_CONNECTED"
-done
-
-# add PORTFWD_PREREQ_CONNECTED for all prerequisite portfwd names
-for rc_target in $pf_prereqnames
-do
-  rc_utarget=$(uppername "$rc_target")
-  pfflags="$pfflags PORTFWD_${rc_utarget}_CONNECTED"
-done
-
-# extract "# F: pfname needs gw ip-addr"
-# add PORTFWD_GW_IP_ADDR to flags
-for rc_gw in $( sed -n "s/^#  *F:  *${target}  *needs  *gw  *\\([0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\) *$/\\1/p" "$sshcfg" )
-do
-  rc_gwname=$( printf '%s\n' "$rc_gw" | tr . _ )
-  rc_ugwname=$(uppername "$rc_gwname")
-  pfflags="$pfflags ROUTE_GW_$rc_ugwname"
-done
-
-# construct svcd "ok to ssh" test command
-test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
-             flag -w PORTFWD_DISABLE && exit 1'
-
-# test if fwd already running
-for pfpidfile in $pfpidfiles
-do
-  test_shcmd="$test_shcmd
-              ifpid -q '$pfpidfile' || exit 1"
-done
-
-for pfflag in $pfflags
-do
-  test_shcmd="$test_shcmd
-              flag -w '$pfflag' || exit 1"
-done
-test_shcmd=" $test_shcmd
-           "'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
-             flag -w ROUTE_DEFAULT || exit 1
-             [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
-             "$HOME/bin-local/do-portfwd"
-            '
-
 if [ $doit ]
 then set_x=set-x
 else set_x=echo
@@ -269,9 +368,9 @@ fi
 # run main restart outer control via svcd
 [ $once ] \
 || exec $set_x \
-          svcd -n "portfwd-$target" \
+          svcd -q -n "portfwd-$target" \
                -t "$test_shcmd" \
-               -- "$0" -1 $opts -- "$target"
+               -- pfx "svcd $target" "$0" -1 $opts -- "$target"
 
 # getconfig target
 #
@@ -290,15 +389,19 @@ pidfile=`sshpidfile "$target"`
 
 # reload config on every pass
 # default command tails var/log/alert-local and wait for the parent sshd to exit
-cfg_command='pids=
+cfg_command='set -x
+             pids=
              [ ! -s var/log/alert-local ] || { tail -F var/log/alert-local & pids="$pids $!"; }
              exec >&2
+             trap "echo SIGNAL 1" 1
+             trap "echo SIGNAL 15" 15
              while kill -0 "$PPID"
              do
                sleep 5
              done
              [ -z "$pids" ] || kill $pids
             '
+cfg_command=
 cfg_outlog=alert-$target
 cfg_errlog=portfwd-$target
 getconfig "$target"
@@ -318,29 +421,19 @@ then
   exit 1
 fi
 
-# fetch some values to compute ControlPath
-ssh_user=$( get-ssh-option -F "$sshcfg" -- "$target" User "$USER" )
-ssh_port=$( get-ssh-option -F "$sshcfg" -- "$target" Port 22 )
-
-ssh_ctrlpath='~/.sshctrl-%r@%n-pf:%p'
-sh_ctrlpath=$HOME/.sshctrl-$ssh_user@$target-pf:$ssh_port
-
 set --  \
     ssh $sshopts -F "$sshcfg" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert -t 'PORTFWD ${utarget}' CONNECTED: $target &" \
-      -o "User=$ssh_user" \
-      -o "Port=$ssh_port" \
-      -o "ControlPath=$ssh_ctrlpath" \
-      "$target" "$cfg_command" \
+      "$target"
+[ -z "$cfg_command" ] || set -- "$@" "$cfg_command"
 
 [ $doit ] || exec echo "$*"
 
 flag -w "$flag_connected" 0
 alert "STARTING: $target"
-rm -f -- "$sh_ctrlpath"
-tag_fd 2 "$target" \
-  $trace_dated \
+##tag_fd 2 "$target" \
+##  $trace_dated \
     "$@" \
     >>"$cfg_outlog" 2>>"$cfg_errlog" </dev/null &
 sshpid=$!
@@ -349,5 +442,4 @@ echo "$sshpid" >"$pidfile"
 wait
 flag -w "$flag_connected" 0
 >"$pidfile"; rm -f "$pidfile"
-rm -f -- "$sh_ctrlpath"
 alert "EXITED: $target"

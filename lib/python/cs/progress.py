@@ -12,7 +12,7 @@ from cs.seq import seq
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(object):
-  ''' A progress counter to track task completion with various utility functions.
+  ''' A progress counter to track task completion with various utility methods.
   '''
 
   def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None, name=None):
@@ -54,6 +54,10 @@ class Progress(object):
     '''
     return self._positions[-1][1]
 
+  @position.setter
+  def position(self, new_position):
+    self.update(new_position)
+
   def update(self, new_position, update_time=None):
     ''' Record more progress.
     '''
@@ -64,6 +68,15 @@ class Progress(object):
     ##          self, self.position, new_position)
     self._positions.append( CheckPoint(update_time, new_position) )
     self._flushed = False
+
+  def advance(self, delta, update_time=None):
+    ''' Record more progress, return the advanced position.
+    '''
+    self.update(self.position + delta, update_time=update_time)
+
+  def __iadd__(self, delta):
+    self.advance(delta)
+    return self
 
   def _flush(self, oldest=None):
     if oldest is None:
@@ -79,9 +92,6 @@ class Progress(object):
           del posns[0:ndx]
         break
     self._flushed = True
-
-  def inc(self, amount=1, when=None):
-    self.update(self.position + amount, when)
 
   @property
   def throughput(self):
@@ -170,6 +180,31 @@ class Progress(object):
     if runtime is None:
       return None
     return time.time() + runtime
+
+class ProgressWriter(object):
+  ''' An object with a .write method which passes the write through to a file and then updates a Progress.
+  '''
+
+  def __init__(self, progress, fp):
+    ''' Initialise the ProgressWriter with a Progress `progress` and a file `fp`.
+    '''
+    Proxy.__init__(self, fp)
+    self.progress = progress
+    self.fp = fp
+
+  def write(self, data):
+    ''' Write `data` to the file and update the Progress. Return as from `fp.write`.
+        The Progress is updated by the amount written; if fp.write
+        returns None then this presumed to be len(data), otherwise
+        the return value from fp.write is used.
+    '''
+    retval = self.fp.write(data)
+    if retval is None:
+      written = len(data)
+    else:
+      written = retval
+    self.progress.advance(written)
+    return retval
 
 if __name__ == '__main__':
   from cs.debug import selftest

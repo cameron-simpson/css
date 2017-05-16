@@ -23,7 +23,8 @@ use cs::Persist;
 use cs::Stat;
 ## use cs::Image::DB;
 use Image::Size;
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 package cs::IM2HTML;
 
@@ -399,7 +400,7 @@ sub _shell
 
   ## warn "@_";
   print _shellFD @_;
-  &'flush(cs::IM2HTML::_shellFD);
+  cs::IM2HTML::_shellFD->flush();
 }
 
 sub ThumbOf($$)

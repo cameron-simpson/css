@@ -12,12 +12,11 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.func'],
+    'install_requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
 }
 
 from contextlib import contextmanager
-import threading
-from threading import Condition, RLock
+from threading import Condition, RLock, Lock, current_thread
 import time
 import traceback
 from cs.excutils import logexc
@@ -65,7 +64,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._lock = lock
     self._finalise_later = finalise_later
-    self._finalise = Condition(self._lock)
+    self._finalise = None
 
   def __enter__(self):
     self.open(caller_frame=caller())
@@ -87,8 +86,10 @@ class MultiOpenMixin(O):
     self.opened = True
     with self._lock:
       self._opens += 1
-      if self._opens == 1:
-        self.startup()
+      opens = self._opens
+    if opens == 1:
+      self._finalise = Condition(self._lock)
+      self.startup()
     return self
 
   def close(self, enforce_final_close=False):
@@ -101,17 +102,18 @@ class MultiOpenMixin(O):
         for Fkey in sorted(self._opened_from.keys()):
           error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
         ##from cs.debug import thread_dump
-        ##thread_dump([threading.current_thread()])
+        ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      if self._opens == 0:
-        self.shutdown()
-        if not self._finalise_later:
-          self.finalise()
-      else:
-        if enforce_final_close:
-          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      opens = self._opens
+    if opens == 0:
+      self.shutdown()
+      if not self._finalise_later:
+        self.finalise()
+    else:
+      if enforce_final_close:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -119,13 +121,11 @@ class MultiOpenMixin(O):
         `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise is not None:
-        finalise = self._finalise
-        self._finalise = None
-        finalise.notify_all()
-        return
-    error("%s: finalised more than once" % (self,))
-    ##raise RuntimeError("%s: finalised more than once" % (self,))
+      finalise = self._finalise
+      if finalise is None:
+        raise RuntimeError("%s: finalised more than once" % (self,))
+      self._finalise = None
+      finalise.notify_all()
 
   @property
   def closed(self):
@@ -201,6 +201,7 @@ class Pool(O):
     self.new_object = new_object
     self.max_size = max_size
     self.pool = []
+    self._lock = Lock()
 
   def __str__(self):
     return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
@@ -209,10 +210,12 @@ class Pool(O):
   def instance(self):
     ''' Context manager returning an object for use, which is returned to the pool afterwards.
     '''
-    try:
-      o = self.pool.pop()
-    except IndexError:
-      o = self.new_object()
+    with self._lock:
+      try:
+        o = self.pool.pop()
+      except IndexError:
+        o = self.new_object()
     yield o
-    if self.max_size == 0 or len(self.pool) < self.max_size:
-      self.pool.append(o)
+    with self._lock:
+      if self.max_size == 0 or len(self.pool) < self.max_size:
+        self.pool.append(o)

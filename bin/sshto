@@ -3,7 +3,7 @@
 # Bang style ssh for hopping through firewalls etc.
 # Sshes from host to host to reach destination.
 # Assorted other minor features.
-#	- Cameron Simpson <cs@zip.com.au> 28may2004
+#       - Cameron Simpson <cs@zip.com.au> 28may2004
 #
 
 set -ue
@@ -33,12 +33,14 @@ setx=:
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-u dfltuser] [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
-	ssh-options...	Passed to all ssh commands.
-	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-options.
-        -u dfltuser     Default user for each step, default from \$SSHTO_RUSER.
-        -v              Verbose. Passed to all ssh commands. Turns on additional tracing.
-	-z, +z		Pass -o Compression yes/no to ssh.
-	-E		Run login setup at far end."
+  ssh-options...  Passed to all ssh commands.
+  sshcfg=value    Transmuted to -o 'sshcfg value' and added to ssh-options.
+  -E              Run login setup at far end.
+  -u dfltuser     Default user for each step, default from \$SSHTO_RUSER.
+  -P              Prefix standard error output with hostname for debugging.
+  -v              Verbose. Passed to all ssh commands. Turns on additional tracing.
+  -V              Verboser, using /opt/css at far end, trace remote shell command.
+  -z, +z          Pass -o Compression yes/no to ssh."
 
 env_presh=': set -vx
            exec 3<&0 4>&1 </dev/null >&2
@@ -48,7 +50,7 @@ env_presh=': set -vx
            tput colors >/dev/null 2>&1 || { TERM=xterm-color; export TERM; }
            ##[ -s /opt/css/env.sh ] && . /opt/css/env.sh
            exec <&3 3<&- >&4 4>&-
-	  '
+          '
 
 set -- $SSHTO_OPTS ${1+"$@"}
 
@@ -61,16 +63,16 @@ first=1
 while [ $# -gt 0 ]
 do
   case $1 in
-    -t)	topt=-t ;;
-    +t)	topt= ;;
+    -t) topt=-t ;;
+    +t) topt= ;;
     -f) fopt=-f ;;
-    -E)	presh=$env_presh ;;
+    -E) presh=$env_presh ;;
     -V) needoptcss=1
         dotrace=1
         trace=set-x
         setx='set -x'
-	sshopts="$sshopts $1"
-	;;
+        sshopts="$sshopts $1"
+        ;;
     # rsync hands us this all on its own :-(
     -l) loginpart=$2; shift ;;
     # default explicit remote user for use, for example:
@@ -84,29 +86,29 @@ do
         ##echo "lsshopts=[$lsshopts]" >&2
         ;;
     -[aAgknNqsTxXYC1246])
-	sshopts="$sshopts $1"
-	;;
+        sshopts="$sshopts $1"
+        ;;
     -[bceImpLRD])
-    	sshopts="$sshopts $1 "`shqstr "$2"`
-	shift
-	;;
+        sshopts="$sshopts $1 "`shqstr "$2"`
+        shift
+        ;;
     -[bceiIlmopLRD]?*)
         sshopts=$sshopts\ `shqstr "$1"`
-	;;
+        ;;
     -P) needoptcss=1 pfxstderr=1 ;;
-    -z)	sshopts="$sshopts -o 'Compression yes'" ;;
-    +z)	sshopts="$sshopts -o 'Compression no'" ;;
+    -z) sshopts="$sshopts -o 'Compression yes'" ;;
+    +z) sshopts="$sshopts -o 'Compression no'" ;;
     [a-zA-Z]*=?*)
-	[ $havehost ] && break	# not supported after host - it's the shell command now
-	cfg=`expr "$1" : '\([^=]*\)=.*'`
-	val=`expr "$1" : '[^=]*=\(.*\)'`
-	sshopts="$sshopts -o "`shqstr "$cfg $val"`
-	;;
-    --)	shift; break ;;
+        [ $havehost ] && break  # not supported after host - it's the shell command now
+        cfg=`expr "$1" : '\([^=]*\)=.*'`
+        val=`expr "$1" : '[^=]*=\(.*\)'`
+        sshopts="$sshopts -o "`shqstr "$cfg $val"`
+        ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)	[ $havehost ] && break
-	host=$1; havehost=1
-	;;
+    *)  [ $havehost ] && break
+        host=$1; havehost=1
+        ;;
   esac
   shift
 done
@@ -206,54 +208,6 @@ expand_hostpath()
   printf '%s\n' "$_xphp_out"
 }
 
-# Take a here!there!... path emit the last host and, if needed, the
-# ProxyCommand to use to tunnel to where it will be used.
-# For example, the path foo!bah!zot will emit something like:
-#  zot ssh foo ssh bah nc %h %p
-#
-split_target()
-{
-  set -- `printf "%s\n" "$1" | tr '!' ' '`
-  _st_pcmd=
-  if [ $# -gt 1 ]
-  then
-    while [ $# -gt 1 ]
-    do
-      _st_target=$1
-      if [ -n "$ruser" ]
-      then
-        case "$_st_target" in
-          # explicitly omit $ruser at an interim step
-          @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
-          *@*)  ;;
-          *)    _st_target=$ruser@$_st_target ;;
-        esac
-      fi
-      if [ -z "$_st_pcmd" ]
-      then  _st_pcmd="ssh $lsshopts"    # first ssh gets the local ssh opts
-      else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
-      fi
-      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $_st_target"
-      if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css"; fi
-      if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $1"; fi
-      if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace"; fi
-      shift
-    done
-    _st_pcmd="$_st_pcmd nc %h %p"
-  fi
-  _st_target=$1
-  if [ -n "$ruser" ]
-  then
-    case "$_st_target" in
-      # explicitly omit $ruser at an interim step
-      @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
-      *@*)  ;;
-      *)    _st_target=$ruser@$_st_target ;;
-    esac
-  fi
-  printf "%s %s\n" "$_st_target" "$_st_pcmd"
-}
-
 hostpath=`expand_hostpath "$host"`
 [ -n "$hostpath" ] || { echo "$cmd: empty hostpath from \$host=$host" >&2; exit 1; }
 [ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
@@ -284,7 +238,7 @@ then
     esac
   done
 else
-  set -- `split_target "$hostpath"`
+  set -- $( sshto-proxy-command "$hostpath" )
   host=$1
   shift
   if [ $# -gt 0 ]

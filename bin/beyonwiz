@@ -4,4 +4,4 @@
 #   - Cameron Simpson <cs@zip.com.au> 2008
 #
 
-exec python -m cs.app.beyonwiz ${1+"$@"}
+exec python3 -m cs.app.beyonwiz ${1+"$@"}

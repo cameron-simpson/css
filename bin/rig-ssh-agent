@@ -1,52 +1,21 @@
 #!/bin/sh
 #
-# Set up a per-host ssh-agent in daemon mode if needed.
+# Ensure we have an ssh agent, setting up a per-host ssh-agent in daemon mode if needed.
+# Emit $SSH_AUTH_SOCK to stdout.
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
 set -ue
+exec 3>&1 1>&2
 
-cmd=$0
-usage="Usage: $cmd [-f] [statefile]
-    -f  Force: always start a new agent and overwrite the statefile."
+statefile=$HOME/var/run/ssh-agent-$HOST
 
-trace=${DEBUG:+set-x}
-statefile=
-badopts=
+# test for existing ssh-agent
+{ ssh-add -l >/dev/null || [ $? = 1 ]; } \
+|| { [ -s "$statefile" ] \
+     && . "$statefile" \
+     && { ssh-add -l >/dev/null || [ $? = 1 ]; }
+   } \
+|| eval `ssh-agent -s | tee "$statefile"`
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -f) force=1 ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-[ $# = 0 ] || { statefile=$1; shift; }
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
-
-if [ $force ] || not $trace get-ssh-agent "$statefile"
-then
-  # some machines don't have an ssh-agent:-(
-  if agent=`$trace which ssh-agent` && [ -x "$agent" ]
-  then
-    $trace rm -f -- "$statefile"
-    export statefile
-    $trace no-ssh-agent \
-      $trace ssh-agent \
-      $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
-      </dev/null &
-  else
-    echo "$cmd: no ssh-agent command, aborting" >&2
-    exit 1
-  fi
-fi
+echo "$SSH_AUTH_SOCK" >&3

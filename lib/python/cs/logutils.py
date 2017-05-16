@@ -14,12 +14,15 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.ansi_colour', 'cs.excutils', 'cs.obj', 'cs.py3'],
+    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.upd'],
 }
 
 import codecs
 from contextlib import contextmanager
-import importlib
+try:
+  import importlib
+except ImportError:
+  importlib = None
 import logging
 from logging import Formatter, StreamHandler
 import os
@@ -29,13 +32,14 @@ import stat
 import sys
 import time
 import threading
-from threading import Lock
+from threading import Lock, Thread
 import traceback
 from cs.ansi_colour import colourise
-from cs.lex import is_identifier, is_dotted_identifier
+from cs.lex import is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
+from cs.upd import Upd
 
 cmd = __file__
 
@@ -43,6 +47,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
+loginfo = O(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -52,8 +57,7 @@ def ifdebug():
   return logging_level <= logging.DEBUG
 
 def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
-  ''' Arrange basic logging setup for conventional UNIX command
-      line error messaging.
+  ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
       Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
       `main_log` is a string, is it used as a filename to open in append
@@ -76,29 +80,34 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       'TRACE' in flags.
       If trace_mode is true, set the global trace_level to logging_level;
       otherwise it defaults to logging.DEBUG.
-      Returns the logging level.
   '''
-  global cmd, logging_level, trace_level, D_mode
+  global cmd, logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
-  linfo = infer_logging_level()
+  inferred = infer_logging_level()
   if level is None:
-    level = linfo.level
+    level = inferred.level
+  loginfo.level = level
   if flags is None:
-    flags = linfo.flags
+    flags = inferred.flags
+  loginfo.flags = flags
   if module_names is None:
-    module_names = linfo.module_names
+    module_names = inferred.module_names
+  loginfo.module_names = module_names
   if function_names is None:
-    function_names = linfo.function_names
+    function_names = inferred.function_names
+  loginfo.function_names = function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
   cmd = cmd_name
+  loginfo.cmd = cmd
 
   if main_log is None:
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
+  loginfo.main_log_file = main_log
 
   # determine some attributes of main_log
   try:
@@ -129,15 +138,18 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       upd_mode = False
     else:
       upd_mode = is_tty
+  loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
     ansi_mode = is_tty
+  loginfo.ansi_mode = ansi_mode
 
   if format is None:
     if is_tty or is_fifo:
       format = DEFAULT_PFX_FORMAT_TTY
     else:
       format = DEFAULT_PFX_FORMAT
+  loginfo.format = format
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
@@ -148,7 +160,10 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
+    loginfo.upd = main_handler.upd
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = trace_mode
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -161,34 +176,37 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if trace_mode:
     trace_level = logging_level
 
-  for module_name in module_names:
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError:
-      warning("setup_logging: cannot import %r", module_name)
+  if module_names or function_names:
+    if importlib is None:
+      warning("setup_logging: no importlib (python<2.7?), ignoring module_names=%r/function_names=%r", module_names, function_names)
     else:
-      M.DEBUG = True
+      for module_name in module_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+        else:
+          M.DEBUG = True
+      for module_name, func_name in function_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+          continue
+        F = M
+        for funcpart in func_name.split('.'):
+          M = F
+          try:
+            F = M.getattr(funcpart)
+          except AttributeError:
+            F = None
+            break
+        if F is None:
+          warning("no %s.%s() found", module_name, func_name)
+        else:
+          setattr(M, funcpart, _ftrace(F))
 
-  for module_name, func_name in function_names:
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError:
-      warning("setup_logging: cannot import %r", module_name)
-      continue
-    F = M
-    for funcpart in func_name.split('.'):
-      M = F
-      try:
-        F = M.getattr(funcpart)
-      except AttributeError:
-        F = None
-        break
-    if F is None:
-      warning("no %s.%s() found", module_name, func_name)
-    else:
-      setattr(M, funcpart, _ftrace(F))
-
-  return level
+  return loginfo
 
 def ftrace(func):
   ''' Decorator to trace a function if __module__.DEBUG is true.
@@ -336,14 +354,35 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# set to true to log as a warning
+X_via_log = False
+# set to true to write direct to /dev/tty
+X_via_tty = False
+
 def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
-  return nl(msg, *args, file=file)
+  if X_via_log:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    warning(msg)
+  elif X_via_tty:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    with open('/dev/tty', 'w') as fp:
+      fp.write(msg)
+      fp.write('\n')
+      fp.flush()
+  else:
+    file = kwargs.pop('file', None)
+    if file is None:
+      file = sys.stderr
+    return nl(msg, *args, file=file)
 
 def XP(msg, *args, **kwargs):
   ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
@@ -485,6 +524,7 @@ class _PfxThreadState(threading.local):
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
+    self.trace = False
 
   @property
   def cur(self):
@@ -600,6 +640,8 @@ class Pfx(object):
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
+    if _state.trace:
+      info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
     _state = self._state
@@ -642,6 +684,8 @@ class Pfx(object):
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
     _state.pop()
+    if _state.trace:
+      info(self._state.prefix)
     return False
 
   @property
@@ -751,6 +795,16 @@ class PfxCallInfo(Pfx):
                  caller[0], caller[1], caller[2],
                  grandcaller[0], grandcaller[1], grandcaller[2])
 
+def PfxThread(target=None, **kw):
+  ''' Factory function returning a Thread which presents the current prefix  ascontext.
+  '''
+  current_prefix = prefix()
+  def run(*a, **kw):
+    with Pfx(current_prefix):
+      if target is not None:
+        target(*a, **kw)
+  return Thread(target=run, **kw)
+
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
@@ -819,7 +873,6 @@ class UpdHandler(StreamHandler):
         A true value causes the handler to colour certain logging levels
         using ANSI terminal sequences.
     '''
-    from cs.upd import Upd
     if strm is None:
       strm = sys.stderr
     if nlLevel is None:
@@ -827,7 +880,7 @@ class UpdHandler(StreamHandler):
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
+    self.upd = Upd(strm)
     self.__nlLevel = nlLevel
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
@@ -835,18 +888,18 @@ class UpdHandler(StreamHandler):
   def emit(self, logrec):
     with self.__lock:
       if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
+        with self.upd._withoutContext():
           if self.__ansi_mode:
             if logrec.levelno >= logging.ERROR:
               logrec.msg = colourise(logrec.msg, 'red')
             elif logrec.levelno >= logging.WARN:
               logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
+          self.upd.without(StreamHandler.emit, self, logrec)
       else:
-        self.__upd.out(logrec.getMessage())
+        self.upd.out(logrec.getMessage())
 
   def flush(self):
-    return self.__upd.flush()
+    return self.upd.flush()
 
 if __name__ == '__main__':
   setup_logging(sys.argv[0])

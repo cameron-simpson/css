@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
+    'install_requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -23,14 +23,13 @@ import time
 import traceback
 from cs.py3 import Queue, raise3
 from cs.py.func import funcname
-from cs.py.stack import caller
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump, stack_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked, bg
-from cs.asynchron import Result, _PendingFunction, ASYNCH_RUNNING, report
+from cs.asynchron import Result, _PendingFunction, AsynchState, report, after
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
 
@@ -226,7 +225,7 @@ class LateFunction(_PendingFunction):
     with self._lock:
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s", self.state)
-      self.state = ASYNCH_RUNNING
+      self.state = AsynchState.running
       L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
 
   @OBSOLETE
@@ -848,10 +847,18 @@ class Later(MultiOpenMixin):
     LF = self._submit(func, **params)
     return LF
 
+  def with_result_of(self, callable1, func, *a, **kw):
+    ''' Defer `callable1`, then add its result to the arguments for `func` and defer that. Return the LateFunction for `func`.
+    '''
+    def then():
+      LF1 = self.defer(callable1)
+      return self.defer(func, *[a + [LF1.result]])
+    return then()
+
   @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
-        Return a Result for later collection of the function result.
+        Return a Result for collection of the result of `func`.
 
         This function will not be submitted until completion of
         the supplied LateFunctions `LFs`.
@@ -889,42 +896,24 @@ class Later(MultiOpenMixin):
     return self._after(LFs, R, func, *a, **kw)
 
   def _after(self, LFs, R, func, *a, **kw):
+    if not isinstance(LFs, list):
+      LFs = list(LFs)
     if R is None:
-      R = Result()
+      R = Result("Later.after(%s)" % (",".join(str(_) for _ in LFs)))
     elif not isinstance(R, Result):
       raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
-    LFs = list(LFs)
-    count = len(LFs)
-
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
-
-    if count == 0:
-      # nothing to wait for - queue the function immediately
-      debug("Later.after: len(LFs) == 0, func=%s", funcname(func))
+    def submit_func():
       self._defer(put_func)
-    else:
-      # create a notification function which submits put_func
-      # after sufficient notifications have been received
-      self._busy.inc("Later._after")
-      L = self.open()
-      countery = [count]  # to stop "count" looking like a local var inside the closure
-      def submit_func(LF):
-        ''' Notification function to submit `func` after sufficient invocations.
-        '''
-        countery[0] -= 1
-        if countery[0] != 0:
-          return
-        self._defer(put_func)
-        L.close()
-        self._busy.dec("Later._after")
-      # submit the notifications
-      for LF in LFs:
-        LF.notify(submit_func)
-    return R
+      L.close()
+      self._busy.dec("Later._after")
+    self._busy.inc("Later._after")
+    L = self.open()
+    return after(LFs, None, submit_func)
 
   @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
@@ -1043,6 +1032,11 @@ class Later(MultiOpenMixin):
     yield
     self._priority = oldpri
 
+  def pool(self, *a, **kw):
+    ''' Return a LatePool to manage some tasks run with this Later.
+    '''
+    return LatePool(L=self, *a, **kw)
+
 class LatePool(object):
   ''' A context manager after the style of subprocess.Pool but with deferred completion.
       Example usage:
@@ -1092,12 +1086,19 @@ class LatePool(object):
       self.join()
     return False
 
+  def add(self, LF):
+    ''' Add a LateFunction to those to be tracked by this LatePool.
+    '''
+    self.LFs.append(LF)
+
   def submit(self, func, **params):
     ''' Submit a function using the LatePool's default paramaters, overridden by `params`.
     '''
     submit_params = dict(self.parameters)
     submit_params.update(kw)
-    return self.L.submit(func, **submit_params)
+    LF = self.L.submit(func, **submit_params)
+    self.add(LF)
+    return LF
 
   def defer(self, func, *a, **kw):
     ''' Defer a function using the LatePool's default paramaters.
@@ -1117,6 +1118,24 @@ class LatePool(object):
     '''
     for LF in self:
       pass
+
+def capacity(func):
+  ''' Decorator for functions which wish to manage concurrent requests.
+      The caller must provide a `capacity` keyword arguments which
+      is either a Later instance or an int; if an int a Later with
+      that capacity will be made.
+      The Later will be passed into the inner function as the
+      `capacity` keyword argument.
+  '''
+  def with_capacity(*a, **kw):
+    ''' Wrapper function 
+    '''
+    L = kw.pop('capacity')
+    if isinstance(L, int):
+      L = Later(L)
+    kw['capacity'] = L
+    return func(*a, **kw)
+  return with_capacity
 
 if __name__ == '__main__':
   import cs.later_tests

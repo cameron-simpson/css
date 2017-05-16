@@ -10,7 +10,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
+    'install_requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
     'entry_points': {
       'console_scripts': [
           'maildb = cs.app.maildb:main',
@@ -692,6 +692,7 @@ class _MailDB(NodeDB):
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    X("RECOMPUTED ADDRESS_GROUPS: %d groups", len(agroups.keys()))
     return agroups
 
   @locked_property

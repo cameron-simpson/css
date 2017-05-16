@@ -12,6 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
 }
 
 import sys
@@ -138,6 +139,12 @@ def transmute(exc_from, exc_to=None):
         raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
     return transmute_transmutor_wrapper
   return transmutor
+
+def unattributable(func):
+  return transmute(AttributeError, RuntimeError)(func)
+
+def safe_property(func):
+  return property(unattributable(func))
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.

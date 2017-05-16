@@ -4,11 +4,18 @@
 #       - Cameron Simpson <cs@zip.com.au> 07oct2009
 #
 
+set -ue
+
 cmd=$0
-usage="Usage: $cmd table"
+usage="Usage: $cmd [-a|table...]"
 
 # no table name? recite tables
-[ $# = 0 ] && exec pfctl -sT
+[ $# -gt 0 ] || exec pfctl -sT
+
+if [ "x$*" = x-a ]
+then
+  set -- $("$0")
+fi
 
 # multiple table names? prefix output with table name
 if [ $# -gt 1 ]
