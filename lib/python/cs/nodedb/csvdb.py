@@ -72,6 +72,7 @@ class Backend_CSVFile(Backend):
     self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
     self.keep_backups = False
+    self.csv = None
     self._lastrow = (None, None, None, None)
 
   def init_nodedb(self):
@@ -162,6 +163,8 @@ class Backend_CSVFile(Backend):
   def _open_csv(self):
     ''' Attach to the shared CSV file.
     '''
+    if self.csv is not None:
+      raise RuntimeError("self.csv should be None, was: %r" % (self.csv,))
     self.csv = SharedCSVFile(self.pathname,
                              importer=self.import_foreign_row,
                              readonly=self.readonly)
@@ -192,7 +195,7 @@ class Backend_CSVFile(Backend):
       error("%s: readonly: rewrite not done", self)
       return
     with rewrite_cmgr(self.pathname, backup_ext='', do_rename=True) as outfp:
-      write_csv_file(fp, self.nodedb.nodedata())
+      write_csv_file(outfp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
   import time
