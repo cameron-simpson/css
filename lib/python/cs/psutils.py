@@ -6,7 +6,6 @@
 
 import os
 from signal import SIGTERM, SIGKILL
-from cs.logutils import Pfx
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`.
@@ -24,28 +23,27 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   if type(pid) is str:
     with Pfx(pid):
       return stop(int(open(pid).read().strip()))
-  with Pfx(str(pid)):
-    os.kill(pid, signum)
-    if wait is None:
-      return True
-    assert wait >= 0, "wait (%s) should be >= 0" % (wait,)
-    now = time.time()
-    then = now + wait
-    while True:
-      time.sleep(0.1)
-      if wait == 0 or time.time() < then:
+  os.kill(pid, signum)
+  if wait is None:
+    return True
+  assert wait >= 0, "wait (%s) should be >= 0" % (wait,)
+  now = time.time()
+  then = now + wait
+  while True:
+    time.sleep(0.1)
+    if wait == 0 or time.time() < then:
+      try:
+        os.kill(pid, 0)
+      except OSError as e:
+        if e.errno != os.ESRCH:
+          raise
+        # process no longer present
+        return True
+    else:
+      if do_SIGKILL:
         try:
-          os.kill(pid, 0)
+          os.kill(pid, SIGKILL)
         except OSError as e:
           if e.errno != os.ESRCH:
             raise
-          # process no longer present
-          return True
-      else:
-        if do_SIGKILL:
-          try:
-            os.kill(pid, SIGKILL)
-          except OSError as e:
-            if e.errno != os.ESRCH:
-              raise
-        return False
+      return False
