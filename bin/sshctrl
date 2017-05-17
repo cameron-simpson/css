@@ -62,10 +62,10 @@ else
     exit 1
   }
   [ -e "$ctrl" ] && $trace rm -f "$ctrl"
-  "$@" -M -N -n \
+  "$@" -M -n \
        -o exitonforwardfailure=yes \
        -o "proxycommand=ssh-proxy '$target'" \
        -o controlmaster=yes \
-       -o controlpersist=yes \
-       "$target" </dev/null
+       -o controlpersist=no \
+       "$target" "while sleep 61; do :; done; # $cmd $target from `hostname`"
 fi
