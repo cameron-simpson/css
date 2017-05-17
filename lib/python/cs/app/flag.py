@@ -51,6 +51,16 @@ def main(argv):
         raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
   return xit
 
+def uppername(s):
+  ''' Uppercase letters, transmute some characters to '_' or '__'.
+  '''
+  return s.upper().replace('-', '_').replace('.', '_').replace('/', '__')
+
+def lowername(s):
+  ''' Lowercase letters, transmute '_' to '-'. Note: NOT the reverse of uppername.
+  '''
+  return s.replace('_', '-').lower()
+
 def flagdirpath(path=None, environ=None):
   ''' Return the pathname of the flags directory.
   '''
