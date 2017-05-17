@@ -20,6 +20,18 @@ import string
 import types
 from cs.lex import get_qstr
 
+# various standard locations used in the cs.* modules
+LOGDIR = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log')
+VARRUN = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run')
+
+def get_standard_var(varname, default, environ=None):
+  if environ is None:
+    environ = os.environ
+  value = environ.get(varname)
+  if value is None:
+    value = default
+  return value
+
 def getLogin(uid=None):
   import pwd
   if uid is None:
