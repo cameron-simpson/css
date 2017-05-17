@@ -49,6 +49,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+exec </dev/null
+
 ctrl=$HOME/.sshctrl-$target
 
 set -- $trace ssh -F "$sshcfg" -o "controlpath=$ctrl"
