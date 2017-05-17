@@ -66,6 +66,6 @@ else
   "$@" -o exitonforwardfailure=yes \
        -o "proxycommand=ssh-proxy '$target'" \
        -o 'controlmaster=yes' \
-       -M -N -f \
-       "$target"
+       -M -N -n \
+       "$target" </dev/null
 fi
