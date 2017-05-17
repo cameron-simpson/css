@@ -62,10 +62,10 @@ else
     exit 1
   }
   [ -e "$ctrl" ] && $trace rm -f "$ctrl"
-  # -M -N -f
-  "$@" -o exitonforwardfailure=yes \
+  "$@" -M -N -n \
+       -o exitonforwardfailure=yes \
        -o "proxycommand=ssh-proxy '$target'" \
        -o 'controlmaster=yes' \
-       -M -N -n \
+       -o 'controlpersist=yes' \
        "$target" </dev/null
 fi
