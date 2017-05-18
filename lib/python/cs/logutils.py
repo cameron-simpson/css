@@ -19,6 +19,7 @@ DISTINFO = {
 
 import codecs
 from contextlib import contextmanager
+import getopt
 try:
   import importlib
 except ImportError:
@@ -653,36 +654,43 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            DP("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            # DP
+            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
                prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        args = getattr(exc_value, 'args', None)
-        if args is not None:
-          if args:
-            if isinstance(args, StringTypes):
-              D("%s: expected args to be a tuple, got %r", prefix, args)
-              args = prefixify(args)
-            else:
-              args = list(args)
-              if len(exc_value.args) == 0:
-                args = [ prefix ]
-              else:
-                args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
-            exc_value.args = args
-        elif hasattr(exc_value, 'message'):
-          exc_value.message = prefixify(str(exc_value.message))
-        elif hasattr(exc_value, 'reason'):
-          if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefixify(exc_value.reason)
-          else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-        elif hasattr(exc_value, 'msg'):
-          exc_value.msg = prefixify(str(exc_value.msg))
+        if isinstance(exc_value, getopt.GetoptError):
+          exc_value.msg = prefixify(exc_value.msg)
         else:
-          # we can't modify this exception - at least report the current prefix state
-          D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
-          error(prefixify(str(exc_value)))
+          args = getattr(exc_value, 'args', None)
+          if args is not None:
+            X("args = %r", args)
+            if args:
+              if isinstance(args, StringTypes):
+                D("%s: expected args to be a tuple, got %r", prefix, args)
+                args = prefixify(args)
+              else:
+                args = list(args)
+                if len(exc_value.args) == 0:
+                  args = [ prefix ]
+                else:
+                  args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
+              exc_value.args = args
+              X("set .args to be %r", exc_value.args)
+          elif hasattr(exc_value, 'message'):
+            exc_value.message = prefixify(str(exc_value.message))
+            X("set .message to be %r", exc_value.message)
+          elif hasattr(exc_value, 'reason'):
+            if isinstance(exc_value.reason, StringTypes):
+              exc_value.reason = prefixify(exc_value.reason)
+            else:
+              warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
+          elif hasattr(exc_value, 'msg'):
+            exc_value.msg = prefixify(str(exc_value.msg))
+          else:
+            # we can't modify this exception - at least report the current prefix state
+            D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
+            error(prefixify(str(exc_value)))
     _state.pop()
     if _state.trace:
       info(self._state.prefix)
