@@ -96,6 +96,11 @@ class Calibre_Library(O):
     self.metadb = CalibreMetaDB(self, self.metadbpath)
     self.table = self.metadb.table
 
+  def __getattr__(self, attr):
+    if attr.startswith('table_'):
+      return self.table(attr[6:])
+    raise AttributeError(attr)
+
   def pathto(self, rpath):
     if rpath.startswith('/'):
       raise ValueError('rpath may not start with a slash: %r' % (rpath,))
