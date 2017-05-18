@@ -5,13 +5,14 @@
 #
 
 from __future__ import print_function
-import sys
-import os
-import os.path
 from collections import namedtuple
 from functools import partial
+from getopt import GetoptError
+import os
+import os.path
 import re
 import sqlite3
+import sys
 from threading import RLock
 from types import SimpleNamespace as NS
 from PIL import Image
@@ -54,27 +55,29 @@ def main(argv=None):
   setup_logging(cmd)
   with Pfx(cmd):
     badopts = False
-    if argv and argv[0].startswith('/'):
-      library_path = argv.pop(0)
-    else:
-      library_path = None
-    CL = Calibre_Library(library_path)
-    xit = 0
-    if not argv:
-      warning("missing op")
+    try:
+      if argv and argv[0].startswith('/'):
+        library_path = argv.pop(0)
+      else:
+        library_path = None
+      CL = Calibre_Library(library_path)
+      xit = 0
+      if not argv:
+        raise GetoptError("missing op")
+        badopts = True
+      else:
+        op = argv.pop(0)
+        with Pfx(op):
+          if op == 'ls':
+            return CL.cmd_ls(argv)
+          if op == 'rename':
+            return CL.cmd_rename(argv)
+          if op == 'tag':
+            return CL.cmd_tag(argv)
+          raise GetoptError("unrecognised op")
+    except GetoptError as e:
+      warning("%s", e)
       badopts = True
-    else:
-      op = argv.pop(0)
-      with Pfx(op):
-        if op == 'ls':
-          xit, badopts = CL.cmd_ls(argv)
-        elif op == 'rename':
-          xit, badopts = CL.cmd_rename(argv)
-        elif op == 'tag':
-          xit, badopts = CL.cmd_tag(argv)
-        else:
-          warning("unrecognised op")
-          badopts = True
     if badopts:
       print(usage, file=sys.stderr)
       return 2
@@ -112,20 +115,15 @@ class Calibre_Library(O):
 
   def cmd_rename(self, argv):
     xit = 0
-    badopts = False
     if not argv:
-      warning("missing 'tags'")
-      badopts = True
+      raise GetoptError("missing 'tags'")
+    entity = argv.pop(0)
+    if entity == "tags":
+      table = self.table('tags')
     else:
-      entity = argv.pop(0)
-      if entity == "tags":
-        table = self.table('tags')
-      else:
-        warning("unsupported entity type: %r", entity)
-        badopts = True
-      if argv:
-        warning("extra arguments after %s: %s", entity, ' '.join(argv))
-        badopts = True
+      raise GetoptError("unsupported entity type: %r" % (entity,))
+    if argv:
+      raise GetoptError("extra arguments after %s: %s" % (entity, ' '.join(argv)))
     if not badopts:
       names = [ obj.name for obj in table.instances() ]
       if not names:
@@ -133,11 +131,10 @@ class Calibre_Library(O):
       for name, newname in edit_strings(names):
         if newname != name:
           table[name].rename(newname)
-    return xit, badopts
+    return xit
 
   def cmd_ls(self, argv):
     xit = 0
-    badopts = False
     if not argv:
       obclass = 'books'
     else:
@@ -162,35 +159,28 @@ class Calibre_Library(O):
           for B in obj.books:
             print(' ', B)
       else:
-        warning("unknown class %r", obclass)
-        badopts = True
+        raise GetoptError("unknown class %r" % (obclass,))
       if argv:
-        warning("extra arguments: %r", argv)
-        badopts = True
-    return xit, badopts
+        raise GetoptError("extra arguments: %r" % (argv,))
+    return xit
 
   def cmd_tag(self, argv):
     xit = 0
-    badopts = False
     if not argv:
-      warning('missing book-title')
-      badopts = True
-    else:
-      book_title = argv.pop(0)
-    if not badopts:
-      with Pfx(book_title):
-        for B in self.books_by_title(book_title):
-          for tag_op in argv:
-            if tag_op.startswith('+'):
-              tag_name = tag_op[1:]
-              B.add_tag(tag_name)
-            elif tag_op.startswith('-'):
-              tag_name = tag_op[1:]
-              B.remove_tag(tag_name)
-            else:
-              warning('unsupported tag op %r', tag_op)
-              badopts = True
-    return xit, badopts
+      raise GetoptError('missing book-title')
+    book_title = argv.pop(0)
+    with Pfx(book_title):
+      for B in self.books_by_title(book_title):
+        for tag_op in argv:
+          if tag_op.startswith('+'):
+            tag_name = tag_op[1:]
+            B.add_tag(tag_name)
+          elif tag_op.startswith('-'):
+            tag_name = tag_op[1:]
+            B.remove_tag(tag_name)
+          else:
+            raise GetoptError('unsupported tag op %r' % (tag_op,))
+    return xit
 
 class CalibreMetaDB(TableSpace):
 
