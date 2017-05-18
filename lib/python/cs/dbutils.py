@@ -144,6 +144,34 @@ class Table(object):
   def __getitem__(self, id_value):
     return the(self.read_rows("%s = ?" % (self.id_column,), id_value))
 
+  def edit_column_by_ids(column_name, ids=None):
+    if ids is None:
+      where = None
+    else:
+      where = '%s in (%s)' % (column_name, ','.join("%d" % i for i in ids))
+    return self.edit_column(column_name, where)
+
+  def edit_column(column_name, where=None):
+    with Pfx("edit_column(%s, %r)", column_name, where):
+      id_column = self.id_column
+      edit_lines = []
+      for row in self.select(where=where):
+        edit_line = "%d:%s" % (row[id_column], row[column_name])
+        edit_lines.append(edit_line)
+      changes = edit_strings(sorted(edit_lines,
+                                    key=lambda _: _.split(':', 1)[1]),
+                             errors=lambda msg: warning(msg + ', discarded')
+                            )
+      for old_string, new_string in changes:
+        with Pfx("%s => %s", old_string, new_string):
+          old_id, old_name = old_string.split(':', 1)
+          new_id, new_name = new_string.split(':', 1)
+          if old_id != new_id:
+            error("id mismatch (%s != %s), discarding change")
+          else:
+            self[int(new_id)] = new_name
+            info("updated")
+
 class Row(object):
 
   def __init__(self, table, values, lock=None):
