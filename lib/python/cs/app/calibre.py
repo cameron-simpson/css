@@ -124,13 +124,12 @@ class Calibre_Library(O):
       raise GetoptError("unsupported entity type: %r" % (entity,))
     if argv:
       raise GetoptError("extra arguments after %s: %s" % (entity, ' '.join(argv)))
-    if not badopts:
-      names = [ obj.name for obj in table.instances() ]
-      if not names:
-        warning
-      for name, newname in edit_strings(names):
-        if newname != name:
-          table[name].rename(newname)
+    names = [ obj.name for obj in table.instances() ]
+    if not names:
+      warning("nothing to rename")
+    for name, newname in edit_strings(names):
+      if newname != name:
+        table[name].rename(newname)
     return xit
 
   def cmd_ls(self, argv):
