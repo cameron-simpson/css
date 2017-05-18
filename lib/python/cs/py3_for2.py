@@ -32,6 +32,18 @@ def exec_code(code, *a):
       else:
         raise ValueError("exec_code: extra arguments after locals: %r" % (a,))
 
+def ustr(s, e='utf-8', errors='strict'):
+  ''' Upgrade str to unicode, if it is a str. Leave other types alone.
+  '''
+  if isinstance(s, str):
+    try:
+      s = s.decode(e, errors)
+    except UnicodeDecodeError, ude:
+      from cs.logutils import warning
+      warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
+      s = s.decode(e, 'replace')
+  return s
+
 class bytes(object):
   ''' Trite bytes implementation.
   '''
@@ -67,6 +79,8 @@ class bytes(object):
       return self.__s == other.__s
     if len(other) != len(self):
       return False
+    if isinstance(other, str):
+      other = bytes(other)
     for i, b in enumerate(self):
       if b != other[i]:
         return False
@@ -86,7 +100,23 @@ class bytes(object):
     return self.__s
   @staticmethod
   def join(bss):
-    return bytes(str.join(bss))
+    return bytes(''.join(bss))
+  def decode(self, encoding='ascii', errors='strict'):
+    return self.__s.decode(encoding, errors)
+  def find(self, sub, *start_end):
+    start_end = list(start_end)
+    if start_end:
+      start = start_end.pop(0)
+    else:
+      start = 0
+    if start_end:
+      end = start_end.pop(0)
+    else:
+      end = len(self)
+    if start_end:
+      raise TypeError('find() takes 2 to 4 arguments: extra arguments: %r'
+                      % (start_end,))
+    return self.__s.find(sub, start, end)
 
 class BytesFile(object):
   ''' Wrapper class for a file opened in binary mode which uses bytes in its methods instead of str.
@@ -118,15 +148,17 @@ class BytesFile(object):
   def close(self):
     return self.fp.close()
 
+joinbytes = bytes.join
+
 from struct import pack as _pack, unpack as _unpack
 
 def pack(fmt, *values):
   return bytes(_pack(fmt, *values))
 
 def unpack(fmt, bs):
-  from cs.logutils import X
-  X("py3_for2.unpack: fmt=%r, bs=%r", fmt, bs)
+  ##from cs.logutils import X
+  ##X("py3_for2.unpack: fmt=%r, bs=%r", fmt, bs)
   if isinstance(bs, bytes):
     bs = bs._bytes__s
-    X("py3_for2.unpack: bs => %r", bs)
+    ##X("py3_for2.unpack: bs => %r", bs)
   return _unpack(fmt, bs)

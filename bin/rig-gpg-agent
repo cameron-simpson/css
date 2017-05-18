@@ -10,14 +10,21 @@ exec 3>&1 1>&2
 
 : ${GPG_AGENT_INFO:=''}
 : ${GNUPGHOME:=$HOME/rc/gnupg}
+: ${HOST:=`hostname -s`}
 
 statefile=$HOME/var/run/gpg-agent-$HOST
 
 { [ -n "$GPG_AGENT_INFO" ] && gpg-agent >/dev/null 2>&1; } \
 || \
 { unset GPG_AGENT_INFO
-  [ -s "$statefile" ] && . "$statefile" && gpg-agent >/dev/null 2>&1 \
-  || { gpg-agent --daemon --sh "--homedir=$GNUPGHOME" "--write-env-file=$statefile" && . "$statefile"; }
+  [ -s "$statefile" ] \
+  && . "$statefile" && export GPG_AGENT_INFO \
+  && gpg-agent >/dev/null 2>&1 \
+  || { which gpg-agent >/dev/null 2>&1 || exit 0
+       gpg-agent --daemon --sh "--homedir=$GNUPGHOME" "--write-env-file=$statefile" 3>&- \
+       && . "$statefile" \
+       && export GPG_AGENT_INFO
+     }
 }
 
 echo "$GPG_AGENT_INFO" >&3

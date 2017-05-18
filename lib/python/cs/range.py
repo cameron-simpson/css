@@ -23,6 +23,7 @@ DISTINFO = {
 import sys
 from bisect import bisect_left
 from collections import namedtuple
+from cs.seq import first
 from cs.logutils import ifdebug, X, XP
 
 def overlap(span1, span2):
@@ -133,6 +134,12 @@ class Range(object):
     for span in self._spans:
       yield Span(*span)
 
+  @property
+  def span0(self):
+    ''' Return the first Span; raises IndexError if there are no spans.
+    '''
+    return first(self.spans())
+
   def _check(self):
     self._check_spans()
 
@@ -166,6 +173,11 @@ class Range(object):
       for x in range( *_span ):
         yield x
 
+  def __bool__(self):
+    return len(self._spans) > 0
+
+  __nonzero__ = __bool__
+
   def __len__(self):
     return sum( [ end-start for start, end in self._spans ] )
 
@@ -190,26 +202,27 @@ class Range(object):
       return 0
 
   def isempty(self):
-    ''' Test if the Range is empty; it has no spans.
+    ''' Test if the Range is empty.
     '''
-    return len(self._spans) == 0
+    return not self
 
   def __contains__(self, x):
     ''' Test `x` to see if it is wholly contained in this Range.
-        `x` may be another Range, a single int or an iterable
+        `x` may be another Range, a Span, or a single int or an iterable
         yielding a pair of ints.
     '''
     if isinstance(x, Range):
       return self.issuperset(x)
-    if isinstance(x, int):
+    if isinstance(x, Span):
+      start = x.start
+      end = x.end
+    elif isinstance(x, int):
       start, end = x, x+1
     else:
       start, end = list(x)
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
-    if ndx >= len(_spans):
-      return False
-    if ndx > 0 and start < _spans[ndx].start:
+    if ndx > 0 and _spans[ndx-1].end > start:
       ndx -= 1
     elif ndx >= len(_spans):
       return False

@@ -17,7 +17,8 @@ $ManMacros=($ENV{OS} eq 'linux' ? '-mandoc' : '-man');
 $MyMacros="";   ## "$ENV{HOME}/rc/header/man";
 $Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
 $Roff='nroff';
-$ManProcess="soelim | eqn | tbl | $Roff $ManMacros $MyMacros -";
+# TODO: add -Tutf8 based on locale
+$ManProcess="soelim | eqn -Tutf8 | tbl | $Roff $ManMacros $MyMacros -";
 $SolarisManProcess="/usr/lib/sgml/sgml2roff \"\$MANFILE\" | $ManProcess";
 
 # GNU col is a busted piece of crap

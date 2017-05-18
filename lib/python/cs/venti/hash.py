@@ -259,6 +259,9 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     MultiOpenMixin.__init__(self)
     self.hashclass = DEFAULT_HASHCLASS
 
+  def __str__(self):
+    return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
+
   def add(self, data):
     hashcode = Hash_SHA1.from_data(data)
     self[hashcode] = data

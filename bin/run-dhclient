@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Run a dhclient on the specified interface
+#   - Cameron Simpson <cs@zip.com.au> 09apr2017
+#
+
+set -ue
+
+[ $# = 1 ] || { echo "usage: $0 ifname" >&2; exit 2; }
+ifname=$1
+shift
+set -x
+exec svcd -n "dhclient-$ifname" -q -x -- dhclient -d "$ifname"

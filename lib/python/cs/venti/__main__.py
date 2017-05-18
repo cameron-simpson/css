@@ -8,41 +8,49 @@ from __future__ import with_statement
 import sys
 import os
 import os.path
+import errno
 from getopt import getopt, GetoptError
 import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
-from cs.debug import ifdebug, dump_debug_threads
+from threading import Thread
+from time import sleep
+from cs.debug import ifdebug, dump_debug_threads, thread_dump
+from cs.env import envsub
 from cs.lex import hexify
-import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
+from cs.logutils import Pfx, exception, error, warning, info, debug, setup_logging, logTo, X, nl
+from cs.tty import statusline
 from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
-from .block import Block, IndirectBlock, dump_block
+from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import CacheStore, MemoryCacheStore
+from .compose import Store, ConfigFile
 from .debug import dump_Dirent
-from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDir_from_spec
-from .dir import Dir
+from .datadir import DataDir, DataDir_from_spec
+from .datafile import DataFile, F_COMPRESSED, decompress
+from .dir import Dir, decode_Dirent_text
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .fsck import fsck_Block, fsck_dir
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore, DataDirStore
+from .store import ProgressStore, DataDirStore
+from .vtftp import ftp_archive
 
 def main(argv):
   cmd = os.path.basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
   setup_logging(cmd_name=cmd)
-  usage = '''Usage: %s [options...] operation [args...]
+  usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
       -C store    Use this as a front end cache store.
                   "-" means no front end cache.
       -M          Don't use an additional MemoryCacheStore front end.
       -S store    Specify the store to use:
-                    /path/to/dir  GDBMStore
+                    [clause]        Specification from .vtrc.
+                    /path/to/dir    GDBMStore
                     tcp:[host]:port TCPStore
-                    |sh-command   StreamStore via sh-command
+                    |sh-command     StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
     Operations:
@@ -53,9 +61,11 @@ def main(argv):
       datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
       datadir [indextype:[hashname:]]/dirpath push other-datadir
       dump filerefs
+      fsck block blockref...
+      ftp archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt mountpoint [subpath]
+      mount archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -70,6 +80,7 @@ def main(argv):
   except:
     verbose = False
 
+  dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
   dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
@@ -105,6 +116,8 @@ def main(argv):
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
 
+  config = ConfigFile(dflt_configpath)
+
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
 
@@ -117,59 +130,14 @@ def main(argv):
   xit = None
   S = None
 
-  if len(args) < 1:
-    error("missing command")
+  signal(SIGHUP, lambda sig, frame: thread_dump())
+  signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+
+  try:
+    xit = cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore)
+  except GetoptError as e:
+    error("%s", e)
     badopts = True
-  else:
-    import signal
-    from cs.debug import thread_dump
-    signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-    op = args.pop(0)
-    with Pfx(op):
-      try:
-        op_func = getattr(sys.modules[__name__], "cmd_" + op)
-      except AttributeError:
-        error("unknown operation \"%s\"", op)
-        badopts = True
-      else:
-        if op in ("scan", "datadir", "init"):
-          # run without a context store
-          try:
-            xit = op_func(args)
-          except GetoptError as e:
-            error("%s", e)
-            badopts = True
-        else:
-          if dflt_vt_store is None:
-            error("no $VT_STORE and no -S option")
-            badopts = True
-          else:
-            try:
-              S = Store(dflt_vt_store)
-            except Exception as e:
-              exception("can't open store \"%s\": %s", dflt_vt_store, e)
-              badopts = True
-            else:
-              if dflt_cache is not None:
-                try:
-                  C = Store(dflt_cache)
-                except:
-                  exception("can't open cache store \"%s\"", dflt_cache)
-                  badopts = True
-                else:
-                  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-              if not badopts:
-                # put an in-memory cache in front of the main cache
-                if useMemoryCacheStore:
-                  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-                                 S, MemoryCacheStore("MemoryCacheStore"))
-                with S:
-                  try:
-                    xit = op_func(args, verbose=verbose, log=log)
-                  except GetoptError as e:
-                    error("%s", e)
-                    badopts = True
 
   if badopts:
     sys.stderr.write(usage)
@@ -181,6 +149,83 @@ def main(argv):
   if ifdebug():
     dump_debug_threads()
 
+  return xit
+
+def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore):
+  try:
+    op = args.pop(0)
+  except IndexError:
+    raise GetoptError("missing command")
+  with Pfx(op):
+    if op == "profile":
+      return cmd_profile(args, verbose, log, config,
+                         dflt_vt_store, dflt_cache, useMemoryCacheStore)
+    try:
+      op_func = getattr(sys.modules[__name__], "cmd_" + op)
+    except AttributeError:
+      raise GetoptError("unknown operation \"%s\"" % (op,))
+    # these commands run without a context Store
+    if op in ("scan", "datadir", "init"):
+      return op_func(args)
+    # open the default Store
+    if dflt_vt_store is None:
+      raise GetoptError("no $VT_STORE and no -S option")
+    try:
+      S = Store(dflt_vt_store, config)
+    except Exception as e:
+      exception("can't open store \"%s\": %s", dflt_vt_store, e)
+      raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
+    # optional CacheStore
+    if dflt_cache is not None:
+      try:
+        C = Store(dflt_cache)
+      except:
+        exception("can't open cache store \"%s\"", dflt_cache)
+        raise GetoptError("can't open cache: %s" % (dflt_cache,))
+      S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
+    # put an in-memory cache in front of the main cache
+    if useMemoryCacheStore:
+      S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+                     S, MemoryCacheStore("MemoryCacheStore"))
+    # start the status ticker
+    if False and sys.stdout.isatty():
+      X("wrap in a ProgressStore")
+      run_ticker = True
+      S = ProgressStore("ProgressStore(%s)" % (S,), S)
+      def ticker():
+        old_text = ''
+        while run_ticker:
+          text = S.status_text()
+          if text != old_text:
+            statusline(text)
+            old_text = text
+          sleep(0.25)
+      T = Thread(name='%s-status-line' % (S,), target=ticker)
+      T.daemon = True
+      T.start()
+    else:
+      run_ticker = False
+    with S:
+      xit = op_func(args, verbose=verbose, log=log)
+    if run_ticker:
+      run_ticker = False
+    return xit
+
+def cmd_profile(*a, **kw):
+  try:
+    import cProfile as profile
+  except ImportError:
+    import profile
+  P = profile.Profile()
+  P.enable()
+  try:
+    xit = cmd_op(*a, **kw)
+  except Exception as e:
+    P.disable()
+    raise
+  P.disable()
+  P.create_stats()
+  P.print_stats(sort='cumulative')
   return xit
 
 def cmd_ar(args, verbose=None, log=None):
@@ -370,6 +415,55 @@ def cmd_dump(args, verbose=None, log=None):
     dump(path)
   return 0
 
+def cmd_fsck(args, verbose=None, log=None):
+  import cs.logutils
+  cs.logutils.X_via_log = True
+  if not args:
+    raise GetoptError("missing fsck type")
+  fsck_type = args.pop(0)
+  with Pfx(fsck_type):
+    try:
+      fsck_op = {
+        "block":    cmd_fsck_block,
+        "dir":      cmd_fsck_dir,
+      }[fsck_type]
+    except KeyError:
+      raise GetoptError("unsupported fsck type")
+    return fsck_op(args, verbose=verbose, log=log)
+
+def cmd_fsck_block(args, verbose=None, log=None):
+  xit = 0
+  if not args:
+    raise GetoptError("missing blockrefs")
+  for blockref in args:
+    with Pfx(blockref):
+      blockref_bs = fromtext(blockref)
+      B, offset = decodeBlock(blockref_bs)
+      if offset < len(blockref_bs):
+        raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
+      if not fsck_Block(B):
+        error("fsck failed")
+        xit = 1
+  return xit
+
+def cmd_fsck_dir(args, verbose=None, log=None):
+  xit = 0
+  if not args:
+    raise GetoptError("missing dirents")
+  for dirent_txt in args:
+    with Pfx(dirent_txt):
+      D = decode_Dirent_text(dirent_txt)
+      if not fsck_dir(D):
+        error("fsck failed")
+        xit = 1
+  return xit
+
+def cmd_ftp(args, verbose=None, log=None):
+  archive, = args
+  ftp_archive(archive)
+  return 0
+
+# TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
   ''' Initialise a directory for use as a store.
       Usage: init dirpath [datadir]
@@ -448,11 +542,19 @@ def cmd_mount(args, verbose=None, log=None):
   except IndexError:
     error("missing special")
     badopts = True
-  try:
+  else:
+    if not os.path.isfile(special):
+      error("not a file: %r", special)
+      badopts = True
+  if args:
     mountpoint = args.pop(0)
-  except IndexError:
-    error("missing mountpoint")
-    badopts = True
+  else:
+    spfx, sext = os.path.splitext(special)
+    if sext != '.vt':
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      badopts = True
+    else:
+      mountpoint = spfx
   if args:
     subpath = args.pop(0)
   else:
@@ -462,10 +564,20 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
+  # import vtfuse before doing anything with side effects
   from .vtfuse import mount
-  if not os.path.isdir(mountpoint):
-    error("%s: mountpoint is not a directory", mountpoint)
-    return 1
+  with Pfx(mountpoint):
+    if not os.path.isdir(mountpoint):
+      # autocreate mountpoint
+      info('mkdir %r ...', mountpoint)
+      try:
+        os.mkdir(mountpoint)
+      except OSError as e:
+        if e.errno == errno.EEXIST:
+          error("mountpoint is not a directory", mountpoint)
+          return 1
+        else:
+          raise
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
@@ -481,9 +593,8 @@ def cmd_mount(args, verbose=None, log=None):
         error("expected directory, not file: %s", E)
         return 1
     with Pfx("open('a')"):
-      syncfp = open(special, 'a')
-  ##with ProgressStore("ProgressStore(%s)" % (defaults.S,), defaults.S) as PS:
-  mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
+      with open(special, 'a') as syncfp:
+        mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):
