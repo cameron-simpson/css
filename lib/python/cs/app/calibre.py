@@ -370,14 +370,14 @@ class Book(CalibreTableRow):
 
   @prop
   def rating(self):
-    Rs = self.related_entities('books_ratings_link', 'book', 'rating')
+    Rs = list(self.related_entities('books_ratings_link', 'book', 'rating'))
     if Rs:
       return the(Rs).rating
     return None
 
   @prop
   def series(self):
-    Ss = self.related_entities('books_series_link', 'book', 'series', 'series')
+    Ss = list(self.related_entities('books_series_link', 'book', 'series', 'series'))
     if Ss:
       return the(Ss)
     return None
