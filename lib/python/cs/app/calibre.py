@@ -241,7 +241,7 @@ class CalibreTable(Table):
       where_argv = (row_id,)
     else:
       raise TypeError("invalid type, expected int or str, got: %s" % (type(row_id),))
-    rows = self.rows(where, *where_argv)
+    rows = self.read_rows(where, *where_argv)
     try:
       row = the(rows)
     except IndexError as e:
@@ -291,13 +291,7 @@ class CalibreTable(Table):
   def update(self, attr, value, where=None, *where_params):
     ''' Update an attribute in selected table rows.
     '''
-    sql = "update %s set %s=?" % (self.name, attr)
-    params = [value]
-    if where:
-      sql += ' WHERE ' + where
-      if where_params:
-        params.extend(where_params)
-    return self.dosql_rw(sql, *params)
+    return self.update_columns((attr,), (value,), where, *where_params)
 
 class CalibreTableRow(Row):
   ''' A snapshot of a row from a table, with column values as attributes.
@@ -378,17 +372,13 @@ class Book(CalibreTableRow):
   def add_tag(self, tag_name):
     if tag_name not in [ str(T) for T in self.tags ]:
       T = self.library.table_tags.make(tag_name)
-      sql = 'INSERT INTO books_tags_link(book, tag) VALUES (%d, %d)' \
-            % (self.id, T.id)
-      self.dosql_rw(sql)
+      self.library.table_books_tags_link.insert(('book', 'tag'), [(self.id, T.id)])
 
   def remove_tag(self, tag_name):
     CL = self.library
     if tag_name in [ str(T) for T in self.tags ]:
       T = CL.tag_by_name(tag_name)
-      sql = 'DELETE FROM books_tags_link WHERE book = %d and tag = %d' \
-            % (self.id, T.id)
-      CL.dosql_rw(sql)
+      CL.table_books_tags_link.delete('book = %d and tag = %d', self.id, T.id)
 
 class Rating(CalibreTableRow):
 
@@ -411,20 +401,28 @@ class Tag(CalibreTableRow):
     if self.name == new_name:
       warning("rename tag %r: no change", self.name)
       return
-    T = self.table
+    X("Tag[%d:%r].rename(new_name=%r)", self.id, self.name, new_name)
+    T = self._table
     try:
       otag = T[new_name]
     except KeyError:
+      # name not in use, rename current tag
       T.update('name', new_name, 'id = %d' % (self.id,))
     else:
-      # update related objects (books?)
-      # to point at the other tag
-      for B in self.books:
-        B.add_tag(new_name)
-        B.remove_tag(self.name)
-      # delete our tag, become the other tag
-      T.delete('id = ?', self.id)
-      self.ns.id = otag.id
+      X("other tag for new_name = %d:%r", otag.id, otag.name)
+      if otag.id == self.id:
+        # case insensitive or the like: update the name in place
+        T.update('name', new_name, 'id = %d' % (self.id,))
+      else:
+        # update related objects (books?)
+        # to point at the other tag
+        for B in self.books:
+          X("  update Book[%d:%r]{%s} ...", B.id, B.name, ','.join(T.name for T in B.tags))
+          B.add_tag(new_name)
+          B.remove_tag(self.name)
+        # delete our tag, become the other tag
+        T.delete('id = ?', self.id)
+        self.ns.id = otag.id
     self.name = new_name
 
 CalibreTable.META_DATA = {
