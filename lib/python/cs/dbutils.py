@@ -100,6 +100,7 @@ class Table(object):
 
   def select(self, where=None, *where_argv):
     ''' Select raw SQL data from the table.
+        It is generally better to use read_rows instead, which returns typed rows.
     '''
     sql = 'select %s from %s' % (','.join(self.column_names), self.table_name)
     sqlargs = []
@@ -242,6 +243,52 @@ class Row(object):
       self._row = self._row._replace(**{attr: value})
     else:
       self.__dict__[attr] = value
+
+_IdRelation = namedtuple('IdRelation',
+                         'id_column relation left_column left right_column right')
+
+class IdRelation(_IdRelation):
+  ''' Manage a relationship between 2 Tables based on their id_columns.
+  '''
+
+  def left_to_right(self, right_ids):
+    ''' Fetch left rows given a pythonic index into right.
+    '''
+    condition = where_index(self.right_column, right_ids)
+    left_ids = set( [ rel[self.left_column]
+                      for rel in rel.select(condition.where, *condition.params)
+                    ] )
+    return self.left[left_ids]
+
+  def right_to_left(self, left_ids):
+    ''' Fetch right rows given a pythonic index into left.
+    '''
+    condition = where_index(self.left_column, left_ids)
+    right_ids = set( [ rel[self.right_column]
+                       for rel in rel.select(condition.where, *condition.params)
+                     ] )
+    return self.right[right_ids]
+
+  def add(self, left_id, right_id):
+    self.relation.insert( (self.left_column, self.right_column),
+                          [ (left_id, right_id) ] )
+
+  def remove(self, left_id, right_id):
+    self.relation.delete(
+      '%s = ? and %s = ?' % (self.left_column, self.right_column),
+      left_id, right_id)
+
+  def remove_left(self, left_ids):
+    ''' Remove all relation rows with the specified left_column values.
+    '''
+    condition = where_index(self.left_column, left_ids)
+    return self.left.delete(condition.where, *condition.params)
+
+  def remove_right(self, right_ids):
+    ''' Remove all relation rows with the specified right_column values.
+    '''
+    condition = where_index(self.right_column, right_ids)
+    return self.right.delete(condition.where, *condition.params)
 
 where_index_result = namedtuple(
                         'where_index_result',
