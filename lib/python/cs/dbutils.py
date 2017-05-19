@@ -118,6 +118,22 @@ class Table(object):
     for row in self.select(where, *where_argv):
       yield row_class(self, row)
 
+  def insert(self, column_names, valueses):
+    sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
+    sqlargs = []
+    tuple_param = '(%s)' % ( ','.join( '?' for _ in column_names ), )
+    tuple_params = []
+    for values in valueses:
+      tuple_params.append(tuple_param)
+      sqlargs.extend(values)
+    sql += ', '.join(tuple_params)
+    C = self.conn.cursor()
+    X("SQL: %s %r", sql, sqlargs)
+    with Pfx("SQL %r: %r", sql, sqlargs):
+      C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
   def update_columns(self, update_columns, update_argv, where, *where_argv):
     sql = 'update %s set %s where %s' \
           % (self.table_name,
