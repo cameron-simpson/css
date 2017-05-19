@@ -3,6 +3,7 @@
 # Classes used for representing relational db things, such as tables and rows.
 #
 
+from __future__ import print_function
 from collections import namedtuple
 from threading import RLock
 from cs.py.func import prop
@@ -113,6 +114,8 @@ class Table(object):
 
   def read_rows(self, where=None, *where_argv):
     ''' Return row objects.
+        This is a generator consuming a SELECT result and must
+        therefore be consumed before another query may be performed.
     '''
     row_class = self.row_class
     for row in self.select(where, *where_argv):
@@ -158,7 +161,17 @@ class Table(object):
     C.close()
 
   def __getitem__(self, id_value):
-    return the(self.read_rows("%s = ?" % (self.id_column,), id_value))
+    ''' Fetch the row or rows indicated by `id_value`.
+        If `id_value` is None or a string or is not slicelike or
+        is not iterable return the sole matching row or raise
+        IndexError.
+        Otherwise return an iterable of row values as from read_rows.
+    '''
+    condition = where_index(self.id_column, in_value)
+    rows = self.read_rows(condition.where, *condition.params)
+    if condition.is_scalar:
+      return the(rows)
+    return rows
 
   def edit_column_by_ids(column_name, ids=None):
     if ids is None:
@@ -229,3 +242,66 @@ class Row(object):
       self._row = self._row._replace(**{attr: value})
     else:
       self.__dict__[attr] = value
+
+where_index_result = namedtuple(
+                        'where_index_result',
+                        'is_scalar where params')
+def where_index(column, index):
+  ''' Return a where clause and any associated parameters for a single column index such as may be accepted by __getitem__.
+      Handles integers, strings, slicelike objects and bounded iterables.
+      Returns a namedtuple with fields (is_scalar, where, params).
+  '''
+  try:
+    start = index.start
+    stop = index.stop
+    step = index.step
+  except AttributeError:
+    # not a slice or slicelike object
+    if index is None:
+      return where_index_result(True, 'ISNULL(`%s`)' % (column,), ())
+    elif isinstance(index, str):
+      # strings are scalars
+      return where_index_result(True, '`%s` = ?' % (column,), (index,))
+    # see if we have an iterable
+    try:
+      id_values = iter(index)
+    except TypeError:
+      # not an iterable therefore a scalar
+      return where_index_result(True, '`%s` = ?' % (column,), (index,))
+  else:
+    # a slice
+    if stop is None:
+      # unbounded slice
+      if step is None:
+        step = 1
+      if step > 0:
+        where = '`%s` >= %d' % (column, start)
+      else:
+        where = '`%s` <= %d' % (column, start)
+        step = -step
+      if step != 1:
+        where += ( ' AND MOD(`%s`, %d) == MOD(%d, %d)'
+                 % (column, step, start, step)
+                 )
+      return where_index_result(False, where, ())
+    # convert the slice into a range
+    id_values = range(start, stop, step)
+  # convert most iterables to a tuple
+  if not isinstance(id_values, (list, tuple)):
+    id_values = tuple(id_values)
+  if len(id_values) == 0:
+    where = 'FALSE'
+  elif len(id_values) == 1:
+    where = '`%s` = ?' % (column,)
+  else:
+    where = '`%s` IN (%s)' % (column, ', '.join(['?' for _ in id_values]),)
+  return where_index_result(False, where, id_values)
+
+def _exercise_where_index():
+  for index in ( None, 0, 1,
+                 (1,2,3), [1,3,2],
+                 slice(0, 8, 2), slice(8, 0, -2),
+                 slice(0, None), slice(0, None, 2),
+                 slice(8, None, -2)
+               ):
+    print(repr(index), '=>', where_index('foo', index))
