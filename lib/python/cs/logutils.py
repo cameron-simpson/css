@@ -456,7 +456,7 @@ def nl(msg, *args, **kw):
     try:
       msg = msg % args
     except TypeError as e:
-      nl("cannot expand msg: %s; msg=%r, args=%r", e, msg, args, file=sys.stderr)
+      nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
       msg = "%s[%r]" % (msg, args)
   file.write(msg)
   file.write("\n")
