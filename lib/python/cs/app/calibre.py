@@ -17,7 +17,7 @@ from threading import RLock
 from types import SimpleNamespace as NS
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from cs.dbutils import TableSpace, Table, Row
+from cs.dbutils import TableSpace, Table, Row, IdRelation
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.py.func import prop
@@ -204,7 +204,7 @@ class CalibreMetaDB(TableSpace):
     return the(self.books_by_title(book_title))
 
   def tag_by_name(self, tag_name):
-    return the( T for T in self.tags if T.name == tag_name )
+    return the( T for T in self.table_tags if T.name == tag_name )
 
   def __getattr__(self, attr):
     if attr.startswith('table_'):
@@ -229,24 +229,6 @@ class CalibreTable(Table):
     ''' Return rows sorted by name.
     '''
     return sorted(self.read_rows(), key=lambda row: row.name)
-
-  def __getitem__(self, row_id):
-    ''' Retrieve row by id or name.
-    '''
-    if isinstance(row_id, int):
-      where = 'id = %d' % (row_id,)
-      where_argv = ()
-    elif isinstance(row_id, str):
-      where = '%s = ?' % (self.name_column,)
-      where_argv = (row_id,)
-    else:
-      raise TypeError("invalid type, expected int or str, got: %s" % (type(row_id),))
-    rows = self.read_rows(where, *where_argv)
-    try:
-      row = the(rows)
-    except IndexError as e:
-      raise KeyError(row_id)
-    return row
 
   def make(self, name):
     try:
@@ -323,21 +305,13 @@ class CalibreTableRow(Row):
 
   def related_entities(self, link_table_name, our_column_name, related_column_name, related_table_name=None):
     ''' Look up related entities via a link table.
-        Return l
     '''
     if related_table_name is None:
-     related_table_name = related_column_name + 's'
-    LT = self.db.table(link_table_name)
-    entity_ids = set( row[related_column_name]
-                      for row in LT.read_rows('%s = %d'
-                                              % (our_column_name, self.id))
-                    )
-    RT = self.db.table(related_table_name)
-    return RT.read_rows('%s in (%s)' \
-             % (RT.id_column,
-                ','.join( str(eid) for eid in sorted(entity_ids) )
-               )
-          )
+      related_table_name = related_column_name + 's'
+    R = IdRelation('id', self.db.table(link_table_name),
+                   our_column_name, self._table,
+                   related_column_name, self.db.table(related_table_name))
+    return R.left_to_right(self.id)
 
 class Author(CalibreTableRow):
 
