@@ -209,6 +209,27 @@ class Row(object):
     self._row = table.row_tuple(*values)
     self._lock = lock
 
+  def __str__(self):
+    return str(self._row)
+
+  def __repr__(self):
+    return "<%s %r>" % (self.__class__.__name__, self._row)
+
+  def __iter__(self):
+    return iter(self._row)
+
+  def __len__(self):
+    return len(self._row)
+
+  def keys(self):
+    return self.column_names
+
+  def values(self):
+    return self._row
+
+  def items(self):
+    return zip(self.column_names, self.values())
+
   @prop
   def db(self):
     return self._table.db
