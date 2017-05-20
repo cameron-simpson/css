@@ -109,7 +109,6 @@ class Table(object):
       sqlargs.append(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
-    ##X("SQL: %s %r", sql, sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, *sqlargs)
 
@@ -132,7 +131,6 @@ class Table(object):
       sqlargs.extend(values)
     sql += ', '.join(tuple_params)
     C = self.conn.cursor()
-    X("SQL: %s %r", sql, sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       C.execute(sql, sqlargs)
     self.conn.commit()
@@ -168,7 +166,7 @@ class Table(object):
         IndexError.
         Otherwise return an iterable of row values as from read_rows.
     '''
-    condition = where_index(self.id_column, in_value)
+    condition = where_index(self.id_column, id_value)
     rows = self.read_rows(condition.where, *condition.params)
     if condition.is_scalar:
       return the(rows)
@@ -251,23 +249,21 @@ class IdRelation(_IdRelation):
   ''' Manage a relationship between 2 Tables based on their id_columns.
   '''
 
-  def left_to_right(self, right_ids):
-    ''' Fetch left rows given a pythonic index into right.
-    '''
-    condition = where_index(self.right_column, right_ids)
-    left_ids = set( [ rel[self.left_column]
-                      for rel in rel.select(condition.where, *condition.params)
-                    ] )
-    return self.left[left_ids]
-
-  def right_to_left(self, left_ids):
+  def left_to_right(self, left_ids):
     ''' Fetch right rows given a pythonic index into left.
     '''
     condition = where_index(self.left_column, left_ids)
-    right_ids = set( [ rel[self.right_column]
-                       for rel in rel.select(condition.where, *condition.params)
-                     ] )
+    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
     return self.right[right_ids]
+
+  def right_to_left(self, right_ids):
+    ''' Fetch left rows given a pythonic index into right.
+    '''
+    condition = where_index(self.right_column, right_ids)
+    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
+    return self.left[left_ids]
 
   def add(self, left_id, right_id):
     self.relation.insert( (self.left_column, self.right_column),
@@ -337,7 +333,7 @@ def where_index(column, index):
   if not isinstance(id_values, (list, tuple)):
     id_values = tuple(id_values)
   if len(id_values) == 0:
-    where = 'FALSE'
+    where = '1=2'
   elif len(id_values) == 1:
     where = '`%s` = ?' % (column,)
   else:
