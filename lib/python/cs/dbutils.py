@@ -3,6 +3,7 @@
 # Classes used for representing relational db things, such as tables and rows.
 #
 
+from __future__ import print_function
 from collections import namedtuple
 from threading import RLock
 from cs.py.func import prop
@@ -99,6 +100,7 @@ class Table(object):
 
   def select(self, where=None, *where_argv):
     ''' Select raw SQL data from the table.
+        It is generally better to use read_rows instead, which returns typed rows.
     '''
     sql = 'select %s from %s' % (','.join(self.column_names), self.table_name)
     sqlargs = []
@@ -107,16 +109,32 @@ class Table(object):
       sqlargs.append(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
-    ##X("SQL: %s %r", sql, sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, *sqlargs)
 
   def read_rows(self, where=None, *where_argv):
     ''' Return row objects.
+        This is a generator consuming a SELECT result and must
+        therefore be consumed before another query may be performed.
     '''
     row_class = self.row_class
     for row in self.select(where, *where_argv):
       yield row_class(self, row)
+
+  def insert(self, column_names, valueses):
+    sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
+    sqlargs = []
+    tuple_param = '(%s)' % ( ','.join( '?' for _ in column_names ), )
+    tuple_params = []
+    for values in valueses:
+      tuple_params.append(tuple_param)
+      sqlargs.extend(values)
+    sql += ', '.join(tuple_params)
+    C = self.conn.cursor()
+    with Pfx("SQL %r: %r", sql, sqlargs):
+      C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
 
   def update_columns(self, update_columns, update_argv, where, *where_argv):
     sql = 'update %s set %s where %s' \
@@ -142,7 +160,45 @@ class Table(object):
     C.close()
 
   def __getitem__(self, id_value):
-    return the(self.read_rows("%s = ?" % (self.id_column,), id_value))
+    ''' Fetch the row or rows indicated by `id_value`.
+        If `id_value` is None or a string or is not slicelike or
+        is not iterable return the sole matching row or raise
+        IndexError.
+        Otherwise return an iterable of row values as from read_rows.
+    '''
+    condition = where_index(self.id_column, id_value)
+    rows = self.read_rows(condition.where, *condition.params)
+    if condition.is_scalar:
+      return the(rows)
+    return rows
+
+  def edit_column_by_ids(column_name, ids=None):
+    if ids is None:
+      where = None
+    else:
+      where = '%s in (%s)' % (column_name, ','.join("%d" % i for i in ids))
+    return self.edit_column(column_name, where)
+
+  def edit_column(column_name, where=None):
+    with Pfx("edit_column(%s, %r)", column_name, where):
+      id_column = self.id_column
+      edit_lines = []
+      for row in self.select(where=where):
+        edit_line = "%d:%s" % (row[id_column], row[column_name])
+        edit_lines.append(edit_line)
+      changes = edit_strings(sorted(edit_lines,
+                                    key=lambda _: _.split(':', 1)[1]),
+                             errors=lambda msg: warning(msg + ', discarded')
+                            )
+      for old_string, new_string in changes:
+        with Pfx("%s => %s", old_string, new_string):
+          old_id, old_name = old_string.split(':', 1)
+          new_id, new_name = new_string.split(':', 1)
+          if old_id != new_id:
+            error("id mismatch (%s != %s), discarding change")
+          else:
+            self[int(new_id)] = new_name
+            info("updated")
 
 class Row(object):
 
@@ -185,3 +241,110 @@ class Row(object):
       self._row = self._row._replace(**{attr: value})
     else:
       self.__dict__[attr] = value
+
+_IdRelation = namedtuple('IdRelation',
+                         'id_column relation left_column left right_column right')
+
+class IdRelation(_IdRelation):
+  ''' Manage a relationship between 2 Tables based on their id_columns.
+  '''
+
+  def left_to_right(self, left_ids):
+    ''' Fetch right rows given a pythonic index into left.
+    '''
+    condition = where_index(self.left_column, left_ids)
+    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
+    return self.right[right_ids]
+
+  def right_to_left(self, right_ids):
+    ''' Fetch left rows given a pythonic index into right.
+    '''
+    condition = where_index(self.right_column, right_ids)
+    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
+    return self.left[left_ids]
+
+  def add(self, left_id, right_id):
+    self.relation.insert( (self.left_column, self.right_column),
+                          [ (left_id, right_id) ] )
+
+  def remove(self, left_id, right_id):
+    self.relation.delete(
+      '%s = ? and %s = ?' % (self.left_column, self.right_column),
+      left_id, right_id)
+
+  def remove_left(self, left_ids):
+    ''' Remove all relation rows with the specified left_column values.
+    '''
+    condition = where_index(self.left_column, left_ids)
+    return self.left.delete(condition.where, *condition.params)
+
+  def remove_right(self, right_ids):
+    ''' Remove all relation rows with the specified right_column values.
+    '''
+    condition = where_index(self.right_column, right_ids)
+    return self.right.delete(condition.where, *condition.params)
+
+where_index_result = namedtuple(
+                        'where_index_result',
+                        'is_scalar where params')
+def where_index(column, index):
+  ''' Return a where clause and any associated parameters for a single column index such as may be accepted by __getitem__.
+      Handles integers, strings, slicelike objects and bounded iterables.
+      Returns a namedtuple with fields (is_scalar, where, params).
+  '''
+  try:
+    start = index.start
+    stop = index.stop
+    step = index.step
+  except AttributeError:
+    # not a slice or slicelike object
+    if index is None:
+      return where_index_result(True, 'ISNULL(`%s`)' % (column,), ())
+    elif isinstance(index, str):
+      # strings are scalars
+      return where_index_result(True, '`%s` = ?' % (column,), (index,))
+    # see if we have an iterable
+    try:
+      id_values = iter(index)
+    except TypeError:
+      # not an iterable therefore a scalar
+      return where_index_result(True, '`%s` = ?' % (column,), (index,))
+  else:
+    # a slice
+    if stop is None:
+      # unbounded slice
+      if step is None:
+        step = 1
+      if step > 0:
+        where = '`%s` >= %d' % (column, start)
+      else:
+        where = '`%s` <= %d' % (column, start)
+        step = -step
+      if step != 1:
+        where += ( ' AND MOD(`%s`, %d) == MOD(%d, %d)'
+                 % (column, step, start, step)
+                 )
+      return where_index_result(False, where, ())
+    # convert the slice into a range
+    id_values = range(start, stop, step)
+  # convert most iterables to a tuple
+  if not isinstance(id_values, (list, tuple)):
+    id_values = tuple(id_values)
+  if len(id_values) == 0:
+    where = '1=2'
+  elif len(id_values) == 1:
+    where = '`%s` = ?' % (column,)
+  else:
+    where = '`%s` IN (%s)' % (column, ', '.join(['?' for _ in id_values]),)
+  return where_index_result(False, where, id_values)
+
+def _exercise_where_index():
+  for index in ( None, 0, 1,
+                 (1,2,3), [1,3,2],
+                 slice(0, 8, 2), slice(8, 0, -2),
+                 slice(0, None), slice(0, None, 2),
+                 slice(8, None, -2)
+               ):
+    print(repr(index), '=>', where_index('foo', index))
