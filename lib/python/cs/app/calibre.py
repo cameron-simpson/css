@@ -140,18 +140,25 @@ class Calibre_Library(O):
       obclass = argv.pop(0)
     with Pfx(obclass):
       if obclass == 'books':
-        for B in self.table_books.instances():
-          print(B,
-                ' '.join(str(T) for T in B.tags),
-                'rating:'+str(B.rating),
-                'series:'+str(B.series),
-               )
-          print(' ', '+'.join(str(A) for A in B.authors))
-          S = B.series
-          if S:
-            for B2 in sorted(S.books):
+        for B in sorted(self.table_books.instances(),
+                        key=lambda B: B.sort):
+          series = B.series
+          if series:
+            print(B, '%s[%g]' % (series, B.series_index))
+          else:
+            print(B)
+          for label, value in (
+            ( 'author', ', '.join(sorted(str(A) for A in B.authors)) ),
+            ( 'tags', ' '.join(sorted(str(T) for T in B.tags))),
+            ( 'rating', B.rating ),
+            ( 'identifiers', ','.join("%s:%s" % I for I in B.identifiers) ),
+          ):
+            if value:
+              print(' ', label+':', value)
+          if series:
+            for B2 in sorted(series.books, key=lambda B: B.series_index):
               if B2.id != B.id:
-                print('  also', B2)
+                print('  also', B2, '[%g]' % (B2.series_index,))
       elif obclass in ('authors', 'tags'):
         for obj in self.table(obclass).instances():
           print(obj)
@@ -217,9 +224,10 @@ class CalibreTable(Table):
 
   def __init__(self, db, table_name):
     meta = self.META_DATA[table_name]
+    klass = getattr(meta, 'klass', CalibreTableRow)
     Table.__init__(self, db, table_name,
                    column_names=meta.columns.split(),
-                   row_class=meta.klass,
+                   row_class=klass,
                    id_column='id')
     CL = db.library
     self.library = CL
@@ -288,10 +296,16 @@ class CalibreTableRow(Row):
   @prop
   def name(self):
     name_column = self._table.name_column
+    if name_column is None:
+      raise AttributeError("no .name attribute for %r" % (self,))
     return getattr(self._row, name_column)
 
   def __str__(self):
-    return self.name
+    try:
+      s = self.name
+    except AttributeError:
+      s = repr(self)
+    return s
 
   def __hash__(self):
     return self.id
@@ -324,6 +338,11 @@ class Book(CalibreTableRow):
   @prop
   def authors(self):
     return self.related_entities('books_authors_link', 'book', 'author')
+
+  @prop
+  def identifiers(self):
+    identifier_rows = self.db.table_identifiers.read_rows('book = %d' % (self.id,))
+    return set( (row.type, row.val) for row in identifier_rows )
 
   @prop
   def rating(self):
@@ -414,6 +433,7 @@ CalibreTable.META_DATA = {
                         columns='id book series'),
   'books_tags_link': NS(klass=CalibreTableRow,
                         columns='id book tag'),
+  'identifiers': NS(columns='id book type val'),
   'ratings': NS(klass=Rating,
                 columns='id rating',
                 name_column='rating'),
