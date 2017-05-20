@@ -61,7 +61,11 @@ def prop(func):
     except AttributeError as e:
       e2 = RuntimeError("inner function %s raised %s" % (func, e))
       if sys.version_info[0] >= 3:
-        eval('raise e2 from e', globals(), locals())
+        try:
+          eval('raise e2 from e', globals(), locals())
+        except:
+          # FIXME: why does this raise a SyntaxError?
+          raise e
       else:
         raise e2
   return property(wrapper)
