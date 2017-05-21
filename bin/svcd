@@ -7,4 +7,4 @@
 # Converted to Python module cs.app.svcd. - cameron, may2017
 #
 
-exec python -m cs.app.svcd ${1+"$@"}
+exec python3 -m cs.app.svcd ${1+"$@"}
