@@ -281,7 +281,7 @@ class SvcD(FlaggedMixin, object):
     '''
     self.subp.terminate()
     final_time = now() + KILL_TIME
-    while self.probe() and now() < final_time():
+    while self.probe() and now() < final_time:
       sleep(1)
     if self.probe():
       self.subp.kill()
@@ -303,17 +303,21 @@ class SvcD(FlaggedMixin, object):
           next_start_time = now() + self.restart_delay
         if self.subp is None:
           # not running - see if it should start
-          if now() >= max(next_test_time, next_start_time) and self.test():
-            # test passes, start service
-            self.spawn()
+          if now() >= max(next_test_time, next_start_time):
+            if self.test():
+              # test passes, start service
+              self.spawn()
+            next_test_time = now() + self.test_rate
         else:
           # running - see if it should stop
           stop = False
           if self.flag_restart:
             self.flag_restart = False
             stop = True
-          elif now() >= next_test_time and not self.test():
-            stop = True
+          elif now() >= next_test_time:
+            if not self.test():
+              stop = True
+            next_test_time = now() + self.test_rate
           if not stop and self.sig_func is not None:
             new_sig = self.sig_func()
             if new_sig is not None and new_sig != old_sig:
@@ -321,8 +325,8 @@ class SvcD(FlaggedMixin, object):
               stop = True
           if stop:
             self.alert('RESTART')
-            self.subp._kill_subproc()
-            sleep(restart_delay)
+            self._kill_subproc()
+            sleep(self.restart_delay)
         sleep(1)
       if self.subp is not None:
         self.subp._kill_subproc()
