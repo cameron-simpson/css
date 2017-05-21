@@ -194,5 +194,54 @@ class PolledFlags(dict):
       if old ^ new:
         self[k] = new
 
+class FlaggedMixin(object):
+  ''' A mixin class adding flag_* and flagname_* attributes.
+  '''
+
+  def __init__(self, flags=None):
+    ''' Initialise the mixin.
+        `flags`: optional parameter; if None defaults to a new default Flags().
+    '''
+    if flags is None:
+      flags = Flags()
+    self.__flags = flags
+
+  def __flagname(self, suffix):
+    ''' Compute a flag name from `suffix`.
+        The object's .name attribute is used as the basis, so a
+        `suffix` of 'bah' with a .name attribute of 'foo' returns
+        'FOO_BAH'.
+        This function returns None if there is no .name attribute or it is None.
+    '''
+    try:
+      name = self.name
+    except AttributeError:
+      return None
+    if name is None:
+      return None
+    return uppername(name + '_' + suffix)
+
+  def __getattr__(self, attr):
+    ''' Support .flag_suffix and .flagname_suffix.
+    '''
+    if attr.startswith('flagname_'):
+      # compute the flag name
+      flagname = self.__flagname(attr[9:])
+      if flagname:
+        return flagname
+    elif attr.startswith('flag_'):
+      # test a flag
+      flagname = self.__flagname(attr[5:])
+      if flagname:
+        return self.__flags[flagname]
+    return super().__getattr__(attr)
+
+  def __setattr__(self, attr, value):
+    ''' Support .flag_suffix=value.
+    '''
+    if attr.startswith('flag_'):
+      self.__flags[self.__flagname(attr[5:])] = value
+    super().__setattr__(attr, value)
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
