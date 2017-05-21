@@ -12,10 +12,8 @@ import errno
 from collections import MutableMapping
 from threading import Thread
 from time import sleep
-from cs.env import envsub
+from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
-
-DFLT_FLAGDIR_SPEC = '$HOME/var/flags'
 
 def main(argv):
   argv = list(argv)
@@ -61,27 +59,14 @@ def lowername(s):
   '''
   return s.replace('_', '-').lower()
 
-def flagdirpath(path=None, environ=None):
-  ''' Return the pathname of the flags directory.
-  '''
-  if environ is None:
-    environ = os.environ
-  if path is None:
-    flagdir = environ.get('FLAGDIR')
-    if flagdir is None:
-      flagdir = envsub(DFLT_FLAGDIR_SPEC)
-  elif not os.path.isabs(path):
-    flagdir = os.path.join(envsub('$HOME'), path)
-  else:
-    flagdir = path
-  return flagdir
-
 class Flags(MutableMapping):
   ''' A mapping which directly inspects the flags directory.
   '''
 
   def __init__(self, flagdir=None, environ=None):
-    self.dirpath = flagdirpath(flagdir, environ)
+    if flagdir is None:
+      flagdir = FLAGDIR(environ=environ)
+    self.dirpath = flagdir
 
   def init(self):
     ''' Ensure the flag directory exists.
