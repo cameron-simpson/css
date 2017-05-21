@@ -73,7 +73,7 @@ def remove_pidfile(path):
       raise
 
 @contextmanager
-def pidfile(path, pid=None):
+def PidFileManager(path, pid=None):
   write_pidfile(path, pid)
   yield
   remove_pidfile(path)
