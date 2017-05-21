@@ -235,11 +235,11 @@ class SvcD(FlaggedMixin, object):
       return True
     if self.flag_disabled:
       return False
-    for flagname, invert in self.test_flags.items():
+    for flagname, truish in self.test_flags.items():
       if self.flags[flagname]:
-        if invert:
+        if not truish:
           return False
-      elif not invert:
+      elif truish:
         return False
     if self.test_func is not None:
       return self.test_func()
