@@ -12,6 +12,7 @@ from getopt import getopt, GetoptError
 import os
 from os.path import basename, join as joinpath, splitext
 import pwd
+from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
@@ -185,6 +186,14 @@ def main(argv, environ=None):
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name, sig_func=sig_func, test_func=test_func, test_rate=test_rate)
+  def signal_handler(signum, frame):
+    X("SIGNAL HANDLER (signum=%s", signum)
+    S.stop()
+    S.wait()
+    sys.exit(1)
+  signal(SIGHUP, signal_handler)
+  signal(SIGINT, signal_handler)
+  signal(SIGTERM, signal_handler)
   pidfile_base, pidfile_ext = splitext(S.pidfile)
   mypidfile = pidfile_base + '-svcd' + pidfile_ext
   with open(mypidfile, "w") as mypidfp:
