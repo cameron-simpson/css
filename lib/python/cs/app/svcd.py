@@ -16,7 +16,7 @@ from subprocess import Popen, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, uppername, FlaggedMixin
-from cs.env import LOGDIR, VARRUN
+from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
 from cs.py.func import prop
 
@@ -193,20 +193,14 @@ class SvcD(FlaggedMixin, object):
   def __init__(self, argv, name=None,
         environ=None,
         flags=None,
-        logdir=None,
         pidfile=None,
         sig_func=None,
         test_flags=None,
         test_func=None,
         test_rate=None,
-        varrun=None
     ):
     if environ is None:
       environ = os.environ
-    if logdir is None:
-      logdir = joinpath(LOGDIR(environ), 'svc')
-    if varrun is None:
-      varrun = VARRUN(environ)
     if flags is None:
       flags = Flags(environ=environ)
     FlaggedMixin.__init__(self, flags=flags)
@@ -214,10 +208,10 @@ class SvcD(FlaggedMixin, object):
       test_flags = {}
     if test_rate is None:
       test_rate = TEST_RATE
+    if pidfile is None and name is not None:
+        pidfile = joinpath(VARRUN(environ=environ), 'svcd-' + name + '.pid')
     self.argv = argv
     self.name = name
-    self.logdir = logdir
-    self.varrun = varrun
     self.test_flags = test_flags
     self.test_func = test_func
     self.test_rate = test_rate
@@ -225,8 +219,6 @@ class SvcD(FlaggedMixin, object):
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
-    if pidfile is None and name is not None:
-        pidfile = joinpath(self.varrun, name + '.pid')
     self.pidfile = pidfile
     self.sig_func = sig_func
 
