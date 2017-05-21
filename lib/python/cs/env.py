@@ -21,8 +21,9 @@ import types
 from cs.lex import get_qstr
 
 # various standard locations used in the cs.* modules
-LOGDIR = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log')
-VARRUN = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run')
+LOGDIR  = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
+VARRUN  = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
+FLAGDIR = lambda environ=None: get_standard_var('FLAGDIR', '$HOME/var/flags', environ=environ)
 
 def get_standard_var(varname, default, environ=None):
   if environ is None:
