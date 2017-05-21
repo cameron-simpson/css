@@ -11,12 +11,13 @@ from __future__ import print_function
 from getopt import getopt, GetoptError
 import os
 from os.path import basename, join as joinpath
+import pwd
 from subprocess import Popen, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, uppername, FlaggedMixin
 from cs.env import LOGDIR, VARRUN
-from cs.logutils import setup_logging, warning, PfxThread as Thread
+from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
 from cs.py.func import prop
 
 TEST_RATE = 7
@@ -33,8 +34,8 @@ USAGE = '''Usage:
           For each name set the flag {NAME}_RESTART, causing the matching
           svcd to shut down and then restart its daemon process.
   %s stop names...
-          For each name kill the svcd running the named daemon process and
-          the daemon process.
+          For each name set the flag {NAME}_STOP, causing the the
+          montior thread to kill the daemon process and exit.
   %s [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
     -1    Run command only once.
     -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
@@ -67,7 +68,7 @@ USAGE = '''Usage:
 
 def main(argv, environ=None):
   cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
   setup_logging(cmd)
 
   flags = Flags()
@@ -104,13 +105,13 @@ def main(argv, environ=None):
     test_shcmd = None
     test_rate = TEST_RATE
     uid = os.geteuid()
-    username = getpwuid(uid).pw_name
+    username = pwd.getpwuid(uid).pw_name
     run_uid = uid
     run_username = username
     test_uid = uid
     test_username = username
     trace = False
-    opts, argv = getopt('1lL:n:p:P:qs:t:T:u:U:x', argv)
+    opts, argv = getopt(argv, '1lL:n:p:P:qs:t:T:u:U:x')
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-1':
@@ -183,7 +184,9 @@ def main(argv, environ=None):
     argv = ['sux', '-u', run_username, '--'] + argv
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = Svcd(argv, name=name, sig_func=sig_func, test_func=test_func, test_rate=test_rate)
+  S = SvcD(argv, name=name, sig_func=sig_func, test_func=test_func, test_rate=test_rate)
+  S.start()
+  S.wait()
 
 class SvcD(FlaggedMixin, object):
 
@@ -193,11 +196,11 @@ class SvcD(FlaggedMixin, object):
         logdir=None,
         pidfile=None,
         sig_func=None,
+        test_flags=None,
         test_func=None,
         test_rate=None,
         varrun=None
     ):
-    X("INIT SVCD %s %r", name, argv)
     if environ is None:
       environ = os.environ
     if logdir is None:
@@ -206,20 +209,26 @@ class SvcD(FlaggedMixin, object):
       varrun = VARRUN(environ)
     if flags is None:
       flags = Flags(environ=environ)
-    FlaggedMixin(self, flags=flags)
+    FlaggedMixin.__init__(self, flags=flags)
+    if test_flags is None:
+      test_flags = {}
     if test_rate is None:
       test_rate = TEST_RATE
+    self.argv = argv
     self.name = name
     self.logdir = logdir
     self.varrun = varrun
+    self.test_flags = test_flags
     self.test_func = test_func
     self.test_rate = test_rate
+    self.restart_delay = self.test_rate
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
     if pidfile is None and name is not None:
         pidfile = joinpath(self.varrun, name + '.pid')
     self.pidfile = pidfile
+    self.sig_func = sig_func
 
   def __str__(self):
     if self.name is None:
@@ -234,6 +243,12 @@ class SvcD(FlaggedMixin, object):
       return True
     if self.flag_disabled:
       return False
+    for flagname, invert in self.test_flags.items():
+      if self.flags[flagname]:
+        if invert:
+          return False
+      elif not invert:
+        return False
     if self.test_func is not None:
       return self.test_func()
     return True
@@ -241,20 +256,18 @@ class SvcD(FlaggedMixin, object):
   def alert(self, msg, *a):
     if a:
       msg = msg % a
-    subprocess.Popen(['alert', 'SVCD %s: %s' % (self.name, msg)], stdin=DEVNULL)
+    Popen(['alert', 'SVCD %s: %s' % (self.name, msg)], stdin=DEVNULL)
 
   def spawn(self):
-    X("SPAWN %r", self.argv)
     if self.subp is not None:
       raise RuntimeError("already running")
-    self.subp = Popen.subprocess(self.argv, stdin=DEVNULL)
+    self.subp = Popen(self.argv, stdin=DEVNULL)
     self.alert('STARTED')
     if self.pidfile is not None:
       with open(self.pidfile, 'w') as pidfp:
         print(self.subp.pid, file=pidfp)
 
   def reap(self):
-    X("REAP")
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
@@ -283,55 +296,69 @@ class SvcD(FlaggedMixin, object):
     return self.reap()
 
   def start(self):
-    X("START %s", self.name)
-    self.active = True
-    old_sig = ''
     def monitor():
-      while self.active:
-        if self.test():
-          # test passes, start service
-          if self.subp is None:
+      old_sig = ''
+      next_test_time = now()
+      next_start_time = now()
+      while True:
+        # check for termination state
+        if self.flag_stop:
+          self.flag_stop = False
+          break
+        # check for process exit
+        if self.subp is not None and not self.probe():
+          self.reap()
+          next_start_time = now() + self.restart_delay
+        if self.subp is None:
+          # not running - see if it should start
+          if now() >= max(next_test_time, next_start_time) and self.test():
+            # test passes, start service
             self.spawn()
-          else:
-            # service already running, check for restart
-            restart = self.flag_restart
-            if not restart and self.sig_func is not None:
-              new_sig = self.sig_func()
-              if new_sig is not None and new_sig != old_sig:
-                old_sig = new_sig
-                restart = True
-            if restart:
-              self.alert('RESTART')
-              self.flag_restart = False
-              if self.subp is not None:
-                self.subp.terminate()
-                self.subp.reap()
         else:
-          # test fails, stop service
-          if self.subp is not None:
-            self._kill_proc()
-        sleep(self.test_rate)
+          # running - see if it should stop
+          stop = False
+          if self.flag_restart:
+            self.flag_restart = False
+            stop = True
+          elif now() >= next_test_time and not self.test():
+            stop = True
+          if not stop and self.sig_func is not None:
+            new_sig = self.sig_func()
+            if new_sig is not None and new_sig != old_sig:
+              old_sig = new_sig
+              stop = True
+          if stop:
+            self.alert('RESTART')
+            self.subp._kill_subproc()
+            sleep(restart_delay)
+        sleep(1)
+      if self.subp is not None:
+        self.subp._kill_subproc()
     T = Thread(name=str(self)+':monitor', target=monitor)
     T.start()
     self.monitor = T
+
+  def stop(self):
+    self.flag_stop = True
+
+  def wait(self):
+    if self.monitor:
+      self.monitor.join()
+      self.monitor = None
 
   def restart(self):
     self.flag_restart = True
 
   def disable(self):
-    X("DISABLE %s", self.name)
     self.flag_disable = True
 
   def enable(self):
-    X("ENABLE %s", self.name)
     self.flag_disabled = False
 
   def probe(self):
     if self.subp is None:
       return False
-    try:
-      os.kill(self.subp.pid, 0)
-    except OSError as e:
-      return False
-    else:
-      return True
+    return self.subp.poll() is None
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
