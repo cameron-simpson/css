@@ -150,7 +150,7 @@ class Flags(MutableMapping):
         try:
           os.remove(k)
         except OSError as e:
-          if e.errno != ENOENT:
+          if e.errno != errno.ENOENT:
             raise
   
   def __delitem__(self, k):
