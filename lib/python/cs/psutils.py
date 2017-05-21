@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 02sep2011
 #
 
+from __future__ import print_function
+from contextlib import contextmanager
+import errno
 import os
 from signal import SIGTERM, SIGKILL
 
@@ -47,3 +50,30 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
           if e.errno != os.ESRCH:
             raise
       return False
+
+def write_pidfile(path, pid=None):
+  ''' Write a process id to a pid file.
+      `path`: the path to the pid file.
+      `pid`: the process id to write, defautl from os.getpid.
+  '''
+  if pid is None:
+    pid = os.getpid()
+  with open(path, "w") as pidfp:
+    print(pid, file=pidfp)
+
+def remove_pidfile(path):
+  ''' Truncate and remove a pidfile, permissions permitting.
+  '''
+  try:
+    with open(path, "w") as pidfp:
+      pass
+    os.remove(path)
+  except OSError as e:
+    if e.errno != errno.EPERM:
+      raise
+
+@contextmanager
+def pidfile(path, pid=None):
+  write_pidfile(path, pid)
+  yield
+  remove_pidfile(path)
