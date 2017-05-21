@@ -204,7 +204,7 @@ class FlaggedMixin(object):
     '''
     if flags is None:
       flags = Flags()
-    self.__flags = flags
+    self.flags = flags
 
   def __flagname(self, suffix):
     ''' Compute a flag name from `suffix`.
@@ -233,14 +233,14 @@ class FlaggedMixin(object):
       # test a flag
       flagname = self.__flagname(attr[5:])
       if flagname:
-        return self.__flags[flagname]
+        return self.flags[flagname]
     raise AttributeError("FlaggedMixin: no %r" % ('.'+attr,))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.
     '''
     if attr.startswith('flag_'):
-      self.__flags[self.__flagname(attr[5:])] = value
+      self.flags[self.__flagname(attr[5:])] = value
     super().__setattr__(attr, value)
 
 if __name__ == '__main__':
