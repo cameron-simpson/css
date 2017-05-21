@@ -10,7 +10,7 @@
 from __future__ import print_function
 from getopt import getopt, GetoptError
 import os
-from os.path import basename, join as joinpath
+from os.path import basename, join as joinpath, splitext
 import pwd
 from subprocess import Popen, DEVNULL, call as callproc
 import sys
@@ -185,8 +185,19 @@ def main(argv, environ=None):
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name, sig_func=sig_func, test_func=test_func, test_rate=test_rate)
+  pidfile_base, pidfile_ext = splitext(S.pidfile)
+  mypidfile = pidfile_base + '-svcd' + pidfile_ext
+  with open(mypidfile, "w") as mypidfp:
+    print(os.getpid(), file=mypidfp)
   S.start()
   S.wait()
+  with open(mypidfile, "w") as mypidfp:
+    pass
+  try:
+    os.remove(mypidfile)
+  except OSError as e:
+    if e.errno != e.EPERM:
+      raise
 
 class SvcD(FlaggedMixin, object):
 
@@ -209,7 +220,7 @@ class SvcD(FlaggedMixin, object):
     if test_rate is None:
       test_rate = TEST_RATE
     if pidfile is None and name is not None:
-        pidfile = joinpath(VARRUN(environ=environ), 'svcd-' + name + '.pid')
+        pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     self.argv = argv
     self.name = name
     self.test_flags = test_flags
@@ -272,7 +283,7 @@ class SvcD(FlaggedMixin, object):
         os.remove(self.pidfile)
       except OSError as e:
         if e.errno != errno.EPERM:
-          warning("remove %r: %s", self.pidfile, e)
+          raise
     return returncode
 
   def _kill_subproc(self):
