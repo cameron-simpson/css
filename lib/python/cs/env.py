@@ -30,7 +30,7 @@ def get_standard_var(varname, default, environ=None):
     environ = os.environ
   value = environ.get(varname)
   if value is None:
-    value = default
+    value = envsub(default, environ)
   return value
 
 def getLogin(uid=None):
@@ -74,10 +74,3 @@ def envsub(s, environ=None, default=None):
   if environ is None:
     environ = os.environ
   return get_qstr(s, 0, q=None, environ=environ, default=default)[0]
-
-def varlog(environ=None):
-  ''' Return the default base for logs for most cs.* modules.
-  '''
-  if environ is None:
-    environ = os.environ
-  return envsub('$HOME/var/log')
