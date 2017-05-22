@@ -187,7 +187,9 @@ def main(argv, environ=None):
     argv = ['sux', '-u', run_username, '--'] + argv
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(argv, name=name, sig_func=sig_func, test_func=test_func, test_rate=test_rate)
+  S = SvcD(argv, name=name,
+           sig_func=sig_func, test_func=test_func,
+           test_rate=test_rate, once=once)
   def signal_handler(signum, frame):
     X("SIGNAL HANDLER (signum=%s", signum)
     S.stop()
@@ -213,6 +215,7 @@ class SvcD(FlaggedMixin, object):
         test_func=None,
         test_rate=None,
         restart_delay=None,
+        once=False,
     ):
     if environ is None:
       environ = os.environ
@@ -233,6 +236,7 @@ class SvcD(FlaggedMixin, object):
     self.test_func = test_func
     self.test_rate = test_rate
     self.restart_delay = restart_delay
+    self.once = once
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
@@ -310,6 +314,8 @@ class SvcD(FlaggedMixin, object):
         # check for process exit
         if self.subp is not None and not self.probe():
           self.reap()
+          if self.once:
+            break
           next_start_time = now() + self.restart_delay
         if self.subp is None:
           # not running - see if it should start
