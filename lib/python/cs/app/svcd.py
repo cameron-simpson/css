@@ -19,6 +19,7 @@ from time import sleep, time as now
 from cs.app.flag import Flags, uppername, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
+from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.py.func import prop
 
 TEST_RATE = 7
@@ -196,17 +197,9 @@ def main(argv, environ=None):
   signal(SIGTERM, signal_handler)
   pidfile_base, pidfile_ext = splitext(S.pidfile)
   mypidfile = pidfile_base + '-svcd' + pidfile_ext
-  with open(mypidfile, "w") as mypidfp:
-    print(os.getpid(), file=mypidfp)
-  S.start()
-  S.wait()
-  with open(mypidfile, "w") as mypidfp:
-    pass
-  try:
-    os.remove(mypidfile)
-  except OSError as e:
-    if e.errno != e.EPERM:
-      raise
+  with PidFileManager(mypidfile):
+    S.start()
+    S.wait()
 
 class SvcD(FlaggedMixin, object):
 
@@ -276,8 +269,7 @@ class SvcD(FlaggedMixin, object):
     self.subp = Popen(self.argv, stdin=DEVNULL)
     self.alert('STARTED')
     if self.pidfile is not None:
-      with open(self.pidfile, 'w') as pidfp:
-        print(self.subp.pid, file=pidfp)
+      write_pidfile(self.pidfile, self.subp.pid)
 
   def reap(self):
     if self.subp is None:
@@ -286,13 +278,7 @@ class SvcD(FlaggedMixin, object):
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
-      with open(self.pidfile, 'w') as pidfp:
-        pass
-      try:
-        os.remove(self.pidfile)
-      except OSError as e:
-        if e.errno != errno.EPERM:
-          raise
+      remove_pidfile(self.pidfile)
     return returncode
 
   def _kill_subproc(self):
