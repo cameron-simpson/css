@@ -217,6 +217,22 @@ class SvcD(FlaggedMixin, object):
         restart_delay=None,
         once=False,
     ):
+    ''' Initialise the SvcD.
+        `argv`: command to run as a subprocess.
+        `flags`: a cs.app.flag.Flags -like object, default None;
+          if None the default flags will be used.
+        `pidfile`: path to pid file, default $VARRUN/{name}.pid.
+        `sig_func`: signature function to compute a string which
+          causes a restart if it changes
+        `test_flags`: map of {flagname: truthiness} which should
+          be monitored at test time; truthy flags must be true and
+          untruthy flags must be false
+        `test_func`: test function with must return true if the comannd can run
+        `test_rate`: frequency of tests, default TEST_RATE
+        `restart_delay`: delay before start of an exiting command,
+          default RESTART_DELAY
+        `once`: if true, run the command only once
+    '''
     if environ is None:
       environ = os.environ
     if pidfile is None and name is not None:
