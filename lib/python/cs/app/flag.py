@@ -133,7 +133,7 @@ class Flags(MutableMapping):
       if self[k]:
         flagpath = self._flagpath(k)
         try:
-          os.remove(k)
+          os.remove(flagpath)
         except OSError as e:
           if e.errno != errno.ENOENT:
             raise
@@ -225,7 +225,8 @@ class FlaggedMixin(object):
     ''' Support .flag_suffix=value.
     '''
     if attr.startswith('flag_'):
-      self.flags[self.__flagname(attr[5:])] = value
+      flagname = self.__flagname(attr[5:])
+      self.flags[flagname] = value
     super().__setattr__(attr, value)
 
 if __name__ == '__main__':
