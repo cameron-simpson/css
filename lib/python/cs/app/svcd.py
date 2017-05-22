@@ -335,7 +335,7 @@ class SvcD(FlaggedMixin, object):
             sleep(self.restart_delay)
         sleep(1)
       if self.subp is not None:
-        self.subp._kill_subproc()
+        self._kill_subproc()
     T = Thread(name=str(self)+':monitor', target=monitor)
     T.start()
     self.monitor = T
