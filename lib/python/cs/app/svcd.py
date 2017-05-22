@@ -22,8 +22,9 @@ from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.py.func import prop
 
-TEST_RATE = 7
-KILL_TIME = 5
+TEST_RATE = 7       # frequency of polling of test condition
+KILL_TIME = 5       # how long to wait for a terminated process to exit
+RESTART_DELAY = 3   # delay be restart of an exited process
 
 USAGE = '''Usage:
   %s disable names...
@@ -211,9 +212,12 @@ class SvcD(FlaggedMixin, object):
         test_flags=None,
         test_func=None,
         test_rate=None,
+        restart_delay=None,
     ):
     if environ is None:
       environ = os.environ
+    if pidfile is None and name is not None:
+      pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
       flags = Flags(environ=environ)
     FlaggedMixin.__init__(self, flags=flags)
@@ -221,14 +225,14 @@ class SvcD(FlaggedMixin, object):
       test_flags = {}
     if test_rate is None:
       test_rate = TEST_RATE
-    if pidfile is None and name is not None:
-        pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
+    if restart_delay is None:
+      restart_delay = RESTART_DELAY
     self.argv = argv
     self.name = name
     self.test_flags = test_flags
     self.test_func = test_func
     self.test_rate = test_rate
-    self.restart_delay = self.test_rate
+    self.restart_delay = restart_delay
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
