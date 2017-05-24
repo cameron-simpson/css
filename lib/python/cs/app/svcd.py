@@ -114,7 +114,7 @@ def main(argv, environ=None):
     run_username = username
     test_uid = uid
     test_username = username
-    trace = False
+    trace = sys.stderr.isatty()
     opts, argv = getopt(argv, '1lL:n:p:P:qs:t:T:u:U:x')
     for opt, value in opts:
       with Pfx(opt):
@@ -190,7 +190,7 @@ def main(argv, environ=None):
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name,
            sig_func=sig_func, test_func=test_func,
-           test_rate=test_rate, once=once)
+           test_rate=test_rate, once=once, trace=trace)
   def signal_handler(signum, frame):
     X("SIGNAL HANDLER (signum=%s", signum)
     S.stop()
@@ -300,7 +300,7 @@ class SvcD(FlaggedMixin, object):
   def alert(self, msg, *a):
     if a:
       msg = msg % a
-    alert_arv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
+    alert_argv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
     if self.trace:
       info("alert: %s: %s" % (self.name, msg))
     Popen(alert_argv, stdin=DEVNULL)
