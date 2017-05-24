@@ -10,6 +10,7 @@ from getopt import getopt, GetoptError
 import os
 from os.path import basename, exists as pathexists
 import re
+from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, DEVNULL
 import sys
 from time import sleep
@@ -151,6 +152,14 @@ def main(argv, environ=None):
 
   PFs = Portfwds(ssh_config=sshcfg, target_list=argv, auto_mode=auto_mode)
   running = True
+  def signal_handler(signum, frame):
+    X("SIGNAL HANDLER (signum=%s", signum)
+    PFs.stop()
+    PFs.wait()
+    sys.exit(1)
+  signal(SIGHUP, signal_handler)
+  signal(SIGINT, signal_handler)
+  signal(SIGTERM, signal_handler)
   while running:
     X("MAIN LOOP TOP")
     PFs.start()
