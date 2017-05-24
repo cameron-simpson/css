@@ -192,7 +192,6 @@ def main(argv, environ=None):
            sig_func=sig_func, test_func=test_func,
            test_rate=test_rate, once=once, trace=trace)
   def signal_handler(signum, frame):
-    X("SIGNAL HANDLER (signum=%s", signum)
     S.stop()
     S.wait()
     sys.exit(1)

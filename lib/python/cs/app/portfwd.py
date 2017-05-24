@@ -123,9 +123,7 @@ def main(argv, environ=None):
       print(target_test_shcmd(target))
       return 0
     argv.insert(0, opt1)
-    X("PREGETOPT argv=%r", argv)
     opts, argv = getopt(argv, '1AF:nxv')
-    X("POSTGETOPT argv=%r", argv)
     for opt, arg in opts:
       with Pfx(opt):
         if opt == '-1':
@@ -157,7 +155,6 @@ def main(argv, environ=None):
   PFs = Portfwds(ssh_config=sshcfg, target_list=argv, auto_mode=auto_mode, trace=trace, flags=flags)
   running = True
   def signal_handler(signum, frame):
-    X("SIGNAL HANDLER (signum=%s", signum)
     PFs.stop()
     PFs.wait()
     sys.exit(1)
@@ -206,15 +203,12 @@ class Portfwd(FlaggedMixin):
     return "Portfwd(%r)" % (self.target,)
 
   def start(self):
-    X("%s: call svcd.start", self)
     self.svcd.start()
 
   def stop(self):
-    X("%s: call svcd.stop", self)
     self.svcd.stop()
 
   def wait(self):
-    X("%s: call svcd.wait", self)
     xit = self.svcd.wait()
     return xit
 
