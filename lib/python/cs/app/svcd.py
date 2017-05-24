@@ -18,7 +18,8 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, uppername, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
+from cs.logutils import setup_logging, warning, info, X, \
+                        Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.py.func import prop
 
@@ -220,6 +221,7 @@ class SvcD(FlaggedMixin, object):
         test_rate=None,
         restart_delay=None,
         once=False,
+        trace=False,
     ):
     ''' Initialise the SvcD.
         `argv`: command to run as a subprocess.
@@ -237,6 +239,7 @@ class SvcD(FlaggedMixin, object):
         `restart_delay`: delay before start of an exiting command,
           default RESTART_DELAY
         `once`: if true, run the command only once
+        `trace`: trace actions, default False
     '''
     if environ is None:
       environ = os.environ
@@ -264,6 +267,7 @@ class SvcD(FlaggedMixin, object):
     self.test_rate = test_rate
     self.restart_delay = restart_delay
     self.once = once
+    self.trace = trace
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
@@ -296,11 +300,16 @@ class SvcD(FlaggedMixin, object):
   def alert(self, msg, *a):
     if a:
       msg = msg % a
-    Popen(['alert', 'SVCD %s: %s' % (self.name, msg)], stdin=DEVNULL)
+    alert_arv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
+    if self.trace:
+      info("alert: %s: %s" % (self.name, msg))
+    Popen(alert_argv, stdin=DEVNULL)
 
   def spawn(self):
     if self.subp is not None:
       raise RuntimeError("already running")
+    if self.trace:
+      info("%s: spawn %r", self.name, self.argv)
     self.subp = Popen(self.argv, stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
@@ -311,6 +320,8 @@ class SvcD(FlaggedMixin, object):
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
+    if self.trace:
+      info("%s: subprocess returncode = %s", self.name, returncode)
     self.flag_running = False
     self.alert('EXITED')
     self.subp = None
