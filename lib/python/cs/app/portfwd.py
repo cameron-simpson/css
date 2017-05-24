@@ -154,7 +154,7 @@ def main(argv, environ=None):
     print(usage, file=sys.stderr)
     return 2
 
-  PFs = Portfwds(ssh_config=sshcfg, target_list=argv, auto_mode=auto_mode, trace=trace)
+  PFs = Portfwds(ssh_config=sshcfg, target_list=argv, auto_mode=auto_mode, trace=trace, flags=flags)
   running = True
   def signal_handler(signum, frame):
     X("SIGNAL HANDLER (signum=%s", signum)
@@ -173,8 +173,9 @@ def main(argv, environ=None):
 
 class Portfwd(FlaggedMixin):
 
-  def __init__(self, PFs, target, test_shcmd=None, trace=False):
+  def __init__(self, PFs, target, test_shcmd=None, trace=False, flags=None):
     self.name = 'portfwd-' + target
+    FlaggedMixin.__init__(self, flags=flags)
     if test_shcmd is None:
       test_shcmd = ':'
     test_shcmd = (
@@ -236,21 +237,23 @@ class Portfwd(FlaggedMixin):
 
 class Portfwds(object):
 
-  def __init__(self, ssh_config=None, environ=None, target_list=None, auto_mode=None, trace=False):
+  def __init__(self, ssh_config=None, environ=None, target_list=None, auto_mode=None, trace=False, flags=None):
     if environ is None:
       environ = os.environ
     if target_list is None:
       target_list = []
     if auto_mode is None:
       auto_mode = False
+    if flags is None:
+      flags = Flags(environ=environ)
     self.target_list = target_list
     self.auto_mode = auto_mode
     self.trace = trace
+    self.flags = flags
     self.environ = environ
     if ssh_config is None:
       ssh_config = environ.get('PORTFWD_SSH_CONFIG')
     self._ssh_config = ssh_config
-    self.flags = Flags()
     self.target_conditions = defaultdict(list)
     self.target_groups = defaultdict(set)
     self.targets_running = {}
@@ -259,7 +262,7 @@ class Portfwds(object):
     required = self.targets_required()
     for target in required:
       if target not in self.targets_running:
-        P = Portfwd(self, target, trace=self.trace)
+        P = Portfwd(self, target, trace=self.trace, flags=self.flags)
         P.start()
         self.targets_running[target] = P
     running = list(self.targets_running.keys())
