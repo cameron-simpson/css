@@ -5,11 +5,11 @@
 #
 
 from __future__ import print_function
-import sys
+from collections import MutableMapping, defaultdict
+import errno
 import os
 import os.path
-import errno
-from collections import MutableMapping
+import sys
 from threading import Thread
 from time import sleep
 from cs.env import FLAGDIR
@@ -58,6 +58,9 @@ def lowername(s):
   ''' Lowercase letters, transmute '_' to '-'. Note: NOT the reverse of uppername.
   '''
   return s.replace('_', '-').lower()
+
+# factory to make a dummy flagslike object without persistent storage
+DummyFlags = lambda: defaultdict(lambda: False)
 
 class Flags(MutableMapping):
   ''' A mapping which directly inspects the flags directory.
