@@ -78,35 +78,31 @@ def main(argv, environ=None):
     opt1 = argv.pop(0)
     if opt1 == '-d':
       if not argv:
-        flags['PORTFWD_DISABLE'] = True
+        flags.flag_portfwd_disable = True
       else:
-        for tspec in argv:
-          for target in resolve_targets(tspec):
-            flags['PORTFWD_' + target.upper() + '_DISABLE'] = True
+        for target in argv:
+          flags['PORTFWD_' + target.upper() + '_DISABLE'] = True
       return 0
     if opt1 == '-e':
       if not argv:
-        flags['PORTFWD_DISABLE'] = False
+        flags.flag_portfwd_disable = False
       else:
-        for tspec in argv:
-          for target in resolve_targets(tspec):
-            flags['PORTFWD_' + target.upper() + '_DISABLE'] = False
+        for name in argv:
+          flags['PORTFWD_' + target.upper() + '_DISABLE'] = False
       return 0
     if opt1 == '-D':
       if not argv:
-        flags['PORTFWD_OVERRIDE'] = False
+        flags.flag_portfwd_override = False
       else:
-        for tspec in argv:
-          for target in resolve_targets(tspec):
-            flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = False
+        for target in argv:
+          flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = False
       return 0
     if opt1 == '-E':
       if not argv:
-        flags['PORTFWD_OVERRIDE'] = True
+        flags.flag_override = True
       else:
-        for tspec in argv:
-          for target in resolve_targets(tspec):
-            flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = True
+        for target in argv:
+          flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = True
       return 0
     if opt1 == '-T':
       if argv and argv[0] == '-F':
