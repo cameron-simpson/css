@@ -220,13 +220,12 @@ class Portfwd(FlaggedMixin):
 
   @prop
   def ssh_argv(self):
-    return [ 'set-x', 'ssh',
+    return [ 'ssh',
              '-F', self.portfwds.ssh_config,
              '-N',
              '-o', 'ExitOnForwardFailure=yes',
              '-o', 'PermitLocalCommand=yes',
              '-o', 'LocalCommand=' + self.local_shcmd,
-             '-v',
              '--',
              self.target ]
 
