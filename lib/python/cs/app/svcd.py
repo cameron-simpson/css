@@ -84,19 +84,19 @@ def main(argv, environ=None):
     arg0 = argv[0]
     if arg0 == 'disable':
       for name in argv:
-        Svcd(name=name).disable()
+        SvcD([], name=name).disable()
       return 0
     if arg0 == 'enable':
       for name in argv:
-        Svcd(name=name).enable()
+        SvcD([], name=name).enable()
       return 0
     if arg0 == 'restart':
       for name in argv:
-        Svcd(name=name).restart()
+        SvcD([], name=name).restart()
       return 0
     if arg0 == 'stop':
       for name in argv:
-        SvcD(name=name).stop()
+        SvcD([], name=name).stop()
       return 0
     once = False
     use_lock = False
