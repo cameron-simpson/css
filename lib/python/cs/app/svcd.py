@@ -198,9 +198,13 @@ def main(argv, environ=None):
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
   signal(SIGTERM, signal_handler)
-  pidfile_base, pidfile_ext = splitext(S.pidfile)
-  mypidfile = pidfile_base + '-svcd' + pidfile_ext
-  with PidFileManager(mypidfile):
+  if S.pidfile:
+    pidfile_base, pidfile_ext = splitext(S.pidfile)
+    mypidfile = pidfile_base + '-svcd' + pidfile_ext
+    with PidFileManager(mypidfile):
+      S.start()
+      S.wait()
+  else:
     S.start()
     S.wait()
 
