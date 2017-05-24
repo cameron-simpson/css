@@ -81,28 +81,28 @@ def main(argv, environ=None):
         flags.flag_portfwd_disable = True
       else:
         for target in argv:
-          flags['PORTFWD_' + target.upper() + '_DISABLE'] = True
+          flags['PORTFWD_' + uppername(target) + '_DISABLE'] = True
       return 0
     if opt1 == '-e':
       if not argv:
         flags.flag_portfwd_disable = False
       else:
         for name in argv:
-          flags['PORTFWD_' + target.upper() + '_DISABLE'] = False
+          flags['PORTFWD_' + uppername(target) + '_DISABLE'] = False
       return 0
     if opt1 == '-D':
       if not argv:
         flags.flag_portfwd_override = False
       else:
         for target in argv:
-          flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = False
+          flags['PORTFWD_' + uppername(target) + '_OVERRIDE'] = False
       return 0
     if opt1 == '-E':
       if not argv:
         flags.flag_override = True
       else:
         for target in argv:
-          flags['PORTFWD_' + target.upper() + '_OVERRIDE'] = True
+          flags['PORTFWD_' + uppername(target) + '_OVERRIDE'] = True
       return 0
     if opt1 == '-T':
       if argv and argv[0] == '-F':
