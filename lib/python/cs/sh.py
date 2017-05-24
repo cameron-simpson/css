@@ -77,9 +77,9 @@ def quotecmd(argv):
   '''
   return ' '.join(quote(argv))
 
-def main(argv):
+def main_shqstr(argv):
   cmd = argv.pop(0)
   print(quotecmd(argv))
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv))
+  sys.exit(main_shqstr(sys.argv))
