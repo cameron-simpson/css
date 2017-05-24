@@ -390,7 +390,6 @@ class SvcD(FlaggedMixin, object):
               old_sig = new_sig
               stop = True
           if stop:
-            self.alert('RESTART')
             self._kill_subproc()
             sleep(self.restart_delay)
         sleep(1)
