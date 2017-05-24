@@ -16,7 +16,7 @@ from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
-from cs.app.flag import Flags, uppername, FlaggedMixin
+from cs.app.flag import Flags, DummyFlags, uppername, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, X, Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
@@ -225,6 +225,7 @@ class SvcD(FlaggedMixin, object):
         `argv`: command to run as a subprocess.
         `flags`: a cs.app.flag.Flags -like object, default None;
           if None the default flags will be used.
+          It is an error to supply this and not specify a `name`.
         `pidfile`: path to pid file, default $VARRUN/{name}.pid.
         `sig_func`: signature function to compute a string which
           causes a restart if it changes
@@ -242,7 +243,13 @@ class SvcD(FlaggedMixin, object):
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
-      flags = Flags(environ=environ)
+      if name is None:
+        name = 'UNNAMED'
+        flags = DummyFlags()
+      else:
+        flags = Flags(environ=environ)
+    elif name is None:
+      raise ValueError("no name specified but flags=%r" % (flags,))
     FlaggedMixin.__init__(self, flags=flags)
     if test_flags is None:
       test_flags = {}
@@ -295,8 +302,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.subp = Popen(self.argv, stdin=DEVNULL)
-    if self.name:
-      self.flag_running = True
+    self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:
       write_pidfile(self.pidfile, self.subp.pid)
@@ -305,8 +311,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
-    if self.name:
-      self.flag_running = False
+    self.flag_running = False
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
