@@ -1141,7 +1141,7 @@ def get_targets(s, offset):
     T, offset = get_target(s, offset)
     targets.append(T)
     if offset < len(s):
-      # check for end of targets (whitespace) or comma (another target)
+      # check for whitespace (end of targets) or comma (another target)
       ch = s[offset]
       if ch.isspace():
         continue
