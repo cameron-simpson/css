@@ -222,6 +222,8 @@ class SvcD(FlaggedMixin, object):
         restart_delay=None,
         once=False,
         trace=False,
+        on_spawn=None,
+        on_reap=None,
     ):
     ''' Initialise the SvcD.
         `argv`: command to run as a subprocess.
@@ -240,6 +242,8 @@ class SvcD(FlaggedMixin, object):
           default RESTART_DELAY
         `once`: if true, run the command only once
         `trace`: trace actions, default False
+        `on_spawn`: to be called after a new subprocess is spawned
+        `on_reap`: to be called after a subprocess is reaped
     '''
     if environ is None:
       environ = os.environ
@@ -268,6 +272,8 @@ class SvcD(FlaggedMixin, object):
     self.restart_delay = restart_delay
     self.once = once
     self.trace = trace
+    self.on_spawn = on_spawn
+    self.on_reap = on_reap
     self.active = False # flag to end the monitor Thread
     self.subp = None    # current subprocess
     self.monitor = None # monitoring Thread
@@ -315,18 +321,22 @@ class SvcD(FlaggedMixin, object):
     self.alert('STARTED')
     if self.pidfile is not None:
       write_pidfile(self.pidfile, self.subp.pid)
+    if self.on_spawn:
+      self.on_spawn()
 
   def reap(self):
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
+    self.flag_running = False
     if self.trace:
       info("%s: subprocess returncode = %s", self.name, returncode)
-    self.flag_running = False
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
       remove_pidfile(self.pidfile)
+    if self.on_reap:
+      self.on_reap()
     return returncode
 
   def _kill_subproc(self):
