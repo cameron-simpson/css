@@ -424,7 +424,9 @@ class FlagCondition(_PortfwdCondition):
   def test_argv(self):
     return ['flag', self.flag]
 
-  def test(self):
+  def test(self, trace=False):
+    if trace:
+      info("test flag %r", self.flag)
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
@@ -437,7 +439,9 @@ class PingCondition(_PortfwdCondition):
   def test_argv(self):
     return self.ping_argv
 
-  def test(self):
+  def test(self, trace=False):
+    if trace:
+      info("run %r", self.ping_argv)
     retcode = subprocess.call(
                 self.ping_argv,
                 stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
