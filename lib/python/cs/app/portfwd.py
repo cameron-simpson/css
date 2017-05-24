@@ -279,6 +279,7 @@ class Portfwds(object):
           warning("not in targets_running")
         else:
           P.wait()
+          del self.targets_runnings[target]
 
   def targets_required(self):
     targets = set()
