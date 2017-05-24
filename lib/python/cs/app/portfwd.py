@@ -298,7 +298,7 @@ class Portfwds(object):
     if self.auto_mode:
       for flagname in self.flags:
         if flagname.startswith('PORTFWD_') and flagname.endswith('_AUTO'):
-          targets.add(flagname[8:-5].lowername())
+          targets.add(lowername(flagname[8:-5]))
     return targets
 
   GROUP_NAME = r'[A-Z][A-Z0-9_]*'
