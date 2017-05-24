@@ -59,14 +59,65 @@ def lowername(s):
   '''
   return s.replace('_', '-').lower()
 
+class FlaggedMixin(object):
+  ''' A mixin class adding flag_* and flagname_* attributes.
+  '''
+
+  def __init__(self, flags=None):
+    ''' Initialise the mixin.
+        `flags`: optional parameter; if None defaults to a new default Flags().
+    '''
+    if flags is None:
+      flags = Flags()
+    self.flags = flags
+
+  def __flagname(self, suffix):
+    ''' Compute a flag name from `suffix`.
+        The object's .name attribute is used as the basis, so a
+        `suffix` of 'bah' with a .name attribute of 'foo' returns
+        'FOO_BAH'.
+        This function returns None if there is no .name attribute or it is None.
+    '''
+    try:
+      name = self.name
+    except AttributeError:
+      return None
+    if name is None:
+      return None
+    return uppername(name + '_' + suffix)
+
+  def __getattr__(self, attr):
+    ''' Support .flag_suffix and .flagname_suffix.
+    '''
+    if attr.startswith('flagname_'):
+      # compute the flag name
+      flagname = self.__flagname(attr[9:])
+      if flagname:
+        return flagname
+    elif attr.startswith('flag_'):
+      # test a flag
+      flagname = self.__flagname(attr[5:])
+      if flagname:
+        return self.flags[flagname]
+    raise AttributeError("FlaggedMixin: no %r" % ('.'+attr,))
+
+  def __setattr__(self, attr, value):
+    ''' Support .flag_suffix=value.
+    '''
+    if attr.startswith('flag_'):
+      flagname = self.__flagname(attr[5:])
+      self.flags[flagname] = value
+    super().__setattr__(attr, value)
+
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)
 
-class Flags(MutableMapping):
+class Flags(MutableMapping,FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
   def __init__(self, flagdir=None, environ=None):
+    FlaggedMixin.__init__(self, flags=self)
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
     self.dirpath = flagdir
@@ -181,56 +232,6 @@ class PolledFlags(dict):
       new = bool(new_flags.get(k))
       if old ^ new:
         self[k] = new
-
-class FlaggedMixin(object):
-  ''' A mixin class adding flag_* and flagname_* attributes.
-  '''
-
-  def __init__(self, flags=None):
-    ''' Initialise the mixin.
-        `flags`: optional parameter; if None defaults to a new default Flags().
-    '''
-    if flags is None:
-      flags = Flags()
-    self.flags = flags
-
-  def __flagname(self, suffix):
-    ''' Compute a flag name from `suffix`.
-        The object's .name attribute is used as the basis, so a
-        `suffix` of 'bah' with a .name attribute of 'foo' returns
-        'FOO_BAH'.
-        This function returns None if there is no .name attribute or it is None.
-    '''
-    try:
-      name = self.name
-    except AttributeError:
-      return None
-    if name is None:
-      return None
-    return uppername(name + '_' + suffix)
-
-  def __getattr__(self, attr):
-    ''' Support .flag_suffix and .flagname_suffix.
-    '''
-    if attr.startswith('flagname_'):
-      # compute the flag name
-      flagname = self.__flagname(attr[9:])
-      if flagname:
-        return flagname
-    elif attr.startswith('flag_'):
-      # test a flag
-      flagname = self.__flagname(attr[5:])
-      if flagname:
-        return self.flags[flagname]
-    raise AttributeError("FlaggedMixin: no %r" % ('.'+attr,))
-
-  def __setattr__(self, attr, value):
-    ''' Support .flag_suffix=value.
-    '''
-    if attr.startswith('flag_'):
-      flagname = self.__flagname(attr[5:])
-      self.flags[flagname] = value
-    super().__setattr__(attr, value)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
