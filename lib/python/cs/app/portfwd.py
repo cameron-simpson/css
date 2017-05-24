@@ -131,7 +131,7 @@ def main(argv, environ=None):
         if opt == '-1':
           once = True
         elif opt == '-A':
-          auto_mode = true
+          auto_mode = True
         elif opt == '-F':
           sshcfg = arg
         elif opt == 'n':
@@ -142,8 +142,8 @@ def main(argv, environ=None):
           verbose = True
         else:
           raise RuntimeError('unhandled option')
-    if not argv:
-      raise GetoptError("missing targets")
+    if not argv and not auto_mode:
+      raise GetoptError("missing targets; targets or -A (auto) option required")
     target_list = argv
     if once and (auto_mode or len(target_list) != 1):
       raise GetoptError("once (-1) requires no auto mode (-A) and exactly one target")
