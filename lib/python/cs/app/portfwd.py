@@ -188,6 +188,9 @@ class Portfwd(FlaggedMixin):
     self.portfwds = PFs
     self.target = target
     self.svcd_name = 'portfwd-' + target
+    self.flag_connected = False
+    def on_reap():
+      self.flag_connected = False
     self.svcd = SvcD(self.ssh_argv,
                      name=self.svcd_name,
                      trace=trace,
@@ -195,7 +198,8 @@ class Portfwd(FlaggedMixin):
                      test_flags={
                         'PORTFWD_DISABLE': False,
                         'ROUTE_DEFAULT': True,
-                     }
+                     },
+                     on_reap=on_reap
                     )
 
   def __str__(self):
