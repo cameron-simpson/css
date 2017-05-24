@@ -285,7 +285,7 @@ class SvcD(FlaggedMixin, object):
   def test(self):
     if self.flag_override:
       return True
-    if self.flag_disabled:
+    if self.flag_disable:
       return False
     for flagname, truish in self.test_flags.items():
       if self.flags[flagname]:
