@@ -291,6 +291,8 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.subp = Popen(self.argv, stdin=DEVNULL)
+    if self.name:
+      self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:
       write_pidfile(self.pidfile, self.subp.pid)
@@ -299,6 +301,8 @@ class SvcD(FlaggedMixin, object):
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
+    if self.name:
+      self.flag_running = False
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
