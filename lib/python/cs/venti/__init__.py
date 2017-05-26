@@ -31,6 +31,11 @@ from cs.lex import texthexify, untexthexify
 from cs.logutils import X
 from cs.seq import isordered
 
+# Default OS level file high water mark.
+# This is used for rollover levels for DataDir files and cache files.
+MAX_FILE_SIZE = 1024 * 1024 * 1024
+
+# path separator, hardwired
 SEP = '/'
 
 class _ventiDefaults(threading.local):
