@@ -5,17 +5,15 @@
 #
 
 from __future__ import print_function
-import sys
+from collections import MutableMapping, defaultdict
+import errno
 import os
 import os.path
-import errno
-from collections import MutableMapping
+import sys
 from threading import Thread
 from time import sleep
-from cs.env import envsub
+from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
-
-DFLT_FLAGDIR_SPEC = '$HOME/var/flags'
 
 def main(argv):
   argv = list(argv)
@@ -51,27 +49,78 @@ def main(argv):
         raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
   return xit
 
-def flagdirpath(path=None, environ=None):
-  ''' Return the pathname of the flags directory.
+def uppername(s):
+  ''' Uppercase letters, transmute some characters to '_' or '__'.
   '''
-  if environ is None:
-    environ = os.environ
-  if path is None:
-    flagdir = environ.get('FLAGDIR')
-    if flagdir is None:
-      flagdir = envsub(DFLT_FLAGDIR_SPEC)
-  elif not os.path.isabs(path):
-    flagdir = os.path.join(envsub('$HOME'), path)
-  else:
-    flagdir = path
-  return flagdir
+  return s.upper().replace('-', '_').replace('.', '_').replace('/', '__')
 
-class Flags(MutableMapping):
+def lowername(s):
+  ''' Lowercase letters, transmute '_' to '-'. Note: NOT the reverse of uppername.
+  '''
+  return s.replace('_', '-').lower()
+
+class FlaggedMixin(object):
+  ''' A mixin class adding flag_* and flagname_* attributes.
+  '''
+
+  def __init__(self, flags=None):
+    ''' Initialise the mixin.
+        `flags`: optional parameter; if None defaults to a new default Flags().
+    '''
+    if flags is None:
+      flags = Flags()
+    self.flags = flags
+
+  def __flagname(self, suffix):
+    ''' Compute a flag name from `suffix`.
+        The object's .name attribute is used as the basis, so a
+        `suffix` of 'bah' with a .name attribute of 'foo' returns
+        'FOO_BAH'.
+        This function returns None if there is no .name attribute or it is None.
+    '''
+    try:
+      name = self.name
+    except AttributeError:
+      return None
+    if name is None:
+      return None
+    return uppername(name + '_' + suffix)
+
+  def __getattr__(self, attr):
+    ''' Support .flag_suffix and .flagname_suffix.
+    '''
+    if attr.startswith('flagname_'):
+      # compute the flag name
+      flagname = self.__flagname(attr[9:])
+      if flagname:
+        return flagname
+    elif attr.startswith('flag_'):
+      # test a flag
+      flagname = self.__flagname(attr[5:])
+      if flagname:
+        return self.flags[flagname]
+    raise AttributeError("FlaggedMixin: no %r" % ('.'+attr,))
+
+  def __setattr__(self, attr, value):
+    ''' Support .flag_suffix=value.
+    '''
+    if attr.startswith('flag_'):
+      flagname = self.__flagname(attr[5:])
+      self.flags[flagname] = value
+    super().__setattr__(attr, value)
+
+# factory to make a dummy flagslike object without persistent storage
+DummyFlags = lambda: defaultdict(lambda: False)
+
+class Flags(MutableMapping,FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
   def __init__(self, flagdir=None, environ=None):
-    self.dirpath = flagdirpath(flagdir, environ)
+    FlaggedMixin.__init__(self, flags=self)
+    if flagdir is None:
+      flagdir = FLAGDIR(environ=environ)
+    self.dirpath = flagdir
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -138,9 +187,9 @@ class Flags(MutableMapping):
       if self[k]:
         flagpath = self._flagpath(k)
         try:
-          os.remove(k)
+          os.remove(flagpath)
         except OSError as e:
-          if e.errno != ENOENT:
+          if e.errno != errno.ENOENT:
             raise
   
   def __delitem__(self, k):

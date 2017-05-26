@@ -51,7 +51,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
 from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
-                   get_qstr, unrfc2047, match_tokens, get_delimited
+                   get_qstr, match_tokens, get_delimited
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
@@ -63,6 +63,7 @@ from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
+from cs.rfc2047 import unrfc2047
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
@@ -1140,7 +1141,7 @@ def get_targets(s, offset):
     T, offset = get_target(s, offset)
     targets.append(T)
     if offset < len(s):
-      # check for end of targets (whitespace) or comma (another target)
+      # check for whitespace (end of targets) or comma (another target)
       ch = s[offset]
       if ch.isspace():
         continue

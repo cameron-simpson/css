@@ -60,11 +60,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# default test: path exists
-if [ $# = 0 ]
+if [ $# -gt 0 ]
 then
-  set -- test -e
-else
   if [ "x$1" = x-c ]
   then
     shmode=1
@@ -94,10 +91,15 @@ do
     '' | . )    path=$dir ;;
     *)          path=$dir/$relpath ;;
   esac
-  if if [ $shmode ]
-     then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
-     else  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
-     fi
+  if
+    if [ $shmode ]
+    then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
+    else
+      if [ $# -gt 0 ]
+      then  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
+      else  [ -e "$path" ]
+      fi
+    fi
   then
     xit=0
     if [ $dirmode ]

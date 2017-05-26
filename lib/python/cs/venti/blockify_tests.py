@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import os
 import os.path
 import sys
 import time
@@ -103,7 +104,7 @@ class TestAll(unittest.TestCase):
               input_chunks = read_from(open('TEST.mp3', 'rb'))
               input_desc = 'TEST.mp3'
             else:
-              X("no TEST.mp3 in ".os.getcwd())
+              X("no TEST.mp3 in %s", os.getcwd())
           with self.subTest("blocked_chunks_of",
                             parser=parser_desc,
                             input_chunks=input_desc,

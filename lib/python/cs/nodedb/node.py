@@ -196,8 +196,9 @@ class _AttrList(list):
   @locked
   def _scrub_local(self):
     # remove all elements from this attribute
-    self._list_clear()
-    self.nodedb._revision += 1
+    if len(self):
+      self._list_clear()
+      self.nodedb._revision += 1
   _scrub = _scrub_local
 
   def _scrub_backend(self):
@@ -270,19 +271,20 @@ class _AttrList(list):
     return value
 
   def remove(self, value):
-    list.remove(self, value)
-    self.nodedb._revision += 1
-    self._save()
-    self.__delitemrefs(value)
+    if value in self:
+      list.remove(self, value)
+      self.nodedb._revision += 1
+      self._save()
+      self.__delitemrefs(value)
 
   def reverse(self):
-    if len(self) > 0:
+    if len(self) > 1:
       list.reverse(self, *args)
       self.nodedb._revision += 1
       self._save()
 
   def sort(self, *args):
-    if len(self) > 0:
+    if len(self) > 1:
       list.sort(self, *args)
       self.nodedb._revision += 1
       self._save()
@@ -506,7 +508,6 @@ class Node(dict):
         default = ()
       values = _AttrList(self, k, _items=default)
       dict.__setitem__(self, k, values) # ensure that this is what gets used later
-      self.nodedb._revision += 1
     return values
 
   __getitem__ = get
@@ -534,9 +535,10 @@ class Node(dict):
     k, plural = parseUC_sAttr(item)
     if k is None or plural:
       raise KeyError(repr(item))
-    dict.__setitem__(self, k, ())
-    dict.__delitem__(self, k)
-    self.nodedb._revision += 1
+    if k in self:
+      dict.__setitem__(self, k, ())
+      dict.__delitem__(self, k)
+      self.nodedb._revision += 1
 
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
