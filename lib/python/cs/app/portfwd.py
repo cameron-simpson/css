@@ -425,6 +425,8 @@ class FlagCondition(_PortfwdCondition):
     return ['flag', self.flag]
 
   def test(self, trace=False):
+    ''' Core test, before inversion.
+    '''
     if trace:
       info("test flag %r", self.flag)
     return self.portfwd.flags[self.flag]
