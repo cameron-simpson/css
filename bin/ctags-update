@@ -39,6 +39,6 @@ else
   cd "$(dirname "$tags")"
 fi
 
-set -- ctags -o "$tags" --tag-relative "$@"
+set -- ctags -o "$tags" --tag-relative --links=no "$@"
 
 exec "$@"
