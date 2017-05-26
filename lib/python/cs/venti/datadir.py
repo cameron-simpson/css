@@ -23,11 +23,12 @@ from cs.resources import MultiOpenMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
+from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
-DEFAULT_ROLLOVER = 1024 * 1024 * 1024
+DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
