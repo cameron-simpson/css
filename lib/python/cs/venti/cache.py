@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement
+from collections import namedtuple
 import sys
 from threading import Lock, Thread
 from cs.asynchron import Result
@@ -14,8 +15,12 @@ from cs.lex import hexify
 from cs.logutils import X
 from cs.progress import Progress
 from cs.queues import IterableQueue
+from . import MAX_FILE_SIZE
 from .datafile import DATAFILE_DOT_EXT
 from .store import BasicStoreSync
+
+DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
+DEFAULT_MAX_CACHEFILES = 3
 
 class CacheStore(BasicStoreSync):
   ''' A CacheStore is a Store front end to a pair of other Stores, a backend
@@ -214,33 +219,80 @@ class FileCacheStore(BasicStoreSync):
       pass
     return data
 
+_CachedData = namedtuple('CachedData', 'cachefile offset length')
+class ClachedData(_CachedData):
+  def fetch(self):
+    return self.cachefile.get(self.offset, self.length)
+
 class FileDataMappingProxy(object):
-  ''' Mapping-like to cache data chunks to bypass gdbm indices and the like.
-      Data are saved immediately into an in memory cache and an
-      asynchronous worker copies new data into a cache file and
-      also to the backend storage.
+  ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
+      Data are saved immediately into an in memory cache and an asynchronous
+      worker copies new data into a cache file and also to the backend
+      storage.
   '''
 
-  def __init__(self, backend, dir=None):
+  def __init__(self, backend, dir=None,
+               max_cachefile_size=None, max_cachefiles=None,
+              ):
     ''' Initialise the cache.
         `backend`: mapping underlying us
+        `dir`: directory to store cache files
+        `max_cachefile_size`: maximum cache file size; a new cache
+          file is created if this is exceeded; default:
+          DEFAULT_CACHEFILE_HIGHWATER
+        `max_cachefiles`: number of cache files to keep around; no
+          more than this many cache files are kept at a time; default:
+          DEFAULT_MAX_CACHEFILES
     '''
     self.backend = backend
+    if max_cachefile_size is None:
+      max_cachefile_size = DEFAULT_CACHEFILE_HIGHWATER
+    if max_cachefiles is None:
+      max_cachefiles = DEFAULT_MAX_CACHEFILES
     self.cached = {}    # map h => data
-    self.saved = {}     # map h => offset, length
+    self.saved = {}     # map h => _CachedData(cachefile, offset, length)
     self._lock = Lock()
-    self.file_cache = RWFileBlockCache(dir=dir, suffix=DATAFILE_DOT_EXT)
-    self.workQ = IterableQueue()
-    self.worker = Thread(target=self._worker)
-    self.worker.start()
+    self.cachefiles = []
+    self._add_cachefile()
+    self._workQ = IterableQueue()
+    self._worker = Thread(target=self._worker)
+    self._worker.start()
+
+  def _add_cachefile(self):
+    cachefile = RWFileBlockCache(dir=dir)
+    self.cachefiles.insert(0, cachefile)
+    if len(cachefiles) > self.max_cachefiles:
+      old_cachefile = self.cachefile.pop()
+      old_cachefile.close()
+
+  @property
+  def cachefile(self):
+    return self.cachefiles[0]
+
+  @property
+  def ncachefiles(self):
+    return len(self.cachefiles)
 
   def close(self):
     ''' Shut down the cache.
         Stop the worker, close the file cache.
     '''
-    self.workQ.close()
-    self.worker.join()
-    self.file_cache.close()
+    self._workQ.close()
+    self._worker.join()
+    for cachefile in cachefiles:
+      cachefile.close()
+
+  def _getref(self, h):
+    ''' Fetch a cache reference from self.saved, return None if missing.
+        Automatically prune stale saved entries if the cachefile is closed.
+    '''
+    saved = self.saved
+    ref = saved.get(h)
+    if ref is not None:
+      if ref.cachefile.closed:
+        ref = None
+        del saved[h]
+    return ref
 
   def __contains__(self, h):
     ''' Mapping method supporting "in".
@@ -248,7 +300,7 @@ class FileDataMappingProxy(object):
     with self._lock:
       if h in self.cached:
         return True
-      if h in self.saved:
+      if self._getref(h) is not None:
         return True
     return h in self.backend
 
@@ -256,16 +308,17 @@ class FileDataMappingProxy(object):
     ''' Mapping method for .keys.
     '''
     seen = set()
-    for k in self.cached.keys():
-      yield k
-      seen.add(k)
-    for k in self.saved.keys():
-      if k not in seen:
-        yield k
-        seen.add(k)
-    for k in self.backend.keys():
-      if k not in seen:
-        yield k
+    for h in self.cached.keys():
+      yield h
+      seen.add(h)
+    saved = self.saved
+    for h in saved.keys():
+      if h not in seen and self._getref(h):
+        yield h
+        seen.add(h)
+    for h in self.backend.keys():
+      if h not in seen:
+        yield h
 
   def __getitem__(self, h):
     ''' Fetch the data with key `h`. Raise KeyError if missing.
@@ -275,45 +328,53 @@ class FileDataMappingProxy(object):
       try:
         data = self.cached[h]
       except KeyError:
-        data = None
         # fetch from file
-        try:
-          offset, length = self.saved[h]
-        except KeyError:
-          offset = None
-    if data is None:
-      if offset is None:
-        # fetch from backend, queue store into cache
-        data = self.backend[h]
-        with self._lock:
-          self.cached[h] = data
-        self.workQ.put( (h, data) )
+        ref = self._getref(h)
+        if ref is not None:
+          return ref.fetch()
       else:
-        # fetch from the file cache
-        data = self.file_cache.get(offset, length)
+        # straight from memory cache
+        return data
+    # not in memory or file cache: fetch from backend, queue store into cache
+    data = self.backend[h]
+    with self._lock:
+      self.cached[h] = data
+    self._workQ.put( (h, data) )
     return data
 
   def __setitem__(self, h, data):
     ''' Store `data` against key `h`.
     '''
     with self._lock:
-      if h in self.cached or h in self.saved:
+      if h in self.cached:
+        # in memory cache, do not save
         return
+      if self._getref(h):
+        # in file cache, do not save
+        return
+      # save in memory cache
       self.cached[h] = data
-    self.workQ.put( (h, data) )
+    # queue for file cache and backend
+    self._workQ.put( (h, data) )
 
   def _worker(self):
-    for h, data in self.workQ:
+    for h, data in self._workQ:
       with self._lock:
-        if h in self.saved:
+        if self._getref(h):
+          # already in file cache, therefore already sent to backend
           return
-      offset = self.file_cache.put(data)
+      cachefile = self.cachefile
+      offset = cachefile.put(data)
       with self._lock:
-        self.saved[h] = offset, len(data)
+        self.saved[h] = CachedData(cachefile, offset, len(data))
+        # release memory cache entry
         try:
           del self.cached[h]
         except KeyError:
           pass
+        # roll over to new cache file
+        if offset + len(data) >= max_cachefile_size:
+          self._add_cachefile()
       # store into the backend
       self.backend[h] = data
 
