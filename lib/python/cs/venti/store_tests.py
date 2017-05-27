@@ -23,6 +23,8 @@ from .hash import HashUtilDict, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .hash_tests import _TestHashCodeUtils
 
 def multitest(method):
+  ''' Decorator to permute a test method for multplie Store types and hash classes.
+  '''
   def testMethod(self):
     for test_store, factory, kwargs, *args in (
         ('MappingStore', MappingStore, {'mapping': {}}),
