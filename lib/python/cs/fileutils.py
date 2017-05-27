@@ -1488,7 +1488,7 @@ class RWFileBlockCache(object):
     '''
     opathname = pathname
     if pathname is None:
-      tmpfd, pathname = mkstemp(suffix=None, dir=dir)
+      tmpfd, pathname = mkstemp(dir=dir, suffix=None)
     self.rfd = os.open(pathname, os.O_RDONLY)
     self.wfd = os.open(pathname, os.O_WRONLY)
     if opathname is None:
@@ -1502,10 +1502,16 @@ class RWFileBlockCache(object):
     self._lock = lock
 
   def close(self):
-    ''' Close the file descriptors, unlink the file if self mode.
+    ''' Close the file descriptors.
     '''
     os.close(self.wfd)
+    self.wfd = None
     os.close(self.rfd)
+    self.rfd = None
+
+  @property
+  def closed(self):
+    return self.wfd is None
 
   def put(self, data):
     ''' Store `data`, return offset.
