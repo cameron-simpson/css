@@ -90,12 +90,12 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertIsNot(chunk, None)
       self.assertEqual(chunk, random_chunk_map[h])
 
-##class TestMappingStore(_TestStore, unittest.TestCase):
+##class TestMappingStore(TestStore, unittest.TestCase):
 ##
 ##  def _init_Store(self):
 ##    self.S = MappingStore("TestMappingStore", {}, hashclass=self.hashclass)
 ##
-##class TestProgressStore(_TestStore, unittest.TestCase):
+##class TestProgressStore(TestStore, unittest.TestCase):
 ##
 ##  def _init_Store(self):
 ##    M = MappingStore("TestProgressStore", {}, hashclass=self.hashclass)
