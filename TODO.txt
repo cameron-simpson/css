@@ -1,4 +1,3 @@
-vtfuse: support lseek SEEK_HOLE and SEEK_DATA T v
 mailfiler: prepend received lines on pickup and filing
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
@@ -29,7 +28,7 @@ venti:
   vt ar yields .vtd file whose first block is a LiteralDirent and
     all dependent Blocks are in the vtd file
   "raw datafile store": point at a datafile and kick off a scanner,
-    fetch blocks until scanned if missing hash
+    fetch will block until scanned if missing hash
     for use with "vt ar"
     "file:datafile.vtd" Store scheme
   daemon: listen on UNIX domain socket
@@ -41,6 +40,8 @@ venti:
     seek, no flush, separate fd for read
   parsers:
     mbox look for nn and rnrn
+    parser for .vtd files, supporting efficient storage of stores
+    parser for Dirents, for blockifying Dirs
   is ctypes.addressof any use for i/o?
   blockify
     sniff files to infer high level syntax
@@ -56,6 +57,7 @@ venti:
   vtfuse
     store content-type in xattrs
     FileHandle use raw file instead of stdio
+    support lseek SEEK_HOLE and SEEK_DATA T v
   File.close:
     get a preferred parser in from outside
     pass the parser to blockify
@@ -66,7 +68,10 @@ venti:
   decode binary stream: use copy buffer
   control module
     vtftp to be an API to it
-  BackedFile to set change-on-close flag on write/truncate etc
+  BackedFile
+    set change-on-close flag on write/truncate etc
+    raw file with rfd and wfd for front file
+    support _only_ pread and pwrite methods for I/O
   meta: user.mime_type
   move to SHA-3-256, check hash size etc
     v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
