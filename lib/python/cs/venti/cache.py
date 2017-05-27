@@ -173,10 +173,10 @@ class FileCacheStore(BasicStoreSync):
       asynchronous updates to the backing Store.
   '''
 
-  def __init__(self, name, backend, dir=None, **kw):
+  def __init__(self, name, backend, dirpath=None, **kw):
     BasicStoreSync.__init__(self, "%s(%s)" % (self.__class__.__name__, name,), **kw)
     self.backend = backend
-    self.cache = FileDataMappingProxy(backend, dir=dir)
+    self.cache = FileDataMappingProxy(backend, dirpath=dirpath)
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
@@ -220,7 +220,7 @@ class FileCacheStore(BasicStoreSync):
     return data
 
 _CachedData = namedtuple('CachedData', 'cachefile offset length')
-class ClachedData(_CachedData):
+class CachedData(_CachedData):
   def fetch(self):
     return self.cachefile.get(self.offset, self.length)
 
@@ -231,12 +231,12 @@ class FileDataMappingProxy(object):
       storage.
   '''
 
-  def __init__(self, backend, dir=None,
+  def __init__(self, backend, dirpath=None,
                max_cachefile_size=None, max_cachefiles=None,
               ):
     ''' Initialise the cache.
         `backend`: mapping underlying us
-        `dir`: directory to store cache files
+        `dirpath`: directory to store cache files
         `max_cachefile_size`: maximum cache file size; a new cache
           file is created if this is exceeded; default:
           DEFAULT_CACHEFILE_HIGHWATER
@@ -244,11 +244,14 @@ class FileDataMappingProxy(object):
           more than this many cache files are kept at a time; default:
           DEFAULT_MAX_CACHEFILES
     '''
-    self.backend = backend
     if max_cachefile_size is None:
       max_cachefile_size = DEFAULT_CACHEFILE_HIGHWATER
     if max_cachefiles is None:
       max_cachefiles = DEFAULT_MAX_CACHEFILES
+    self.backend = backend
+    self.dirpath = dirpath
+    self.max_cachefile_size = max_cachefile_size
+    self.max_cachefiles = max_cachefiles
     self.cached = {}    # map h => data
     self.saved = {}     # map h => _CachedData(cachefile, offset, length)
     self._lock = Lock()
@@ -259,19 +262,11 @@ class FileDataMappingProxy(object):
     self._worker.start()
 
   def _add_cachefile(self):
-    cachefile = RWFileBlockCache(dir=dir)
+    cachefile = RWFileBlockCache(dirpath=self.dirpath)
     self.cachefiles.insert(0, cachefile)
-    if len(cachefiles) > self.max_cachefiles:
-      old_cachefile = self.cachefile.pop()
+    if len(self.cachefiles) > self.max_cachefiles:
+      old_cachefile = self.cachefiles.pop()
       old_cachefile.close()
-
-  @property
-  def cachefile(self):
-    return self.cachefiles[0]
-
-  @property
-  def ncachefiles(self):
-    return len(self.cachefiles)
 
   def close(self):
     ''' Shut down the cache.
@@ -279,7 +274,7 @@ class FileDataMappingProxy(object):
     '''
     self._workQ.close()
     self._worker.join()
-    for cachefile in cachefiles:
+    for cachefile in self.cachefiles:
       cachefile.close()
 
   def _getref(self, h):
@@ -363,7 +358,7 @@ class FileDataMappingProxy(object):
         if self._getref(h):
           # already in file cache, therefore already sent to backend
           return
-      cachefile = self.cachefile
+      cachefile = self.cachefiles[0]
       offset = cachefile.put(data)
       with self._lock:
         self.saved[h] = CachedData(cachefile, offset, len(data))
@@ -373,7 +368,7 @@ class FileDataMappingProxy(object):
         except KeyError:
           pass
         # roll over to new cache file
-        if offset + len(data) >= max_cachefile_size:
+        if offset + len(data) >= self.max_cachefile_size:
           self._add_cachefile()
       # store into the backend
       self.backend[h] = data
