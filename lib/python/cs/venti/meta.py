@@ -726,7 +726,7 @@ class Meta(dict):
     if isinstance(xkv, bytes):
       return xkv
     if isinstance(xkv, str):
-      return xkv.encode('uft-8')
+      return xkv.encode('utf-8')
     raise TypeError("cannot convert to bytes: %r" % (xkv,))
 
   def getxattr(self, xk, xv_default):
