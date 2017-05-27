@@ -1477,18 +1477,19 @@ class RWFileBlockCache(object):
   ''' A scratch file for storing data.
   '''
 
-  def __init__(self, pathname=None, dir=None, suffix=None, lock=None):
+  def __init__(self, pathname=None, dirpath=None, suffix=None, lock=None):
     ''' Initialise the file.
         `pathname`: path of file. If None, create a new file with
-          tempfile.mkstemp using dir=`dir` and unlink that file once
+          tempfile.mkstemp using dir=`dirpath` and unlink that file once
           opened.
-        `dir`: location for the file if made by mkstemp as above.
+        `dirpath`: location for the file if made by mkstemp as above.
         `lock`: an object to use as a mutex, allowing sharing with
           some outer system. A Lock will be allocated if omitted.
     '''
     opathname = pathname
+    X("dirpath=%r,suffix=%r", dirpath, suffix)
     if pathname is None:
-      tmpfd, pathname = mkstemp(dir=dir, suffix=None)
+      tmpfd, pathname = mkstemp(dir=dirpath, suffix=None)
     self.rfd = os.open(pathname, os.O_RDONLY)
     self.wfd = os.open(pathname, os.O_WRONLY)
     if opathname is None:
