@@ -87,7 +87,7 @@ def main(argv, environ=None):
       if not argv:
         flags.flag_portfwd_disable = False
       else:
-        for name in argv:
+        for target in argv:
           flags['PORTFWD_' + uppername(target) + '_DISABLE'] = False
       return 0
     if opt1 == '-D':
