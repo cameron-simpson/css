@@ -150,10 +150,10 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    fp = self.Eopen._open_file
+    return self.Eopen._open_file.pread(size, offset)
+    x x x x fp = self.Eopen._open_file
     with fp:
       with self._lock:
-        fp.flush()
         fp.seek(offset)
         data = fp.read(size)
     return data
@@ -763,6 +763,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def forget(self, inode_list):
+    X("FORGET %r", inode_list)
     for inode, nlookup in inode_list:
       self._vt_core.kref_dec(inode, nlookup)
 

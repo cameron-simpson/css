@@ -78,14 +78,14 @@ class TestAll(unittest.TestCase):
 
   def test02blocked_chunks_of(self):
     for parser in (
-        None,
-        scan_text,
-        scan_mp3,
+        ##None,
+        ##scan_text,
+        ##scan_mp3,
         scan_mp4,
       ):
       parser_desc = 'None' if parser is None else parser.__name__
       for input_desc, input_chunks in (
-          ('random data', self.random_data),
+          ##('random data', self.random_data),
           ('100 x ' + __file__, [ self.mycode for _ in range(100) ]),
         ):
         testfile = None
@@ -153,6 +153,10 @@ class TestAll(unittest.TestCase):
             self.assertEqual(src_total, chunk_total)
             self.assertEqual(b''.join(source_chunks),
                              b''.join(all_chunks))
+          if False:
+            for hits, size in sorted([ (hits, size) for size, hits in histogram.items() if isinstance(size, int) ]):
+              if hits > 1:
+                X("size %d: %d", size, hits)
         if rfp is not None:
           rfp.close()
           rfp = None

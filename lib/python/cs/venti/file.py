@@ -5,11 +5,11 @@
 
 from __future__ import print_function, absolute_import
 from io import RawIOBase
-import os
+from os import SEEK_SET
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from cs.threads import locked
-from cs.logutils import Pfx, PfxThread, info, X
+from cs.logutils import Pfx, PfxThread, info, X, XP
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 from . import defaults
@@ -75,7 +75,7 @@ class BlockFile(RawIOBase):
     self._offset += nread
     return nread
 
-class File(BackedFile):
+class File(object):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
@@ -86,12 +86,14 @@ class File(BackedFile):
     '''
     if backing_block is None:
       backing_block = Block(data=b'')
-    self._backing_block = backing_block
-    BackedFile.__init__(self, BlockFile(backing_block))
-    # lock for file sync operations
-    # NB: _not_ an RLock, we do separate acquire/release in the sync itself
-    self._sync_lock = Lock()
     self.filename = None
+    self._syncer = None # syncing Thread, close waits for it
+    self._reset(backing_block)
+    self._lock = RLock()
+
+  def _reset(self, new_backing_block):
+    self._backing_block = new_backing_block
+    self._file = BackedFile(BlockFile(new_backing_block))
 
   @property
   @locked
@@ -103,52 +105,64 @@ class File(BackedFile):
     '''
     return self._backing_block
 
-  @backing_block.setter
-  @locked
-  def backing_block(self, new_block):
-    self._backing_block = new_block
-    self._reset(BlockFile(new_block))
-
   @locked
   def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
         We dispatch the sync in the background within a lock.
         `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
-    super().flush()
-    if self.front_range:
-      self._sync_lock.acquire()
-      if not self.front_range:
-        self._sync_lock.release()
+    with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
+      if not self._file.front_range:
+        XP("empty front_range, no action")
       else:
+        # only do work if there are new data in the file
+        XP("front_range=%s", self.front_range)
         # push the current state as the backing file
         # and initiate a sync to the Store
-        back_block = self.backing_block
-        front_file = self.front_file
-        front_range = self.front_range
-        new_back_file = self.push_file()
+        old_file = self._file
+        old_file.read_only = True
+        old_syncer = self._syncer
+        new_file = BackedFile(old_file)
         S = defaults.S
-        def update_store():
-          # Recompute the top Block from the current high level blocks.
-          # As a side-effect of setting .backing_block we discard the
-          # front file data, which are now saved to the Store.
-          with S:
-            B = top_block_for(
-                  self._high_level_blocks_from_front_back(
-                      front_file, back_block, front_range,
-                      scanner=scanner))
-          self._backing_block = B
-          self._sync_lock.release()
-        PfxThread(name="%s.flush(): update_store" % (self,), target=update_store).start()
+        with S:
+          def update_store():
+            # Recompute the top Block from the current high level blocks.
+            # As a side-effect of setting .backing_block we discard the
+            # front file data, which are now saved to the Store.
+            with S:
+              XP("File.update_store: syncing to Store...")
+              B = top_block_for(
+                    self._high_level_blocks_from_front_back(
+                        old_file.front_file, back_block, front_range,
+                        scanner=scanner))
+            old_file.close()
+            XP("File.update_store: syncing to Store: stored")
+            with self._lock:
+              if self._file is old_file:
+                XP("File.update_store: syncing to Store: still using old _file, update to use new stored Block")
+                self._reset(B)
+              else:
+                XP("File.update_store: self has moved on, do not update _file")
+            if old_syncer:
+              XP("File.update_store: wait for previous _syncher...")
+              old_syncer.join()
+            XP("File.update_store: syncing to Store DONE")
+          T = PfxThread(name="%s.flush(): update_store" % (self,),
+                        target=update_store)
+          T.start()
+        self._syncher = T
+        self._file = new_file
+    XP("DONE")
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
         Wait for any flush to complete before returing the backing block.
     '''
     self.flush()
-    with self._sync_lock:
-      B = self.backing_block
-    return B
+    T = self._syncer
+    if T:
+      T.join()
+    return self.backing_block
 
   @locked
   def truncate(self, length):
@@ -185,9 +199,16 @@ class File(BackedFile):
     super().close()
     return B
 
-  def read(self, size=-1):
+  def seek(self, offset, whence=SEEK_SET):
+    return self._file.seek(offset, whence=whence)
+
+  def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
+    if offset is not None:
+      with self._lock:
+        self.seek(offset)
+        return self.read(size=size)
     if size == -1:
       return self.readall()
     if size < 1:

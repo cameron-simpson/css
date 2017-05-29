@@ -794,41 +794,19 @@ class Pathname(str):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
 class BackedFile(object):
-  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front file.
+  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
   '''
 
-  def __init__(self, back_file, front_file=None):
+  def __init__(self, back_file, dirpath=None):
     ''' Initialise the BackedFile using `back_file` for the backing data.
     '''
     self._offset = 0
+    self._dirpath = dirpath
     self._lock = RLock()
-    self._reset(back_file, new_front_file=front_file)
-
-  @locked
-  def _reset(self, new_back_file, new_front_file):
-    ''' Reset the state of this BackedFile.
-        Set the front_file and back_file.
-        Note that the former front and back files are not closed.
-    '''
-    if new_front_file is None:
-      new_front_file = TemporaryFile()
-      self._need_close_front = True
-    else:
-      self._need_close_front = False
-    self.back_file = new_back_file
-    self.front_file = new_front_file
+    self.back_file = back_file
+    self.front_file = TemporaryFile(dir=dirpath, buffering=0)
     self.front_range = Range()
-
-  @locked
-  def push_file(self, new_front_file=None):
-    ''' Push a new front file onto this BackedFile. Return the new back file.
-        If `new_front_file` is None, allocate a TemporaryFile.
-    '''
-    if new_front_file is None:
-      new_front_file = TemporaryFile()
-    new_back_file = BackedFile(self.back_file, front_file=new_front_file)
-    self._reset(new_back_file, new_front_file)
-    return self.back_file
+    self.read_only = False
 
   @locked
   def switch_back_file(self, new_back_file):
@@ -848,23 +826,15 @@ class BackedFile(object):
 
   def close(self):
     ''' Close the BackedFile.
-        Flush contents. Close the front_file  is necessary.
+        Flush contents. Close the front_file if necessary.
     '''
-    self.flush()
-    if self._need_close_front:
-      self.front_file.close()
+    self.front_file.close()
     self.front_file = None
 
   def tell(self):
     ''' Report the current file pointer offset.
     '''
     return self._offset
-
-  @locked
-  def flush(self):
-    ''' Flush the I/O buffer of the front_file.
-    '''
-    self.front_file.flush()
 
   @locked
   def __len__(self):
@@ -956,6 +926,8 @@ class BackedFile(object):
   def write(self, b):
     ''' Write data to the front_file.
     '''
+    if self.read_only:
+      raise RuntimeError("write to read-only BackedFile")
     front_file = self.front_file
     start = self._offset
     front_file.seek(start)
@@ -983,7 +955,7 @@ class BackedFile_TestMethods(object):
     bfp = self.backed_fp
     # test reading whole file
     bfp.seek(0)
-    bfp_text = bfp.read()
+    bfp_text = bfp.read_n(len(bfp))
     self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
     # test reading first 512 bytes only
     bfp.seek(0)
