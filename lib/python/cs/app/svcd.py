@@ -11,7 +11,7 @@ from __future__ import print_function
 from getopt import getopt, GetoptError
 import os
 from os.path import basename, join as joinpath, splitext
-import pwd
+from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, DEVNULL, call as callproc
 import sys
@@ -109,7 +109,7 @@ def main(argv, environ=None):
     test_shcmd = None
     test_rate = TEST_RATE
     uid = os.geteuid()
-    username = pwd.getpwuid(uid).pw_name
+    username = getpwuid(uid).pw_name
     run_uid = uid
     run_username = username
     test_uid = uid
