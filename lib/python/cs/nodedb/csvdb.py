@@ -42,7 +42,7 @@ def write_csv_header(fp):
   csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
 
 def write_csv_file(fp, nodedata):
-  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the vertical" CSV style.
+  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the "vertical" CSV style.
       `fp` may also be a string in which case the named file
       is truncated and rewritten.
       `attrmap` maps attribute names to sequences of preserialised values as
@@ -74,6 +74,7 @@ class Backend_CSVFile(Backend):
     self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
     self.keep_backups = False
+    self.csv = None
     self._lastrow = (None, None, None, None)
 
   def init_nodedb(self):
@@ -108,6 +109,8 @@ class Backend_CSVFile(Backend):
   def _open_csv(self):
     ''' Attach to the shared CSV file.
     '''
+    if self.csv is not None:
+      raise RuntimeError("self.csv should be None, was: %r" % (self.csv,))
     self.csv = SharedCSVFile(self.pathname,
                              importer=self.import_foreign_row,
                              readonly=self.readonly)
@@ -138,7 +141,7 @@ class Backend_CSVFile(Backend):
       error("%s: readonly: rewrite not done", self)
       return
     with rewrite_cmgr(self.pathname, backup_ext='', do_rename=True) as outfp:
-      write_csv_file(fp, self.nodedb.nodedata())
+      write_csv_file(outfp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
   import time

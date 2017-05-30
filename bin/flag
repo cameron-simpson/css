@@ -119,8 +119,8 @@ case "$flagname" in
     echo "$cmd: illegal flagname: $flagname" >&2
     badopts=1
     ;;
-  *[a-z.]*)
-    flagname=$( echo "$flagname" | tr '.[a-z]' '_[A-Z]' )
+  *[a-z.-]*)
+    flagname=$( echo "$flagname" | tr '.[a-z]-' '_[A-Z]_' )
 esac
 
 if [ $# = 0 ]
