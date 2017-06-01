@@ -189,8 +189,8 @@ def main(argv, environ=None):
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name,
-           sig_func=sig_func, test_func=test_func,
-           test_rate=test_rate, once=once, trace=trace)
+           sig_func=sig_func, test_func=test_func, test_rate=test_rate,
+           once=once, quiet=quiet, trace=trace)
   def signal_handler(signum, frame):
     S.stop()
     S.wait()
@@ -220,6 +220,7 @@ class SvcD(FlaggedMixin, object):
         test_rate=None,
         restart_delay=None,
         once=False,
+        quiet=False,
         trace=False,
         on_spawn=None,
         on_reap=None,
@@ -240,6 +241,7 @@ class SvcD(FlaggedMixin, object):
         `restart_delay`: delay before start of an exiting command,
           default RESTART_DELAY
         `once`: if true, run the command only once
+        `quiet`: if true, do not issue alerts
         `trace`: trace actions, default False
         `on_spawn`: to be called after a new subprocess is spawned
         `on_reap`: to be called after a subprocess is reaped
@@ -270,6 +272,7 @@ class SvcD(FlaggedMixin, object):
     self.test_rate = test_rate
     self.restart_delay = restart_delay
     self.once = once
+    self.quiet = quiet
     self.trace = trace
     self.on_spawn = on_spawn
     self.on_reap = on_reap
@@ -303,6 +306,8 @@ class SvcD(FlaggedMixin, object):
     return True
 
   def alert(self, msg, *a):
+    if self.quiet:
+      return
     if a:
       msg = msg % a
     alert_argv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
