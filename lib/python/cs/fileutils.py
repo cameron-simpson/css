@@ -903,7 +903,7 @@ class SharedAppendFile(object):
       is sent and the file it reopened and rescanned from the
       beginning.
 
-      Sunclasses which emit higher order records, such as
+      Subclasses which emit higher order records, such as
       SharedAppendLines below, will need to intercept the `importer`
       paramater and substitute one of their own which constructs
       records from the lower order data received from the superclass.
@@ -1075,6 +1075,7 @@ class SharedAppendFile(object):
     '''
     with Pfx("%s._monitor", self):
       first = True
+      count = 0
       # run until closed and no pending outbound updates
       while ( not self.closed
            or ( not self.no_update
