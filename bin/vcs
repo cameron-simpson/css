@@ -31,10 +31,8 @@ usage="Usage: $cmd [-V vcs_type] [command [args...]]
     type [dir]  Report type of tree."
 
 vcs_type=
-if [ -t 2 ]
-then  trace=set-x
-else  trace=command
-fi
+trace=command
+##[ -t 2 ] && trace=set-x
 
 badopts=
 
