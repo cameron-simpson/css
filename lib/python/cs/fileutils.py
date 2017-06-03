@@ -906,7 +906,7 @@ class SharedAppendFile(object):
 
   def __init__(self, pathname,
                read_only=False, write_only=False, binary=False,
-               lock_ext=None, lock_timeout=None):
+               lock_ext=None, lock_timeout=None, poll_interval=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
         `read_only`: set to true if we will not write updates.
@@ -914,14 +914,19 @@ class SharedAppendFile(object):
         `binary`: if the file is to be opened in binary mode, otherwise text mode.
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
+        `poll_interval`: poll time when taking a lock file,
+            default DEFAULT_POLL_INTERVAL
     '''
     with Pfx("SharedAppendFile(%r): __init__", pathname):
+      if poll_interval is None:
+        poll_interval = DEFAULT_POLL_INTERVAL
       self.pathname = abspath(pathname)
       self.binary = binary
       self.read_only = read_only
       self.write_only = write_only
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
+      self.poll_interval = poll_interval
       if self.read_only:
         if self.write_only:
           raise ValueError("only one of read_only and write_only may be true")
