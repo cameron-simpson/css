@@ -1046,8 +1046,8 @@ class SharedAppendFile(object):
     ''' A generator returning data chunks from the file indefinitely.
         This supports writing monitors for file updates.
         Note that this, like other iterators, shares the same file offset pointer.
-        Also note that it calls the class' iterator, so that if s
-        aubsclass returns higher level records from its iterator,
+        Also note that it calls the class' iterator, so that if a
+        subsclass returns higher level records from its iterator,
         those records will also be returned from tail.
 
         Usage:
