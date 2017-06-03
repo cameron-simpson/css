@@ -82,10 +82,8 @@ class Backend_CSVFile(Backend):
     with Pfx("%s.init_nodedb", self):
       self.csv = SharedCSVFile(self.pathname, read_only=self.readonly)
       # initial scan of the database
-      XP("scan %r ...", self.pathname)
       for row in self.csv:
         self._import_foreign_row(row)
-      XP("dispatch monitor thread...")
       self._monitor = PfxThread(name="monitor", target=self._monitor_foreign_updates)
       self._monitor.start()
 
@@ -93,11 +91,8 @@ class Backend_CSVFile(Backend):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
     with Pfx("%s.close", self):
-      XP("_close_csv...")
       self._close_csv()
-      XP("wait for monitor thread")
       self._monitor.join()
-      XP("DONE")
 
   @locked
   def _close_csv(self):
@@ -130,7 +125,6 @@ class Backend_CSVFile(Backend):
     nodedb = self.nodedb
     value = nodedb.fromtext(value)
     for update in Update.from_csv_row( (t, name, attr, value) ):
-      X("import foreign %s", update)
       nodedb._update_local(update)
 
   def _update(self, update):
