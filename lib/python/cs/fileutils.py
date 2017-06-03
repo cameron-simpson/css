@@ -941,6 +941,7 @@ class SharedAppendFile(object):
       self._readlock = RLock()
       if not self.write_only:
         self._readopen()
+      self.closed = False
 
   def __str__(self):
     return "SharedAppendFile(%r)" % (self.pathname,)
