@@ -79,57 +79,21 @@ class SharedCSVFile(SharedAppendLines):
   ''' Shared access to a CSV file in UTF-8 encoding.
   '''
 
-  def __init__(self, pathname, readonly=False, **kw):
-    importer = kw.get('importer')
-    if importer is not None:
-      kw['importer'] = lambda line: self._queue_csv_text(line, importer)
-    self._csv_partials = []
-    self._importQ = IterableQueue(
-        1, name="SharedCSVFile(%r)._importQ" % (pathname,))
-    self._csvr = csv_reader(self._importQ)
-    self._csv_stream_thread = Thread(target=self._csv_stream,
-                                     name="SharedCSVFile(%r)._csv_stream_thread" % (
-                                         pathname,),
-                                     args=(importer,))
-    self._csv_stream_thread.daemon = True
-    self._csv_stream_thread.start()
-    SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
+  def __init__(self, pathname, dialect='excel', fmtparams=None, **kw):
+    if fmtparams is None:
+      fmtparams = {}
+    super().__init__(pathname, **kw)
+    self.dialect = dialect
+    self.fmtparams = fmtparams
 
-  def _queue_csv_text(self, line, importer):
-    ''' Importer for SharedAppendLines: convert to row from CSV data, pass to real importer.
+  def __iter__(self):
+    ''' Yield csv rows.
     '''
-    if line is None:
-      importer(None)
-    else:
-      self._importQ.put(line)
+    yield from csv.reader( (line for line in super().__iter__()),
+                           dialect=self.dialect,
+                           **self.fmtparams)
 
-  def _csv_stream(self, importer):
-    for row in self._csvr:
-      importer(row)
-
-  if sys.hexversion >= 0x03000000:
-    # python 3 onwards
-    def transcribe_update(self, fp, row):
-      ''' Transcribe an update `row` to the supplied file `fp`.
-      '''
-      # sanity check: we should only be writing between foreign updates
-      # and foreign updates should always be complete lines
-      if len(self._csv_partials):
-        warning("%s._transcribe_update while non-empty partials[]: %r",
-                self, self._csv_partials)
-      csv_writerow(csv.writer(fp), row, encoding='utf-8')
-  else:
-    # python 2
-    def transcribe_update(self, fp, row):
-      ''' Transcribe an update `row` to the supplied file `fp`.
-      '''
-      # sanity check: we should only be writing between foreign updates
-      # and foreign updates should always be complete lines
-      if len(self._csv_partials):
-        warning("%s._transcribe_update while non-empty partials[]: %r",
-                self, self._csv_partials)
-      sfp = BytesIO()
-      csv_writerow(csv.writer(sfp), row, encoding='utf-8')
-      line = sfp.getvalue().decode('utf-8')
-      fp.write(line)
-      sfp.flush()
+  @contextmanager
+  def writer(self):
+    with self.open() as wfp:
+      yield csv.writer(wfp, dialect=self.dialect, **self.fmtparams)
