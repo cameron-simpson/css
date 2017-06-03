@@ -83,7 +83,7 @@ class SharedCSVFile(SharedAppendLines):
   def __init__(self, pathname, dialect='excel', fmtparams=None, **kw):
     if fmtparams is None:
       fmtparams = {}
-    super().__init__(pathname, **kw)
+    super().__init__(pathname, newline='', **kw)
     self.dialect = dialect
     self.fmtparams = fmtparams
 
