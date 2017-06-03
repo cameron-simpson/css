@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 import sys
 from io import StringIO
 import os
