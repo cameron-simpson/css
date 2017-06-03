@@ -19,8 +19,7 @@ DISTINFO = {
 
 from io import RawIOBase
 from functools import partial
-import os
-from os import fdopen, \
+from os import dup, fdopen, \
                SEEK_CUR, SEEK_END, SEEK_SET, \
                O_APPEND, O_RDONLY, O_RDWR, O_WRONLY
 from os.path import basename, dirname, isdir, isabs as isabspath, \
@@ -31,6 +30,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import datetime
 from itertools import takewhile
+import os
 import shutil
 import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
@@ -1038,7 +1038,7 @@ class SharedAppendFile(object):
           yield wfp
           end = wfp.tell()
         if end > start:
-          sel._read_skip.add(start, end)
+          self._read_skip.add(start, end)
         if not self.write_only:
           self._readopen()
 
@@ -1059,7 +1059,7 @@ class SharedAppendFile(object):
         yield item
       if self.closed:
         return
-      sleep(DEFAULT_TAIL_PAUSE)
+      time.sleep(DEFAULT_TAIL_PAUSE)
 
   @property
   def filestate(self):
@@ -1068,7 +1068,7 @@ class SharedAppendFile(object):
     fd = self._fd
     if fd is None:
       return None
-    return FileState(_fd)
+    return FileState(fd)
 
   # TODO: need to notice filestate changes in other areas
   # TODO: support in place rewrite?
