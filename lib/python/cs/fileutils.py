@@ -959,7 +959,11 @@ class SharedAppendFile(object):
     assert not self.write_only
     mode = 'rb' if self.binary else 'r'
     fd = dup(self._fd)
-    self._rfp = fdopen(fd, mode, buffering=0)
+    if self.binary:
+      buffering = 0
+    else:
+      buffering = -1
+    self._rfp = fdopen(fd, mode, buffering=buffering)
     self.open_state = self.filestate
 
   def _readclose(self):
