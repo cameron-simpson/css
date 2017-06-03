@@ -905,13 +905,14 @@ class SharedAppendFile(object):
   '''
 
   def __init__(self, pathname,
-               read_only=False, write_only=False, binary=False,
+               read_only=False, write_only=False, binary=False, newline=None,
                lock_ext=None, lock_timeout=None, poll_interval=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
         `read_only`: set to true if we will not write updates.
         `write_only`: set to true if we will not read updates.
         `binary`: if the file is to be opened in binary mode, otherwise text mode.
+        'newline`: passed to open()
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
         `poll_interval`: poll time when taking a lock file,
@@ -922,6 +923,7 @@ class SharedAppendFile(object):
         poll_interval = DEFAULT_POLL_INTERVAL
       self.pathname = abspath(pathname)
       self.binary = binary
+      self.newline = newline
       self.read_only = read_only
       self.write_only = write_only
       self.lock_ext = lock_ext
@@ -963,7 +965,7 @@ class SharedAppendFile(object):
       buffering = 0
     else:
       buffering = -1
-    self._rfp = fdopen(fd, mode, buffering=buffering)
+    self._rfp = fdopen(fd, mode, buffering=buffering, newline=self.newline)
     self.open_state = self.filestate
 
   def _readclose(self):
@@ -1032,7 +1034,7 @@ class SharedAppendFile(object):
       with self._readlock:
         mode = 'ab' if self.binary else 'a'
         fd = dup(self._fd)
-        with fdopen(fd, mode) as wfp:
+        with fdopen(fd, mode, newline=self.newline) as wfp:
           wfp.seek(0, SEEK_END)
           start = wfp.tell()
           yield wfp
