@@ -24,6 +24,7 @@ DISTINFO = {
     'install_requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
 }
 
+from contextlib import contextmanager
 import csv
 from io import BytesIO
 import sys
