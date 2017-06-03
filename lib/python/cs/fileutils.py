@@ -20,7 +20,9 @@ DISTINFO = {
 from io import RawIOBase
 from functools import partial
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET
+from os import fdopen, \
+               SEEK_CUR, SEEK_END, SEEK_SET, \
+               O_APPEND, O_RDONLY, O_RDWR, O_WRONLY
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import errno
@@ -32,7 +34,7 @@ from itertools import takewhile
 import shutil
 import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import RLock, Thread
+from threading import Lock, RLock, Thread
 import time
 import unittest
 from cs.asynchron import Result
@@ -48,6 +50,8 @@ from cs.obj import O
 from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
+DEFAULT_TAIL_PAUSE = 0.25
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -878,142 +882,63 @@ class BackedFile_TestMethods(object):
 class SharedAppendFile(object):
   ''' A base class to share a modifiable file between multiple users.
 
-      The use case derives from the shared CSV files used by
+      The use case was driven from the shared CSV files used by
       cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
       read from a common CSV file, and coordinate updates with a
       lock file.
 
-      Subclasses need to implement one method:
+      This presents the following interfaces:
 
-      transcribe_update(self, fp, item):
-        fp    the output file
-        item  the output record, to be serialised to the file
+        __iter__: yields data chunks from the underlying file up
+          to EOF; it block no more than reading from the file does.
+          Note that multiple iterators share the same read pointer.
 
-      Users of the class or subclass who need to receive foreign
-      updates need to supply the `importer` parameter, a callable
-      which is handed a foreign record from the file to incorporate
-      into their own state. They must be prepared to accept the
-      value None, which is a marker for seeing EOF on the backing
-      file; it is sent unconditionally on completion of the first
-      scan of the file and then whenever a scan of the file receives
-      additional data. They must also be prepared to accept the
-      value SharedAppendFile.SENTINEL_RESTART which is sent when a
-      rewrite/replacement is observed; if the file shrinks or changes
-      inode it is presumed to have been rewritten - SENTINEL_RESTART
-      is sent and the file it reopened and rescanned from the
-      beginning.
+        open: a context manager returning a writable file for writing
+          updates to the file; it blocks reads from this instance
+          (though not, of course, by other users of the file) and
+          arranges that users of __iter__ do not receive their own
+          written data, thus arranging that __iter__ returns only
+          foreign file updates.
 
-      Subclasses which emit higher order records, such as
-      SharedAppendLines below, will need to intercept the `importer`
-      paramater and substitute one of their own which constructs
-      records from the lower order data received from the superclass.
-      For example, here is the for in SharedAppendLines.__init__
-      for this purpose:
-
-        importer = kw.get('importer')
-        if importer is not None:
-          kw['importer'] = lambda chunk: self._linearise(chunk, importer)
-
-      The ._linearise method accepts data chunks from the
-      SharedAppendFile superclass and passes completed text lines
-      to the supplied `importer`, keeping the state of incomplete
-      line data between calls.
-
-      Note that the intercepting importer passes through None values
-      immediately; they indicate only that more raw data has been
-      gathered from the backing file, not that a complete record
-      has been assembled for import. For example,
-      SharedAppendLines._linearise starts like this:
-
-        if chunk is None:
-          importer(None)
-        else:
-          ... gather chunk into lines ...
-
-      Therefore real importers and intercepting importers must be
-      prepared to accept None at any time; an interceptor passes
-      it through and a real (end user) importer discards it, but
-      may use the receipt of None to update state such as determining
-      that the first scan of the backing file has completed or to
-      update some progress/activity indicator.
+      Subclasses would normally override __iter__ to parse the
+      received data into their natural records.
   '''
 
-  DEFAULT_MAX_QUEUE = 128
-  SENTINEL_RESTART = object()
-
-  def __init__(self, pathname, no_update=False, importer=None,
-                binary=False, max_queue=None,
-                poll_interval=None,
-                lock_ext=None, lock_timeout=None):
+  def __init__(self, pathname,
+               read_only=False, write_only=False, binary=False,
+               lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
-        `importer`: callable to accept foreign data chunks as their appear
-        `no_update`: set to true if we will not write updates.
+        `read_only`: set to true if we will not write updates.
+        `write_only`: set to true if we will not read updates.
         `binary`: if the file is to be opened in binary mode, otherwise text mode.
-        `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
-        `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
     '''
     with Pfx("SharedAppendFile(%r): __init__", pathname):
-      if max_queue is None:
-        max_queue = self.DEFAULT_MAX_QUEUE
-      if poll_interval is None:
-        poll_interval = DEFAULT_POLL_INTERVAL
       self.pathname = abspath(pathname)
       self.binary = binary
-      self.no_update = no_update
-      self.importer = importer
-      self.poll_interval = poll_interval
-      self.max_queue = max_queue
-      self.ready = Result(name="readiness(%s)" % (self,))
-      # lock file paramaters
+      self.read_only = read_only
+      self.write_only = write_only
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
-      # mutex on read access
+      if self.read_only:
+        if self.write_only:
+          raise ValueError("only one of read_only and write_only may be true")
+        o_flags = O_RDONLY
+      elif self.write_only:
+        o_flags = O_WRONLY | O_APPEND
+      else:
+        o_flags = O_RDWR | O_APPEND
+      self._fd = os.open(self.pathname, o_flags)
+      self._read_offset = 0
+      self._read_skip = Range()
       self._readlock = RLock()
-      if not no_update:
-        # inbound updates to be saved to the file
-        self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
-      self._open()
+      if not self.write_only:
+        self._readopen()
 
   def __str__(self):
     return "SharedAppendFile(%r)" % (self.pathname,)
-
-  def _open(self, skip_to_end=False):
-    ''' Open the file for read or read/write.
-    '''
-    mode = "r" if self.no_update else "r+"
-    if self.binary:
-      mode += "b"
-    self.fp = open(self.pathname, mode)
-    if skip_to_end:
-      self.fp.seek(0, SEEK_END)
-    self.open_state = self.filestate
-    self.closed = False
-    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
-    self._monitor_thread.daemon = True
-    self._monitor_thread.start()
-
-  def _close(self):
-    fp = self.fp
-    self.fp = None
-    fp.close()
-
-  def rewrite(self, chunks):
-    ''' Rewrite the file using content from `chunks`, then switch the new file into place.
-    '''
-    X("%s.rewrite...", self)
-    with self._lockfile():
-      with self._readlock:
-        self._close()
-        tmpfp = mkstemp(dir=dirname(self.pathname))
-        for chunk in chunks:
-          tmpfp.write(chunk)
-        tmpfp.close()
-        os.rename(tmpfp, self.pathname)
-        self._open(skip_to_end=True)
-    X("%s.rewrite DONE", self)
 
   def close(self):
     ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
@@ -1021,155 +946,156 @@ class SharedAppendFile(object):
     if self.closed:
       warning("multiple close of %s", self)
     self.closed = True
-    if not self.no_update:
-      self._inQ.close()
-    self._monitor_thread.join()
-    self._close()
 
-  @property
-  def filestate(self):
-    ''' The current FileState of the backing file.
+  def _readopen(self, skip_to_end=False):
+    ''' Open the file for read.
     '''
-    fp = self.fp
-    if fp is None:
-      return None
-    return FileState(fp.fileno())
+    assert not self.write_only
+    mode = 'rb' if self.binary else 'r'
+    fd = dup(self._fd)
+    self._rfp = fdopen(fd, mode, buffering=0)
+    self.open_state = self.filestate
+
+  def _readclose(self):
+    ''' Close the reader.
+    '''
+    assert not self.write_only
+    rfp = self._rfp
+    self._rfp = None
+    rfp.close()
+    self.closed = True
+
+  def __iter__(self):
+    ''' Iterate over the file, yielding data chunks until EOF.
+        This skips data written to the file by this instance so that
+        the data chunks returned are always foreign updates.
+        Note that all iterators share the same file offset pointer.
+
+        Usage:
+          for chunk in f:
+            ... process chunk ...
+    '''
+    assert not self.write_only
+    while True:
+      with self._readlock:
+        # advance over any skip areas
+        offset = self._read_offset
+        skip = self._read_skip
+        while skip and skip.start <= offset:
+          start0, end0 = skip.span0
+          if offset < end0:
+            offset = end0
+          skip.discard(start0, end0)
+        read_size = DEFAULT_READSIZE
+        if skip:
+          read_size = min(read_size, skip.span0.start - offset)
+          assert read_size > 0
+        # gather data
+        self._rfp.seek(offset)
+        bs = self._rfp.read(read_size)
+        self._read_offset = self._rfp.tell()
+      if not bs:
+        break
+      yield bs
 
   def _lockfile(self):
-    ''' Obtain an exclusive lock on the CSV file.
+    ''' Obtain an exclusive write lock on the CSV file.
+        This arranges that multiple instances can coordinate writes.
+
+        Usage:
+          with self._lockfile():
+            ... write data ...
     '''
     return lockfile(self.pathname,
                     ext=self.lock_ext,
                     poll_interval=self.poll_interval,
                     timeout=self.lock_timeout)
 
-  def put(self, update_item):
-    ''' Queue an update record for transcription to the shared file.
+  @contextmanager
+  def open(self):
+    ''' Open the file for append write, returing a writable file.
+        Iterators are blocked for the duration of the context manager.
     '''
-    self._inQ.put(update_item)
+    if self.read_only:
+      raise RuntimeError("attempt to write to read only SharedAppendFile")
+    with self._lockfile():
+      with self._readlock:
+        mode = 'ab' if self.binary else 'a'
+        fd = dup(self._fd)
+        with fdopen(fd, mode) as wfp:
+          wfp.seek(0, SEEK_END)
+          start = wfp.tell()
+          yield wfp
+          end = wfp.tell()
+        if end > start:
+          sel._read_skip.add(start, end)
+        if not self.write_only:
+          self._readopen()
 
-  def _read_to_eof(self, force_eof=False):
-    ''' Read update data from the file until EOF, hand data chunks to the importer.
-        At EOF put None if at least one chunk was sent or force_eof
-        is True (set on the first scan so that end users can know
-        when the backing file has completed its initial read).
-        Return the number of reads with data; 0 ==> no new data.
-    '''
-    debug("READ_TO_EOF...")
-    count = 0
-    for chunk in chunks_of(self.fp):
-      if len(chunk) == 0:
-        warning("empty chunk received from chunks_of(%s)", self.fp)
-      else:
-        self.importer(chunk)
-        count += 1
-    if force_eof or count > 0:
-      debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
-      self.importer(None)
-    return count
+  def tail(self):
+    ''' A generator returning data chunks from the file indefinitely.
+        This supports writing monitors for file updates.
+        Note that this, like other iterators, shares the same file offset pointer.
+        Also note that it calls the class' iterator, so that if s
+        aubsclass returns higher level records from its iterator,
+        those records will also be returned from tail.
 
-  def _monitor(self):
-    ''' Monitor the input queue and the data file.
-        Read data from the data file as it appears, copy to the output queue.
-        Read updates from the input queue, append to the data file.
+        Usage:
+          for chunk in f:
+            ... process chunk ...
     '''
-    with Pfx("%s._monitor", self):
-      first = True
-      count = 0
-      # run until closed and no pending outbound updates
-      while ( not self.closed
-           or ( not self.no_update
-            and (not self._inQ.closed or not self._inQ.empty())
-              )
-            ):
-        if self.importer:
-          # catch up
-          with self._readlock:
-            count = self._read_to_eof(force_eof=first)
-          if first:
-            # indicate first to-EOF read complete, output queue primed
-            self.ready.put(True)
-        if not self.no_update:
-          # check for outgoing updates
-          if self._inQ.empty():
-            # sleep briefly if nothing to write out
-            if count == 0:
-              time.sleep(self.poll_interval)
-          else:
-            # updates due
-            # obtain lock
-            #   read until EOF
-            #   append updates
-            # release lock
-            with self._lockfile():
-              if self.importer:
-                with self._read_lock:
-                  self._read_to_eof()
-                  pos = self.fp.tell()
-              self.fp.seek(0, SEEK_END)
-              if self.importer and pos != self.fp.tell():
-                warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
-              while not self._inQ.empty():
-                item = self._inQ._get()
-                self.transcribe_update(self.fp, item)
-              self.fp.flush()
-        # watch for file being rewritten by other users
-        fstate = FileState(self.pathname)
-        if not fstate.samefile(self.open_state):
-          X("%s: new file, reopen and send SENTINEL_RESTART to client...", self)
-          with self._readlock:
-            self._close()
-            self._open()
-          # alert client to complete new state
-          self.importer(self.SENTINEL_RESTART)
-        # clear flag for next pass
-        first = False
+    while True:
+      for item in self:
+        yield item
+      if self.closed:
+        return
+      sleep(DEFAULT_TAIL_PAUSE)
+
+  @property
+  def filestate(self):
+    ''' The current FileState of the backing file.
+    '''
+    fd = self._fd
+    if fd is None:
+      return None
+    return FileState(_fd)
+
+  # TODO: need to notice filestate changes in other areas
+  # TODO: support in place rewrite?
+  @contextmanager
+  def rewrite(self):
+    ''' Context manager for rewriting the file.
+        This writes data to a new file which is then renamed onto the original.
+        After the switch, the read pointer is set to the end of the new file.
+        Usage:
+          with f.rewrite() as wfp:
+            ... write data to wfp ...
+    '''
+    X("%s.rewrite...", self)
+    with self._readlock:
+      with self.open() as wfp:
+        tmpfp = mkstemp(dir=dirname(self.pathname), text=self.binary)
+        yield tmpfp
+        if not self.write_only:
+          self._read_offset = tmpfp.tell()
+        tmpfp.close()
+        os.rename(tmpfp, self.pathname)
+    X("%s.rewrite DONE", self)
 
 class SharedAppendLines(SharedAppendFile):
+  ''' A line oriented subclass of SharedAppendFile.
+  '''
 
   def __init__(self, *a, **kw):
     if 'binary' in kw:
       raise ValueError('may not specify binary=')
-    importer = kw.get('importer')
-    if importer is not None:
-      kw['importer'] = lambda chunk: self._linearise(chunk, importer)
-    self._line_partials = []
-    SharedAppendFile.__init__(self, *a, binary=False, **kw)
-
-  def _linearise(self, chunk, importer):
-    ''' Importer for SharedAppendFile: convert to lines from raw data, pass to real importer.
-    '''
-    if chunk is None:
-      importer(None)
     else:
-      partials = self._line_partials
-      start = 0
-      while True:
-        nlpos = chunk.find('\n', start)
-        if nlpos < 0:
-          break
-        line = ''.join( partials + [chunk[start:nlpos+1]] )
-        partials[:] = []
-        importer(line)
-        start = nlpos + 1
-      if start < len(chunk):
-        partials.append(chunk[start:])
+      kw['binary'] = False
+    super().__init__(*a, **kw)
 
-  def rewrite(self, lines, encoding="utf-8"):
-    return SharedAppendFile.rewrite(self, ( line.encode(encoding) for line in lines ))
-
-  def transcribe_update(self, fp, s):
-    ''' Transcribe a string as a line.
-    '''
-    # sanity check: we should only be writing between foreign updates
-    # and foreign updates should always be complete lines
-    if len(self._line_partials):
-      warning("%s._transcribe_update while non-empty partials[]: %r",
-              self, self._line_partials)
-    if '\n' in s:
-      raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
-    fp.write(s)
-    fp.write('\n')
+  def __iter__(self):
+    for line in as_lines(super().__iter__()):
+      yield line
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
