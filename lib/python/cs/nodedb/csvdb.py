@@ -5,18 +5,18 @@
 #
 
 import csv
+import datetime
 import io
 import os
 import os.path
-import sys
-import datetime
-import time
 from shutil import copyfile
+import sys
 from threading import Thread, Lock
+import time
 from cs.debug import trace
 from cs.csvutils import csv_writerow, SharedCSVFile
 from cs.fileutils import FileState, rewrite_cmgr
-from cs.logutils import Pfx, error, warning, info, debug, D, X, PfxThread
+from cs.logutils import Pfx, error, warning, info, debug, D, X, XP, PfxThread
 from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
@@ -86,7 +86,7 @@ class Backend_CSVFile(Backend):
       for row in self.csv:
         self._import_foreign_row(row)
       XP("dispatch monitor thread...")
-      self._monitor = PfxThread("monitor", target=self._monitor_foreign_updates)
+      self._monitor = PfxThread(name="monitor", target=self._monitor_foreign_updates)
       self._monitor.start()
 
   def close(self):
@@ -140,7 +140,8 @@ class Backend_CSVFile(Backend):
       warning("%s: readonly, discarding: %s", self.pathname, update)
       return
     with self.csv.writer() as w:
-      w.writerow(row)
+      for row in update.to_csv():
+        w.writerow(row)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
