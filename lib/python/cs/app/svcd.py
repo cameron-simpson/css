@@ -169,7 +169,7 @@ def main(argv, environ=None):
       argv = ['sh', '-c', sig_shcmd]
       if test_uid != uid:
         argv = ['sux', '-u', test_username, '--'] + argv
-      P = Popen(argv, stdin=DEVNULL, stdout=PIPE) == 0
+      P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()
       if returncode != 0:
