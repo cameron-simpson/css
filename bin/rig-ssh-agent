@@ -20,7 +20,7 @@ cmd=$0
 usage="Usage: $cmd [-f]"
 
 force=
-[ "x$1" = x-f ] && { force=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
