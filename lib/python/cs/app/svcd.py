@@ -13,7 +13,7 @@ import os
 from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, DEVNULL, call as callproc
+from subprocess import Popen, PIPE, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, uppername, FlaggedMixin
