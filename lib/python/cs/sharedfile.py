@@ -15,6 +15,7 @@ from threading import RLock
 import time
 from cs.logutils import Pfx
 from cs.range import Range
+from cs.timeutils import TimeoutError
 
 DEFAULT_POLL_INTERVAL = 1.0
 
