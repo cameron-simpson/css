@@ -95,15 +95,14 @@ class FlaggedMixin(object):
         The object's .name attribute is used as the basis, so a
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
-        This function returns None if there is no .name attribute or it is None.
     '''
     try:
       name = self.name
     except AttributeError:
-      return None
-    if name is None:
-      return None
-    return uppername(name + '_' + suffix)
+      flagname = suffix
+    else:
+      flagname = name + '_' + suffix
+    return uppername(flagname)
 
   def __getattr__(self, attr):
     ''' Support .flag_suffix and .flagname_suffix.
@@ -126,7 +125,8 @@ class FlaggedMixin(object):
     if attr.startswith('flag_'):
       flagname = self.__flagname(attr[5:])
       self.flags[flagname] = value
-    super().__setattr__(attr, value)
+    else:
+      super().__setattr__(attr, value)
 
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)
