@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+    'requires': ['cs.env', 'cs.lex', 'cs.logutils', 'cs.range', 'cs.threads', 'cs.py3'],
 }
 
 from io import RawIOBase
@@ -37,16 +37,11 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import Lock, RLock, Thread
 import time
 import unittest
-from cs.asynchron import Result
-from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
 from cs.logutils import exception, error, warning, debug, Pfx, D, X
-from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
-from cs.timeutils import TimeoutError
-from cs.obj import O
 from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
