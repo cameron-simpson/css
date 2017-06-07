@@ -7,21 +7,28 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-a] [-d] {relpath|.} [{-c shcmd | testcmd [args...]}]
+usage="Usage: $cmd [-a] [-d] [-t top] [-T top] {relpath|.} [{-c shcmd | testcmd [args...]}]
   -a    Find all matches. Default is to stop after the first match.
-  -c shcmd
-        Run shell command \"shcmd\" with the environment variable
   -d    Print the test directory instead of the test directory plus
         \"relpath\".
+  -t top Go no higher than the directory top.
+  -T top Go only lower than the directory top.
+  Command:
+    -c shcmd
+        Run shell command \"shcmd\" with the context environment variables set.
+    testcmd [args...]
+        Run testcmd with the context environment variables set.
   Environment:
         \$FINDUP_DIR is set to the test directory.
         \$FINDUP_PATH is set to the test path (the test directory
         with \"relpath\" appended, unless \"relpath\" is \".\" or
         the empty string, in which case it will just be the test
-        directory."
+        directory)."
 
 all=
 dirmode=
+top=
+top0=
 shmode=
 
 badopts=
@@ -31,6 +38,8 @@ do
   case $1 in
     -a) all=1 ;;
     -d) dirmode=1 ;;
+    -t) top=$2; shift ;;
+    -T) top0=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -51,11 +60,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# default test: path exists
-if [ $# = 0 ]
+if [ $# -gt 0 ]
 then
-  set -- test -e
-else
   if [ "x$1" = x-c ]
   then
     shmode=1
@@ -80,14 +86,20 @@ odir=
 dir=$( pwd )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
+  [ -z "$top0" ] || [ "x$dir" != "x$top0" ] || break
   case "$relpath" in
     '' | . )    path=$dir ;;
     *)          path=$dir/$relpath ;;
   esac
-  if if [ $shmode ]
-     then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
-     else  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
-     fi
+  if
+    if [ $shmode ]
+    then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
+    else
+      if [ $# -gt 0 ]
+      then  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
+      else  [ -e "$path" ]
+      fi
+    fi
   then
     xit=0
     if [ $dirmode ]
@@ -96,6 +108,7 @@ do
     fi
     [ $all ] || break
   fi
+  [ -z "$top" ] || [ "x$dir" != "x$top" ] || break
   odir=$dir
   dir=$( dirname "$dir" )
 done

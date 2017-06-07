@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convenience command to start disparate services based on name.
-# The configuration is in $HOME/rc/svc.
+# The configuration is in $HOME/.svcrc.
 # For further convenience I define the following shell aliases:
 #
 #   alias disable='svc disable'

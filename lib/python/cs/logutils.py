@@ -14,11 +14,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3'],
+    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.upd'],
 }
 
 import codecs
 from contextlib import contextmanager
+import getopt
 try:
   import importlib
 except ImportError:
@@ -32,13 +33,14 @@ import stat
 import sys
 import time
 import threading
-from threading import Lock
+from threading import Lock, Thread
 import traceback
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
+from cs.upd import Upd
 
 cmd = __file__
 
@@ -46,6 +48,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
+loginfo = O(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -79,9 +82,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       If trace_mode is true, set the global trace_level to logging_level;
       otherwise it defaults to logging.DEBUG.
   '''
-  global cmd, logging_level, trace_level, D_mode
-
-  loginfo = O()
+  global cmd, logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level()
@@ -160,8 +161,10 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = trace_mode
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -352,6 +355,8 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# set to true to log as a warning
+X_via_log = False
 # set to true to write direct to /dev/tty
 X_via_tty = False
 
@@ -359,7 +364,13 @@ def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  if X_via_tty:
+  if X_via_log:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    warning(msg)
+  elif X_via_tty:
     # NB: ignores any kwargs
     msg = str(msg)
     if args:
@@ -445,7 +456,7 @@ def nl(msg, *args, **kw):
     try:
       msg = msg % args
     except TypeError as e:
-      nl("cannot expand msg: %s; msg=%r, args=%r", e, msg, args, file=sys.stderr)
+      nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
       msg = "%s[%r]" % (msg, args)
   file.write(msg)
   file.write("\n")
@@ -514,6 +525,7 @@ class _PfxThreadState(threading.local):
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
+    self.trace = False
 
   @property
   def cur(self):
@@ -629,6 +641,8 @@ class Pfx(object):
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
+    if _state.trace:
+      info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
     _state = self._state
@@ -640,37 +654,46 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            DP("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            # DP
+            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
                prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        args = getattr(exc_value, 'args', None)
-        if args is not None:
-          if args:
-            if isinstance(args, StringTypes):
-              D("%s: expected args to be a tuple, got %r", prefix, args)
-              args = prefixify(args)
-            else:
-              args = list(args)
-              if len(exc_value.args) == 0:
-                args = [ prefix ]
-              else:
-                args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
-            exc_value.args = args
-        elif hasattr(exc_value, 'message'):
-          exc_value.message = prefixify(str(exc_value.message))
-        elif hasattr(exc_value, 'reason'):
-          if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefixify(exc_value.reason)
-          else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-        elif hasattr(exc_value, 'msg'):
-          exc_value.msg = prefixify(str(exc_value.msg))
+        if isinstance(exc_value, getopt.GetoptError):
+          exc_value.msg = prefixify(exc_value.msg)
         else:
-          # we can't modify this exception - at least report the current prefix state
-          D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
-          error(prefixify(str(exc_value)))
+          args = getattr(exc_value, 'args', None)
+          if args is not None:
+            X("args = %r", args)
+            if args:
+              if isinstance(args, StringTypes):
+                D("%s: expected args to be a tuple, got %r", prefix, args)
+                args = prefixify(args)
+              else:
+                args = list(args)
+                if len(exc_value.args) == 0:
+                  args = [ prefix ]
+                else:
+                  args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
+              exc_value.args = args
+              X("set .args to be %r", exc_value.args)
+          elif hasattr(exc_value, 'message'):
+            exc_value.message = prefixify(str(exc_value.message))
+            X("set .message to be %r", exc_value.message)
+          elif hasattr(exc_value, 'reason'):
+            if isinstance(exc_value.reason, StringTypes):
+              exc_value.reason = prefixify(exc_value.reason)
+            else:
+              warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
+          elif hasattr(exc_value, 'msg'):
+            exc_value.msg = prefixify(str(exc_value.msg))
+          else:
+            # we can't modify this exception - at least report the current prefix state
+            D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
+            error(prefixify(str(exc_value)))
     _state.pop()
+    if _state.trace:
+      info(self._state.prefix)
     return False
 
   @property
@@ -780,6 +803,16 @@ class PfxCallInfo(Pfx):
                  caller[0], caller[1], caller[2],
                  grandcaller[0], grandcaller[1], grandcaller[2])
 
+def PfxThread(target=None, **kw):
+  ''' Factory function returning a Thread which presents the current prefix as context.
+  '''
+  current_prefix = prefix()
+  def run(*a, **kw):
+    with Pfx(current_prefix):
+      if target is not None:
+        target(*a, **kw)
+  return Thread(target=run, **kw)
+
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
@@ -848,7 +881,6 @@ class UpdHandler(StreamHandler):
         A true value causes the handler to colour certain logging levels
         using ANSI terminal sequences.
     '''
-    from cs.upd import Upd
     if strm is None:
       strm = sys.stderr
     if nlLevel is None:
