@@ -21,7 +21,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
+    'install_requires': ['cs.debug', 'cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -30,9 +30,7 @@ from io import BytesIO
 import sys
 from threading import Thread
 from cs.debug import trace
-from cs.fileutils import SharedAppendLines
 from cs.logutils import Pfx, warning
-from cs.queues import IterableQueue
 
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
@@ -75,26 +73,3 @@ else:
         default 'utf-8'.
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
-
-class SharedCSVFile(SharedAppendLines):
-  ''' Shared access to a CSV file in UTF-8 encoding.
-  '''
-
-  def __init__(self, pathname, dialect='excel', fmtparams=None, **kw):
-    if fmtparams is None:
-      fmtparams = {}
-    super().__init__(pathname, newline='', **kw)
-    self.dialect = dialect
-    self.fmtparams = fmtparams
-
-  def __iter__(self):
-    ''' Yield csv rows.
-    '''
-    yield from csv.reader( (line for line in super().__iter__()),
-                           dialect=self.dialect,
-                           **self.fmtparams)
-
-  @contextmanager
-  def writer(self):
-    with self.open() as wfp:
-      yield csv.writer(wfp, dialect=self.dialect, **self.fmtparams)
