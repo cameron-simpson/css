@@ -14,9 +14,10 @@ import sys
 from threading import Thread, Lock
 import time
 from cs.debug import trace
-from cs.csvutils import csv_writerow, SharedCSVFile
+from cs.csvutils import csv_writerow
 from cs.fileutils import FileState, rewrite_cmgr
 from cs.logutils import Pfx, error, warning, info, debug, D, X, XP, PfxThread
+from cs.sharedfile import SharedCSVFile
 from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
@@ -34,12 +35,6 @@ def resolve_csv_row(row, lastrow):
     if attr == '':
       attr = lastrow[2]
     return t, name, attr, value
-
-def write_csv_header(fp):
-  ''' Write CSV header row. Used for exported CSV data.
-  '''
-  csvw = csv.writer(fp)
-  csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
 
 def write_csv_file(fp, nodedata):
   ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the "vertical" CSV style.
