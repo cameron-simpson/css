@@ -11,9 +11,11 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+import cs.iso8601
 import cs.sh
 from cs.xml import etree
 from .iphone import is_iphone
+from cs.logutils import X
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.
@@ -97,6 +99,9 @@ def ingest_plist_elem(e):
     return True
   if e.tag == 'data':
     return base64.b64decode(e.text)
+  if e.tag == 'date':
+    return iso8601.parseZ(e.text)
+  X("NOT TRANSFORMING plist elem %r: %r %r", e, e.attrib, e.text)
   return e
 
 def ingest_plist_array(pa):
