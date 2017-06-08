@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 def strformat(sep=None):
   if sep is None:
     sep = 'T'
-  return sep.join('%Y-%m-%d', '%H:%M:%S')
+  return sep.join( ('%Y-%m-%d', '%H:%M:%S') )
 
 # strptime format for a Z style ISO8601 date string
 ISO8601_FORMAT_Z = strformat() + 'Z'
