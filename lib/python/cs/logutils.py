@@ -19,6 +19,7 @@ DISTINFO = {
 
 import codecs
 from contextlib import contextmanager
+import getopt
 try:
   import importlib
 except ImportError:
@@ -32,7 +33,7 @@ import stat
 import sys
 import time
 import threading
-from threading import Lock
+from threading import Lock, Thread
 import traceback
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
@@ -47,7 +48,7 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
-loginfo = O(upd_mode=False)
+loginfo = O(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -163,8 +164,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    if trace_mode:
-      Pfx._state.trace = True
+    Pfx._state.trace = trace_mode
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -283,7 +283,6 @@ def infer_logging_level(env_debug=None, environ=None):
         numeric >= 1 and < 2: logging.INFO
         numeric >= 2 => logging.DEBUG
         "DEBUG" => logging.DEBUG
-        "TRACE" => Pfx issues log.info calls
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
@@ -326,13 +325,14 @@ def infer_logging_level(env_debug=None, environ=None):
       if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
         function_names.append( (module_name, func_name) )
     else:
-      if flag == 'DEBUG':
+      uc_flag = flag.upper()
+      if uc_flag == 'DEBUG':
         level = logging.DEBUG
-      elif flag == 'INFO':
+      elif uc_flag == 'INFO':
         level = logging.INFO
-      elif flag == 'WARN' or flag == 'WARNING':
+      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
         level = logging.WARNING
-      elif flag == 'ERROR':
+      elif uc_flag == 'ERROR':
         level = logging.ERROR
   return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
 
@@ -456,7 +456,7 @@ def nl(msg, *args, **kw):
     try:
       msg = msg % args
     except TypeError as e:
-      nl("cannot expand msg: %s; msg=%r, args=%r", e, msg, args, file=sys.stderr)
+      nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
       msg = "%s[%r]" % (msg, args)
   file.write(msg)
   file.write("\n")
@@ -638,7 +638,6 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
-    global loginfo
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -646,7 +645,6 @@ class Pfx(object):
       info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
-    global loginfo
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
@@ -656,36 +654,43 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            DP("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            # DP
+            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
                prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        args = getattr(exc_value, 'args', None)
-        if args is not None:
-          if args:
-            if isinstance(args, StringTypes):
-              D("%s: expected args to be a tuple, got %r", prefix, args)
-              args = prefixify(args)
-            else:
-              args = list(args)
-              if len(exc_value.args) == 0:
-                args = [ prefix ]
-              else:
-                args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
-            exc_value.args = args
-        elif hasattr(exc_value, 'message'):
-          exc_value.message = prefixify(str(exc_value.message))
-        elif hasattr(exc_value, 'reason'):
-          if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefixify(exc_value.reason)
-          else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-        elif hasattr(exc_value, 'msg'):
-          exc_value.msg = prefixify(str(exc_value.msg))
+        if isinstance(exc_value, getopt.GetoptError):
+          exc_value.msg = prefixify(exc_value.msg)
         else:
-          # we can't modify this exception - at least report the current prefix state
-          D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
-          error(prefixify(str(exc_value)))
+          args = getattr(exc_value, 'args', None)
+          if args is not None:
+            X("args = %r", args)
+            if args:
+              if isinstance(args, StringTypes):
+                D("%s: expected args to be a tuple, got %r", prefix, args)
+                args = prefixify(args)
+              else:
+                args = list(args)
+                if len(exc_value.args) == 0:
+                  args = [ prefix ]
+                else:
+                  args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
+              exc_value.args = args
+              X("set .args to be %r", exc_value.args)
+          elif hasattr(exc_value, 'message'):
+            exc_value.message = prefixify(str(exc_value.message))
+            X("set .message to be %r", exc_value.message)
+          elif hasattr(exc_value, 'reason'):
+            if isinstance(exc_value.reason, StringTypes):
+              exc_value.reason = prefixify(exc_value.reason)
+            else:
+              warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
+          elif hasattr(exc_value, 'msg'):
+            exc_value.msg = prefixify(str(exc_value.msg))
+          else:
+            # we can't modify this exception - at least report the current prefix state
+            D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
+            error(prefixify(str(exc_value)))
     _state.pop()
     if _state.trace:
       info(self._state.prefix)
@@ -797,6 +802,16 @@ class PfxCallInfo(Pfx):
                  "at %s:%d %s(), called from %s:%d %s()",
                  caller[0], caller[1], caller[2],
                  grandcaller[0], grandcaller[1], grandcaller[2])
+
+def PfxThread(target=None, **kw):
+  ''' Factory function returning a Thread which presents the current prefix as context.
+  '''
+  current_prefix = prefix()
+  def run(*a, **kw):
+    with Pfx(current_prefix):
+      if target is not None:
+        target(*a, **kw)
+  return Thread(target=run, **kw)
 
 # Logger public functions
 def exception(msg, *args):

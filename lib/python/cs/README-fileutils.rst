@@ -15,7 +15,7 @@ Convenience functions and classes for files and filenames/pathnames.
 
 * abspath_from_file: restore relative path with respect to another path, as for an include filename
 
-* chunks_of: generator yielding text or data from an open file until EOF
+* read_from: generator yielding text or data from an open file until EOF
 
 * lines_of: generator yielding lines of text from an open file until EOF
 

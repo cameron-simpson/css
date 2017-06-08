@@ -14,32 +14,34 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.lex', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
 }
 
 from io import RawIOBase
 from functools import partial
-import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET
-from os.path import basename, dirname, isabs, isdir, \
-                    abspath, join as joinpath, exists as existspath
+from os import dup, fdopen, \
+               SEEK_CUR, SEEK_END, SEEK_SET, \
+               O_APPEND, O_RDONLY, O_RDWR, O_WRONLY
+from os.path import basename, dirname, isdir, isabs as isabspath, \
+                    abspath, join as joinpath
 import errno
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
+import datetime
 from itertools import takewhile
+import os
 import shutil
 import socket
-import stat
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import RLock, Thread
+from threading import Lock, RLock, Thread
 import time
 import unittest
 from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
-from cs.logutils import error, warning, debug, Pfx, D, X
+from cs.logutils import exception, error, warning, debug, Pfx, D, X
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
@@ -47,43 +49,9 @@ from cs.timeutils import TimeoutError
 from cs.obj import O
 from cs.py3 import ustr, bytes
 
-try:
-  from os import pread
-except ImportError:
-  # implement our own pread
-  # NB: not thread safe!
-  def pread(fd, size, offset):
-    offset0 = os.lseek(fd, 0, SEEK_CUR)
-    os.lseek(fd, offset, SEEK_SET)
-    chunks = []
-    while size > 0:
-      data = os.read(fd, size)
-      if len(data) == 0:
-        break
-      chunks.append(data)
-      size -= len(data)
-    os.lseek(fd, offset0, SEEK_SET)
-    data = b''.join(chunks)
-    return data
-
-def seekable(fp):
-  ''' Try to test if a filelike object is seekable.
-      First try the .seekable method from IOBase, otherwise try
-      getting a file descriptor from fp.fileno and stat()ing that,
-      otherwise return False.
-  '''
-  try:
-    test = fp.seekable
-  except AttributeError:
-    try:
-      getfd = fp.fileno
-    except AttributeError:
-      return False
-    test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
-  return test()
-
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
+DEFAULT_TAIL_PAUSE = 0.25
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -140,17 +108,8 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  if do_rename:
-    tmpdir = dirname(filepath)
-  else:
-    tmpdir = None
-  with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
-    if isinstance(data, list):
-      I = data
-    else:
-      I = chunks_of(data)
-    for chunk in I:
-      T.write(chunk)
+  with NamedTemporaryFile(mode=mode) as T:
+    T.write(data.read())
     T.flush()
     if not empty_ok:
       st = os.stat(T.name)
@@ -241,8 +200,8 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not isabs(path):
-    if not isabs(from_file):
+  if not isabspath(path):
+    if not isabspath(from_file):
       from_file = abspath(from_file)
     path = joinpath(dirname(from_file), path)
   return path
@@ -396,8 +355,7 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL
             new_value = getattr(self, attr_value, unset_object)
             if new_value is unset_object:
               raise
-            import cs.logutils
-            cs.logutils.exception("exception during poll_file, leaving .%s untouched", attr_value)
+            exception("exception during poll_file, leaving .%s untouched", attr_value)
           else:
             if new_filestate:
               setattr(self, attr_value, new_value)
@@ -526,8 +484,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
               new_value = getattr(self, attr_value, unset_object)
               if new_value is unset_object:
                 raise
-              import cs.logutils
-              cs.logutils.debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
+              debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
             else:
               # examine new filestates in case they changed during load
               # _if_ we knew about them from the earlier load
@@ -544,83 +501,6 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
       return getattr(self, attr_value, unset_object)
     return property(getprop)
   return made_files_property
-
-def makelockfile(path, ext=None, poll_interval=None, timeout=None):
-  ''' Create a lockfile and return its path.
-      The file can be removed with os.remove.
-      This is the core functionality supporting the lockfile()
-      context manager.
-      `path`: the base associated with the lock file, often the
-              filesystem object whose access is being managed.
-      `ext`: the extension to the base used to construct the lock file name.
-             Default: ".lock"
-      `timeout`: maximum time to wait before failing,
-                 default None (wait forever).
-      `poll_interval`: polling frequency when timeout is not 0.
-  '''
-  if poll_interval is None:
-    poll_interval = DEFAULT_POLL_INTERVAL
-  if ext is None:
-    ext = '.lock'
-  if timeout is not None and timeout < 0:
-    raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
-  start = None
-  lockpath = path + ext
-  while True:
-    try:
-      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
-    except OSError as e:
-      if e.errno != errno.EEXIST:
-        raise
-      if timeout is not None and timeout <= 0:
-        # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
-      now = time.time()
-      # post: timeout is None or timeout > 0
-      if start is None:
-        # first try - set up counters
-        start = now
-        complaint_last = start
-        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
-      else:
-        if now - complaint_last >= complaint_interval:
-          from cs.logutils import warning
-          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
-                  os.getpid(), now - start, lockpath)
-          complaint_last = now
-          complaint_interval *= 2
-      # post: start is set
-      if timeout is None:
-        sleep_for = poll_interval
-      else:
-        sleep_for = min(poll_interval, start + timeout - now)
-      # test for timeout
-      if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
-      time.sleep(sleep_for)
-      continue
-    else:
-      break
-  os.close(lockfd)
-  return lockpath
-
-@contextmanager
-def lockfile(path, ext=None, poll_interval=None, timeout=None):
-  ''' A context manager which takes and holds a lock file.
-      `path`: the base associated with the lock file.
-      `ext`: the extension to the base used to construct the lock file name.
-             Default: ".lock"
-      `timeout`: maximum time to wait before failing,
-                 default None (wait forever).
-      `poll_interval`: polling frequency when timeout is not 0.
-  '''
-  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
-  yield lockpath
-  os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
@@ -772,7 +652,7 @@ class Pathname(str):
 
   @property
   def isabs(self):
-    return isabs(self)
+    return isabspath(self)
 
   @property
   def short(self):
@@ -781,50 +661,47 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class BackedFile(object):
-  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front file.
+class BackedFile(RawIOBase):
+  ''' A RawIOBase implementation that uses a backing file for initial data and writes new data to a front file.
   '''
 
-  def __init__(self, back_file):
-    ''' Initialise the BackedFile using `back_file` for the backing data.
+  def __init__(self, back_file, front_file=None):
+    ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
     '''
     self._offset = 0
     self._lock = RLock()
-    self._reset(back_file, _no_front_close=True)
+    self._reset(back_file, front_file)
 
   @locked
-  def _reset(self, new_back_file, _no_front_close=False):
-    if not _no_front_close:
-      self.front_file.close()
-    self.back_file = new_back_file
-    self.front_file = TemporaryFile()
-    self.front_range = Range()
+  def _reset(self, back_file, front_file=None, front_range=None):
+    ''' Reset the internal state of the BackedFile.
+    '''
+    if front_range is None:
+      front_range = Range()
+    self.back_file = back_file
+    self._front_file = front_file
+    self.front_range = front_range
 
   def __enter__(self):
-    ''' BackedFile instances offer a context manager that takes the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
+    ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
     '''
     self._lock.acquire()
 
   def __exit__(self, *e):
     self._lock.release()
 
-  def close(self):
-    self.flush()
-    self.front_file.close()
-    self.front_file = None
+  @locked
+  def _discard_front_file(self):
+    ''' Reset the BackedFile, keeping only the backing file.
+    '''
+    self._reset(self.back_file)
+
+  @locked_property
+  def front_file(self):
+    return TemporaryFile()
 
   def tell(self):
     return self._offset
-
-  @locked
-  def flush(self):
-    self.front_file.flush()
-
-  @locked
-  def __len__(self):
-    ''' Length of the file: max(len(backing_file), len(front_file)).
-    '''
-    return max(self.back_file.seek(0, SEEK_END), self.front_range.end)
 
   @locked
   def seek(self, pos, whence=SEEK_SET):
@@ -833,29 +710,12 @@ class BackedFile(object):
     elif whence == SEEK_CUR:
       self._offset += pos
     elif whence == SEEK_END:
-      self._offset = len(self) + pos
+      endpos = self._back_file.seek(0, SEEK_END)
+      if self.front_range is not None:
+        endpos = max(back_end, self.front_range.end())
+      self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
-    return self._offset
-
-  def spans(self):
-    ''' Yield (in_front, span) for all spans from 0 to len(self).
-    '''
-    return self.front_range.spans(0, len(self))
-
-  def front_spans(self):
-    ''' Yield span for all spans from 0 to len(self) in the front_file.
-    '''
-    for in_front, span in self.spans():
-      if in_front:
-        yield span
-
-  def back_spans(self):
-    ''' Yield span for all spans from 0 to len(self) in the back_file.
-    '''
-    for in_front, span in self.spans():
-      if not in_front:
-        yield span
 
   def read_n(self, n):
     ''' Read `n` bytes of data and return them.
@@ -867,10 +727,6 @@ class BackedFile(object):
       raise ValueError("n two low, expected >=1, got %r" % (n,))
     data = bytearray(n)
     nread = self.readinto(data)
-    if nread == n:
-      # do not copy the buffer if we got all the requested data
-      return data
-    # return short copy
     return data[:nread]
 
   @locked
@@ -942,7 +798,7 @@ class BackedFile_TestMethods(object):
     bfp.seek(512)
     bfp.write(random_chunk)
     # check that the front file has a single span of the right dimensions
-    ffp = bfp.front_file
+    ffp = bfp._front_file
     fr = bfp.front_range
     self.assertIsNotNone(ffp)
     self.assertIsNotNone(fr)
@@ -963,389 +819,9 @@ class BackedFile_TestMethods(object):
     self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
-class SharedAppendFile(object):
-  ''' A base class to share a modifiable file between multiple users.
-
-      The use case derives from the shared CSV files used by
-      cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
-      read from a common CSV file, and coordinate updates with a
-      lock file.
-
-      Subclasses need to implement one method:
-
-      transcribe_update(self, fp, item):
-        fp    the output file
-        item  the output record, to be serialised to the file
-
-      Users of the class or subclass who need to receive foreign
-      updates need to supply the `importer` parameter, a callable
-      which is handed a foreign record from the file to incorporate
-      into their own state. They must be prepared to accept the
-      value None, which is a marker for seeing EOF on the backing
-      file; it is sent unconditionally on the first scan of the
-      file and then whenever a scan of the file receives additional
-      data.
-
-      Sunclasses which emit higher order records, such as
-      SharedAppendLines below, will need to intercept the `importer`
-      paramater and substitute one of their own which constructs
-      records from the lower order data received from the superclass.
-      For example, here is the for in SharedAppendLines.__init__
-      for this purpose:
-
-        importer = kw.get('importer')
-        if importer is not None:
-          kw['importer'] = lambda chunk: self._linearise(chunk, importer)
-
-      The ._linearise method accepts data chunks from the
-      SharedAppendFile superclass and passes completed text lines
-      to the supplied `importer`, keeping the state of incomplete
-      line data between calls.
-
-      Note that the intercepting importer passes through None values
-      immediately; they indicate only that more raw data has been
-      gathered from the backing file, not that a complete record
-      has been assembled for import. For example,
-      SharedAppendLines._linearise starts like this:
-
-        if chunk is None:
-          importer(None)
-        else:
-          ... gather chunk into lines ...
-
-      Therefore real importers and intercepting importers must be
-      prepared to accept None at any time; an interceptor passes
-      it through and a real (end user) importer discards it, but
-      may use the receipt of None to update state such as determining
-      that the first scan of the backing file has completed or to
-      update some progress/activity indicator.
-  '''
-
-  DEFAULT_MAX_QUEUE = 128
-
-  def __init__(self, pathname, no_update=False, importer=None,
-                binary=False, max_queue=None,
-                poll_interval=None,
-                lock_ext=None, lock_timeout=None):
-    ''' Initialise this SharedAppendFile.
-        `pathname`: the pathname of the file to open.
-        `importer`: callable to accept foreign data chunks as their appear
-        `no_update`: set to true if we will not write updates.
-        `binary`: if the file is to be opened in binary mode, otherwise text mode.
-        `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
-        `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
-        `lock_ext`: lock file extension.
-        `lock_timeout`: maxmimum time to wait for obtaining the lock file.
-    '''
-    with Pfx("SharedAppendFile(%r): __init__", pathname):
-      if max_queue is None:
-        max_queue = self.DEFAULT_MAX_QUEUE
-      if poll_interval is None:
-        poll_interval = DEFAULT_POLL_INTERVAL
-      self.pathname = pathname
-      self.binary = binary
-      self.no_update = no_update
-      self.importer = importer
-      self.poll_interval = poll_interval
-      self.max_queue = max_queue
-      self.ready = Result(name="readiness(%s)" % (self,))
-      self.lock_ext = lock_ext
-      self.lock_timeout = lock_timeout
-      if not no_update:
-        # inbound updates to be saved to the file
-        self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
-      self._open_fp()
-
-  def __str__(self):
-    return "SharedAppendFile(%r)" % (self.pathname,)
-
-  def _open_fp(self):
-    ''' Open the file for read or read/write, save open file as .fp.
-    '''
-    mode = "r" if self.no_update else "r+"
-    if self.binary:
-      mode += "b"
-    self.fp = open(self.pathname, mode)
-    self.closed = False
-    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
-    self._monitor_thread.daemon = True
-    self._monitor_thread.start()
-
-  def close(self):
-    ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
-    '''
-    if self.closed:
-      warning("multiple close of %s", self)
-    self.closed = True
-    if not self.no_update:
-      self._inQ.close()
-    self._monitor_thread.join()
-    fp = self.fp
-    self.fp = None
-    fp.close()
-
-  @property
-  def filestate(self):
-    ''' The current FileState of the backing file.
-    '''
-    fp = self.fp
-    if fp is None:
-      return None
-    return FileState(fp.fileno())
-
-  def _lockfile(self):
-    ''' Obtain an exclusive lock on the CSV file.
-    '''
-    return lockfile(self.pathname,
-                    ext=self.lock_ext,
-                    poll_interval=self.poll_interval,
-                    timeout=self.lock_timeout)
-
-  @contextmanager
-  def open(self, mode=None):
-    ''' Context manager to obtain the lockfile, open the file with the specified mode (default: append), return the open file.
-    '''
-    if mode is None:
-      mode = "ab" if self.binary else "a"
-    with self._lockfile():
-      self.fp.flush()
-      self.fp.close()
-      try:
-        fp = open(self.pathname, mode)
-      except OSError:
-        raise
-      else:
-        yield fp
-        fp.close()
-      finally:
-        self._open_fp()
-
-  def put(self, update_item):
-    ''' Queue an update record for transcription to the shared file.
-    '''
-    self._inQ.put(update_item)
-
-  def _read_to_eof(self, force_eof=False):
-    ''' Read update data from the file until EOF, hand data chunks to the importer.
-        At EOF put None if at least one chunk was sent or force_eof
-        is True (set on the first scan so that end users can know
-        when the backing file has completed its initial read).
-        Return the number of reads with data; 0 ==> no new data.
-    '''
-    debug("READ_TO_EOF...")
-    count = 0
-    for chunk in chunks_of(self.fp):
-      if len(chunk) == 0:
-        warning("empty chunk received from chunks_of(%s)", self.fp)
-      else:
-        self.importer(chunk)
-        count += 1
-    if force_eof or count > 0:
-      debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
-      self.importer(None)
-    return count
-
-  def _monitor(self):
-    ''' Monitor the input queue and the data file.
-        Read data from the data file as it appears, copy to the output queue.
-        Read updates from the input queue, append to the data file.
-    '''
-    with Pfx("%s._monitor", self):
-      first = True
-      # run until closed and no pending outbound updates
-      while ( not self.closed
-           or ( not self.no_update
-            and (not self._inQ.closed or not self._inQ.empty())
-              )
-            ):
-        if self.importer:
-          # catch up
-          count = self._read_to_eof(force_eof=first)
-          if first:
-            # indicate first to-EOF read complete, output queue primed
-            self.ready.put(True)
-        else:
-          count = 0
-        if not self.no_update:
-          # check for outgoing updates
-          if self._inQ.empty():
-            # sleep briefly if nothing to write out
-            if count == 0:
-              time.sleep(self.poll_interval)
-          else:
-            # updates due
-            # obtain lock
-            #   read until EOF
-            #   append updates
-            # release lock
-            with self._lockfile():
-              if self.importer:
-                self._read_to_eof()
-                pos = self.fp.tell()
-              self.fp.seek(0, SEEK_END)
-              if self.importer and pos != self.fp.tell():
-                warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
-              while not self._inQ.empty():
-                item = self._inQ._get()
-                self.transcribe_update(self.fp, item)
-              self.fp.flush()
-        # clear flag for next pass
-        first = False
-
-class SharedAppendLines(SharedAppendFile):
-
-  def __init__(self, *a, **kw):
-    if 'binary' in kw:
-      raise ValueError('may not specify binary=')
-    importer = kw.get('importer')
-    if importer is not None:
-      kw['importer'] = lambda chunk: self._linearise(chunk, importer)
-    self._line_partials = []
-    SharedAppendFile.__init__(self, *a, binary=False, **kw)
-
-  def _linearise(self, chunk, importer):
-    ''' Importer for SharedAppendFile: convert to lines from raw data, pass to real importer.
-    '''
-    if chunk is None:
-      importer(None)
-    else:
-      partials = self._line_partials
-      start = 0
-      while True:
-        nlpos = chunk.find('\n', start)
-        if nlpos < 0:
-          break
-        line = ''.join( partials + [chunk[start:nlpos+1]] )
-        partials[:] = []
-        importer(line)
-        start = nlpos + 1
-      if start < len(chunk):
-        partials.append(chunk[start:])
-
-  def transcribe_update(self, fp, s):
-    ''' Transcribe a string as a line.
-    '''
-    # sanity check: we should only be writing between foreign updates
-    # and foreign updates should always be complete lines
-    if len(self._line_partials):
-      warning("%s._transcribe_update while non-empty partials[]: %r",
-              self, self._line_partials)
-    if '\n' in s:
-      raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
-    fp.write(s)
-    fp.write('\n')
-
-class Tee(object):
-  ''' An object with .write, .flush and .close methods which copies data to multiple output files.
-  '''
-
-  def __init__(self, *fps):
-    ''' Initialise the Tee; any arguments are taken to be output file objects.
-    '''
-    self._fps = list(fps)
-
-  def add(self, output):
-    self._fps.append(output)
-
-  def write(self, data):
-    for fp in self._fps:
-      fp.write(data)
-
-  def flush(self):
-    for fp in self._fps:
-      fp.flush()
-
-  def close(self):
-    for fp in self._fps:
-      fp.close()
-    self._fps = None
-
-@contextmanager
-def tee(fp, fp2):
-  ''' Context manager duplicating .write and .flush from fp to fp2.
-  '''
-  def _write(*a, **kw):
-    fp2.write(*a, **kw)
-    return old_write(*a, **kw)
-  def _flush(*a, **kw):
-    fp2.flush(*a, **kw)
-    return old_flush(*a, **kw)
-  old_write = getattr(fp, 'write')
-  old_flush = getattr(fp, 'flush')
-  fp.write = _write
-  fp.flush = _flush
-  yield
-  fp.write = old_write
-  fp.flush = old_flush
-
-class NullFile(object):
-  ''' Writable file that discards its input.
-      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
-  '''
-
-  def __init__(self):
-    self.offset = 0
-
-  def write(self, data):
-    dlen = len(data)
-    self.offset += dlen
-    return dlen
-
-  def flush(self):
-    pass
-
-def file_data(fp, nbytes, rsize=None):
-  ''' Read `nbytes` of data from `fp` and yield the chunks as read.
-      If `nbytes` is None, copy until EOF.
-      `rsize`: read size, default DEFAULT_READSIZE.
-  '''
-  if rsize is None:
-    rsize = DEFAULT_READSIZE
-  ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
-  copied = 0
-  while nbytes is None or nbytes > 0:
-    to_read = rsize if nbytes is None else min(nbytes, rsize)
-    data = fp.read(to_read)
-    if not data:
-      if nbytes is not None:
-        if copied > 0:
-          # no warning of nothing copied - that is immediate end of file - valid
-          warning("early EOF: only %d bytes read, %d still to go",
-                  copied, nbytes)
-      break
-    yield data
-    copied += len(data)
-    nbytes -= len(data)
-
-def copy_data(fpin, fpout, nbytes, rsize=None):
-  ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
-      If `nbytes` is None, copy until EOF.
-      `rsize`: read size, default DEFAULT_READSIZE.
-  '''
-  copied = 0
-  for chunk in file_data(fpin, nbytes, rsize):
-    fpout.write(chunk)
-    copied += len(chunk)
-  return copied
-
-def read_data(fp, nbytes, rsize=None):
-  ''' Read `nbytes` of data from `fp`, return the data.
-      If `nbytes` is None, copy until EOF.
-      `rsize`: read size, default DEFAULT_READSIZE.
-  '''
-  bss = list(file_data(fp, nbytes, rsize))
-  if len(bss) == 0:
-    return b''
-  elif len(bss) == 1:
-    return bss[0]
-  else:
-    return b''.join(bss)
-
-def chunks_of(fp, rsize=None):
+def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
   '''
-  if rsize is None:
-    rsize = DEFAULT_READSIZE
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
@@ -1359,55 +835,6 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
-
-class SavingFile(object):
-  ''' A simple file-like object with .write and .close methods used
-      to accrue a file, and a .cancel method to be used instead of
-      .close to discard the file.
-      The originating use case is a cache file for an HTTP response;
-      if the response ends up incomplete the cache file is discarded.
-  '''
-
-  def __init__(self, path, text=False, dir=None):
-    ''' Open the scratch file.
-    '''
-    self.path = path
-    if tmpdir is None:
-      # try to make the temporary file in the same directory as the
-      # target path
-      tmpdir = dirname(path)
-      if not isdir(tmpdir):
-        # fall back to the default
-        tmpdir = None
-    self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
-    self.fp = os.fdopen(fd, ( 'w' if text else 'wb' ) )
-
-  def write(self, data):
-    ''' Transcribe data to the temp file.
-    '''
-    return self.fp.write(data)
-
-  def flush(self):
-    ''' Flush buffered data to the temp file.
-    '''
-    return self.fp.flush()
-
-  def cancel(self):
-    ''' Cancel the transcription to the temp file and discard.
-    '''
-    self.fp.close()
-    self.fp = None
-    os.remove(self.tmppath)
-
-  def close(self):
-    ''' Close the output and move the file into place as the cached response.
-    '''
-    self.fp.close()
-    self.fp = None
-    path = self.path
-    if exsistspath(path):
-      warning("replacing existing %r", path)
-    os.rename(self.tmppath, path)
 
 if __name__ == '__main__':
   import cs.fileutils_tests

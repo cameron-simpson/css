@@ -6,6 +6,7 @@
 # - Cameron Simpson <cs@zip.com.au> 25jul2010
 #
 
+from __future__ import print_function
 import sys
 from cs.xml import pprint
 pprint(sys.stdin.read())

@@ -278,7 +278,6 @@ class MappingStore(BasicStoreSync):
       if h not in mapping:
         mapping[h] = data
       else:
-        X("%s.add: hashcode %s already stored", self, h)
         if False:
           with Pfx("EXISTING HASH"):
             try:

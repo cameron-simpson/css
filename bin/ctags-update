@@ -6,45 +6,39 @@
 
 set -ue
 
+tags=
+
 cmd=$(basename "$0")
-usage="Usage: $cmd [files...]"
+usage="Usage: $cmd [-o tagfile] [--] [files...]"
 
-if [ -f tags ]
-then
-  prefix=
-else
-  wd=$(pwd)
-  tagdir=$(findup -d tags) || { echo "$cmd: no tags file" >&2; exit 1; }
-  # compute
-  tagdir_slash=$tagdir/
-  case "$wd" in
-    "$tagdir_slash"*)
-        prefix=${wd:${#tagdir_slash}} ;;
-    *)  prefix=$wd ;;
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -o) tags=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
   esac
-  cd "$tagdir"
-fi
+  shift
+done
 
-if [ $# = 0 ]
+[ -n "$tags" ] || tags=$(findup tags) || {
+  echo "$cmd: no tags file located, aborting" >&2
+  exit 1
+}
+
+if [ -s "$tags" -a $# -gt 0 ]
 then
-  set -- -R
+  set -- -a "$@"
 else
-  first=1
-  for file
-  do
-    [ $first ] && { set -- -a; first=; }
-    if [ -n "$prefix" ]
-    then
-      case "$file" in
-        /*) ;; *) file=$prefix/$file ;;
-      esac
-    else
-      case "$file" in
-        -*) file=./$file ;;
-      esac
-    fi
-    set -- "$@" "$file"
-  done
+  set -- -R
+  cd "$(dirname "$tags")"
 fi
 
-exec ctags -o tags "$@"
+set -- ctags -o "$tags" --tag-relative --links=no "$@"
+
+exec "$@"

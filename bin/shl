@@ -48,6 +48,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+which source-highlight >/dev/null || {
+  echo "$cmd: no source highlight, using cat" >&2
+  exec cat "$filename"
+}
+
 # match_lang ext
 match_lang() {
   source-highlight --lang-list | awk -v "ext=$1" '$1 == ext { print($1); }'
