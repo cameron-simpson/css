@@ -100,7 +100,7 @@ def ingest_plist_elem(e):
   if e.tag == 'data':
     return base64.b64decode(e.text)
   if e.tag == 'date':
-    return iso8601.parseZ(e.text)
+    return cs.iso8601.parseZ(e.text)
   X("NOT TRANSFORMING plist elem %r: %r %r", e, e.attrib, e.text)
   return e
 
