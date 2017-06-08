@@ -4,6 +4,17 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "facilities for shared access to files",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.range', 'cs.timeutils'],
+}
+
 from contextlib import contextmanager
 import csv
 import errno
