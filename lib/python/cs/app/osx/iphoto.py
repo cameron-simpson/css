@@ -909,7 +909,7 @@ class Album_Mixin(iPhotoRow):
         for sqk in sorted(sq.keys()):
           X("  %s => %s", sqk, sq[sqk])
     else:
-      X("===== UNSUPPORTED QUERY CLASS")
+      X("===== UNSUPPORTED QUERY CLASS: %r", queryClassName)
     return d
 
 class Master_Mixin(iPhotoRow):
@@ -1375,6 +1375,7 @@ def resolve_object(objs, i):
       class_id = o.pop('$class')['CF$UID']
       class_def = resolve_object(objs, class_id)
       if 'NS.string' in o:
+        # NS.string => flat string
         value = o.pop('NS.string')
       elif 'NS.objects' in o:
         objects = []
@@ -1389,7 +1390,8 @@ def resolve_object(objs, i):
             key_id = kd.pop('CF$UID')
             if kd:
               raise ValueError("other fields in key ref: %r" % (kd,))
-            keys.append(resolve_object(objs, key_id))
+            key = resolve_object(objs, key_id)
+            keys.append(key)
           value = dict(zip(keys, objects))
         else:
           value = list(objects)
