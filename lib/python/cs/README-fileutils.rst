@@ -5,10 +5,6 @@ Convenience functions and classes for files and filenames/pathnames.
 
 * BackedFile: a RawIOBase implementation that uses a backing file for initial data and writes new data to a front file
 
-* SharedAppendFile: a base class to share a modifiable file between multiple users
-
-* SharedAppendLines: a subclass of SharedAppendFile which shares updates in units oftext lines
-
 * FileState: a signature object for a file state derived from os.stat or os.lstat or os.fstat; has .mtime, .size, .dev and .ino attributes
 
 * Tee: an output file-like object for copying data to multiple output files
@@ -28,8 +24,6 @@ Convenience functions and classes for files and filenames/pathnames.
 * @files_property: decorator for a caching property whose value is recomputed if any of a set of files changes
 
 * make_files_property: constructor for variants on @files_property
-
-* lockfile: context manager to take a lock file around an operation, such as access to a shared file
 
 * shortpath: return `path` with the first matching leading prefix replaced with short form such as "~/" or "$LOGDIR/" etc
 
