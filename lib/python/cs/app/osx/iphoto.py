@@ -183,8 +183,10 @@ def cmd_ls(I, argv):
                 print(' ', column_name+':', row[column_name])
         if obclass == 'albums':
           print("apalbumpath =", row.apalbum_path)
-          print(repr(row.load_apalbum_plist()))
-          print("filter =", row.decode_filterData())
+          apalbum = row.load_apalbum_plist()
+          print(repr(apalbum))
+          pprint.pprint(apalbum, width=32)
+          ##print("filter =", row.decode_filterData())
   return xit
 
 def cmd_rename(I, argv):
