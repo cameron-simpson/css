@@ -15,7 +15,7 @@ import cs.iso8601
 import cs.sh
 from cs.xml import etree
 from .iphone import is_iphone
-from cs.logutils import X
+from cs.logutils import Pfx, X
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.
@@ -44,11 +44,25 @@ def import_as_etree(plist):
     raise ValueError("export_xml_as_plist(E=%s,...): plutil exited with returncode=%s" % (E, retcode))
   return E
 
-def ingest_plist(plist):
+def ingest_plist(plist, recurse=False, resolve=False):
   ''' Ingest an Apple plist and return as a PListDict.
       Trivial wrapper for import_as_etree and ingest_plist_etree.
+      `recurse`: unpack any bytes objects as plists
+      `resolve`: resolve unpacked bytes plists' '$objects' entries
   '''
-  return ingest_plist_etree(import_as_etree(plist))
+  if resolve and not recurse:
+    raise ValueError("resolve true but recurse false")
+  with Pfx("ingest_plist(%r)", plist):
+    pd = ingest_plist_etree(import_as_etree(plist))
+    if recurse:
+      for key, value in list(pd.items()):
+        with Pfx("[%r]", key):
+          if isinstance(value, bytes):
+            subpd = ingest_plist(value)
+            if resolve:
+              subpd = resolve_object(subpd['$objects'], 1)
+            pd[key] = subpd
+    return pd
 
 def export_xml_to_plist(E, fp=None, fmt='binary1'):
   ''' Export the content of an etree.Element to a plist file.
@@ -151,6 +165,97 @@ class PListDict(dict):
       self[attr] = value
     else:
       super().__setattr__(attr, value)
+
+def resolve_object(objs, i):
+  ''' Resolve an object definition from structures like an iPhoto album
+      queryData object list.
+  '''
+  o = objs[i]
+  if isinstance(o, (str, int, bool, float, ObjectClassDefinition, ObjectClassInstance)):
+    return o
+  if isinstance(o, PListDict):
+    if '$class' in o:
+      # instance definition
+      class_id = o.pop('$class')['CF$UID']
+      class_def = resolve_object(objs, class_id)
+      if 'NS.string' in o:
+        # NS.string => flat string
+        value = o.pop('NS.string')
+      elif 'NS.objects' in o:
+        objects = []
+        for od in o.pop('NS.objects'):
+          obj_id = od.pop('CF$UID')
+          if od:
+            raise ValueError("other fields in obj ref: %r" % (od,))
+          objects.append(resolve_object(objs, obj_id))
+        if 'NS.keys' in o:
+          keys = []
+          for kd in o.pop('NS.keys'):
+            key_id = kd.pop('CF$UID')
+            if kd:
+              raise ValueError("other fields in key ref: %r" % (kd,))
+            key = resolve_object(objs, key_id)
+            keys.append(key)
+          value = dict(zip(keys, objects))
+        else:
+          value = list(objects)
+      elif 'NS.data' in o:
+        value = o['NS.data']
+      elif 'data' in o:
+        data = o['data']
+        key_id = data.pop('CF$UID')
+        if data:
+          raise ValueError("other fields in data: %r" % (data,))
+        data = resolve_object(objs, key_id)
+        o['data'] = data
+        value = data
+      else:
+        warning("unhandled $class instance: %r", o)
+      o = ObjectClassInstance(class_def, value)
+    elif '$classname' in o:
+      class_name = o.pop('$classname')
+      class_mro = o.pop('$classes')
+      o = ObjectClassDefinition(class_name, class_mro)
+    else:
+      warning("unknown dict content: %r" % (o,))
+  else:
+    warning("unsupported value %r" % (o,))
+  objs[i] = o
+  return o
+
+class ObjectClassDefinition(object):
+  def __init__(self, name, mro):
+    self.name = name
+    self.mro = mro
+  def __str__(self):
+    return "%s%r" % (self.name, self.mro)
+  __repr__ = __str__
+
+class ObjectClassInstance(object):
+  def __init__(self, class_def, value):
+    self.class_def = class_def
+    self.value = value
+  @property
+  def name(self):
+    return self.class_def.name
+  def __str__(self):
+    return "%s%r" % (self.name, self.value)
+  __repr__ = __str__
+  def __len__(self): return len(self.value)
+  def __getitem__(self, key): return self.value[key]
+  def __setitem__(self, key, value): self.value[key] = value
+  def __contains__(self, key): return key in self.value
+  def __getattr__(self, attr):
+    try:
+      return self.value[attr]
+    except KeyError:
+      raise AttributeError("not in self.value: %r" % (attr,))
+    except TypeError:
+      raise AttributeError("cannot index self.value: %r" % (attr,))
+    raise AttributeError(attr)
+  def keys(self): return self.value.keys()
+  def items(self): return self.value.items()
+  def values(self): return self.value.values()
 
 ####################################################################################
 # Old routines written for use inside my jailbroken iPhone.
