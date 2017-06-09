@@ -175,18 +175,19 @@ def cmd_ls(I, argv):
           if argv:
             for column_name in sorted(row.column_names):
               if column_name.endswith('Data'):
-                data_plist = ingest_plist(row[column_name])
-                obj = unpack_plist_object(data_plist)
+                obj = ingest_plist(row[column_name], recurse=True, resolve=True)
                 print(' ', column_name+':')
                 pprint.pprint(obj.value, width=32)
               else:
                 print(' ', column_name+':', row[column_name])
         if obclass == 'albums':
           print("apalbumpath =", row.apalbum_path)
-          apalbum = row.load_apalbum_plist()
+          apalbum = row.apalbum
           print(repr(apalbum))
           pprint.pprint(apalbum, width=32)
-          ##print("filter =", row.decode_filterData())
+          for k, v in sorted(apalbum.plist.items()):
+            print("  %r: %r" % (k, v))
+          print("ifilter =", row.decode_filterData())
   return xit
 
 def cmd_rename(I, argv):
@@ -441,7 +442,7 @@ class iPhoto(O):
     return self.pathto('AlbumData.xml')
 
   def load_albumdata(self):
-    return ingest_plist(self.albumdata_path)
+    return ingest_plist(self.albumdata_path, recurse=True, resolve=True)
 
   @locked_property
   def albumdata_xml_plist(self):
@@ -882,35 +883,57 @@ class iPhotoRow(Row):
     return "%d:%s" % (self.modelId, self.name)
 
 class Album_Mixin(iPhotoRow):
+
   @prop
   def apalbum_path(self):
     return self.iphoto.pathto(os.path.join('Database/Albums', self.uuid+'.apalbum'))
 
-  def load_apalbum_plist(self):
-    pd = ingest_plist(self.apalbum_path)
-    for key, value in list(pd.items()):
-      if isinstance(value, bytes):
-        pd[key] = unpack_plist_object(ingest_plist(value))
-    return pd
+  @locked_property
+  def apalbum(self):
+    return AlbumPList(self.apalbum_path)
 
   def decode_filterData(self):
     X("================= decode_filterData")
     filterPList = ingest_plist(self.filterData)
-    filter = unpack_plist_object(filterPList)
-    for k, v in filter.items():
+    ifilter = unpack_plist_object(filterPList)
+    for k, v in ifilter.items():
       X("%s: %r", k, v)
-    queryClassName = filter.queryClassName
+    queryClassName = ifilter.queryClassName
     X("QUERY CLASS NAME = %r", queryClassName)
     d = {'queryClassName': queryClassName}
     if queryClassName == 'RKMultiItemQuery':
       subQueries = []
-      for i, sq in enumerate(filter.querySubqueries):
-        X("SUBQUERY %d: %r", i, sq)
+      for i, sq in enumerate(ifilter.querySubqueries):
+        X("  SUBQUERY %d: %r", i, sq)
         for sqk in sorted(sq.keys()):
-          X("  %s => %s", sqk, sq[sqk])
+          X("    %s => %s", sqk, sq[sqk])
     else:
       X("===== UNSUPPORTED QUERY CLASS: %r", queryClassName)
     return d
+
+class AlbumPList(object):
+
+  def __init__(self, plistpath):
+    self.path = plistpath
+    self.plist = ingest_plist(plistpath, recurse=True, resolve=True)
+
+def FilterQuery(ifilter):
+  classname = ifilter.queryClassName
+  if classname == 'RKSingleItemQuery':
+    return SingleItemQuery(ifilter)
+  if classname == 'RKMultiItemQuery':
+    return MultiItemQuery(ifilter)
+  raise ValueError("unsupported filter query class name %r", classname)
+
+class BaseFilterQuery(O):
+  def __init__(self, ifilter):
+    O.__init__(self, *ifilter)
+class SingleItemQuery(BaseFilterQuery):
+  pass
+class MultiItemQuery(BaseFilterQuery):
+  def __init__(self, ifilter):
+    FilterQuery.__init__(self, ifilter)
+    self.querySubqueries = [ FilterQuery(f) for f in self.querySubqueries ]
 
 class Master_Mixin(iPhotoRow):
 
@@ -1357,101 +1380,6 @@ SCHEMAE = {'Faces':
                 },
             }
           }
-
-def unpack_plist_object(plist):
-  # TODO: check that all object refs have been resolved?
-  return resolve_object(plist['$objects'], 1)
-
-def resolve_object(objs, i):
-  ''' Resolve an object definition from structures like an album
-      queryData object list.
-  '''
-  o = objs[i]
-  if isinstance(o, (str, int, bool, float, ClassDefinition, ClassInstance)):
-    return o
-  if isinstance(o, PListDict):
-    if '$class' in o:
-      # instance definition
-      class_id = o.pop('$class')['CF$UID']
-      class_def = resolve_object(objs, class_id)
-      if 'NS.string' in o:
-        # NS.string => flat string
-        value = o.pop('NS.string')
-      elif 'NS.objects' in o:
-        objects = []
-        for od in o.pop('NS.objects'):
-          obj_id = od.pop('CF$UID')
-          if od:
-            raise ValueError("other fields in obj ref: %r" % (od,))
-          objects.append(resolve_object(objs, obj_id))
-        if 'NS.keys' in o:
-          keys = []
-          for kd in o.pop('NS.keys'):
-            key_id = kd.pop('CF$UID')
-            if kd:
-              raise ValueError("other fields in key ref: %r" % (kd,))
-            key = resolve_object(objs, key_id)
-            keys.append(key)
-          value = dict(zip(keys, objects))
-        else:
-          value = list(objects)
-      elif 'NS.data' in o:
-        value = o['NS.data']
-      elif 'data' in o:
-        data = o['data']
-        key_id = data.pop('CF$UID')
-        if data:
-          raise ValueError("other fields in data: %r" % (data,))
-        data = resolve_object(objs, key_id)
-        o['data'] = data
-        value = data
-      else:
-        warning("unhandled $class instance: %r", o)
-      o = ClassInstance(class_def, value)
-    elif '$classname' in o:
-      class_name = o.pop('$classname')
-      class_mro = o.pop('$classes')
-      o = ClassDefinition(class_name, class_mro)
-    else:
-      warning("unknown dict content: %r" % (o,))
-  else:
-    warning("unsupported value %r" % (o,))
-  objs[i] = o
-  return o
-
-class ClassDefinition(object):
-  def __init__(self, name, mro):
-    self.name = name
-    self.mro = mro
-  def __str__(self):
-    return "%s%r" % (self.name, self.mro)
-  __repr__ = __str__
-
-class ClassInstance(object):
-  def __init__(self, class_def, value):
-    self.class_def = class_def
-    self.value = value
-  @property
-  def name(self):
-    return self.class_def.name
-  def __str__(self):
-    return "%s%r" % (self.name, self.value)
-  __repr__ = __str__
-  def __len__(self): return len(self.value)
-  def __getitem__(self, key): return self.value[key]
-  def __setitem__(self, key, value): self.value[key] = value
-  def __contains__(self, key): return key in self.value
-  def __getattr__(self, attr):
-    try:
-      return self.value[attr]
-    except KeyError:
-      raise AttributeError("not in self.value: %r" % (attr,))
-    except TypeError:
-      raise AttributeError("cannot index self.value: %r" % (attr,))
-    raise AttributeError(attr)
-  def keys(self): return self.value.keys()
-  def items(self): return self.value.items()
-  def values(self): return self.value.values()
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
