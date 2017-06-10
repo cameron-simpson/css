@@ -4,6 +4,10 @@
 #       - Cameron Simpson <cs@zip.com.au> 15apr2014
 #
 
+import sys
+from functools import partial
+from cs.excutils import transmute
+
 DISTINFO = {
     'description': "convenience facilities related to Python functions",
     'keywords': ["python2", "python3"],
@@ -11,12 +15,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': ['cs.excutils'],
 }
-
-import sys
-from cs.excutils import transmute
 
 def funcname(func):
   ''' Return a name for the supplied function `func`.
@@ -131,9 +132,9 @@ def yields_type(func, basetype):
                 % (funcname, basetype, type(item), item)
               )
       yield item
-  check_yields_type.__name__ = ( 'check_yields_type[%s,basetype=%s]'
-                                 % (funcname, basetype)
-                               )
+  check_yields_type.__name__ = (
+      'check_yields_type[%s,basetype=%s]' % (funcname, basetype)
+  )
   return check_yields_type
 
 def returns_type(func, basetype):
@@ -148,7 +149,7 @@ def returns_type(func, basetype):
               % (funcname, basetype, type(retval), retval)
             )
     return retval
-  check_returns_type.__name__ = ( 'check_returns_type[%s,basetype=%s]'
-                                  % (funcname, basetype)
-                                )
+  check_returns_type.__name__ = (
+      'check_returns_type[%s,basetype=%s]' % (funcname, basetype)
+  )
   return check_returns_type
