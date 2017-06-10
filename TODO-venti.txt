@@ -1,4 +1,3 @@
-test3
 vt ar yields .vtd file whose first block is a LiteralDirent and
   all dependent Blocks are in the vtd file
 "raw datafile store": point at a datafile and kick off a scanner,
