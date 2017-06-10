@@ -902,8 +902,26 @@ class AlbumPList(object):
     self.path = plistpath
     self.plist = ingest_plist(plistpath, recurse=True, resolve=True)
 
+  def __str__(self):
+    return "<AlbumPList:%r>" % (self.plist,)
+
+  def __repr__(self):
+    return "<AlbumPList %r:%r>" % (self.path, self.plist)
+
+  @prop
+  def filter(self):
+    return self.plist['FilterInfo']
+
+  def dump(self):
+    Q = self.get_query()
+    XP("QUERY = %s", Q)
+    XP("RUN = %s", Q.run())
+
+  def get_query(self):
+    return FilterQuery(self.filter)
+
 def FilterQuery(ifilter):
-  classname = ifilter.queryClassName
+  classname = ifilter['queryClassName']
   if classname == 'RKSingleItemQuery':
     return SingleItemQuery(ifilter)
   if classname == 'RKMultiItemQuery':
@@ -912,13 +930,29 @@ def FilterQuery(ifilter):
 
 class BaseFilterQuery(O):
   def __init__(self, ifilter):
-    O.__init__(self, *ifilter)
+    ##XP("BaseFilterQuery: ifilter=%r", ifilter)
+    O.__init__(self, **ifilter)
+    self._ifilter = ifilter
+
 class SingleItemQuery(BaseFilterQuery):
-  pass
+  def __str__(self):
+    return "SingleItemQuery(%r)" % (self._ifilter,)
+  __repr__ = __str__
+  def run(self):
+    invert = self.queryIsEnabled
+    return ()
+
 class MultiItemQuery(BaseFilterQuery):
   def __init__(self, ifilter):
-    FilterQuery.__init__(self, ifilter)
+    BaseFilterQuery.__init__(self, ifilter)
     self.querySubqueries = [ FilterQuery(f) for f in self.querySubqueries ]
+  def __str__(self):
+    return "MultiItemQuery(%s)" \
+           % ( ",".join(str(q) for q in self.querySubqueries), )
+  def run(self):
+    invert = self.queryIsEnabled
+    conjunction = self.queryMatchType == 1
+    return ()
 
 class Master_Mixin(iPhotoRow):
 
