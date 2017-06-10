@@ -180,14 +180,14 @@ def cmd_ls(I, argv):
                 pprint.pprint(obj.value, width=32)
               else:
                 print(' ', column_name+':', row[column_name])
-        if obclass == 'albums':
-          print("apalbumpath =", row.apalbum_path)
-          apalbum = row.apalbum
-          print(repr(apalbum))
-          pprint.pprint(apalbum, width=32)
-          for k, v in sorted(apalbum.plist.items()):
-            print("  %r: %r" % (k, v))
-          print("ifilter =", row.decode_filterData())
+          if obclass == 'albums':
+            print("apalbumpath =", row.apalbum_path)
+            apalbum = row.apalbum
+            if apalbum is None:
+              error("NO ALBUM DATA?")
+            else:
+              print("filter:")
+              apalbum.dump()
   return xit
 
 def cmd_rename(I, argv):
@@ -890,26 +890,11 @@ class Album_Mixin(iPhotoRow):
 
   @locked_property
   def apalbum(self):
-    return AlbumPList(self.apalbum_path)
-
-  def decode_filterData(self):
-    X("================= decode_filterData")
-    filterPList = ingest_plist(self.filterData)
-    ifilter = unpack_plist_object(filterPList)
-    for k, v in ifilter.items():
-      X("%s: %r", k, v)
-    queryClassName = ifilter.queryClassName
-    X("QUERY CLASS NAME = %r", queryClassName)
-    d = {'queryClassName': queryClassName}
-    if queryClassName == 'RKMultiItemQuery':
-      subQueries = []
-      for i, sq in enumerate(ifilter.querySubqueries):
-        X("  SUBQUERY %d: %r", i, sq)
-        for sqk in sorted(sq.keys()):
-          X("    %s => %s", sqk, sq[sqk])
-    else:
-      X("===== UNSUPPORTED QUERY CLASS: %r", queryClassName)
-    return d
+    try:
+      return AlbumPList(self.apalbum_path)
+    except FileNotFoundError as e:
+      error("apalbum: %r: %s", self.apalbum_path, e)
+      return None
 
 class AlbumPList(object):
 
