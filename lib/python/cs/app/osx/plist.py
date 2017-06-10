@@ -15,7 +15,7 @@ import cs.iso8601
 import cs.sh
 from cs.xml import etree
 from .iphone import is_iphone
-from cs.logutils import Pfx, X
+from cs.logutils import Pfx, X, XP, warning
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.
@@ -201,6 +201,21 @@ def resolve_object(objs, i):
           value = list(objects)
       elif 'NS.data' in o:
         value = o['NS.data']
+      elif 'NSLocation' in o:
+        count = o['NSRangeCount']
+        length = o['NSLength']
+        location = o['NSLocation']
+        value = o
+      elif 'NSRangeData' in o:
+        XP("o = %r", o)
+        count = o['NSRangeCount']
+        data = o['NSRangeData']
+        key_id = data.pop('CF$UID')
+        if data:
+          raise ValueError("other fields in NSRangeData: %r" % (data,))
+        X("key_id = %r", key_id)
+        data = resolve_object(objs, key_id)
+        value = {'NSRangeCount': count, 'NSRangeData': data}
       elif 'data' in o:
         data = o['data']
         key_id = data.pop('CF$UID')
