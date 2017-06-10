@@ -188,26 +188,50 @@ def test_is_package(libdir, package_name):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
+class Package(O):
+
+  def __init__(self, package_name):
+    super().__init__(name=package_name)
+
+  @property
+  def hg_tag(self):
+    return self.package.name + '-' + self.package.version
+
 class PyPI_Package(O):
 
   def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_version=None):
     ''' Initialise: save package_name and its name in PyPI.
     '''
     self.pypi_url = pypi_url
-    if pypi_package_name is None:
-      pypi_package_name = package_name
-    if pypi_version is None:
-      pypi_version = package_version
-    self.package_name = package_name
-    self.pypi_package_name = pypi_package_name
-    self.version = package_version
+    self.package = Package(package_name)
+    self.package.version = package_version
+    efl._pypi_package_name = pypi_package_name
+    self._pypi_version = pypi_package_version
     self.pypi_version = pypi_version
     self.libdir = LIBDIR
     self._prep_distinfo()
 
   @property
+  def package_name(self):
+    return self.package.name
+
+  @property
+  def pypi_package_name(self):
+    name = self._pypi_package_name
+    if name is None:
+      name = self.package_name
+    return name
+
+  @property
+  def pypi_package_version(self):
+    version = self._pypi_package_version
+    if version is None:
+      version = self.package.version
+    return version
+
+  @property
   def hg_tag(self):
-    return self.package_name + '-' + self.version
+    return self.package.hg_tag
 
   def _prep_distinfo(self):
     ''' Property containing the distutils infor for this package.
