@@ -106,9 +106,9 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
           ##debug("inside lock, already computed up to date %s", property_name)
           pass
       X("property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
-          property_name,
-          getattr(self, property_revision_name),
-          getattr(self, original_revision_name))
+        property_name,
+        getattr(self, property_revision_name),
+        getattr(self, original_revision_name))
     else:
       ##debug("outside lock, already computed up to date %s", property_name)
       pass
@@ -128,9 +128,9 @@ def yields_type(func, basetype):
     for item in func(*a, **kw):
       if not isinstance(item, basetype):
         raise TypeError(
-                "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
-                % (funcname, basetype, type(item), item)
-              )
+            "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
+            % (funcname, basetype, type(item), item)
+        )
       yield item
   check_yields_type.__name__ = (
       'check_yields_type[%s,basetype=%s]' % (funcname, basetype)
@@ -145,9 +145,9 @@ def returns_type(func, basetype):
     retval = func(*a, **kw)
     if not isinstance(retval, basetype):
       raise TypeError(
-              "wrong type returned from func %s: expected subclass of %s, got %s: %r"
-              % (funcname, basetype, type(retval), retval)
-            )
+          "wrong type returned from func %s: expected subclass of %s, got %s: %r"
+          % (funcname, basetype, type(retval), retval)
+      )
     return retval
   check_returns_type.__name__ = (
       'check_returns_type[%s,basetype=%s]' % (funcname, basetype)
