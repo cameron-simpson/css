@@ -355,7 +355,7 @@ class MailFiler(O):
   def logdir(self):
     ''' The pathname of the directory in which log files are written.
     '''
-    varlog = cs.env.varlog(self.environ)
+    varlog = cs.env.LOGDIR(self.environ)
     return os.path.join(varlog, 'mailfiler')
 
   def folder_logfile(self, folder_path):
@@ -544,7 +544,7 @@ class MessageFiler(O):
         specifies the filename of the message, supporting hard linking
         the message into a Maildir.
     '''
-    with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
+    with with_log(os.path.join(cs.env.LOGDIR(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = message_path
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1141,7 +1141,7 @@ def get_targets(s, offset):
     T, offset = get_target(s, offset)
     targets.append(T)
     if offset < len(s):
-      # check for end of targets (whitespace) or comma (another target)
+      # check for whitespace (end of targets) or comma (another target)
       ch = s[offset]
       if ch.isspace():
         continue

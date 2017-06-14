@@ -3,6 +3,11 @@
 # RFC2047 - MIME Part 3 - http://tools.ietf.org/html/rfc2047
 #
 
+import base64
+import quopri
+import re
+from cs.py3 import unicode
+
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 

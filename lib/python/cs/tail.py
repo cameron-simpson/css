@@ -9,13 +9,17 @@ import sys
 import time
 from cs.logutils import D, error, warning, info
 
+DEFAULT_READSIZE = 16384
+
 def tail(fp,
-         readsize=8192, polltime=1,
+         readsize=None, polltime=1,
          seekoffset=0, seekwhence=os.SEEK_END,
          quit_at_eof=False,
          follow_name=None):
   ''' Yield whole lines from a file.
   '''
+  if readsize is None:
+    readsize = DEFAULT_READSIZE
   fp.seek(seekoffset, seekwhence)
   partline = ''
   while True:
