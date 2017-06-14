@@ -7,7 +7,9 @@
 from __future__ import with_statement
 import sys
 import os
-import os.path
+from os.path import basename, dirname, splitext, \
+    exists as existspath, join as joinpath, \
+    isabs as isabspath, isdir as isdirpath, isfile as isfilepath
 import errno
 from getopt import getopt, GetoptError
 import datetime
@@ -21,9 +23,9 @@ from cs.lex import hexify
 from cs.logutils import Pfx, exception, error, warning, info, debug, setup_logging, logTo, X, nl
 from cs.tty import statusline
 from . import totext, fromtext, defaults
-from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
+from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import CacheStore, MemoryCacheStore
+from .cache import CacheStore, MemoryCacheStore, FileCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
@@ -34,10 +36,9 @@ from .fsck import fsck_Block, fsck_dir
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
-from .vtftp import ftp_archive
 
 def main(argv):
-  cmd = os.path.basename(argv[0])
+  cmd = basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
   setup_logging(cmd_name=cmd)
@@ -128,8 +129,6 @@ def main(argv):
     log = silent
 
   xit = None
-  S = None
-
   signal(SIGHUP, lambda sig, frame: thread_dump())
   signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
 
@@ -175,18 +174,19 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
     except Exception as e:
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    # optional CacheStore
-    if dflt_cache is not None:
-      try:
-        C = Store(dflt_cache)
-      except:
-        exception("can't open cache store \"%s\"", dflt_cache)
-        raise GetoptError("can't open cache: %s" % (dflt_cache,))
-      S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-    # put an in-memory cache in front of the main cache
-    if useMemoryCacheStore:
-      S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-                     S, MemoryCacheStore("MemoryCacheStore"))
+    S = FileCacheStore("vtfuse", S)
+    ### optional CacheStore
+    ##if dflt_cache is not None:
+    ##  try:
+    ##    C = Store(dflt_cache)
+    ##  except:
+    ##    exception("can't open cache store \"%s\"", dflt_cache)
+    ##    raise GetoptError("can't open cache: %s" % (dflt_cache,))
+    ##  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
+    ### put an in-memory cache in front of the main cache
+    ##if useMemoryCacheStore:
+    ##  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+    ##                 S, MemoryCacheStore("MemoryCacheStore"))
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
@@ -320,12 +320,12 @@ def cmd_ar(args, verbose=None, log=None):
                 continue
             copy_out_dir(E, ospath, modes, log=log)
           else:
-            if os.path.exists(ospath):
+            if existspath(ospath):
               error("already exists")
               xit = 1
               continue
-            osparent = os.path.dirname(ospath)
-            if not os.path.isdir(osparent):
+            osparent = dirname(ospath)
+            if not isdirpath(osparent):
               with Pfx("makedirs(%s)", osparent):
                 try:
                   os.makedirs(osparent)
@@ -459,9 +459,19 @@ def cmd_fsck_dir(args, verbose=None, log=None):
   return xit
 
 def cmd_ftp(args, verbose=None, log=None):
-  archive, = args
-  ftp_archive(archive)
-  return 0
+  if not args:
+    raise GetoptError("missing dirent or archive")
+  target = args.pop(0)
+  if args:
+    raise GetoptError("extra arguments: " + ' '.join(args))
+  with Pfx(target):
+    if isabspath(target):
+      archive = target
+      ArchiveFTP(archive).cmdloop()
+    else:
+      D = decode_Dirent_text(target)
+      DirFTP(D).cmdloop()
+    return 0
 
 # TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
@@ -479,7 +489,7 @@ def cmd_init(args, verbose=None, log=None):
     raise GetoptError("extra arguments after datadir: %s" % (' '.join(args),))
   for dirpath in statedirpath, datadirpath:
     with Pfx(dirpath):
-      if not os.path.isdir(dirpath):
+      if not isdirpath(dirpath):
         raise GetoptError("not a directory")
     with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS) as S:
       os.system("ls -la %s" % (statedirpath,))
@@ -543,13 +553,13 @@ def cmd_mount(args, verbose=None, log=None):
     error("missing special")
     badopts = True
   else:
-    if not os.path.isfile(special):
+    if not isfilepath(special):
       error("not a file: %r", special)
       badopts = True
   if args:
     mountpoint = args.pop(0)
   else:
-    spfx, sext = os.path.splitext(special)
+    spfx, sext = splitext(special)
     if sext != '.vt':
       error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
       badopts = True
@@ -567,7 +577,7 @@ def cmd_mount(args, verbose=None, log=None):
   # import vtfuse before doing anything with side effects
   from .vtfuse import mount
   with Pfx(mountpoint):
-    if not os.path.isdir(mountpoint):
+    if not isdirpath(mountpoint):
       # autocreate mountpoint
       info('mkdir %r ...', mountpoint)
       try:
@@ -587,6 +597,7 @@ def cmd_mount(args, verbose=None, log=None):
     # no "last entry" (==> first use) - make an empty directory
     if E is None:
       E = Dir('/')
+      X("cmd_mount: new E=%s", E)
     else:
       ##dump_Dirent(E, recurse=True)
       if not E.isdir:
@@ -608,7 +619,7 @@ def cmd_pack(args, verbose=None, log=None):
   
   for ospath in args:
     with Pfx(ospath):
-      if not os.path.exists(ospath):
+      if not existspath(ospath):
         error("missing")
         xit = 1
         continue
@@ -620,7 +631,7 @@ def cmd_pack(args, verbose=None, log=None):
         xit = 1
         continue
       log("remove %r", ospath)
-      if os.path.isdir(ospath):
+      if isdirpath(ospath):
         shutil.rmtree(ospath)
       else:
         os.remove(ospath)
@@ -640,7 +651,7 @@ def cmd_scan(args, verbose=None, log=None):
     raise GetoptError("missing datafile/datadir")
   hashclass = DEFAULT_HASHCLASS
   for arg in args:
-    if os.path.isdir(arg):
+    if isdirpath(arg):
       dirpath = arg
       D = DataDir(dirpath)
       with D:
@@ -662,13 +673,13 @@ def cmd_unpack(args, verbose=None, log=None):
   if len(args) < 1:
     raise GetoptError("missing archive name")
   arpath = args.pop(0)
-  arbase, arext = os.path.splitext(arpath)
+  arbase, arext = splitext(arpath)
   X("arbase=%r, arext=%r", arbase, arext)
   if arext != '.vt':
     raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
   if len(args) > 0:
     raise GetoptError("extra arguments after archive name %r" % (arpath,))
-  if os.path.exists(arbase):
+  if existspath(arbase):
     error("archive base already exists: %r", arbase)
     return 1
   with Pfx(arpath):
@@ -725,7 +736,7 @@ def ls(path, D, recurse, fp=None):
         warning("%s: expected file, found directory", name)
       lsDirent(fp, E, name)
     for name in dirs:
-      ls(os.path.join(path, name), D.chdir1(name), recurse, fp)
+      ls(joinpath(path, name), D.chdir1(name), recurse, fp)
 
 def cat(path, fp=None):
   ''' Write a file to the output, like cat(1).

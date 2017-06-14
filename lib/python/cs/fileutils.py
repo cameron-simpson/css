@@ -33,7 +33,8 @@ from itertools import takewhile
 import os
 import shutil
 import socket
-from tempfile import TemporaryFile, NamedTemporaryFile
+import stat
+from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock, Thread
 import time
 import unittest
@@ -52,6 +53,52 @@ from cs.py3 import ustr, bytes
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
 DEFAULT_TAIL_PAUSE = 0.25
+
+try:
+  from os import pread
+except ImportError:
+  # implement our own pread
+  # NB: not thread safe!
+  def pread(fd, size, offset):
+    offset0 = os.lseek(fd, 0, SEEK_CUR)
+    os.lseek(fd, offset, SEEK_SET)
+    chunks = []
+    while size > 0:
+      data = os.read(fd, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      size -= len(data)
+    os.lseek(fd, offset0, SEEK_SET)
+    data = b''.join(chunks)
+    return data
+
+def fdreader(fd, readsize=None):
+  ''' Generator yielding data chunks from a file descriptor until EOF.
+  '''
+  if readsize is None:
+    readsize = 1024
+  while True:
+    bs = os.read(fd, readsize)
+    if not bs:
+      break
+    yield bs
+
+def seekable(fp):
+  ''' Try to test if a filelike object is seekable.
+      First try the .seekable method from IOBase, otherwise try
+      getting a file descriptor from fp.fileno and stat()ing that,
+      otherwise return False.
+  '''
+  try:
+    test = fp.seekable
+  except AttributeError:
+    try:
+      getfd = fp.fileno
+    except AttributeError:
+      return False
+    test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
+  return test()
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -661,26 +708,28 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class BackedFile(RawIOBase):
-  ''' A RawIOBase implementation that uses a backing file for initial data and writes new data to a front file.
+class BackedFile(object):
+  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
   '''
 
-  def __init__(self, back_file, front_file=None):
-    ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
+  def __init__(self, back_file, dirpath=None):
+    ''' Initialise the BackedFile using `back_file` for the backing data.
     '''
     self._offset = 0
+    self._dirpath = dirpath
     self._lock = RLock()
-    self._reset(back_file, front_file)
+    self.back_file = back_file
+    self.front_file = TemporaryFile(dir=dirpath, buffering=0)
+    self.front_range = Range()
+    self.read_only = False
 
   @locked
-  def _reset(self, back_file, front_file=None, front_range=None):
-    ''' Reset the internal state of the BackedFile.
+  def switch_back_file(self, new_back_file):
+    ''' Switch out one back file for another. Return the old back file.
     '''
-    if front_range is None:
-      front_range = Range()
-    self.back_file = back_file
-    self._front_file = front_file
-    self.front_range = front_range
+    old_back_file = self.back_file
+    self.back_file = new_back_file
+    return old_back_file
 
   def __enter__(self):
     ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
@@ -690,21 +739,22 @@ class BackedFile(RawIOBase):
   def __exit__(self, *e):
     self._lock.release()
 
-  @locked
-  def _discard_front_file(self):
-    ''' Reset the BackedFile, keeping only the backing file.
+  def close(self):
+    ''' Close the BackedFile.
+        Flush contents. Close the front_file if necessary.
     '''
-    self._reset(self.back_file)
-
-  @locked_property
-  def front_file(self):
-    return TemporaryFile()
+    self.front_file.close()
+    self.front_file = None
 
   def tell(self):
+    ''' Report the current file pointer offset.
+    '''
     return self._offset
 
   @locked
   def seek(self, pos, whence=SEEK_SET):
+    ''' Adjust the current file pointer offset.
+    '''
     if whence == SEEK_SET:
       self._offset = pos
     elif whence == SEEK_CUR:
@@ -731,6 +781,8 @@ class BackedFile(RawIOBase):
 
   @locked
   def readinto(self, b):
+    ''' Read data into a bytearray.
+    '''
     start = self._offset
     end = start + len(b)
     back_file = self.back_file
@@ -760,6 +812,10 @@ class BackedFile(RawIOBase):
 
   @locked
   def write(self, b):
+    ''' Write data to the front_file.
+    '''
+    if self.read_only:
+      raise RuntimeError("write to read-only BackedFile")
     front_file = self.front_file
     start = self._offset
     front_file.seek(start)
@@ -787,7 +843,7 @@ class BackedFile_TestMethods(object):
     bfp = self.backed_fp
     # test reading whole file
     bfp.seek(0)
-    bfp_text = bfp.read()
+    bfp_text = bfp.read_n(len(bfp))
     self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
     # test reading first 512 bytes only
     bfp.seek(0)
@@ -819,14 +875,134 @@ class BackedFile_TestMethods(object):
     self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
-def chunks_of(fp, rsize=16384):
-  ''' Generator to present text or data from an open file until EOF.
+class Tee(object):
+  ''' An object with .write, .flush and .close methods which copies data to multiple output files.
   '''
+
+  def __init__(self, *fps):
+    ''' Initialise the Tee; any arguments are taken to be output file objects.
+    '''
+    self._fps = list(fps)
+
+  def add(self, output):
+    self._fps.append(output)
+
+  def write(self, data):
+    for fp in self._fps:
+      fp.write(data)
+
+  def flush(self):
+    for fp in self._fps:
+      fp.flush()
+
+  def close(self):
+    for fp in self._fps:
+      fp.close()
+    self._fps = None
+
+@contextmanager
+def tee(fp, fp2):
+  ''' Context manager duplicating .write and .flush from fp to fp2.
+  '''
+  def _write(*a, **kw):
+    fp2.write(*a, **kw)
+    return old_write(*a, **kw)
+  def _flush(*a, **kw):
+    fp2.flush(*a, **kw)
+    return old_flush(*a, **kw)
+  old_write = getattr(fp, 'write')
+  old_flush = getattr(fp, 'flush')
+  fp.write = _write
+  fp.flush = _flush
+  yield
+  fp.write = old_write
+  fp.flush = old_flush
+
+class NullFile(object):
+  ''' Writable file that discards its input.
+      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
+  '''
+
+  def __init__(self):
+    self.offset = 0
+
+  def write(self, data):
+    dlen = len(data)
+    self.offset += dlen
+    return dlen
+
+  def flush(self):
+    pass
+
+def file_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp` and yield the chunks as read.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
+  ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
+  copied = 0
+  while nbytes is None or nbytes > 0:
+    to_read = rsize if nbytes is None else min(nbytes, rsize)
+    data = fp.read(to_read)
+    if not data:
+      if nbytes is not None:
+        if copied > 0:
+          # no warning of nothing copied - that is immediate end of file - valid
+          warning("early EOF: only %d bytes read, %d still to go",
+                  copied, nbytes)
+      break
+    yield data
+    copied += len(data)
+    nbytes -= len(data)
+
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  copied = 0
+  for chunk in file_data(fpin, nbytes, rsize):
+    fpout.write(chunk)
+    copied += len(chunk)
+  return copied
+
+def read_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp`, return the data.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  bss = list(file_data(fp, nbytes, rsize))
+  if len(bss) == 0:
+    return b''
+  elif len(bss) == 1:
+    return bss[0]
+  else:
+    return b''.join(bss)
+
+def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
+  ''' Generator to present text or data from an open file until EOF.
+      `rsize`: read size, default: DEFAULT_READSIZE
+      `tail_mode`: yield an empty chunk at EOF, allowing resumption
+        of the file grows
+  '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
+  if tail_delay is None:
+    tail_delay = DEFAULT_TAIL_PAUSE
+  elif not tail_mode:
+    raise ValueError("tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay))
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
-      break
-    yield chunk
+      if tail_mode:
+        yield chunk
+        time.sleep(tail_delay)
+      else:
+        break
+    else:
+      yield chunk
 
 def lines_of(fp, partials=None):
   ''' Generator yielding lines from a file until EOF.
@@ -835,6 +1011,69 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
+
+class RWFileBlockCache(object):
+  ''' A scratch file for storing data.
+  '''
+
+  def __init__(self, pathname=None, dirpath=None, suffix=None, lock=None):
+    ''' Initialise the file.
+        `pathname`: path of file. If None, create a new file with
+          tempfile.mkstemp using dir=`dirpath` and unlink that file once
+          opened.
+        `dirpath`: location for the file if made by mkstemp as above.
+        `lock`: an object to use as a mutex, allowing sharing with
+          some outer system. A Lock will be allocated if omitted.
+    '''
+    opathname = pathname
+    X("dirpath=%r,suffix=%r", dirpath, suffix)
+    if pathname is None:
+      tmpfd, pathname = mkstemp(dir=dirpath, suffix=None)
+    self.rfd = os.open(pathname, os.O_RDONLY)
+    self.wfd = os.open(pathname, os.O_WRONLY)
+    if opathname is None:
+      os.remove(pathname)
+      os.close(tmpfd)
+      self.pathname = None
+    else:
+      self.pathname = pathname
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+
+  def close(self):
+    ''' Close the file descriptors.
+    '''
+    os.close(self.wfd)
+    self.wfd = None
+    os.close(self.rfd)
+    self.rfd = None
+
+  @property
+  def closed(self):
+    return self.wfd is None
+
+  def put(self, data):
+    ''' Store `data`, return offset.
+    '''
+    assert len(data) > 0
+    wfd = self.wfd
+    with self._lock:
+      offset = os.lseek(wfd, 0, 1)
+      length = os.write(wfd, data)
+    assert length == len(data)
+    return offset
+
+  def get(self, offset, length):
+    ''' Get data from `offset` of length `length`.
+    '''
+    assert length > 0
+    rfd = self.rfd
+    with self._lock:
+      os.lseek(rfd, offset, 0)
+      data = os.read(rfd, length)
+    assert len(data) == length
+    return data
 
 if __name__ == '__main__':
   import cs.fileutils_tests

@@ -24,37 +24,34 @@ _mp3_sr_m1     = [ 44100, 48000, 32000, None ]
 _mp3_sr_m2     = [ 22050, 24000, 16000, None ]
 _mp3_sr_m25    = [ 11025, 12000, 8000, None ]
 
-def parse_mp3(chunks):
-  ''' Read MP3 data from `fp` and yield frame data chunks.
+def frames_from_chunks(chunks, copy_offsets=None):
+  ''' Read MP3 data and yield data frames.
+      `chunks`: iterable yielding data chunks
+      `copy_offsets`: default None, passed to the CornuCopyBuffer initialiser
   '''
-  bfr = CornuCopyBuffer(iter(chunks))
-  chunk = b''
-  def accrue(min_size, short_ok=False):
-    nonlocal bfr, chunk
-    new_chunks = []
-    length0 = len(chunk)
-    bfr.extend(min_size, copy_chunks=new_chunks.append, short_ok=short_ok)
-    chunk = bfr.buf
-    yield from iter(new_chunks)
+  bfr = CornuCopyBuffer(iter(chunks), copy_offsets=copy_offsets)
+  return framesof(bfr)
+
+def framesof(bfr):
+  ''' Read MP3 data from a CornuCopyBuffer and yield data frames.
+  '''
   while True:
     offset = bfr.offset
     advance_by = None
-    yield from accrue(3, short_ok=True)
-    if not chunk:
+    bfr.extend(3, short_ok=True)
+    if not bfr:
       break
-    if len(chunk) < 3:
-      raise ValueError("less than 3 bytes from input: %r" % (chunk,))
-    if chunk[:3] == b'TAG':
-      yield from accrue(128)
-      yield offset + 128
+    if len(bfr) < 3:
+      raise ValueError("less than 3 bytes from input: %r" % (bfr.buf,))
+    if bfr[:3] == b'TAG':
       advance_by = 128
-    elif chunk[:3] == b'ID3':
+    elif bfr[:3] == b'ID3':
       # TODO: suck up a few more bytes and compute length
       raise RuntimeError("ID3 not implemented")
     else:
       # 4 byte header
-      yield from accrue(4)
-      b0, b1, b2, b3 = chunk[:4].tolist()
+      bfr.extend(4)
+      b0, b1, b2, b3 = bfr.buf[:4].tolist()
       if b0 != 255:
         raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
       if (b1 & 224) != 224:
@@ -71,16 +68,16 @@ def parse_mp3(chunks):
         elif layer == 3:
           bitrate = _mp3_br_v1_l3[bri]
         else:
-          raise ValueError("offset %d: bogus layer %s" % (offset, layer))
+          raise ValueError("offset %d: bogus layer %s" % (offset+1, layer))
       elif audio_vid == 2 or audio_vid == 2.5:
         if layer == 1:
           bitrate = _mp3_br_v2_l1[bri]
         elif layer == 2 or layer == 3:
           bitrate = _mp3_br_v2_l23[bri]
         else:
-          raise ValueError("offset %d: bogus layer %s" % (offset, layer))
+          raise ValueError("offset %d: bogus layer %s" % (offset+1, layer))
       else:
-        raise ValueError("offset %d: bogus audio_vid %s" % (offset, audio_vid))
+        raise ValueError("offset %d: bogus audio_vid %s" % (offset+1, audio_vid))
       sri = (b2&12) >> 2
       if audio_vid == 1:
         samplingrate = _mp3_sr_m1[sri]
@@ -89,7 +86,7 @@ def parse_mp3(chunks):
       elif audio_vid == 2.5:
         samplingrate = _mp3_sr_m25[sri]
       else:
-        raise ValueError("offset %d: unsupported audio_vid %s" % (offset, audio_vid))
+        raise ValueError("offset %d: unsupported audio_vid %s" % (offset+2, audio_vid))
       padding = (b2&2) >> 1
       # TODO: surely this is wrong? seems to include header in audio sample
       if layer == 1:
@@ -102,8 +99,13 @@ def parse_mp3(chunks):
       if has_crc:
         frame_len += 2
       ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
-      yield from accrue(frame_len)
-      yield offset + frame_len
       advance_by = frame_len
     assert advance_by > 0
+    bfr.report_offset(offset)
+    bfr.extend(advance_by)
+    yield bfr.buf[:advance_by]
     bfr.skip(advance_by)
+
+if __name__ == '__main__':
+  import cs.mp3_tests
+  cs.mp3_tests.selftest(sys.argv)
