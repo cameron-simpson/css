@@ -23,7 +23,7 @@ def FileState(path, do_lstat=False):
       lThis returns an object with mtime, size, dev and ino attributes
       and can be compared for equality with other signatures.
   '''
-  if isinstance(path) is int:
+  if isinstance(path, int):
     S = os.fstat(path)
   else:
     S = os.lstat(path) if do_lstat else os.stat(path)
