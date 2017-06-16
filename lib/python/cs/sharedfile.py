@@ -9,14 +9,20 @@ import csv
 import errno
 import os
 from os import dup, fdopen, SEEK_END, O_APPEND, O_RDONLY, O_RDWR, O_WRONLY
-from os.path import abspath
+from os.path import abspath, dirname
 import sys
+from tempfile import mkstemp
 from threading import RLock
 import time
-from cs.logutils import Pfx
+from cs.filestate import FileState
+from cs.lex import as_lines
+from cs.logutils import Pfx, warning
 from cs.range import Range
+from cs.timeutils import TimeoutError
 
 DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
+DEFAULT_TAIL_PAUSE = 0.25
 
 @contextmanager
 def lockfile(path, ext=None, poll_interval=None, timeout=None):
@@ -282,16 +288,14 @@ class SharedAppendFile(object):
           with f.rewrite() as wfp:
             ... write data to wfp ...
     '''
-    X("%s.rewrite...", self)
     with self._readlock:
-      with self.open() as wfp:
+      with self.open() as _:
         tmpfp = mkstemp(dir=dirname(self.pathname), text=self.binary)
         yield tmpfp
         if not self.write_only:
           self._read_offset = tmpfp.tell()
         tmpfp.close()
         os.rename(tmpfp, self.pathname)
-    X("%s.rewrite DONE", self)
 
 class SharedAppendLines(SharedAppendFile):
   ''' A line oriented subclass of SharedAppendFile.
@@ -322,9 +326,10 @@ class SharedCSVFile(SharedAppendLines):
   def __iter__(self):
     ''' Yield csv rows.
     '''
-    yield from csv.reader( (line for line in super().__iter__()),
+    for row in csv.reader( (line for line in super().__iter__()),
                            dialect=self.dialect,
-                           **self.fmtparams)
+                           **self.fmtparams):
+      yield row
 
   @contextmanager
   def writer(self):
