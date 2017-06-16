@@ -14,40 +14,29 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
 }
 
-from io import RawIOBase
 from functools import partial
-from os import dup, fdopen, \
-               SEEK_CUR, SEEK_END, SEEK_SET, \
-               O_APPEND, O_RDONLY, O_RDWR, O_WRONLY
+from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import errno
 import sys
-from collections import namedtuple
 from contextlib import contextmanager
 import datetime
-from itertools import takewhile
 import os
 import shutil
-import socket
 import stat
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
-from threading import Lock, RLock, Thread
+from threading import Lock, RLock
 import time
-import unittest
-from cs.asynchron import Result
-from cs.debug import trace
 from cs.env import envsub
+from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import exception, error, warning, debug, Pfx, D, X
-from cs.queues import IterableQueue
+from cs.logutils import exception, error, warning, debug, Pfx, X
 from cs.range import Range
-from cs.threads import locked, locked_property
-from cs.timeutils import TimeoutError
-from cs.obj import O
+from cs.threads import locked
 from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
@@ -253,22 +242,6 @@ def abspath_from_file(path, from_file):
     path = joinpath(dirname(from_file), path)
   return path
 
-_FileState = namedtuple('FileState', 'mtime size dev ino')
-_FileState.samefile = lambda self, other: self.dev == other.dev and self.ino == other.ino
-
-def FileState(path, do_lstat=False):
-  ''' Return a signature object for a file state derived from os.stat
-      (or os.lstat if `do_lstat` is true).
-      `path` may also be an int, in which case os.fstat is used.
-      This returns an object with mtime, size, dev and ino attributes
-      and can be compared for equality with other signatures.
-  '''
-  if type(path) is int:
-    s = os.fstat(path)
-  else:
-    s = os.lstat(path) if do_lstat else os.stat(path)
-  return _FileState(s.st_mtime, s.st_size, s.st_dev, s.st_ino)
-
 def poll_file(path, old_state, reload_file, missing_ok=False):
   ''' Watch a file for modification by polling its state as obtained by FileState().
       Call reload_file(path) if the state changes.
@@ -402,7 +375,7 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL
             new_value = getattr(self, attr_value, unset_object)
             if new_value is unset_object:
               raise
-            exception("exception during poll_file, leaving .%s untouched", attr_value)
+            exception("exception during poll_file (%s), leaving .%s untouched", e, attr_value)
           else:
             if new_filestate:
               setattr(self, attr_value, new_value)
@@ -762,7 +735,7 @@ class BackedFile(object):
     elif whence == SEEK_END:
       endpos = self._back_file.seek(0, SEEK_END)
       if self.front_range is not None:
-        endpos = max(back_end, self.front_range.end())
+        endpos = max(len(self.back_file), self.front_range.end())
       self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
@@ -1010,7 +983,7 @@ def lines_of(fp, partials=None):
   '''
   if partials is None:
     partials = []
-  return as_lines(chunks_of(fp), partials)
+  return as_lines(read_from(fp), partials)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.
