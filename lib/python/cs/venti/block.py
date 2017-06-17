@@ -275,7 +275,7 @@ class _Block(object):
       h = self.hashcode
     except AttributeError:
       return self.data == odata
-    return h == h.from_bytes(odata)
+    return h == h.from_chunk(odata)
 
   @locked_property
   def subblocks(self):

@@ -92,7 +92,7 @@ class TestDataDir(unittest.TestCase):
     '''
     D = self.datadir
     with D:
-      hashfunc = D.hashclass.from_bytes
+      hashfunc = D.hashclass.from_chunk
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
