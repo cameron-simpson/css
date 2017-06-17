@@ -59,7 +59,7 @@ def decode_Dirent_text(text):
 class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
 
   @classmethod
-  def from_data(cls, data, offset=0):
+  def from_bytes(cls, data, offset=0):
     ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
         Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
     '''
@@ -117,7 +117,7 @@ def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
   '''
   offset0 = offset
-  components, offset = DirentComponents.from_data(data, offset)
+  components, offset = DirentComponents.from_bytes(data, offset)
   type_, name, metatext, block = components
   try:
     if type_ == D_DIR_T:

@@ -28,7 +28,7 @@ class TestHashing(unittest.TestCase):
     import random
     for _ in range(10):
       rs = bytes( random.randint(0, 255) for _ in range(100) )
-      H = Hash_SHA1.from_data(rs)
+      H = Hash_SHA1.from_bytes(rs)
       self.assertEqual( sha1(rs).digest(), bytes(H) )
       # bytes(hash_num + hash_bytes)
       Hencode = H.encode()
@@ -97,7 +97,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
         KS1.add(h)
       # make a block not in the map
       data2 = randblock(rand0(8193))
-      h2 = Hash_SHA1.from_data(data2)
+      h2 = Hash_SHA1.from_bytes(data2)
       self.assertNotIn(h2, KS1, "abort test: %s in previous blocks" % (h2,))
       #
       # extract hashes, check results

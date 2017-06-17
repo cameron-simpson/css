@@ -139,7 +139,7 @@ class StreamStore(BasicStoreAsync):
       return self._add_direct_bg(data)
     hashclass = self.hashclass
     def add_if_missing():
-      h = hashclass.from_data(data)
+      h = hashclass.from_bytes(data)
       if self.contains(h):
         return h
       h2 = self._add_direct_bg(data)()

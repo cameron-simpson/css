@@ -267,7 +267,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           continue
         advanced = False
         for offset, flags, data, offset2 in F.scan_new():
-          hashcode = self.hashclass.from_data(data)
+          hashcode = self.hashclass.from_bytes(data)
           indexQ.put( (hashcode, filenum, offset) )
           advanced = True
           if self._monitor_halt:
@@ -459,7 +459,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
                            % (F.filename, offset2, F.size))
       F.size = offset2
-    hashcode = self.hashclass.from_data(data)
+    hashcode = self.hashclass.from_bytes(data)
     ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, n, offset)
     rollover = self.rollover

@@ -656,7 +656,7 @@ def cmd_scan(args, verbose=None, log=None):
       D = DataDir(dirpath)
       with D:
         for n, offset, data in D.scan():
-          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_bytes(data)))
     else:
       filepath = arg
       F = DataFile(filepath)
@@ -664,7 +664,7 @@ def cmd_scan(args, verbose=None, log=None):
         for offset, flags, data in F.scan():
           if flags & F_COMPRESSED:
             data = decompress(data)
-          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_bytes(data)))
   return 0
 
 def cmd_unpack(args, verbose=None, log=None):

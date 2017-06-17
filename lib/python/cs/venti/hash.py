@@ -33,7 +33,7 @@ def hash_of_byteses(bss):
   H = sha1()
   for bs in bss:
     H.update(bs)
-  return Hash_SHA1.from_data(H.digest())
+  return Hash_SHA1.from_bytes(H.digest())
 
 class _Hash(bytes):
   ''' All hashes are bytes subclasses.
@@ -79,7 +79,7 @@ class _Hash(bytes):
     return cls(hashbytes)
 
   @classmethod
-  def from_data(cls, data):
+  def from_bytes(cls, data):
     ''' Factory function returning a _Hash object from a data block.
     '''
     hashbytes = cls.HASHFUNC(data).digest()
@@ -87,9 +87,9 @@ class _Hash(bytes):
 
   @property
   def hashfunc(self):
-    ''' Convenient hook to this Hash's class' .from_data method.
+    ''' Convenient hook to this Hash's class' .from_bytes method.
     '''
-    return self.__class__.from_data
+    return self.__class__.from_bytes
 
 class Hash_SHA1(_Hash):
   HASHFUNC = sha1
@@ -263,7 +263,7 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
 
   def add(self, data):
-    hashcode = Hash_SHA1.from_data(data)
+    hashcode = Hash_SHA1.from_bytes(data)
     self[hashcode] = data
     return hashcode
 
