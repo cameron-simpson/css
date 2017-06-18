@@ -224,6 +224,7 @@ class SvcD(FlaggedMixin, object):
         trace=False,
         on_spawn=None,
         on_reap=None,
+        debug=False
     ):
     ''' Initialise the SvcD.
         `argv`: command to run as a subprocess.
@@ -245,6 +246,7 @@ class SvcD(FlaggedMixin, object):
         `trace`: trace actions, default False
         `on_spawn`: to be called after a new subprocess is spawned
         `on_reap`: to be called after a subprocess is reaped
+        `debug`: turns on tracing of flag changes
     '''
     if environ is None:
       environ = os.environ
@@ -255,7 +257,7 @@ class SvcD(FlaggedMixin, object):
         name = 'UNNAMED'
         flags = DummyFlags()
       else:
-        flags = Flags(environ=environ)
+        flags = Flags(environ=environ, debug=debug)
     elif name is None:
       raise ValueError("no name specified but flags=%r" % (flags,))
     FlaggedMixin.__init__(self, flags=flags)
