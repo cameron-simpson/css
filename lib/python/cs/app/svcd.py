@@ -11,9 +11,9 @@ from __future__ import print_function
 from getopt import getopt, GetoptError
 import os
 from os.path import basename, join as joinpath, splitext
-import pwd
+from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, DEVNULL, call as callproc
+from subprocess import Popen, PIPE, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, uppername, FlaggedMixin
@@ -109,7 +109,7 @@ def main(argv, environ=None):
     test_shcmd = None
     test_rate = TEST_RATE
     uid = os.geteuid()
-    username = pwd.getpwuid(uid).pw_name
+    username = getpwuid(uid).pw_name
     run_uid = uid
     run_username = username
     test_uid = uid
@@ -169,7 +169,7 @@ def main(argv, environ=None):
       argv = ['sh', '-c', sig_shcmd]
       if test_uid != uid:
         argv = ['sux', '-u', test_username, '--'] + argv
-      P = Popen(argv, stdin=DEVNULL, stdout=PIPE) == 0
+      P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()
       if returncode != 0:
@@ -189,8 +189,8 @@ def main(argv, environ=None):
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name,
-           sig_func=sig_func, test_func=test_func,
-           test_rate=test_rate, once=once, trace=trace)
+           sig_func=sig_func, test_func=test_func, test_rate=test_rate,
+           once=once, quiet=quiet, trace=trace)
   def signal_handler(signum, frame):
     S.stop()
     S.wait()
@@ -220,6 +220,7 @@ class SvcD(FlaggedMixin, object):
         test_rate=None,
         restart_delay=None,
         once=False,
+        quiet=False,
         trace=False,
         on_spawn=None,
         on_reap=None,
@@ -240,6 +241,7 @@ class SvcD(FlaggedMixin, object):
         `restart_delay`: delay before start of an exiting command,
           default RESTART_DELAY
         `once`: if true, run the command only once
+        `quiet`: if true, do not issue alerts
         `trace`: trace actions, default False
         `on_spawn`: to be called after a new subprocess is spawned
         `on_reap`: to be called after a subprocess is reaped
@@ -270,6 +272,7 @@ class SvcD(FlaggedMixin, object):
     self.test_rate = test_rate
     self.restart_delay = restart_delay
     self.once = once
+    self.quiet = quiet
     self.trace = trace
     self.on_spawn = on_spawn
     self.on_reap = on_reap
@@ -303,6 +306,8 @@ class SvcD(FlaggedMixin, object):
     return True
 
   def alert(self, msg, *a):
+    if self.quiet:
+      return
     if a:
       msg = msg % a
     alert_argv = ['alert', 'SVCD %s: %s' % (self.name, msg)]

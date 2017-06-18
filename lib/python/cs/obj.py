@@ -3,6 +3,9 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+from copy import copy as copy0
+from cs.py3 import StringTypes
+
 DISTINFO = {
     'description': "Convenience facilities for objects.",
     'keywords': ["python2", "python3"],
@@ -13,9 +16,6 @@ DISTINFO = {
     ],
     'install_requires': ['cs.py3'],
 }
-
-from copy import copy as copy0
-from cs.py3 import StringTypes
 
 T_SEQ = 'SEQUENCE'
 T_MAP = 'MAPPING'
@@ -54,7 +54,8 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
   for attr, value in kw.items():
     if not len(attr) or not attr[0].isalpha():
       if not attr.startswith('_O_'):
-        warning(".%s: ignoring, does not start with a letter", attr)
+        ##warning(".%s: ignoring, does not start with a letter", attr)
+        pass
       continue
     try:
       ovalue = getattr(o, attr)
@@ -76,7 +77,7 @@ def O_attrs(o):
   '''
   omit = getattr(o, '_O_omit', ())
   for attr in sorted(dir(o)):
-    if attr[0].isalpha() and not attr in omit:
+    if attr[0].isalpha() and attr not in omit:
       try:
         value = getattr(o, attr)
       except AttributeError:
@@ -108,9 +109,10 @@ def O_str(o, no_recurse=False, seen=None):
     return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
   seen.add(id(o))
   if no_recurse:
-    attrdesc_strs = [ "%s=<%s>" % (pattr, type(pvalue).__name__)
-                      for pattr, pvalue in O_attritems(o)
-                    ]
+    attrdesc_strs = [
+        "%s=<%s>" % (pattr, type(pvalue).__name__)
+        for pattr, pvalue in O_attritems(o)
+    ]
   else:
     attrdesc_strs = []
     for pattr, pvalue in O_attritems(o):

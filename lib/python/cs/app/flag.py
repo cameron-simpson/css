@@ -7,6 +7,7 @@
 from __future__ import print_function
 from collections import MutableMapping, defaultdict
 import errno
+from getopt import GetoptError
 import os
 import os.path
 import sys
@@ -15,38 +16,56 @@ from time import sleep
 from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
 
+USAGE = '''Usage:
+  %s            Recite all flag values.
+  %s flagname   Test value of named flag.
+  %s flagname {0|1|false|true}
+                Set value of named flag.'''
+
 def main(argv):
   argv = list(argv)
   cmd = argv.pop(0)
+  usage = USAGE % (cmd, cmd, cmd)
   xit = 0
   flagdir = None
   F = Flags(flagdir=flagdir)
-  if len(argv) == 0:
-    ks = sorted(F.keys())
-    for k in ks:
-      print(k, "TRUE" if F[k] else "FALSE")
-  else:
-    k = argv.pop(0)
-    if argv == 0:
-      xit = 0 if F[k] else 1
+  badopts = False
+  try:
+    if not argv:
+      ks = sorted(F.keys())
+      for k in ks:
+        print(k, "TRUE" if F[k] else "FALSE")
     else:
-      value = argv.pop(0)
-      if len(argv) == 0:
-        if value == '0':
-          value = False
-        elif value == '1':
-          value = True
-        else:
-          value = value.lower()
-          if value == 'false':
+      k = argv.pop(0)
+      if not argv:
+        xit = 0 if F[k] else 1
+      else:
+        value = argv.pop(0)
+        if len(argv) == 0:
+          if value == '0':
             value = False
-          elif value == 'true':
+          elif value == '1':
             value = True
           else:
-            raise ValueError("invalid key value, expected 0, 1, true or false, got: %s", value)
-        F[k] = value
-      else:
-        raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
+            value = value.lower()
+            if value == 'false':
+              value = False
+            elif value == 'true':
+              value = True
+            else:
+              raise GetoptError(
+                      "invalid key value, expected 0, 1, true or false, got: %s"
+                      % (value,))
+          F[k] = value
+        else:
+          raise GetoptError("unexpected values after key value: %s"
+                            % (' '.join(argv),))
+  except GetoptError as e:
+    print("%s: warning: %s" % (cmd, e), file=sys.stderr)
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
   return xit
 
 def uppername(s):
@@ -76,15 +95,14 @@ class FlaggedMixin(object):
         The object's .name attribute is used as the basis, so a
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
-        This function returns None if there is no .name attribute or it is None.
     '''
     try:
       name = self.name
     except AttributeError:
-      return None
-    if name is None:
-      return None
-    return uppername(name + '_' + suffix)
+      flagname = suffix
+    else:
+      flagname = name + '_' + suffix
+    return uppername(flagname)
 
   def __getattr__(self, attr):
     ''' Support .flag_suffix and .flagname_suffix.
@@ -107,7 +125,8 @@ class FlaggedMixin(object):
     if attr.startswith('flag_'):
       flagname = self.__flagname(attr[5:])
       self.flags[flagname] = value
-    super().__setattr__(attr, value)
+    else:
+      super().__setattr__(attr, value)
 
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)

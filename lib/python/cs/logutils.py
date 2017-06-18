@@ -804,7 +804,7 @@ class PfxCallInfo(Pfx):
                  grandcaller[0], grandcaller[1], grandcaller[2])
 
 def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread which presents the current prefix  ascontext.
+  ''' Factory function returning a Thread which presents the current prefix as context.
   '''
   current_prefix = prefix()
   def run(*a, **kw):
