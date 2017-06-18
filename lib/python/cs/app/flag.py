@@ -82,12 +82,15 @@ class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
   '''
 
-  def __init__(self, flags=None):
+  def __init__(self, flags=None, debug=None):
     ''' Initialise the mixin.
         `flags`: optional parameter; if None defaults to a new default Flags().
     '''
     if flags is None:
-      flags = Flags()
+      flags = Flags(debug=debug)
+    else:
+      if debug is not None:
+        flags.debug = debug
     self.flags = flags
 
   def __flagname(self, suffix):
@@ -135,11 +138,16 @@ class Flags(MutableMapping,FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
-  def __init__(self, flagdir=None, environ=None):
+  def __init__(self, flagdir=None, environ=None, debug=None):
+    if debug is None:
+      debug = False
+    self.debug = debug
     FlaggedMixin.__init__(self, flags=self)
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
     self.dirpath = flagdir
+    self.debug = debug
+    self._old_flags = {}
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -189,8 +197,11 @@ class Flags(MutableMapping,FlaggedMixin):
     try:
       S = os.stat(flagpath)
     except OSError:
-      return False
-    return S.st_size > 0
+      value = False
+    else:
+      value = S.st_size > 0
+    self._track(k, value)
+    return value
 
   def __setitem__(self, k, truthy):
     ''' Set the flag value.
@@ -198,11 +209,13 @@ class Flags(MutableMapping,FlaggedMixin):
         If false, remove the flag file.
     '''
     if truthy:
+      value = True
       if not self[k]:
         flagpath = self._flagpath(k)
         with open(flagpath, 'w') as fp:
           fp.write("1\n")
     else:
+      value = False
       if self[k]:
         flagpath = self._flagpath(k)
         try:
@@ -210,9 +223,17 @@ class Flags(MutableMapping,FlaggedMixin):
         except OSError as e:
           if e.errno != errno.ENOENT:
             raise
+    self._track(k, value)
   
   def __delitem__(self, k):
     self[k] = False
+
+  def _track(self, k, value):
+    old_value = self._old_flags.get(k, False)
+    if value != old_value:
+      self._old_flags[k] = value
+      if self.debug:
+        print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
 
 class PolledFlags(dict):
   ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
