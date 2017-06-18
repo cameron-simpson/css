@@ -1,3 +1,4 @@
+make sure csvdb is properly using sharedcsvfile
 make in memory nodedb using a dict that is its own backend
 reform map: dunders update and push changes, foreign methods to
   ingest changes, iter to watch foreign changes or all changes,
