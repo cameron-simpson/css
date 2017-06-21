@@ -33,7 +33,7 @@ do
     *.py)
       { $trace python3 -m py_compile "$lintfile" \
         && $trace pyflakes-2.7 "$lintfile" \
-        && $trace pep8 --ignore=E111,E114,E126,E201,E202,E265,E266,E301,E302,E501,E731 "$lintfile" \
+        && $trace pep8 --ignore=E111,E114,E126,E201,E202,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
         && $trace pylint "$lintfile"
       } || xit=1
       ;;
