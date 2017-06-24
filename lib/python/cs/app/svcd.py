@@ -16,12 +16,11 @@ from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, PIPE, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
-from cs.app.flag import Flags, DummyFlags, uppername, FlaggedMixin
+from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, X, \
                         Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
-from cs.py.func import prop
 
 TEST_RATE = 7       # frequency of polling of test condition
 KILL_TIME = 5       # how long to wait for a terminated process to exit
@@ -74,9 +73,6 @@ def main(argv, environ=None):
   cmd = basename(argv.pop(0))
   usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
   setup_logging(cmd)
-
-  flags = Flags()
-
   badopts = False
   try:
     if not argv:
@@ -102,8 +98,8 @@ def main(argv, environ=None):
     use_lock = False
     lock_name = None
     name = None
-    svcd_pidfile = None
-    subprocess_pidfile = None
+    svc_pidfile = None  # pid file for the service process
+    mypidfile = None    # pid file for the svcd
     quiet = False
     sig_shcmd = None
     test_shcmd = None
@@ -128,9 +124,9 @@ def main(argv, environ=None):
         elif opt == '-n':
           name = value
         elif opt == '-p':
-          svcd_pidfile = value
+          svc_pidfile = value
         elif opt == '-P':
-          subprocess_pidfile = value
+          mypidfile = value
         elif opt == '-q':
           quiet = True
         elif opt == '-s':
@@ -188,7 +184,7 @@ def main(argv, environ=None):
     argv = ['sux', '-u', run_username, '--'] + argv
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(argv, name=name,
+  S = SvcD(argv, name=name, pidfile=svc_pidfile,
            sig_func=sig_func, test_func=test_func, test_rate=test_rate,
            once=once, quiet=quiet, trace=trace)
   def signal_handler(signum, frame):
@@ -198,9 +194,10 @@ def main(argv, environ=None):
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
   signal(SIGTERM, signal_handler)
-  if S.pidfile:
-    pidfile_base, pidfile_ext = splitext(S.pidfile)
-    mypidfile = pidfile_base + '-svcd' + pidfile_ext
+  if S.pidfile or mypidfile:
+    if mypidfile is None:
+      pidfile_base, pidfile_ext = splitext(S.pidfile)
+      mypidfile = pidfile_base + '-svcd' + pidfile_ext
     with PidFileManager(mypidfile):
       S.start()
       S.wait()
