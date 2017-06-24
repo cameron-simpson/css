@@ -1,3 +1,4 @@
+salt entries for Dirs,
 text serialisation: all human readable, regular syntax
 "live" xattr: x-vt-blockref => block reference as text
 vt ar yields .vtd file whose first block is a LiteralDirent and
