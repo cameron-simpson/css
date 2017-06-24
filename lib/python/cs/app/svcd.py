@@ -224,7 +224,7 @@ class SvcD(FlaggedMixin, object):
         trace=False,
         on_spawn=None,
         on_reap=None,
-        debug=False
+        debug=None,
     ):
     ''' Initialise the SvcD.
         `argv`: command to run as a subprocess.
@@ -252,6 +252,8 @@ class SvcD(FlaggedMixin, object):
       environ = os.environ
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
+    if debug is None:
+      debug = sys.stderr.isatty()
     if flags is None:
       if name is None:
         name = 'UNNAMED'
