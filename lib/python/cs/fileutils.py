@@ -789,6 +789,9 @@ class BackedFile(ReadMixin):
     self.front_range = Range()
     self.read_only = False
 
+  def __len__(self):
+    return max(self.front_range.end, len(self.back_file))
+
   @locked
   def switch_back_file(self, new_back_file):
     ''' Switch out one back file for another. Return the old back file.
