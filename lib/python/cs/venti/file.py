@@ -197,7 +197,6 @@ class File(LockableMixin,ReadMixin):
     ''' Close the File, return the top Block.
     '''
     B = self.sync()
-    super().close()
     return B
 
   def seek(self, offset, whence=SEEK_SET):
