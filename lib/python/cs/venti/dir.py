@@ -392,7 +392,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       If open, ._open_file refers to the content.
       NOTE: multiple opens return the _same_ backing file, with a
       shared read/write offset. File systems must share this, and
-      keep their own offsets in their file handles.
+      maintain their own offsets in their file handle objects.
   '''
 
   def __init__(self, name, metatext=None, block=None):
