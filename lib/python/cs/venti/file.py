@@ -96,6 +96,9 @@ class File(LockableMixin,ReadMixin):
     self._backing_block = new_backing_block
     self._file = BackedFile(BlockFile(new_backing_block))
 
+  def __len__(self):
+    return len(self._file)
+
   @property
   @locked
   def backing_block(self):
