@@ -12,6 +12,7 @@ from cs.threads import locked
 from cs.logutils import Pfx, PfxThread, info, X, XP
 from cs.fileutils import BackedFile, ReadMixin
 from cs.queues import IterableQueue
+from cs.threads import LockableMixin
 from . import defaults
 from .meta import Meta
 from .block import Block
@@ -202,6 +203,7 @@ class File(LockableMixin,ReadMixin):
   def seek(self, offset, whence=SEEK_SET):
     return self._file.seek(offset, whence=whence)
 
+  @locked
   def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
@@ -229,6 +231,7 @@ class File(LockableMixin,ReadMixin):
           return data
     return b''
 
+  @locked
   def readall(self):
     ''' Concatenate all the data from the current offset to the end of the file.
     '''
