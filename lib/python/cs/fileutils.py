@@ -522,6 +522,83 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
     return property(getprop)
   return made_files_property
 
+def makelockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' Create a lockfile and return its path.
+      The file can be removed with os.remove.
+      This is the core functionality supporting the lockfile()
+      context manager.
+      `path`: the base associated with the lock file, often the
+              filesystem object whose access is being managed.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
+  '''
+  if poll_interval is None:
+    poll_interval = DEFAULT_POLL_INTERVAL
+  if ext is None:
+    ext = '.lock'
+  if timeout is not None and timeout < 0:
+    raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
+  start = None
+  lockpath = path + ext
+  while True:
+    try:
+      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+    except OSError as e:
+      if e.errno != errno.EEXIST:
+        raise
+      if timeout is not None and timeout <= 0:
+        # immediate failure
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      now = time.time()
+      # post: timeout is None or timeout > 0
+      if start is None:
+        # first try - set up counters
+        start = now
+        complaint_last = start
+        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+      else:
+        if now - complaint_last >= complaint_interval:
+          from cs.logutils import warning
+          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
+                  os.getpid(), now - start, lockpath)
+          complaint_last = now
+          complaint_interval *= 2
+      # post: start is set
+      if timeout is None:
+        sleep_for = poll_interval
+      else:
+        sleep_for = min(poll_interval, start + timeout - now)
+      # test for timeout
+      if sleep_for <= 0:
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      time.sleep(sleep_for)
+      continue
+    else:
+      break
+  os.close(lockfd)
+  return lockpath
+
+@contextmanager
+def lockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' A context manager which takes and holds a lock file.
+      `path`: the base associated with the lock file.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
+  '''
+  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
+  yield lockpath
+  os.remove(lockpath)
+
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
