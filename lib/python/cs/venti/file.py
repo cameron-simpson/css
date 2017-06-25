@@ -10,14 +10,14 @@ import sys
 from threading import Lock, RLock
 from cs.threads import locked
 from cs.logutils import Pfx, PfxThread, info, X, XP
-from cs.fileutils import BackedFile
+from cs.fileutils import BackedFile, ReadMixin
 from cs.queues import IterableQueue
 from . import defaults
 from .meta import Meta
 from .block import Block
 from .blockify import top_block_for, blockify
 
-class BlockFile(RawIOBase):
+class BlockFile(RawIOBase,ReadMixin):
   ''' A read-only file interface to a Block based on io.RawIOBase.
   '''
 
@@ -75,7 +75,7 @@ class BlockFile(RawIOBase):
     self._offset += nread
     return nread
 
-class File(object):
+class File(LockableMixin,ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
