@@ -442,6 +442,19 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
     return p
   return prop(getprop)
 
+class LockableMixin(object):
+  ''' Trite mixin to control access to an object via its ._lock attribute.
+      Exposes the ._lock as the property .lock.
+      Presents a context manager interface for obtaining an object's lock.
+  '''
+  def __enter__(self):
+    self._lock.acquire()
+  def __exit(self, exc_type, exc_value, traceback):
+    self._lock.release()
+  @property
+  def lock(self):
+    return self._lock
+
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a
       with statement using the context manager `cmanager`.
