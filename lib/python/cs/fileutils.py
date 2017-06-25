@@ -758,7 +758,23 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class BackedFile(object):
+class ReadMixin(object):
+  ''' Useful read methods to accodmodate modes not necessarily available in a class.
+  '''
+
+  def read_n(self, n):
+    ''' Read `n` bytes of data and return them.
+        Unlike file.read(), RawIOBase.read() may return short data,
+        thus this workalike, which may only return short data if
+        it hits EOF.
+    '''
+    if n < 1:
+      raise ValueError("n two low, expected >=1, got %r" % (n,))
+    data = bytearray(n)
+    nread = self.readinto(data)
+    return data[:nread]
+
+class BackedFile(ReadMixin):
   ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
   '''
 
@@ -816,18 +832,6 @@ class BackedFile(object):
       self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
-
-  def read_n(self, n):
-    ''' Read `n` bytes of data and return them.
-        Unlike file.read(), RawIOBase.read() may return short data,
-        thus this workalike, which may only return short data if
-        it hits EOF.
-    '''
-    if n < 1:
-      raise ValueError("n two low, expected >=1, got %r" % (n,))
-    data = bytearray(n)
-    nread = self.readinto(data)
-    return data[:nread]
 
   @locked
   def readinto(self, b):
