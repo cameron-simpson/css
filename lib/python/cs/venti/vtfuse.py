@@ -52,6 +52,8 @@ XATTR_NOFOLLOW = 0x0001
 XATTR_CREATE   = 0x0002
 XATTR_REPLACE  = 0x0004
 
+XATTR_NAME_BLOCKREF = b'x-vt-blockref'
+
 # records associated with an open file
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
@@ -150,8 +152,6 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    return self.Eopen._open_file.pread(size, offset)
-    x x x x fp = self.Eopen._open_file
     with fp:
       with self._lock:
         fp.seek(offset)
@@ -785,6 +785,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def getxattr(self, inode, xattr_name, ctx):
     # TODO: test for permission to access inode?
     E = self._vt_core.i2E(inode)
+    if xattr_name == XATTR_NAME_BLOCKREF:
+        return E.block.encode()
     # bit of a hack: pretend all attributes exist, empty if missing
     # this is essentially to shut up llfuse, which otherwise reports ENOATTR
     # with a stack trace
@@ -833,7 +835,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def listxattr(self, inode, ctx):
     # TODO: ctx allows to access inode?
     E = self._vt_core.i2E(inode)
-    return list(E.meta.listxattrs())
+    xattrs = set(E.meta.listxattrs())
+    xattrs.add(XATTR_NAME_BLOCKREF)
+    return list(xattrs)
 
   @handler
   def lookup(self, parent_inode, name_b, ctx):
@@ -993,6 +997,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def removexattr(self, inode, xattr_name, ctx):
     # TODO: test for inode ownership?
+    if xattr_name == XATTR_NAME_BLOCKREF:
+      # TODO: should we support this as "force recompute"?
+      # feels like that would be a bug workaround
+      raise FuseOSError(errno.EINVAL)
     E = self._vt_core.i2E(inode)
     meta = E.meta
     try:
@@ -1067,6 +1075,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
     # TODO: check perms (ownership?)
+    if xattr_name == XATTR_NAME_BLOCKREF:
+      # TODO: support this as a "switch out the content action"?
+      raise FuseOSError(errno.EINVAL)
     E = self._vt_core.i2E(inode)
     E.meta.setxattr(xattr_name, value)
 
