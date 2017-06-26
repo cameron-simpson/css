@@ -99,7 +99,13 @@ class CornuCopyBuffer(object):
           # which returns an empty chunk at the current EOF
           # but can continue iteration
           break
-      self.buf = memoryview(b''.join(bufs))
+      if not bufs:
+        newbuf = b''
+      elif len(bufs) == 1:
+        newbuf = bufs[0]
+      else:
+        newbuf = b''.join(bufs)
+      self.buf = memoryview(newbuf)
 
   def tail_extend(self, min_size):
     ''' Extend method for parsers reading "tail"-like chunk streams,
