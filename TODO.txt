@@ -1,3 +1,4 @@
+fvwm: move cs-fvwm-blah python code into cs.app.fvwm
 nodedb:
   reform map: dunders update and push changes, foreign methods to
     ingest changes, iter to watch foreign changes or all changes,
