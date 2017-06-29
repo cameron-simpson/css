@@ -14,7 +14,8 @@ from subprocess import Popen, PIPE
 import shutil
 from tempfile import mkdtemp
 from threading import RLock
-from cs.logutils import setup_logging, Pfx, info, warning, error, X
+from cs.logutils import setup_logging, info, warning, error, X
+from cs.pfx import Pfx
 import cs.sh
 from cs.threads import locked_property
 from cs.py.modules import import_module_name

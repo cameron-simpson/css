@@ -17,7 +17,8 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import LogExceptions
 from cs.fileutils import fdreader
 import cs.logutils; cs.logutils.X_via_tty = True
-from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
+from cs.logutils import D, X, XP, debug, warning, error, exception
+from cs.pfx import Pfx
 from cs.obj import O
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge

@@ -4,7 +4,8 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
-from cs.logutils import D, error, debug, X, Pfx
+from cs.logutils import D, error, debug, X
+from cs.pfx import Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from . import defaults, totext

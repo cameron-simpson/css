@@ -56,7 +56,8 @@ from cs.excutils import logexc
 ##safe_property
 safe_property = property
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
+from cs.logutils import pfx_iter, debug, error, warning, exception, D, X
+from cs.pfx import Pfx
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked_property
 from cs.py3 import ustr, unicode

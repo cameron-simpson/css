@@ -9,7 +9,8 @@ from os import SEEK_SET
 import sys
 from threading import Lock, RLock
 from cs.threads import locked
-from cs.logutils import Pfx, PfxThread, info, X, XP
+from cs.logutils import PfxThread, info, X, XP
+from cs.pfx import Pfx
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 from . import defaults

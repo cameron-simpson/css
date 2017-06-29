@@ -34,7 +34,8 @@ import time
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import exception, error, warning, debug, Pfx, X
+from cs.logutils import exception, error, warning, debug, X
+from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
 from cs.py3 import ustr, bytes

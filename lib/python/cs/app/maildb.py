@@ -29,7 +29,8 @@ import sys
 import os
 import tempfile
 import unittest
-from cs.logutils import setup_logging, Pfx, info, warning, error, D, X
+from cs.logutils import setup_logging, info, warning, error, D, X
+from cs.pfx import Pfx
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier

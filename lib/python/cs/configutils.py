@@ -23,7 +23,8 @@ from threading import RLock
 from cs.py3 import ConfigParser, StringTypes
 from cs.fileutils import file_property
 from cs.threads import locked, locked_property
-from cs.logutils import Pfx, info, D, X
+from cs.logutils import info, D, X
+from cs.pfx import Pfx
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.

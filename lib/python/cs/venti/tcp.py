@@ -12,7 +12,8 @@ from threading import Lock, Thread
 from .stream import StreamStore
 from cs.excutils import logexc
 from cs.socketutils import OpenSocket
-from cs.logutils import debug, X, Pfx
+from cs.logutils import debug, X
+from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
 
 class _Server(ThreadingMixIn, TCPServer):

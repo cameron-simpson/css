@@ -5,7 +5,8 @@
 #
 
 from collections import namedtuple, OrderedDict
-from cs.logutils import Pfx, error, warning, X
+from cs.logutils import error, warning, X
+from cs.pfx import Pfx
 
 ETC_SERVICES = '/etc/services'
 

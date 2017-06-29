@@ -24,7 +24,8 @@ from time import sleep
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
+from cs.logutils import status, info, debug, warning, D, X, XP
+from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin

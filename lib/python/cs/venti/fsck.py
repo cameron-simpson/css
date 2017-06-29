@@ -4,7 +4,8 @@
 #   - Cameron Simpson <cs@zip.com.au> 11feb2017
 #
 
-from cs.logutils import Pfx, error, warning, info, X
+from cs.logutils import error, warning, info, X
+from cs.pfx import Pfx
 from . import defaults
 from .block import HashCodeBlock, LiteralBlock
 from .paths import walk

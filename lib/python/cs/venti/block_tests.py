@@ -7,7 +7,8 @@
 import sys
 from random import choice
 import unittest
-from cs.logutils import D, X, Pfx
+from cs.logutils import D, X
+from cs.pfx import Pfx
 from cs.randutils import rand0, randblock
 from cs.py3 import bytes
 from . import totext

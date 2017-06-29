@@ -45,7 +45,8 @@ from cs.later import Later, RetryError, \
                     FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
+from cs.logutils import setup_logging, logTo, info, debug, error, warning, exception, trace, D, X
+from cs.pfx import Pfx
 from cs.mappings import MappingChain, SeenSet
 from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq

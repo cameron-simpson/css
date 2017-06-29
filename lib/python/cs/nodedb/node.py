@@ -19,7 +19,8 @@ from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
 from cs.obj import O
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
+from cs.logutils import D, error, warning, info, debug, exception, X
+from cs.pfx import Pfx
 from cs.seq import the, get0
 from cs.threads import locked
 from cs.py.func import derived_property
