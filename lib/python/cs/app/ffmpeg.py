@@ -139,7 +139,8 @@ def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
     with Pfx("multiconvert"):
       argv = [ 'ffmpeg',
                '-y' if overwrite else '-n',
-             ]
+               '-strict', '-2',     # enables experimental codes
+               ]
       # assemble input arguments
       stdin = None
       stdout = None

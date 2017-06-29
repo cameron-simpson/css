@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 import sys
 from io import StringIO
 import os
@@ -14,7 +14,7 @@ from threading import Lock
 import time
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite, rewrite_cmgr, lockfile, Pathname, \
+from .fileutils import compare, rewrite, rewrite_cmgr, Pathname, \
                         file_property, make_file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
@@ -142,47 +142,6 @@ class Test_Misc(unittest.TestCase):
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
       self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
-
-  def test_lockfile_00_basic(self):
-    lockbase = self.lockbase
-    lockpath = self.lockpath
-    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
-    with lockfile(lockbase) as lock:
-      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assertTrue( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
-    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
-
-  def test_lockfile_01_conflict(self):
-    lockbase = self.lockbase
-    lockpath = self.lockpath
-    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
-    with lockfile(lockbase) as lock:
-      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assertTrue( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
-      try:
-        with lockfile(lockbase, timeout=0):
-          self.assertTrue( False, "lock inside lock, should not happen: %s" % (lockpath,))
-      except TimeoutError:
-        pass
-    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
-
-  def test_lockfile_02_timeout(self):
-    lockbase = self.lockbase
-    lockpath = self.lockpath
-    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
-    with lockfile(lockbase) as lock:
-      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assertTrue( os.path.exists(lockpath), "inside lock before nested lock attempt, lock file does not exist: %s" % (lockpath,))
-      start = time.time()
-      try:
-        with lockfile(lockbase, timeout=0.5):
-          self.assertTrue( False, "lock inside lock, should not happen: %s" % (lockpath,))
-      except TimeoutError:
-        end = time.time()
-        self.assertTrue( end - start >= 0.5, "nested lock timeout took less than 0.5s" )
-        self.assertTrue( end - start <= 0.6, "nested lock timeout took more than 0.6s" )
-      self.assertTrue( os.path.exists(lockpath), "inside lock after nested lock attempt, lock file does not exist: %s" % (lockpath,))
-    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def test_file_property_00(self):
     PC = self.fileprop = TestFileProperty()

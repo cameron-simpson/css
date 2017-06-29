@@ -136,8 +136,9 @@ class _Recording(object):
                .replace('/', '|') \
                .replace(' ', '-') \
                .replace('----', '--')
-    filename = filename[:255 - (len(outext) + 1)]
-    return filename + '.' + outext
+    filename = filename[:250 - (len(outext) + 1)]
+    filename += '.' + outext
+    return filename
 
   # TODO: move into cs.fileutils?
   @staticmethod

@@ -6,18 +6,20 @@
 
 from __future__ import print_function
 from collections import defaultdict
+import errno
 from getopt import getopt, GetoptError
 import os
 from os.path import basename, exists as pathexists
 import re
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, DEVNULL
+import subprocess
+from subprocess import DEVNULL
 import sys
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
 from cs.env import envsub
-from cs.logutils import setup_logging, warning, X, Pfx
+from cs.logutils import setup_logging, info, warning, X, Pfx
 from cs.sh import quotecmd as shq
 from cs.py.func import prop
 
@@ -63,14 +65,11 @@ def main(argv, environ=None):
   badopts = False
   once = False
   doit = True
-  dotrace = True
   sshcfg = None
-  sshopts = ['-n']
-  print_test = False
-  setflags = False
   auto_mode = False
   flags = Flags(environ=environ)
   trace = sys.stderr.isatty()
+  verbose = False
 
   try:
     if not argv:
@@ -87,7 +86,7 @@ def main(argv, environ=None):
       if not argv:
         flags.flag_portfwd_disable = False
       else:
-        for name in argv:
+        for target in argv:
           flags['PORTFWD_' + uppername(target) + '_DISABLE'] = False
       return 0
     if opt1 == '-D':
@@ -116,7 +115,10 @@ def main(argv, environ=None):
       if argv:
         raise GetoptError("%s: extra arguments after target %r: %s"
                           % (opt1, target, ' '.join(argv)))
-      print(target_test_shcmd(target))
+      PFs = Portfwds(ssh_config=sshcfg, target_list=(target,),
+                     auto_mode=auto_mode, trace=trace, verbose=verbose,
+                     flags=flags)
+      print(PFs.forward(target).test_shcmd())
       return 0
     argv.insert(0, opt1)
     opts, argv = getopt(argv, '1AF:nxv')
@@ -128,7 +130,7 @@ def main(argv, environ=None):
           auto_mode = True
         elif opt == '-F':
           sshcfg = arg
-        elif opt == 'n':
+        elif opt == '-n':
           doit = False
         elif opt == '-x':
           trace = True
@@ -148,7 +150,14 @@ def main(argv, environ=None):
     print(usage, file=sys.stderr)
     return 2
 
-  PFs = Portfwds(ssh_config=sshcfg, target_list=argv, auto_mode=auto_mode, trace=trace, flags=flags)
+  PFs = Portfwds(ssh_config=sshcfg, target_list=argv,
+                 auto_mode=auto_mode, trace=trace, verbose=verbose,
+                 flags=flags)
+  if not doit:
+    for target in sorted(PFs.targets_required()):
+      print(PFs.forward(target))
+    return 0
+
   running = True
   def signal_handler(signum, frame):
     PFs.stop()
@@ -166,7 +175,7 @@ def main(argv, environ=None):
 
 class Portfwd(FlaggedMixin):
 
-  def __init__(self, PFs, target, test_shcmd=None, trace=False, flags=None):
+  def __init__(self, target, ssh_config=None, test_shcmd=None, trace=False, verbose=False, flags=None):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     if test_shcmd is None:
@@ -177,8 +186,9 @@ class Portfwd(FlaggedMixin):
         + '\nflag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1'
         )
     self.test_shcmd = test_shcmd
+    self.ssh_config = ssh_config
     self.trace = trace
-    self.portfwds = PFs
+    self.verbose = verbose
     self.target = target
     self.svcd_name = 'portfwd-' + target
     self.flag_connected = False
@@ -196,7 +206,7 @@ class Portfwd(FlaggedMixin):
                     )
 
   def __str__(self):
-    return "Portfwd(%r)" % (self.target,)
+    return "Portfwd %s %s" % (self.target, shq(self.ssh_argv))
 
   def start(self):
     self.svcd.start()
@@ -208,19 +218,28 @@ class Portfwd(FlaggedMixin):
     xit = self.svcd.wait()
     return xit
 
-  @prop
-  def ssh_argv(self):
-    return [ 'ssh',
-             '-F', self.portfwds.ssh_config,
-             '-N',
-             '-o', 'ExitOnForwardFailure=yes',
-             '-o', 'PermitLocalCommand=yes',
-             '-o', 'LocalCommand=' + self.local_shcmd,
-             '--',
-             self.target ]
+  def test_shcmd(self):
+    return self.svcd.test_shcmd()
 
   @prop
-  def local_shcmd(self):
+  def ssh_argv(self):
+    argv = [ 'ssh' ]
+    if self.verbose:
+      argv.append('-v')
+    if self.ssh_config:
+      argv.extend(['-F', self.ssh_config])
+    argv.extend([ '-N',
+                  '-o', 'ExitOnForwardFailure=yes',
+                  '-o', 'PermitLocalCommand=yes',
+                  '-o', 'LocalCommand=' + self.ssh_localcommand,
+                  '--',
+                  self.target ])
+    return argv
+
+  @prop
+  def ssh_localcommand(self):
+    ''' Shell command for ssh to invoke on connection ready.
+    '''
     setflag_argv = [ 'flag', '-w', self.flagname_connected, '1' ]
     alert_title = 'PORTFWD ' + self.target.upper()
     alert_message = 'CONNECTED: ' + self.target
@@ -230,7 +249,8 @@ class Portfwd(FlaggedMixin):
 
 class Portfwds(object):
 
-  def __init__(self, ssh_config=None, environ=None, target_list=None, auto_mode=None, trace=False, flags=None):
+  def __init__(self, ssh_config=None, environ=None, target_list=None,
+               auto_mode=None, trace=False, verbose=False, flags=None):
     if environ is None:
       environ = os.environ
     if target_list is None:
@@ -242,20 +262,39 @@ class Portfwds(object):
     self.target_list = target_list
     self.auto_mode = auto_mode
     self.trace = trace
+    self.verbose = verbose
     self.flags = flags
     self.environ = environ
     if ssh_config is None:
       ssh_config = environ.get('PORTFWD_SSH_CONFIG')
     self._ssh_config = ssh_config
+    self._forwards = {}
     self.target_conditions = defaultdict(list)
     self.target_groups = defaultdict(set)
     self.targets_running = {}
 
+  @property
+  def forwards(self):
+    ''' A list of the existing Portfwd instances.
+    '''
+    return list(self._forwards.values())
+
+  def forward(self, target):
+    ''' Obtain the named Portfwd, creating it if necessary.
+    '''
+    try:
+      P = self._forwards[target]
+    except KeyError:
+      P = Portfwd(target, ssh_config=self.ssh_config,
+                  trace=self.trace, flags=self.flags)
+      self._forwards[target] = P
+    return P
+
   def start(self):
     required = self.targets_required()
     for target in required:
+      P = self.forward(target)
       if target not in self.targets_running:
-        P = Portfwd(self, target, trace=self.trace, flags=self.flags)
         P.start()
         self.targets_running[target] = P
     running = list(self.targets_running.keys())
@@ -409,7 +448,7 @@ class _PortfwdCondition(object):
 
   def shcmd(self):
     cmd = ' '.join(shq(self.test_argv))
-    if invert:
+    if self.invert:
       cmd = 'if ' + cmd + '; then false; else true; fi'
     return cmd
 
@@ -418,7 +457,6 @@ class FlagCondition(_PortfwdCondition):
   def __init__(self, portfwd, invert, flag):
     super().__init__(portfwd, invert)
     self.flag = flag
-    test
 
   @prop
   def test_argv(self):
@@ -432,7 +470,7 @@ class FlagCondition(_PortfwdCondition):
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
-  def __init__(portfwd, invert, ping_target):
+  def __init__(self, portfwd, invert, ping_target):
     super().__init__(portfwd, invert)
     self.ping_target = ping_target
     self.ping_argv = [ 'ping', '-c', '1', '-t', '3', self.ping_target ]
