@@ -4,8 +4,12 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 from contextlib import contextmanager
+import logging
+import sys
 import threading
+from cs.py3 import StringTypes, ustr
 
 def pfx_iter(tag, iter):
   ''' Wrapper for iterators to prefix exceptions with `tag`.
@@ -164,7 +168,7 @@ class Pfx(object):
             exc_value.msg = prefixify(str(exc_value.msg))
           else:
             # we can't modify this exception - at least report the current prefix state
-            D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
+            D("%s: Pfx.__exit__: exc_value = %r", prefix, exc_value)
             error(prefixify(str(exc_value)))
     _state.pop()
     if _state.trace:
@@ -234,7 +238,7 @@ class Pfx(object):
       try:
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
-        XP("exception logging to %s msg=%r, args=%r, kwargs=%r: %s", L, msg, args, kwargs, e)
+        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s", self._state.prefix, L, msg, args, kwargs, e, file=sys.stderr)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
@@ -283,4 +287,4 @@ def PfxThread(target=None, **kw):
     with Pfx(current_prefix):
       if target is not None:
         target(*a, **kw)
-  return Thread(target=run, **kw)
+  return threading.Thread(target=run, **kw)
