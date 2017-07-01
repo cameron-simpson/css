@@ -360,56 +360,6 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
-# set to true to log as a warning
-X_via_log = False
-# set to true to write direct to /dev/tty
-X_via_tty = False
-
-def X(msg, *args, **kwargs):
-  ''' Unconditionally write the message `msg` to sys.stderr.
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-  '''
-  if X_via_log:
-    # NB: ignores any kwargs
-    msg = str(msg)
-    if args:
-      msg = msg % args
-    warning(msg)
-  elif X_via_tty:
-    # NB: ignores any kwargs
-    msg = str(msg)
-    if args:
-      msg = msg % args
-    with open('/dev/tty', 'w') as fp:
-      fp.write(msg)
-      fp.write('\n')
-      fp.flush()
-  else:
-    file = kwargs.pop('file', None)
-    if file is None:
-      file = sys.stderr
-    return nl(msg, *args, file=file)
-
-def XP(msg, *args, **kwargs):
-  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
-  '''
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
-  elif file is not None:
-    if isinstance(file, StringTypes):
-      with open(file, "a") as fp:
-        XP(msg, *args, file=fp)
-      return
-  file.write(prefix())
-  file.write(': ')
-  file.flush()
-  return X(msg, *args, file=file)
-
-def XX(prepfx, msg, *args, **kwargs):
-  with PrePfx(prepfx):
-    return XP(msg, *args, **kwargs)
-
 def status(msg, *args, **kwargs):
   ''' Write a message to the terminal's status line.
       If there is no status line use the xterm title bar sequence :-(
