@@ -26,9 +26,9 @@ import threading
 import time
 import traceback
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, PrePfx, ifdebug
+from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, ifdebug
 from cs.obj import O, Proxy
-from cs.pfx import Pfx
+from cs.pfx import Pfx, PrePfx
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq

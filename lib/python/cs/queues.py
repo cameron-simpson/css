@@ -22,9 +22,9 @@ from threading import Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
 import cs.logutils
-from cs.logutils import exception, error, warning, debug, D, PfxCallInfo
+from cs.logutils import exception, error, warning, debug, D
 from cs.obj import O
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx, PfxCallInfo, XP
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
