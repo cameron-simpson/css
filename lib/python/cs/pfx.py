@@ -67,6 +67,7 @@ class _PfxThreadState(threading.local):
     stack = self.stack
     if not stack:
       # I'd do this in __init__ except that cs.logutils.cmd may get set too late
+      from cs.logutils import cmd
       stack.append(Pfx(cmd))
     return stack[-1]
 
