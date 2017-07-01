@@ -26,7 +26,8 @@ import sys
 from fnmatch import fnmatch
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import setup_logging, info, warning, error, XP
+from cs.logutils import setup_logging, info, warning, error
+from cs.pfx import XP
 from cs.pfx import Pfx
 
 DEFAULT_CONFIGS = ('$HOME/.ssh/config', '/etc/ssh/ssh_config')

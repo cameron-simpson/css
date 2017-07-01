@@ -21,7 +21,8 @@ import time
 import traceback
 from cs.excutils import logexc
 import cs.logutils
-from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
+from cs.logutils import debug, warning, error, PfxCallInfo, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.obj import O
 from cs.py.stack import caller, stack_dump

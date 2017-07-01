@@ -9,7 +9,8 @@ import sys
 from threading import Lock, RLock
 import time
 from cs.cmdutils import docmd
-from cs.logutils import D, debug, error, info, warning, X, XP
+from cs.logutils import D, debug, error, info, warning, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.lex import hexify, texthexify
 from cs.py.stack import stack_dump

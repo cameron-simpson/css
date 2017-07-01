@@ -17,7 +17,8 @@ from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader, csv_writerow
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import D, X, XP, debug, warning, error, exception
+from cs.logutils import D, X, debug, warning, error, exception
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin

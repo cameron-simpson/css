@@ -24,7 +24,8 @@ import sys
 from bisect import bisect_left
 from collections import namedtuple
 from cs.seq import first
-from cs.logutils import ifdebug, X, XP
+from cs.logutils import ifdebug, X
+from cs.pfx import XP
 
 def overlap(span1, span2):
   ''' Return a list [start, end] denoting the overlap of two spans.

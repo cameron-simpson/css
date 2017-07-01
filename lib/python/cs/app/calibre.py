@@ -22,7 +22,8 @@ from cs.edit import edit_strings
 from cs.env import envsub
 from cs.py.func import prop
 from cs.lex import get_identifier
-from cs.logutils import info, warning, error, setup_logging, X, XP
+from cs.logutils import info, warning, error, setup_logging, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.obj import O
 from cs.seq import the

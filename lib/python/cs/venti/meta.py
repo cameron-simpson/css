@@ -12,7 +12,8 @@ from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import exception, error, warning, debug, X, XP
+from cs.logutils import exception, error, warning, debug, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.threads import locked
 from . import totext, fromtext

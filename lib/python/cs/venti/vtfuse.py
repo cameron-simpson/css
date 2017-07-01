@@ -22,7 +22,8 @@ import time
 from types import SimpleNamespace as NS
 from cs.debug import DummyMap, TracingObject
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X, XP, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.logutils import X, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.obj import O, obj_as_dict
 from cs.py.func import funccite, funcname

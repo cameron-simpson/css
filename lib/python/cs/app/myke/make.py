@@ -19,7 +19,8 @@ from cs.later import Later
 from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, AsynchState
 import cs.logutils
-from cs.logutils import debug, info, warning, error, D, X, XP
+from cs.logutils import debug, info, warning, error, D, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.obj import O
 from cs.py.func import prop

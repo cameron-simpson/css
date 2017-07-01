@@ -9,7 +9,8 @@
 from __future__ import with_statement
 import sys
 from cs.inttypes import Enum
-from cs.logutils import setup_logging, info, debug, warning, X, XP
+from cs.logutils import setup_logging, info, debug, warning, X
+from cs.pfx import XP
 from cs.pfx import Pfx
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
