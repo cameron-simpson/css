@@ -5,21 +5,8 @@
 #
 
 from __future__ import with_statement
-
-DISTINFO = {
-    'description': "Logging convenience routines.",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.upd'],
-}
-
 import codecs
 from contextlib import contextmanager
-import getopt
 try:
   import importlib
 except ImportError:
@@ -32,15 +19,34 @@ from pprint import pformat
 import stat
 import sys
 import time
-from threading import Lock, Thread
+from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
-from cs.obj import O, O_str
-from cs.pfx import Pfx
+from cs.obj import O
+from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.py3 import unicode, StringTypes, ustr
 from cs.upd import Upd
+from cs.x import X
+
+DISTINFO = {
+    'description': "Logging convenience routines.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': [
+        'cs.ansi_colour',
+        'cs.lex',
+        'cs.obj',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.upd'
+        ],
+}
 
 cmd = __file__
 
