@@ -45,18 +45,20 @@ from cs.later import Later, RetryError, \
                     FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
+from cs.logutils import setup_logging, logTo, info, debug, error, warning, exception, trace, D
 from cs.mappings import MappingChain, SeenSet
-from cs.queues import NullQueue, NullQ, IterableQueue
-from cs.seq import seq
-from cs.threads import locked, locked_property
-from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.pfx import Pfx
 from cs.app.flag import PolledFlags
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
+from cs.queues import NullQueue, NullQ, IterableQueue
+from cs.seq import seq
+from cs.threads import locked, locked_property
+from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.x import X
 
 # parallelism of jobs
 DEFAULT_JOBS = 4

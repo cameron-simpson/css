@@ -18,8 +18,9 @@ from .fileutils import compare, rewrite, rewrite_cmgr, Pathname, \
                         file_property, make_file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
+from .logutils import D
 from .timeutils import TimeoutError, sleep
-from .logutils import D, X
+from .x import X
 
 class TestFileProperty(object):
   def __init__(self):

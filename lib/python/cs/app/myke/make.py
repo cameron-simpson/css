@@ -12,16 +12,18 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
+from cs.asynchron import Result, report as report_LFs, AsynchState
 from cs.excutils import logexc
 from cs.inttypes import Flags
-from cs.threads import Lock, RLock, Channel, locked, locked_property
 from cs.later import Later
-from cs.queues import MultiOpenMixin
-from cs.asynchron import Result, report as report_LFs, AsynchState
 import cs.logutils
-from cs.logutils import Pfx, debug, info, warning, error, D, X, XP
+from cs.logutils import debug, info, warning, error, D
 from cs.obj import O
+from cs.pfx import Pfx, XP
 from cs.py.func import prop
+from cs.queues import MultiOpenMixin
+from cs.threads import Lock, RLock, Channel, locked, locked_property
+from cs.x import X
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 

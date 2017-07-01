@@ -11,7 +11,8 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import Pfx, debug, warning, error, exception, X, XP, PrePfx
+from cs.logutils import debug, warning, error, exception, PrePfx
+from cs.pfx import Pfx, XP
 from cs.predicate import post_condition
 from cs.py3 import BytesFile
 from cs.queues import IterableQueue
@@ -19,6 +20,7 @@ from cs.resources import not_closed, ClosedError
 from cs.seq import seq, Seq
 from cs.serialise import Packet, read_Packet, write_Packet, put_bs, get_bs
 from cs.threads import locked
+from cs.x import X
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 

@@ -6,7 +6,8 @@ import sys
 from contextlib import contextmanager
 from cs.py3 import StringTypes
 from cs.excutils import unimplemented
-from cs.logutils import Pfx, error, warning, debug, trace, D
+from cs.logutils import error, warning, debug, trace, D
+from cs.pfx import Pfx
 from . import NodeDB, Backend
 
 class Backend_SQLAlchemy(Backend):

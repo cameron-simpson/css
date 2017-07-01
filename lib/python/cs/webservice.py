@@ -13,7 +13,8 @@ from io import StringIO
 import urllib2
 from cs.obj import flavour, T_MAP, T_SEQ
 import cs.logutils
-from cs.logutils import LogTime, Pfx, error
+from cs.logutils import LogTime, error
+from cs.pfx import Pfx
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.

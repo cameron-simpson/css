@@ -52,7 +52,8 @@ from cs.fileutils import abspath_from_file, file_property, files_property, \
 import cs.lex
 from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
                    get_qstr, match_tokens, get_delimited
-from cs.logutils import Pfx, setup_logging, with_log, \
+from cs.logutils import setup_logging, with_log, \
+from cs.pfx import Pfx
                         debug, info, warning, error, exception, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \

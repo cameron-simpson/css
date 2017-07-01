@@ -18,7 +18,8 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, X, \
+from cs.logutils import setup_logging, warning, info
+from cs.x import X
                         Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 

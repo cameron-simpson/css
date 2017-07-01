@@ -9,13 +9,15 @@ import sys
 from threading import Lock, RLock
 import time
 from cs.cmdutils import docmd
-from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
+from cs.logutils import D, debug, error, info, warning
+from cs.pfx import Pfx, XP
 from cs.lex import hexify, texthexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
+from cs.x import X
 from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File

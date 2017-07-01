@@ -12,8 +12,10 @@ from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import exception, error, warning, debug, X, XP, Pfx
+from cs.logutils import exception, error, warning, debug
+from cs.pfx import Pfx, XP
 from cs.threads import locked
+from cs.x import X
 from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'

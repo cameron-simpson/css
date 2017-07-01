@@ -7,7 +7,7 @@
 from collections import namedtuple
 import os.path
 from subprocess import Popen, PIPE
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 from cs.obj import O
 
 class MetaData(O):

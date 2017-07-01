@@ -20,8 +20,10 @@ from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.env import envsub
 from cs.lex import hexify
-from cs.logutils import Pfx, exception, error, warning, info, debug, setup_logging, logTo, X, nl
+from cs.logutils import exception, error, warning, info, debug, setup_logging, logTo, nl
+from cs.pfx import Pfx
 from cs.tty import statusline
+from cs.x import X
 from . import totext, fromtext, defaults
 from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
