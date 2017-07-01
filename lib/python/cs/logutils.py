@@ -381,9 +381,10 @@ def status(msg, *args, **kwargs):
         warning('status: curses.tigetflag(hs): not a Boolean capability, presuming false')
         has_ansi_status = None
       elif has_status > 0:
-        has_ansi_status = ( curses.tigetstr('to_status_line'),
-                            curses.gtigetstr('from_status_line')
-                          )
+        has_ansi_status = (
+            curses.tigetstr('to_status_line'),
+            curses.gtigetstr('from_status_line')
+        )
       else:
         warning('status: hs=%s, presuming false', has_status)
         has_ansi_status = None
@@ -400,23 +401,22 @@ def nl(msg, *args, **kw):
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
   try:
-    file = kw.pop('file')
+    fp = kw.pop('file')
   except KeyError:
-    file = sys.stdout
+    fp = sys.stdout
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
   if args:
-    omsg = msg
     try:
       msg = msg % args
     except TypeError as e:
       nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
       msg = "%s[%r]" % (msg, args)
-  file.write(msg)
-  file.write("\n")
+  fp.write(msg)
+  fp.write("\n")
   try:
-    flush = file.flush
+    flush = fp.flush
   except AttributeError:
     pass
   else:
@@ -469,7 +469,7 @@ def logException(exc_type, exc_value, exc_tb):
     sys.excepthook = sys.__excepthook__
     exception("EXCEPTION: %s:%s" % (exc_type, exc_value))
     for line in traceback.format_exception(exc_type, exc_value, exc_tb):
-      exception("EXCEPTION> "+line)
+      exception("EXCEPTION> " + line)
     sys.excepthook = curhook
 
 def OBSOLETE(func):
