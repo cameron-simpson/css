@@ -22,13 +22,13 @@ from threading import Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
 import cs.logutils
-from cs.logutils import exception, error, warning, debug, D, X, PfxCallInfo
-from cs.pfx import XP
-from cs.pfx import Pfx
+from cs.logutils import exception, error, warning, debug, D, PfxCallInfo
+from cs.obj import O
+from cs.pfx import Pfx, XP
+from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
-from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
-from cs.obj import O
+from cs.x import X
 
 class _QueueIterator(MultiOpenMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which

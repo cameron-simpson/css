@@ -29,16 +29,17 @@ import sys
 import os
 import tempfile
 import unittest
-from cs.logutils import setup_logging, info, warning, error, D, X
+from cs.lex import get_identifier
+from cs.logutils import setup_logging, info, warning, error, D
 from cs.pfx import Pfx
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
-from cs.lex import get_identifier
-import cs.sh
-from cs.seq import get0, last
-from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
+from cs.seq import get0, last
+import cs.sh
+from cs.threads import locked, locked_property
+from cs.x import X
 
 def main(argv=None, stdin=None):
   if argv is None:

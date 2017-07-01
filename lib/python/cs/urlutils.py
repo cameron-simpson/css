@@ -56,12 +56,13 @@ from cs.excutils import logexc
 ##safe_property
 safe_property = property
 from cs.lex import parseUC_sAttr
-from cs.logutils import pfx_iter, debug, error, warning, exception, D, X
+from cs.logutils import pfx_iter, debug, error, warning, exception, D
+from cs.obj import O
 from cs.pfx import Pfx
+from cs.py3 import ustr, unicode
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked_property
-from cs.py3 import ustr, unicode
-from cs.obj import O
+from cs.x import X
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader

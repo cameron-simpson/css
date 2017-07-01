@@ -34,11 +34,12 @@ import time
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import exception, error, warning, debug, X
+from cs.logutils import exception, error, warning, debug
 from cs.pfx import Pfx
+from cs.py3 import ustr, bytes
 from cs.range import Range
 from cs.threads import locked
-from cs.py3 import ustr, bytes
+from cs.x import X
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192

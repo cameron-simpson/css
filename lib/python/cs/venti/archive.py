@@ -23,9 +23,10 @@ from itertools import takewhile, chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, info, warning, error, X
+from cs.logutils import D, info, warning, error
 from cs.pfx import Pfx
 from cs.seq import last
+from cs.x import X
 from . import totext, fromtext
 from .block import dump_block
 from .blockify import blockify, top_block_for

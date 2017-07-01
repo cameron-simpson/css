@@ -20,11 +20,12 @@ import os.path
 import sys
 from collections import Mapping
 from threading import RLock
-from cs.py3 import ConfigParser, StringTypes
 from cs.fileutils import file_property
-from cs.threads import locked, locked_property
-from cs.logutils import info, D, X
+from cs.logutils import info, D
 from cs.pfx import Pfx
+from cs.py3 import ConfigParser, StringTypes
+from cs.threads import locked, locked_property
+from cs.x import X
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.

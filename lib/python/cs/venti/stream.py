@@ -9,11 +9,11 @@
 from __future__ import with_statement
 import sys
 from cs.inttypes import Enum
-from cs.logutils import setup_logging, info, debug, warning, X
-from cs.pfx import XP
-from cs.pfx import Pfx
+from cs.logutils import setup_logging, info, debug, warning
+from cs.pfx import Pfx, XP
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
+from cs.x import X
 from .store import BasicStoreAsync
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum

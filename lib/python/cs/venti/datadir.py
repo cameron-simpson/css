@@ -17,14 +17,14 @@ from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader, csv_writerow
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import D, X, debug, warning, error, exception
-from cs.pfx import XP
-from cs.pfx import Pfx
+from cs.logutils import D, debug, warning, error, exception
+from cs.pfx import Pfx, XP
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
+from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin

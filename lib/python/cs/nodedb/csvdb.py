@@ -13,15 +13,15 @@ from shutil import copyfile
 import sys
 from threading import Thread, Lock
 import time
-from cs.debug import trace
 from cs.csvutils import csv_writerow
+from cs.debug import trace
 from cs.fileutils import FileState, rewrite_cmgr
-from cs.logutils import error, warning, info, debug, D, X, PfxThread
-from cs.pfx import XP
-from cs.pfx import Pfx
+from cs.logutils import error, warning, info, debug, D, PfxThread
+from cs.pfx import Pfx, XP
+from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from cs.sharedfile import SharedCSVFile
 from cs.threads import locked
-from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
+from cs.x import X
 from . import NodeDB
 from .backend import Backend, Update, ResetUpdate, ExtendUpdate
 

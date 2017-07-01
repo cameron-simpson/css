@@ -13,8 +13,9 @@ import unittest
 from unittest import skip
 from cs.buffer import chunky
 from cs.fileutils import read_from
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.randutils import rand0, randblock
+from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 from .cache import MemoryCacheStore

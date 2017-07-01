@@ -6,8 +6,9 @@ from __future__ import print_function
 import sys
 import os.path
 import json
-from cs.logutils import setup_logging, warning, error, X
+from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx
+from cs.x import X
 from . import Recording
 
 TRY_N = 32

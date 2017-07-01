@@ -31,7 +31,8 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked, bg
 from cs.asynchron import Result, _PendingFunction, AsynchState, report, after
 from cs.seq import seq, TrackingCounter
-from cs.logutils import PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, OBSOLETE
+from cs.logutils import PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
+from cs.x import X
 from cs.pfx import XP
 from cs.pfx import Pfx
 

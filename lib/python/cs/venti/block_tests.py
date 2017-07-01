@@ -7,10 +7,11 @@
 import sys
 from random import choice
 import unittest
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.pfx import Pfx
-from cs.randutils import rand0, randblock
 from cs.py3 import bytes
+from cs.randutils import rand0, randblock
+from cs.x import X
 from . import totext
 from .block import Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, \
                 verify_block, \

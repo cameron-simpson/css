@@ -22,12 +22,12 @@ from cs.edit import edit_strings
 from cs.env import envsub
 from cs.py.func import prop
 from cs.lex import get_identifier
-from cs.logutils import info, warning, error, setup_logging, X
-from cs.pfx import XP
-from cs.pfx import Pfx
+from cs.logutils import info, warning, error, setup_logging
 from cs.obj import O
+from cs.pfx import Pfx, XP
 from cs.seq import the
 from cs.threads import locked, locked_property
+from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Calibre_Library'
 METADB_NAME = 'metadata.db'

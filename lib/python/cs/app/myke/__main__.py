@@ -3,7 +3,8 @@
 from __future__ import print_function
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info, D, X
+from cs.logutils import setup_logging, warning, error, info, D
+from cs.x import X
 from .make import Maker
 from .parse import parseMacroAssignment
 

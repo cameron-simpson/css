@@ -12,10 +12,11 @@ import sys
 import tempfile
 import unittest
 from cs.excutils import logexc
-import cs.logutils
-cs.logutils.X_via_tty = True
-from cs.logutils import setup_logging, warning, X
+from cs.logutils import setup_logging, warning
 from cs.randutils import randblock
+from cs.x import X
+import cs.x
+cs.x.X_via_tty = True
 from . import _TestAdditionsMixin
 from .datadir import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore

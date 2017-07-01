@@ -59,7 +59,8 @@ def noexc(func):
       which I have had abort otherwise sensible code.
   '''
   def noexc_wrapper(*args, **kwargs):
-    from cs.logutils import exception, X
+    from cs.logutils import exception
+    from cs.x import X
     try:
       return func(*args, **kwargs)
     except Exception as e:
@@ -81,7 +82,8 @@ def noexc_gen(func):
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
-  from cs.logutils import exception, X
+  from cs.logutils import exception
+  from cs.x import X
 
   def noexc_gen_wrapper(*args, **kwargs):
     try:

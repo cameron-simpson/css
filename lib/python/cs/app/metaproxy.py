@@ -45,7 +45,8 @@ from cs.asynchron import Asynchron
 from cs.env import envsub
 from cs.excutils import LogExceptions
 from cs.fileutils import copy_data, Tee
-from cs.logutils import setup_logging, debug, info, warning, error, exception, D, X
+from cs.logutils import setup_logging, debug, info, warning, error, exception, D
+from cs.x import X
 from cs.pfx import Pfx
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars

@@ -16,11 +16,11 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_data, read_from, pread, seekable
+from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py3 import bytes, pack, unpack, iter_unpack
-# DEBUG
-from cs.logutils import warning, X
-from cs.pfx import Pfx
+from cs.x import X
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)

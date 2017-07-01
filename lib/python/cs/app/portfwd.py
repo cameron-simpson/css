@@ -19,10 +19,11 @@ from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
 from cs.env import envsub
-from cs.logutils import setup_logging, info, warning, X
+from cs.logutils import setup_logging, info, warning
 from cs.pfx import Pfx
-from cs.sh import quotecmd as shq
 from cs.py.func import prop
+from cs.sh import quotecmd as shq
+from cs.x import X
 
 USAGE = '''Usage:
   %s -d [targets...]

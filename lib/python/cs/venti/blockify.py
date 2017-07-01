@@ -9,10 +9,11 @@ from functools import partial
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import PfxThread, debug, warning, exception, D, X
+from cs.logutils import PfxThread, debug, warning, exception, D
 from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.seq import tee
+from cs.x import X
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
