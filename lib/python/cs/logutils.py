@@ -121,12 +121,12 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     fd = main_log.fileno()
   except (AttributeError, IOError):
     is_fifo = False
-    is_reg = False
+    ##is_reg = False                        # unused
     is_tty = False
   else:
     st = os.fstat(fd)
     is_fifo = stat.S_ISFIFO(st.st_mode)
-    is_reg = stat.S_ISREG(st.st_mode)
+    ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
   if main_log.encoding is None:
@@ -221,9 +221,8 @@ def ftrace(func):
   M = func.__module__
   def func_wrap(*a, **kw):
     do_debug = M.__dict__.get('DEBUG', False)
-    if do_debug:
-      func = _ftrace(func)
-    return func(*a, **kw)
+    wrapper = _ftrace(func) if do_debug else func
+    return wrapper(*a, **kw)
   return func_wrap
 
 def _ftrace(func):
@@ -264,7 +263,7 @@ class PfxFormatter(Formatter):
     record.cmd = self.cmd if self.cmd else globals()['cmd']
     record.pfx = Pfx._state.prefix
     try:
-      fmts = Formatter.format(self, record)
+      s = Formatter.format(self, record)
     except TypeError as e:
       X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
       X("record=%s", record.__dict__)
@@ -274,7 +273,7 @@ class PfxFormatter(Formatter):
     if self.context_level is None or record.level >= self.context_level:
       message_parts.append(self.formatTime(record))
       message_parts.append(record.pfx)
-    message_parts.append(record.message)
+    message_parts.append(s)
     record.message = ': '.join(message_parts)
     return record.message
 
