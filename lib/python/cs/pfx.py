@@ -9,7 +9,7 @@ from contextlib import contextmanager
 import logging
 import sys
 import threading
-from cs.py3 import StringTypes, ustr
+from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
 def pfx_iter(tag, iter):
