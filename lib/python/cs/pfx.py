@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Pfx: a framework for dynamic message prefixes easily 
+# Pfx: a framework for easy to use dynamic message prefixes.
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
@@ -10,6 +10,7 @@ import logging
 import sys
 import threading
 from cs.py3 import StringTypes, ustr
+from cs.x import X
 
 def pfx_iter(tag, iter):
   ''' Wrapper for iterators to prefix exceptions with `tag`.
@@ -121,6 +122,7 @@ class Pfx(object):
     _state.append(self)
     _state.raise_needs_prefix = True
     if _state.trace:
+      from cs.logutils import info
       info(self._state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -135,43 +137,38 @@ class Pfx(object):
           if not isinstance(text, StringTypes):
             # DP
             X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-               prefix, text.__class__, text, sys.exc_info())
+              prefix, text.__class__, text, sys.exc_info())
             return text
-          return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        if isinstance(exc_value, getopt.GetoptError):
-          exc_value.msg = prefixify(exc_value.msg)
-        else:
-          args = getattr(exc_value, 'args', None)
-          if args is not None:
-            X("args = %r", args)
-            if args:
-              if isinstance(args, StringTypes):
-                D("%s: expected args to be a tuple, got %r", prefix, args)
-                args = prefixify(args)
-              else:
-                args = list(args)
-                if len(exc_value.args) == 0:
-                  args = [ prefix ]
-                else:
-                  args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
-              exc_value.args = args
-              X("set .args to be %r", exc_value.args)
-          elif hasattr(exc_value, 'message'):
-            exc_value.message = prefixify(str(exc_value.message))
-            X("set .message to be %r", exc_value.message)
-          elif hasattr(exc_value, 'reason'):
-            if isinstance(exc_value.reason, StringTypes):
-              exc_value.reason = prefixify(exc_value.reason)
-            else:
-              warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-          elif hasattr(exc_value, 'msg'):
-            exc_value.msg = prefixify(str(exc_value.msg))
+          return prefix \
+                 + ': ' \
+                 + ustr(text, errors='replace').replace('\n', '\n' + prefix)
+        for attr in 'args', 'message', 'msg', 'reason':
+          X("probe %s.%s ...", exc_value, attr)
+          try:
+            value = getattr(exc_value, attr)
+          except AttributeError:
+            pass
           else:
-            # we can't modify this exception - at least report the current prefix state
-            D("%s: Pfx.__exit__: exc_value = %r", prefix, exc_value)
-            error(prefixify(str(exc_value)))
+            if isinstance(value, StringTypes):
+              value = prefixify(value)
+            else:
+              try:
+                vlen = len(value)
+              except TypeError:
+                print("warning: %s.%s: " % (exc_value, attr),
+                      prefixify("do not know how to prefixify: %r" % (value,)),
+                      file=sys.stderr)
+                continue
+              else:
+                if vlen < 1:
+                  value = [ prefixify(repr(value)) ]
+                else:
+                  value = [ prefixify(value[0]) ] + list(value[1:])
+            setattr(exc_value, attr, value)
+            break
     _state.pop()
     if _state.trace:
+      from cs.logutils import info
       info(self._state.prefix)
     return False
 
@@ -288,3 +285,23 @@ def PfxThread(target=None, **kw):
       if target is not None:
         target(*a, **kw)
   return threading.Thread(target=run, **kw)
+
+def XP(msg, *args, **kwargs):
+  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  '''
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  elif file is not None:
+    if isinstance(file, StringTypes):
+      with open(file, "a") as fp:
+        XP(msg, *args, file=fp)
+      return
+  file.write(prefix())
+  file.write(': ')
+  file.flush()
+  return X(msg, *args, file=file)
+
+def XX(prepfx, msg, *args, **kwargs):
+  with PrePfx(prepfx):
+    return XP(msg, *args, **kwargs)
