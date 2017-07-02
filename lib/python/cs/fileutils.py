@@ -278,23 +278,29 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
-def file_based(func, attr_name=None, filename=None, sig_func=None, **dkw):
+def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
   ''' A decorator which caches a value obtained from a file.
       In addition to all the keyword arguments for @cs.deco.cached,
       this decorator also accepts the following argument:
       `filename`: the filename to monitor. Default from the
         ._{attr_name}__filename attribute. This value will be passed
         to the method as the `filename` keyword parameter.
+      If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
       If the `sig_func` is not specified it defaults to
         cs.filestate.FileState({filename}).
   '''
   if attr_name is None:
     attr_name = func.__name__
-  filename0 = dkw.pop('filename', None)
   filename_attr = '_' + attr_name + '__filename'
+  filename0 = filename
+  if poll_delay is None:
+    poll_delay = DEFAULT_POLL_INTERVAL
   sig_func = dkw.pop('sig_func', None)
   if sig_func is None:
     def sig_func(self):
+      filename = filename0
+      if filename is None:
+        filename = getattr(self, filename_attr)
       return FileState(filename)
   def wrap0(self, *a, **kw):
     filename = kw.pop('filename', None)
@@ -304,7 +310,6 @@ def file_based(func, attr_name=None, filename=None, sig_func=None, **dkw):
       else:
         filename = filename0
     kw['filename'] = filename
-    X("call %s(a=%r,kw=%r)", func, a, kw)
     return func(self, *a, **kw)
   dkw['attr_name'] = attr_name
   dkw['sig_func'] = sig_func
