@@ -49,21 +49,21 @@ class ConfigWatcher(Mapping):
     self._lock = RLock()
     if not os.path.isabs(config_path):
       config_path = os.path.abspath(config_path)
-    self._config_path = config_path
+    self._config__filename = config_path
     self._config_lock = self._lock
     self._watchers = {}
 
   def __str__(self):
-    return "ConfigWatcher(%r)" % (self._config_path,)
+    return "ConfigWatcher(%r)" % (self._config__filename,)
 
   @file_property
-  def config(self, path):
+  def config(self, filename):
     self._mapping = None
-    return load_config(path)
+    return load_config(filename)
 
   @property
   def path(self):
-    return self._config_path
+    return self._config__filename
 
   def as_dict(self):
     ''' Construct and return a dictionary containing an entry for each section
