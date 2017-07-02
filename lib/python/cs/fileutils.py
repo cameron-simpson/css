@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
 }
 
 from functools import partial
@@ -31,6 +31,7 @@ import stat
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+from cs.deco import cached
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -277,7 +278,44 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
-def file_property(func):
+def file_based(func, attr_name=None, filename=None, sig_func=None, **dkw):
+  ''' A decorator which caches a value obtained from a file.
+      In addition to all the keyword arguments for @cs.deco.cached,
+      this decorator also accepts the following argument:
+      `filename`: the filename to monitor. Default from the
+        ._{attr_name}__filename attribute. This value will be passed
+        to the method as the `filename` keyword parameter.
+      If the `sig_func` is not specified it defaults to
+        cs.filestate.FileState({filename}).
+  '''
+  if attr_name is None:
+    attr_name = func.__name__
+  filename0 = dkw.pop('filename', None)
+  filename_attr = '_' + attr_name + '__filename'
+  sig_func = dkw.pop('sig_func', None)
+  if sig_func is None:
+    def sig_func(self):
+      return FileState(filename)
+  def wrap0(self, *a, **kw):
+    filename = kw.pop('filename', None)
+    if filename is None:
+      if filename0 is None:
+        filename = getattr(self, filename_attr)
+      else:
+        filename = filename0
+    kw['filename'] = filename
+    X("call %s(a=%r,kw=%r)", func, a, kw)
+    return func(self, *a, **kw)
+  dkw['attr_name'] = attr_name
+  dkw['sig_func'] = sig_func
+  return cached(wrap0, **dkw)
+
+def file_property(func, **kw):
+  ''' A property whose value reloads if a file changes.
+  '''
+  return property(file_based(func, **kw))
+
+def file_property_old(func):
   ''' A property whose value reloads if a file changes.
       This is just the default mode for make_file_property().
       `func` accepts the file path and returns the new value.
