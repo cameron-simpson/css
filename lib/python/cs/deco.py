@@ -45,7 +45,6 @@ def cached(*da, **dkw):
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
-  X("da=%r,dkw=%r", da, dkw)
   if not da:
     def wrapper(func):
       return cached(func, **dkw)
@@ -59,8 +58,6 @@ def cached(*da, **dkw):
   poll_delay = dkw.pop('poll_delay', None)
   sig_func = dkw.pop('sig_func', None)
   unset_value = dkw.pop('unset_value', None)
-  X("func=%s, attr_name=%r, poll_delay=%r, sig_func=%r, unset_value=%r",
-    func, attr_name, poll_delay, sig_func, unset_value)
   if dkw:
     raise ValueError("unexpected keyword arguments: %r" % (dkw,))
   if poll_delay is not None and poll_delay <= 0:
@@ -73,9 +70,7 @@ def cached(*da, **dkw):
   lastpoll_attr = val_attr + '__lastpoll'
 
   def wrapper(self, *a, **kw):
-    X("@cached(%s)(self=%r,a=%r,kw=%r...", func, self, a, kw)
     value0 = getattr(self, val_attr, unset_value)
-    X("  old value: %r", value0)
     # see if we should use the cached value
     try:
       if poll_delay is not None:
@@ -86,24 +81,18 @@ def cached(*da, **dkw):
          and lastpoll is not None
          and now - lastpoll < poll_delay
         ):
-          X("  too soon: returning %r", value0)
           return value0
-        X("  update lastpoll to %r", now)
         setattr(self, lastpoll_attr, now)
-        if sig_func is not None:
-          # see if the signature is unchanged
-          sig0 = getattr(self, sig_attr, None)
-          sig = sig_func(self)
-          if sig0 is not None and sig0 == sig:
-            X("  signature (%r) unchanged: returning %r", value0)
-            return value0
+      if sig_func is not None:
+        # see if the signature is unchanged
+        sig0 = getattr(self, sig_attr, None)
+        sig = sig_func(self)
+        if sig0 is not None and sig0 == sig:
+          return value0
       # compute the current value
-      X("  call func(*%r,**%r)...", a, kw)
       value = func(self, *a, **kw)
-      X("    ==> %r", value)
       setattr(self, val_attr, value)
       if sig_func is not None:
-        X("  update signature to %r", sig)
         setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
@@ -112,9 +101,7 @@ def cached(*da, **dkw):
       except TypeError:
         changed = True
       if changed:
-        X("  changed: bump revision counter")
         setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
-      X("  return new value: %r", value)
       return value
     except Exception as e:
       from cs.logutils import exception, setup_logging
