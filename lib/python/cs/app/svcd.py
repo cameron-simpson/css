@@ -19,9 +19,9 @@ from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info
-from cs.x import X
-                        Pfx, PfxThread as Thread
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
+from cs.x import X
 
 TEST_RATE = 7       # frequency of polling of test condition
 KILL_TIME = 5       # how long to wait for a terminated process to exit
