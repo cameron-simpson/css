@@ -701,8 +701,11 @@ class Pilfer(O):
         if saveas.endswith('/'):
           saveas += 'index.html'
       if saveas == '-':
-        sys.stdout.write(U.content)
-        sys.stdout.flush()
+        outfd = os.dup(sys.stdout.fileno())
+        content = U.content
+        with self._lock:
+          with os.fdopen(outfd, 'wb') as outfp:
+            outfp.write(content)
       else:
         with Pfx(saveas):
           if not overwrite and os.path.exists(saveas):
