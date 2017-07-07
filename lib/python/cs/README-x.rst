@@ -1,5 +1,5 @@
 X(): low level debug function.
-===========================
+==============================
 
 X() is my function for low level ad hoc debug messages.
 It takes a message and optional format arguments for use with `%`.
