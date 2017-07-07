@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Just my X and D debugging functions.
+# Just my X debugging function.
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
@@ -34,9 +34,13 @@ def X(msg, *args, **kw):
       return
     if X_via_tty:
       # NB: ignores any kwargs
-      with open('/dev/tty', 'w') as fp:
-        fp.write(msg)
-        fp.write('\n')
-      return
+      try:
+        with open('/dev/tty', 'w') as fp:
+          fp.write(msg)
+          fp.write('\n')
+      except OSError as e:
+        X("X: cannot write to /dev/tty: %s", e, file=sys.stderr)
+      else:
+        return
     fp = sys.stderr
   print(msg, file=fp)
