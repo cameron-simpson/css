@@ -59,7 +59,7 @@ class _PfxThreadState(threading.local):
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
-    self.trace = False
+    self.trace = None
 
   @property
   def cur(self):
@@ -126,8 +126,7 @@ class Pfx(object):
     _state.append(self)
     _state.raise_needs_prefix = True
     if _state.trace:
-      from cs.logutils import info
-      info(self._state.prefix)
+      _state.trace(_state.prefix)
 
   def __exit__(self, exc_type, exc_value, traceback):
     _state = self._state
@@ -172,8 +171,7 @@ class Pfx(object):
             break
     _state.pop()
     if _state.trace:
-      from cs.logutils import info
-      info(self._state.prefix)
+      _state.trace(_state.prefix)
     return False
 
   @property

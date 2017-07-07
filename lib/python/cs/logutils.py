@@ -169,7 +169,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = trace_mode
+    Pfx._state.trace = info
   else:
     main_handler = logging.StreamHandler(main_log)
 
