@@ -299,7 +299,7 @@ class Module(object):
               try:
                 D = PM.DISTINFO
               except AttributeError:
-                warning("missing and also missing in package %r", pkg_name)
+                warning("missing and also missing from package %r", pkg_name)
               else:
                 ##warning("DISTINFO from package %r", pkg_name)
                 pass
@@ -310,57 +310,53 @@ class Module(object):
     return D
 
   def check(self, silent=False):
-    with Pfx("check %r", self.name):
-      if self._check_status is not None:
-        return self._check_status
-      if not self._checking:
-        self._checking = True
-        self._check_status = self._check(silent)
-        self._checking = False
+    if self._check_status is not None:
       return self._check_status
+    if not self._checking:
+      self._checking = True
+      self._check_status = self._check(silent)
+      self._checking = False
+    return self._check_status
 
   def _check(self, silent):
-    with Pfx("check %s", self.name):
-      ok = True
-      distinfo = self.DISTINFO
-      with Pfx('DISTINFO'):
-        install_requires = distinfo.get('install_requires')
-        if install_requires is None:
-          silent or error("missing DISTINFO[install_requires]")
-          ok = False
-          install_requires = distinfo.get('requires')
-          if install_requires is None:
-            install_requires = ()
-          else:
-            silent or warning("working off DISTINFO[requires]=%r", install_requires)
-        install_requires = set(install_requires)
-        # check imports against install_requires
-        subimports = set()
-        # check the imports for every file in the package
-        for pathname in sorted(self.paths()):
-          if not self.is_package:
-            module_name = self.name
-          else:
-            # compute module name from pathname
-            relpath = os.path.relpath(pathname, self.dirpath)
-            dirpart, basepart = os.path.split(relpath)
-            if basepart == '__init__.py':
-              module_name = dirpart.replace(os.sep, '.')
-            else:
-              mod_part, mod_ext = os.path.splitext(relpath)
-              if mod_ext != '.py':
-                warning("relpath %r does not end in '.py', computing module_name from %r", relpath, mod_part)
-              module_name = mod_part.replace(os.sep, '.')
-            module_name = self.package_name + '.' + module_name
-          # check the file
-          fok, fimports = self._check_imports(module_name, pathname, install_requires, silent, self.modules)
-          subimports.update(fimports)
-          if not fok:
-            ok = False
-        for required in sorted(install_requires - subimports):
-          with Pfx("install_required[%s]", required):
-            silent or warning("not imported")
-
+    ok = True
+    distinfo = self.DISTINFO
+    install_requires = distinfo.get('install_requires')
+    if install_requires is None:
+      silent or error("missing DISTINFO[install_requires]")
+      ok = False
+      install_requires = distinfo.get('requires')
+      if install_requires is None:
+        install_requires = ()
+      else:
+        silent or warning("working off DISTINFO[requires]=%r", install_requires)
+    install_requires = set(install_requires)
+    # check imports against install_requires
+    subimports = set()
+    # check the imports for every file in the package
+    for pathname in sorted(self.paths()):
+      if not self.is_package:
+        module_name = self.name
+      else:
+        # compute module name from pathname
+        relpath = os.path.relpath(pathname, self.dirpath)
+        dirpart, basepart = os.path.split(relpath)
+        if basepart == '__init__.py':
+          module_name = dirpart.replace(os.sep, '.')
+        else:
+          mod_part, mod_ext = os.path.splitext(relpath)
+          if mod_ext != '.py':
+            warning("relpath %r does not end in '.py', computing module_name from %r", relpath, mod_part)
+          module_name = mod_part.replace(os.sep, '.')
+        module_name = self.package_name + '.' + module_name
+      # check the file
+      fok, fimports = self._check_imports(module_name, pathname, install_requires, silent, self.modules)
+      subimports.update(fimports)
+      if not fok:
+        ok = False
+    for required in sorted(install_requires - subimports):
+      with Pfx("install_required[%s]", required):
+        silent or warning("not imported")
     return ok
 
   def _check_imports(self, module_name, filename, install_requires, silent, Ms):
