@@ -12,6 +12,8 @@ import threading
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
+cmd = None
+
 def pfx_iter(tag, iter):
   ''' Wrapper for iterators to prefix exceptions with `tag`.
   '''
@@ -63,7 +65,6 @@ class _PfxThreadState(threading.local):
   def cur(self):
     ''' .cur is the current/topmost Pfx instance.
     '''
-    global cmd
     stack = self.stack
     if not stack:
       # I'd do this in __init__ except that cs.logutils.cmd may get set too late
@@ -75,6 +76,7 @@ class _PfxThreadState(threading.local):
   def prefix(self):
     ''' Return the prevailing message prefix.
     '''
+    global cmd
     marks = []
     for P in reversed(list(self.stack)):
       marks.append(P.umark)
@@ -82,6 +84,8 @@ class _PfxThreadState(threading.local):
         break
     if self._ur_prefix is not None:
       marks.append(self._ur_prefix)
+    if cmd is not None:
+      marks.append(cmd)
     marks = reversed(marks)
     return unicode(': ').join(marks)
 
