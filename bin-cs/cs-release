@@ -85,7 +85,8 @@ def main(argv):
                   print(name, 'NOT OK')
                   xit = 1
               else:
-                warning('skipped, not a "cs." module name')
+                warning('not a "cs." module name')
+                xit = 1
             elif op == 'last':
               print(name, N.last_suffix())
             elif op == 'log':
