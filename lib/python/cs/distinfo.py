@@ -248,7 +248,7 @@ class PyPI_Package(O):
                       ('version', self.pypi_version),
                       ):
       if value is None:
-        warning("_prep: no value for %r", name)
+        warning("_prep: no value for %r", kw)
       else:
         with Pfx(kw):
           if kw in dinfo:
