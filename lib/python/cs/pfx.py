@@ -68,7 +68,7 @@ class _PfxThreadState(threading.local):
     global cmd
     stack = self.stack
     if not stack:
-      return cmd
+      return Pfx(cmd if cmd else sys.argv.get(0, "CMD"))
     return stack[-1]
 
   @property
