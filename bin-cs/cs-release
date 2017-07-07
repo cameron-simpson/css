@@ -8,6 +8,7 @@
 #
 
 from __future__ import print_function
+from collections import defaultdict
 from getopt import GetoptError
 import sys
 import os.path
@@ -193,22 +194,15 @@ def pipefrom(*argv, **kw):
     pipecmd = ' '.join(argv)
     raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
 
-class Modules(object):
-
-  def __init__(self):
-    self.modules = {}
-
-  def module(self, name):
-    try:
-      M = self.modules[name]
-    except KeyError:
-      M = Module(name, self)
-      self.modules[name] = M
-    return M
-
-  __getitem__ = module
+class Modules(defaultdict):
+  ''' An autopopulating dict of mod_name->Module.
+  '''
+  def __missing__(self, mod_name):
+    return Module(mod_name, self)
 
 class Module(object):
+  ''' Metadata about a Python module.
+  '''
 
   def __init__(self, name, modules):
     self.name = name
