@@ -69,7 +69,10 @@ def main(argv):
         names = argv
       else:
         names = sorted(VCS.release_prefixes())
+      ok = True
       for name in names:
+        if not ok:
+          break
         with Pfx(op):
           with Pfx(name):
             N = ReleaseName(name, Ms, VCS, LV)
@@ -98,7 +101,7 @@ def main(argv):
             elif op == 'next':
               print(name, N.next_suffix())
             elif op == 'pypi':
-              # upload latest release to testpypi
+              # upload latest release to pypi
               N.submit_pypi(force=force)
             elif op == 'release':
               # issue new release tag
@@ -114,7 +117,7 @@ def main(argv):
                   return 1
               changes = list(N.log_since())
               if not changes:
-                error("no changes since last release, aborting")
+                error("no changes since last release, not making new release")
                 xit = 1
               else:
                 print("Changes since the last release:")
@@ -124,7 +127,7 @@ def main(argv):
                 with pipefrom('readdottext', keep_stdin=True) as dotfp:
                   release_message = dotfp.read().rstrip()
                 if not release_message:
-                  error("empty release message, aborting")
+                  error("empty release message, not making new release")
                   xit = 1
                 else:
                   next_tag = N.next_release_tag()
