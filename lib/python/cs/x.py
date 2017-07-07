@@ -15,6 +15,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'install_requires': [],
 }
 
 # set to true to log as a warning
