@@ -618,16 +618,29 @@ class ReleaseName(object):
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+    if not self.check():
+      warning("check fails")
+      if force:
+        warning("submitting anyway")
+      else:
+        return
     with Pfx(pypi_flavour):
       last_suffix = self.last_suffix()
       lastvalue_key, last_pypi_release = self.last_upload(pypi_flavour)
       if last_suffix == last_pypi_release:
         info("already released %r", last_suffix)
-        if not force:
+        if force:
+          warning("submitting anyway")
+        else:
           return
       with Pfx("%r->%r", last_pypi_release, last_suffix):
         PKG = PyPI_Package(pypi_url, self.prefix, last_suffix)
-        PKG.check()
+        if not PKG.check():
+          warning("package check fails")
+          if force:
+            warning("submitting anyway")
+          else:
+            return
         PKG.register()
         PKG.upload()
         self.lv[lastvalue_key] = last_suffix
