@@ -7,6 +7,16 @@
 from __future__ import print_function
 import sys
 
+DISTINFO = {
+    'description': "X(), for low level debugging",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 # set to true to log as a warning
 X_logger = None
 # set to true to write direct to /dev/tty
