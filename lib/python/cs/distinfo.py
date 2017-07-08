@@ -6,13 +6,13 @@
 #
 
 from __future__ import print_function
-import sys
-import os
-import os.path
 from functools import partial
 from getopt import getopt, GetoptError
+import os
+import os.path
 from subprocess import Popen, PIPE
 import shutil
+import sys
 from tempfile import mkdtemp
 from threading import RLock
 from cs.logutils import setup_logging, info, warning, error
