@@ -8,13 +8,14 @@ from contextlib import contextmanager
 from threading import Condition
 from collections import namedtuple
 import unittest
-from cs.logutils import D, OBSOLETE, debug, error, X
-from cs.threads import locked, locked_property
-from cs.excutils import unimplemented
-from cs.timeutils import sleep
 from cs.debug import RLock, Thread
+from cs.excutils import unimplemented
+from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
+from cs.threads import locked, locked_property
+from cs.timeutils import sleep
+from cs.x import X
 
 # a db update
 _Update = namedtuple('_Update', 'do_append type name attr values')

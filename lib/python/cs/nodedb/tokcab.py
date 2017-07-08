@@ -9,7 +9,8 @@ import os.path
 import unittest
 import sys
 from threading import Lock
-from cs.logutils import error, Pfx
+from cs.logutils import error
+from cs.pfx import Pfx
 from cs.excutils import unimplemented
 from cs.py3 import StringTypes
 from . import NodeDB, Backend

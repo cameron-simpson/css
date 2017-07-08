@@ -5,9 +5,14 @@
 #   - Cameron Simpson <cs@zip.com.au> 05mar2017
 #
 
+from functools import partial
+from os.path import basename, splitext
 import sys
-from cs.logutils import X
+from cs.buffer import CornuCopyBuffer, chunky
+from cs.logutils import X, PfxThread, exception
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
+from .datafile import scan_chunks
 
 def linesof(chunks):
   ''' Process binary chunks, yield binary lines ending in '\n'.
@@ -15,8 +20,10 @@ def linesof(chunks):
   '''
   pending = []
   for chunk in chunks:
+    # get a memoryview so that we can cheaply queue bits of it
     mv_chunk = memoryview(chunk)
     upto = 0
+    # but scan the chunk, because memoryviews do not have .find
     nlpos = chunk.find(b'\n')
     while nlpos >= 0:
       pending.append(mv_chunk[upto:nlpos+1])
@@ -24,35 +31,122 @@ def linesof(chunks):
       pending = []
       upto = nlpos + 1
       nlpos = chunk.find(b'\n', upto)
+    # stash incomplete line in pending
     if upto < len(chunk):
       pending.append(mv_chunk[upto:])
   if pending:
     yield b''.join(pending)
 
-def parse_text(chunks, prefixes=None):
-  if prefixes is None:
-    prefixes = PREFIXES_ALL
-  prefixes = [ ( prefix
-                 if isinstance(prefix, bytes)
-                 else bytes(prefix)
-                      if isinstance(prefix, memoryview)
-                      else prefix.encode('utf-8')
-                           if isinstance(prefix, str)
-                           else prefix
-               )
-               for prefix in prefixes
-             ]
-  offset = 0
-  for line in linesof(chunks):
-    yield line
-    next_offset = None
-    for prefix in prefixes:
-      if line.startswith(prefix):
-        next_offset = offset
-        break
-    if next_offset is not None:
-      yield next_offset
-    offset += len(line)
+def scan_text(bfr, prefixes=None):
+  ''' Scan textual data, yielding offsets of lines starting with
+      useful prefixes, such as function definitions.
+  '''
+  with Pfx("scan_text"):
+    if prefixes is None:
+      prefixes = PREFIXES_ALL
+    prefixes = [ ( prefix
+                   if isinstance(prefix, bytes)
+                   else bytes(prefix)
+                        if isinstance(prefix, memoryview)
+                        else prefix.encode('utf-8')
+                             if isinstance(prefix, str)
+                             else prefix
+                 )
+                 for prefix in prefixes
+               ]
+    offset = 0
+    for line in linesof(bfr):
+      next_offset = None
+      for prefix in prefixes:
+        if line.startswith(prefix):
+          next_offset = offset
+          break
+      if next_offset is not None:
+        yield next_offset
+      offset += len(line)
+
+scan_text_from_chunks = chunky(scan_text)
+
+def report_offsets(bfr, run_parser):
+  ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
+      `bfr`: a CornuCopyBuffer
+      `run_parser`: a callable which runs the parser; it should accept a
+        CornuCopyBuffer as its sole argument.
+      This function allocates an IterableQueue to receive the parser offset
+      reports and sets the CornuCopyBuffer with report_offset copying
+      offsets to the queue.
+      It is the task of the parser to call `bfr.report_offset` as
+      necessary to indicate suitable offsets.
+  '''
+  with Pfx("report_offsets(bfr,run_parser=%s)", run_parser):
+    offsetQ = IterableQueue()
+    if bfr.copy_offsets is not None:
+      warning("bfr %s already has copy_offsets, replacing", bfr)
+    bfr.copy_offsets = offsetQ.put
+    def thread_body():
+      with Pfx("parser-thread"):
+        try:
+          run_parser(bfr)
+        except Exception as e:
+          exception("exception: %s", e)
+          raise
+        finally:
+          offsetQ.close()
+    T = PfxThread(target=thread_body)
+    T.start()
+    return offsetQ
+
+report_offsets_from_chunks = chunky(report_offsets)
+
+def scan_vtd(bfr):
+  ''' Scan a datafile from `bfr` and yield chunk start offsets.
+  '''
+  with Pfx("scan_vtd"):
+    def run_parser(bfr):
+      for offset, *etc in scan_chunks(bfr):
+        bfr.report_offset(offset)
+    return report_offsets(bfr, run_parser)
+
+def scan_mp3(bfr):
+  ''' Scan MP3 data from `bfr` and yield frame start offsets.
+  '''
+  from cs.mp3 import framesof as parse_mp3_from_buffer
+  with Pfx("scan_mp3"):
+    def run_parser(bfr):
+      for frame in parse_mp3_from_buffer(bfr):
+        pass
+    return report_offsets(bfr, run_parser)
+
+scan_mp3_from_chunks = chunky(scan_mp3)
+
+def scan_mp4(bfr):
+  ''' Scan ISO14496 input and yield Box start offsets.
+  '''
+  from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
+  with Pfx("parse_mp4"):
+    def run_parser(bfr):
+      for B in parse_mp4_from_buffer(bfr, discard=True):
+        pass
+    return report_offsets(bfr, run_parser)
+
+parse_mp4_from_chunks = chunky(scan_mp4)
+
+def scanner_from_filename(filename):
+  ''' Choose a scanner based a filename.
+      Returns None if these is no special scanner.
+  '''
+  root, ext = splitext(basename(filename))
+  if ext:
+    assert ext.startswith('.')
+    parser = SCANNERS_BY_EXT.get(ext[1:].lower())
+    if parser is not None:
+      return parser
+  return None
+
+def scanner_from_mime_type(mime_type):
+  ''' Choose a scanner based a mime_type.
+  '''
+  return SCANNERS_BY_MIME_TYPE.get(mime_type)
 
 PREFIXES_MAIL = ( 'From ', '--' )
 PREFIXES_PYTHON = (
@@ -68,6 +162,33 @@ PREFIXES_PERL = (
 PREFIXES_SH = (
     'function ',
 )
+PREFIXES_SQL_DUMP = (
+    'INSERT INTO ',
+    'DROP TABLE ',
+    'CREATE TABLE ',
+)
+
+SCANNERS_BY_EXT = {
+  'go':     partial(scan_text, prefixes=PREFIXES_GO),
+  'mp3':    scan_mp3,
+  'mp4':    scan_mp4,
+  'pl':     partial(scan_text, prefixes=PREFIXES_PERL),
+  'pm':     partial(scan_text, prefixes=PREFIXES_PERL),
+  'py':     partial(scan_text, prefixes=PREFIXES_PYTHON),
+  'sh':     partial(scan_text, prefixes=PREFIXES_SH),
+  'sql':    partial(scan_text, prefixes=PREFIXES_SQL_DUMP),
+  'vtd':    scan_vtd,
+}
+
+SCANNERS_BY_MIME_TYPE = {
+  'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
+  'audio/mpeg':    scan_mp3,
+  'video/mp4':     scan_mp4,
+  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
+  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
+  'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
+  'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),
+}
 
 PREFIXES_ALL = (
     PREFIXES_MAIL
@@ -75,4 +196,5 @@ PREFIXES_ALL = (
     + PREFIXES_GO
     + PREFIXES_PERL
     + PREFIXES_SH
+    + PREFIXES_SQL_DUMP
 )

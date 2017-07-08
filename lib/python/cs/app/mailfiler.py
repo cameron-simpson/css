@@ -43,6 +43,7 @@ import subprocess
 from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
+from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
@@ -52,7 +53,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, \
 import cs.lex
 from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
                    get_qstr, match_tokens, get_delimited
-from cs.logutils import Pfx, setup_logging, with_log, \
+from cs.logutils import setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
@@ -60,7 +61,7 @@ from cs.mailutils import Maildir, message_addresses, modify_header, \
 from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
-from cs.app.maildb import MailDB
+from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047

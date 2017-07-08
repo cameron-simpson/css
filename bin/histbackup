@@ -89,7 +89,7 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
+[ -t 2 ] && trace=setx
 vecho=:
 symlink=LATEST
 src=
@@ -173,6 +173,7 @@ else
 fi
 daycode(){ date '+%Y-%m-%d'; }
 datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
+setx(){ ( set -x; command "$@" ); }
 
 ### rsync capabilities at local end
 ##rsync_has_link_dest=
@@ -330,7 +331,7 @@ do
     #
     # Trace execution of important commands (rsync, linktree etc).
     #
-    -x)         trace=set-x ;;
+    -x)         trace=setx ;;
 
     --)         shift; break ;;
     -*)         echo "$cmd: unrecognised option: $1" >&2

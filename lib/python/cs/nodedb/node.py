@@ -17,13 +17,15 @@ from threading import Thread
 from collections import namedtuple
 from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
-from cs.obj import O
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
-from cs.seq import the, get0
-from cs.threads import locked
+from cs.logutils import D, error, warning, info, debug, exception
+from cs.obj import O
+from cs.pfx import Pfx
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, unicode
+from cs.seq import the, get0
+from cs.threads import locked
+from cs.x import X
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name

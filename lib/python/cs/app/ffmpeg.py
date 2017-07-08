@@ -7,7 +7,7 @@
 from collections import namedtuple
 import os.path
 from subprocess import Popen, PIPE
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 from cs.obj import O
 
 class MetaData(O):
@@ -139,7 +139,8 @@ def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
     with Pfx("multiconvert"):
       argv = [ 'ffmpeg',
                '-y' if overwrite else '-n',
-             ]
+               '-strict', '-2',     # enables experimental codes
+               ]
       # assemble input arguments
       stdin = None
       stdout = None

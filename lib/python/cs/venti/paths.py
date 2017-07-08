@@ -5,7 +5,8 @@
 #
 
 import os
-from cs.logutils import Pfx, D, info, warning, error
+from cs.logutils import D, info, warning, error
+from cs.pfx import Pfx
 from .file import file_top_block
 from .dir import decode_Dirent_text, FileDirent
 

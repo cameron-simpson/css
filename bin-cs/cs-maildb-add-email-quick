@@ -6,7 +6,7 @@
 
 import os
 import sys
-from cs.csvutils import SharedCSVFile
+from cs.sharedfile import SharedCSVFile
 from cs.logutils import X
 from cs.mailutils import message_addresses, Message
 from cs.nodedb.csvdb import write_csv_file

@@ -3,7 +3,7 @@
 import os
 import sys
 from cs.logging import setup_logging, error
-from cs.logutils import cmd
+from cs.pfx import cmd
 import cs.csbug
 
 usage="Usage:\t"+cmd+'''\tReport this help message.

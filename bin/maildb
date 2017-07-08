@@ -4,4 +4,4 @@
 #       - Cameron Simpson <cs@zip.com.au> 04apr2009
 #
 
-exec python -m cs.app.maildb ${1+"$@"}
+exec python3 -m cs.app.maildb ${1+"$@"}

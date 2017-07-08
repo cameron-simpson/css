@@ -8,8 +8,10 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
-from cs.logutils import warning, Pfx, X
+from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.threads import locked_property
+from cs.x import X
 from . import _Recording, RecordingMetaData
 
 class Enigma2MetaData(RecordingMetaData):

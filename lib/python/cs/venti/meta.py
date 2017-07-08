@@ -12,8 +12,10 @@ from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import exception, error, warning, debug, X, XP, Pfx
+from cs.logutils import exception, error, warning, debug
+from cs.pfx import Pfx, XP
 from cs.threads import locked
+from cs.x import X
 from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'
@@ -115,6 +117,13 @@ def permbits_to_allow_deny(bits):
     else:
       sub += c
   return add, sub
+
+def rwx(mode):
+  ''' Transcribe 3 bits of a UNIX mode in 'rwx' form.
+  '''
+  return ( 'r' if mode&4 else '-' ) \
+       + ( 'w' if mode&2 else '-' ) \
+       + ( 'x' if mode&1 else '-' )
 
 class AC(object):
   __slots__ = ('prefix', 'allow', 'deny')
@@ -714,10 +723,12 @@ class Meta(dict):
 
   @staticmethod
   def _xattrify(xkv):
+    ''' Convert value `xkv` to bytes.
+    '''
     if isinstance(xkv, bytes):
       return xkv
     if isinstance(xkv, str):
-      return xkv.encode('iso8859-1')
+      return xkv.encode('utf-8')
     raise TypeError("cannot convert to bytes: %r" % (xkv,))
 
   def getxattr(self, xk, xv_default):
@@ -735,3 +746,15 @@ class Meta(dict):
 
   def listxattrs(self):
     return self._xattrs.keys()
+
+  @property
+  def mime_type(self):
+    return self.getxattr('user.mime_type', None)
+
+  @mime_type.setter
+  def mime_type(self, new_type):
+    self.setxattr('user.mime_type', value)
+
+  @mime_type.deleter
+  def mime_type(self):
+    self.delxattr('user.mime_type')

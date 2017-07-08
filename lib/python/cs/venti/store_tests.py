@@ -12,10 +12,11 @@ import sys
 import tempfile
 import unittest
 from cs.excutils import logexc
-import cs.logutils
-cs.logutils.X_via_tty = True
-from cs.logutils import setup_logging, warning, X
+from cs.logutils import setup_logging, warning
 from cs.randutils import randblock
+from cs.x import X
+import cs.x
+cs.x.X_via_tty = True
 from . import _TestAdditionsMixin
 from .datadir import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore
@@ -23,6 +24,8 @@ from .hash import HashUtilDict, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .hash_tests import _TestHashCodeUtils
 
 def multitest(method):
+  ''' Decorator to permute a test method for multplie Store types and hash classes.
+  '''
   def testMethod(self):
     for test_store, factory, kwargs, *args in (
         ('MappingStore', MappingStore, {'mapping': {}}),
@@ -88,12 +91,12 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertIsNot(chunk, None)
       self.assertEqual(chunk, random_chunk_map[h])
 
-##class TestMappingStore(_TestStore, unittest.TestCase):
+##class TestMappingStore(TestStore, unittest.TestCase):
 ##
 ##  def _init_Store(self):
 ##    self.S = MappingStore("TestMappingStore", {}, hashclass=self.hashclass)
 ##
-##class TestProgressStore(_TestStore, unittest.TestCase):
+##class TestProgressStore(TestStore, unittest.TestCase):
 ##
 ##  def _init_Store(self):
 ##    M = MappingStore("TestProgressStore", {}, hashclass=self.hashclass)
