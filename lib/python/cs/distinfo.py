@@ -24,7 +24,7 @@ from cs.threads import locked_property
 from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
+URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
