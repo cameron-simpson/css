@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
 }
 
 from functools import partial
@@ -31,6 +31,7 @@ import stat
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+from cs.deco import cached
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -277,114 +278,47 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
-def file_property(func):
+def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
+  ''' A decorator which caches a value obtained from a file.
+      In addition to all the keyword arguments for @cs.deco.cached,
+      this decorator also accepts the following argument:
+      `filename`: the filename to monitor. Default from the
+        ._{attr_name}__filename attribute. This value will be passed
+        to the method as the `filename` keyword parameter.
+      If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
+      If the `sig_func` is not specified it defaults to
+        cs.filestate.FileState({filename}).
+  '''
+  if attr_name is None:
+    attr_name = func.__name__
+  filename_attr = '_' + attr_name + '__filename'
+  filename0 = filename
+  if poll_delay is None:
+    poll_delay = DEFAULT_POLL_INTERVAL
+  sig_func = dkw.pop('sig_func', None)
+  if sig_func is None:
+    def sig_func(self):
+      filename = filename0
+      if filename is None:
+        filename = getattr(self, filename_attr)
+      return FileState(filename)
+  def wrap0(self, *a, **kw):
+    filename = kw.pop('filename', None)
+    if filename is None:
+      if filename0 is None:
+        filename = getattr(self, filename_attr)
+      else:
+        filename = filename0
+    kw['filename'] = filename
+    return func(self, *a, **kw)
+  dkw['attr_name'] = attr_name
+  dkw['sig_func'] = sig_func
+  return cached(wrap0, **dkw)
+
+def file_property(func, **kw):
   ''' A property whose value reloads if a file changes.
-      This is just the default mode for make_file_property().
-      `func` accepts the file path and returns the new value.
-      The underlying attribute name is '_' + func.__name__,
-      the default from make_file_property().
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestate and {attr_name}_path track the
-      associated file state.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
-
-      The decorated function just loads the file content and returns
-      the value computed from it. Example where .foo returns the
-      length of the file data:
-
-        class C(object):
-          def __init__(self):
-            self._foo_path = '.foorc'
-          @file_property
-          def foo(self):
-            with open(self._foo_path) as foofp:
-              value = len(foofp.read())
-            return value
-
-      The load function is called on the first access and on every
-      access thereafter where the associated file's FileState() has
-      changed and the time since the last successful load exceeds
-      the poll_rate (1s). Races are largely circumvented by ignoring
-      reloads that raise exceptions or where the FileState() before
-      the load differs from the FileState() after the load (indicating
-      the file was in flux during the load); the next poll will
-      retry.
   '''
-  return make_file_property()(func)
-
-def make_file_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL):
-  ''' Construct a decorator that watches an associated file.
-      `attr_name`: the underlying attribute, default: '_' + func.__name__
-      `unset_object`: the sentinel value for "uninitialised", default: None
-      `poll_rate`: how often in seconds to poll the file for changes, default: 1
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestate and {attr_name}_path track the
-      associated file state.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
-
-      The decorated function just loads the file content and returns
-      the value computed from it. Example where .foo returns the
-      length of the file data, polling no more often than once
-      every 3 seconds:
-
-        class C(object):
-          def __init__(self):
-            self._foo_path = '.foorc'
-          @make_file_property(poll_rate=3)
-          def foo(self):
-            with open(self._foo_path) as foofp:
-              value = len(foofp.read())
-            return value
-
-      The load function is called on the first access and on every
-      access thereafter where the associated file's FileState() has
-      changed and the time since the last successful load exceeds
-      the poll_rate (default 1s). Races are largely circumvented
-      by ignoring reloads that raise exceptions or where the FileState()
-      before the load differs from the FileState() after the load
-      (indicating the file was in flux during the load); the next
-      poll will retry.
-  '''
-  def made_file_property(func):
-    if attr_name is None:
-      attr_value = '_' + func.__name__
-    else:
-      attr_value = attr_name
-    attr_lock = attr_value + '_lock'
-    attr_filestate = attr_value + '_filestate'
-    attr_path = attr_value + '_path'
-    attr_lastpoll = attr_value + '_lastpoll'
-    def getprop(self):
-      ''' Try to reload the property value from the file if the property value
-          is stale and the file has been modified since the last reload.
-      '''
-      with getattr(self, attr_lock):
-        now = time.time()
-        then = getattr(self, attr_lastpoll, None)
-        if then is None or then + poll_rate <= now:
-          setattr(self, attr_lastpoll, now)
-          old_filestate = getattr(self, attr_filestate, None)
-          try:
-            new_filestate, new_value = poll_file(getattr(self, attr_path),
-                                          old_filestate,
-                                          partial(func, self),
-                                          missing_ok=True)
-          except NameError:
-            raise
-          except AttributeError:
-            raise
-          except Exception as e:
-            new_value = getattr(self, attr_value, unset_object)
-            if new_value is unset_object:
-              raise
-            exception("exception during poll_file (%s), leaving .%s untouched", e, attr_value)
-          else:
-            if new_filestate:
-              setattr(self, attr_value, new_value)
-              setattr(self, attr_filestate, new_filestate)
-      return getattr(self, attr_value, unset_object)
-    return property(getprop)
-  return made_file_property
+  return property(file_based(func, **kw))
 
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.

@@ -16,8 +16,8 @@ import time
 from cs.csvutils import csv_writerow
 from cs.debug import trace
 from cs.fileutils import FileState, rewrite_cmgr
-from cs.logutils import error, warning, info, debug, D, PfxThread
-from cs.pfx import Pfx, XP
+from cs.logutils import error, warning, info, debug, D
+from cs.pfx import Pfx, PfxThread, XP
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from cs.sharedfile import SharedCSVFile
 from cs.threads import locked

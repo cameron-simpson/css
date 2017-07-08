@@ -14,7 +14,6 @@ from collections import namedtuple
 import os
 
 _FileState = namedtuple('FileState', 'stat mtime size dev ino')
-_FileState.samefile = lambda self, other: self.dev == other.dev and self.ino == other.ino
 
 def FileState(path, do_lstat=False):
   ''' Return a signature object for a file state derived from os.stat

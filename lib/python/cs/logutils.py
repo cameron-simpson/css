@@ -48,8 +48,6 @@ DISTINFO = {
         ],
 }
 
-cmd = __file__
-
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
@@ -65,7 +63,7 @@ def ifdebug():
 
 def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
   ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
-      Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
+      Sets cs.pfx.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
@@ -88,7 +86,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       If trace_mode is true, set the global trace_level to logging_level;
       otherwise it defaults to logging.DEBUG.
   '''
-  global cmd, logging_level, trace_level, D_mode, loginfo
+  global logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level()
@@ -107,8 +105,9 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  cmd = cmd_name
-  loginfo.cmd = cmd
+  import cs.pfx
+  cs.pfx.cmd = cmd_name
+  loginfo.cmd = cmd_name
 
   if main_log is None:
     main_log = sys.stderr
@@ -170,7 +169,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
     # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = trace_mode
+    Pfx._state.trace = info
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -260,7 +259,8 @@ class PfxFormatter(Formatter):
   def format(self, record):
     ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
     '''
-    record.cmd = self.cmd if self.cmd else globals()['cmd']
+    import cs.pfx
+    record.cmd = self.cmd if self.cmd else cs.pfx.cmd
     record.pfx = Pfx._state.prefix
     try:
       s = Formatter.format(self, record)

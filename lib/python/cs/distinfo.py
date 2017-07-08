@@ -6,13 +6,13 @@
 #
 
 from __future__ import print_function
-import sys
-import os
-import os.path
 from functools import partial
 from getopt import getopt, GetoptError
+import os
+import os.path
 from subprocess import Popen, PIPE
 import shutil
+import sys
 from tempfile import mkdtemp
 from threading import RLock
 from cs.logutils import setup_logging, info, warning, error
@@ -24,7 +24,7 @@ from cs.threads import locked_property
 from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
+URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -248,7 +248,7 @@ class PyPI_Package(O):
                       ('version', self.pypi_version),
                       ):
       if value is None:
-        warning("_prep: no value for %r", name)
+        warning("_prep: no value for %r", kw)
       else:
         with Pfx(kw):
           if kw in dinfo:

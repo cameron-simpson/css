@@ -19,6 +19,7 @@ from cs.later import Later
 import cs.logutils
 from cs.logutils import debug, info, warning, error, D
 from cs.obj import O
+import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -49,7 +50,7 @@ class Maker(MultiOpenMixin):
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
     if name is None:
-      name = cs.logutils.cmd
+      name = cs.pfx.cmd
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
@@ -115,10 +116,10 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get( (cs.logutils.cmd+'rc').upper() )
+      makerc = os.environ.get( (cs.pfx.cmd+'rc').upper() )
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
-      makefile = os.path.basename(cs.logutils.cmd).title() + 'file'
+      makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
       _makefiles.append(makefile)
       self._makefiles = _makefiles
     if type(_makefiles) is not tuple:
