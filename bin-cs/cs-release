@@ -11,6 +11,7 @@ from __future__ import print_function
 from collections import defaultdict
 from getopt import GetoptError
 import sys
+import os
 import os.path
 import re
 from subprocess import Popen, PIPE, check_call
@@ -577,10 +578,10 @@ class ReleaseName(object):
     ''' List of paths relevant this name, for use with hg log.
     '''
     prefix = self.prefix
-    base = os.path.join(PYLIBTOP, prefix.replace('.', '/'))
+    base = os.path.join(PYLIBTOP, prefix.replace('.', os.sep))
     basepy = base + '.py'
     readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
-    return (base, basepy, readme)
+    return base, basepy, readme
 
   def log_since(self):
     ''' Generator yielding (files, line) tuples for log lines since the last release for the supplied `prefix`.
