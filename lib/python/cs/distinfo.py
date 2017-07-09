@@ -59,9 +59,9 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
   -v pypi-version
         Version number for PyPI. Default from last release tag for pkg-name.
   Operations:
-    check   Run setup.py check on the resulting package.
-    register Register/update the package description and version.
-    upload   Upload the package source distribution.'''
+    check       Run setup.py check on the resulting package.
+    register    Register/update the package description and version.
+    upload      Upload the package source distribution.'''
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
@@ -208,7 +208,7 @@ class PyPI_Package(O):
     self.pypi_url = pypi_url
     self.package = Package(package_name)
     self.package.version = package_version
-    efl._pypi_package_name = pypi_package_name
+    self._pypi_package_name = pypi_package_name
     self._pypi_version = pypi_package_version
     self.pypi_version = pypi_version
     self.libdir = LIBDIR
