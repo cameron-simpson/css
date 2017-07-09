@@ -14,14 +14,11 @@ from subprocess import Popen, PIPE
 import shutil
 import sys
 from tempfile import mkdtemp
-from threading import RLock
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 import cs.sh
-from cs.threads import locked_property
-from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
 URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
@@ -49,15 +46,18 @@ DISTINFO_CLASSIFICATION = {
 }
 
 
-USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args...]
-  -n pypi-pkg-name
+USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-args...]
+  -n pypi-pkgname
         Name of package in PyPI. Default the same as the local package.
   -r pypi_repo_url
         Use the specified PyPI repository URL.
         Default: %s, or from the environment variable $PYPI_URL.
         Official site: %s
   -v pypi-version
-        Version number for PyPI. Default from last release tag for pkg-name.
+        Version number for PyPI. Default from the chosen pkgname release.
+  pkgname
+        Python package/module name.
+  @tag  Use the specified VCS tag. Default: the last release tag for pkgname.
   Operations:
     check       Run setup.py check on the resulting package.
     register    Register/update the package description and version.
@@ -70,6 +70,8 @@ def main(argv):
 
   badopts = False
 
+  package_name = None
+  vcs_tag = None
   pypi_package_name = None
   pypi_version = None
   pypi_url = None
@@ -93,10 +95,15 @@ def main(argv):
           badopts = True
 
   if not argv:
-    warning("missing pkg-name")
+    warning("missing pkgname")
     badopts = True
   else:
     package_name = argv.pop(0)
+    try:
+      package_name, vcs_tag = package_name.split('@', 1)
+    except ValueError:
+      pass
+
     if not argv:
       warning("missing op")
       badopts = True
@@ -202,7 +209,7 @@ class Package(O):
 
 class PyPI_Package(O):
 
-  def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_version=None):
+  def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_package_version=None):
     ''' Initialise: save package_name and its name in PyPI.
     '''
     self.pypi_url = pypi_url
@@ -210,7 +217,6 @@ class PyPI_Package(O):
     self.package.version = package_version
     self._pypi_package_name = pypi_package_name
     self._pypi_version = pypi_package_version
-    self.pypi_version = pypi_version
     self.libdir = LIBDIR
     self._prep_distinfo()
 
