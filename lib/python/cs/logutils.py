@@ -76,7 +76,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       infer_logging_level().
       If `upd_mode` is None, set it to True if flags contains 'UPD',
       otherwise to False if flags contains 'NOUPD', otherwise set
-      it from main_log.isatty().
+      it to False (was from main_log.isatty()).
       A true value causes the root logger to use cs.upd for logging.
       If `ansi_mode` is None, set it from main_log.isatty().
       A true value causes the root logger to colour certain logging levels
@@ -143,7 +143,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     elif 'NOUPD' in flags:
       upd_mode = False
     else:
-      upd_mode = is_tty
+      ##upd_mode = is_tty
+      upd_mode = False
   loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
