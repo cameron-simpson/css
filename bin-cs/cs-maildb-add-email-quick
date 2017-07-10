@@ -6,7 +6,7 @@
 
 import os
 import sys
-from cs.csvutils import SharedCSVFile
+from cs.sharedfile import SharedCSVFile
 from cs.logutils import X
 from cs.mailutils import message_addresses, Message
 from cs.nodedb.csvdb import write_csv_file
@@ -20,6 +20,8 @@ csvpath = os.environ['MAILDB']
 M = Message(sys.stdin, headersonly=True)
 addresses = list(message_addresses(M, ['from', 'to', 'cc', 'bcc', 'reply-to']))
 csv = SharedCSVFile(csvpath)
-with csv.open() as fp:
+with csv.writer() as w:
   for realname, addr in addresses:
-    write_csv_file(fp, [('ADDRESS', addr.lower(), {'GROUP': groups})])
+    for group in groups:
+      row = [ 'ADDRESS', addr.lower(), 'GROUP', group ]
+      w.writerow(row)

@@ -41,8 +41,11 @@ from cs.env import envsub
 from cs.excutils import logexc
 from cs.fileutils import read_from
 from cs.later import Later
-from cs.logutils import setup_logging, D, X, XP, error, warning, info, Pfx
+from cs.logutils import setup_logging, D, error, warning, info
+from cs.x import X
+from cs.pfx import XP
 from cs.obj import O, O_str
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.resources import Pool
 from cs.threads import locked_property
