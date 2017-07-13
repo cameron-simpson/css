@@ -18,8 +18,9 @@ import sys
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
+from cs.cmdutils import pipefrom
 from cs.env import envsub
-from cs.logutils import setup_logging, info, warning
+from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
@@ -199,6 +200,7 @@ class Portfwd(FlaggedMixin):
     self.svcd = SvcD(self.ssh_argv,
                      name=self.svcd_name,
                      trace=trace,
+                     sig_func=self.sig_func,
                      test_func=lambda: os.system(self.test_shcmd) == 0,
                      test_flags={
                         'PORTFWD_DISABLE': False,
@@ -248,6 +250,22 @@ class Portfwd(FlaggedMixin):
     alert_argv = [ 'alert', '-t', alert_title, alert_message ]
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
+
+  def sig_func(self):
+    ''' Signature function, returning the ssh options for this target.
+    '''
+    ssh_argv = ['ssh']
+    if self.ssh_config:
+      ssh_argv.extend(['-F', self.ssh_config])
+    ssh_argv.append('-G')
+    ssh_argv.append(self.target)
+    ssh_proc = pipefrom(ssh_argv)
+    ssh_options = ssh_proc.stdout.read()
+    ssh_retcode = ssh_proc.wait()
+    if ssh_retcode != 0:
+      error("%r: non-zero return code: %s", ssh_argv, ssh_retcode)
+      return None
+    return ssh_options
 
 class Portfwds(object):
 
