@@ -232,7 +232,7 @@ class Portfwd(FlaggedMixin):
       argv.append('-v')
     if self.ssh_config:
       argv.extend(['-F', self.ssh_config])
-    argv.extend([ '-N',
+    argv.extend([ '-N', '-T',
                   '-o', 'ExitOnForwardFailure=yes',
                   '-o', 'PermitLocalCommand=yes',
                   '-o', 'LocalCommand=' + self.ssh_localcommand,
@@ -257,7 +257,7 @@ class Portfwd(FlaggedMixin):
     ssh_argv = ['ssh']
     if self.ssh_config:
       ssh_argv.extend(['-F', self.ssh_config])
-    ssh_argv.append('-G')
+    ssh_argv.extend(['-G', '-T'])
     ssh_argv.append(self.target)
     ssh_proc = pipefrom(ssh_argv)
     ssh_options = ssh_proc.stdout.read()
