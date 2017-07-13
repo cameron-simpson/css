@@ -305,6 +305,7 @@ class Portfwds(object):
     try:
       P = self._forwards[target]
     except KeyError:
+      info("instantiate new target %r", target)
       P = Portfwd(target, ssh_config=self.ssh_config,
                   trace=self.trace, flags=self.flags)
       self._forwards[target] = P
@@ -315,11 +316,13 @@ class Portfwds(object):
     for target in required:
       P = self.forward(target)
       if target not in self.targets_running:
+        info("start target %r", target)
         P.start()
         self.targets_running[target] = P
     running = list(self.targets_running.keys())
     for target in running:
       if target not in required:
+        info("stop target %r", target)
         P = self.targets_running[target]
         P.stop()
         del self.targets_running[target]
