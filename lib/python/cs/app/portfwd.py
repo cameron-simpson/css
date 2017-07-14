@@ -348,7 +348,10 @@ class Portfwds(object):
       targets.update(self.resolve_target_spec(spec))
     if self.auto_mode:
       for flagname in self.flags:
-        if flagname.startswith('PORTFWD_') and flagname.endswith('_AUTO'):
+        if ( flagname.startswith('PORTFWD_')
+         and flagname.endswith('_AUTO')
+         and self.flags[flagname]
+        ):
           targets.add(lowername(flagname[8:-5]))
     return targets
 
