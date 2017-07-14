@@ -292,6 +292,8 @@ class Portfwds(object):
     self.target_conditions = defaultdict(list)
     self.target_groups = defaultdict(set)
     self.targets_running = {}
+    if self.ssh_config:
+      self._load_ssh_config()
 
   @property
   def forwards(self):
@@ -402,9 +404,9 @@ class Portfwds(object):
               label = m.group(1)
               tail = line[m.end():]
               with Pfx(label):
+                words = tail.split()
                 if label == 'F':
                   # F: target condition...
-                  words = tail.split()
                   if not words:
                     warning("nothing follows")
                     continue
@@ -415,14 +417,15 @@ class Portfwds(object):
                       continue
                     op = words.pop(0)
                     with Pfx(op):
-                      if words and words[0].startswith('!'):
-                        invert = True
-                        words[0] = words[0][1:]
-                        if not words[0]:
+                      invert = False
+                      if words:
+                        if words[0] == '!':
+                          invert = True
                           words.pop(0)
-                      else:
-                        invert = False
-                      C = Condition(self, target, op, invert, *words)
+                        elif words[0].startswith('!'):
+                          invert = True
+                          words[0] = words[0][1:]
+                      C = Condition(self, op, invert, *words)
                       self.target_conditions[target].append(C)
                 else:
                   # GROUP: targets...
