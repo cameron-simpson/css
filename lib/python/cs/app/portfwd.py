@@ -198,7 +198,7 @@ class Portfwd(FlaggedMixin):
                      test_func=self.test_func,
                      test_flags={
                         'PORTFWD_DISABLE': False,
-                        'PORTFWD_SHH_READY': True,
+                        'PORTFWD_SSH_READY': True,
                         'ROUTE_DEFAULT': True,
                      },
                      on_reap=on_reap
@@ -260,14 +260,10 @@ class Portfwd(FlaggedMixin):
     return ssh_options
 
   def test_func(self):
-    X("TEST %r", self.name)
     for condition in self.conditions:
-      X("TEST: probe %s", condition)
       if not condition.probe():
-        X("%s: failed: %s", self.name, condition)
         return False
     if self.test_shcmd:
-      X("TEST: system(%r)", self.test_shcmd)
       return os.system(self.test_shcmd) == 0
     return True
 
