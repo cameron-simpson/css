@@ -80,18 +80,22 @@ def main(argv, environ=None):
       raise GetoptError("missing arguments")
     arg0 = argv[0]
     if arg0 == 'disable':
+      argv.pop(0)
       for name in argv:
         SvcD([], name=name).disable()
       return 0
     if arg0 == 'enable':
+      argv.pop(0)
       for name in argv:
         SvcD([], name=name).enable()
       return 0
     if arg0 == 'restart':
+      argv.pop(0)
       for name in argv:
         SvcD([], name=name).restart()
       return 0
     if arg0 == 'stop':
+      argv.pop(0)
       for name in argv:
         SvcD([], name=name).stop()
       return 0
