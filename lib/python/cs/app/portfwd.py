@@ -309,7 +309,8 @@ class Portfwds(object):
     except KeyError:
       info("instantiate new target %r", target)
       P = Portfwd(target, ssh_config=self.ssh_config,
-                  trace=self.trace, flags=self.flags)
+                  trace=self.trace, flags=self.flags,
+                  conditions=self.target_conditions[target])
       self._forwards[target] = P
     return P
 
@@ -467,6 +468,12 @@ class _PortfwdCondition(object):
     self.portfwd = portfwd
     self.invert = invert
 
+  def __str__(self):
+    return "%s%s[%s]" % (self.__class__.__name__,
+                       '!' if self.invert else '',
+                       ','.join("%s=%r" % (attr, getattr(self, attr))
+                                for attr in sorted(self._attrnames)
+                               ))
   def __bool__(self):
     if self.test():
       return not self.invert
@@ -482,9 +489,11 @@ class _PortfwdCondition(object):
 
   def probe(self):
     result = self.test()
-    return not result if self.ivert else result
+    return not result if self.invert else result
 
 class FlagCondition(_PortfwdCondition):
+
+  _attrnames = ['flag']
 
   def __init__(self, portfwd, invert, flag):
     super().__init__(portfwd, invert)
@@ -502,6 +511,9 @@ class FlagCondition(_PortfwdCondition):
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
+
+  _attrnames = ['ping_target']
+
   def __init__(self, portfwd, invert, ping_target):
     super().__init__(portfwd, invert)
     self.ping_target = ping_target
