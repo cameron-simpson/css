@@ -30,20 +30,19 @@ def main(argv=None):
     return 2
 
   # gather any macro assignments and apply
-  ns = None
+  cmd_ns = {}
   while args:
     macro = parseMacroAssignment("command line", args[0])
     if macro is None:
       break
-    if ns is None:
-      ns = {}
-      M._namespaces.insert(0, ns)
-    ns[macro.name] = macro
+    cmd_ns[macro.name] = macro
     args.pop(0)
 
   # defer __enter__ until after option parsing
   ok = M.loadMakefiles(M.makefiles)
   ok = ok and M.loadMakefiles(M.appendfiles)
+  if cmd_ns:
+    M._namespaces.insert(0, cmd_ns)
   if not ok:
     error("errors loading Mykefiles")
     xit = 1

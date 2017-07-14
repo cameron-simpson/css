@@ -18,8 +18,9 @@ import sys
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
+from cs.cmdutils import pipefrom
 from cs.env import envsub
-from cs.logutils import setup_logging, info, warning
+from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
@@ -177,18 +178,12 @@ def main(argv, environ=None):
 
 class Portfwd(FlaggedMixin):
 
-  def __init__(self, target, ssh_config=None, test_shcmd=None, trace=False, verbose=False, flags=None):
+  def __init__(self, target, ssh_config=None, conditions=(), test_shcmd=None, trace=False, verbose=False, flags=None):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
-    if test_shcmd is None:
-      test_shcmd = ':'
-    test_shcmd = (
-        'set -ue\n'
-        + test_shcmd
-        + '\nflag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1'
-        )
     self.test_shcmd = test_shcmd
     self.ssh_config = ssh_config
+    self.conditions = conditions
     self.trace = trace
     self.verbose = verbose
     self.target = target
@@ -199,9 +194,11 @@ class Portfwd(FlaggedMixin):
     self.svcd = SvcD(self.ssh_argv,
                      name=self.svcd_name,
                      trace=trace,
-                     test_func=lambda: os.system(self.test_shcmd) == 0,
+                     sig_func=self.sig_func,
+                     test_func=self.test_func,
                      test_flags={
                         'PORTFWD_DISABLE': False,
+                        'PORTFWD_SSH_READY': True,
                         'ROUTE_DEFAULT': True,
                      },
                      on_reap=on_reap
@@ -220,17 +217,14 @@ class Portfwd(FlaggedMixin):
     xit = self.svcd.wait()
     return xit
 
-  def test_shcmd(self):
-    return self.svcd.test_shcmd()
-
   @prop
   def ssh_argv(self):
-    argv = [ 'ssh' ]
+    argv = ['ssh']
     if self.verbose:
       argv.append('-v')
     if self.ssh_config:
       argv.extend(['-F', self.ssh_config])
-    argv.extend([ '-N',
+    argv.extend([ '-N', '-T',
                   '-o', 'ExitOnForwardFailure=yes',
                   '-o', 'PermitLocalCommand=yes',
                   '-o', 'LocalCommand=' + self.ssh_localcommand,
@@ -248,6 +242,30 @@ class Portfwd(FlaggedMixin):
     alert_argv = [ 'alert', '-t', alert_title, alert_message ]
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
+
+  def sig_func(self):
+    ''' Signature function, returning the ssh options for this target.
+    '''
+    ssh_argv = ['ssh']
+    if self.ssh_config:
+      ssh_argv.extend(['-F', self.ssh_config])
+    ssh_argv.extend(['-G', '-T'])
+    ssh_argv.append(self.target)
+    ssh_proc = pipefrom(ssh_argv)
+    ssh_options = ssh_proc.stdout.read()
+    ssh_retcode = ssh_proc.wait()
+    if ssh_retcode != 0:
+      error("%r: non-zero return code: %s", ssh_argv, ssh_retcode)
+      return None
+    return ssh_options
+
+  def test_func(self):
+    for condition in self.conditions:
+      if not condition.probe():
+        return False
+    if self.test_shcmd:
+      return os.system(self.test_shcmd) == 0
+    return True
 
 class Portfwds(object):
 
@@ -274,6 +292,8 @@ class Portfwds(object):
     self.target_conditions = defaultdict(list)
     self.target_groups = defaultdict(set)
     self.targets_running = {}
+    if self.ssh_config:
+      self._load_ssh_config()
 
   @property
   def forwards(self):
@@ -287,8 +307,10 @@ class Portfwds(object):
     try:
       P = self._forwards[target]
     except KeyError:
+      info("instantiate new target %r", target)
       P = Portfwd(target, ssh_config=self.ssh_config,
-                  trace=self.trace, flags=self.flags)
+                  trace=self.trace, flags=self.flags,
+                  conditions=self.target_conditions[target])
       self._forwards[target] = P
     return P
 
@@ -297,11 +319,13 @@ class Portfwds(object):
     for target in required:
       P = self.forward(target)
       if target not in self.targets_running:
+        info("start target %r", target)
         P.start()
         self.targets_running[target] = P
     running = list(self.targets_running.keys())
     for target in running:
       if target not in required:
+        info("stop target %r", target)
         P = self.targets_running[target]
         P.stop()
         del self.targets_running[target]
@@ -327,7 +351,10 @@ class Portfwds(object):
       targets.update(self.resolve_target_spec(spec))
     if self.auto_mode:
       for flagname in self.flags:
-        if flagname.startswith('PORTFWD_') and flagname.endswith('_AUTO'):
+        if ( flagname.startswith('PORTFWD_')
+         and flagname.endswith('_AUTO')
+         and self.flags[flagname]
+        ):
           targets.add(lowername(flagname[8:-5]))
     return targets
 
@@ -358,8 +385,7 @@ class Portfwds(object):
 
   def _load_ssh_config(self):
     ''' Read configuration information from the ssh config.
-
-        # F: target needs 
+        # F: target needs
         # GROUP: target...
     '''
     cfg = self.ssh_config
@@ -379,9 +405,9 @@ class Portfwds(object):
               label = m.group(1)
               tail = line[m.end():]
               with Pfx(label):
+                words = tail.split()
                 if label == 'F':
                   # F: target condition...
-                  words = tail.split()
                   if not words:
                     warning("nothing follows")
                     continue
@@ -392,14 +418,15 @@ class Portfwds(object):
                       continue
                     op = words.pop(0)
                     with Pfx(op):
-                      if words and words[0].startswith('!'):
-                        invert = True
-                        words[0] = words[0][1:]
-                        if not words[0]:
+                      invert = False
+                      if words:
+                        if words[0] == '!':
+                          invert = True
                           words.pop(0)
-                      else:
-                        invert = False
-                      C = Condition(self, target, op, invert, *words)
+                        elif words[0].startswith('!'):
+                          invert = True
+                          words[0] = words[0][1:]
+                      C = Condition(self, op, invert, *words)
                       self.target_conditions[target].append(C)
                 else:
                   # GROUP: targets...
@@ -441,6 +468,12 @@ class _PortfwdCondition(object):
     self.portfwd = portfwd
     self.invert = invert
 
+  def __str__(self):
+    return "%s%s[%s]" % (self.__class__.__name__,
+                       '!' if self.invert else '',
+                       ','.join("%s=%r" % (attr, getattr(self, attr))
+                                for attr in sorted(self._attrnames)
+                               ))
   def __bool__(self):
     if self.test():
       return not self.invert
@@ -454,7 +487,13 @@ class _PortfwdCondition(object):
       cmd = 'if ' + cmd + '; then false; else true; fi'
     return cmd
 
+  def probe(self):
+    result = self.test()
+    return not result if self.invert else result
+
 class FlagCondition(_PortfwdCondition):
+
+  _attrnames = ['flag']
 
   def __init__(self, portfwd, invert, flag):
     super().__init__(portfwd, invert)
@@ -472,6 +511,9 @@ class FlagCondition(_PortfwdCondition):
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
+
+  _attrnames = ['ping_target']
+
   def __init__(self, portfwd, invert, ping_target):
     super().__init__(portfwd, invert)
     self.ping_target = ping_target
