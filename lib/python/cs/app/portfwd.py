@@ -178,7 +178,7 @@ def main(argv, environ=None):
 
 class Portfwd(FlaggedMixin):
 
-  def __init__(self, target, ssh_config=None, test_shcmd=None, trace=False, verbose=False, flags=None):
+  def __init__(self, target, ssh_config=None, conditions=(), test_shcmd=None, trace=False, verbose=False, flags=None):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     if test_shcmd is None:
@@ -190,6 +190,7 @@ class Portfwd(FlaggedMixin):
         )
     self.test_shcmd = test_shcmd
     self.ssh_config = ssh_config
+    self.conditions = conditions
     self.trace = trace
     self.verbose = verbose
     self.target = target
@@ -201,7 +202,7 @@ class Portfwd(FlaggedMixin):
                      name=self.svcd_name,
                      trace=trace,
                      sig_func=self.sig_func,
-                     test_func=lambda: os.system(self.test_shcmd) == 0,
+                     test_func=self.test_func,
                      test_flags={
                         'PORTFWD_DISABLE': False,
                         'ROUTE_DEFAULT': True,
@@ -227,7 +228,7 @@ class Portfwd(FlaggedMixin):
 
   @prop
   def ssh_argv(self):
-    argv = [ 'ssh' ]
+    argv = ['ssh']
     if self.verbose:
       argv.append('-v')
     if self.ssh_config:
@@ -266,6 +267,16 @@ class Portfwd(FlaggedMixin):
       error("%r: non-zero return code: %s", ssh_argv, ssh_retcode)
       return None
     return ssh_options
+
+  def test_func(self):
+    X("TEST %r", self.name)
+    for condition in self.conditions:
+      X("TEST: probe %s", condition)
+      if not condition.probe():
+        X("%s: failed: %s", self.name, condition)
+        return False
+    X("TEST: system(%r)", self.test_shcmd)
+    return os.system(self.test_shcmd) == 0
 
 class Portfwds(object):
 
@@ -474,6 +485,10 @@ class _PortfwdCondition(object):
     if self.invert:
       cmd = 'if ' + cmd + '; then false; else true; fi'
     return cmd
+
+  def probe(self):
+    result = self.test()
+    return not result if self.ivert else result
 
 class FlagCondition(_PortfwdCondition):
 
