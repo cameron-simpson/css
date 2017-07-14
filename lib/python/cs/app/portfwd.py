@@ -181,13 +181,6 @@ class Portfwd(FlaggedMixin):
   def __init__(self, target, ssh_config=None, conditions=(), test_shcmd=None, trace=False, verbose=False, flags=None):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
-    if test_shcmd is None:
-      test_shcmd = ':'
-    test_shcmd = (
-        'set -ue\n'
-        + test_shcmd
-        + '\nflag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1'
-        )
     self.test_shcmd = test_shcmd
     self.ssh_config = ssh_config
     self.conditions = conditions
@@ -205,6 +198,7 @@ class Portfwd(FlaggedMixin):
                      test_func=self.test_func,
                      test_flags={
                         'PORTFWD_DISABLE': False,
+                        'PORTFWD_SHH_READY': True,
                         'ROUTE_DEFAULT': True,
                      },
                      on_reap=on_reap
@@ -222,9 +216,6 @@ class Portfwd(FlaggedMixin):
   def wait(self):
     xit = self.svcd.wait()
     return xit
-
-  def test_shcmd(self):
-    return self.svcd.test_shcmd()
 
   @prop
   def ssh_argv(self):
@@ -275,8 +266,10 @@ class Portfwd(FlaggedMixin):
       if not condition.probe():
         X("%s: failed: %s", self.name, condition)
         return False
-    X("TEST: system(%r)", self.test_shcmd)
-    return os.system(self.test_shcmd) == 0
+    if self.test_shcmd:
+      X("TEST: system(%r)", self.test_shcmd)
+      return os.system(self.test_shcmd) == 0
+    return True
 
 class Portfwds(object):
 
@@ -390,8 +383,7 @@ class Portfwds(object):
 
   def _load_ssh_config(self):
     ''' Read configuration information from the ssh config.
-
-        # F: target needs 
+        # F: target needs
         # GROUP: target...
     '''
     cfg = self.ssh_config
