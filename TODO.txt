@@ -1,3 +1,4 @@
+make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
 fvwm: move cs-fvwm-blah python code into cs.app.fvwm
