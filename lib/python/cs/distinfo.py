@@ -4,24 +4,27 @@
 # functions to prep and release packages to PyPI.
 #   - Cameron Simpson <cs@zip.com.au> 01jan2015
 #
+
 from __future__ import print_function
-import sys
-import os
-import os.path
 from functools import partial
 from getopt import getopt, GetoptError
+import os
+import os.path
 from subprocess import Popen, PIPE
 import shutil
+import sys
 from tempfile import mkdtemp
 from threading import RLock
-from cs.logutils import setup_logging, Pfx, info, warning, error, X
+from cs.logutils import setup_logging, info, warning, error
+from cs.obj import O
+from cs.pfx import Pfx
+from cs.py.modules import import_module_name
 import cs.sh
 from cs.threads import locked_property
-from cs.py.modules import import_module_name
-from cs.obj import O
+from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
+URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -245,7 +248,7 @@ class PyPI_Package(O):
                       ('version', self.pypi_version),
                       ):
       if value is None:
-        warning("_prep: no value for %r", name)
+        warning("_prep: no value for %r", kw)
       else:
         with Pfx(kw):
           if kw in dinfo:
@@ -264,7 +267,7 @@ class PyPI_Package(O):
 
   def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
     ''' Return a path based on a `package_name` (default self.package_name).
-        `prefix_dir`: is supplied, prefixed to the returned relative path.
+        `prefix_dir`: if supplied, prefixed to the returned relative path.
         `up`: if true, discard the last component of the package name before
         computing the path.
     '''
@@ -320,7 +323,7 @@ class PyPI_Package(O):
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
-          distinfo['long_description'] = readmefp.read().decode('utf-8')
+          distinfo['long_description'] = readmefp.read()
       shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
       with open(manifest_path, "a") as mfp:
         mfp.write('include README.rst\n')
@@ -355,8 +358,9 @@ class PyPI_Package(O):
       with open(setup_path, "w") as setup:
         distinfo = self.distinfo
         out = partial(print, file=setup)
-        out("#!/usr/bin/python")
-        out("from distutils.core import setup")
+        out("#!/usr/bin/env python")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
         out("setup(")
         # mandatory fields, in preferred order
         written = set()
@@ -396,12 +400,15 @@ class PyPI_Package(O):
     '''
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
+      # simple case - module file and its tests
       yield package_subpath + '.py'
       test_subpath = package_subpath + '_tests.py'
       test_path = os.path.join(libdir, test_subpath)
       if os.path.exists(test_path):
         yield test_subpath
     else:
+      # packages - all .py files in directory
+      # warning about unexpected other files
       libprefix = libdir + os.path.sep
       for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
         for filename in filenames:
@@ -433,7 +440,7 @@ class PyPI_Package(O):
         for subpath in self.package_paths(superpackage_name, self.libdir):
           hgargv.extend(['-I', os.path.join(self.libdir, subpath)])
       else:
-        # just collecting requires __init__.py files
+        # just collecting required __init__.py files
         hgargv.extend(['-I', os.path.join(base, '__init__.py')])
       package_parts.pop()
       first = False

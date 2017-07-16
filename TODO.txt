@@ -1,0 +1,38 @@
+make Asynchrons __await__able
+port cs.fileutils.files_property to cs.deco.cached
+cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
+fvwm: move cs-fvwm-blah python code into cs.app.fvwm
+nodedb:
+  reform map: dunders update and push changes, foreign methods to
+    ingest changes, iter to watch foreign changes or all changes,
+    support multiple iterators by registering notifiers?
+cs.py.func: find out why eval causes syntax error with raise e from e2
+vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
+portfwd ARP_ADDR check for local networks
+colourise command highlighing multiple regexps and line ranges
+mailfiler: prepend received lines on pickup and filing
+portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
+pf activate new-pf-clause
+e: sort entries
+rename shortpath-prompt to short-path, make path breaking shortenings options (for prompt mode), make it work with relative paths and files as endpoints
+setenv: remove cs.logutils, not py2.5 compatible
+vbox: support remote device import for mkvdi
+str: strace/ktrace wrapper, spawn ktrace + kdump -l
+vbox status
+vbox info
+vbox: list vms is needed by some op and missing
+compare curses calls between cs.logutils and cs.tty
+merge cs.fileutils.shortpath and bin-cs/shortpath-prompt
+myke: support +=
+cs.numeric
+  add histograms
+  function the evaluate a rolling hash against all possible permutations
+ssh-opts: cononical capitalisation of option names
+cs.buffer
+  unit tests
+cs.fileutils:
+  subfile: a file-like object proxying a byte range of another file
+  tail() with blocking and nonblocking mode; follow mode? emits chunks
+mp4/iso14496
+  STTSBox (_GenericSampleBox): shorter rendition of .samples
+  how is video stored? decoder for common formats

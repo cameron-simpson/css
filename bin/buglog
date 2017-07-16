@@ -25,7 +25,6 @@ set -ue
 : ${BUGSYSTEMS:=`bugsystems`}
 
 trace=
-[ -t 2 ] && trace=set-x
 
 readstdin=1
 when=

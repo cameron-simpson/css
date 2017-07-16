@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
 }
 
 import email.message
@@ -32,10 +32,12 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, exception, debug, D, X
-from cs.threads import locked_property
-from cs.seq import seq
+from cs.logutils import info, warning, exception, debug, D
+from cs.pfx import Pfx
 from cs.py3 import StringTypes
+from cs.seq import seq
+from cs.threads import locked_property
+from cs.x import X
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
@@ -438,7 +440,7 @@ class Maildir(mailbox.Maildir):
         The default is to transcribe all messages.
     '''
     if keys is None:
-      keys = self.iterkeys()
+      keys = self.keys()
     for key in keys:
       with Pfx(key):
         message = self[key]

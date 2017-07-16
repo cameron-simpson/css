@@ -9,7 +9,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.py3'],
+    'install_requires': ['cs.py3'],
 }
 
 import base64
@@ -20,7 +20,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
+from cs.py3 import bytes, unicode, ustr, sorted, StringTypes, joinbytes
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -127,9 +127,10 @@ _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
-      `whitelist`: a bytes or string object indicating byte values which may be represented directly in text; string objects are converted to 
-      hexify() and texthexify() output strings may be freely
-      concatenated and decoded with untexthexify().
+      `whitelist`: a bytes or string object indicating byte values
+        which may be represented directly in text; string objects are
+        converted to hexify() and texthexify() output strings may be
+        freely concatenated and decoded with untexthexify().
   '''
   if sys.hexversion < 0x03000000:
     bschr = lambda bs, ndx: bs[ndx]
@@ -179,6 +180,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   return ''.join(chunks)
 
 def untexthexify(s, shiftin='[', shiftout=']'):
+  ''' Decode a textual representation of binary data into binary data.
+      Outside of the `shiftin`/`shiftout` markers the binary data
+      are represented as hexadecimal. Within the markers the bytes
+      have the values of the ordinals of the characters.
+  '''
   chunks = []
   while len(s) > 0:
     hexlen = s.find(shiftin)
@@ -202,62 +208,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if len(s) % 2 != 0:
       raise TypeError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
-  return b''.join(chunks)
-
-# regexp to match RFC2047 text chunks
-re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
-
-def unrfc2047(s, warning=None):
-  ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
-      littered varieties that come from some low quality mail clients) and
-      decode them into flat Unicode.
-      `warning`: optional parameter specifying function to report warning messages, default cs.logutils.warning
-  '''
-  if warning is None:
-    from cs.logutils import warning
-  if not isinstance(s, unicode):
-    s = unicode(s, 'iso8859-1')
-  chunks = []
-  sofar = 0
-  for m in re_RFC2047.finditer(s):
-    start = m.start()
-    end = m.end()
-    if start > sofar:
-      chunks.append(s[sofar:start])
-    enccset = m.group(1)
-    enctype = m.group(2).upper()
-    # default to undecoded text
-    enctext = m.group(3)
-    if enctype == 'B':
-      try:
-        enctext = base64.b64decode(enctext)
-      except TypeError as e:
-        warning("%r: %e", enctext, e)
-        enctext = m.group()
-    elif enctype == 'Q':
-      try:
-        enctext = quopri.decodestring(enctext.replace('_', ' '))
-      except UnicodeEncodeError as e:
-        warning("%r: %e", enctext, e)
-        ##enctext = enctext.decode('iso8859-1')
-    else:
-      raise RuntimeError("unhandled RFC2047 string: %r" % (m.group(),))
-    try:
-      enctext = enctext.decode(enccset)
-    except LookupError as e:
-      warning("decode(%s): %e: %r", enccset, e, enctext)
-      enctext = enctext.decode('iso8859-1')
-    except UnicodeDecodeError as e:
-      warning("decode(%s): %s: %r", enccset, e, enctext)
-      enctext = enctext.decode(enccset, 'replace')
-    except UnicodeEncodeError as e:
-      warning("decode(%s): %e: %r", enccset, e, enctext)
-      enctext = enctext.decode(enccset, 'replace')
-    chunks.append(enctext)
-    sofar = end
-  if sofar < len(s):
-    chunks.append(s[sofar:])
-  return unicode('').join(chunks)
+  return joinbytes(chunks)
 
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
@@ -274,11 +225,23 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, offset, whitespace)
 
+def skipwhite(s, offset):
+  ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
+  '''
+  _, offset = get_white(s, offset=offset)
+  return offset
+
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_hexadecimal(s, offset=0):
+  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+      Return hex_string, new_offset.
+  '''
+  return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).

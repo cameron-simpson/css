@@ -10,15 +10,16 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
+    'install_requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
 }
 
 from getopt import GetoptError
 import os.path
 import sys
-from cs.nodedb.backend import Backend
+from cs.nodedb.backend import Backend, Update, ExtendUpdate, ResetUpdate
 from cs.nodedb.node import Node, NodeDB, NodeDBFromURL
-from cs.logutils import setup_logging, Pfx, error
+from cs.logutils import setup_logging, error
+from cs.pfx import Pfx
 
 def main(argv):
   xit = 0

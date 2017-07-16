@@ -12,7 +12,7 @@ set -ue
 pyver() {
   # NB: before python 3.4 "python --version" wrote to stderr
   # http://bugs.python.org/issue18338
-  "$1" --version 2>&1 | awk '{print$2}'
+  $trace "$1" --version 2>&1 | awk '{print$2}'
 }
 
 : ${VENV_DIR:=$HOME/var/venv}
@@ -20,8 +20,11 @@ pyver() {
 cmd=`basename "$0"`
 usage="Usage:
     $cmd [version]
-    $cmd [version] init [python]
+    $cmd [version] init [python [venv-dir]]
     $cmd [version] [exec] command [args...]"
+
+trace=
+[ -t 2 ] && trace=set-x
 
 badopts=
 
@@ -45,15 +48,19 @@ case "$op" in
     then  pyexe=$1; shift
     else  pyexe=python$pyver
     fi
-    if pyver=$( pyver "$pyexe" )
+    pyver=$( pyver "$pyexe" ) || exit 1
+    if [ $# -gt 0 ]
+    then  venvdir=$1; shift; set_major=
+    else  venvdir=$VENV_DIR/$pyver set_major=1
+    fi
+    $trace mkdir -- "$venvdir"
+    $trace virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
+    if [ $set_major ]
     then
-      if [ $# -gt 0 ]
-      then  venvdir=$1; shift
-      else  venvdir=$VENV_DIR/$pyver
-      fi
-      [ -t 2 ] && set -x
-      mkdir -- "$venvdir"
-      virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
+      venvdir_up=$( dirname "$venvdir" )
+      pyver_major=$( expr "x$pyver" : 'x\([1-9]\)\..*' )
+      symlink=$venvdir_up/$pyver_major
+      [ -e "$symlink" ] || $trace ln -s "$pyver" "$symlink"
     fi
     exit $?
     ;;
@@ -75,5 +82,6 @@ fi
 venvdir=$VENV_DIR/$pyver
 
 set +u
+[ -t 2 ] && echo "+ . $venvdir/bin/activate" >&2
 . "$venvdir/bin/activate"
-exec "$@"
+exec $trace "$@"

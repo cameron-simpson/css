@@ -12,6 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
 }
 
 import sys
@@ -58,7 +59,8 @@ def noexc(func):
       which I have had abort otherwise sensible code.
   '''
   def noexc_wrapper(*args, **kwargs):
-    from cs.logutils import exception, X
+    from cs.logutils import exception
+    from cs.x import X
     try:
       return func(*args, **kwargs)
     except Exception as e:
@@ -80,7 +82,8 @@ def noexc_gen(func):
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
-  from cs.logutils import exception, X
+  from cs.logutils import exception
+  from cs.x import X
 
   def noexc_gen_wrapper(*args, **kwargs):
     try:
@@ -138,6 +141,12 @@ def transmute(exc_from, exc_to=None):
         raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
     return transmute_transmutor_wrapper
   return transmutor
+
+def unattributable(func):
+  return transmute(AttributeError, RuntimeError)(func)
+
+def safe_property(func):
+  return property(unattributable(func))
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.

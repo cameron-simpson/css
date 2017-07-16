@@ -12,18 +12,20 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.func'],
+    'install_requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
 }
 
-import threading
-from threading import Condition, RLock
+from contextlib import contextmanager
+from threading import Condition, RLock, Lock, current_thread
 import time
 import traceback
 from cs.excutils import logexc
 import cs.logutils
-from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
+from cs.logutils import debug, warning, error
 from cs.obj import O
+from cs.pfx import Pfx, PfxCallInfo, XP
 from cs.py.stack import caller, stack_dump
+from cs.x import X
 
 class ClosedError(Exception):
   pass
@@ -64,7 +66,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._lock = lock
     self._finalise_later = finalise_later
-    self._finalise = Condition(self._lock)
+    self._finalise = None
 
   def __enter__(self):
     self.open(caller_frame=caller())
@@ -86,8 +88,10 @@ class MultiOpenMixin(O):
     self.opened = True
     with self._lock:
       self._opens += 1
-      if self._opens == 1:
-        self.startup()
+      opens = self._opens
+    if opens == 1:
+      self._finalise = Condition(self._lock)
+      self.startup()
     return self
 
   def close(self, enforce_final_close=False):
@@ -100,17 +104,18 @@ class MultiOpenMixin(O):
         for Fkey in sorted(self._opened_from.keys()):
           error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
         ##from cs.debug import thread_dump
-        ##thread_dump([threading.current_thread()])
+        ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      if self._opens == 0:
-        self.shutdown()
-        if not self._finalise_later:
-          self.finalise()
-      else:
-        if enforce_final_close:
-          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      opens = self._opens
+    if opens == 0:
+      self.shutdown()
+      if not self._finalise_later:
+        self.finalise()
+    else:
+      if enforce_final_close:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -118,13 +123,11 @@ class MultiOpenMixin(O):
         `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise is not None:
-        finalise = self._finalise
-        self._finalise = None
-        finalise.notify_all()
-        return
-    error("%s: finalised more than once" % (self,))
-    ##raise RuntimeError("%s: finalised more than once" % (self,))
+      finalise = self._finalise
+      if finalise is None:
+        raise RuntimeError("%s: finalised more than once" % (self,))
+      self._finalise = None
+      finalise.notify_all()
 
   @property
   def closed(self):
@@ -176,3 +179,45 @@ class MultiOpen(MultiOpenMixin):
 
   def shutdown(self):
     self.openable.close()
+
+class Pool(O):
+  ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
+      All the pool objects must be suitable for use, so the
+      `new_object` callable will typically be a closure. For example,
+      here is the __init__ for a per-thread AWS Bucket using a
+      distinct Session:
+
+      def __init__(self, bucket_name):
+        Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
+  '''
+
+  def __init__(self, new_object, max_size=None):
+    ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
+        `new_object` is a callable which returns a new object for the Pool.
+        `max_size`: The maximum size of the pool of available objects saved for reuse.
+            If omitted or None, defaults to 4.
+            If 0, no upper limit is applied.
+    '''
+    if max_size is None:
+      max_size = 4
+    self.new_object = new_object
+    self.max_size = max_size
+    self.pool = []
+    self._lock = Lock()
+
+  def __str__(self):
+    return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
+
+  @contextmanager
+  def instance(self):
+    ''' Context manager returning an object for use, which is returned to the pool afterwards.
+    '''
+    with self._lock:
+      try:
+        o = self.pool.pop()
+      except IndexError:
+        o = self.new_object()
+    yield o
+    with self._lock:
+      if self.max_size == 0 or len(self.pool) < self.max_size:
+        self.pool.append(o)

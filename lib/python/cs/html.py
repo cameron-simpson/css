@@ -14,14 +14,15 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.logutils', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.py3'],
 }
 
 from io import StringIO
 import re
 import sys
-from cs.logutils import warning, X
+from cs.logutils import warning
 from cs.py3 import StringTypes
+from cs.x import X
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')

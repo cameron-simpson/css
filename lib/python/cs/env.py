@@ -12,13 +12,26 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.lex'],
+    'install_requires': ['cs.lex'],
 }
 
 import os
 import string
 import types
 from cs.lex import get_qstr
+
+# various standard locations used in the cs.* modules
+LOGDIR  = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
+VARRUN  = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
+FLAGDIR = lambda environ=None: get_standard_var('FLAGDIR', '$HOME/var/flags', environ=environ)
+
+def get_standard_var(varname, default, environ=None):
+  if environ is None:
+    environ = os.environ
+  value = environ.get(varname)
+  if value is None:
+    value = envsub(default, environ)
+  return value
 
 def getLogin(uid=None):
   import pwd
@@ -61,10 +74,3 @@ def envsub(s, environ=None, default=None):
   if environ is None:
     environ = os.environ
   return get_qstr(s, 0, q=None, environ=environ, default=default)[0]
-
-def varlog(environ=None):
-  ''' Return the default base for logs for most cs.* modules.
-  '''
-  if environ is None:
-    environ = os.environ
-  return envsub('$HOME/var/log')

@@ -6,20 +6,20 @@
 
 import os
 import os.path
-from types import StringTypes
 import unittest
 import sys
-import thread
 from threading import Lock
-from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
-from cs.logutils import error, Pfx
+from cs.logutils import error
+from cs.pfx import Pfx
 from cs.excutils import unimplemented
+from cs.py3 import StringTypes
 from . import NodeDB, Backend
 from .node import nodekey
 
 class Backend_TokyoCabinet(Backend):
 
   def __init__(self, dbpath, readonly=False):
+    from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
     self.readonly = readonly
     self.dbpath = dbpath
     self.tcdb = TCHash()

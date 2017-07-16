@@ -12,11 +12,10 @@ import sys
 import unittest
 from cs.debug import thread_dump, debug_object_shell
 from cs.logutils import X
-from cs.randutils import rand0, randblock
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore
-from .store_tests import _TestStore
+from .store_tests import TestStore
 from .tcp import TCPStoreServer, TCPStoreClient
 
 BIND_HOST = '127.0.0.1'
@@ -24,7 +23,7 @@ _base_port = 9999
 
 def make_tcp_store():
   global _base_port
-  mapping_S = MappingStore(HashUtilDict())
+  mapping_S = MappingStore("tcp_tests.make_tcp_store.mapping_S", HashUtilDict())
   while True:
     bind_addr = (BIND_HOST, _base_port)
     try:
@@ -41,18 +40,18 @@ def make_tcp_store():
   S = TCPStoreClient(bind_addr)
   return S, remote_S
 
-class TestTCPStore(_TestStore, unittest.TestCase):
+class TestTCPStore(TestStore, unittest.TestCase):
 
   def _init_Store(self):
     self.S, self.remote_S = make_tcp_store()
 
   def setUp(self):
-    _TestStore.setUp(self)
+    TestStore.setUp(self)
     self.remote_S.open()
 
   def tearDown(self):
     self.remote_S.close()
-    _TestStore.tearDown(self)
+    TestStore.tearDown(self)
 
 class TestHashCodeUtilsTCPStore(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a TCPStore on a HashUtilDict.

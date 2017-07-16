@@ -1,5 +1,7 @@
 - .hg-cs-category
 - .job
+- *.pyc
+- __pycache__
 - pod2htm*.tmp
 - /cgi-bin
 - /cs

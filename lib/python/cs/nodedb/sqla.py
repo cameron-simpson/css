@@ -4,46 +4,17 @@ import os
 from threading import Lock
 import sys
 from contextlib import contextmanager
-import sqlalchemy
-from sqlalchemy import create_engine, \
-                       MetaData, Table, Column, Index, Integer, String, \
-                       select
-from sqlalchemy.pool import QueuePool
-from sqlalchemy.orm import mapper, sessionmaker
-from sqlalchemy.sql import and_, or_, not_, asc
-from sqlalchemy.sql.expression import distinct
 from cs.py3 import StringTypes
 from cs.excutils import unimplemented
-from cs.logutils import Pfx, error, warning, debug, trace, D
+from cs.logutils import error, warning, debug, trace, D
+from cs.pfx import Pfx
 from . import NodeDB, Backend
-
-def NODESTable(metadata, name=None):
-  ''' Set up an SQLAlchemy Table for the nodes.
-  '''
-  if name is None:
-    name='NODES'
-  return Table(name, metadata,
-               Column('ID', Integer, primary_key=True, nullable=False),
-               Column('NAME', String(64)),
-               Column('TYPE', String(64), nullable=False),
-              )
-
-def ATTRSTable(metadata, name=None):
-  ''' Set up an SQLAlchemy Table for the attributes.
-  '''
-  if name is None:
-    name='ATTRS'
-  return Table(name, metadata,
-               Column('ID', Integer, primary_key=True, nullable=False),
-               Column('NODE_ID', Integer, nullable=False, index=True),
-               Column('ATTR', String(64), nullable=False, index=True),
-               # mysql max index key len is 1000, so VALUE only 900
-               Column('VALUE', String(900), index=True),
-              )
 
 class Backend_SQLAlchemy(Backend):
 
   def __init__(self, engine, nodes_name=None, attrs_name=None, readonly=False):
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import QueuePool
     Backend.__init__(self, readonly=readonly)
     if isinstance(engine, StringTypes):
       echo = len(os.environ.get('DEBUG','')) > 0
@@ -62,18 +33,45 @@ class Backend_SQLAlchemy(Backend):
     self.__IDbyTypeName = {}
 
   def _open(self):
+    from sqlalchemy import MetaData
     engine = self.engine
-    metadata=MetaData()
+    metadata = MetaData()
     metadata.bind = engine
-    nodes = self.nodes = NODESTable(metadata, name=self.nodes_name)
+    nodes = self.nodes = self.NODESTable(metadata, name=self.nodes_name)
     Index('nametype', nodes.c.NAME, nodes.c.TYPE)
-    attrs = self.attrs = ATTRSTable(metadata, name=self.attrs_name)
+    attrs = self.attrs = self.ATTRSTable(metadata, name=self.attrs_name)
     Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
     metadata.create_all()
     self.attrs.select().execute()
 
   def _close(self):
     raise RuntimeError("how to close .engine?")
+
+  def NODESTable(metadata, name=None):
+    ''' Set up an SQLAlchemy Table for the nodes.
+    '''
+    from sqlalchemy import Table, Column, Index, Integer, String
+    if name is None:
+      name='NODES'
+    return Table(name, metadata,
+                 Column('ID', Integer, primary_key=True, nullable=False),
+                 Column('NAME', String(64)),
+                 Column('TYPE', String(64), nullable=False),
+                )
+
+  def ATTRSTable(metadata, name=None):
+    ''' Set up an SQLAlchemy Table for the attributes.
+    '''
+    from sqlalchemy import Table, Column, Index, Integer, String
+    if name is None:
+      name='ATTRS'
+    return Table(name, metadata,
+                 Column('ID', Integer, primary_key=True, nullable=False),
+                 Column('NODE_ID', Integer, nullable=False, index=True),
+                 Column('ATTR', String(64), nullable=False, index=True),
+                 # mysql max index key len is 1000, so VALUE only 900
+                 Column('VALUE', String(900), index=True),
+                )
 
   def _noteNodeKey(self, t, name, node_id):
     ''' Remember the mapping between db node_id and (type, name).
@@ -132,6 +130,8 @@ class Backend_SQLAlchemy(Backend):
   def nodedata(self):
     ''' Pull all node data from the database.
     '''
+    from sqlalchemy import select
+    from sqlalchemy.sql import and_, asc
     with Pfx("%s.nodedata()...", self):
       nodes = self.nodes
       attrs = self.attrs
@@ -184,6 +184,7 @@ class Backend_SQLAlchemy(Backend):
   def push_updates(self, csvrows):
     ''' Apply the update rows from the iterable `csvrows` to the database.
     '''
+    from sqlalchemy.sql import and_
     trace("push_updates: write our own updates")
     totext = self.nodedb.totext
     lastrow = None

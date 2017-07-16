@@ -5,7 +5,8 @@
 #
 
 import os
-from cs.logutils import Pfx, D, info, warning, error
+from cs.logutils import D, info, warning, error
+from cs.pfx import Pfx
 from .file import file_top_block
 from .dir import decode_Dirent_text, FileDirent
 
@@ -83,13 +84,14 @@ def resolve(rootD, subpath, do_mkdir=False):
     subpaths.pop(0)
   return E, parent, subpaths
 
-def walk(rootD, topdown=True):
+def walk(rootD, topdown=True, yield_status=False):
   ''' An analogue to os.walk to descend a vt Dir tree.
       Yields Dir, relpath, dirnames, filenames for each directory in the tree.
       The top directory (`rootD`) has the relpath ''.
   '''
   if not topdown:
     raise ValueError("topdown must be true, got %r" % (topdown,))
+  ok = True
   # queue of (Dir, relpath)
   pending = [ (rootD, '') ]
   while pending:
@@ -97,10 +99,21 @@ def walk(rootD, topdown=True):
     dirnames = thisD.dirs()
     filenames = thisD.files()
     yield thisD, relpath, dirnames, filenames
-    for dirname in reversed(dirnames):
-      subD = rootD.chdir1(dirname)
-      if relpath:
-        subpath = os.path.join(relpath, dirname)
-      else:
-        subpath = dirname
-      pending.append( (subD, subpath) )
+    with Pfx("walk(relpath=%r)", relpath):
+      for dirname in reversed(dirnames):
+        with Pfx("dirname=%r", dirname):
+          try:
+            subD = thisD.chdir1(dirname)
+          except KeyError as e:
+            if not yield_status:
+              raise
+            error("chdir1(%r): %s", dirname, e)
+            ok = False
+          else:
+            if relpath:
+              subpath = os.path.join(relpath, dirname)
+            else:
+              subpath = dirname
+            pending.append( (subD, subpath) )
+  if yield_status:
+    yield ok

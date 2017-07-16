@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'install_requires': [ 'cs.configutils', 'cs.env', 'cs.excutils', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
     'entry_points': {
       'console_scripts': [
           'mailfiler = cs.app.mailfiler:main',
@@ -43,6 +43,7 @@ import subprocess
 from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
+from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
@@ -50,9 +51,9 @@ from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
-                   unrfc2047, match_tokens, get_delimited
-from cs.logutils import Pfx, setup_logging, with_log, \
+from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
+                   get_qstr, match_tokens, get_delimited
+from cs.logutils import setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
@@ -60,9 +61,10 @@ from cs.mailutils import Maildir, message_addresses, modify_header, \
 from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
-from cs.app.maildb import MailDB
+from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
+from cs.rfc2047 import unrfc2047
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
@@ -354,14 +356,14 @@ class MailFiler(O):
   def logdir(self):
     ''' The pathname of the directory in which log files are written.
     '''
-    varlog = cs.env.varlog(self.environ)
+    varlog = cs.env.LOGDIR(self.environ)
     return os.path.join(varlog, 'mailfiler')
 
   def folder_logfile(self, folder_path):
     ''' Return path to log file associated with the named folder.
-        TODO: ase on relative path from folder root, not just basename.
+        TODO: base on relative path from folder root, not just basename.
     '''
-    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+    return os.path.join(self.logdir, '%s.log' % (os.path.basename(folder_path)))
 
   def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
@@ -532,6 +534,7 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.alert_rule = None
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
@@ -542,7 +545,7 @@ class MessageFiler(O):
         specifies the filename of the message, supporting hard linking
         the message into a Maildir.
     '''
-    with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
+    with with_log(os.path.join(cs.env.LOGDIR(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = message_path
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -559,6 +562,22 @@ class MessageFiler(O):
       except Exception as e:
         exception("matching rules: %s", e)
         return False
+
+      # apply additional targets from $ALERT_TARGETS, if any
+      if self.flags.alert:
+        alert_targets = self.environ.get('ALERT_TARGETS', '')
+        if alert_targets:
+          try:
+            Ts, offset = get_targets(alert_targets, 0)
+            offset = skipwhite(alert_targets, offset)
+            if offset < len(alert_targets):
+              raise ValueError('unparsed $ALERT_TARGETS text: %r'
+                               % alert_targets[offset:])
+          except Exception as e:
+            error('parsing $ALERT_TARGETS: %s', e)
+          else:
+            for T in Ts:
+              T.apply(self)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
@@ -594,6 +613,9 @@ class MessageFiler(O):
         This is separated out to support the command line "save target" operation.
     '''
     ok = True
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
     # save message to folders
     for folder in sorted(self.save_to_folders):
       try:
@@ -635,9 +657,6 @@ class MessageFiler(O):
       except Exception as e:
         exception("piping to %r: %s", shcmd, e)
         ok = False
-    # issue arrival alert
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
     return ok
 
   def modify(self, hdr, new_value, always=False):
@@ -836,8 +855,8 @@ class MessageFiler(O):
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
-	If `alert_level` is more than 1, prepend "-l alert_level"
-	to the alert command line arguments.
+        If `alert_level` is more than 1, prepend "-l alert_level"
+        to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
@@ -906,7 +925,7 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
 # local-part@domain
-re_simpleADDRatDOM_s = '[a-z0-9][\-a-z0-9]*' + re_atDOM_s
+re_simpleADDRatDOM_s = '[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
 
 # GROUPNAME or @domain
 re_GROUPNAMEorDOMorADDR_s = \
@@ -964,151 +983,160 @@ def parserules(fp):
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d", file_label, lineno):
-      if filename:
-        if not line.endswith('\n'):
+    P = Pfx("%s:%d", file_label, lineno)
+    if filename:
+      if not line.endswith('\n'):
+        with P:
           raise ValueError("short line at EOF")
 
-      # skip comments
-      if line.startswith('#'):
-        continue
+    # skip comments
+    if line.startswith('#'):
+      continue
 
-      # remove newline and trailing whitespace
-      line = line.rstrip()
+    # remove newline and trailing whitespace
+    line = line.rstrip()
 
-      # skip blank lines
-      if not line:
-        continue
+    # skip blank lines
+    if not line:
+      continue
 
-      # check for leading whitespace (continuation line)
-      _, offset = get_white(line, 0)
-      if not _:
-        # text at start of line ==> new rule
-        # yield old rule if in progress
-        if R:
-          yield R
-          R = None
-        # < includes only match at the start of a line
-        if line[offset] == '<':
-          # include another categories file
-          _, offset = get_white(line, offset+1)
-          subfilename, offset = get_nonwhite(line, offset=offset)
-          if not subfilename:
-            raise ValueError("missing filename")
-          subfilename = envsub(subfilename)
-          if filename:
-            subfilename = abspath_from_file(subfilename, filename)
-          else:
-            subfilename = os.path.abspath(subfilename)
-          for R in parserules(subfilename):
-            yield R
-          continue
-        # new rule: gather targets and label
-        R = Rule(filename=(filename if filename else file_label), lineno=lineno)
-
-        # leading optional '+' (continue) or '=' (final)
-        if line[offset] == '+':
-          R.flags.halt = False
-          offset += 1
-        elif line[offset] == '=':
-          R.flags.halt = True
-          offset += 1
-
-        # leading '!' alert: multiple '!' raise the alert level
-        while line[offset] == '!':
-          R.flags.alert += 1
-          offset += 1
-
-        # targets
-        Ts, offset = get_targets(line, offset)
-        R.targets.extend(Ts)
-        _, offset = get_white(line, offset)
-        if offset >= len(line):
-          # no label; end line parse
-          continue
-
-        # label
-        label, offset = get_nonwhite(line, offset)
-        if label == '.':
-          label = ''
-        R.label = label
-        _, offset = get_white(line, offset)
-        if offset >= len(line):
-          # no condition; end line parse
-          continue
-
-      # parse condition and add to current rule
-      condition_flags = O(invert=False)
-
-      if line[offset:] == '.':
-        # placeholder for no condition
-        continue
-
-      if line[offset] == '!':
-        condition_flags.invert = True
+    # check for leading whitespace (continuation line)
+    _, offset = get_white(line, 0)
+    if not _:
+      # text at start of line ==> new rule
+      # yield old rule if in progress
+      if R:
+        yield R
+        R = None
+      # < includes only match at the start of a line
+      if line[offset] == '<':
+        # include another categories file
         _, offset = get_white(line, offset+1)
-        if offset == len(line):
-          warning('no condition after "!"')
-          continue
+        subfilename, offset = get_nonwhite(line, offset=offset)
+        if not subfilename:
+          with P:
+            raise ValueError("missing filename")
+        subfilename = envsub(subfilename)
+        if filename:
+          subfilename = abspath_from_file(subfilename, filename)
+        else:
+          subfilename = os.path.abspath(subfilename)
+        for R in parserules(subfilename):
+          yield R
+        continue
+      # new rule: gather targets and label
+      R = Rule(filename=(filename if filename else file_label), lineno=lineno)
 
-      # leading hdr1,hdr2.func(
-      m = re_HEADERFUNCTION.match(line, offset)
+      # leading optional '+' (continue) or '=' (final)
+      if line[offset] == '+':
+        R.flags.halt = False
+        offset += 1
+      elif line[offset] == '=':
+        R.flags.halt = True
+        offset += 1
+
+      # leading '!' alert: multiple '!' raise the alert level
+      while line[offset] == '!':
+        R.flags.alert += 1
+        offset += 1
+
+      # targets
+      Ts, offset = get_targets(line, offset)
+      R.targets.extend(Ts)
+      _, offset = get_white(line, offset)
+      if offset >= len(line):
+        # no label; end line parse
+        continue
+
+      # label
+      label, offset = get_nonwhite(line, offset)
+      if label == '.':
+        label = ''
+      R.label = label
+      _, offset = get_white(line, offset)
+      if offset >= len(line):
+        # no condition; end line parse
+        continue
+
+    # parse condition and add to current rule
+    condition_flags = O(invert=False)
+
+    if line[offset:] == '.':
+      # placeholder for no condition
+      continue
+
+    if line[offset] == '!':
+      condition_flags.invert = True
+      _, offset = get_white(line, offset+1)
+      if offset == len(line):
+        warning('no condition after "!"')
+        continue
+
+    # leading hdr1,hdr2.func(
+    m = re_HEADERFUNCTION.match(line, offset)
+    if m:
+      header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
+      testfuncname = m.group(3)
+      offset = m.end()
+      _, offset = get_white(line, offset)
+      if offset == len(line):
+        with P:
+          raise ValueError("missing argument to header function")
+      if line[offset] == '"':
+        test_string, offset = get_qstr(line, offset)
+        _, offset = get_white(line, offset)
+        if offset == len(line) or line[offset] != ')':
+          with P:
+            raise ValueError("missing closing parenthesis after header function argument")
+        offset += 1
+        _, offset = get_white(line, offset)
+        if offset < len(line):
+          with P:
+            raise ValueError("extra text after header function: %r" % (line[offset:],))
+      else:
+        with P:
+          raise ValueError("unexpected argument to header function, expected double quoted string")
+      C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
+    else:
+      # leading hdr1,hdr2,...:
+      m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
       if m:
         header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
-        testfuncname = m.group(3)
         offset = m.end()
-        _, offset = get_white(line, offset)
         if offset == len(line):
-          raise ValueError("missing argument to header function")
-        if line[offset] == '"':
-          test_string, offset = get_qstr(line, offset)
-          _, offset = get_white(line, offset)
-          if offset == len(line) or line[offset] != ')':
-            raise ValueError("missing closing parenthesis after header function argument")
-          offset += 1
-          _, offset = get_white(line, offset)
-          if offset < len(line):
-            raise ValueError("extra text after header function: %r" % (line[offset:],))
-        else:
-          raise ValueError("unexpected argument to header function, expected double quoted string")
-        C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
-      else:
-        # leading hdr1,hdr2,...:
-        m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
-        if m:
-          header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
-          offset = m.end()
-          if offset == len(line):
+          with P:
             raise ValueError("missing match after header names")
+      else:
+        header_names = ('to', 'cc', 'bcc')
+      # headers:/regexp
+      if line[offset] == '/':
+        regexp = line[offset+1:]
+        if regexp.startswith('^'):
+          atstart = True
+          regexp = regexp[1:]
         else:
-          header_names = ('to', 'cc', 'bcc')
-        # headers:/regexp
-        if line[offset] == '/':
-          regexp = line[offset+1:]
-          if regexp.startswith('^'):
-            atstart = True
-            regexp = regexp[1:]
-          else:
-            atstart = False
-          C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
-        else:
-          # headers:(group[|group...])
-          m = re_INGROUPorDOMorADDR.match(line, offset)
-          if m:
-            group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
-            offset = m.end()
-            if offset < len(line):
+          atstart = False
+        C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
+      else:
+        # headers:(group[|group...])
+        m = re_INGROUPorDOMorADDR.match(line, offset)
+        if m:
+          group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
+          offset = m.end()
+          if offset < len(line):
+            with P:
               raise ValueError("extra text after groups: %s" % (line,))
-            C = Condition_InGroups(condition_flags, header_names, group_names)
-          else:
-            if line[offset] == '(':
+          C = Condition_InGroups(condition_flags, header_names, group_names)
+        else:
+          if line[offset] == '(':
+            with P:
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
-            # just a comma separated list of addresses
-            # TODO: should be RFC2822 list instead?
-            addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
-            C = Condition_AddressMatch(condition_flags, header_names, addrkeys)
+          # just a comma separated list of addresses
+          # TODO: should be RFC2822 list instead?
+          addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
+          C = Condition_AddressMatch(condition_flags, header_names, addrkeys)
 
-      R.conditions.append(C)
+    R.conditions.append(C)
 
   if R is not None:
     yield R
@@ -1121,10 +1149,20 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    if T is not None:
-      targets.append(T)
-    if offset < len(s) and s[offset] == ',':
-      offset += 1
+    targets.append(T)
+    if offset < len(s):
+      # check for whitespace (end of targets) or comma (another target)
+      ch = s[offset]
+      if ch.isspace():
+        continue
+      elif ch == ',':
+        while True:
+          offset += 1
+          if offset >= len(s) or s[offset] != ',':
+            break
+      else:
+        raise ValueError('offset %d: expected comma after target, found: %r'
+                         % (offset, s[offset:]))
   return targets, offset
 
 def get_target(s, offset, quoted=False):
@@ -1201,9 +1239,6 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    if offset < len(s):
-      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
-      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
@@ -1498,7 +1533,9 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
+    # choose to test message-ids or addresses
     if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      # test is against message-ids
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
@@ -1535,6 +1572,7 @@ class Condition_InGroups(_Condition):
                 debug("match %s to (%s)", msgid, group_name)
                 return True
     else:
+      # test is against addresses
       for address in filer.addresses(header_name):
         for group_name in self.group_names:
           if group_name.startswith('@'):
@@ -1543,6 +1581,7 @@ class Condition_InGroups(_Condition):
               debug("match %s to %s", address, group_name)
               return True
           elif '@' in group_name:
+            # full address local part
             if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
@@ -1588,6 +1627,14 @@ class Rule(O):
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
+  def __str__(self):
+    return "%s:%d: %r %r" % (self.filename, self.lineno, self.targets, self.conditions)
+
+  def __repr__(self):
+    return "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" \
+           % (self.filename, self.lineno, self.targets, self.conditions,
+             self.flags, self.label)
+
   @property
   def context(self):
     return "%s:%d" % (shortpath(self.filename), self.lineno)
@@ -1630,7 +1677,6 @@ class Rules(list):
         if R.match(filer):
           filer.apply_rule(R)
           if R.flags.halt:
-            done = True
             break
 
 class WatchedMaildir(O):

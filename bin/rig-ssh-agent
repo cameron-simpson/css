@@ -1,52 +1,51 @@
 #!/bin/sh
 #
-# Set up a per-host ssh-agent in daemon mode if needed.
-#	- Cameron Simpson <cs@zip.com.au> 30jul2001
+# Ensure we have an ssh agent, setting up a per-host ssh-agent in daemon mode if needed.
+# Emit $SSH_AUTH_SOCK to stdout.
+#
+# I keep a shell function around to access this:
+#
+#    gsa(){
+#      SSH_AUTH_SOCK=`rig-ssh-agent ${1+"$@"}`; export SSH_AUTH_SOCK
+#    }
+#
+# - Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
 set -ue
 
+: ${HOST:=`hostname -s`}
+
 cmd=$0
-usage="Usage: $cmd [-f] [statefile]
-    -f  Force: always start a new agent and overwrite the statefile."
+usage="Usage: $cmd [-f]"
 
-trace=${DEBUG:+set-x}
-statefile=
-badopts=
+force=
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -f) force=1 ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] || { statefile=$1; shift; }
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+statefile=$HOME/var/run/ssh-agent-$HOST
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
-
-if [ $force ] || not $trace get-ssh-agent "$statefile"
+need_agent=
+if [ "$force" ]
 then
-  # some machines don't have an ssh-agent:-(
-  if agent=`$trace which ssh-agent` && [ -x "$agent" ]
-  then
-    $trace rm -f -- "$statefile"
-    export statefile
-    $trace no-ssh-agent \
-      $trace ssh-agent \
-      $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
-      </dev/null &
-  else
-    echo "$cmd: no ssh-agent command, aborting" >&2
-    exit 1
-  fi
+  need_agent=1
+else
+  # test for existing ssh-agent
+  exec 3>&1 1>&2
+  { ssh-add -l >/dev/null || [ $? = 1 ]; } \
+  || { [ -s "$statefile" ] \
+       && . "$statefile" \
+       && { ssh-add -l >/dev/null || [ $? = 1 ]; }
+     } \
+  || need_agent=1
+  exec 1>&3 3>&1
 fi
+
+if [ $need_agent ]
+then
+  # start per-host agent, update state file
+  eval $(ssh-agent -s | tee "$statefile")
+fi
+
+echo "$SSH_AUTH_SOCK" >&3

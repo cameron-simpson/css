@@ -5,7 +5,19 @@
 #
 
 from contextlib import contextmanager
-from cs.logutils import Pfx, error
+from cs.logutils import error
+from cs.pfx import Pfx
+
+DISTINFO = {
+    'description': "fnctions for expressing predicates",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': ['cs.logutils'],
+}
 
 @contextmanager
 def post_condition(*predicates):

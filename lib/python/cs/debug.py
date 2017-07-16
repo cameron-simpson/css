@@ -14,25 +14,28 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+    'install_requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
 }
 
-from contextlib import contextmanager
 from cmd import Cmd
 import inspect
 import logging
+import os
+from subprocess import Popen, PIPE
 import sys
 import threading
 import time
 import traceback
-from cs.py3 import Queue, Queue_Empty, exec_code
+import cs.logutils
+from cs.logutils import debug, error, warning, setup_logging, D, ifdebug
+from cs.obj import O, Proxy
+from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
-import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
-from cs.obj import O, Proxy
+from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.timeutils import sleep
+from cs.x import X
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -51,6 +54,18 @@ def RLock():
     return threading.RLock()
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
+
+class TraceSuite(object):
+  ''' Context manager to trace start and end of a code suite.
+  '''
+  def __init__(self, msg, *a):
+    if a:
+      msg = msg % a
+    self.msg = msg
+  def __enter__(self):
+    X("TraceSuite ENTER %s", self.msg)
+  def __exit__(self, exc_type, exc_value, traceback):
+    X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
 def Thread(*a, **kw):
   if not ifdebug():
@@ -232,17 +247,17 @@ class DebuggingLock(DebugWrapper):
   def _timed_acquire(self, Q, filename, lineno):
     ''' Block waiting for lock acquisition.
         Report slow acquisition.
-	This would be inline above except that Python 2 Locks do
-	not have a timeout parameter, hence this thread.
-	This probably scales VERY badly if there is a lot of Lock
-	contention.
+        This would be inline above except that Python 2 Locks do
+        not have a timeout parameter, hence this thread.
+        This probably scales VERY badly if there is a lot of Lock
+        contention.
     '''
     slow = self.slow
     sofar = 0
     slowness = 0
     while True:
       try:
-        taken = Q.get(True, 1)
+        Q.get(True, 1)
       except Queue_Empty:
         sofar += 1
         slowness += 1
@@ -318,7 +333,6 @@ class DebuggingThread(threading.Thread, DebugWrapper):
 def trace(func):
   ''' Decorator to report the call and return of a function.
   '''
-  from cs.py.func import funccite
   def subfunc(*a, **kw):
     X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
     try:
@@ -384,6 +398,25 @@ class DummyMap(object):
     X("%s[%r] => %r", self, key, v)
     return v
 
+def openfiles(substr=None, pid=None):
+  ''' Run lsof(8) against process `pid` returning paths of open files whose paths contain `substr`.
+      `substr`: default substring to select by; default returns all paths.
+      `pid`: process to examine; default from os.getpid().
+  '''
+  if pid is None:
+    pid = os.getpid()
+  paths = []
+  P = Popen(['lsof', '-p', str(pid)], stdout=PIPE)
+  for lsof in P.stdout:
+    lsof = lsof.decode()
+    fields = lsof.split()
+    if len(fields) >= 9:
+      if fields[4] == 'REG':
+        if substr is None or substr in fields[8]:
+          paths.append(fields[8])
+  P.wait()
+  return paths
+
 class DebugShell(Cmd):
   ''' An interactive prompt for python statements, attached to /dev/tty by default.
   '''
@@ -421,7 +454,7 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
-def selftest(module_name, argv=None, defaultTest=None):
+def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
   if argv is None:

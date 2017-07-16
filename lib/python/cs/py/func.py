@@ -4,6 +4,11 @@
 #       - Cameron Simpson <cs@zip.com.au> 15apr2014
 #
 
+import sys
+from functools import partial
+from cs.excutils import transmute
+from cs.py3 import unicode
+
 DISTINFO = {
     'description': "convenience facilities related to Python functions",
     'keywords': ["python2", "python3"],
@@ -11,12 +16,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.excutils'],
+    ],
+    'install_requires': ['cs.excutils', 'cs.py3'],
 }
-
-from cs.excutils import transmute
-from cs.py3 import unicode
 
 def funcname(func):
   ''' Return a name for the supplied function `func`.
@@ -48,8 +50,30 @@ def callmethod_if(o, method, default=None, a=None, kw=None):
     kw = {}
   return m(*a, **kw)
 
+def prop(func):
+  ''' The builtin @property decorator lets internal AttributeErrors escape.
+      While that can support properties that appear to exist conditionally,
+      in practice this is almost never what I want, and it masks deeper errors.
+      Hence this wrapper for @property that transmutes internal AttributeErrors
+      into RuntimeErrors.
+  '''
+  def wrapper(*a, **kw):
+    try:
+      return func(*a, **kw)
+    except AttributeError as e:
+      e2 = RuntimeError("inner function %s raised %s" % (func, e))
+      if sys.version_info[0] >= 3:
+        try:
+          eval('raise e2 from e', globals(), locals())
+        except:
+          # FIXME: why does this raise a SyntaxError?
+          raise e
+      else:
+        raise e2
+  return property(wrapper)
+
 def derived_property(func, original_revision_name='_revision', lock_name='_lock', property_name=None, unset_object=None):
-  ''' A property which must be recomputed if the reference revision exceeds the snapshot revision.
+  ''' A property which must be recomputed if the reference revision (attached to self) exceeds the snapshot revision.
   '''
   if property_name is None:
     property_name = '_' + func.__name__
@@ -77,11 +101,15 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
           X("COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name, p_revision, o_revision)
           p = func(self)
           setattr(self, property_name, p)
-          ##X("COMPUTE .%s: set .%s to %s", self, property_revision_name, o_revision)
+          X("COMPUTE .%s: set .%s to %s", property_name, property_revision_name, o_revision)
           setattr(self, property_revision_name, o_revision)
         else:
           ##debug("inside lock, already computed up to date %s", property_name)
           pass
+      X("property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
+        property_name,
+        getattr(self, property_revision_name),
+        getattr(self, original_revision_name))
     else:
       ##debug("outside lock, already computed up to date %s", property_name)
       pass
@@ -96,35 +124,35 @@ def derived_from(property_name):
 def yields_type(func, basetype):
   ''' Decrator which checks that a generator yields values of type `basetype`.
   '''
-  funcname = funccite(func)
+  citation = funccite(func)
   def check_yields_type(*a, **kw):
     for item in func(*a, **kw):
       if not isinstance(item, basetype):
         raise TypeError(
-                "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
-                % (funcname, basetype, type(item), item)
-              )
+            "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
+            % (citation, basetype, type(item), item)
+        )
       yield item
-  check_yields_type.__name__ = ( 'check_yields_type[%s,basetype=%s]'
-                                 % (funcname, basetype)
-                               )
+  check_yields_type.__name__ = (
+      'check_yields_type[%s,basetype=%s]' % (citation, basetype)
+  )
   return check_yields_type
 
 def returns_type(func, basetype):
   ''' Decrator which checks that a function returns values of type `basetype`.
   '''
-  funcname = funccite(func)
+  citation = funccite(func)
   def check_returns_type(*a, **kw):
     retval = func(*a, **kw)
     if not isinstance(retval, basetype):
       raise TypeError(
-              "wrong type returned from func %s: expected subclass of %s, got %s: %r"
-              % (funcname, basetype, type(retval), retval)
-            )
+          "wrong type returned from func %s: expected subclass of %s, got %s: %r"
+          % (citation, basetype, type(retval), retval)
+      )
     return retval
-  check_returns_type.__name__ = ( 'check_returns_type[%s,basetype=%s]'
-                                  % (funcname, basetype)
-                                )
+  check_returns_type.__name__ = (
+      'check_returns_type[%s,basetype=%s]' % (citation, basetype)
+  )
   return check_returns_type
 
 def yields_str(func):

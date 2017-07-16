@@ -9,7 +9,8 @@ use strict qw(vars);
 ##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 require 'open2.pl';
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 use cs::IO;
 use cs::PipeDecode;
@@ -33,7 +34,7 @@ sub Digest
 { my($this,$filename)=@_;
   my($to,$from)=($this->{TO},$this->{FROM});
   print $to $filename, "\n";
-  &'flush($to);
+  $to->flush();
   local($_);
 
   return undef if ! defined ($_=<$from>);
