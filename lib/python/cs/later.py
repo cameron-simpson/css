@@ -346,6 +346,8 @@ class _PipelineStageManyToMany(_PipelineStage):
     LF.notify(notify)
 
 class _PipelineStagePipeline(_PipelineStage):
+  ''' A _PipelineStage which feeds an asynchronous pipeline.
+  '''
 
   def __init__(self, name, pipeline, subpipeline, outQ, retry_interval=None):
     _PipelineStage.__init__(self, name, pipeline, None, outQ, retry_interval=retry_interval)
@@ -386,8 +388,9 @@ class _Pipeline(MultiOpenMixin):
       try:
         func_sig, functor = action
       except TypeError:
+        X("_Pipeline: action=%r", action)
         func_sig = action.sig
-        functor = action.functor()
+        functor = action.functor(self.later)
       pq_name = ":".join( (name,
                            str(index),
                            str(func_sig),
@@ -406,6 +409,7 @@ class _Pipeline(MultiOpenMixin):
       elif func_sig == FUNC_MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_PIPELINE:
+        X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
         raise RuntimeError("unimplemented func_sig=%r, functor=%s" % (func_sig, functor))
