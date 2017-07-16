@@ -48,11 +48,11 @@ from cs.later import Later, RetryError, \
                     FUNC_MANY_TO_MANY, FUNC_PIPELINE
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X, XP
+from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, D, X, XP
 from cs.mappings import MappingChain, SeenSet
 import cs.obj
 from cs.obj import O
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_iter
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
