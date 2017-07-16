@@ -156,10 +156,29 @@ def main(argv, stdin=None):
         else:
           url = argv.pop(0)
 
-          # load any named pipeline definitions on the command line
-          # these are of the form: pipename:{ action... }
+          # prepare a blank PilferRC and supply as first in chain for this Pilfer
           rc = PilferRC(None)
           P.rcs.insert(0, rc)
+
+          # Load any named pipeline definitions on the command line.
+          #
+          # A pipeline specification is specified by a leading argument
+          # of the form "pipe_name:{", followed by arguments defining
+          # functions for the pipeline, and a terminating argument of the
+          # form "}".
+          #
+          # Return `(spec, argv2, errors)` where `spec` is a PipeSpec
+          # embodying the specification, `argv2` is the list of arguments
+          # after the specification and `errors` is a list of error
+          # messages encountered parsing the function arguments.
+          #
+          # If the leading argument does not commence a function specification
+          # then `spec` will be None and `argv2` will be `argv`.
+          #
+          # Note: this syntax works well with traditional Bourne shells.
+          # Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+          # sensible behaviour. Bash users may be out of luck.
+          #
           while len(argv) and argv[0].endswith(':{'):
             openarg = argv[0]
             with Pfx(openarg):
@@ -327,7 +346,7 @@ def urls(url, stdin=None, cmd=None):
 # TODO: recursion protection in action_map expansion
 def argv_pipefuncs(argv, action_map, do_trace):
   ''' Process command line strings and return a corresponding list
-      of functions to construct a Later.pipeline.
+      of actions to construct a Later.pipeline.
   '''
   # we reverse the list to make action expansion easier
   argv = list(argv)
@@ -335,7 +354,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
   pipe_funcs = []
   while argv:
     action = argv.pop(0)
-    # support commenting of individual actions
+    # support commenting-out of individual actions
     if action.startswith('#'):
       continue
     # macro - prepend new actions
@@ -580,7 +599,7 @@ class Pilfer(O):
   @locked
   def diversion(self, pipe_name):
     ''' Return the diversion named `pipe_name`.
-        A diversion enbodies a pipeline of the specified name.
+        A diversion embodies a pipeline of the specified name.
         There is only one of a given name in the shared state.
         They are instantiated at need.
     '''
@@ -1013,12 +1032,14 @@ def _test_grokfunc( P, *a, **kw ):
   return v
 
 # actions that work on the whole list of in-play URLs
+# these return Pilfers
 many_to_many = {
       'sort':         lambda Ps, key=lambda P: P._, reverse=False: \
                         sorted(Ps, key=key, reverse=reverse),
       'last':         lambda Ps: Ps[-1:],
     }
 
+# actions that work on individual Pilfer instances, returning multiple strings
 one_to_many = {
       'hrefs':        lambda P: url_hrefs(P._),
       'srcs':         lambda P: url_srcs(P._),
@@ -1026,7 +1047,7 @@ one_to_many = {
       'xmltext':      lambda P, match: XML(P._).findall(match),
     }
 
-# actions that work on individual Pilfer instances, returning strings
+# actions that work on individual Pilfer instances, returning single strings
 one_to_one = {
       '..':           lambda P: URL(P._, None).parent,
       'delay':        lambda P, delay: (P._, sleep(float(delay)))[0],
@@ -1065,10 +1086,9 @@ def action_func_raw(action, do_trace):
       This is primarily used by action_func below, but also called
       by subparses such as selectors applied to the values of named
       variables.
-      result_is_Pilfer: the returned function returns a Pilfer object
-        instead of a simple result such as a Boolean or a string.
+      Selectors return booleans, all other functions return or yield Pilfers.
   '''
-  # save original form of action string
+  # save original form of the action string
   action0 = action
   args = []
   kwargs = {}
@@ -1880,7 +1900,7 @@ class PipeSpec(O):
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
-  ''' Load PilferRC instances rom the supplied `pathname`, recursing if this is a directory.
+  ''' Load PilferRC instances from the supplied `pathname`, recursing if this is a directory.
       Return a list of the PilferRC instances obtained.
   '''
   rcs = []
