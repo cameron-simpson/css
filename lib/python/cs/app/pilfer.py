@@ -17,7 +17,7 @@ from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from getopt import getopt, GetoptError
-from string import Formatter
+from string import Formatter, whitespace
 from subprocess import Popen, PIPE
 from time import sleep
 from threading import Lock, RLock, Thread
@@ -42,12 +42,14 @@ from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, RetryError, \
-                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
+                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, \
+                    FUNC_MANY_TO_MANY, FUNC_PIPELINE
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
+from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X, XP
 from cs.mappings import MappingChain, SeenSet
 from cs.queues import NullQueue, NullQ, IterableQueue
+from cs.resources import MultiOpenMixin
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
@@ -182,22 +184,34 @@ def main(argv, stdin=None):
           # sensible behaviour. Bash users may be out of luck.
           #
           while len(argv) and argv[0].endswith(':{'):
-            openarg = argv[0]
+            openarg = argv.pop(0)
             with Pfx(openarg):
-              spec, argv2, errors = get_pipeline_spec(argv)
-              argv = argv2
-              if spec is None:
-                errors.insert(0, "invalid pipe opening token: %r" % (openarg,))
-              if errors:
+              pipe_name = openarg[:-2]
+              argv2 = []
+              end_pos = None
+              for pos, arg in enumerate(argv):
+                if arg == '}':
+                  end_pos = pos
+                  break
+              if end_pos is None:
+                error("no closing '}'")
                 badopts = True
-                for err in errors:
-                  error(err)
+                argv = []
               else:
+                spec = PipeSpec(pipe_name, argv[:end_pos])
                 try:
                   rc.add_pipespec(spec)
                 except KeyError as e:
                   error("add pipe: %s", e)
                   badopts = True
+                argv = argv[end_pos+1:]
+
+          # now load the main pipeline
+          if not argv:
+            error("missing main pipeline")
+            badopts = True
+          else:
+            main_spec = PipeSpec(None, argv)
 
           # gather up the remaining definition as the running pipeline
           pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
@@ -225,11 +239,14 @@ def main(argv, stdin=None):
               pipeline = L.pipeline(pipe_funcs,
                                     name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                                   blocking=True).open()
+                                                   blocking=True).open(),
                                    )
+              X("MAIN: RUN PIPELINE...")
               with pipeline:
                 for U in urls(url, stdin=stdin, cmd=cmd):
+                  X("MAIN: PUT %r", U)
                   pipeline.put( P.copy_with_vars(_=U) )
+              X("MAIN: RUN PIPELINE: ALL ITEMS .put")
               # wait for main pipeline to drain
               LTR.state("drain main pipeline")
               for item in pipeline.outQ:
@@ -354,69 +371,29 @@ def argv_pipefuncs(argv, action_map, do_trace):
       # fork a new pipeline instance per item
       # terminate this pipeline with a function to spawn subpipelines
       # using the tail of the action list from this point
-      func_sig, function = action_per(action, argv)
+      if not argv:
+        errors.append("no actions after %r" % (per,))
+      else:
+        tail_argv = list(argv)
+        name = "per:[%s]" % (','.join(argv))
+        pipespec = PipeSpec(name, argv)
+        def per(P):
+          pipeline = P.later.pipeline(pipespec.actions,
+                                      inputs=(P,),
+                                      name="%s(%s)" % (name, P))
+          with P.later.release():
+            for P2 in pipeline.outQ:
+              yield P2
+        pipe_funcs.append( (FUNC_ONE_TO_MANY, per) )
       argv = []
-      pipe_funcs.append( (func_sig, function) )
+      continue
+    try:
+      A = Action(action, do_trace)
+    except ValueError as e:
+      errors.append("bad action %r: %s" % (action, e))
     else:
-      # regular action
-      try:
-        func_sig, function = action_func(action, do_trace)
-      except ValueError as e:
-        errors.append("bad action %r: %s" % (action, e))
-      else:
-        if func_sig != FUNC_MANY_TO_MANY:
-          # other functions are called with each item
-          function = retriable(function)
-        pipe_funcs.append( (func_sig, function) )
+      pipe_funcs.append(A)
   return pipe_funcs, errors
-
-def get_pipeline_spec(argv):
-  ''' Parse a leading pipeline specification from the list of arguments `argv`.
-      A pipeline specification is specified by a leading argument
-      of the form "pipe_name:{", followed by arguments defining
-      functions for the pipeline, and a terminating argument of the
-      form "}".
-
-      Return `(spec, argv2, errors)` where `spec` is a PipeSpec
-      embodying the specification, `argv2` is the list of arguments
-      after the specification and `errors` is a list of error
-      messages encountered parsing the function arguments.
-
-      If the leading argument does not commence a function specification
-      then `spec` will be None and `argv2` will be `argv`.
-
-      Note: this syntax works well with traditional Bourne shells.
-      Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
-      sensible behaviour. Bash users may be out of luck.
-  '''
-  errors = []
-  pipe_name = None
-  spec = None
-  if not argv:
-    # no arguments, no spec
-    argv2 = argv
-  else:
-    arg = argv[0]
-    if not arg.endswith(':{'):
-      # not a start-of-spec
-      argv2 = argv
-    else:
-      pipe_name, offset = get_identifier(arg)
-      if not pipe_name or offset != len(arg)-2:
-        # still not a start-of-spec
-        argv2 = argv
-      else:
-        with Pfx(arg):
-          # started with "foo:{"; gather spec until "}"
-          for i in range(1, len(argv)):
-            if argv[i] == '}':
-              spec = PipeSpec(pipe_name, argv[1:i])
-              argv2 = argv[i+1:]
-              break
-          if spec is None:
-            errors.append('%s: missing closing "}"' % (arg,))
-            argv2 = argv[1:]
-  return spec, argv2, errors
 
 def notNone(v, name="value"):
   if v is None:
@@ -614,18 +591,20 @@ class Pilfer(O):
         It will collect items from the iterable `inputs`.
         `pipe_name` may be a PipeSpec.
     '''
+    with Pfx("pipe spec %r" % (pipe_name,)):
+      name = "pipe_through:%s" % (pipe_name,)
+      return self.pipe_from_spec(pipe_name, inputs, name=name)
+
+  def pipe_from_spec(self, pipe_name, name=None):
+    ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
+    '''
     if isinstance(pipe_name, PipeSpec):
       spec = pipe_name
       pipe_name = str(spec)
     else:
       spec = self.pipes.get(pipe_name)
       if spec is None:
-        raise KeyError("no pipe specification named %r" % (pipe_name,))
-    with Pfx("pipe spec %r" % (pipe_name,)):
-      name = "pipe_through:%s" % (pipe_name,)
-      return self.pipe_from_spec(spec, inputs, name=name)
-
-  def pipe_from_spec(self, spec, inputs, name=None):
+        raise ValueError("no pipe specification named %r" % (pipe_name,))
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
     with Pfx("%s", spec):
@@ -977,9 +956,56 @@ one_test = {
 # regular expressions used when parsing actions
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
-def action_func_raw(action, do_trace):
-  ''' Accept a string `action` and return a tuple of:
-        function, func_sig, result_is_Pilfer
+def Action(action_text, do_trace):
+  ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an _Action.
+  '''
+  parsed = parse_action(action_text, do_trace)
+  try:
+    sig, function = parsed
+  except TypeError:
+    action = parsed
+  else:
+    action = ActionFunction(action_text, sig, lambda: function)
+  return action
+
+def pilferify11(func):
+  ''' Decorator for 1-to-1 Pilfer=>nonPilfer functions to return a Pilfer.
+  '''
+  def pf(P, *a, **kw):
+    return P.copy_with_vars(_=func(P, *a, **kw))
+  return pf
+
+def pilferify1m(func):
+  ''' Decorator for 1-to-many Pilfer=>nonPilfers functions to yield Pilfers.
+  '''
+  def pf(P, *a, **kw):
+    for value in func(P, *a, **kw):
+      yield P.copy_with_vars(_=value)
+  return pf
+
+def pilferifymm(func):
+  ''' Decorator for 1-to-many Pilfer=>nonPilfers functions to yield Pilfers.
+  '''
+  def pf(Ps, *a, **kw):
+    if not isinstance(Ps, list):
+      Ps = list(Ps)
+    if Ps:
+      P0 = Ps[0]
+      for value in func(Ps, *a, **kw):
+        yield P0.copy_with_vars(_=value)
+  return pf
+
+def pilferifysel(func):
+  ''' Decorator for selector Pilfer=>bool functions to yield Pilfers.
+  '''
+  def pf(Ps, *a, **kw):
+    for P in Ps:
+      if func(P, *a, **kw):
+        yield P
+  return pf
+
+def parse_action(action, do_trace):
+  ''' Accept a string `action` and return an _Action subclass instance or a (sig, function) tuple.
       This is primarily used by action_func below, but also called
       by subparses such as selectors applied to the values of named
       variables.
@@ -987,13 +1013,12 @@ def action_func_raw(action, do_trace):
   '''
   # save original form of the action string
   action0 = action
-  args = []
-  kwargs = {}
+
   if action.startswith('!'):
     # ! shell command to generate items based off current item
     # receive text lines, stripped
-    function, func_sig = action_shcmd(action[1:])
-    return function, args, kwargs, func_sig, False
+    return ActionShellCommand(action0, action[1:])
+
   if action.startswith('|'):
     # | shell command to pipe though
     # receive text lines, stripped
@@ -1567,56 +1592,32 @@ class ActionPipeTo(_Action):
 
   class _OnDemandPipeline(MultiOpenMixin):
 
-    @logexc
-    def trace_function(*a, **kw):
-      with Pfx(action):
-        try:
-          retval = function(*a, **kw)
-        except Exception as e:
-          exception("TRACE: EXCEPTION: %s", e)
-          raise
-        return retval
+    def __init__(self, pipespec, L):
+      MultiOpenMixin.__init__(self)
+      self.pipespec = pipespec
+      self.later = L
+      self._Q = None
 
-    trace_function.__name__ = "trace_action(%r)" % (action,)
-    return func_sig, trace_function
+    @property
+    def outQ(self):
+      X("GET _OnDemandPipeline.outQ")
+      return self._Q.outQ
 
-def function_by_name(func_name):
-  ''' Look up `func_name` in mappings of named functions.
-      Return (function, func_sig, result_is_Pilfer).
-  '''
-  # look up function by name in mappings
-  if func_name in many_to_many:
-    # many-to-many functions get passed straight in
-    result_is_Pilfer = True
-    function = many_to_many[func_name]
-    if function.__name__ == '<lambda>':
-      function.__name__ = '<lambda %r>' % func_name
-    function = yields_Pilfer(function)
-    func_sig = FUNC_MANY_TO_MANY
-  elif func_name in one_to_many:
-    result_is_Pilfer = False
-    function = one_to_many[func_name]
-    if function.__name__ == '<lambda>':
-      function.__name__ = '<lambda %r>' % func_name
-    function = yields_str(function)
-    func_sig = FUNC_ONE_TO_MANY
-  elif func_name in one_to_one:
-    result_is_Pilfer = False
-    function = one_to_one[func_name]
-    if function.__name__ == '<lambda>':
-      function.__name__ = '<lambda %r>' % func_name
-    function = returns_str(function)
-    func_sig = FUNC_ONE_TO_ONE
-  elif func_name in one_test:
-    result_is_Pilfer = False
-    function = one_test[func_name]
-    if function.__name__ == '<lambda>':
-      function.__name__ = '<lambda %r>' % func_name
-    function = returns_bool(function)
-    func_sig = FUNC_SELECTOR
-  else:
-    raise ValueError("unknown action")
-  return function, func_sig, result_is_Pilfer
+    def put(self, P):
+      with self._lock:
+        Q = self._Q
+        if Q is None:
+          X("ActionPipeTo._OnDemandPipeline: create pipeline from %s", self.pipespec)
+          Q = self._Q = P.pipe_from_spec(self.pipespec)
+      self._pipeline.put(P)
+
+  def functor(self, L):
+    ''' Return an _OnDemandPipeline to process piped items.
+    '''
+    X("ActionPipeTo: create _OnDemandPipeline(%s)", self.pipespec)
+    return self._OnDemandPipeline(self.pipespec, L)
+
+class ActionShellFilter(_Action):
 
   def __init__(self, action0, shcmd, args, kwargs):
     _Action.__init__(action0, FUNC_PIPELINE, args, kwargs)
@@ -1821,14 +1822,14 @@ class PipeSpec(O):
     self.argv = argv
 
   @logexc
-  def pipe_funcs(self, action_map, do_trace):
+  def pipe_funcs(self, L, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
         It is important that this list is constructed anew for each
         new pipeline instance because many of the functions rely
         on closures to track state.
     '''
     with Pfx(self.name):
-      pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
+      pipe_funcs, errors = argv_pipefuncs(self.argv, L, action_map, do_trace)
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
