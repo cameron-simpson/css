@@ -54,7 +54,9 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.app.flag import PolledFlags
 import cs.obj
 from cs.obj import O
-from cs.py.func import funcname, funccite, yields_type, returns_type
+from cs.py.func import funcname, funccite, \
+                       yields_type, returns_type, \
+                       yields_str, returns_bool
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
@@ -286,21 +288,6 @@ def main(argv, stdin=None):
     xit = 2
 
   return xit
-
-def yields_str(func):
-  ''' Decorator for generators which should yield strings.
-  '''
-  return yields_type(func, (str, unicode))
-
-def returns_bool(func):
-  ''' Decorator for functions which should return Booleans.
-  '''
-  return returns_type(func, bool)
-
-def returns_str(func):
-  ''' Decorator for functions which should return strings.
-  '''
-  return returns_type(func, (str, unicode))
 
 @yields_str
 def urls(url, stdin=None, cmd=None):
