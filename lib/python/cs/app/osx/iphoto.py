@@ -14,6 +14,7 @@ from functools import partial
 import pprint
 from getopt import GetoptError
 import re
+import shlex
 import sqlite3
 from threading import RLock
 from PIL import Image
@@ -34,22 +35,26 @@ from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
-USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
-  info masters      List info about masters.
-  ls                List apdb names.
-  ls [0-5]          List master pathnames with specific rating.
-  ls albums         List album names.
-  ls events         List events names.
-  ls folders        List folder names (includes events).
-  ls keywords       List keywords.
-  ls masters        List master pathnames.
-  ls people         List person names.
-  rename {events|keywords|people} {/regexp|name}...
-                    Rename entities.
-  select criteria... List masters with all specified criteria.
-  tag criteria... [--] {+tag|-tag}...
-                    Add or remove tags from selected images.
-  test [args...]    Whatever I'm testing at the moment...
+USAGE = '''Usage:
+  %s [/path/to/iphoto-library-path] - < operation-lines
+    Read lines containing "op [op-args...]" and execute.
+
+  %s [/path/to/iphoto-library-path] op [op-args...]
+    info masters      List info about masters.
+    ls                List apdb names.
+    ls [0-5]          List master pathnames with specific rating.
+    ls albums         List album names.
+    ls events         List events names.
+    ls folders        List folder names (includes events).
+    ls keywords       List keywords.
+    ls masters        List master pathnames.
+    ls people         List person names.
+    rename {events|keywords|people} {/regexp|name}...
+                      Rename entities.
+    select criteria... List masters with all specified criteria.
+    tag criteria... [--] {+tag|-tag}...
+                      Add or remove tags from selected images.
+    test [args...]    Whatever I'm testing at the moment...
 
 Criteria:
   [!]/regexp            Filename matches regexp.
@@ -69,8 +74,9 @@ def main(argv=None):
   '''
   if argv is None:
     argv = [ 'cs.app.osx.iphoto' ]
-  cmd = os.path.basename(argv.pop(0))
-  usage = USAGE % (cmd,)
+  cmd0 = argv.pop(0)
+  cmd = os.path.basename(cmd0)
+  usage = USAGE % (cmd, cmd)
   setup_logging(cmd)
   with Pfx(cmd):
     badopts = False
@@ -79,35 +85,51 @@ def main(argv=None):
     else:
       library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
     I = iPhoto(library_path)
-    xit = 0
-    if not argv:
-      warning("missing op")
-      badopts = True
-    else:
-      op = argv.pop(0)
-      with Pfx(op):
-        try:
-          if op == 'info':
-            xit = cmd_info(I, argv)
-          elif op == 'ls':
-            xit = cmd_ls(I, argv)
-          elif op == 'rename':
-            xit = cmd_rename(I, argv)
-          elif op == 'select':
-            xit = cmd_select(I, argv)
-          elif op == "tag":
-            xit = cmd_tag(I, argv)
-          elif op == "test":
-            xit = cmd_test(I, argv)
-          else:
-            raise GetoptError("unrecognised op")
-        except GetoptError as e:
-          warning("usage: %s", e)
-          badopts = True
-    if badopts:
-      print(usage, file=sys.stderr)
-      return 2
-    return xit
+    return main_iphoto(I, argv, usage)
+
+def main_iphoto(I, argv, usage):
+  xit = 0
+  badopts = False
+  if not argv:
+    warning("missing op")
+    badopts = True
+  else:
+    if argv == ['-']:
+      for lineno, line in enumerate(sys.stdin, 1):
+        with Pfx("stdin:%d", lineno):
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          print(line)
+          sub_argv = shlex.split(line, comments=True)
+          sub_xit = main_iphoto(I, sub_argv, usage)
+          if sub_xit != 0:
+            return sub_xit
+      return 0
+    op = argv.pop(0)
+    with Pfx(op):
+      try:
+        if op == 'info':
+          xit = cmd_info(I, argv)
+        elif op == 'ls':
+          xit = cmd_ls(I, argv)
+        elif op == 'rename':
+          xit = cmd_rename(I, argv)
+        elif op == 'select':
+          xit = cmd_select(I, argv)
+        elif op == "tag":
+          xit = cmd_tag(I, argv)
+        elif op == "test":
+          xit = cmd_test(I, argv)
+        else:
+          raise GetoptError("unrecognised op")
+      except GetoptError as e:
+        warning("usage: %s", e)
+        badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  return xit
 
 def cmd_info(I, argv):
   ''' Usage: info masters...
