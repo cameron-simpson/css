@@ -717,8 +717,14 @@ class iPhoto(O):
 
   def match_one_keyword(self, kwname):
     matches = self.match_keyword(kwname)
+    # no match
     if not matches:
       raise ValueError("unknown keyword")
+    # exact match
+    for match in matches:
+      if match == kwname:
+        return match
+    # multiple inexact matches
     if len(matches) > 1:
       raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
     return matches[0]
