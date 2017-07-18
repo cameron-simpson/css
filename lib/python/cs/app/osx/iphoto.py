@@ -482,7 +482,7 @@ class iPhoto(O):
             ##@locked
             def loadfunc():
               if not getattr(self, loaded_attr, False):
-                XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qual_name)
+                ##XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qual_name)
                 getattr(self, load_funcname)()
                 setattr(self, loaded_attr, True)
             return loadfunc
@@ -742,14 +742,20 @@ class iPhoto(O):
     # no match
     if not matches:
       raise ValueError("unknown keyword")
+    if len(matches) == 1:
+      return matches[0]
     # exact match
     for match in matches:
       if match == kwname:
         return match
+    pfxmatches = []
+    for match in matches:
+      if match.startswith(kwname+' ('):
+        pfxmatches.append(match)
+    if len(pfxmatches) == 1:
+      return pfxmatches[0]
     # multiple inexact matches
-    if len(matches) > 1:
-      raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
-    return matches[0]
+    raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
 
   def versions_by_keyword(self, kwname):
     self.load_keywords()
