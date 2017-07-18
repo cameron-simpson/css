@@ -357,8 +357,12 @@ def cmd_tag(I, argv):
         kw_name = arg[1:]
         try:
           kw_name = I.match_one_keyword(kw_name)
+        except KeyError as e:
+          warning("unknown tag")
+          continue
         except ValueError as e:
-          raise GetoptError("invalid tag: %s" % (e,))
+          warning("ambiguous tag")
+          continue
         kw = I.keyword_by_name[kw_name]
         tagging.append( (kw_op == '+', kw) )
     except GetoptError as e:
@@ -366,6 +370,9 @@ def cmd_tag(I, argv):
       badopts = True
   if badopts:
     raise GetoptError("invalid arguments")
+  if not tagging:
+    warning("no tags to apply, skipping")
+    return 0
   masters = None
   for selector in selectors:
     masters = selector.select(masters)
@@ -741,7 +748,7 @@ class iPhoto(O):
     matches = self.match_keyword(kwname)
     # no match
     if not matches:
-      raise ValueError("unknown keyword")
+      raise KeyError("unknown keyword")
     if len(matches) == 1:
       return matches[0]
     # exact match
