@@ -8,7 +8,8 @@ from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath
-from cs.logutils import Pfx, X, debug
+from cs.logutils import X, debug
+from cs.pfx import Pfx
 from cs.threads import locked
 from cs.py.func import prop
 from .store import ChainStore, DataDirStore

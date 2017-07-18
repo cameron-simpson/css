@@ -5,7 +5,8 @@
 #
 
 from contextlib import contextmanager
-from cs.logutils import Pfx, error
+from cs.logutils import error
+from cs.pfx import Pfx
 
 DISTINFO = {
     'description': "fnctions for expressing predicates",

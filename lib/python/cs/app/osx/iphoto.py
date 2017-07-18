@@ -23,12 +23,14 @@ from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import Pfx, debug, info, warning, error, setup_logging, X, XP
+from cs.logutils import debug, info, warning, error, setup_logging
+from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked, locked_property
 from cs.xml import pprint as xml_pprint
+from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 

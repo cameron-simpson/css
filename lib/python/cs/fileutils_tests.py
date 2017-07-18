@@ -15,11 +15,12 @@ import time
 import unittest
 from tempfile import NamedTemporaryFile
 from .fileutils import compare, rewrite, rewrite_cmgr, Pathname, \
-                        file_property, make_file_property, \
+                        file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
+from .logutils import D
 from .timeutils import TimeoutError, sleep
-from .logutils import D, X
+from .x import X
 
 class TestFileProperty(object):
   def __init__(self):
@@ -39,12 +40,6 @@ class TestFileProperty(object):
       data = fp.read()
     ##D("test1 loads \"%s\" => %s", path, data)
     return data
-  @make_file_property(poll_rate=0.3)
-  def test2(self, path):
-    with open(path) as fp:
-      data = fp.read()
-    ##D("test2 loads \"%s\" => %s", path, data)
-    return data
 
 class TestFilesProperty(object):
   ''' Tests for watching multiple files.
@@ -52,8 +47,6 @@ class TestFilesProperty(object):
   def __init__(self):
     self._test1_paths = ('testfileprop1',)
     self._test1_lock = Lock()
-    self._test2_paths = ('testfileprop2',)
-    self._test2_lock = Lock()
   def write1(self, data):
     with open(self._test1_paths[0], "w") as fp:
       fp.write(data)

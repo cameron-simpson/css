@@ -11,7 +11,10 @@ import re
 import string
 from getopt import getopt, GetoptError
 import cs.lex
-from cs.logutils import setup_logging, error, warning, cmd
+from cs.logutils import setup_logging, error, warning
+
+cmd = os.path.basename(sys.argv[0])
+setup_logging(cmd)
 
 if 'LOGDIR' in os.environ:
   logdir=os.environ['LOGDIR']

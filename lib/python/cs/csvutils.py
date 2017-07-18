@@ -30,7 +30,8 @@ from io import BytesIO
 import sys
 from threading import Thread
 from cs.debug import trace
-from cs.logutils import Pfx, warning
+from cs.logutils import warning
+from cs.pfx import Pfx
 
 if sys.hexversion >= 0x03000000:
   # python 3 onwards

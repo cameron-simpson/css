@@ -16,10 +16,11 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_data, read_from, pread, seekable
+from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py3 import bytes, pack, unpack, iter_unpack
-# DEBUG
-from cs.logutils import warning, X, Pfx
+from cs.x import X
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -34,7 +35,7 @@ SIZE_16MB = 1024*1024*16
 BoxHeader = namedtuple('BoxHeader', 'type user_type length header_length')
 
 def parse_box_header(bfr):
-  ''' Decode a box header from the CornuzCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
+  ''' Decode a box header from the CornuCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
   '''
   # return BoxHeader=None if at the end of the data
   bfr.extend(1, short_ok=True)
@@ -240,6 +241,8 @@ class Box(object):
         `discard_data`: if false (default), keep the unparsed data portion as
           a list of data chunk in the attribute .data_chunks; if true,
           discard the unparsed data
+        `copy_offsets`: if not None, call `copy_offsets` with each
+          Box starting offset
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
@@ -247,9 +250,10 @@ class Box(object):
       return None
     if cls is None:
       cls = pick_box_class(box_header.type)
-    X("Box.from_chunks: cls=%s", cls)
     B = cls(box_header)
     B.offset = offset0
+    X("Box.from_buffer: found %s at %d", bytes(B.box_type), offset0)
+    bfr.report_offset(offset0)
     # further parse some or all of the data
     B.parse_data(bfr)
     # record the offset of any unparsed data portion
@@ -998,11 +1002,11 @@ class _TimeToSampleBox(_GenericSampleBox):
     super().parse_data(bfr, '>LL', 'count delta')
 add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
-class CTTSBox(FullBox):
+class CTTSBox(_GenericSampleBox):
   ''' A 'ctts' Composition Time to Sample box - section 8.6.1.3.
   '''
   def parse_data(self, bfr):
-    super().parse_data(bfr, '>LL', 'count delta', '>Ll')
+    super().parse_data(bfr, '>LL', 'count offset', '>Ll')
 add_box_class(CTTSBox)
 
 class CSLGBox(FullBox):
@@ -1142,17 +1146,31 @@ class DREFBox(FullBox):
 
 add_box_class(DREFBox)
 
+def parse_file(fp, discard=False, copy_offsets=None):
+  return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
+
+def parse_chunks(chunks, discard=False, copy_offsets=None):
+  return parse_buffer(CornuCopyBuffer(chunks, copy_offsets=copy_offsets),
+                      discard=discard)
+
+def parse_buffer(bfr, discard=False, copy_offsets=None):
+  if copy_offsets is not None:
+    bfr.copy_offsets = copy_offsets
+  while True:
+    B = Box.from_buffer(bfr, discard_data=discard)
+    if B is None:
+      break
+    yield B
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
   from cs.logutils import setup_logging
   setup_logging(__file__)
   stdin = fdopen(sys.stdin.fileno(), 'rb')
-  bfr = CornuCopyBuffer(read_from(stdin))
-  while True:
-    B = Box.from_buffer(bfr)
-    if B is None:
-      break
-    B._skip_data(bfr, discard=True)
+  for B in parse_file(stdin, discard=True):
     B.dump()
-    ##print(B)
+
+if __name__ == '__main__':
+  import cs.iso14496_tests
+  cs.iso14496_tests.selftest(sys.argv)

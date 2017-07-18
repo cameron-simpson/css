@@ -12,9 +12,10 @@ import os
 import stat
 import errno
 import cs.mail
-from cs.logutils import setup_logging, error, warn, cmd
+from cs.logutils import setup_logging, error, warn
 
-setup_logging()
+cmd = sys.argv[0]
+setup_logging(cmd)
 
 fmt='%Y'
 

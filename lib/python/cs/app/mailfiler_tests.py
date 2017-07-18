@@ -13,8 +13,9 @@ from cs.app.mailfiler import \
         Target_Assign, Target_PipeLine, Target_Substitution, Target_SetFlag, \
         Target_Function, Target_MailAddress, Target_MailFolder, \
         parserules
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.obj import O
+from cs.x import X
 
 if not os.environ.get('DEBUG', ''):
   def D(*a):

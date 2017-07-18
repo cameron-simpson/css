@@ -12,11 +12,9 @@ The revision control repository is published here:
 
   https://bitbucket.org/cameron_simpson/css/commits/all
 
-Some of the Python modules are availoable from PyPI here:
+Some of the Python modules are available from PyPI here:
 
-  https://pypi.python.org/pypi?%3Aaction=search&term=cameron+simpson&submit=search
-
-(Because PyPI lacks "author" pages, that is a crude search for my name, which happens to get only my packages at present; they all have names starting "cs." should you need to disambiguate things.)
+  https://pypi.org/user/cameron.simpson/
 
 An autoindex of the scripts is in the file 1INDEX.txt.
 
@@ -35,7 +33,7 @@ Installing my scripts:
 
   That line should be in your .profile or other environment setup
   script.  It's pretty simple; it adds the css components to the
-  END of your PATHs (so no css script name preempts anything you
+  END of your PATHs (so that no css script name preempts anything you
   already have).
 
   It mostly does this:
@@ -60,7 +58,7 @@ Installing my scripts:
     $HOSTNAME   Your machine's fully qualified domain name.
                         Defaults to `hostname`.
 
-    $ARCH       Your architecure, in the form vendor.cpu.os,
+    $ARCH       Your architecture, in the form vendor.cpu.os,
             eg sun.sparc.solaris or sgi.mips.irix.
 
     $SYSTEMID   A name for your machines' administrative domain
@@ -88,7 +86,7 @@ Licence:
     - you make recipients aware that the scripts can be obtained for
       free from my own web page
 
-Warrantee:
+Warranty:
 
     None whatsoever!
 

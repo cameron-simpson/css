@@ -2,7 +2,8 @@ import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from collections import namedtuple
 from email.utils import parseaddr, getaddresses, formataddr
-from cs.logutils import Pfx, error, warning, info
+from cs.logutils import error, warning, info
+from cs.pfx import Pfx
 
 AddressInfo = namedtuple('AddressInfo', 'key address categories')
 
