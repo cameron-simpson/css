@@ -1,0 +1,2 @@
+decode album definitions
+import keywords from /path/to/iphoto-library

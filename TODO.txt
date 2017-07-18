@@ -28,9 +28,6 @@ cs.numeric
   add histograms
   function the evaluate a rolling hash against all possible permutations
 ssh-opts: cononical capitalisation of option names
-iphoto:
-  decode album definitions
-  import keywords from /path/to/iphoto-library
 cs.buffer
   unit tests
 cs.fileutils:
