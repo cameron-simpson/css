@@ -1,0 +1,3 @@
+use tag as synonym for keyword throughout cmd line
+decode album definitions
+import keywords from /path/to/iphoto-library

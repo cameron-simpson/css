@@ -11,11 +11,14 @@ import os.path
 from collections import namedtuple
 from fnmatch import fnmatch
 from functools import partial
+import pprint
+from getopt import GetoptError
 import re
 import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from .plist import PListDict, ingest_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -26,6 +29,7 @@ from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked, locked_property
+from cs.xml import pprint as xml_pprint
 from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -43,6 +47,9 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   rename {events|keywords|people} {/regexp|name}...
                     Rename entities.
   select criteria... List masters with all specified criteria.
+  tag criteria... [--] {+tag|-tag}...
+                    Add or remove tags from selected images.
+  test [args...]    Whatever I'm testing at the moment...
 
 Criteria:
   [!]/regexp            Filename matches regexp.
@@ -51,6 +58,8 @@ Criteria:
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
                         May also be writtens "who:...".
+  [!]attr{<,<=,=,>=,>}value
+                        Test image attribute eg "width>=1920".
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
 '''
@@ -77,178 +86,288 @@ def main(argv=None):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op == 'info':
-          if not argv:
-            warning("missing masters")
-            badopts = True
+        try:
+          if op == 'info':
+            xit = cmd_info(I, argv)
+          elif op == 'ls':
+            xit = cmd_ls(I, argv)
+          elif op == 'rename':
+            xit = cmd_rename(I, argv)
+          elif op == 'select':
+            xit = cmd_select(I, argv)
+          elif op == "tag":
+            xit = cmd_tag(I, argv)
+          elif op == "test":
+            xit = cmd_test(I, argv)
           else:
-            obclass = argv.pop(0)
-            with Pfx(obclass):
-              if obclass == 'masters':
-                for master in sorted(I.masters(), key=lambda m: m.pathname):
-                  with Pfx(master.pathname):
-                    iminfo = master.image_info
-                    if iminfo is None:
-                      error("no info")
-                      xit = 1
-                    else:
-                      print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
-                            *[ 'kw:'+kwname for kwname in master.keyword_names ])
-              else:
-                warning("unknown class %r", obclass)
-                badopts = True
-        elif op == 'ls':
-          if not argv:
-            for db_name in sorted(I.db_names()):
-              print(db_name)
-          else:
-            obclass = argv.pop(0)
-            with Pfx(obclass):
-              if obclass.isdigit():
-                rating = int(obclass)
-                I.load_versions()
-                names = []
-                for version in I.versions():
-                  if version.mainRating == rating:
-                    pathname = version.master.pathname
-                    if pathname is not None:
-                      names.append(pathname)
-              elif obclass == 'albums':
-                I.load_albums()
-                names = I.album_names()
-              elif obclass == 'events':
-                I.load_folders()
-                names = I.event_names()
-              elif obclass == 'folders':
-                I.load_folders()
-                names = I.folder_names()
-              elif obclass == 'keywords':
-                I.load_keywords()
-                names = I.keyword_names()
-              elif obclass == 'masters':
-                I.load_masters()
-                names = I.master_pathnames()
-              elif obclass == 'people':
-                I.load_persons()
-                names = I.person_names()
-              else:
-                warning("unknown class %r", obclass)
-                badopts = True
-              if argv:
-                warning("extra arguments: %r", argv)
-                badopts = True
-              if not badopts:
-                for name in sorted(names):
-                  print(name)
-        elif op == 'rename':
-          if not argv:
-            warning("missing 'events'")
-            badopts = True
-          else:
-            obclass = argv.pop(0)
-            if obclass == 'events':
-              table = I.folder_table
-              I.load_folders()
-              get_items = I.events
-            elif obclass == 'keywords':
-              table = I.keyword_table
-              I.load_keywords()
-              get_items = I.read_keywords
-            elif obclass == 'people':
-              table = I.person_table
-              I.load_persons()
-              get_items = I.persons
-            else:
-              warning("known class %r", obclass)
-              badopts = True
-            all_names = set(item.name for item in get_items())
-            if argv:
-              edit_lines = set()
-              for arg in argv:
-                # TODO: select by regexp if /blah
-                if arg.startswith('/'):
-                  regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
-                  edit_lines.update(item.edit_string
-                                    for item in get_items()
-                                    if regexp.search(item.name))
-                elif '*' in arg or '?' in arg:
-                  edit_lines.update(item.edit_string
-                                    for item in get_items()
-                                    if fnmatch(item.name, arg))
-                elif arg in all_names:
-                  for item in get_items():
-                    if item.name == arg:
-                      edit_lines.add(item.edit_string)
-                else:
-                  warning("unknown item name: %s", arg)
-                  badopts = True
-            else:
-              edit_lines = set(item.edit_string for item in get_items())
-            if not badopts:
-              changes = edit_strings(sorted(edit_lines,
-                                            key=lambda _: _.split(':', 1)[1]),
-                                     errors=lambda msg: warning(msg + ', discarded')
-                                    )
-              for old_string, new_string in changes:
-                with Pfx("%s => %s", old_string, new_string):
-                  old_modelId, old_name = old_string.split(':', 1)
-                  old_modelId = int(old_modelId)
-                  try:
-                    new_modelId, new_name = new_string.split(':', 1)
-                    new_modelId = int(new_modelId)
-                  except ValueError as e:
-                    error("invalid edited string: %s", e)
-                    xit = 1
-                  else:
-                    if old_modelId != new_modelId:
-                      error("modelId changed")
-                      xit = 1
-                    elif new_name in all_names:
-                      if obclass == 'keywords':
-                        # TODO: merge keywords
-                        print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
-                        otherModelId = the(item.modelId
-                                           for item in get_items()
-                                           if item.name == new_name)
-                        I.replace_keywords(old_modelId, otherModelId)
-                        I.expunge_keyword(old_modelId)
-                      else:
-                        error("new name already in use: %r", new_name)
-                        xit = 1
-                    else:
-                      print("%d: %s => %s" % (old_modelId, old_name, new_name))
-                      table[old_modelId].name = new_name
-        elif op == 'select':
-          if not argv:
-            warning("missing selectors")
-            badopts = True
-          else:
-            selectors = []
-            for selection in argv:
-              try:
-                selector = I.parse_selector(selection)
-              except ValueError as e:
-                warning("invalid selector: %s", e)
-                badopts = True
-              else:
-                selectors.append(selector)
-          if not badopts:
-            masters = None
-            for selector in selectors:
-              masters = selector.select(masters)
-            for master in masters:
-              print(master.pathname)
-        elif op == "test":
-          test(argv, I)
-        else:
-          warning("unrecognised op")
+            raise GetoptError("unrecognised op")
+        except GetoptError as e:
+          warning("usage: %s", e)
           badopts = True
     if badopts:
       print(usage, file=sys.stderr)
       return 2
     return xit
 
-def test(argv, I):
+def cmd_info(I, argv):
+  ''' Usage: info masters...
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing masters")
+  obclass = argv.pop(0)
+  with Pfx(obclass):
+    if obclass == 'masters':
+      for master in sorted(I.masters(), key=lambda m: m.pathname):
+        with Pfx(master.pathname):
+          iminfo = master.image_info
+          if iminfo is None:
+            error("no info")
+            xit = 1
+          else:
+            print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
+                  *[ 'kw:'+kwname for kwname in master.keyword_names ])
+    else:
+      raise GetoptError("unknown class: %r" % (obclass,))
+  return xit
+
+def cmd_ls(I, argv):
+  xit = 0
+  get_row_map = {
+    'albums':   I.albums,
+    'events':   I.folders,
+    'folders':  I.folders,
+    'keywords': I.keywords,
+    'masters':  I.masters,
+    'people':   I.persons,
+  }
+  if not argv:
+    for obclass_name in sorted(get_row_map.keys()):
+      print(obclass_name)
+  else:
+    obclass = argv.pop(0)
+    with Pfx(obclass):
+      if obclass.isdigit():
+        rating = int(obclass)
+        I.load_versions()
+        names = []
+        for version in I.versions():
+          if version.mainRating == rating:
+            pathname = version.master.pathname
+            if pathname is not None:
+              names.append(pathname)
+      try:
+        get_rows = get_row_map[obclass]
+      except KeyError:
+        raise GetoptError("unknown class")
+      rows = get_rows()
+      if obclass == 'events':
+        if not argv:
+          argv = I.event_names()
+      elif obclass == 'folders':
+        if not argv:
+          argv = I.folder_names()
+      def row_key(row):
+        key = getattr(row, 'name', None)
+        if key is None:
+          key = str(row.modelId)
+        return key
+      for row in sorted(rows, key=row_key):
+        key = row_key(row)
+        with Pfx(key):
+          if argv and key not in argv:
+            continue
+          print(key)
+          if argv:
+            for column_name in sorted(row.column_names):
+              if column_name.endswith('Data'):
+                obj = ingest_plist(row[column_name], recurse=True, resolve=True)
+                print(' ', column_name+':')
+                pprint.pprint(obj.value, width=32)
+              else:
+                print(' ', column_name+':', row[column_name])
+          if obclass == 'albums':
+            print("apalbumpath =", row.apalbum_path)
+            apalbum = row.apalbum
+            if apalbum is None:
+              error("NO ALBUM DATA?")
+            else:
+              print("filter:")
+              apalbum.dump()
+  return xit
+
+def cmd_rename(I, argv):
+  ''' Usage: rename {events|keywords|people} {/regexp|name}...
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing events")
+  obclass = argv.pop(0)
+  with Pfx(obclass):
+    if obclass == 'events':
+      table = I.folder_table
+      I.load_folders()
+      get_items = I.events
+    elif obclass == 'keywords':
+      table = I.keyword_table
+      I.load_keywords()
+      get_items = I.read_keywords
+    elif obclass == 'people':
+      table = I.person_table
+      I.load_persons()
+      get_items = I.persons
+    else:
+      raise GetoptError("known class")
+    all_names = set(item.name for item in get_items())
+    if argv:
+      edit_lines = set()
+      for arg in argv:
+        with Pfx(arg):
+          # TODO: select by regexp if /blah
+          if arg.startswith('/'):
+            regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+            edit_lines.update(item.edit_string
+                              for item in get_items()
+                              if regexp.search(item.name))
+          elif '*' in arg or '?' in arg:
+            edit_lines.update(item.edit_string
+                              for item in get_items()
+                              if fnmatch(item.name, arg))
+          elif arg in all_names:
+            for item in get_items():
+              if item.name == arg:
+                edit_lines.add(item.edit_string)
+          else:
+            raise GetoptError("unknown item name")
+    else:
+      edit_lines = set(item.edit_string for item in get_items())
+    changes = edit_strings(sorted(edit_lines,
+                                  key=lambda _: _.split(':', 1)[1]),
+                           errors=lambda msg: warning(msg + ', discarded')
+                          )
+    for old_string, new_string in changes:
+      with Pfx("%s => %s", old_string, new_string):
+        old_modelId, old_name = old_string.split(':', 1)
+        old_modelId = int(old_modelId)
+        try:
+          new_modelId, new_name = new_string.split(':', 1)
+          new_modelId = int(new_modelId)
+        except ValueError as e:
+          error("invalid edited string: %s", e)
+          xit = 1
+        else:
+          if old_modelId != new_modelId:
+            error("modelId changed")
+            xit = 1
+          elif new_name in all_names:
+            if obclass == 'keywords':
+              # TODO: merge keywords
+              print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
+              otherModelId = the(item.modelId
+                                 for item in get_items()
+                                 if item.name == new_name)
+              I.replace_keywords(old_modelId, otherModelId)
+              I.expunge_keyword(old_modelId)
+            else:
+              error("new name already in use: %r", new_name)
+              xit = 1
+          else:
+            print("%d: %s => %s" % (old_modelId, old_name, new_name))
+            table[old_modelId].name = new_name
+  return xit
+
+def cmd_select(I, argv):
+  xit = 0
+  badopts = False
+  if not argv:
+    raise GetoptError("missing selectors")
+  selectors = []
+  for selection in argv:
+    with Pfx(selection):
+      try:
+        selector = I.parse_selector(selection)
+      except ValueError as e:
+        warning("invalid selector: %s", e)
+        badopts = True
+      else:
+        selectors.append(selector)
+  if badopts:
+    raise GetoptError("invalid arguments")
+  masters = None
+  for selector in selectors:
+    masters = selector.select(masters)
+  for master in masters:
+    print(master.pathname)
+  return xit
+
+def cmd_tag(I, argv):
+  xit = 0
+  badopts = False
+  if not argv:
+    raise GetoptError("missing selector")
+  selectors = []
+  while argv:
+    selection = argv.pop(0)
+    if selection == '--':
+      break
+    if selection.startswith('+'):
+      argv.insert(0, selection)
+      break
+    with Pfx(selection):
+      try:
+        selector = I.parse_selector(selection)
+      except ValueError as e:
+        warning("invalid selector: %s", e)
+        badopts = True
+      else:
+        selectors.append(selector)
+  if not argv:
+    raise GetoptError("missing tags")
+  tagging = []
+  for arg in argv:
+    try:
+      with Pfx(arg):
+        if not arg:
+          raise GetoptError("invalid empty tag")
+        kw_op = arg[0]
+        if kw_op not in ('+', '-'):
+          raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
+        kw_name = arg[1:]
+        try:
+          kw_name = I.match_one_keyword(kw_name)
+        except ValueError as e:
+          raise GetoptError("invalid tag: %s" % (e,))
+        kw = I.keyword_by_name[kw_name]
+        tagging.append( (kw_op == '+', kw) )
+    except GetoptError as e:
+      warning(e)
+      badopts = True
+  if badopts:
+    raise GetoptError("invalid arguments")
+  masters = None
+  for selector in selectors:
+    masters = selector.select(masters)
+  for master in masters:
+    with Pfx(master.basename):
+      V = master.latest_version()
+      for add, tag in tagging:
+        with Pfx("%s%s", "+" if add else "-", tag.name):
+          kws = V.keywords
+          if add:
+            if tag not in kws:
+              V.add_keyword(tag)
+              info('OK')
+          else:
+            if tag in kws:
+              V.del_keyword(tag)
+              info('OK')
+  return xit
+
+def cmd_test(I, argv):
+  AD = I.load_albumdata()
+  print('AlbumData.xml:')
+  print(pprint.pformat(AD._as_dict(), indent=2, width=32))
+  sys.exit(1)
   ##for folder in I.read_folders():
   ##  print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
   ##for keyword in I.read_keywords():
@@ -280,6 +399,7 @@ def test(argv, I):
     FI.save(filename)
     FI.close()
     break
+  return 0
 
 Image_Info = namedtuple('Image_Info', 'dx dy format')
 
@@ -358,21 +478,23 @@ class iPhoto(O):
   def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
-    by_id = self.album_by_id = {}
-    ##by_uuid = self.album_by_uuid = {}
-    by_name = self.albums_by_name = {}
-    for album in self.read_albums():
-      by_id[album.modelId] = album
-      ##by_uuid[album.uuid] = album
-      name = album.name
-      if name is None:
-        warning("album has no name: %s", album.uuid)
-      else:
-        try:
-          albums = by_name[name]
-        except KeyError:
-          albums = by_name[name] = set()
-        albums.add(album)
+    with Pfx("_load_table_albums"):
+      by_id = self.album_by_id = {}
+      ##by_uuid = self.album_by_uuid = {}
+      by_name = self.albums_by_name = {}
+      for album in self.read_albums():
+        by_id[album.modelId] = album
+        ##by_uuid[album.uuid] = album
+        name = album.name
+        if name is None:
+          debug("album has no name: %s", album.uuid)
+          pass
+        else:
+          try:
+            albums = by_name[name]
+          except KeyError:
+            albums = by_name[name] = set()
+          albums.add(album)
 
   def album(self, album_id):
     self.load_albums()
@@ -381,6 +503,21 @@ class iPhoto(O):
   def album_names(self):
     self.load_albums()
     return self.albums_by_name.keys()
+
+  @property
+  def albumdata_path(self):
+    ''' Pathname of the AlbumData.xml file, saved when iPhoto quits.
+    '''
+    return self.pathto('AlbumData.xml')
+
+  def load_albumdata(self):
+    return ingest_plist(self.albumdata_path, recurse=True, resolve=True)
+
+  @locked_property
+  def albumdata_xml_plist(self):
+    ''' Ingest and cache the AlbumData.xml file.
+    '''
+    return self.load_albumdata()
 
   def _load_table_faces(self):
     ''' Load Faces.RKDetectedFace into memory and set up mappings.
@@ -562,13 +699,8 @@ class iPhoto(O):
     self.load_keywords()
     return self.keyword_by_id.get(keyword_id)
 
-  @locked_property
-  def keywords(self):
-    self.load_keywords()
-    return self.keyword_by_name.values()
-
   def keyword_names(self):
-    return frozenset(kw.name for kw in self.keywords)
+    return frozenset(kw.name for kw in self.keywords())
 
   def match_keyword(self, kwname):
     ''' User convenience: match string against all keywords, return matches.
@@ -636,14 +768,27 @@ class iPhoto(O):
   def expunge_keyword(self, keyword_id):
     ''' Remove the specified keyword.
     '''
+    # remove keyword from versions
     self \
       .table_by_nickname['keywordForVersion'] \
       .delete_by_column('keywordId', keyword_id)
+    # remove keyword definition
     self \
       .table_by_nickname['keyword'] \
       .delete_by_column('modelId', keyword_id)
 
   def parse_selector(self, selection):
+    ''' Parse a single image selection criterion.
+        Leading "!" or "-" inverts the test.
+        /regexp     Compare image filename against regexp.
+        kw:         Image has some keywords.
+        kw:kwname   Image has keyword "kwname".
+        who:, face: Image contains a face.
+        who:name, face:name
+                    Image contains the named face.
+        attr{<,<=,=,>=,>}value
+                    Test image attribute eg "width>=1920".
+    '''
     with Pfx(selection):
       selection0 = selection
       selector = None
@@ -808,7 +953,83 @@ class iPhotoRow(Row):
   def edit_string(self):
     return "%d:%s" % (self.modelId, self.name)
 
+class Album_Mixin(iPhotoRow):
+
+  @prop
+  def apalbum_path(self):
+    return self.iphoto.pathto(os.path.join('Database/Albums', self.uuid+'.apalbum'))
+
+  @locked_property
+  def apalbum(self):
+    try:
+      return AlbumPList(self.apalbum_path)
+    except FileNotFoundError as e:
+      error("apalbum: %r: %s", self.apalbum_path, e)
+      return None
+
+class AlbumPList(object):
+
+  def __init__(self, plistpath):
+    self.path = plistpath
+    self.plist = ingest_plist(plistpath, recurse=True, resolve=True)
+
+  def __str__(self):
+    return "<AlbumPList:%r>" % (self.plist,)
+
+  def __repr__(self):
+    return "<AlbumPList %r:%r>" % (self.path, self.plist)
+
+  @prop
+  def filter(self):
+    return self.plist['FilterInfo']
+
+  def dump(self):
+    Q = self.get_query()
+    XP("QUERY = %s", Q)
+    XP("RUN = %s", Q.run())
+
+  def get_query(self):
+    return FilterQuery(self.filter)
+
+def FilterQuery(ifilter):
+  classname = ifilter['queryClassName']
+  if classname == 'RKSingleItemQuery':
+    return SingleItemQuery(ifilter)
+  if classname == 'RKMultiItemQuery':
+    return MultiItemQuery(ifilter)
+  raise ValueError("unsupported filter query class name %r", classname)
+
+class BaseFilterQuery(O):
+  def __init__(self, ifilter):
+    ##XP("BaseFilterQuery: ifilter=%r", ifilter)
+    O.__init__(self, **ifilter)
+    self._ifilter = ifilter
+
+class SingleItemQuery(BaseFilterQuery):
+  def __str__(self):
+    return "SingleItemQuery(%r)" % (self._ifilter,)
+  __repr__ = __str__
+  def run(self):
+    invert = self.queryIsEnabled
+    return ()
+
+class MultiItemQuery(BaseFilterQuery):
+  def __init__(self, ifilter):
+    BaseFilterQuery.__init__(self, ifilter)
+    self.querySubqueries = [ FilterQuery(f) for f in self.querySubqueries ]
+  def __str__(self):
+    return "MultiItemQuery(%s)" \
+           % ( ",".join(str(q) for q in self.querySubqueries), )
+  def run(self):
+    invert = self.queryIsEnabled
+    conjunction = self.queryMatchType == 1
+    return ()
+
 class Master_Mixin(iPhotoRow):
+
+  @prop
+  def basename(self):
+    return os.path.basename(self.imagePath)
 
   @prop
   def pathname(self):
@@ -919,7 +1140,20 @@ class Version_Mixin(iPhotoRow):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
-class Folder_Mixin(iPhotoRow):
+  def add_keyword(self, kw):
+    # remove keyword from versions
+    self \
+      .iphoto.table_by_nickname['keywordForVersion'] \
+      .insert( ('keywordId', 'versionId'),
+               ( (kw.modelId, self.modelId), ) )
+
+  def del_keyword(self, kw):
+    # remove keyword from versions
+    self \
+      .iphoto.table_by_nickname['keywordForVersion'] \
+      .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
+
+class Folder_Mixin(Album_Mixin):
   pass
 
 class Keyword_Mixin(iPhotoRow):
@@ -1210,6 +1444,7 @@ SCHEMAE = {'Faces':
                 },
               'album':
                 { 'table_name': 'RKAlbum',
+                  'mixin': Album_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
                       'serviceAccountName', 'serviceFullName', 'name', 'folderUuid',

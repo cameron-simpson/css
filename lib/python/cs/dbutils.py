@@ -90,6 +90,12 @@ class Table(object):
     self.row_class = row_class
     self._lock = lock
 
+  def __str__(self):
+    return "%s:name=%s" % (self.__class__.__name__, self.table_name)
+
+  def __repr__(self):
+    return "%s[%s]" % (self, ','.join(self._column_names))
+
   @prop
   def qual_name(self):
     db_name = self.db.db_name
@@ -211,10 +217,8 @@ class Row(object):
     self._lock = lock
 
   def __str__(self):
-    return str(self._row)
-
-  def __repr__(self):
-    return "<%s %r>" % (self.__class__.__name__, self._row)
+    return "%s:%s" % (self._table.table_name, self._row)
+  __repr__ = __str__
 
   def __iter__(self):
     return iter(self._row)
