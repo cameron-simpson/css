@@ -47,6 +47,8 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   rename {events|keywords|people} {/regexp|name}...
                     Rename entities.
   select criteria... List masters with all specified criteria.
+  tag criteria... [--] {+tag|-tag}...
+                    Add or remove tags from selected images.
   test [args...]    Whatever I'm testing at the moment...
 
 Criteria:
@@ -93,6 +95,8 @@ def main(argv=None):
             xit = cmd_rename(I, argv)
           elif op == 'select':
             xit = cmd_select(I, argv)
+          elif op == "tag":
+            xit = cmd_tag(I, argv)
           elif op == "test":
             xit = cmd_test(I, argv)
           else:
@@ -292,8 +296,71 @@ def cmd_select(I, argv):
   masters = None
   for selector in selectors:
     masters = selector.select(masters)
-    for master in masters:
-      print(master.pathname)
+  for master in masters:
+    print(master.pathname)
+  return xit
+
+def cmd_tag(I, argv):
+  xit = 0
+  badopts = False
+  if not argv:
+    raise GetoptError("missing selector")
+  selectors = []
+  while argv:
+    selection = argv.pop(0)
+    if selection == '--':
+      break
+    if selection.startswith('+'):
+      argv.insert(0, selection)
+      break
+    with Pfx(selection):
+      try:
+        selector = I.parse_selector(selection)
+      except ValueError as e:
+        warning("invalid selector: %s", e)
+        badopts = True
+      else:
+        selectors.append(selector)
+  if not argv:
+    raise GetoptError("missing tags")
+  tagging = []
+  for arg in argv:
+    try:
+      with Pfx(arg):
+        if not arg:
+          raise GetoptError("invalid empty tag")
+        kw_op = arg[0]
+        if kw_op not in ('+', '-'):
+          raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
+        kw_name = arg[1:]
+        try:
+          kw_name = I.match_one_keyword(kw_name)
+        except ValueError as e:
+          raise GetoptError("invalid tag: %s" % (e,))
+        kw = I.keyword_by_name[kw_name]
+        tagging.append( (kw_op == '+', kw) )
+    except GetoptError as e:
+      warning(e)
+      badopts = True
+  if badopts:
+    raise GetoptError("invalid arguments")
+  masters = None
+  for selector in selectors:
+    masters = selector.select(masters)
+  for master in masters:
+    with Pfx(master.basename):
+      V = master.latest_version()
+      for add, tag in tagging:
+        with Pfx("%s%s", "+" if add else "-", tag.name):
+          kws = V.keywords
+          if add:
+            if tag not in kws:
+              V.add_keyword(tag)
+              info('OK')
+          else:
+            if tag in kws:
+              V.del_keyword(tag)
+              info('OK')
   return xit
 
 def cmd_test(I, argv):
@@ -701,9 +768,11 @@ class iPhoto(O):
   def expunge_keyword(self, keyword_id):
     ''' Remove the specified keyword.
     '''
+    # remove keyword from versions
     self \
       .table_by_nickname['keywordForVersion'] \
       .delete_by_column('keywordId', keyword_id)
+    # remove keyword definition
     self \
       .table_by_nickname['keyword'] \
       .delete_by_column('modelId', keyword_id)
@@ -959,6 +1028,10 @@ class MultiItemQuery(BaseFilterQuery):
 class Master_Mixin(iPhotoRow):
 
   @prop
+  def basename(self):
+    return os.path.basename(self.imagePath)
+
+  @prop
   def pathname(self):
     return os.path.join(self.iphoto.pathto('Masters'), self.imagePath)
 
@@ -1066,6 +1139,19 @@ class Version_Mixin(iPhotoRow):
   @prop
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
+
+  def add_keyword(self, kw):
+    # remove keyword from versions
+    self \
+      .iphoto.table_by_nickname['keywordForVersion'] \
+      .insert( ('keywordId', 'versionId'),
+               ( (kw.modelId, self.modelId), ) )
+
+  def del_keyword(self, kw):
+    # remove keyword from versions
+    self \
+      .iphoto.table_by_nickname['keywordForVersion'] \
+      .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
 
 class Folder_Mixin(Album_Mixin):
   pass
