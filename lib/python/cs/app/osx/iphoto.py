@@ -35,11 +35,8 @@ from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
-USAGE = '''Usage:
-  %s [/path/to/iphoto-library-path] - < operation-lines
-    Read lines containing "op [op-args...]" and execute.
-
-  %s [/path/to/iphoto-library-path] op [op-args...]
+USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
+    -                 Read ops from standard input and execute.
     info masters      List info about masters.
     ls                List apdb names.
     ls [0-5]          List master pathnames with specific rating.
@@ -76,7 +73,7 @@ def main(argv=None):
     argv = [ 'cs.app.osx.iphoto' ]
   cmd0 = argv.pop(0)
   cmd = os.path.basename(cmd0)
-  usage = USAGE % (cmd, cmd)
+  usage = USAGE % (cmd,)
   setup_logging(cmd)
   with Pfx(cmd):
     badopts = False
@@ -86,60 +83,59 @@ def main(argv=None):
       library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
     I = iPhoto(library_path)
     try:
-      return main_iphoto(I, argv, usage)
+      return main_iphoto(I, argv)
     except GetoptError as e:
       warning("warning: %s", e)
       print(usage, file=sys.stderr)
       return 2
 
-def main_iphoto(I, argv, usage):
+def main_iphoto(I, argv):
   xit = 0
   badopts = False
   if not argv:
-    warning("missing op")
-    badopts = True
-  else:
-    if argv == ['-']:
-      for lineno, line in enumerate(sys.stdin, 1):
-        with Pfx("stdin:%d", lineno):
-          line = line.strip()
-          if not line or line.startswith('#'):
-            continue
-          print(line)
-          sub_argv = shlex.split(line, comments=True)
-          try:
-            sub_xit = main_iphoto(I, sub_argv, usage)
-          except GetoptError as e:
-            warning("%s", e)
-            badopts = True
-          else:
-            if sub_xit != 0 and xit == 0:
-              xit = sub_xit
-      if badopts and xit == 0:
-        xit = 2
-      return xit
-    op = argv.pop(0)
-    with Pfx(op):
+    raise GetoptError("missing op")
+  op = argv.pop(0)
+  with Pfx(op):
+    if op == '-':
+      xit = cmd_(I, argv)
+    elif op == 'info':
+      xit = cmd_info(I, argv)
+    elif op == 'ls':
+      xit = cmd_ls(I, argv)
+    elif op == 'rename':
+      xit = cmd_rename(I, argv)
+    elif op == 'select':
+      xit = cmd_select(I, argv)
+    elif op == "tag":
+      xit = cmd_tag(I, argv)
+    elif op == "test":
+      xit = cmd_test(I, argv)
+    else:
+      raise GetoptError("unrecognised op")
+  return xit
+
+def cmd_(I, argv):
+  xit = 0
+  badopts = False
+  if argv:
+    raise GetoptError("extra arguments: %s", ' '.join(argv))
+  for lineno, line in enumerate(sys.stdin, 1):
+    with Pfx("stdin:%d", lineno):
+      line = line.strip()
+      if not line or line.startswith('#'):
+        continue
+      print(line)
+      sub_argv = shlex.split(line, comments=True)
       try:
-        if op == 'info':
-          xit = cmd_info(I, argv)
-        elif op == 'ls':
-          xit = cmd_ls(I, argv)
-        elif op == 'rename':
-          xit = cmd_rename(I, argv)
-        elif op == 'select':
-          xit = cmd_select(I, argv)
-        elif op == "tag":
-          xit = cmd_tag(I, argv)
-        elif op == "test":
-          xit = cmd_test(I, argv)
-        else:
-          raise GetoptError("unrecognised op")
+        sub_xit = main_iphoto(I, sub_argv)
       except GetoptError as e:
-        warning("usage: %s", e)
+        warning("%s", e)
         badopts = True
-  if badopts:
-    raise GetoptError("invalid invocation")
+      else:
+        if sub_xit != 0 and xit == 0:
+          xit = sub_xit
+  if badopts and xit == 0:
+    xit = 2
   return xit
 
 def cmd_info(I, argv):
@@ -769,8 +765,10 @@ class iPhoto(O):
         return match
     pfxmatches = []
     for match in matches:
-      if match.startswith(kwname+' ('):
-        pfxmatches.append(match)
+      for suffix in ' (', '/':
+        if match.startswith(kwname+suffix):
+          pfxmatches.append(match)
+          break
     if len(pfxmatches) == 1:
       return pfxmatches[0]
     # multiple inexact matches
