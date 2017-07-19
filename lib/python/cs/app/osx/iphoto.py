@@ -17,6 +17,7 @@ import re
 import shlex
 import sqlite3
 from threading import RLock
+from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from .plist import PListDict, ingest_plist
@@ -365,8 +366,8 @@ def cmd_tag(I, argv):
         try:
           kw_name = I.match_one_keyword(kw_name)
         except KeyError as e:
-          warning("unknown tag")
-          continue
+          warning("unknown tag, CREATE")
+          I.create_keyword(kw_name)
         except ValueError as e:
           warning("ambiguous tag")
           continue
@@ -827,6 +828,15 @@ class iPhoto(O):
     self \
       .table_by_nickname['keyword'] \
       .delete_by_column('modelId', keyword_id)
+
+  def create_keyword(self, kw_name):
+    # create new keyword definition
+    self \
+      .table_by_nickname['keyword'] \
+      .insert( ('uuid', 'name'),
+               ( (str(uuid4()), kw_name), )
+             )
+    self._load_table_keywords()
 
   def parse_selector(self, selection):
     ''' Parse a single image selection criterion.
