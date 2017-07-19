@@ -85,7 +85,12 @@ def main(argv=None):
     else:
       library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
     I = iPhoto(library_path)
-    return main_iphoto(I, argv, usage)
+    try:
+      return main_iphoto(I, argv, usage)
+    except GetoptError as e:
+      warning("warning: %s", e)
+      print(usage, file=sys.stderr)
+      return 2
 
 def main_iphoto(I, argv, usage):
   xit = 0
@@ -134,8 +139,7 @@ def main_iphoto(I, argv, usage):
         warning("usage: %s", e)
         badopts = True
   if badopts:
-    print(usage, file=sys.stderr)
-    return 2
+    raise GetoptError("invalid invocation")
   return xit
 
 def cmd_info(I, argv):
@@ -871,7 +875,7 @@ class iPhoto(O):
                 raise ValueError("invalid keyword: %s" % (e,))
               else:
                 if kwname != okwname:
-                  info("%r ==> %r", okwname, kwname)
+                  debug("%r ==> %r", okwname, kwname)
                 selector = SelectByKeyword_Name(self, kwname, invert)
           elif sel_type == 'face' or sel_type == 'who':
             person_name = selection
