@@ -102,10 +102,17 @@ def main_iphoto(I, argv, usage):
             continue
           print(line)
           sub_argv = shlex.split(line, comments=True)
-          sub_xit = main_iphoto(I, sub_argv, usage)
-          if sub_xit != 0:
-            return sub_xit
-      return 0
+          try:
+            sub_xit = main_iphoto(I, sub_argv, usage)
+          except GetoptError as e:
+            warning("%s", e)
+            badopts = True
+          else:
+            if sub_xit != 0 and xit == 0:
+              xit = sub_xit
+      if badopts and xit == 0:
+        xit = 2
+      return xit
     op = argv.pop(0)
     with Pfx(op):
       try:
@@ -338,7 +345,7 @@ def cmd_tag(I, argv):
     with Pfx(selection):
       try:
         selector = I.parse_selector(selection)
-      except ValueError as e:
+      except (ValueError,KeyError) as e:
         warning("invalid selector: %s", e)
         badopts = True
       else:
@@ -740,7 +747,8 @@ class iPhoto(O):
     lc_kwname = kwname.lower()
     matches = []
     for name in self.keyword_names():
-      if lc_kwname in name.lower():
+      words = name.split()
+      if words and lc_kwname == words[0].lower():
         matches.append(name)
     return matches
 
