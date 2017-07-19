@@ -102,10 +102,17 @@ def main_iphoto(I, argv, usage):
             continue
           print(line)
           sub_argv = shlex.split(line, comments=True)
-          sub_xit = main_iphoto(I, sub_argv, usage)
-          if sub_xit != 0:
-            return sub_xit
-      return 0
+          try:
+            sub_xit = main_iphoto(I, sub_argv, usage)
+          except GetoptError as e:
+            warning("%s", e)
+            badopts = True
+          else:
+            if sub_xit != 0 and xit == 0:
+              xit = sub_xit
+      if badopts and xit == 0:
+        xit = 2
+      return xit
     op = argv.pop(0)
     with Pfx(op):
       try:
@@ -338,7 +345,7 @@ def cmd_tag(I, argv):
     with Pfx(selection):
       try:
         selector = I.parse_selector(selection)
-      except ValueError as e:
+      except (ValueError,KeyError) as e:
         warning("invalid selector: %s", e)
         badopts = True
       else:
@@ -357,8 +364,12 @@ def cmd_tag(I, argv):
         kw_name = arg[1:]
         try:
           kw_name = I.match_one_keyword(kw_name)
+        except KeyError as e:
+          warning("unknown tag")
+          continue
         except ValueError as e:
-          raise GetoptError("invalid tag: %s" % (e,))
+          warning("ambiguous tag")
+          continue
         kw = I.keyword_by_name[kw_name]
         tagging.append( (kw_op == '+', kw) )
     except GetoptError as e:
@@ -366,6 +377,9 @@ def cmd_tag(I, argv):
       badopts = True
   if badopts:
     raise GetoptError("invalid arguments")
+  if not tagging:
+    warning("no tags to apply, skipping")
+    return 0
   masters = None
   for selector in selectors:
     masters = selector.select(masters)
@@ -482,7 +496,7 @@ class iPhoto(O):
             ##@locked
             def loadfunc():
               if not getattr(self, loaded_attr, False):
-                XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qual_name)
+                ##XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qual_name)
                 getattr(self, load_funcname)()
                 setattr(self, loaded_attr, True)
             return loadfunc
@@ -733,7 +747,8 @@ class iPhoto(O):
     lc_kwname = kwname.lower()
     matches = []
     for name in self.keyword_names():
-      if lc_kwname in name.lower():
+      words = name.split()
+      if words and lc_kwname == words[0].lower():
         matches.append(name)
     return matches
 
@@ -741,15 +756,21 @@ class iPhoto(O):
     matches = self.match_keyword(kwname)
     # no match
     if not matches:
-      raise ValueError("unknown keyword")
+      raise KeyError("unknown keyword")
+    if len(matches) == 1:
+      return matches[0]
     # exact match
     for match in matches:
       if match == kwname:
         return match
+    pfxmatches = []
+    for match in matches:
+      if match.startswith(kwname+' ('):
+        pfxmatches.append(match)
+    if len(pfxmatches) == 1:
+      return pfxmatches[0]
     # multiple inexact matches
-    if len(matches) > 1:
-      raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
-    return matches[0]
+    raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
 
   def versions_by_keyword(self, kwname):
     self.load_keywords()
