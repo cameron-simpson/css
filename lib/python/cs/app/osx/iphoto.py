@@ -17,6 +17,7 @@ import re
 import shlex
 import sqlite3
 from threading import RLock
+from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from .plist import PListDict, ingest_plist
@@ -335,6 +336,7 @@ def cmd_tag(I, argv):
   if not argv:
     raise GetoptError("missing selector")
   selectors = []
+  unknown = False
   while argv:
     selection = argv.pop(0)
     if selection == '--':
@@ -345,11 +347,16 @@ def cmd_tag(I, argv):
     with Pfx(selection):
       try:
         selector = I.parse_selector(selection)
-      except (ValueError,KeyError) as e:
+      except KeyError as e:
+        warning(e)
+        unknown = True
+      except ValueError as e:
         warning("invalid selector: %s", e)
         badopts = True
       else:
         selectors.append(selector)
+  if unknown:
+    return 1
   if not argv:
     raise GetoptError("missing tags")
   tagging = []
@@ -365,8 +372,8 @@ def cmd_tag(I, argv):
         try:
           kw_name = I.match_one_keyword(kw_name)
         except KeyError as e:
-          warning("unknown tag")
-          continue
+          warning("unknown tag, CREATE")
+          I.create_keyword(kw_name)
         except ValueError as e:
           warning("ambiguous tag")
           continue
@@ -828,17 +835,24 @@ class iPhoto(O):
       .table_by_nickname['keyword'] \
       .delete_by_column('modelId', keyword_id)
 
+  def create_keyword(self, kw_name):
+    # create new keyword definition
+    self \
+      .table_by_nickname['keyword'] \
+      .insert( ('uuid', 'name'),
+               ( (str(uuid4()), kw_name), )
+             )
+    self._load_table_keywords()
+
   def parse_selector(self, selection):
     ''' Parse a single image selection criterion.
-        Leading "!" or "-" inverts the test.
-        /regexp     Compare image filename against regexp.
-        kw:         Image has some keywords.
-        kw:kwname   Image has keyword "kwname".
-        who:, face: Image contains a face.
-        who:name, face:name
-                    Image contains the named face.
-        attr{<,<=,=,>=,>}value
-                    Test image attribute eg "width>=1920".
+        A leading "!" or "-" inverts the test.
+        /regexp                 Compare image filename against regexp.
+        {kw,keyword,tag}:       Image has at least one keywords.
+        {kw,keyword,tag}:kwname Image has keyword "kwname".
+        {who,face}:             Image has at least one face.
+        {who,face}:name         Imagine contains the named face.
+        attr{<,<=,=,>=,>}value  Test image attribute eg "width>=1920".
     '''
     with Pfx(selection):
       selection0 = selection
@@ -859,7 +873,7 @@ class iPhoto(O):
         selection = selection[offset:]
         if selection.startswith(':'):
           selection = selection[1:]
-          if sel_type == 'kw':
+          if sel_type in ('keyword', 'kw', 'tag'):
             kwname = selection
             if not kwname:
               selector = SelectByFunction(self,
@@ -869,13 +883,16 @@ class iPhoto(O):
               okwname = kwname
               try:
                 kwname = self.match_one_keyword(kwname)
+              except KeyError as e:
+                warning("no match for keyword %r, using dummy selector", kwname)
+                selector = SelectByKeyword_Name(self, None, invert)
               except ValueError as e:
                 raise ValueError("invalid keyword: %s" % (e,))
               else:
                 if kwname != okwname:
                   debug("%r ==> %r", okwname, kwname)
                 selector = SelectByKeyword_Name(self, kwname, invert)
-          elif sel_type == 'face' or sel_type == 'who':
+          elif sel_type in ('face', 'who'):
             person_name = selection
             if not person_name:
               selector = SelectByFunction(self,
@@ -1402,6 +1419,15 @@ class SelectByKeyword_Name(_SelectMasters):
     self.iphoto = iphoto
     self.kwname = kwname
     self.invert = invert
+
+  def select(self, masters=None):
+    if self.kwname is None:
+      if self.invert:
+        if masters is None:
+          masters = self.iphoto.masters()
+        return masters
+      return ()
+    return super().select(masters)
 
   def select_from_all(self):
     if self.invert:
