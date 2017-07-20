@@ -37,22 +37,22 @@ from cs.x import X
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
-    -                 Read ops from standard input and execute.
-    info masters      List info about masters.
-    ls                List apdb names.
-    ls [0-5]          List master pathnames with specific rating.
-    ls albums         List album names.
-    ls events         List events names.
-    ls folders        List folder names (includes events).
-    ls keywords       List keywords.
-    ls masters        List master pathnames.
-    ls people         List person names.
-    rename {events|keywords|people} {/regexp|name}...
-                      Rename entities.
-    select criteria... List masters with all specified criteria.
+    -                   Read ops from standard input and execute.
+    info masters        List info about masters.
+    ls                  List apdb names.
+    ls [0-5]            List master pathnames with specific rating.
+    ls albums           List album names.
+    ls events           List events names.
+    ls folders          List folder names (includes events).
+    ls {keywords|tags}  List keywords/tags.
+    ls masters          List master pathnames.
+    ls {people|faces}   List person/face names.
+    rename {events|keywords/tags|people/faces} {/regexp|name}...
+                        Rename entities.
+    select criteria...  List masters with all specified criteria.
     tag criteria... [--] {+tag|-tag}...
-                      Add or remove tags from selected images.
-    test [args...]    Whatever I'm testing at the moment...
+                        Add or remove tags from selected images.
+    test [args...]      Whatever I'm testing at the moment...
 
 Criteria:
   [!]/regexp            Filename matches regexp.
@@ -168,8 +168,10 @@ def cmd_ls(I, argv):
     'events':   I.folders,
     'folders':  I.folders,
     'keywords': I.keywords,
+    'tags':     I.keywords,
     'masters':  I.masters,
     'people':   I.persons,
+    'faces':    I.persons,
   }
   if not argv:
     for obclass_name in sorted(get_row_map.keys()):
@@ -227,7 +229,7 @@ def cmd_ls(I, argv):
   return xit
 
 def cmd_rename(I, argv):
-  ''' Usage: rename {events|keywords|people} {/regexp|name}...
+  ''' Usage: rename {events|keywords/tags|people/faces} {/regexp|name}...
   '''
   xit = 0
   if not argv:
@@ -238,11 +240,11 @@ def cmd_rename(I, argv):
       table = I.folder_table
       I.load_folders()
       get_items = I.events
-    elif obclass == 'keywords':
+    elif obclass in ('keywords', 'tags'):
       table = I.keyword_table
       I.load_keywords()
       get_items = I.read_keywords
-    elif obclass == 'people':
+    elif obclass in ('people', 'faces'):
       table = I.person_table
       I.load_persons()
       get_items = I.persons
