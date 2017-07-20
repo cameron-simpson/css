@@ -479,46 +479,51 @@ class iPhoto(O):
     return self.dbs.pathto(db_name)
 
   def __getattr__(self, attr):
-    if not attr.startswith('_'):
-      if attr.endswith('s'):
-        if '_' not in attr:
-          # *s ==> iterable of * (obtained from *_by_id)
-          nickname = attr[:-1]
-          if nickname in self.table_by_nickname:
-            # require the matching table load
-            getattr(self, 'load_%ss' % (nickname,))()
-            by_id = getattr(self, nickname + '_by_id')
-            return lambda: by_id.values()
-        # read_*s ==> iterator of rows from table "*"
-        if attr.startswith('read_'):
+    try:
+      if not attr.startswith('_'):
+        if attr.endswith('s'):
+          if '_' not in attr:
+            # *s ==> iterable of * (obtained from *_by_id)
+            nickname = attr[:-1]
+            if nickname in self.table_by_nickname:
+              # require the matching table load
+              getattr(self, 'load_%ss' % (nickname,))()
+              by_id = getattr(self, nickname + '_by_id')
+              return lambda: by_id.values()
+          # read_*s ==> iterator of rows from table "*"
+          if attr.startswith('read_'):
+            nickname = attr[5:-1]
+            return self.table_by_nickname[nickname].read_rows
+        if attr.startswith('load_') and attr.endswith('s'):
           nickname = attr[5:-1]
-          return self.table_by_nickname[nickname].read_rows
-      if attr.startswith('load_') and attr.endswith('s'):
-        nickname = attr[5:-1]
-        if nickname in self.table_by_nickname:
-          loaded_attr = '_loaded_table_' + nickname
-          loaded = getattr(self, loaded_attr, False)
-          if loaded:
-            return lambda: None
-          else:
+          if nickname in self.table_by_nickname:
+            loaded_attr = '_loaded_table_' + nickname
+            loaded = getattr(self, loaded_attr, False)
+            if loaded:
+              return lambda: None
             load_funcname = '_load_table_' + nickname + 's'
             ##@locked
             def loadfunc():
               if not getattr(self, loaded_attr, False):
-                ##XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qual_name)
-                getattr(self, load_funcname)()
+                lf = getattr(self, load_funcname)
+                lf()
                 setattr(self, loaded_attr, True)
+            loadfunc.__name__ = load_funcname
             return loadfunc
-      if attr.startswith('select_by_'):
-        criterion_words = attr[10:].split('_')
-        class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
-        return partial(globals()[class_name], self)
-      if attr.endswith('_table'):
-        # *_table ==> table "*"
-        nickname = attr[:-6]
-        if nickname in self.table_by_nickname:
-          return self.table_by_nickname[nickname]
-    raise AttributeError("iPhoto.__getattr__: nothing named %r" % (attr,))
+        if attr.startswith('select_by_'):
+          criterion_words = attr[10:].split('_')
+          class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
+          return partial(globals()[class_name], self)
+        if attr.endswith('_table'):
+          # *_table ==> table "*"
+          nickname = attr[:-6]
+          if nickname in self.table_by_nickname:
+            return self.table_by_nickname[nickname]
+    except AttributeError as e:
+      msg = "__getattr__ got internal AttributeError: %s" % (e,)
+      raise RuntimeError(msg)
+    msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
+    raise AttributeError(msg)
 
   def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
