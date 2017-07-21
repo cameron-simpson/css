@@ -1370,10 +1370,13 @@ class Person_Mixin(iPhotoRow):
   def vfaces(self):
     return set()
 
+# association of masters/versions/faces
 class VFace_Mixin(iPhotoRow):
 
   @prop
   def master(self):
+    ''' The master for this row.
+    '''
     return self.iphoto.master(self.masterId)
 
   def person(self):
