@@ -576,12 +576,13 @@ class iPhoto(O):
           if attr.startswith('read_'):
             nickname = attr[5:-1]
             return self.table_by_nickname[nickname].read_rows
+          # load_*s ==> function to load the table if not already loaded
           if attr.startswith('load_'):
             nickname = attr[5:-1]
             if nickname in self.table_by_nickname:
               loaded_attr = '_loaded_table_' + nickname
-              loaded = getattr(self, loaded_attr, False)
-              if loaded:
+              if getattr(self, loaded_attr, False):
+                # already loaded: no-op
                 return lambda: None
               load_funcname = '_load_table_' + nickname + 's'
               ##@locked
@@ -1051,7 +1052,9 @@ class iPhotoDBs(object):
     return conn
 
   def _load_db(self, db_name):
+    X("iPhotoDBs._load_db(%r)...", db_name)
     db = self.dbmap[db_name] = iPhotoDB(self.iphoto, db_name)
+    X("iPhotoDBs._load_db(%r) COMPLETE", db_name)
     return db
 
   @locked
