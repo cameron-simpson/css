@@ -243,14 +243,16 @@ def cmd_rename(I, argv):
   obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass == 'events':
-      items = I.folder_rows
+      table = I.folder_table
     elif obclass in ('keywords', 'tags'):
-      items = I.keyword_rows
+      table = I.keyword_table
     elif obclass in ('people', 'faces'):
-      items = I.person_rows
+      table = I.person_table
     else:
       raise GetoptError("known class")
+    items = list(table)
     all_names = set(item.name for item in items)
+    X("%d items: %r", len(items), all_names)
     if argv:
       edit_lines = set()
       for arg in argv:
