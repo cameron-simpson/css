@@ -707,17 +707,17 @@ class iPhoto(O):
     return self.folders_by_name.keys()
 
   def folders_simple(self):
-    return [ folder for folder in self.folders()
-             if folder.sortKeyPath == 'custom.default'
-           ]
+    return [ folder for folder in self.folders() if folder.is_simple_folder ]
 
   def event(self, event_id):
     self.load_folders()
-    l
+    folder = self.folder(event_id)
+    if not folder.is_event:
+      return None
+    return folder
+
   def events(self):
-    return [ folder for folder in self.folders()
-             if folder.sortKeyPath == 'custom.kind'
-           ]
+    return [ folder for folder in self.folders() if folder.is_event ]
 
   def event_names(self):
     return [ event.name for event in self.events() ]
@@ -1313,7 +1313,30 @@ class Version_Mixin(iPhotoRow):
       .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
 
 class Folder_Mixin(Album_Mixin):
-  pass
+
+  def versions(self):
+    ''' Return the versions with this album.
+    '''
+    I = self.iphoto
+    I.load_albumForVersions()
+    for vid in I.al4v_version_ids_by_album_id.get(self.modelId, ()):
+      yield I.version(vid)
+
+  def masters(self):
+    ''' Return the masters from this album.
+    '''
+    ms = set()
+    for version in self.versions():
+      ms.add(version.master)
+    return ms
+
+  @property
+  def is_event(self):
+    return self.sortKeyPath == 'custom.kind'
+
+  @property
+  def is_simple_folder(self):
+    return self.sortKeyPath == 'custom.default'
 
 class Keyword_Mixin(iPhotoRow):
 
@@ -1647,6 +1670,11 @@ SCHEMAE = {'Faces':
                       'faceDetectionRotationFromMaster', 'editListData',
                       'hasKeywords',
                     ),
+                },
+              'albumForVersion':
+                { 'table_name': 'RKAlbumVersion',
+                  'columns':
+                    ( 'modelId', 'versionId', 'albumId'),
                 },
               'keywordForVersion':
                 { 'table_name': 'RKKeywordForVersion',
