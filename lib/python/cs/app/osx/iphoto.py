@@ -573,22 +573,22 @@ class iPhoto(O):
           if attr.startswith('read_'):
             nickname = attr[5:-1]
             return self.table_by_nickname[nickname].read_rows
-        if attr.startswith('load_') and attr.endswith('s'):
-          nickname = attr[5:-1]
-          if nickname in self.table_by_nickname:
-            loaded_attr = '_loaded_table_' + nickname
-            loaded = getattr(self, loaded_attr, False)
-            if loaded:
-              return lambda: None
-            load_funcname = '_load_table_' + nickname + 's'
-            ##@locked
-            def loadfunc():
-              if not getattr(self, loaded_attr, False):
-                lf = getattr(self, load_funcname)
-                lf()
-                setattr(self, loaded_attr, True)
-            loadfunc.__name__ = load_funcname
-            return loadfunc
+          if attr.startswith('load_'):
+            nickname = attr[5:-1]
+            if nickname in self.table_by_nickname:
+              loaded_attr = '_loaded_table_' + nickname
+              loaded = getattr(self, loaded_attr, False)
+              if loaded:
+                return lambda: None
+              load_funcname = '_load_table_' + nickname + 's'
+              ##@locked
+              def loadfunc():
+                if not getattr(self, loaded_attr, False):
+                  lf = getattr(self, load_funcname)
+                  lf()
+                  setattr(self, loaded_attr, True)
+              loadfunc.__name__ = load_funcname
+              return loadfunc
         if attr.startswith('select_by_'):
           criterion_words = attr[10:].split('_')
           class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
