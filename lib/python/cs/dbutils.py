@@ -81,6 +81,15 @@ class Table(object):
   '''
 
   def __init__(self, db, table_name, lock=None, row_class=None, column_names=None, id_column=None, name_column=None):
+    ''' Initialise a new Table.
+        `db`: the database (TableSpace) containing this Table
+        `table_name`: the Table's name
+        `lock`: optional Lock; if omitted or None use `db._lock`
+        `row_class`: factory to construct a Row from a query result
+        `column_names`: Table column names
+        `id_column`: the Table primary key column
+        `name_column`: optional Table name column, contains an identifying string
+    '''
     if lock is None:
       lock = db._lock
     self.db = db
@@ -329,6 +338,13 @@ _IdRelation = namedtuple('IdRelation',
 
 class IdRelation(_IdRelation):
   ''' Manage a relationship between 2 Tables based on their id_columns.
+      Initialised with:
+      `id_column`: id column for the relation Table
+      `relation`: the relation Table
+      `left_column`: relation Table column containing the id for the left Table
+      `left`: the left Table
+      `right_column`: relation Table column containing the id for the right Table
+      `right`: the right Table
   '''
 
   def left_to_right(self, left_ids):
