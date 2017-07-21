@@ -229,6 +229,9 @@ def cmd_ls(I, argv):
             else:
               print("filter:")
               apalbum.dump()
+          if obclass in ('folders', 'events'):
+            for master in row.masters():
+              print('   ', master.pathname)
   return xit
 
 def cmd_rename(I, argv):
