@@ -206,8 +206,7 @@ class Table(object):
     if self.name_column is None:
       raise RuntimeError("%s: no name_colum" % (self,))
     row = self[id_value]
-    self.update((self.name_column,), (new_name,),
-                 "`%s` = %%s" % (self.id_column,), row[self.id_column])
+    row.name = new_name
 
   def edit_column_by_ids(self, column_name, ids=None):
     if ids is None:
@@ -277,14 +276,42 @@ class Row(object):
   def id_value(self):
     return getattr(self._row, self._table.id_column)
 
+  @prop
+  def name(self):
+    name_column = self._table.name_column
+    if name_column is None:
+      raise RuntimeError("%s: no name_column" % (self,))
+    return self[name_column]
+
+  @name.setting
+  def name(self, new_name):
+    name_column = self._table.name_column
+    if name_column is None:
+      raise RuntimeError("%s: no name_column" % (self,))
+    self[name_column] = new_name
+
   def __getitem__(self, key):
+    ''' Direct access to row values by column name or index.
+    '''
     if isinstance(key, int):
       # do I really want to support numeric access to columns?
       return self._row[key]
     try:
       return getattr(self._row, key)
     except AttributeError as e:
-      raise KeyError("_row has not attribute %r: %s" % (key, e))
+      raise KeyError("_row has no attribute %r: %s" % (key, e))
+
+  def __setitem__(self, key, value):
+    ''' Direct access to row values by column name or index.
+    '''
+    if isinstance(key, int):
+      # do I really want to support numeric access to columns?
+      key = self._table.column_names[key]
+    self._table.update_columns((key,),
+                               (value,),
+                               '`%s` = ?' % (self._table.id_column,),
+                               self.id_value)
+    self._row = self._row._replace(**{key: value})
 
   def __getattr__(self, attr):
     if not attr.startswith('_') and attr in self.column_names:
@@ -293,8 +320,7 @@ class Row(object):
 
   def __setattr__(self, attr, value):
     if not attr.startswith('_') and attr in self.column_names:
-      self._table.update_columns((attr,), (value,), '%s = ?' % (self._table.id_column,), self.id_value)
-      self._row = self._row._replace(**{attr: value})
+      self[attr] = value
     else:
       self.__dict__[attr] = value
 
