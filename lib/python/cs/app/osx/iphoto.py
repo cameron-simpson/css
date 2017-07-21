@@ -1000,7 +1000,12 @@ class iPhotoTable(Table):
     table_name = schema['table_name']
     column_names = schema['columns']
     row_class = schema.get('mixin', iPhotoRow)
-    Table.__init__(self, db, table_name, column_names=column_names, id_column='modelId', row_class=row_class)
+    name_column = schema.get('name')
+    if name_column is None and 'name' in column_names:
+      name_column = 'name'
+    Table.__init__(self, db, table_name, column_names=column_names,
+                   id_column='modelId', name_column=name_column,
+                   row_class=row_class)
     self.nickname = nickname
     self.schema = schema
 
