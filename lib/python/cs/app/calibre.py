@@ -93,6 +93,7 @@ class Calibre_Library(O):
     '''
     if libpath is None:
       libpath = os.environ.get('CALIBRE_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
+    info("%s: libpath=%r", self.__class__.__name__, libpath)
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
@@ -238,7 +239,7 @@ class CalibreTable(Table):
   def instances(self):
     ''' Return rows sorted by name.
     '''
-    return sorted(self.read_rows(), key=lambda row: row.name)
+    return sorted(self, key=lambda row: row.name)
 
   def make(self, name):
     try:
@@ -343,7 +344,7 @@ class Book(CalibreTableRow):
 
   @prop
   def identifiers(self):
-    identifier_rows = self.db.table_identifiers.read_rows('book = %d' % (self.id,))
+    identifier_rows = self.db.table_identifiers.rows('book = %d' % (self.id,))
     return set( (row.type, row.val) for row in identifier_rows )
 
   @prop
