@@ -243,20 +243,14 @@ def cmd_rename(I, argv):
   obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass == 'events':
-      table = I.folder_table
-      I.load_folders()
-      get_items = I.events
+      items = I.folder_rows
     elif obclass in ('keywords', 'tags'):
-      table = I.keyword_table
-      I.load_keywords()
-      get_items = I.read_keywords
+      items = I.keyword_rows
     elif obclass in ('people', 'faces'):
-      table = I.person_table
-      I.load_persons()
-      get_items = I.persons
+      items = I.person_rows
     else:
       raise GetoptError("known class")
-    all_names = set(item.name for item in get_items())
+    all_names = set(item.name for item in items)
     if argv:
       edit_lines = set()
       for arg in argv:
@@ -265,20 +259,20 @@ def cmd_rename(I, argv):
           if arg.startswith('/'):
             regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
             edit_lines.update(item.edit_string
-                              for item in get_items()
+                              for item in items
                               if regexp.search(item.name))
           elif '*' in arg or '?' in arg:
             edit_lines.update(item.edit_string
-                              for item in get_items()
+                              for item in items
                               if fnmatch(item.name, arg))
           elif arg in all_names:
-            for item in get_items():
+            for item in items:
               if item.name == arg:
                 edit_lines.add(item.edit_string)
           else:
             raise GetoptError("unknown item name")
     else:
-      edit_lines = set(item.edit_string for item in get_items())
+      edit_lines = set(item.edit_string for item in items)
     changes = edit_strings(sorted(edit_lines,
                                   key=lambda _: _.split(':', 1)[1]),
                            errors=lambda msg: warning(msg + ', discarded')
@@ -302,7 +296,7 @@ def cmd_rename(I, argv):
               # TODO: merge keywords
               print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
               otherModelId = the(item.modelId
-                                 for item in get_items()
+                                 for item in items
                                  if item.name == new_name)
               I.replace_keywords(old_modelId, otherModelId)
               I.expunge_keyword(old_modelId)
@@ -572,10 +566,10 @@ class iPhoto(O):
               getattr(self, 'load_%ss' % (nickname,))()
               by_id = getattr(self, nickname + '_by_id')
               return lambda: by_id.values()
-          # read_*s ==> iterator of rows from table "*"
-          if attr.startswith('read_'):
-            nickname = attr[5:-1]
-            return self.table_by_nickname[nickname].read_rows
+          # *_rows ==> iterator of rows from table "*"
+          if attr.endswith('_rows'):
+            nickname = attr[:-5]
+            return iter(self.table_by_nickname[nickname])
           # load_*s ==> function to load the table if not already loaded
           if attr.startswith('load_'):
             nickname = attr[5:-1]
@@ -615,7 +609,7 @@ class iPhoto(O):
       by_id = self.album_by_id = {}
       ##by_uuid = self.album_by_uuid = {}
       by_name = self.albums_by_name = {}
-      for album in self.read_albums():
+      for album in self.album_rows:
         by_id[album.modelId] = album
         ##by_uuid[album.uuid] = album
         name = album.name
@@ -657,7 +651,7 @@ class iPhoto(O):
     '''
     by_id = self.face_by_id = {}
     by_master_uuid = self.faces_by_master_uuid = {}
-    for face in self.read_faces():
+    for face in self.face_rows:
       by_id[face.modelId] = face
       muuid = face.masterUuid
       try:
@@ -674,7 +668,7 @@ class iPhoto(O):
     '''
     by_id = self.vface_by_id = {}
     by_master_id = self._vfaces_by_master_id = {}
-    for vface in self.read_vfaces():
+    for vface in self.vface_rows:
       by_id[vface.modelId] = vface
       master_id = vface.masterId
       try:
@@ -693,7 +687,7 @@ class iPhoto(O):
     '''
     by_id = self.folder_by_id = {}
     by_name = self.folders_by_name = {}
-    for folder in self.read_folders():
+    for folder in self.folder_rows:
       by_id[folder.modelId] = folder
       name = folder.name
       try:
@@ -735,7 +729,7 @@ class iPhoto(O):
     by_id = self.person_by_id = {}
     by_name = self.person_by_name = {}
     by_faceKey = self.person_by_faceKey = {}
-    for person in self.read_persons():
+    for person in self.person_rows:
       by_id[person.modelId] = person
       by_name[person.name] = person
       by_faceKey[person.faceKey] = person
@@ -789,7 +783,7 @@ class iPhoto(O):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
     by_id = self.master_by_id = {}
-    for master in self.read_masters():
+    for master in self.master_rows:
       by_id[master.modelId] = master
 
   def master(self, master_id):
@@ -806,7 +800,7 @@ class iPhoto(O):
     '''
     by_id = self.version_by_id = {}
     by_master_id = self.versions_by_master_id = {}
-    for version in self.read_versions():
+    for version in self.version_rows:
       by_id[version.modelId] = version
       master_id = version.masterId
       try:
@@ -824,7 +818,7 @@ class iPhoto(O):
     '''
     by_id = self.keyword_by_id = {}
     by_name = self.keyword_by_name = {}
-    for kw in self.read_keywords():
+    for kw in self.keyword_rows:
       by_id[kw.modelId] = kw
       by_name[kw.name] = kw
 
@@ -884,7 +878,7 @@ class iPhoto(O):
     '''
     by_kwid = self.kw4v_version_ids_by_keyword_id = {}
     by_vid = self.kw4v_keyword_ids_by_version_id = {}
-    for kw4v in self.read_keywordForVersions():
+    for kw4v in self.keywordForVersion_rows:
       kwid = kw4v.keywordId
       vid = kw4v.versionId
       try:
