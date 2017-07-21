@@ -117,7 +117,7 @@ class Table(object):
     ''' Return a list of row_class instances.
     '''
     row_class = self.row_class
-    return [ row_class(self, row) for row in self.select(where, *where_argv) ]
+    return list(row_class(self, row) for row in self.select(where, *where_argv))
 
   @prop
   def qual_name(self):
