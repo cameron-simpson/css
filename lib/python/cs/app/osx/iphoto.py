@@ -52,6 +52,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     select criteria...  List masters with all specified criteria.
     tag criteria... [--] {+tag|-tag}...
                         Add or remove tags from selected images.
+    tag-events [/regexp] Autotag images from their event name.
     test [args...]      Whatever I'm testing at the moment...
 
 Criteria:
@@ -109,6 +110,8 @@ def main_iphoto(I, argv):
       xit = cmd_select(I, argv)
     elif op == "tag":
       xit = cmd_tag(I, argv)
+    elif op == "tag-events":
+      xit = cmd_tag_events(I, argv)
     elif op == "test":
       xit = cmd_test(I, argv)
     else:
@@ -333,6 +336,82 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  xit = 0
+  badopts = False
+  if not argv:
+    raise GetoptError("missing selector")
+  selectors = []
+  unknown = False
+  while argv:
+    selection = argv.pop(0)
+    if selection == '--':
+      break
+    if selection.startswith('+'):
+      argv.insert(0, selection)
+      break
+    with Pfx(selection):
+      try:
+        selector = I.parse_selector(selection)
+      except KeyError as e:
+        warning(e)
+        unknown = True
+      except ValueError as e:
+        warning("invalid selector: %s", e)
+        badopts = True
+      else:
+        selectors.append(selector)
+  if unknown:
+    return 1
+  if not argv:
+    raise GetoptError("missing tags")
+  tagging = []
+  for arg in argv:
+    try:
+      with Pfx(arg):
+        if not arg:
+          raise GetoptError("invalid empty tag")
+        kw_op = arg[0]
+        if kw_op not in ('+', '-'):
+          raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
+        kw_name = arg[1:]
+        try:
+          kw_name = I.match_one_keyword(kw_name)
+        except KeyError as e:
+          warning("unknown tag, CREATE")
+          I.create_keyword(kw_name)
+        except ValueError as e:
+          warning("ambiguous tag")
+          continue
+        kw = I.keyword_by_name[kw_name]
+        tagging.append( (kw_op == '+', kw) )
+    except GetoptError as e:
+      warning(e)
+      badopts = True
+  if badopts:
+    raise GetoptError("invalid arguments")
+  if not tagging:
+    warning("no tags to apply, skipping")
+    return 0
+  masters = None
+  for selector in selectors:
+    masters = selector.select(masters)
+  for master in masters:
+    with Pfx(master.basename):
+      V = master.latest_version()
+      for add, tag in tagging:
+        with Pfx("%s%s", "+" if add else "-", tag.name):
+          kws = V.keywords
+          if add:
+            if tag not in kws:
+              V.add_keyword(tag)
+              info('OK')
+          else:
+            if tag in kws:
+              V.del_keyword(tag)
+              info('OK')
+  return xit
+
+def cmd_tag_events(I, argv):
   xit = 0
   badopts = False
   if not argv:
