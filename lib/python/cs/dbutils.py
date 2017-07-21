@@ -36,10 +36,11 @@ class TableSpace(object):
             getattr(self, 'load_%ss' % (nickname,))()
             by_id = getattr(self, nickname + '_by_id')
             return lambda: by_id.values()
-        # read_*s ==> iterator of rows from table "*"
-        if attr.startswith('read_'):
-          nickname = attr[5:-1]
-          return self.table_by_nickname[nickname].read_rows
+        # *_rows ==> list of rows from table
+        if attr.endswith('_rows'):
+          nickname = attr[:-5]
+          T = self.table_by_nickname[nickname]
+          return T.rows()
       if attr.startswith('load_') and attr.endswith('s'):
         nickname = attr[5:-1]
         if nickname in self.table_by_nickname:
@@ -129,7 +130,7 @@ class Table(object):
 
   def select(self, where=None, *where_argv):
     ''' Select raw SQL data from the table.
-        It is generally better to use read_rows instead, which returns typed rows.
+        It is generally better to use .rows instead, which returns typed rows.
     '''
     sql = 'select %s from %s' % (','.join(self.column_names), self.table_name)
     sqlargs = []
@@ -182,18 +183,16 @@ class Table(object):
   def named_row(self, name, fuzzy=False):
     if self.name_column is None:
       raise RuntimeError("%s: no name_column" % (self,))
-    rows = list(self.read_rows('`%s` = %%s' % (self.name_column,), name))
+    rows = self.rows('`%s` = %%s' % (self.name_column,), name)
     if len(rows) == 1:
       return rows[0]
     if fuzzy:
       name_stripped = name.strip()
-      rows = list(self.read_rows('trim(`%s`) = %%s'
-                                 % (self.name_column,)), name_stripped)
+      rows = self.rows('trim(`%s`) = %%s' % (self.name_column,), name_stripped)
       if len(rows) == 1:
         return rows[0]
       name_lc = name_stripped.lower()
-      rows = list(self.read_rows('lower(trim(`%s`)) = %%s'
-                                 % (self.name_column,)), name_lc)
+      rows = self.rows('lower(trim(`%s`)) = %%s' % (self.name_column,), name_lc)
       if len(rows) == 1:
         return rows[0]
     raise KeyError("%s: no row named %r" % (self, name))
@@ -203,12 +202,12 @@ class Table(object):
         If `id_value` is None or a string or is not slicelike or
         is not iterable return the sole matching row or raise
         IndexError.
-        Otherwise return an iterable of row values as from read_rows.
+        Otherwise return a list of row_class instances.
     '''
     if isinstance(id_value, str):
       return self.named_row(id_value, fuzzy=True)
     condition = where_index(self.id_column, id_value)
-    rows = self.read_rows(condition.where, *condition.params)
+    rows = self.rows(condition.where, *condition.params)
     if condition.is_scalar:
       return the(rows)
     return rows
@@ -353,7 +352,7 @@ class IdRelation(_IdRelation):
     ''' Fetch right rows given a pythonic index into left.
     '''
     condition = where_index(self.left_column, left_ids)
-    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    rel_rows = self.relation.rows(condition.where, *condition.params)
     right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
     return self.right[right_ids]
 
@@ -361,7 +360,7 @@ class IdRelation(_IdRelation):
     ''' Fetch left rows given a pythonic index into right.
     '''
     condition = where_index(self.right_column, right_ids)
-    rel_rows = self.relation.read_rows(condition.where, *condition.params)
+    rel_rows = self.relation.rows(condition.where, *condition.params)
     left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
     return self.left[left_ids]
 
