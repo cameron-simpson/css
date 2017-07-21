@@ -107,6 +107,17 @@ class Table(object):
   def __repr__(self):
     return "%s[%s]" % (self, ','.join(self._column_names))
 
+  def __iter__(self):
+    ''' Return an iterator of all the rows as row_class instances.
+    '''
+    return iter(self.rows())
+
+  def rows(self, where=None, *where_argv):
+    ''' Return a list of row_class instances.
+    '''
+    row_class = self.row_class
+    return [ row_class(self, row) for row in self.select(where, *where_argv) ]
+
   @prop
   def qual_name(self):
     db_name = self.db.db_name
@@ -129,15 +140,6 @@ class Table(object):
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, *sqlargs)
-
-  def read_rows(self, where=None, *where_argv):
-    ''' Return row objects.
-        This is a generator consuming a SELECT result and must
-        therefore be consumed before another query may be performed.
-    '''
-    row_class = self.row_class
-    for row in self.select(where, *where_argv):
-      yield row_class(self, row)
 
   def insert(self, column_names, valueses):
     sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
