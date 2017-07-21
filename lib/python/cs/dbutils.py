@@ -292,7 +292,7 @@ class Row(object):
       raise RuntimeError("%s: no name_column" % (self,))
     return self[name_column]
 
-  @name.setting
+  @name.setter
   def name(self, new_name):
     name_column = self._table.name_column
     if name_column is None:
