@@ -5,12 +5,13 @@
 
 from __future__ import print_function
 from collections import namedtuple
+from functools import partial
 from threading import RLock
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked
 from cs.logutils import X, debug, info, warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
 
 class TableSpace(object):
 
@@ -79,13 +80,14 @@ class Table(object):
   ''' Base class for table data.
   '''
 
-  def __init__(self, db, table_name, lock=None, row_class=None, column_names=None, id_column=None):
+  def __init__(self, db, table_name, lock=None, row_class=None, column_names=None, id_column=None, name_column=None):
     if lock is None:
       lock = db._lock
     self.db = db
     self.table_name = table_name
     self.column_names = column_names
     self.id_column = id_column
+    self.name_column = name_column
     self.row_tuple = namedtuple('%s_Row' % (table_name,), column_names)
     self.row_class = row_class
     self._lock = lock
@@ -166,6 +168,25 @@ class Table(object):
     self.conn.commit()
     C.close()
 
+  def named_row(self, name, fuzzy=False):
+    if self.name_column is None:
+      raise RuntimeError("%s: no name_column" % (self,))
+    rows = list(self.read_rows('`%s` = %%s' % (self.name_column,), name))
+    if len(rows) == 1:
+      return rows[0]
+    if fuzzy:
+      name_stripped = name.strip()
+      rows = list(self.read_rows('trim(`%s`) = %%s'
+                                 % (self.name_column,)), name_stripped)
+      if len(rows) == 1:
+        return rows[0]
+      name_lc = name_stripped.lower()
+      rows = list(self.read_rows('lower(trim(`%s`)) = %%s'
+                                 % (self.name_column,)), name_lc)
+      if len(rows) == 1:
+        return rows[0]
+    raise KeyError("%s: no row named %r" % (self, name))
+
   def __getitem__(self, id_value):
     ''' Fetch the row or rows indicated by `id_value`.
         If `id_value` is None or a string or is not slicelike or
@@ -173,30 +194,39 @@ class Table(object):
         IndexError.
         Otherwise return an iterable of row values as from read_rows.
     '''
+    if isinstance(id_value, str):
+      return self.named_row(id_value, fuzzy=True)
     condition = where_index(self.id_column, id_value)
     rows = self.read_rows(condition.where, *condition.params)
     if condition.is_scalar:
       return the(rows)
     return rows
 
-  def edit_column_by_ids(column_name, ids=None):
+  def __setitem__(self, id_value, new_name):
+    if self.name_column is None:
+      raise RuntimeError("%s: no name_colum" % (self,))
+    row = self[id_value]
+    self.update((self.name_column,), (new_name,),
+                 "`%s` = %%s" % (self.id_column,), row[self.id_column])
+
+  def edit_column_by_ids(self, column_name, ids=None):
     if ids is None:
       where = None
     else:
       where = '%s in (%s)' % (column_name, ','.join("%d" % i for i in ids))
     return self.edit_column(column_name, where)
 
-  def edit_column(column_name, where=None):
+  def edit_column(self, column_name, where=None):
     with Pfx("edit_column(%s, %r)", column_name, where):
       id_column = self.id_column
       edit_lines = []
       for row in self.select(where=where):
         edit_line = "%d:%s" % (row[id_column], row[column_name])
         edit_lines.append(edit_line)
-      changes = edit_strings(sorted(edit_lines,
-                                    key=lambda _: _.split(':', 1)[1]),
-                             errors=lambda msg: warning(msg + ', discarded')
-                            )
+      changes = self.edit_strings(sorted(edit_lines,
+                                         key=lambda _: _.split(':', 1)[1]),
+                                  errors=lambda msg: warning(msg + ', discarded')
+                                 )
       for old_string, new_string in changes:
         with Pfx("%s => %s", old_string, new_string):
           old_id, old_name = old_string.split(':', 1)
