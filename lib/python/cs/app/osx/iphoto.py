@@ -166,72 +166,57 @@ def cmd_info(I, argv):
 
 def cmd_ls(I, argv):
   xit = 0
-  get_row_map = {
-    'albums':   I.albums,
-    'events':   I.folders,
-    'folders':  I.folders,
-    'keywords': I.keywords,
-    'tags':     I.keywords,
-    'masters':  I.masters,
-    'people':   I.persons,
-    'faces':    I.persons,
-  }
-  if not argv:
-    for obclass_name in sorted(get_row_map.keys()):
-      print(obclass_name)
-  else:
-    obclass = argv.pop(0)
-    with Pfx(obclass):
-      if obclass.isdigit():
-        rating = int(obclass)
-        I.load_versions()
-        names = []
-        for version in I.versions():
-          if version.mainRating == rating:
-            pathname = version.master.pathname
-            if pathname is not None:
-              names.append(pathname)
-      try:
-        get_rows = get_row_map[obclass]
-      except KeyError:
-        raise GetoptError("unknown class")
-      rows = get_rows()
-      if obclass == 'events':
-        if not argv:
-          argv = I.event_names()
-      elif obclass == 'folders':
-        if not argv:
-          argv = I.folder_names()
-      def row_key(row):
-        key = getattr(row, 'name', None)
-        if key is None:
-          key = str(row.modelId)
-        return key
-      for row in sorted(rows, key=row_key):
-        key = row_key(row)
-        with Pfx(key):
-          if argv and key not in argv:
-            continue
-          print(key)
-          if argv:
-            for column_name in sorted(row.column_names):
-              if column_name.endswith('Data'):
-                obj = ingest_plist(row[column_name], recurse=True, resolve=True)
-                print(' ', column_name+':')
-                pprint.pprint(obj.value, width=32)
-              else:
-                print(' ', column_name+':', row[column_name])
-          if obclass == 'albums':
-            print("apalbumpath =", row.apalbum_path)
-            apalbum = row.apalbum
-            if apalbum is None:
-              error("NO ALBUM DATA?")
+  obclass = argv.pop(0)
+  with Pfx(obclass):
+    if obclass.isdigit():
+      rating = int(obclass)
+      rows = I.versions_table.rows_by_value('rating', rating)
+    elif obclass == 'events':
+      rows = I.events()
+    elif obclass == 'folders':
+      rows = I.folders()
+    elif obclass in ('keywords', 'tags'):
+      rows = I.keywords()
+    elif obclass == 'masters':
+      rows = I.masters()
+    elif obclass in ('faces', 'people'):
+      rows = I.persons()
+    else:
+      raise GetoptError("unknown class")
+      I.load_versions()
+      names = []
+      for version in I.versions():
+        if version.mainRating == rating:
+          pathname = version.master.pathname
+          if pathname is not None:
+            names.append(pathname)
+    for row in sorted(rows):
+      name = row.name
+      with Pfx(name):
+        if argv and name not in argv:
+          continue
+        print(name)
+        if argv:
+          for column_name in sorted(row.column_names):
+            if column_name.endswith('Data'):
+              obj = ingest_plist(row[column_name], recurse=True, resolve=True)
+              print(' ', column_name+':')
+              pprint.pprint(obj.value, width=32)
             else:
-              print("filter:")
-              apalbum.dump()
-          if obclass in ('folders', 'events'):
-            for master in row.masters():
-              print('   ', master.pathname)
+              print(' ', column_name+':', row[column_name])
+        if obclass == 'albums':
+          print("apalbumpath =", row.apalbum_path)
+          apalbum = row.apalbum
+          if apalbum is None:
+            error("NO ALBUM DATA?")
+          else:
+            print("filter:")
+            apalbum.dump()
+        if obclass in ('folders', 'events'):
+          X("masters...")
+          for master in row.masters():
+            print('   ', master.pathname)
+          X("masters DONE")
   return xit
 
 def cmd_rename(I, argv):
