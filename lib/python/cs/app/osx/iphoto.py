@@ -564,31 +564,11 @@ class iPhoto(O):
             # *s ==> iterable of * (obtained from *_by_id)
             nickname = attr[:-1]
             if nickname in self.table_by_nickname:
-              # require the matching table load
-              getattr(self, 'load_%ss' % (nickname,))()
-              by_id = getattr(self, nickname + '_by_id')
-              return lambda: by_id.values()
+              return lambda: iter(self.table_by_nickname[nickname])
           # *_rows ==> iterator of rows from table "*"
           if attr.endswith('_rows'):
             nickname = attr[:-5]
             return iter(self.table_by_nickname[nickname])
-          # load_*s ==> function to load the table if not already loaded
-          if attr.startswith('load_'):
-            nickname = attr[5:-1]
-            if nickname in self.table_by_nickname:
-              loaded_attr = '_loaded_table_' + nickname
-              if getattr(self, loaded_attr, False):
-                # already loaded: no-op
-                return lambda: None
-              load_funcname = '_load_table_' + nickname + 's'
-              ##@locked
-              def loadfunc():
-                if not getattr(self, loaded_attr, False):
-                  lf = getattr(self, load_funcname)
-                  lf()
-                  setattr(self, loaded_attr, True)
-              loadfunc.__name__ = load_funcname
-              return loadfunc
         if attr.startswith('select_by_'):
           criterion_words = attr[10:].split('_')
           class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
@@ -604,33 +584,10 @@ class iPhoto(O):
     msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
     raise AttributeError(msg)
 
-  def _load_table_albums(self):
-    ''' Load Library.RKMaster into memory and set up mappings.
-    '''
-    with Pfx("_load_table_albums"):
-      by_id = self.album_by_id = {}
-      ##by_uuid = self.album_by_uuid = {}
-      by_name = self.albums_by_name = {}
-      for album in self.album_rows:
-        by_id[album.modelId] = album
-        ##by_uuid[album.uuid] = album
-        name = album.name
-        if name is None:
-          debug("album has no name: %s", album.uuid)
-          pass
-        else:
-          try:
-            albums = by_name[name]
-          except KeyError:
-            albums = by_name[name] = set()
-          albums.add(album)
-
   def album(self, album_id):
-    self.load_albums()
-    return self.album_by_id.get(album_id)
+    return self.albums_table[album_id]
 
   def album_names(self):
-    self.load_albums()
     return self.albums_by_name.keys()
 
   @property
@@ -648,69 +605,23 @@ class iPhoto(O):
     '''
     return self.load_albumdata()
 
-  def _load_table_faces(self):
-    ''' Load Faces.RKDetectedFace into memory and set up mappings.
-    '''
-    by_id = self.face_by_id = {}
-    by_master_uuid = self.faces_by_master_uuid = {}
-    for face in self.face_rows:
-      by_id[face.modelId] = face
-      muuid = face.masterUuid
-      try:
-        faces = by_master_uuid[muuid]
-      except KeyError as e:
-        faces = by_master_uuid[muuid] = set()
-      faces.add(face)
-
   def face(self, face_id):
-    return self.face_by_id.get(face_id)
-
-  def _load_table_vfaces(self):
-    ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
-    '''
-    by_id = self.vface_by_id = {}
-    by_master_id = self._vfaces_by_master_id = {}
-    for vface in self.vface_rows:
-      by_id[vface.modelId] = vface
-      master_id = vface.masterId
-      try:
-        vfaces = by_master_id[master_id]
-      except KeyError:
-        vfaces = by_master_id[master_id] = set()
-      vfaces.add(vface)
+    return self.faces_table[face_id]
 
   @locked_property
   def vfaces_by_master_id(self):
-    self.load_vfaces()
     return I._vfaces_by_master_id.get(self.modelId, ())
 
-  def _load_table_folders(self):
-    ''' Load Library.RKFolder into memory and set up mappings.
-    '''
-    by_id = self.folder_by_id = {}
-    by_name = self.folders_by_name = {}
-    for folder in self.folder_rows:
-      by_id[folder.modelId] = folder
-      name = folder.name
-      try:
-        folders = by_name[name]
-      except KeyError:
-        folders = by_name[name] = set()
-      folders.add(folder)
-
   def folder(self, folder_id):
-    self.load_folders()
-    return self.folder_by_id.get(folder_id)
+    return self.folders_table[folder_id]
 
   def folder_names(self):
-    self.load_folders()
     return self.folders_by_name.keys()
 
   def folders_simple(self):
     return [ folder for folder in self.folders() if folder.is_simple_folder ]
 
   def event(self, event_id):
-    self.load_folders()
     folder = self.folder(event_id)
     if not folder.is_event:
       return None
@@ -725,24 +636,10 @@ class iPhoto(O):
   def events_by_name(self, name):
     return [ event for event in self.events() if event.name == name ]
 
-  def _load_table_persons(self):
-    ''' Load Faces.RKFaceName into memory and set up mappings.
-    '''
-    by_id = self.person_by_id = {}
-    by_name = self.person_by_name = {}
-    by_faceKey = self.person_by_faceKey = {}
-    for person in self.person_rows:
-      by_id[person.modelId] = person
-      by_name[person.name] = person
-      by_faceKey[person.faceKey] = person
-      # skip fullName; seems to be to associated with Contacts or something
-
   def person(self, faceKey):
-    self.load_persons()
     return self.person_by_faceKey.get(faceKey)
 
   def person_names(self):
-    self.load_persons()
     return self.person_by_name.keys()
 
   def match_people(self, person_name):
@@ -781,39 +678,14 @@ class iPhoto(O):
       raise ValueError("matches multiple people, rejected: %r" % (matches,))
     return matches.pop()
 
-  def _load_table_masters(self):
-    ''' Load Library.RKMaster into memory and set up mappings.
-    '''
-    by_id = self.master_by_id = {}
-    for master in self.master_rows:
-      by_id[master.modelId] = master
-
   def master(self, master_id):
-    self.load_masters()
-    return self.master_by_id.get(master_id)
+    return self.masters_table[master_id]
 
   def master_pathnames(self):
-    self.load_masters()
-    for master in self.master_by_id.values():
-      yield master.pathname
-
-  def _load_table_versions(self):
-    ''' Load Library.RKVersion into memory and set up mappings.
-    '''
-    by_id = self.version_by_id = {}
-    by_master_id = self.versions_by_master_id = {}
-    for version in self.version_rows:
-      by_id[version.modelId] = version
-      master_id = version.masterId
-      try:
-        versions = by_master_id[master_id]
-      except KeyError:
-        versions = by_master_id[master_id] = set()
-      versions.add(version)
+    return [ master.pathname for master in self.masters_table ]
 
   def version(self, version_id):
-    self.load_versions()
-    return self.version_by_id.get(version_id)
+    return self.versions_table[version_id]
 
   def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
@@ -825,7 +697,6 @@ class iPhoto(O):
       by_name[kw.name] = kw
 
   def keyword(self, keyword_id):
-    self.load_keywords()
     return self.keyword_by_id.get(keyword_id)
 
   def keyword_names(self):
@@ -834,7 +705,6 @@ class iPhoto(O):
   def match_keyword(self, kwname):
     ''' User convenience: match string against all keywords, return matches.
     '''
-    self.load_keywords()
     if kwname in self.keyword_by_name:
       return (kwname,)
     lc_kwname = kwname.lower()
@@ -868,36 +738,14 @@ class iPhoto(O):
     raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
 
   def versions_by_keyword(self, kwname):
-    self.load_keywords()
     return self.keywords_by_name[kwname].versions()
 
   def masters_by_keyword(self, kwname):
-    self.load_keywords()
     return self.keyword_by_name[kwname].masters()
-
-  def _load_table_keywordForVersions(self):
-    ''' Load Library.RKKeywordForVersion into memory and set up mappings.
-    '''
-    by_kwid = self.kw4v_version_ids_by_keyword_id = {}
-    by_vid = self.kw4v_keyword_ids_by_version_id = {}
-    for kw4v in self.keywordForVersion_rows:
-      kwid = kw4v.keywordId
-      vid = kw4v.versionId
-      try:
-        version_ids = by_kwid[kwid]
-      except KeyError:
-        version_ids = by_kwid[kwid] = set()
-      version_ids.add(vid)
-      try:
-        keyword_ids = by_vid[vid]
-      except KeyError:
-        keyword_ids = by_vid[vid] = set()
-      keyword_ids.add(kwid)
 
   def keywords_by_version(self, version_id):
     ''' Return version
     '''
-    self.load_keywordForVersions()
     kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
     return [ self.keyword(kwid) for kwid in kwids ]
 
@@ -1192,7 +1040,6 @@ class Master_Mixin(iPhotoRow):
   @locked_property
   def versions(self):
     I = self.iphoto
-    I.load_versions()
     return I.versions_by_master_id.get(self.modelId, ())
 
   def latest_version(self):
@@ -1213,13 +1060,11 @@ class Master_Mixin(iPhotoRow):
   @locked_property
   def faces(self):
     I = self.iphoto
-    I.load_faces()
     return I.faces_by_master_id.get(self.modelId, ())
 
   @locked_property
   def vfaces(self):
     I = self.iphoto
-    I.load_vfaces()
     return I.vfaces_by_master_id.get(self.modelId, ())
 
   @locked_property
@@ -1278,7 +1123,7 @@ class Version_Mixin(iPhotoRow):
 
   @prop
   def master(self):
-    master = self.iphoto.master(self.masterId)
+    master = self.iphoto.master_table[self.masterId]
     if master is None:
       raise ValueError("version %d masterId %d matches no master"
                        % (self.modelId, self.masterId))
@@ -1339,7 +1184,6 @@ class Keyword_Mixin(iPhotoRow):
     ''' Return the versions with this keyword.
     '''
     I = self.iphoto
-    I.load_keywordForVersions()
     for vid in I.kw4v_version_ids_by_keyword_id.get(self.modelId, ()):
       yield I.version(vid)
 
