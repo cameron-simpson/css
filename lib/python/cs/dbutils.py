@@ -315,7 +315,7 @@ class Row(object):
     self._lock = lock
 
   def __str__(self):
-    return "%s:%s" % (self._table.table_name, self._row)
+    return "<%s>%s:%s" % (self.__class__.__name__, self._table.table_name, self._row)
   __repr__ = __str__
 
   def __iter__(self):
@@ -323,6 +323,13 @@ class Row(object):
 
   def __len__(self):
     return len(self._row)
+
+  def __lt__(self, other):
+    table = self._table
+    cmp_column = table.name_column
+    if cmp_column is None:
+      cmp_column = table.id_column
+    return self[cmp_column] < other[cmp_column]
 
   def keys(self):
     return self.column_names
