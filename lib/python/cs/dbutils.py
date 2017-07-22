@@ -161,6 +161,23 @@ class Table(object):
     row_class = self.row_class
     return list(row_class(self, row) for row in self.select(where, *where_argv))
 
+  def rows_by_value(self, column_names, *values):
+    if isinstance(column_names, str):
+      column_names = (column_names,)
+    if len(column_names) != len(values):
+      raise ValueError("%d column_names vs %d values"
+                       % (len(column_names), len(values)))
+    P = Params(self.db.param_style)
+    conditions = []
+    for column_name, value in zip(column_names, values):
+      if isinstance(value, (list, tuple)):
+        conditions.append('`%s` in (%s)'
+                          % (column_name, ','.join(P.vadd(column_name, value))))
+      else:
+        conditions.append('%s = %s' % (column_name, P.add(column_name, value)))
+    where_clause = ' AND '.join(conditions)
+    return self.rows(where_clause, *P.values)
+
   @prop
   def qual_name(self):
     db_name = self.db.db_name
