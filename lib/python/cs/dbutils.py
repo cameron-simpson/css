@@ -4,7 +4,7 @@
 #
 
 from __future__ import print_function
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from functools import partial
 from threading import RLock
 from cs.py.func import prop
@@ -12,6 +12,48 @@ from cs.seq import the
 from cs.threads import locked
 from cs.logutils import X, debug, info, warning, error
 from cs.pfx import Pfx, XP
+
+class Params(object):
+  ''' A manager for query parameters.
+  '''
+
+  def __init__(self, style):
+    ''' Initialise the parameter manager.
+        `style`: the TableSpace paramater style:
+          '?': use '?' as the placeholder
+          '%s': use '%s' as the placeholder
+          TODO:
+          '$n': PostgreSQL style numbered parameters.
+          ':name_n': MySQL style :name_n numbered and named parameters.
+    '''
+    self.style = style
+    self.counts = defaultdict(int)
+    self.params = []
+    self.values = []
+
+  def add(self, name, value):
+    ''' Add a value with a name basis; return the parameter placeholder.
+    '''
+    if self.style in ('?', '%s'):
+      self.params.append('?')
+      self.values.append(value)
+    else:
+      raise RuntimeError("style %r not implemented" % (self.style,))
+    return self.params[-1]
+
+  def vadd(self, name, values):
+    ''' Add multiple values with a common name basis; return the parameter placeholders.
+    '''
+    params = []
+    for value in values:
+      params.append(self.add(name, value))
+    return params
+
+  def map(self):
+    ''' Return a mapping of parameter string to value.
+        Only useful for named paramater styles eg ":foo9".
+    '''
+    return dict(zip(self.params, self.values))
 
 class TableSpace(object):
 
