@@ -1040,13 +1040,6 @@ class iPhotoDBs(object):
       return os.path.join(self.dbdirpath, db_name+'.db')
     return os.path.join(self.dbdirpath, db_name+'.apdb')
 
-  def _opendb(self, dbpath):
-    ''' Open an SQLite3 connection to the named database.
-    '''
-    conn = sqlite3.connect(dbpath)
-    XP("connect(%r): isolation_level=%s", dbpath, conn.isolation_level)
-    return conn
-
   def _load_db(self, db_name):
     X("iPhotoDBs._load_db(%r)...", db_name)
     db = self.dbmap[db_name] = iPhotoDB(self.iphoto, db_name)
