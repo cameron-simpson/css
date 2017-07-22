@@ -197,6 +197,7 @@ class CalibreMetaDB(TableSpace):
     TableSpace.__init__(self, CalibreTable, db_name=dbpath, lock=CL._lock)
     self.library = CL
     self.conn = sqlite3.connect(CL.metadbpath)
+    self.param_style = '?'
 
   def dosql_ro(self, sql, *params):
     return self.conn.execute(sql, params)
