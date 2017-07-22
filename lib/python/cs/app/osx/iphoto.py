@@ -21,7 +21,7 @@ from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from .plist import PListDict, ingest_plist
-from cs.dbutils import TableSpace, Table, Row
+from cs.dbutils import TableSpace, Table, Row, IdRelation
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
@@ -1155,21 +1155,23 @@ class Version_Mixin(iPhotoRow):
 
 class Folder_Mixin(Album_Mixin):
 
+  def via(self, map_nickname, to_column, to_nickname):
+    tables = self.iphoto.table_by_nickname
+    return IdRelation('modelId', tables[map_nickname],
+                      'albumId', self._table,
+                      to_column,
+                      tables[to_nickname])
+
   def versions(self):
-    ''' Return the versions with this album.
-    '''
-    I = self.iphoto
-    I.load_albumForVersions()
-    for vid in I.al4v_version_ids_by_album_id.get(self.modelId, ()):
-      yield I.version(vid)
+    return self.via('albumForVersion', 'versionId', 'version') \
+               .left_to_right(self.modelId)
 
   def masters(self):
     ''' Return the masters from this album.
     '''
-    ms = set()
-    for version in self.versions():
-      ms.add(version.master)
-    return ms
+    vs = self.versions()
+    version_ids = [ v.modelId for v in vs ]
+    return self.iphoto.master_table[version_ids]
 
   @property
   def is_event(self):
