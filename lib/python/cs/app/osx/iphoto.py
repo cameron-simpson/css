@@ -912,6 +912,7 @@ class iPhotoDB(TableSpace):
     self.iphoto = iphoto
     self.dbpath = iphoto.dbpath(db_name)
     self.conn = sqlite3.connect(self.dbpath)
+    self.param_style = '?'
     self.schema = SCHEMAE[db_name]
     for nickname, schema in self.schema.items():
       self.iphoto.table_by_nickname[nickname] = iPhotoTable(self, nickname, schema)
