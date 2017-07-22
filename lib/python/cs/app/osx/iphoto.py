@@ -294,7 +294,7 @@ def cmd_rename(I, argv):
             error("modelId changed")
             xit = 1
           elif new_name in all_names:
-            if obclass == 'keywords':
+            if obclass in ('keywords', 'tags'):
               # TODO: merge keywords
               print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
               otherModelId = the(item.modelId
