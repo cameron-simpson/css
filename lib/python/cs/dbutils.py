@@ -420,6 +420,8 @@ class IdRelation(_IdRelation):
     condition = where_index(self.left_column, left_ids)
     rel_rows = self.relation.rows(condition.where, *condition.params)
     right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
+    if not right_ids:
+      return []
     return self.right[right_ids]
 
   def right_to_left(self, right_ids):
@@ -428,6 +430,8 @@ class IdRelation(_IdRelation):
     condition = where_index(self.right_column, right_ids)
     rel_rows = self.relation.rows(condition.where, *condition.params)
     left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
+    if not left_ids:
+      return []
     return self.left[left_ids]
 
   def add(self, left_id, right_id):
