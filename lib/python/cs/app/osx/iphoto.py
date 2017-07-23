@@ -1138,13 +1138,6 @@ class Version_Mixin(iPhotoRow):
 
 class Folder_Mixin(Album_Mixin):
 
-  def via(self, map_nickname, to_column, to_nickname):
-    tables = self.iphoto.table_by_nickname
-    return IdRelation('modelId', tables[map_nickname],
-                      'albumId', self._table,
-                      to_column,
-                      tables[to_nickname])
-
   def versions(self):
     return [ M.latest_version() for M in self.masters() ]
 
