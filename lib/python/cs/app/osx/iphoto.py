@@ -398,78 +398,73 @@ def cmd_tag(I, argv):
 
 def cmd_tag_events(I, argv):
   xit = 0
-  badopts = False
-  if not argv:
-    raise GetoptError("missing selector")
-  selectors = []
-  unknown = False
-  while argv:
-    selection = argv.pop(0)
-    if selection == '--':
-      break
-    if selection.startswith('+'):
-      argv.insert(0, selection)
-      break
-    with Pfx(selection):
-      try:
-        selector = I.parse_selector(selection)
-      except KeyError as e:
-        warning(e)
-        unknown = True
-      except ValueError as e:
-        warning("invalid selector: %s", e)
-        badopts = True
-      else:
-        selectors.append(selector)
-  if unknown:
-    return 1
-  if not argv:
-    raise GetoptError("missing tags")
-  tagging = []
-  for arg in argv:
-    try:
-      with Pfx(arg):
-        if not arg:
-          raise GetoptError("invalid empty tag")
-        kw_op = arg[0]
-        if kw_op not in ('+', '-'):
-          raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
-        kw_name = arg[1:]
-        try:
-          kw_name = I.match_one_keyword(kw_name)
-        except KeyError as e:
-          warning("unknown tag, CREATE")
-          I.create_keyword(kw_name)
-        except ValueError as e:
-          warning("ambiguous tag")
-          continue
-        kw = I.keyword_by_name[kw_name]
-        tagging.append( (kw_op == '+', kw) )
-    except GetoptError as e:
-      warning(e)
-      badopts = True
-  if badopts:
-    raise GetoptError("invalid arguments")
-  if not tagging:
-    warning("no tags to apply, skipping")
-    return 0
-  masters = None
-  for selector in selectors:
-    masters = selector.select(masters)
-  for master in masters:
-    with Pfx(master.basename):
-      V = master.latest_version()
-      for add, tag in tagging:
-        with Pfx("%s%s", "+" if add else "-", tag.name):
-          kws = V.keywords
-          if add:
-            if tag not in kws:
-              V.add_keyword(tag)
-              info('OK')
+  if argv and argv[0].startswith('/'):
+    ptn = argv.pop(0)[1:]
+    ptn_re = re.compile(ptn, re.I)
+  else:
+    ptn = None
+  if argv:
+    raise GetoptError('extra arguments: %s' % (' '.join(argv),))
+  events = I.events()
+  if ptn:
+    X("winnow %d events", len(events))
+    events = [ E for E in events if ptn_re.search(E.name) ]
+  warned_faces = set()
+  warned_kws = set()
+  for event in events:
+    with Pfx(event.name):
+      info("auto tag...")
+      kws = set()
+      for part in event.name.split('--'):
+        part = part.strip('-')
+        with Pfx(part):
+          if '+' in part:
+            for name0 in part.split('+'):
+              if name0 in warned_faces:
+                continue
+              name = name0.replace('-', ' ')
+              face = I.person_table.get(name)
+              if not face:
+                warning("unknown face reference %r", name0)
+                warned_faces.add(name0)
+                continue
+              info("expecting face %s", face.name)
           else:
-            if tag in kws:
-              V.del_keyword(tag)
-              info('OK')
+            kw = I.keyword_table.get(part)
+            if kw is None:
+              face = I.person_table.get(part.replace('-', ' '))
+              if face is None:
+                if '-' in part:
+                  for subpart in part.split('-'):
+                    with Pfx(subpart):
+                      kw = I.keyword_table.get(subpart)
+                      if kw:
+                        kws.add(kw)
+                      elif subpart in warned_kws:
+                        pass
+                      else:
+                        warning("unknown keyword")
+                        warned_kws.add(subpart)
+                elif part in warned_kws:
+                  pass
+                else:
+                  warning("unknown keyword")
+                  warned_kws.add(part)
+              else:
+                info("expecting face for %s", part)
+            else:
+              kws.add(kw)
+      if kws:
+        for V in event.versions():
+          vkws = V.keywords
+          for kw in sorted(kws):
+            if kw not in vkws:
+              with Pfx("%s + %s", V.name, kw.name):
+                V.add_keyword(kw)
+                info("OK")
+      else:
+        ##warning("no recognised keywords, no tagging")
+        pass
   return xit
 
 def cmd_test(I, argv):
