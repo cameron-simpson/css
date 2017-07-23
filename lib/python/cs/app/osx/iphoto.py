@@ -36,6 +36,12 @@ from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
+RE_SCENE = r's0*(\d+)'
+RE_EPISODE = r'e0*(\d+)'
+RE_EPISODE_SCENE = r'e0*(\d+)s0*(\d+)'
+RE_SERIES_EPISODE = r's0*(\d+)e0*(\d+)'
+RE_SERIES_EPISODE_SCENE = r's0*(\d+)e0*(\d+)s0*(\d+)'
+
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
     info masters        List info about masters.
@@ -418,6 +424,48 @@ def cmd_tag_events(I, argv):
       for part in event.name.split('--'):
         part = part.strip('-')
         with Pfx(part):
+          # look for series/episode/scene markers
+          m = None
+          for ptn in (
+            RE_SCENE,
+            RE_EPISODE,
+            RE_EPISODE_SCENE,
+            RE_SERIES_EPISODE,
+            RE_SERIES_EPISODE_SCENE,
+          ):
+            m = re.match(ptn, part)
+            if not m:
+              continue
+            if m.group() != part:
+              m = None
+              continue
+            kwnames = []
+            if ptn == RE_SCENE:
+              kwnames.append('scene-%02d' % (int(m.group(1))))
+            elif ptn == RE_EPISODE:
+              kwnames.append('episode-%02d' % (int(m.group(1))))
+            elif ptn == RE_EPISODE_SCENE:
+              kwnames.append('episode-%02d' % (int(m.group(1))))
+              kwnames.append('scene-%02d' % (int(m.group(2))))
+            elif ptn == RE_SERIES_EPISODE:
+              kwnames.append('series-%02d' % (int(m.group(1))))
+              kwnames.append('episode-%02d' % (int(m.group(2))))
+            elif ptn == RE_SERIES_EPISODE_SCENE:
+              kwnames.append('series-%02d' % (int(m.group(1))))
+              kwnames.append('episode-%02d' % (int(m.group(2))))
+              kwnames.append('scene-%02d' % (int(m.group(3))))
+            else:
+              raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
+            for kwname in kwnames:
+              try:
+                kw = I.keyword(kwname)
+              except KeyError:
+                kw = I.create_keyword(kwname)
+              kws.add(kw)
+            break
+          if m:
+            continue
+          # look for person+person...
           if '+' in part:
             for name0 in part.split('+'):
               if name0 in warned_faces:
