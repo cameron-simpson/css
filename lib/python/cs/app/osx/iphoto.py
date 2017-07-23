@@ -419,7 +419,7 @@ def cmd_autotag(I, argv):
     events = [ E for E in events if ptn_re.search(E.name) ]
   warned_faces = set()
   warned_kws = set()
-  for event in events:
+  for event in sorted(events):
     with Pfx(event.name):
       kws = set()
       for part in event.name.split('--'):
@@ -483,7 +483,7 @@ def cmd_autotag(I, argv):
             if kw is None:
               face = I.person_table.get(part.replace('-', ' '))
               if face is None:
-                if '-' in part:
+                if False and '-' in part:
                   for subpart in part.split('-'):
                     with Pfx(subpart):
                       kw = I.get_keyword(subpart)
