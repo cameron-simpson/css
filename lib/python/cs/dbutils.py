@@ -67,6 +67,9 @@ class TableSpace(object):
     self.table_class = table_class
     self._lock = lock
 
+  def new_params(self):
+    return Params(self.param_style)
+
   def __getattr__(self, attr):
     if not attr.startswith('_'):
       if attr.endswith('s'):
@@ -150,6 +153,9 @@ class Table(object):
   def __repr__(self):
     return "%s[%s]" % (self, ','.join(self._column_names))
 
+  def new_params(self):
+    return self.db.new_params()
+
   def __iter__(self):
     ''' Return an iterator of all the rows as row_class instances.
     '''
@@ -167,7 +173,7 @@ class Table(object):
     if len(column_names) != len(values):
       raise ValueError("%d column_names vs %d values"
                        % (len(column_names), len(values)))
-    P = Params(self.db.param_style)
+    P = self.new_params()
     conditions = []
     for column_name, value in zip(column_names, values):
       if isinstance(value, (list, tuple)):
@@ -198,6 +204,8 @@ class Table(object):
       sqlargs.append(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
+    info("SQL = %r", sql)
+    if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, *sqlargs)
 
@@ -242,16 +250,22 @@ class Table(object):
   def named_row(self, name, fuzzy=False):
     if self.name_column is None:
       raise RuntimeError("%s: no name_column" % (self,))
-    rows = self.rows('`%s` = %%s' % (self.name_column,), name)
+    rows = self.rows_by_value(self.name_column, name)
     if len(rows) == 1:
       return rows[0]
     if fuzzy:
       name_stripped = name.strip()
-      rows = self.rows('trim(`%s`) = %%s' % (self.name_column,), name_stripped)
+      P = self.new_params()
+      rows = self.rows('trim(`%s`) = %s'
+                       % (self.name_column,
+                          P.add('name_stripped', name_stripped)))
       if len(rows) == 1:
         return rows[0]
       name_lc = name_stripped.lower()
-      rows = self.rows('lower(trim(`%s`)) = %%s' % (self.name_column,), name_lc)
+      P = self.new_params()
+      rows = self.rows('lower(trim(`%s`)) = %s'
+                       % (self.name_column,
+                          P.add('name_lc', name_lc)))
       if len(rows) == 1:
         return rows[0]
     raise KeyError("%s: no row named %r" % (self, name))
@@ -281,7 +295,7 @@ class Table(object):
     if ids is None:
       where = None
     else:
-      where = '%s in (%s)' % (column_name, ','.join("%d" % i for i in ids))
+      where = '`%s` in (%s)' % (column_name, ','.join("%d" % i for i in ids))
     return self.edit_column(column_name, where)
 
   def edit_column(self, column_name, where=None):
@@ -317,6 +331,9 @@ class Row(object):
   def __str__(self):
     return "<%s>%s:%s" % (self.__class__.__name__, self._table.table_name, self._row)
   __repr__ = __str__
+
+  def new_params(self):
+    return self._table.new_params()
 
   def __iter__(self):
     return iter(self._row)
@@ -375,7 +392,7 @@ class Row(object):
     try:
       return getattr(self._row, key)
     except AttributeError as e:
-      raise KeyError("_row has no attribute %r: %s" % (key, e))
+      raise KeyError("_row %r has no attribute %r: %s" % (self._row, key, e))
 
   def __setitem__(self, key, value):
     ''' Direct access to row values by column name or index.
