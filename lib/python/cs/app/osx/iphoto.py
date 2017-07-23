@@ -421,7 +421,6 @@ def cmd_autotag(I, argv):
   warned_kws = set()
   for event in events:
     with Pfx(event.name):
-      info("auto tag...")
       kws = set()
       for part in event.name.split('--'):
         part = part.strip('-')
@@ -478,7 +477,7 @@ def cmd_autotag(I, argv):
                 warning("unknown face reference %r", name0)
                 warned_faces.add(name0)
                 continue
-              info("expecting face %s", face.name)
+              debug("expecting face %s", face.name)
           else:
             kw = I.get_keyword(part)
             if kw is None:
@@ -501,7 +500,7 @@ def cmd_autotag(I, argv):
                   warning("unknown keyword")
                   warned_kws.add(part)
               else:
-                info("expecting face for %s", part)
+                debug("expecting face for %s", part)
             else:
               kws.add(kw)
       if kws:
@@ -609,6 +608,8 @@ class iPhoto(O):
           nickname = attr[:-6]
           if nickname in self.table_by_nickname:
             return self.table_by_nickname[nickname]
+          else:
+            X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
     except AttributeError as e:
       msg = "__getattr__ got internal AttributeError: %s" % (e,)
       raise RuntimeError(msg)
@@ -816,12 +817,13 @@ class iPhoto(O):
 
   def create_keyword(self, kw_name):
     # create new keyword definition
+    info("CREATE new keyword %r", kw_name)
     self \
       .table_by_nickname['keyword'] \
       .insert( ('uuid', 'name'),
                ( (str(uuid4()), kw_name), )
              )
-    self._load_table_keywords()
+    return self.keyword(kw_name)
 
   def parse_selector(self, selection):
     ''' Parse a single image selection criterion.
