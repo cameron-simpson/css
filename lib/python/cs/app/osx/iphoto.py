@@ -195,6 +195,9 @@ def cmd_ls(I, argv):
       with Pfx(name):
         if argv and name not in argv:
           continue
+        if not name:
+          X("SKIP EMPTY NAME")
+          continue
         print(name)
         if argv:
           for column_name in sorted(row.column_names):
@@ -213,10 +216,8 @@ def cmd_ls(I, argv):
             print("filter:")
             apalbum.dump()
         if obclass in ('folders', 'events'):
-          X("masters...")
           for master in row.masters():
             print('   ', master.pathname)
-          X("masters DONE")
   return xit
 
 def cmd_rename(I, argv):
