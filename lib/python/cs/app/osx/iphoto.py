@@ -1148,15 +1148,12 @@ class Folder_Mixin(Album_Mixin):
                       tables[to_nickname])
 
   def versions(self):
-    return self.via('albumForVersion', 'versionId', 'version') \
-               .left_to_right(self.modelId)
+    return [ M.latest_version() for M in self.masters() ]
 
   def masters(self):
     ''' Return the masters from this album.
     '''
-    vs = self.versions()
-    version_ids = [ v.modelId for v in vs ]
-    return self.iphoto.master_table[version_ids]
+    return self.iphoto.master_table.rows_by_value('projectUuid', self['uuid'])
 
   @property
   def is_event(self):
