@@ -587,7 +587,7 @@ class iPhoto(O):
     return self.load_albumdata()
 
   def face(self, face_id):
-    return self.faces_table[face_id]
+    return self.person_table[face_id]
 
   @locked_property
   def vfaces_by_master_id(self):
@@ -727,8 +727,10 @@ class iPhoto(O):
   def keywords_by_version(self, version_id):
     ''' Return version
     '''
-    kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
-    return [ self.keyword(kwid) for kwid in kwids ]
+    return IdRelation('modelId', self.keywordForVersion_table,
+                      'versionId', self.version_table,
+                      'keywordId', self.keyword_table \
+                     ).left_to_right(version_id)
 
   def replace_keywords(self, old_keyword_id, new_keyword_id):
     ''' Update image tags to replace one keyword with another.
@@ -1022,7 +1024,7 @@ class Master_Mixin(iPhotoRow):
   @locked_property
   def versions(self):
     I = self.iphoto
-    return I.versions_by_master_id.get(self.modelId, ())
+    return I.version_table.rows_by_value('masterId', self.modelId)
 
   def latest_version(self):
     vs = self.versions
