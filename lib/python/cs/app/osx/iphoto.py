@@ -58,7 +58,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     select criteria...  List masters with all specified criteria.
     tag criteria... [--] {+tag|-tag}...
                         Add or remove tags from selected images.
-    tag-events [/regexp] Autotag images from their event name.
+    autotag [/regexp] Autotag images from their event name.
     test [args...]      Whatever I'm testing at the moment...
 
 Criteria:
@@ -116,8 +116,8 @@ def main_iphoto(I, argv):
       xit = cmd_select(I, argv)
     elif op == "tag":
       xit = cmd_tag(I, argv)
-    elif op == "tag-events":
-      xit = cmd_tag_events(I, argv)
+    elif op == "autotag":
+      xit = cmd_autotag(I, argv)
     elif op == "test":
       xit = cmd_test(I, argv)
     else:
@@ -402,7 +402,9 @@ def cmd_tag(I, argv):
               info('OK')
   return xit
 
-def cmd_tag_events(I, argv):
+def cmd_autotag(I, argv):
+  ''' Apply tags to images based on the text of their event names.
+  '''
   xit = 0
   if argv and argv[0].startswith('/'):
     ptn = argv.pop(0)[1:]
