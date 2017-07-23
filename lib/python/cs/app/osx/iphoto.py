@@ -36,11 +36,11 @@ from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
-RE_SCENE = r's0*(\d+)'
-RE_EPISODE = r'e0*(\d+)'
-RE_EPISODE_SCENE = r'e0*(\d+)s0*(\d+)'
-RE_SERIES_EPISODE = r's0*(\d+)e0*(\d+)'
-RE_SERIES_EPISODE_SCENE = r's0*(\d+)e0*(\d+)s0*(\d+)'
+RE_SCENE = r's0*(\d+)[a-z]?'
+RE_EPISODE = r'e0*(\d+)[a-z]?'
+RE_EPISODE_SCENE = r'e0*(\d+)s0*(\d+)[a-z]?'
+RE_SERIES_EPISODE = r's0*(\d+)e0*(\d+)[a-z]?'
+RE_SERIES_EPISODE_SCENE = r's0*(\d+)e0*(\d+)s0*(\d+)[a-z]?'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
