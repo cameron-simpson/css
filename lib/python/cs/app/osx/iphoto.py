@@ -480,14 +480,14 @@ def cmd_autotag(I, argv):
                 continue
               info("expecting face %s", face.name)
           else:
-            kw = I.keyword_table.get(part)
+            kw = I.get_keyword(part)
             if kw is None:
               face = I.person_table.get(part.replace('-', ' '))
               if face is None:
                 if '-' in part:
                   for subpart in part.split('-'):
                     with Pfx(subpart):
-                      kw = I.keyword_table.get(subpart)
+                      kw = I.get_keyword(subpart)
                       if kw:
                         kws.add(kw)
                       elif subpart in warned_kws:
@@ -727,46 +727,58 @@ class iPhoto(O):
       by_id[kw.modelId] = kw
       by_name[kw.name] = kw
 
-  def keyword(self, keyword_id):
-    return self.keyword_by_id.get(keyword_id)
-
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords())
 
-  def match_keyword(self, kwname):
+  def match_keywords(self, kwname):
     ''' User convenience: match string against all keywords, return matches.
     '''
-    if kwname in self.keyword_by_name:
-      return (kwname,)
+    kw = self.keyword_table.get(kwname)
+    if kw:
+      return kw,
+    if not isinstance(kwname, str):
+      return ()
     lc_kwname = kwname.lower()
-    matches = []
-    for name in self.keyword_names():
-      words = name.split()
+    kw = self.keyword_table.get(lc_kwname)
+    if kw:
+      return kw,
+    kws = []
+    for kw in self.keywords():
+      words = kw.name.split()
       if words and lc_kwname == words[0].lower():
-        matches.append(name)
-    return matches
+        kws.append(kw)
+    return kws
 
-  def match_one_keyword(self, kwname):
-    matches = self.match_keyword(kwname)
-    # no match
-    if not matches:
-      raise KeyError("unknown keyword")
-    if len(matches) == 1:
-      return matches[0]
-    # exact match
-    for match in matches:
-      if match == kwname:
-        return match
-    pfxmatches = []
-    for match in matches:
-      for suffix in ' (', '/':
-        if match.startswith(kwname+suffix):
-          pfxmatches.append(match)
-          break
-    if len(pfxmatches) == 1:
-      return pfxmatches[0]
-    # multiple inexact matches
-    raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
+  def keyword(self, kwname):
+    ''' Try to match a single keyword.
+    '''
+    with Pfx("I.keyword(%r)", kwname):
+      kws = self.match_keywords(kwname)
+      # no match
+      if not kws:
+        raise KeyError("unknown keyword")
+      if len(kws) == 1:
+        # exact match
+        return kws[0]
+      pfxkws = []
+      for kw in kws:
+        for suffix in ' (', '/':
+          if kw.name.startswith(kwname+suffix):
+            pfxkws.append(kw)
+            break
+      if len(pfxkws) == 1:
+        return pfxkws[0]
+      # multiple inexact matches
+      raise ValueError("matches multiple keywords, rejected: %r" % (kws,))
+
+  def get_keyword(self, kwname, default=None):
+    try:
+      return self.keyword(kwname)
+    except KeyError:
+      return default
+    except ValueError as e:
+      warning("invalid kwname: %s", e)
+      return None
 
   def versions_by_keyword(self, kwname):
     return self.keywords_by_name[kwname].versions()
