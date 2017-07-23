@@ -204,8 +204,8 @@ class Table(object):
       sqlargs.append(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
-    info("SQL = %r", sql)
-    if sqlargs: info("  args = %r", sqlargs)
+    ##info("SQL = %r", sql)
+    ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, *sqlargs)
 
@@ -256,16 +256,16 @@ class Table(object):
     if fuzzy:
       name_stripped = name.strip()
       P = self.new_params()
-      rows = self.rows('trim(`%s`) = %s'
-                       % (self.name_column,
-                          P.add('name_stripped', name_stripped)))
+      sql = 'trim(`%s`) = %s' % (self.name_column,
+                                 P.add('name_stripped', name_stripped))
+      rows = self.rows(sql, *P.values)
       if len(rows) == 1:
         return rows[0]
       name_lc = name_stripped.lower()
       P = self.new_params()
-      rows = self.rows('lower(trim(`%s`)) = %s'
-                       % (self.name_column,
-                          P.add('name_lc', name_lc)))
+      sql = 'lower(trim(`%s`)) = %s' % (self.name_column,
+                                        P.add('name_lc', name_lc))
+      rows = self.rows(sql, *P.values)
       if len(rows) == 1:
         return rows[0]
     raise KeyError("%s: no row named %r" % (self, name))
@@ -284,6 +284,13 @@ class Table(object):
     if condition.is_scalar:
       return the(rows)
     return rows
+
+  def get(self, id_value, default=None):
+    try:
+      return self[id_value]
+    except (IndexError, KeyError) as e:
+      ##X("%s.get(%r): %s", self, id_value, e)
+      return default
 
   def __setitem__(self, id_value, new_name):
     if self.name_column is None:
@@ -340,6 +347,16 @@ class Row(object):
 
   def __len__(self):
     return len(self._row)
+
+  def __hash__(self):
+    return self[self._table.id_column]
+
+  def __eq__(self, other):
+    table = self._table
+    cmp_column = table.name_column
+    if cmp_column is None:
+      cmp_column = table.id_column
+    return self[cmp_column] == other[cmp_column]
 
   def __lt__(self, other):
     table = self._table
