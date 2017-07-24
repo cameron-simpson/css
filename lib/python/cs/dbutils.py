@@ -279,10 +279,16 @@ class Table(object):
     '''
     if isinstance(id_value, str):
       return self.named_row(id_value, fuzzy=True)
-    condition = where_index(self.id_column, id_value)
-    rows = self.rows(condition.where, *condition.params)
-    if condition.is_scalar:
-      return the(rows)
+    if isinstance(id_value, (list, set, tuple)) and len(id_value) >= 1024:
+      # too many parameters
+      if not isinstance(id_value, set):
+        id_value = set(id_value)
+      rows = list( row for row in self if row[self.id_column] in id_value )
+    else:
+      condition = where_index(self.id_column, id_value)
+      rows = self.rows(condition.where, *condition.params)
+      if condition.is_scalar:
+        return the(rows)
     return rows
 
   def get(self, id_value, default=None):

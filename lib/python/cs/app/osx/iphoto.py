@@ -37,10 +37,13 @@ from cs.x import X
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 RE_SCENE = r's0*(\d+)[a-z]?'
+RE_SCENE_PART = r's0(\d+)p0(\d+)[a-z]?'
 RE_EPISODE = r'e0*(\d+)[a-z]?'
+RE_EPISODE_PART = r'e0(\d+)p0(\d+)[a-z]?'
 RE_EPISODE_SCENE = r'e0*(\d+)s0*(\d+)[a-z]?'
 RE_SERIES_EPISODE = r's0*(\d+)e0*(\d+)[a-z]?'
 RE_SERIES_EPISODE_SCENE = r's0*(\d+)e0*(\d+)s0*(\d+)[a-z]?'
+RE_PART = r'p0(\d+)[a-z]?'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
@@ -366,14 +369,13 @@ def cmd_tag(I, argv):
           raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
         kw_name = arg[1:]
         try:
-          kw_name = I.match_one_keyword(kw_name)
+          kw = I.keyword(kw_name)
         except KeyError as e:
           warning("unknown tag, CREATE")
-          I.create_keyword(kw_name)
+          kw = I.create_keyword(kw_name)
         except ValueError as e:
           warning("ambiguous tag")
           continue
-        kw = I.keyword_by_name[kw_name]
         tagging.append( (kw_op == '+', kw) )
     except GetoptError as e:
       warning(e)
@@ -425,14 +427,17 @@ def cmd_autotag(I, argv):
       for part in event.name.split('--'):
         part = part.strip('-')
         with Pfx(part):
-          # look for series/episode/scene markers
+          # look for series/episode/scene/part markers
           m = None
           for ptn in (
             RE_SCENE,
+            RE_SCENE_PART,
             RE_EPISODE,
+            RE_EPISODE_PART,
             RE_EPISODE_SCENE,
             RE_SERIES_EPISODE,
             RE_SERIES_EPISODE_SCENE,
+            RE_PART,
           ):
             m = re.match(ptn, part)
             if not m:
@@ -443,8 +448,14 @@ def cmd_autotag(I, argv):
             kwnames = []
             if ptn == RE_SCENE:
               kwnames.append('scene-%02d' % (int(m.group(1))))
+            elif ptn == RE_SCENE_PART:
+              kwnames.append('scene-%02d' % (int(m.group(1))))
+              kwnames.append('part-%02d' % (int(m.group(2))))
             elif ptn == RE_EPISODE:
               kwnames.append('episode-%02d' % (int(m.group(1))))
+            elif ptn == RE_EPISODE_PART:
+              kwnames.append('episode-%02d' % (int(m.group(1))))
+              kwnames.append('part-%02d' % (int(m.group(2))))
             elif ptn == RE_EPISODE_SCENE:
               kwnames.append('episode-%02d' % (int(m.group(1))))
               kwnames.append('scene-%02d' % (int(m.group(2))))
@@ -455,6 +466,8 @@ def cmd_autotag(I, argv):
               kwnames.append('series-%02d' % (int(m.group(1))))
               kwnames.append('episode-%02d' % (int(m.group(2))))
               kwnames.append('scene-%02d' % (int(m.group(3))))
+            elif ptn == RE_PART:
+              kwnames.append('part-%02d' % (int(m.group(1))))
             else:
               raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
             for kwname in kwnames:
@@ -782,10 +795,10 @@ class iPhoto(O):
       return None
 
   def versions_by_keyword(self, kwname):
-    return self.keywords_by_name[kwname].versions()
+    return self.keyword(kwname).versions()
 
   def masters_by_keyword(self, kwname):
-    return self.keyword_by_name[kwname].masters()
+    return self.keyword(kwname).masters()
 
   def keywords_by_version(self, version_id):
     ''' Return version
@@ -861,18 +874,17 @@ class iPhoto(O):
                                           lambda master: len(master.keywords) > 0,
                                           invert)
             else:
-              okwname = kwname
               try:
-                kwname = self.match_one_keyword(kwname)
+                kw = self.keyword(kwname)
               except KeyError as e:
                 warning("no match for keyword %r, using dummy selector", kwname)
                 selector = SelectByKeyword_Name(self, None, invert)
               except ValueError as e:
                 raise ValueError("invalid keyword: %s" % (e,))
               else:
-                if kwname != okwname:
-                  debug("%r ==> %r", okwname, kwname)
-                selector = SelectByKeyword_Name(self, kwname, invert)
+                if kw.name != kwname:
+                  debug("%r ==> %r", kwname, kw.name)
+                selector = SelectByKeyword_Name(self, kw.name, invert)
           elif sel_type in ('face', 'who'):
             person_name = selection
             if not person_name:
@@ -936,9 +948,7 @@ class iPhotoDBs(object):
     return os.path.join(self.dbdirpath, db_name+'.apdb')
 
   def _load_db(self, db_name):
-    X("iPhotoDBs._load_db(%r)...", db_name)
     db = self.dbmap[db_name] = iPhotoDB(self.iphoto, db_name)
-    X("iPhotoDBs._load_db(%r) COMPLETE", db_name)
     return db
 
   @locked
@@ -1224,8 +1234,10 @@ class Keyword_Mixin(iPhotoRow):
     ''' Return the versions with this keyword.
     '''
     I = self.iphoto
-    for vid in I.kw4v_version_ids_by_keyword_id.get(self.modelId, ()):
-      yield I.version(vid)
+    return IdRelation('modelId', I.keywordForVersion_table,
+                      'keywordId', I.keyword_table,
+                      'versionId', I.version_table) \
+                     .left_to_right(self.modelId)
 
   def masters(self):
     ''' Return the masters with this keyword.
