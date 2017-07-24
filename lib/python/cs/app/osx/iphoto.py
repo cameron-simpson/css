@@ -37,10 +37,13 @@ from cs.x import X
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 RE_SCENE = r's0*(\d+)[a-z]?'
+RE_SCENE_PART = r's0(\d+)p0(\d+)[a-z]?'
 RE_EPISODE = r'e0*(\d+)[a-z]?'
+RE_EPISODE_PART = r'e0(\d+)p0(\d+)[a-z]?'
 RE_EPISODE_SCENE = r'e0*(\d+)s0*(\d+)[a-z]?'
 RE_SERIES_EPISODE = r's0*(\d+)e0*(\d+)[a-z]?'
 RE_SERIES_EPISODE_SCENE = r's0*(\d+)e0*(\d+)s0*(\d+)[a-z]?'
+RE_PART = r'p0(\d+)[a-z]?'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
@@ -425,14 +428,17 @@ def cmd_autotag(I, argv):
       for part in event.name.split('--'):
         part = part.strip('-')
         with Pfx(part):
-          # look for series/episode/scene markers
+          # look for series/episode/scene/part markers
           m = None
           for ptn in (
             RE_SCENE,
+            RE_SCENE_PART,
             RE_EPISODE,
+            RE_EPISODE_PART,
             RE_EPISODE_SCENE,
             RE_SERIES_EPISODE,
             RE_SERIES_EPISODE_SCENE,
+            RE_PART,
           ):
             m = re.match(ptn, part)
             if not m:
@@ -443,8 +449,14 @@ def cmd_autotag(I, argv):
             kwnames = []
             if ptn == RE_SCENE:
               kwnames.append('scene-%02d' % (int(m.group(1))))
+            elif ptn == RE_SCENE_PART:
+              kwnames.append('scene-%02d' % (int(m.group(1))))
+              kwnames.append('part-%02d' % (int(m.group(2))))
             elif ptn == RE_EPISODE:
               kwnames.append('episode-%02d' % (int(m.group(1))))
+            elif ptn == RE_EPISODE_PART:
+              kwnames.append('episode-%02d' % (int(m.group(1))))
+              kwnames.append('part-%02d' % (int(m.group(2))))
             elif ptn == RE_EPISODE_SCENE:
               kwnames.append('episode-%02d' % (int(m.group(1))))
               kwnames.append('scene-%02d' % (int(m.group(2))))
@@ -455,6 +467,8 @@ def cmd_autotag(I, argv):
               kwnames.append('series-%02d' % (int(m.group(1))))
               kwnames.append('episode-%02d' % (int(m.group(2))))
               kwnames.append('scene-%02d' % (int(m.group(3))))
+            elif ptn == RE_PART:
+              kwnames.append('part-%02d' % (int(m.group(1))))
             else:
               raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
             for kwname in kwnames:
