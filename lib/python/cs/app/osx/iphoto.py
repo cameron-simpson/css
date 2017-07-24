@@ -369,14 +369,13 @@ def cmd_tag(I, argv):
           raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
         kw_name = arg[1:]
         try:
-          kw_name = I.match_one_keyword(kw_name)
+          kw = I.keyword(kw_name)
         except KeyError as e:
           warning("unknown tag, CREATE")
-          I.create_keyword(kw_name)
+          kw = I.create_keyword(kw_name)
         except ValueError as e:
           warning("ambiguous tag")
           continue
-        kw = I.keyword_by_name[kw_name]
         tagging.append( (kw_op == '+', kw) )
     except GetoptError as e:
       warning(e)
@@ -796,10 +795,10 @@ class iPhoto(O):
       return None
 
   def versions_by_keyword(self, kwname):
-    return self.keywords_by_name[kwname].versions()
+    return self.keyword(kwname).versions()
 
   def masters_by_keyword(self, kwname):
-    return self.keyword_by_name[kwname].masters()
+    return self.keyword(kwname).masters()
 
   def keywords_by_version(self, version_id):
     ''' Return version
@@ -875,18 +874,17 @@ class iPhoto(O):
                                           lambda master: len(master.keywords) > 0,
                                           invert)
             else:
-              okwname = kwname
               try:
-                kwname = self.match_one_keyword(kwname)
+                kw = self.keyword(kwname)
               except KeyError as e:
                 warning("no match for keyword %r, using dummy selector", kwname)
                 selector = SelectByKeyword_Name(self, None, invert)
               except ValueError as e:
                 raise ValueError("invalid keyword: %s" % (e,))
               else:
-                if kwname != okwname:
-                  debug("%r ==> %r", okwname, kwname)
-                selector = SelectByKeyword_Name(self, kwname, invert)
+                if kw.name != kwname:
+                  debug("%r ==> %r", kwname, kw.name)
+                selector = SelectByKeyword_Name(self, kw.name, invert)
           elif sel_type in ('face', 'who'):
             person_name = selection
             if not person_name:
@@ -950,9 +948,7 @@ class iPhotoDBs(object):
     return os.path.join(self.dbdirpath, db_name+'.apdb')
 
   def _load_db(self, db_name):
-    X("iPhotoDBs._load_db(%r)...", db_name)
     db = self.dbmap[db_name] = iPhotoDB(self.iphoto, db_name)
-    X("iPhotoDBs._load_db(%r) COMPLETE", db_name)
     return db
 
   @locked
@@ -1238,8 +1234,10 @@ class Keyword_Mixin(iPhotoRow):
     ''' Return the versions with this keyword.
     '''
     I = self.iphoto
-    for vid in I.kw4v_version_ids_by_keyword_id.get(self.modelId, ()):
-      yield I.version(vid)
+    return IdRelation('modelId', I.keywordForVersion_table,
+                      'keywordId', I.keyword_table,
+                      'versionId', I.version_table) \
+                     .left_to_right(self.modelId)
 
   def masters(self):
     ''' Return the masters with this keyword.
