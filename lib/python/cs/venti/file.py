@@ -5,13 +5,16 @@
 
 from __future__ import print_function, absolute_import
 from io import RawIOBase
-import os
+from os import SEEK_SET
 import sys
-from threading import Thread
-from cs.threads import locked
-from cs.logutils import Pfx, info, X
+from threading import Lock, RLock
 from cs.fileutils import BackedFile
+from cs.logutils import PfxThread, info
+from cs.pfx import Pfx, XP
 from cs.queues import IterableQueue
+from cs.threads import locked
+from cs.x import X
+from . import defaults
 from .meta import Meta
 from .block import Block
 from .blockify import top_block_for, blockify
@@ -69,12 +72,12 @@ class BlockFile(RawIOBase):
     nread = 0
     for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
       Blen = end - start
-      b[nread:nread+Blen] = B[start:end]
+      b[nread:nread + Blen] = B[start:end]
       nread += Blen
     self._offset += nread
     return nread
 
-class File(BackedFile):
+class File(object):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
@@ -85,32 +88,82 @@ class File(BackedFile):
     '''
     if backing_block is None:
       backing_block = Block(data=b'')
-    self._backing_block = backing_block
-    BackedFile.__init__(self, BlockFile(backing_block))
+    self.filename = None
+    self._syncer = None # syncing Thread, close waits for it
+    self._reset(backing_block)
+    self._lock = RLock()
+
+  def _reset(self, new_backing_block):
+    self._backing_block = new_backing_block
+    self._file = BackedFile(BlockFile(new_backing_block))
 
   @property
   @locked
   def backing_block(self):
+    ''' Return the current backing block.
+        The backing block may be out of date with respect to any
+        pending flushes; call .sync() to obtain an up to date flushed
+        block.
+    '''
     return self._backing_block
 
-  @backing_block.setter
   @locked
-  def backing_block(self, new_block):
-    X("File: update _backing_block to %s from %s", new_block, self._backing_block)
-    self._backing_block = new_block
-    self._reset(BlockFile(new_block))
-
-  @locked
-  def flush(self):
+  def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
-        Returns the new top Block.
+        We dispatch the sync in the background within a lock.
+        `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
-    if not self.front_range.isempty():
-      # Recompute the top Block from the current high level blocks.
-      # As a side-effect of setting .backing_block we discard the
-      # front file data, which are now saved to the Store.
-      self.backing_block = top_block_for(self.high_level_blocks())
-      # TODO: truncate the front file?
+    with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
+      if not self._file.front_range:
+        XP("empty front_range, no action")
+      else:
+        # only do work if there are new data in the file
+        XP("front_range=%s", self.front_range)
+        # push the current state as the backing file
+        # and initiate a sync to the Store
+        old_file = self._file
+        old_file.read_only = True
+        old_syncer = self._syncer
+        new_file = BackedFile(old_file)
+        S = defaults.S
+        with S:
+          def update_store():
+            # Recompute the top Block from the current high level blocks.
+            # As a side-effect of setting .backing_block we discard the
+            # front file data, which are now saved to the Store.
+            with S:
+              XP("File.update_store: syncing to Store...")
+              B = top_block_for(
+                    self._high_level_blocks_from_front_back(
+                        old_file.front_file, back_block, front_range,
+                        scanner=scanner))
+            old_file.close()
+            XP("File.update_store: syncing to Store: stored")
+            with self._lock:
+              if self._file is old_file:
+                XP("File.update_store: syncing to Store: still using old _file, update to use new stored Block")
+                self._reset(B)
+              else:
+                XP("File.update_store: self has moved on, do not update _file")
+            if old_syncer:
+              XP("File.update_store: wait for previous _syncher...")
+              old_syncer.join()
+            XP("File.update_store: syncing to Store DONE")
+          T = PfxThread(name="%s.flush(): update_store" % (self,),
+                        target=update_store)
+          T.start()
+        self._syncher = T
+        self._file = new_file
+    XP("DONE")
+
+  def sync(self):
+    ''' Dispatch a flush, return the flushed backing block.
+        Wait for any flush to complete before returing the backing block.
+    '''
+    self.flush()
+    T = self._syncer
+    if T:
+      T.join()
     return self.backing_block
 
   @locked
@@ -134,7 +187,7 @@ class File(BackedFile):
         # should be the partial direct block at the end of the range, and
         # whatever new indirect blocks get made to span things
         self.backing_block \
-          = top_block_for(backing_block0.top_blocks(0, length))
+            = top_block_for(backing_block0.top_blocks(0, length))
     elif length > cur_len:
       # extend the front_file and front_range
       self.front_file.truncate(length)
@@ -144,17 +197,24 @@ class File(BackedFile):
   def close(self):
     ''' Close the File, return the top Block.
     '''
-    B = self.flush()
-    BackedFile.close(self)
+    B = self.sync()
+    super().close()
     return B
 
-  def read(self, size = -1):
+  def seek(self, offset, whence=SEEK_SET):
+    return self._file.seek(offset, whence=whence)
+
+  def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
+    if offset is not None:
+      with self._lock:
+        self.seek(offset)
+        return self.read(size=size)
     if size == -1:
       return self.readall()
     if size < 1:
-      raise ValueError("%s.read: size(%r) < 0 but not -1", self, size)
+      raise ValueError("%s.read: size(%r) < 1 but not -1", self, size)
     start = self._offset
     end = start + size
     for inside, span in self.front_range.slices(start, end):
@@ -171,23 +231,56 @@ class File(BackedFile):
           return data
     return b''
 
+  def readall(self):
+    ''' Concatenate all the data from the current offset to the end of the file.
+    '''
+    bss = []
+    for inside, span in self.front_range.slices(self._offset, len(self)):
+      if inside:
+        # data from the front file; return the spanned chunks
+        for chunk in filedata(self.front_file, start=span.start, end=span.end):
+          self._offset += len(chunk)
+          bss.append(chunk)
+      else:
+        # data from the backing block: return the first chunk
+        for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
+          chunk = B[Bstart:Bend]
+          self._offset += len(chunk)
+          bss.append(chunk)
+    return b''.join(bss)
+
   @locked
   def high_level_blocks(self, start=None, end=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
-    if start is None:
-      start = 0
-    if end is None:
-      end = self.front_range.end
-    for inside, span in self.front_range.slices(start, end):
-      if inside:
-        # blockify the new data and yield the top block
-        yield top_block_for(blockify(filedata(self.front_file,
+    return self._high_level_blocks_from_front_back(
+                  self.front_file, back_block, self.front_range,
+                  start, end, scanner=scanner)
+
+  @staticmethod
+  def _high_level_blocks_from_front_back(
+        front_file, back_block, front_range,
+        start=None, end=None, scanner=None):
+    ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
+    '''
+    with Pfx("File.high_level_blocks(%s..%s)", start, end):
+      if start is None:
+        start = 0
+      if end is None:
+        end = front_range.end
+      ##X("_HLB: front_file=%s, back_block=%s, front_range=%s, start=%s, end=%s...",
+      ##  front_file, back_block, front_range, start, end)
+      for in_front, span in front_range.slices(start, end):
+        if in_front:
+          # blockify the new data and yield the top block
+          B = top_block_for(blockify(filedata(front_file,
                                               start=span.start,
-                                              end=span.end)))
-      else:
-        for B in self.backing_block.top_blocks(span.start, span.end):
+                                              end=span.end),
+                                     scanner))
           yield B
+        else:
+          for B in back_block.top_blocks(span.start, span.end):
+            yield B
 
 def filedata(fp, rsize=8192, start=None, end=None):
   ''' A generator to yield chunks of data from a file.

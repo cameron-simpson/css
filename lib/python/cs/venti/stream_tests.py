@@ -11,7 +11,7 @@ from cs.logutils import X
 from .hash import DEFAULT_HASHCLASS
 from .hash_tests import HashUtilDict, _TestHashCodeUtils
 from .store import MappingStore
-from .store_tests import _TestStore
+from .store_tests import TestStore
 from .stream import StreamStore
 
 def make_stream_store(hashclass, addif):
@@ -32,11 +32,11 @@ def make_stream_store(hashclass, addif):
                  )
   return S, remote_S
 
-class TestStreamStore(_TestStore, unittest.TestCase):
+class TestStreamStore(TestStore, unittest.TestCase):
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=False)
 
-class TestStreamStoreAddIf(_TestStore, unittest.TestCase):
+class TestStreamStoreAddIf(TestStore, unittest.TestCase):
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=True)
 

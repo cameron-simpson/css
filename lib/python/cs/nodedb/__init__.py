@@ -18,7 +18,8 @@ import os.path
 import sys
 from cs.nodedb.backend import Backend, Update, ExtendUpdate, ResetUpdate
 from cs.nodedb.node import Node, NodeDB, NodeDBFromURL
-from cs.logutils import setup_logging, Pfx, error
+from cs.logutils import setup_logging, error
+from cs.pfx import Pfx
 
 def main(argv):
   xit = 0

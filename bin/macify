@@ -31,10 +31,11 @@ import os
 import os.path
 import sys
 import unicodedata
-from cs.logutils import setup_logging, warn, cmd
+from cs.logutils import setup_logging, warn
 from cs.app.osx.fs import nfd
 
-setup_logging()
+cmd = os.path.basename(sys.argv[0])
+setup_logging(cmd)
 
 SrcEncoding='iso8859-1'
 

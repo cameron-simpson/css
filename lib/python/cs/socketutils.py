@@ -8,7 +8,9 @@ import os
 import sys
 import errno
 import socket
-from cs.logutils import X, XP, Pfx, PrePfx, warning, info
+from cs.logutils import X, PrePfx, warning, info
+from cs.pfx import XP
+from cs.pfx import Pfx
 
 def bind_next_port(sock, host, base_port):
   ''' Bind a the socket `sock` to the first free (`host`, port); return the port.

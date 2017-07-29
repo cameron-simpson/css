@@ -22,6 +22,7 @@
 '''
 
 import re
+import os
 from os.path import abspath
 from string import ascii_letters, digits
 import tempfile
@@ -29,6 +30,13 @@ import threading
 from cs.lex import texthexify, untexthexify
 from cs.logutils import X
 from cs.seq import isordered
+
+# Default OS level file high water mark.
+# This is used for rollover levels for DataDir files and cache files.
+MAX_FILE_SIZE = 1024 * 1024 * 1024
+
+# path separator, hardwired
+SEP = '/'
 
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
@@ -60,8 +68,9 @@ def fromtext(s):
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
-# characters used for metadata.
-_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{}*/'
+# characters used for metadata, notably including the double quote
+# because it is heavily using in JSON.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
@@ -73,8 +82,8 @@ class _TestAdditionsMixin:
   '''
 
   @staticmethod
-  def mktmpdir():
-    return abspath(tempfile.mkdtemp(prefix="test-cs.venti", suffix=".tmpdir", dir='.'))
+  def mktmpdir(prefix="cs.venti"):
+    return tempfile.TemporaryDirectory(prefix="test-"+prefix+"-", suffix=".tmpdir", dir=os.getcwd())
 
   def assertLen(self, o, length, *a, **kw):
     ''' Test len(o) unless it raises NotImplementedError.
@@ -89,4 +98,4 @@ class _TestAdditionsMixin:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
-    return isordered(s, reverse, strict)
+    self.assertTrue(isordered(s, reverse, strict), "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))

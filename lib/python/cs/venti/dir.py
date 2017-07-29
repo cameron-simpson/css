@@ -1,5 +1,6 @@
 import os
 import os.path
+from cmd import Cmd
 from collections import namedtuple
 import pwd
 import grp
@@ -7,17 +8,20 @@ import stat
 import sys
 from threading import Lock, RLock
 import time
-from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
+from cs.cmdutils import docmd
+from cs.logutils import D, debug, error, info, warning
+from cs.pfx import Pfx, XP
 from cs.lex import hexify, texthexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
-from . import totext, fromtext
+from cs.x import X
+from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
-from .meta import Meta
+from .meta import Meta, rwx
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -146,7 +150,7 @@ class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, metatext=None):
+  def __init__(self, type_, name, metatext=None, parent=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -159,15 +163,32 @@ class _Dirent(object):
         self.meta.update_from_text(metatext)
       else:
         self.meta.update_from_items(metatext.items())
+    self.parent = parent
 
   def __str__(self):
-    return self.textencode()
+    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__,
                                D_type2str(self.type),
                                self.name,
                                self.meta)
+
+  def __hash__(self):
+    ''' Allows collecting _Dirents in a set.
+    '''
+    return id(self)
+
+  def pathto(self, R=None):
+    ''' Return the path to this element if known.
+        `R`: optional root Dirent, default None.
+    '''
+    E = self
+    path = []
+    while E is not R:
+      path.append(E.name)
+      E = E.parent
+    return os.path.join(*reversed(path))
 
   # TODO: support .block=None
   def __eq__(self, other):
@@ -238,6 +259,15 @@ class _Dirent(object):
     if when is None:
       when = time.time()
     self.mtime = when
+
+  @locked
+  def change(self):
+    ''' Mark this dirent as changed; propagate to parent Dir if present.
+    '''
+    E = self
+    while E is not None:
+      E.changed = True
+      E = E.parent
 
   def stat(self):
     from pwd import getpwnam
@@ -376,6 +406,32 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._block = block
     self._check()
 
+  @locked
+  def startup(self):
+    ''' Set up ._open_file on first open.
+    '''
+    self._check()
+    if self._open_file is not None:
+      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self._block is None:
+      raise RuntimeError("first open, but ._block is None")
+    self._open_file = File(self._block)
+    self._block = None
+    self._check()
+
+  @locked
+  def shutdown(self):
+    ''' On final close, close ._open_file and save result as ._block.
+    '''
+    self._check()
+    if self._block is not None:
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
+    Eopen = self._open_file
+    Eopen.filename = self.name
+    self._block = Eopen.close()
+    self._open_file = None
+    self._check()
+
   def _check(self):
     # TODO: check ._block and ._open_file against MultiOpenMixin open count
     if self._block is None:
@@ -397,7 +453,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is None:
       return self._block
     else:
-      return self._open_file.flush()
+      return self._open_file.sync()
 
   @block.setter
   @locked
@@ -418,34 +474,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
       return len(self._open_file)
     return len(self.block)
 
-  @locked
-  def startup(self):
-    ''' Set up ._open_file on first open.
-    '''
-    self._check()
-    if self._open_file is not None:
-      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-    if self._block is None:
-      raise RuntimeError("first open, but ._block is None")
-    self._open_file = File(self._block)
-    self._block = None
-    self._check()
-
-  @locked
-  def shutdown(self):
-    ''' On final close, close ._open_file and save result as ._block.
-    '''
-    X("FileDirent.CLOSE %s ...", self)
-    self._check()
-    if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
-    self._block = self._open_file.close()
-    X("CLOSE %s: _block=%s", self, self._block)
-    self._open_file = None
-    self._check()
-
-  def flush(self):
-    return self._open_file.flush()
+  def flush(self, scanner=None):
+    return self._open_file.flush(scanner)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -519,16 +549,6 @@ class Dir(_Dirent):
     self.changed = False
     self._lock = RLock()
 
-  @locked
-  def change(self):
-    ''' Mark this Dir as changed; propagate to parent Dir if present.
-    '''
-    ##XP("Dir %r: changed=True", self.name)
-    ##stack_dump(indent=2)
-    self.changed = True
-    if self.parent:
-      self.parent.change()
-
   @property
   @locked
   def entries(self):
@@ -563,14 +583,11 @@ class Dir(_Dirent):
                         for name in names
                         if name != '.' and name != '..'
                       )
-      # TODO: if len(data) >= 16384
+      # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self.changed = False
-      ##warning("Dir.block: computed Block %s", B)
-      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
@@ -584,7 +601,7 @@ class Dir(_Dirent):
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
-    return len(name) > 0 and name.find('/') < 0
+    return len(name) > 0 and name.find(SEP) < 0
 
   def get(self, name, dflt=None):
     if name not in self:
@@ -625,20 +642,21 @@ class Dir(_Dirent):
     self.touch()
     self.change()
     E.name = name
-    if E.isdir:
-      Eparent = E.parent
-      if Eparent is None:
-        E.parent = D
-      elif Eparent is not self:
-        warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
-        E.parent = self
+    Eparent = E.parent
+    if Eparent is None:
+      E.parent = self
+    elif Eparent is not self:
+      warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
+      E.parent = self
 
   def __delitem__(self, name):
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
+    E = self.entries[name]
     del self.entries[name]
+    E.parent = None
     self.touch()
     self.change()
 
@@ -680,7 +698,7 @@ class Dir(_Dirent):
     ''' Change directory to `path`, return the ending directory.
     '''
     D = self
-    for name in path.split('/'):
+    for name in path.split(SEP):
       if len(name) == 0:
         continue
       D = D.chdir1(name)
@@ -713,6 +731,173 @@ class Dir(_Dirent):
       E = subE
 
     return E
+
+class DirFTP(Cmd):
+  ''' Class for FTP-like access to a Dir.
+  '''
+
+  def __init__(self, D, prompt=None):
+    Cmd.__init__(self)
+    self._prompt = prompt
+    self.root = D
+    self.cwd = D
+
+  @property
+  def prompt(self):
+    prompt = self._prompt
+    pwd = SEP + self.op_pwd()
+    return ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
+
+  def emptyline(self):
+    pass
+
+  def do_EOF(self, args):
+    ''' Quit on end of input.
+    '''
+    return True
+
+  @docmd
+  def do_quit(self, args):
+    ''' Usage: quit
+    '''
+    return True
+
+  @docmd
+  def do_cd(self, args):
+    ''' Usage: cd pathname
+        Change working directory.
+    '''
+    argv = shlex.split(args)
+    if len(argv) != 1:
+      raise GetoptError("exactly one argument expected, received: %r" % (argv,))
+    self.op_cd(argv[0])
+    print(self.op_pwd())
+
+  def op_cd(self, path):
+    ''' Change working directory.
+    '''
+    if path.startswith(SEP):
+      D = self.root
+    else:
+      D = self.cwd
+    for base in path.split(SEP):
+      if base == '' or base == '.':
+        pass
+      elif base == '..':
+        if D is not self.root:
+          D = D.parent
+      else:
+        D = D.chdir1(base)
+    self.cwd = D
+
+  @docmd
+  def do_inspect(self, args):
+    ''' Usage: inspect name
+        Print VT level details about name.
+    '''
+    argv = shlex.split(args)
+    if len(argv) != 1:
+      raise GetoptError("invalid arguments: %r" % (argv,))
+    name, = argv
+    E, P, tail = resolve(self.cwd, name)
+    if tail:
+      raise OSError(errno.ENOENT)
+    print("%s: %s" % (name, E))
+    M = E.meta
+    print(M.textencode())
+    print("size=%d" % (len(E.block),))
+
+  @docmd
+  def do_pwd(self, args):
+    ''' Usage: pwd
+        Print the current working directory path.
+    '''
+    argv = shlex.split(args)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (args,))
+    print(self.op_pwd())
+
+  def op_pwd(self):
+    ''' Return the path to the current working directory.
+    '''
+    E = self.cwd
+    names = []
+    seen = set()
+    while E is not self.root:
+      seen.add(E)
+      P = E.parent
+      if P is None:
+        raise ValueError("no parent: names=%r, E=%s" % (names, E))
+      if P in seen:
+        raise ValueError("loop detected: names=%r, E=%s" % (names, E))
+      name = E.name
+      if P[name] is not E:
+        name = None
+        for Pname, PE in sorted(P.entries.items()):
+          if PE is E:
+            name = Pname
+            break
+        if name is None:
+          raise ValueError("detached: E not present in P: E=%s, P=%s" % (E, P))
+      names.append(name)
+      E = P
+    return SEP.join(reversed(names))
+
+  @docmd
+  def do_ls(self, args):
+    ''' Usage: ls [paths...]
+    '''
+    argv = shlex.split(args)
+    if not argv:
+      argv = sorted(self.cwd.entries.keys())
+    for name in argv:
+      with Pfx(name):
+        E, P, tail = resolve(self.cwd, name)
+        if tail:
+          error("not found: unresolved path elements: %r", tail)
+        else:
+          M = E.meta
+          S = M.stat()
+          u, g, perms = M.unix_perms
+          typemode = M.unix_typemode
+          typechar = ( '-' if typemode == stat.S_IFREG
+                  else 'd' if typemode == stat.S_IFDIR
+                  else 's' if typemode == stat.S_IFLNK
+                  else '?'
+                     )
+          print("%s%s%s%s %s" % ( typechar,
+                                  rwx((typemode>>6)&7),
+                                  rwx((typemode>>3)&7),
+                                  rwx((typemode)&7),
+                                  name
+                                ))
+
+  def op_ls(self):
+    ''' Return a dict mapping current directories names to Dirents.
+    '''
+    return dict(self.cwd.entries)
+
+  @docmd
+  def do_mkdir(self, args):
+    argv = shlex.split(args)
+    if not argv:
+      raise GetoptError("missing arguments")
+    for arg in argv:
+      with Pfx(arg):
+        E, P, tail = resolve(self.cwd, arg)
+        if not tail:
+          error("path exists")
+        elif len(tail) > 1:
+          error("missing superdirectory")
+        elif not E.isdir:
+          error("superpath is not a directory")
+        else:
+          subname = tail[0]
+          if subname in E:
+            error("%r exists", subname)
+          else:
+            E.mkdir(subname)
+        self.cwd
 
 if __name__ == '__main__':
   import cs.venti.dir_tests

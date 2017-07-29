@@ -24,3 +24,5 @@ exec_code = exec
 
 # file interface returning bytes from binary file
 BytesFile = lambda fp: fp
+
+joinbytes = b''.join

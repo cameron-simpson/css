@@ -15,7 +15,9 @@ from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import tail
-from cs.logutils import cmd, setup_logging
+from cs.logutils import setup_logging
+
+cmd = None
 
 USAGE = "Usage: %s configuration-file"
 

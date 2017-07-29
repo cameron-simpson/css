@@ -328,8 +328,8 @@ target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
 def main(argv):
-  setup_logging()
-  cmd = cs.logutils.cmd
+  cmd = os.path.basename(argv[0])
+  setup_logging(cmd)
 
   trackRules=True       # add X-Cats2Procmailrc line to show rule
   useXLabel=False       # put tag in X-Label header instead of subject

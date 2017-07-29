@@ -29,15 +29,17 @@ import sys
 import os
 import tempfile
 import unittest
-from cs.logutils import setup_logging, Pfx, info, warning, error, D, X
+from cs.lex import get_identifier
+from cs.logutils import setup_logging, info, warning, error, D
+from cs.pfx import Pfx
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
-from cs.lex import get_identifier
-import cs.sh
-from cs.seq import get0, last
-from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
+from cs.seq import get0, last
+import cs.sh
+from cs.threads import locked, locked_property
+from cs.x import X
 
 def main(argv=None, stdin=None):
   if argv is None:
@@ -51,7 +53,6 @@ def main(argv=None, stdin=None):
     Ops:
       abbreviate abbrev address
         (also "abbrev")
-      compact
       edit-group group
       edit-group /regexp/
       export exportpath
@@ -65,6 +66,7 @@ def main(argv=None, stdin=None):
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
         Using both -A and -G emits mutt aliases lines with the -group option.
+      rewrite
       update-domain @old-domain @new-domain [{/regexp/|address}...]''' \
     % (cmd,)
   setup_logging(cmd)
@@ -97,9 +99,10 @@ def main(argv=None, stdin=None):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      readonly = op not in ('abbreviate', 'abbrev', 'compact',
+      readonly = op not in ('abbreviate', 'abbrev',
                             'edit-group', 'import-addresses',
                             'learn-addresses', 'update-domain',
+                            'rewrite',
                            )
       with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
@@ -121,8 +124,6 @@ def main(argv=None, stdin=None):
             except ValueError as e:
               error(e)
               xit = 1
-        elif op == 'compact':
-          MDB.rewrite()
         elif op == 'export':
           exportpath = argv.pop(0)
           if argv:
@@ -279,6 +280,8 @@ def main(argv=None, stdin=None):
               badopts = True
             else:
               edit_group(MDB, group)
+        elif op == 'rewrite':
+          MDB.rewrite()
         elif op == 'update-domain':
           if not len(argv):
             error("missing @old-domain")
@@ -570,7 +573,6 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    raise NotImplementedError("needs recode")
     obackend = self.backend
     self.backend = None
     self.scrub()
@@ -692,6 +694,7 @@ class _MailDB(NodeDB):
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    X("RECOMPUTED ADDRESS_GROUPS: %d groups", len(agroups.keys()))
     return agroups
 
   @locked_property
