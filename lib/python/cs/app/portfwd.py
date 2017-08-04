@@ -193,6 +193,7 @@ class Portfwd(FlaggedMixin):
       self.flag_connected = False
     self.svcd = SvcD(self.ssh_argv,
                      name=self.svcd_name,
+                     flags=self.flags,
                      trace=trace,
                      sig_func=self.sig_func,
                      test_func=self.test_func,
