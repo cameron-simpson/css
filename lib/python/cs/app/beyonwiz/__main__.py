@@ -6,29 +6,33 @@ from __future__ import print_function
 import sys
 import os.path
 import json
-from cs.logutils import setup_logging, warning, error, Pfx
+from cs.logutils import setup_logging, warning, error
+from cs.pfx import Pfx
+from cs.x import X
 from . import Recording
+
+TRY_N = 32
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
         Write the video content of the named tvwiz directories to
         standard output as MPEG2 transport Stream, acceptable to
         ffmpeg's "mpegts" format.
-    %s convert tvwizdir output.mp4
-        Convert the video content of the named tvwiz directory to
-        the named output file (typically MP4, though he ffmpeg
-        output format chosen is based on the extension). Most
-        metadata are preserved.
-    %s header tvwizdirs...
-        Print header information from the named tvwiz directories.
-    %s mconvert tvwizdirs...
-        Convert the video content of the named tvwiz directories to
-        automatically named .mp4 files in the current directory.
+    %s convert recording [start..end]... [output.mp4]
+        Convert the video content of the named recording to
+        the named output file (typically MP4, though the ffmpeg
+        output format chosen is based on the extension).
         Most metadata are preserved.
-    %s meta pathnames...
-        Report metadata for the supplied pathnames.
-    %s scan tvwizdirs...
-        Scan the data structures of the named tvwiz directories.
+        start..end: Optional start and end offsets in seconds, used
+          to crop the recording output.
+    %s mconvert recording...
+        Convert multiple named recordings to automatically named .mp4 files
+        in the current directory.
+        Most metadata are preserved.
+    %s meta recording...
+        Report metadata for the supplied recordings.
+    %s scan recording...
+        Scan the data structures of the supplied recordings.
     %s stat tvwizdirs...
         Print some summary infomation for the named tvwiz directories.
     %s test
@@ -38,7 +42,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -54,17 +58,7 @@ def main(argv):
           badopts = True
       elif op == "convert":
         if len(args) < 1:
-          error("missing tvwizdir")
-          badopts = True
-        if len(args) < 2:
-          error("missing output.mp4")
-          badopts = True
-        if len(args) > 2:
-          warning("extra arguments after output: %s", " ".join(args))
-          badopts = True
-      elif op == "header":
-        if len(args) < 1:
-          error("missing tvwizdirs")
+          error("missing recording")
           badopts = True
       elif op == "mconvert":
         if len(args) < 1:
@@ -103,44 +97,42 @@ def main(argv):
         TVWiz(arg).copyto(stdout_bfp)
         stdoutp.bfp.close()
     elif op == "convert":
-      srcpath, dstpath = args
-      R = Recording(srcpath)
-      xit = R.convert(dstpath)
-    elif op == "header":
-      for tvwizdir in args:
-        with Pfx(tvwizdir):
-          print(tvwizdir)
-          TV = TVWiz(tvwizdir)
-          print(repr(TV.header))
+      srcpath = args.pop(0)
+      with Pfx(srcpath):
+        # parse optional start..end arguments
+        timespans = []
+        while args and '..' in args[0]:
+          try:
+            start, end = args[0].split('..')
+            start_s = float(start)
+            end_s = float(end)
+            if start_s > end_s:
+              raise ValueError("start:%s > end:%s" % (start, end))
+          except ValueError as e:
+            X("FAIL %r: %s", args[0], e)
+            pass
+          else:
+            args.pop(0)
+            timespans.append( (start_s, end_s) )
+        # collect optional dstpath
+        if args:
+          dstpath = args.pop(0)
+        else:
+          dstpath = None
+        R = Recording(srcpath)
+        xit = 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
     elif op == "mconvert":
+      xit = 0
       for srcpath in args:
         with Pfx(srcpath):
-          ok = True
           R = Recording(srcpath)
-          dstpath = R.convertpath()
-          if os.path.exists(dstpath):
-            dstpfx, dstext = os.path.splitext(dstpath)
-            ok = False
-            for i in range(32):
-              dstpath2 = "%s--%d%s" % (dstpfx, i+1, dstext)
-              if not os.path.exists(dstpath2):
-                dstpath = dstpath2
-                ok = True
-                break
-            if not ok:
-              error("file exists, and so do most --n flavours of it: %r", dstpath)
-              xit = 1
-          if ok:
-            try:
-              ffxit = R.convert(dstpath)
-            except ValueError as e:
-              error("%s: %s", dstpath, e)
-              xit = 1
+          if not R.convert(None, max_n=TRY_N):
+            xit = 1
     elif op == "meta":
       for filename in args:
         with Pfx(filename):
           R = Recording(filename)
-          print(filename, R.metadata.as_json(), sep='\t')
+          print(filename, R.metadata._asjson(), sep='\t')
     elif op == "scan":
       for arg in args:
         print(arg)
@@ -166,11 +158,12 @@ def main(argv):
           print("    final chunk of %d" % chunkSize)
         print("  total %d" % total)
     elif op == "stat":
-      for arg in args:
-        TV = TVWiz(arg)
-        H = TV.header
-        print(arg)
-        print("  %s %s: %s, %s" % (H.svcName, H.start_dt.isoformat(' '), H.evtName, H.episode))
+      for pathname in args:
+        R = Recording(pathname)
+        print(pathname)
+        for json_line in R.metadata._asjson(indent="  ").split("\n"):
+          if json_line:
+            print(" ", json_line)
     elif op == "test":
       host = args.pop(0)
       print("host =", host, "args =", args)

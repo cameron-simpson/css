@@ -547,6 +547,7 @@ dorsync()
   esac
   set -- $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   [ $imode ] && set -- filter_fd 1 "$filteroutput" "$@"
+  set -- $trace "$@"
   "$@"
 }
 

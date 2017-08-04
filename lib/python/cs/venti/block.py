@@ -4,9 +4,11 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
-from cs.logutils import D, error, debug, X, Pfx
+from cs.logutils import D, error, debug
+from cs.pfx import Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
+from cs.x import X
 from . import defaults, totext
 from .hash import decode as hash_decode
 
@@ -74,7 +76,8 @@ def decodeBlock(bs, offset=0, length=None):
                 type 3: suboffset, super block
               }
   '''
-  with Pfx('decodeBlock(bs, offset=%d,length=%s)', offset, length):
+  with Pfx('decodeBlock(bs=%r,offset=%d,length=%s)',
+           bs[offset:offset+16], offset, length):
     if length is None:
       length, offset = get_bs(bs, offset)
       return decodeBlock(bs, offset, length)
@@ -418,17 +421,16 @@ class HashCodeBlock(_Block):
         raise ValueError("supplied hashcode %r != saved hash for data (%r : %r)" % (hashcode, h, data))
     self.hashcode = hashcode
 
+  def __repr__(self):
+    return "%s:len=%d:hashcode=%s" % (self.__class__.__name__, len(self), self.hashcode)
+
   def stored_data(self):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
     S = defaults.S
     hashcode = self.hashcode
-    try:
-      return S[hashcode]
-    except KeyError as e:
-      error("%s: data for hashcode %s not available: %s", self, hashcode, e)
-      raise IOError("data for hashcode %s not available: %s" % (hashcode, e)) from e
+    return S[hashcode]
 
   def encode(self):
     flags = 0
@@ -440,6 +442,8 @@ class HashCodeBlock(_Block):
 
   @property
   def data(self):
+    ''' The direct data of this Block.
+    '''
     return self.stored_data()
 
 def Block(hashcode=None, data=None, span=None):
@@ -520,6 +524,9 @@ class RLEBlock(_Block):
     self.octet = octet
     self.indirect = False
 
+  def __repr__(self):
+    return "%s:len=%d:0x%02x" % (self.__class__.__name__, len(self), self.octet)
+
   @property
   def data(self):
     return self.octet * self.span
@@ -542,6 +549,9 @@ class LiteralBlock(_Block):
     self.data = data
     self.indirect = False
     self.span = len(data)
+
+  def __repr__(self):
+    return "%s:%s" % (self.__class__.__name__, self)
 
   def encode(self):
     return self._encode(0, self.span, BlockType.BT_LITERAL, 0,
@@ -587,7 +597,10 @@ class _SubBlock(_Block):
                         ))
 
   def __getitem__(self, index):
-    # TODO: what about slices?
+    if isinstance(index, slice):
+      return self.data[index]
+    if index < 0 or index >= self.span:
+      raise IndexError("index %d outside span %d" % (index, self.span))
     return self._superblock[self._offset+index]
 
 def chunksOf(B, start, stop=None):

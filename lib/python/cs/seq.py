@@ -21,6 +21,7 @@ from threading import Lock, Condition
 from cs.logutils import warning, debug, D
 from cs.py.stack import caller
 from cs.py3 import exec_code
+from cs.x import X
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -96,6 +97,16 @@ def get0(iterable, default=None):
     return default
   else:
     return i
+
+def tee(iterable, *Qs):
+  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
+      `Qs`: the queues, objects accepting a .put method.
+      Note: the item is .put onto every queue before being yielded from this generator.
+  '''
+  for item in iterable:
+    for Q in Qs:
+      Q.put(item)
+    yield item
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
@@ -196,7 +207,12 @@ def onetomany(func):
   return gather
 
 def isordered(s, reverse=False, strict=False):
+  ''' Test whether an iterable is ordered.
+      Note that the iterable is iterated, so this is a destructive
+      test for nonsequences.
+  '''
   first = True
+  prev = None
   for i, item in enumerate(s):
     if not first:
       if reverse:
@@ -204,11 +220,10 @@ def isordered(s, reverse=False, strict=False):
       else:
         ordered = item > prev if strict else item >= prev
       if not ordered:
-        raise AssertionError(
-                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
-                % (reverse, strict, i-1, i, prev, item))
+        return False
     prev = item
     first = False
+  return True
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.

@@ -6,8 +6,9 @@
 
 from collections import namedtuple
 import time
-from cs.logutils import warning, exception, X
+from cs.logutils import warning, exception
 from cs.seq import seq
+from cs.x import X
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 

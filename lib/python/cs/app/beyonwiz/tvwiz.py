@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from . import _Recording
+from . import _Recording, RecordingMetaData
 
 # constants related to headers
 #
@@ -72,18 +72,20 @@ def unrle(data, fmt, offset=0):
   offset += len(subdata)
   return subdata, offset
 
-class TVWiz_Header(RecordingMeta):
+class TVWizMetaData(RecordingMetaData):
 
   @property
   def start_unixtime(self):
-    return (self.mjd - 40587) * DAY + self.start
+    H = self.sources['header']
+    return (H['mjd'] - 40587) * DAY + H['start']
 
 class TVWiz(_Recording):
 
   def __init__(self, wizdir):
-    _Recording.__init__(self)
+    _Recording.__init__(self, wizdir)
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
+    self.headerpath = os.path.join(self.dirpath, TVHDR)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -102,10 +104,6 @@ class TVWiz(_Recording):
     to_parse = daytext + timetext
     dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
-
-  @property
-  def header_path(self):
-    return os.path.join(self.dirpath, TVHDR)
 
   @staticmethod
   def parse_header_data(data, offset=0):
@@ -140,15 +138,27 @@ class TVWiz(_Recording):
               playtime=last*10+sec, lastOff=lastOff)
 
   def read_header(self):
-    with open(self.header_path, "rb") as hfp:
+    with open(self.headerpath, "rb") as hfp:
       data = hfp.read()
     return self.parse_header_data(data)
 
   @locked_property
   def metadata(self):
-    return self.read_header()
-
-  meta = header
+    H = self.read_header()
+    hd = H._asdict()
+    hdata['pathname'] = self.headerpath
+    data = {
+        'channel': H.channel,
+        'title': H.evtName,
+        'episode': H.episode,
+        'synopsys': H.synopsis,
+        'start_unixtime':  H.start,
+        'tags': set(),
+        'sources': {
+          'header': hdata,
+        }
+      }
+    return TVWizMetaData(**data)
 
   @staticmethod
   def tvwiz_parse_trunc(fp):
@@ -195,22 +205,3 @@ class TVWiz(_Recording):
           size -= len(buf)
       if lastFileNum is not None:
         fp.close()
-
-  def path_parts(self):
-    M = self.metadata
-    return M.evtName, M.episode, M.svcName
-
-  def ffmpeg_metadata(self, format='mp4'):
-    H = self.header
-    return FFmpegMetaData(format,
-                          title=( H.evtName
-                                  if len(H.episode) == 0
-                                  else '%s: %s' % (H.evtName, H.episode)
-                                ),
-                          show=H.evtName,
-                          episode_id=H.episode,
-                          synopsis=H.synopsis,
-                          network=H.svcName,
-                          comment='Transcoded from %r using ffmpeg. Recording date %s.'
-                                  % (self.dirpath, H.start_dt_iso),
-                         )

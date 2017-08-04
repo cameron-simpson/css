@@ -12,8 +12,10 @@ from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import error, warning, debug, X, XP, Pfx
+from cs.logutils import exception, error, warning, debug
+from cs.pfx import Pfx, XP
 from cs.threads import locked
+from cs.x import X
 from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'
@@ -115,6 +117,13 @@ def permbits_to_allow_deny(bits):
     else:
       sub += c
   return add, sub
+
+def rwx(mode):
+  ''' Transcribe 3 bits of a UNIX mode in 'rwx' form.
+  '''
+  return ( 'r' if mode&4 else '-' ) \
+       + ( 'w' if mode&2 else '-' ) \
+       + ( 'x' if mode&1 else '-' )
 
 class AC(object):
   __slots__ = ('prefix', 'allow', 'deny')
@@ -275,7 +284,12 @@ class Meta(dict):
                         )
     else:
       # use the more verbose safe JSON encoding
-      encoded = json.dumps(dict(self))
+      d = dict(self)
+      try:
+        encoded = json.dumps(d, separators=(',', ':'))
+      except Exception as e:
+        exception("json.dumps: %s: d=%r", e, d)
+        raise
     return encoded
 
   def _normalise(self):
@@ -291,7 +305,10 @@ class Meta(dict):
     # update 'x' if necessary
     _xattrs = self._xattrs
     if _xattrs:
-      self['x'] = dict( (name, texthexify(data)) for name, data in _xattrs.items() )
+      x = {}
+      for xk, xv in self._xattrs.items():
+        x[xk.decode('iso8859-1')] = xv.decode('iso8859-1')
+      self['x'] = x
     elif 'x' in self:
       del self['x']
 
@@ -343,8 +360,8 @@ class Meta(dict):
       elif k == 'n':
         v = int(v)
       elif k == 'x':
-        # TODO: should we update the existing xattrs, or replace them all as now?
-        self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
+        for xk, xv in v.items():
+          self.setxattr(xk, xv)
       else:
         self[k] = v
 
@@ -704,6 +721,40 @@ class Meta(dict):
             debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
             os.utime(ospath, (st.st_atime, mst_mtime))
 
+  @staticmethod
+  def _xattrify(xkv):
+    ''' Convert value `xkv` to bytes.
+    '''
+    if isinstance(xkv, bytes):
+      return xkv
+    if isinstance(xkv, str):
+      return xkv.encode('utf-8')
+    raise TypeError("cannot convert to bytes: %r" % (xkv,))
+
+  def getxattr(self, xk, xv_default):
+    return self._xattrs.get(self._xattrify(xk), xv_default)
+
+  def setxattr(self, xk, xv):
+    xk = self._xattrify(xk)
+    xv = self._xattrify(xv)
+    self._xattrs[xk] = xv
+
+  def delxattr(self, xk):
+    xk = self._xattrify(xk)
+    if xk in self._xattrs:
+      del self._xattrs[xk]
+
+  def listxattrs(self):
+    return self._xattrs.keys()
+
   @property
-  def xattrs(self):
-    return self._xattrs
+  def mime_type(self):
+    return self.getxattr('user.mime_type', None)
+
+  @mime_type.setter
+  def mime_type(self, new_type):
+    self.setxattr('user.mime_type', value)
+
+  @mime_type.deleter
+  def mime_type(self):
+    self.delxattr('user.mime_type')

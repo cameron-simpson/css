@@ -7,9 +7,10 @@ if sys.hexversion < 0x02060000:
   bytes = str
 from bisect import bisect_left, bisect_right
 from cs.lex import hexify
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
+from cs.x import X
 from .pushpull import missing_hashcodes
 
 # enums for hash types, used in encode/decode
@@ -258,6 +259,9 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     dict.__init__(self)
     MultiOpenMixin.__init__(self)
     self.hashclass = DEFAULT_HASHCLASS
+
+  def __str__(self):
+    return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
 
   def add(self, data):
     hashcode = Hash_SHA1.from_data(data)
