@@ -764,9 +764,9 @@ class ReadMixin(object):
 
   def read_n(self, n):
     ''' Read `n` bytes of data and return them.
-        Unlike file.read(), RawIOBase.read() may return short data,
-        thus this workalike, which may only return short data if
-        it hits EOF.
+        Unlike traditional file.read(), RawIOBase.read() may return short
+        data, thus this workalike, which may only return short data if it
+        hits EOF.
     '''
     if n < 1:
       raise ValueError("n two low, expected >=1, got %r" % (n,))
