@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 from collections import MutableMapping, defaultdict
+from contextlib import contextmanager
 import errno
 from getopt import GetoptError
 import os
@@ -140,8 +141,16 @@ class Flags(MutableMapping, FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
-  def __init__(self, flagdir=None, environ=None, debug=None):
+  def __init__(self, flagdir=None, environ=None, lock=None, debug=None):
     MutableMapping.__init__(self)
+    @contextmanager
+    def mutex():
+      if lock:
+        lock.acquire()
+      yield
+      if lock:
+        lock.release()
+    self._mutex = mutex
     if debug is None:
       debug = False
     self.debug = debug
@@ -173,7 +182,8 @@ class Flags(MutableMapping, FlaggedMixin):
     ''' Iterator returning the flag names in the directory.
     '''
     try:
-      listing = os.listdir(self.dirpath)
+      with self._mutex():
+        listing = list(os.listdir(self.dirpath))
     except OSError as e:
       if e.errno == errno.ENOENT:
         return
@@ -213,30 +223,33 @@ class Flags(MutableMapping, FlaggedMixin):
     '''
     if truthy:
       value = True
-      if not self[k]:
-        flagpath = self._flagpath(k)
-        with open(flagpath, 'w') as fp:
-          fp.write("1\n")
+      with self._mutex():
+        if not self[k]:
+          flagpath = self._flagpath(k)
+          with open(flagpath, 'w') as fp:
+            fp.write("1\n")
     else:
       value = False
-      if self[k]:
-        flagpath = self._flagpath(k)
-        try:
-          os.remove(flagpath)
-        except OSError as e:
-          if e.errno != errno.ENOENT:
-            raise
+      with self._mutex():
+        if self[k]:
+          flagpath = self._flagpath(k)
+          try:
+            os.remove(flagpath)
+          except OSError as e:
+            if e.errno != errno.ENOENT:
+              raise
     self._track(k, value)
 
   def __delitem__(self, k):
     self[k] = False
 
   def _track(self, k, value):
-    old_value = self._old_flags.get(k, False)
-    if value != old_value:
-      self._old_flags[k] = value
-      if self.debug:
-        print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
+    with self._mutex():
+      old_value = self._old_flags.get(k, False)
+      if value != old_value:
+        self._old_flags[k] = value
+    if value != old_value and self.debug:
+      print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
 
 class PolledFlags(dict):
   ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.

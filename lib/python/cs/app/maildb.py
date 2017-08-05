@@ -337,10 +337,10 @@ def edit_groupness(MDB, addresses, subgroups):
   '''
   with Pfx("edit_groupness()"):
     Gs = sorted( set(subgroups),
-                 ( lambda G1, G2: cmp(G1.name, G2.name) )
+                 key=lambda G: G.name
                )
     As = sorted( set(addresses),
-                 ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
+                 key=lambda A: A.realname.lower()
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
