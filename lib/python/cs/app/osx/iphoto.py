@@ -422,10 +422,12 @@ def cmd_autotag(I, argv):
   warned_faces = set()
   warned_kws = set()
   for event in sorted(events):
-    with Pfx(event.name):
+    with Pfx("event %r", event.name):
       kws = set()
       for part in event.name.split('--'):
         part = part.strip('-')
+        if not part:
+          continue
         with Pfx(part):
           # look for series/episode/scene/part markers
           m = None
@@ -498,6 +500,8 @@ def cmd_autotag(I, argv):
               if face is None:
                 if False and '-' in part:
                   for subpart in part.split('-'):
+                    if subpart in warned_kws:
+                      continue
                     with Pfx(subpart):
                       kw = I.get_keyword(subpart)
                       if kw:
@@ -783,7 +787,8 @@ class iPhoto(O):
       if len(pfxkws) == 1:
         return pfxkws[0]
       # multiple inexact matches
-      raise ValueError("matches multiple keywords, rejected: %r" % (kws,))
+      raise ValueError("matches multiple keywords, rejected: %r"
+                       % ([kw.name for kw in kws],))
 
   def get_keyword(self, kwname, default=None):
     try:
