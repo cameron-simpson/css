@@ -885,36 +885,56 @@ class BackedFile(ReadMixin):
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
 
-  @locked
-  def readinto(self, b):
-    ''' Read data into a bytearray.
+  def file_data(self, n, rsize=None):
+    ''' Return "natural" file data.
+        This is used to support readinto efficiently.
     '''
+    X("file_data: n=%d", n)
+    if n < 1:
+      return
     start = self._offset
-    end = start + len(b)
+    end = start + n
     back_file = self.back_file
     front_file = self.front_file
-    boff = 0
-    bspace = len(b)
-    for in_front, span in self.front_range.slices(start, end):
-      offset = span.start
+    X("front_range=%s", self.front_range)
+    SLICES = list(self.front_range.slices(start, end))
+    X("front_range slices=%r", SLICES)
+    for in_front, span in SLICES:
+      X("offset=%d, in_front=%s, span=%s", self._offset, in_front, span)
+      assert span.start == self._offset
+      assert span.end <= end
       size = span.size
-      if size > bspace:
-        size = bspace
-      data = bytearray(size)
-      if in_front:
-        front_file.seek(offset)
-        nread = front_file.readinto(data)
+      src_file = front_file if in_front else back_file
+      X("seek %d", self._offset)
+      src_file.seek(self._offset)
+      try:
+        rn = src_file.read_natural
+      except AttributeError:
+        while size > 0:
+          X("read %d ...", size)
+          bs = src_file.read(size)
+          bs_len = len(bs)
+          assert bs_len <= size
+          if bs:
+            X("bs = %r...", bs[:16])
+            self._offset += bs_len
+            yield bs
+          else:
+            X("EMPTY READ, leave loop")
+            break
+          size -= bs_len
+          X("offset => %d", self._offset)
+          assert self._offset <= end
       else:
-        back_file.seek(offset)
-        nread = back_file.readinto(data)
-      assert nread <= size
-      b[boff:boff+nread] = data[:nread]
-      boff += nread
-      self._offset = offset + nread
-      if nread < size:
-        # short read
+        for bs in rn(size, rsize=rsize):
+          self._offset += bs_len
+          yield bs
+          assert self._offset <= end
+      if self._offset < span.end:
+        # short data, infer EOF, exit loop
         break
-    return boff
+      raise RuntimeError("BANG")
+    X("EXIT file_data")
 
   @locked
   def write(self, b):
