@@ -829,7 +829,17 @@ class BackedFile(ReadMixin):
     self.read_only = False
 
   def __len__(self):
-    return max(self.front_range.end, len(self.back_file))
+    back_file = self.back_file
+    try:
+      back_len = len(back_file)
+    except TypeError:
+      back_pos = back_file.tell()
+      X("BackedFile.__len__: tell=%d", back_pos)
+      back_len = back_file.seek(0, 2)
+      X("BackedFile.__len__: seek(0,2)=%d", back_len)
+      back_file.seek(back_pos, 0)
+      X("BackedFile.__len__: after seek(%d,0), tell=%d", back_pos, back_file.tell())
+    return max(self.front_range.end, back_len)
 
   @locked
   def switch_back_file(self, new_back_file):
