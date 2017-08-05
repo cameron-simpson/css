@@ -980,7 +980,7 @@ class BackedFile_TestMethods(object):
     bfp.seek(512)
     bfp.write(random_chunk)
     # check that the front file has a single span of the right dimensions
-    ffp = bfp._front_file
+    ffp = bfp.front_file
     fr = bfp.front_range
     self.assertIsNotNone(ffp)
     self.assertIsNotNone(fr)
