@@ -36,6 +36,7 @@ from cs.filestate import FileState
 from cs.lex import as_lines
 from cs.logutils import exception, error, warning, debug, Pfx, X
 from cs.range import Range
+from cs.timeutils import TimeoutError
 from cs.threads import locked
 from cs.py3 import ustr, bytes
 
