@@ -162,7 +162,7 @@ def rewrite(filepath, data,
     if do_rename:
       # rename new file into old path
       # tries to preserve perms, but does nothing for other metadata
-      copymode(filepath, T.name)
+      shutil.copymode(filepath, T.name)
       if backup_ext:
         os.link(filepath, filepath + backup_ext)
       os.rename(T.name, filepath)
