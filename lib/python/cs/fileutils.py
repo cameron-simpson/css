@@ -773,7 +773,45 @@ class ReadMixin(object):
       raise ValueError("n two low, expected >=1, got %r" % (n,))
     data = bytearray(n)
     nread = self.readinto(data)
-    return data[:nread]
+    return memoryview(data)[:nread] if nread != n else data
+
+  def read_natural(self, n, rsize=None):
+    ''' A generator that yields data from the file in its natural blocking if possible.
+        `n`: the maximum number of bytes to read.
+        `rsize`: read size hint if relevant.
+        WARNING: this function may move the current file offset.
+        This function should be overridden by classes with natural
+        direct and efficient data streams. Example override cases
+        include a BackedFile which has natural blocks from the front
+        and back files and a CornuCopyBuffer which has natural
+        blocks from its source iterator.
+    '''
+    return file_data(self, n, rsize=None)
+
+  def read(self, n):
+    ''' Do a single potentially short read.
+    '''
+    for bs in self.file_data(n):
+      return bs
+
+  @locked
+  def readinto(self, barray):
+    ''' Read data into a bytearray.
+        Uses read_natural to obtain data in as efficient a fashion as possible.
+    '''
+    X("readinto(barray=%s:len=%d)", id(barray), len(barray))
+    needed = len(barray)
+    boff = 0
+    for bs in self.read_natural(needed):
+      bs_len = len(bs)
+      X("readinfo: got %d bytes from read_natural(needed=%d)", bs_len, needed)
+      assert bs_len <= needed
+      boff2 = boff + bs_len
+      barray[boff:boff2] = bs
+      boff = boff2
+      needed -= bs_len
+    X("readinto: final boff=%d", boff)
+    return boff
 
 class BackedFile(ReadMixin):
   ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
