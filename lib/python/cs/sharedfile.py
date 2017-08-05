@@ -16,7 +16,8 @@ from threading import RLock
 import time
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import Pfx, warning
+from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.range import Range
 from cs.timeutils import TimeoutError
 

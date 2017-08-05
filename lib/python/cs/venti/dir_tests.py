@@ -7,9 +7,10 @@
 from random import shuffle
 import sys
 import unittest
-from cs.logutils import D, X
-from cs.randutils import randbool, randblock
+from cs.logutils import D
 from cs.py3 import bytes
+from cs.randutils import randbool, randblock
+from cs.x import X
 from . import totext
 from .store import MappingStore
 from .dir import FileDirent, Dir, decode_Dirent, decode_Dirent_text, decode_Dirents

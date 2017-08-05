@@ -13,7 +13,6 @@ from threading import Lock
 import time
 import unittest
 from .cache import LRU_Cache
-from .logutils import D, X
 
 def check(o):
   return o._selfcheck()

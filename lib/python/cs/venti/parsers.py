@@ -9,7 +9,8 @@ from functools import partial
 from os.path import basename, splitext
 import sys
 from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import X, Pfx, PfxThread, exception
+from cs.logutils import X, PfxThread, exception
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from .datafile import scan_chunks
 

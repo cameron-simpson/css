@@ -21,7 +21,8 @@ from .objc import convertObjCtype
 import time
 from threading import Lock
 from AddressBook import ABAddressBook
-from cs.logutils import setup_logging, Pfx, warning, info, D, debug
+from cs.logutils import setup_logging, warning, info, D, debug
+from cs.pfx import Pfx
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
 

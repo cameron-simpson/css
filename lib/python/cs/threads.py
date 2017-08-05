@@ -27,14 +27,15 @@ import threading
 from threading import Semaphore, Condition, current_thread
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.seq import seq
 from cs.excutils import transmute
 from cs.debug import Lock, RLock, Thread
-from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D, X
+from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname, prop
 from cs.py3 import raise3, Queue, PriorityQueue
+from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
+from cs.seq import seq
+from cs.x import X
 
 def bg(func, daemon=None, name=None):
   ''' Dispatch the callable `func` in its own Thread; return the Thread.

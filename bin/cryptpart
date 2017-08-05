@@ -135,7 +135,7 @@ case "$op" in
       echo "$cmd: $op: keyfile already exists: $keyfile0" >&2
       exit 1
     }
-    $trace dd if=/dev/random "of=$keyfile0" bs=64 count=1 || :
+    $trace dd if=/dev/random "of=$keyfile0" bs=1 count=64 || :
     { set -ue
       $trace cryptsetup luksFormat --key-file "$keyfile0" "$partition" </dev/null
       "$0" "$partition" dump

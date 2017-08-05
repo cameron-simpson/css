@@ -8,11 +8,17 @@ from io import RawIOBase
 from os import SEEK_SET
 import sys
 from threading import Lock, RLock
+from cs.fileutils import BackedFile
+from cs.logutils import PfxThread, info
+from cs.pfx import Pfx, XP
+from cs.queues import IterableQueue
 from cs.threads import locked
-from cs.logutils import Pfx, PfxThread, info, X, XP
+from cs.logutils import info
 from cs.fileutils import BackedFile, ReadMixin
+from cs.pfx import Pfx, PfxThread, XP
 from cs.queues import IterableQueue
 from cs.threads import LockableMixin
+from cs.x import X
 from . import defaults
 from .meta import Meta
 from .block import Block

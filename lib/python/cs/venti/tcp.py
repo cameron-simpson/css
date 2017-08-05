@@ -11,9 +11,10 @@ from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from threading import Lock, Thread
 from .stream import StreamStore
 from cs.excutils import logexc
-from cs.socketutils import OpenSocket
-from cs.logutils import debug, X, Pfx
+from cs.logutils import debug
+from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
+from cs.socketutils import OpenSocket
 
 class _Server(ThreadingMixIn, TCPServer):
 

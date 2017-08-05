@@ -66,7 +66,7 @@ def prop(func):
           eval('raise e2 from e', globals(), locals())
         except:
           # FIXME: why does this raise a SyntaxError?
-          raise e
+          raise e2
       else:
         raise e2
   return property(wrapper)

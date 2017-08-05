@@ -11,7 +11,8 @@ import sys
 from collections import namedtuple
 from getopt import getopt, GetoptError
 from cs.alg import collate
-from cs.logutils import setup_logging, Pfx, warning, error
+from cs.logutils import setup_logging, warning, error
+from cs.pfx import Pfx
 from cs.psutils import stop
 
 ETC_MYCNF = '/etc/my.cnf'

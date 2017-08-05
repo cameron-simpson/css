@@ -4,24 +4,27 @@
 # functions to prep and release packages to PyPI.
 #   - Cameron Simpson <cs@zip.com.au> 01jan2015
 #
+
 from __future__ import print_function
-import sys
-import os
-import os.path
 from functools import partial
 from getopt import getopt, GetoptError
+import os
+import os.path
 from subprocess import Popen, PIPE
 import shutil
+import sys
 from tempfile import mkdtemp
 from threading import RLock
-from cs.logutils import setup_logging, Pfx, info, warning, error, X
+from cs.logutils import setup_logging, info, warning, error
+from cs.obj import O
+from cs.pfx import Pfx
+from cs.py.modules import import_module_name
 import cs.sh
 from cs.threads import locked_property
-from cs.py.modules import import_module_name
-from cs.obj import O
+from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
+URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -245,7 +248,7 @@ class PyPI_Package(O):
                       ('version', self.pypi_version),
                       ):
       if value is None:
-        warning("_prep: no value for %r", name)
+        warning("_prep: no value for %r", kw)
       else:
         with Pfx(kw):
           if kw in dinfo:

@@ -13,7 +13,8 @@ from os.path import basename, splitext
 from subprocess import Popen, PIPE
 import sys
 from cs.cmdutils import run
-from cs.logutils import setup_logging, warning, Pfx
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx
 
 USAGE = r'''Usage:
   %s [ls [VBoxManage list options...]]

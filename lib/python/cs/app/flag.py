@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 from collections import MutableMapping, defaultdict
+from contextlib import contextmanager
 import errno
 from getopt import GetoptError
 import os
@@ -23,6 +24,8 @@ USAGE = '''Usage:
                 Set value of named flag.'''
 
 def main(argv):
+  ''' Main program: inspect or modify flags.
+  '''
   argv = list(argv)
   cmd = argv.pop(0)
   usage = USAGE % (cmd, cmd, cmd)
@@ -41,7 +44,7 @@ def main(argv):
         xit = 0 if F[k] else 1
       else:
         value = argv.pop(0)
-        if len(argv) == 0:
+        if not argv:
           if value == '0':
             value = False
           elif value == '1':
@@ -54,8 +57,8 @@ def main(argv):
               value = True
             else:
               raise GetoptError(
-                      "invalid key value, expected 0, 1, true or false, got: %s"
-                      % (value,))
+                  "invalid key value, expected 0, 1, true or false, got: %s"
+                  % (value,))
           F[k] = value
         else:
           raise GetoptError("unexpected values after key value: %s"
@@ -82,12 +85,15 @@ class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
   '''
 
-  def __init__(self, flags=None):
+  def __init__(self, flags=None, debug=None):
     ''' Initialise the mixin.
         `flags`: optional parameter; if None defaults to a new default Flags().
     '''
     if flags is None:
-      flags = Flags()
+      flags = Flags(debug=debug)
+    else:
+      if debug is not None:
+        flags.debug = debug
     self.flags = flags
 
   def __flagname(self, suffix):
@@ -117,7 +123,7 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       if flagname:
         return self.flags[flagname]
-    raise AttributeError("FlaggedMixin: no %r" % ('.'+attr,))
+    raise AttributeError("FlaggedMixin: no %r" % ('.' + attr, ))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.
@@ -131,15 +137,29 @@ class FlaggedMixin(object):
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)
 
-class Flags(MutableMapping,FlaggedMixin):
+class Flags(MutableMapping, FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
 
-  def __init__(self, flagdir=None, environ=None):
+  def __init__(self, flagdir=None, environ=None, lock=None, debug=None):
+    MutableMapping.__init__(self)
+    @contextmanager
+    def mutex():
+      if lock:
+        lock.acquire()
+      yield
+      if lock:
+        lock.release()
+    self._mutex = mutex
+    if debug is None:
+      debug = False
+    self.debug = debug
     FlaggedMixin.__init__(self, flags=self)
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
     self.dirpath = flagdir
+    self.debug = debug
+    self._old_flags = {}
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -151,24 +171,25 @@ class Flags(MutableMapping,FlaggedMixin):
     ''' Compute the pathname of the flag backing file.
         Raise KeyError on invalid flag names.
     '''
-    if len(k) == 0:
+    if not k:
       raise KeyError(k)
     name, offset = get_uc_identifier(k)
     if offset != len(k):
       raise KeyError(k)
-    return os.path.join(self.dirpath, k)
+    return os.path.join(self.dirpath, name)
 
   def __iter__(self):
     ''' Iterator returning the flag names in the directory.
     '''
     try:
-      listing = os.listdir(self.dirpath)
+      with self._mutex():
+        listing = list(os.listdir(self.dirpath))
     except OSError as e:
       if e.errno == errno.ENOENT:
         return
       raise
     for k in listing:
-      if len(k) > 0:
+      if k:
         name, offset = get_uc_identifier(k)
         if offset == len(k):
           yield name
@@ -177,7 +198,7 @@ class Flags(MutableMapping,FlaggedMixin):
     ''' Return the number of flag files.
     '''
     n = 0
-    for k in self:
+    for _ in self:
       n += 1
     return n
 
@@ -189,8 +210,11 @@ class Flags(MutableMapping,FlaggedMixin):
     try:
       S = os.stat(flagpath)
     except OSError:
-      return False
-    return S.st_size > 0
+      value = False
+    else:
+      value = S.st_size > 0
+    self._track(k, value)
+    return value
 
   def __setitem__(self, k, truthy):
     ''' Set the flag value.
@@ -198,21 +222,34 @@ class Flags(MutableMapping,FlaggedMixin):
         If false, remove the flag file.
     '''
     if truthy:
-      if not self[k]:
-        flagpath = self._flagpath(k)
-        with open(flagpath, 'w') as fp:
-          fp.write("1\n")
+      value = True
+      with self._mutex():
+        if not self[k]:
+          flagpath = self._flagpath(k)
+          with open(flagpath, 'w') as fp:
+            fp.write("1\n")
     else:
-      if self[k]:
-        flagpath = self._flagpath(k)
-        try:
-          os.remove(flagpath)
-        except OSError as e:
-          if e.errno != errno.ENOENT:
-            raise
-  
+      value = False
+      with self._mutex():
+        if self[k]:
+          flagpath = self._flagpath(k)
+          try:
+            os.remove(flagpath)
+          except OSError as e:
+            if e.errno != errno.ENOENT:
+              raise
+    self._track(k, value)
+
   def __delitem__(self, k):
     self[k] = False
+
+  def _track(self, k, value):
+    with self._mutex():
+      old_value = self._old_flags.get(k, False)
+      if value != old_value:
+        self._old_flags[k] = value
+    if value != old_value and self.debug:
+      print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
 
 class PolledFlags(dict):
   ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
@@ -228,7 +265,7 @@ class PolledFlags(dict):
     if poll_interval is None:
       poll_interval = PolledFlags.DEFAULT_POLL_INTERVAL
     self._flags = Flags(flagdir)
-    self._poll_flags(silent=True)
+    self._poll_flags()
     T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
     T.daemon = True
     T.start()
@@ -240,7 +277,7 @@ class PolledFlags(dict):
       sleep(delay)
       self._poll_flags()
 
-  def _poll_flags(self, silent=False):
+  def _poll_flags(self):
     ''' Poll the filesystem flags and update the .flags attribute.
     '''
     new_flags = dict(self._flags)

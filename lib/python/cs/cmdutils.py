@@ -9,7 +9,7 @@ import os
 import sys
 import io
 import subprocess
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 
 def run(argv, trace=False):
   ''' Run a command. Optionally trace invocation. Return result of subprocess.call.

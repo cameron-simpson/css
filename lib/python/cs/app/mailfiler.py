@@ -43,6 +43,7 @@ import subprocess
 from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
+from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
@@ -52,7 +53,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, \
 import cs.lex
 from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
                    get_qstr, match_tokens, get_delimited
-from cs.logutils import Pfx, setup_logging, with_log, \
+from cs.logutils import setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
@@ -60,7 +61,7 @@ from cs.mailutils import Maildir, message_addresses, modify_header, \
 from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
-from cs.app.maildb import MailDB
+from cs.pfx import Pfx
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
@@ -982,151 +983,160 @@ def parserules(fp):
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d", file_label, lineno):
-      if filename:
-        if not line.endswith('\n'):
+    P = Pfx("%s:%d", file_label, lineno)
+    if filename:
+      if not line.endswith('\n'):
+        with P:
           raise ValueError("short line at EOF")
 
-      # skip comments
-      if line.startswith('#'):
-        continue
+    # skip comments
+    if line.startswith('#'):
+      continue
 
-      # remove newline and trailing whitespace
-      line = line.rstrip()
+    # remove newline and trailing whitespace
+    line = line.rstrip()
 
-      # skip blank lines
-      if not line:
-        continue
+    # skip blank lines
+    if not line:
+      continue
 
-      # check for leading whitespace (continuation line)
-      _, offset = get_white(line, 0)
-      if not _:
-        # text at start of line ==> new rule
-        # yield old rule if in progress
-        if R:
-          yield R
-          R = None
-        # < includes only match at the start of a line
-        if line[offset] == '<':
-          # include another categories file
-          _, offset = get_white(line, offset+1)
-          subfilename, offset = get_nonwhite(line, offset=offset)
-          if not subfilename:
-            raise ValueError("missing filename")
-          subfilename = envsub(subfilename)
-          if filename:
-            subfilename = abspath_from_file(subfilename, filename)
-          else:
-            subfilename = os.path.abspath(subfilename)
-          for R in parserules(subfilename):
-            yield R
-          continue
-        # new rule: gather targets and label
-        R = Rule(filename=(filename if filename else file_label), lineno=lineno)
-
-        # leading optional '+' (continue) or '=' (final)
-        if line[offset] == '+':
-          R.flags.halt = False
-          offset += 1
-        elif line[offset] == '=':
-          R.flags.halt = True
-          offset += 1
-
-        # leading '!' alert: multiple '!' raise the alert level
-        while line[offset] == '!':
-          R.flags.alert += 1
-          offset += 1
-
-        # targets
-        Ts, offset = get_targets(line, offset)
-        R.targets.extend(Ts)
-        _, offset = get_white(line, offset)
-        if offset >= len(line):
-          # no label; end line parse
-          continue
-
-        # label
-        label, offset = get_nonwhite(line, offset)
-        if label == '.':
-          label = ''
-        R.label = label
-        _, offset = get_white(line, offset)
-        if offset >= len(line):
-          # no condition; end line parse
-          continue
-
-      # parse condition and add to current rule
-      condition_flags = O(invert=False)
-
-      if line[offset:] == '.':
-        # placeholder for no condition
-        continue
-
-      if line[offset] == '!':
-        condition_flags.invert = True
+    # check for leading whitespace (continuation line)
+    _, offset = get_white(line, 0)
+    if not _:
+      # text at start of line ==> new rule
+      # yield old rule if in progress
+      if R:
+        yield R
+        R = None
+      # < includes only match at the start of a line
+      if line[offset] == '<':
+        # include another categories file
         _, offset = get_white(line, offset+1)
-        if offset == len(line):
-          warning('no condition after "!"')
-          continue
+        subfilename, offset = get_nonwhite(line, offset=offset)
+        if not subfilename:
+          with P:
+            raise ValueError("missing filename")
+        subfilename = envsub(subfilename)
+        if filename:
+          subfilename = abspath_from_file(subfilename, filename)
+        else:
+          subfilename = os.path.abspath(subfilename)
+        for R in parserules(subfilename):
+          yield R
+        continue
+      # new rule: gather targets and label
+      R = Rule(filename=(filename if filename else file_label), lineno=lineno)
 
-      # leading hdr1,hdr2.func(
-      m = re_HEADERFUNCTION.match(line, offset)
+      # leading optional '+' (continue) or '=' (final)
+      if line[offset] == '+':
+        R.flags.halt = False
+        offset += 1
+      elif line[offset] == '=':
+        R.flags.halt = True
+        offset += 1
+
+      # leading '!' alert: multiple '!' raise the alert level
+      while line[offset] == '!':
+        R.flags.alert += 1
+        offset += 1
+
+      # targets
+      Ts, offset = get_targets(line, offset)
+      R.targets.extend(Ts)
+      _, offset = get_white(line, offset)
+      if offset >= len(line):
+        # no label; end line parse
+        continue
+
+      # label
+      label, offset = get_nonwhite(line, offset)
+      if label == '.':
+        label = ''
+      R.label = label
+      _, offset = get_white(line, offset)
+      if offset >= len(line):
+        # no condition; end line parse
+        continue
+
+    # parse condition and add to current rule
+    condition_flags = O(invert=False)
+
+    if line[offset:] == '.':
+      # placeholder for no condition
+      continue
+
+    if line[offset] == '!':
+      condition_flags.invert = True
+      _, offset = get_white(line, offset+1)
+      if offset == len(line):
+        warning('no condition after "!"')
+        continue
+
+    # leading hdr1,hdr2.func(
+    m = re_HEADERFUNCTION.match(line, offset)
+    if m:
+      header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
+      testfuncname = m.group(3)
+      offset = m.end()
+      _, offset = get_white(line, offset)
+      if offset == len(line):
+        with P:
+          raise ValueError("missing argument to header function")
+      if line[offset] == '"':
+        test_string, offset = get_qstr(line, offset)
+        _, offset = get_white(line, offset)
+        if offset == len(line) or line[offset] != ')':
+          with P:
+            raise ValueError("missing closing parenthesis after header function argument")
+        offset += 1
+        _, offset = get_white(line, offset)
+        if offset < len(line):
+          with P:
+            raise ValueError("extra text after header function: %r" % (line[offset:],))
+      else:
+        with P:
+          raise ValueError("unexpected argument to header function, expected double quoted string")
+      C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
+    else:
+      # leading hdr1,hdr2,...:
+      m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
       if m:
         header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
-        testfuncname = m.group(3)
         offset = m.end()
-        _, offset = get_white(line, offset)
         if offset == len(line):
-          raise ValueError("missing argument to header function")
-        if line[offset] == '"':
-          test_string, offset = get_qstr(line, offset)
-          _, offset = get_white(line, offset)
-          if offset == len(line) or line[offset] != ')':
-            raise ValueError("missing closing parenthesis after header function argument")
-          offset += 1
-          _, offset = get_white(line, offset)
-          if offset < len(line):
-            raise ValueError("extra text after header function: %r" % (line[offset:],))
-        else:
-          raise ValueError("unexpected argument to header function, expected double quoted string")
-        C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
-      else:
-        # leading hdr1,hdr2,...:
-        m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
-        if m:
-          header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
-          offset = m.end()
-          if offset == len(line):
+          with P:
             raise ValueError("missing match after header names")
+      else:
+        header_names = ('to', 'cc', 'bcc')
+      # headers:/regexp
+      if line[offset] == '/':
+        regexp = line[offset+1:]
+        if regexp.startswith('^'):
+          atstart = True
+          regexp = regexp[1:]
         else:
-          header_names = ('to', 'cc', 'bcc')
-        # headers:/regexp
-        if line[offset] == '/':
-          regexp = line[offset+1:]
-          if regexp.startswith('^'):
-            atstart = True
-            regexp = regexp[1:]
-          else:
-            atstart = False
-          C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
-        else:
-          # headers:(group[|group...])
-          m = re_INGROUPorDOMorADDR.match(line, offset)
-          if m:
-            group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
-            offset = m.end()
-            if offset < len(line):
+          atstart = False
+        C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
+      else:
+        # headers:(group[|group...])
+        m = re_INGROUPorDOMorADDR.match(line, offset)
+        if m:
+          group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
+          offset = m.end()
+          if offset < len(line):
+            with P:
               raise ValueError("extra text after groups: %s" % (line,))
-            C = Condition_InGroups(condition_flags, header_names, group_names)
-          else:
-            if line[offset] == '(':
+          C = Condition_InGroups(condition_flags, header_names, group_names)
+        else:
+          if line[offset] == '(':
+            with P:
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
-            # just a comma separated list of addresses
-            # TODO: should be RFC2822 list instead?
-            addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
-            C = Condition_AddressMatch(condition_flags, header_names, addrkeys)
+          # just a comma separated list of addresses
+          # TODO: should be RFC2822 list instead?
+          addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
+          C = Condition_AddressMatch(condition_flags, header_names, addrkeys)
 
-      R.conditions.append(C)
+    R.conditions.append(C)
 
   if R is not None:
     yield R

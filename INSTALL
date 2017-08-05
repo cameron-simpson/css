@@ -14,9 +14,7 @@ The revision control repository is published here:
 
 Some of the Python modules are available from PyPI here:
 
-  https://pypi.python.org/pypi?%3Aaction=search&term=cameron+simpson&submit=search
-
-(Because PyPI lacks "author" pages, that is a crude search for my name, which happens to get only my packages at present; they all have names starting "cs." should you need to disambiguate things.)
+  https://pypi.org/user/cameron.simpson/
 
 An autoindex of the scripts is in the file 1INDEX.txt.
 

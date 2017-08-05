@@ -37,6 +37,7 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from cs.app.flag import PolledFlags
 from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
@@ -45,18 +46,20 @@ from cs.later import Later, RetryError, \
                     FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
+from cs.logutils import setup_logging, logTo, info, debug, error, warning, exception, trace, D
 from cs.mappings import MappingChain, SeenSet
+import cs.obj
+from cs.obj import O
+import cs.pfx
+from cs.pfx import Pfx
+from cs.py.func import funcname, funccite, yields_type, returns_type
+from cs.py.modules import import_module_name
+from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
-from cs.app.flag import PolledFlags
-import cs.obj
-from cs.obj import O
-from cs.py.func import funcname, funccite, yields_type, returns_type
-from cs.py.modules import import_module_name
-from cs.py3 import input, ConfigParser, sorted, ustr, unicode
+from cs.x import X
 
 # parallelism of jobs
 DEFAULT_JOBS = 4
@@ -290,7 +293,7 @@ def urls(url, stdin=None, cmd=None):
   if stdin is None:
     stdin = sys.stdin
   if cmd is None:
-    cmd = cs.logutils.cmd
+    cmd = cs.pfx.cmd
   if url != '-':
     # literal URL supplied, deliver to pipeline
     yield url
@@ -699,8 +702,11 @@ class Pilfer(O):
         if saveas.endswith('/'):
           saveas += 'index.html'
       if saveas == '-':
-        sys.stdout.write(U.content)
-        sys.stdout.flush()
+        outfd = os.dup(sys.stdout.fileno())
+        content = U.content
+        with self._lock:
+          with os.fdopen(outfd, 'wb') as outfp:
+            outfp.write(content)
       else:
         with Pfx(saveas):
           if not overwrite and os.path.exists(saveas):

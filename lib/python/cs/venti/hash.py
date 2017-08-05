@@ -7,9 +7,10 @@ if sys.hexversion < 0x02060000:
   bytes = str
 from bisect import bisect_left, bisect_right
 from cs.lex import hexify
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
+from cs.x import X
 from .pushpull import missing_hashcodes
 
 # enums for hash types, used in encode/decode
