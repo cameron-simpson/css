@@ -702,7 +702,25 @@ class iPhoto(O):
       if lc_person_name == name.lower():
         matches.add(name)
     if not matches:
-      # try by word
+      # try "who aka who-else" and "formerly" and "was"
+      for split_word in 'aka', 'formerly', 'was':
+        split_word = ' ' + split_word + ' '
+        for name in all_names:
+          aliases = name.lower().split(split_word)
+          if lc_person_name in aliases:
+            matches.add(name)
+    if not matches:
+      # try "who (where)"
+      for name in all_names:
+        if name.endswith(')'):
+          try:
+            left, etc = name.split(' (', 1)
+          except ValueError:
+            continue
+          if left.lower().strip() == lc_person_name:
+            matches.add(name)
+    if not matches:
+      # try by word: all words but in any order
       lc_person_words = lc_person_name.split()
       for name in all_names:
         lc_words = name.lower().split()
