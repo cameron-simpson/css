@@ -7,7 +7,36 @@
 import time
 from cs.x import X
 
-def cached(*da, **dkw):
+def decorator(deco, *da, **dkw):
+  ''' Wrapper for decorator functions to support optional keyword arguments.
+      Examples:
+        @decorator
+        def dec(func, **dkw):
+          ...
+        @dec
+        def func1(...):
+          ...
+        @dec(foo='bah')
+        def func2(...):
+          ...
+  '''
+  X("@decorator: deco=%s, da=%r, dkw=%r)", deco, da, dkw)
+  def overdeco(*da, **dkw):
+    X("@decorator:overdeco: da=%r, dkw=%r)", da, dkw)
+    if not da:
+      def wrapper(*a, **dkw):
+        X("@decorator:wrapper:a=%r,kw=%r", a, dkw)
+        func, = a
+        return deco(func, **dkw)
+      return wrapper
+    if len(da) > 1:
+      raise ValueError("extra positional arguments after function: %r" % (da[1:],))
+    func = da[0]
+    return deco(func, **dkw)
+  return overdeco
+
+@decorator
+def cached(func, **dkw):
   ''' Decorator to cache the result of a method and keep a revision counter for changes.
       The revision supports the @revised decorator.
 
@@ -45,15 +74,6 @@ def cached(*da, **dkw):
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
-  if not da:
-    def wrapper(func):
-      return cached(func, **dkw)
-    return wrapper
-
-  func = da[0]
-  if len(da) > 1:
-    raise ValueError("extra positional arguments after function: %r" % (da[1:],))
-
   attr_name = dkw.pop('attr_name', None)
   poll_delay = dkw.pop('poll_delay', None)
   sig_func = dkw.pop('sig_func', None)
