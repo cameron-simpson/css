@@ -31,7 +31,7 @@ import stat
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
-from cs.deco import cached
+from cs.deco import cached, decorator
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -279,6 +279,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
+@decorator
 def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
   ''' A decorator which caches a value obtained from a file.
       In addition to all the keyword arguments for @cs.deco.cached,
@@ -316,10 +317,11 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
   dkw['sig_func'] = sig_func
   return cached(wrap0, **dkw)
 
-def file_property(func, **kw):
+@decorator
+def file_property(func, **dkw):
   ''' A property whose value reloads if a file changes.
   '''
-  return property(file_based(func, **kw))
+  return property(file_based(func, **dkw))
 
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.
