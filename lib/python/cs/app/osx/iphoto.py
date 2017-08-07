@@ -20,7 +20,7 @@ from threading import RLock
 from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import PListDict, ingest_plist
+from .plist import ingest_plist
 from cs.dbutils import TableSpace, Table, Row, IdRelation
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -31,7 +31,6 @@ from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked, locked_property
-from cs.xml import pprint as xml_pprint
 from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -87,7 +86,6 @@ def main(argv=None):
   usage = USAGE % (cmd,)
   setup_logging(cmd)
   with Pfx(cmd):
-    badopts = False
     if argv and argv[0].startswith('/'):
       library_path = argv.pop(0)
     else:
@@ -102,7 +100,6 @@ def main(argv=None):
 
 def main_iphoto(I, argv):
   xit = 0
-  badopts = False
   if not argv:
     raise GetoptError("missing op")
   op = argv.pop(0)
@@ -659,7 +656,7 @@ class iPhoto(O):
 
   @locked_property
   def vfaces_by_master_id(self):
-    return I._vfaces_by_master_id.get(self.modelId, ())
+    return self.iphoto._vfaces_by_master_id.get(self.modelId, ())
 
   def folder(self, folder_id):
     return self.folders_table[folder_id]
