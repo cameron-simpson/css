@@ -424,7 +424,7 @@ class SvcD(FlaggedMixin, object):
     self.flag_disable = True
 
   def enable(self):
-    self.flag_disabled = False
+    self.flag_disable = False
 
   def probe(self):
     if self.subp is None:
