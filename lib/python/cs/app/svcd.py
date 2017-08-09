@@ -18,7 +18,7 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info
+from cs.logutils import setup_logging, warning, info, debug
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.x import X
@@ -362,52 +362,53 @@ class SvcD(FlaggedMixin, object):
     return self.reap()
 
   def start(self):
-    def monitor():
-      old_sig = ''
-      next_test_time = now()
-      next_start_time = now()
-      while True:
-        # check for termination state
-        if self.flag_stop:
-          self.flag_stop = False
-          break
-        # check for process exit
-        if self.subp is not None and not self.probe():
-          self.reap()
-          if self.once:
+    with Pfx("SvcD.start(%s)", self):
+      def monitor():
+        old_sig = ''
+        next_test_time = now()
+        next_start_time = now()
+        while True:
+          # check for termination state
+          if self.flag_stop:
+            self.flag_stop = False
             break
-          next_start_time = now() + self.restart_delay
-        if self.subp is None:
-          # not running - see if it should start
-          if now() >= max(next_test_time, next_start_time):
-            if self.test():
-              # test passes, start service
-              self.spawn()
-            next_test_time = now() + self.test_rate
-        else:
-          # running - see if it should stop
-          stop = False
-          if self.flag_restart:
-            self.flag_restart = False
-            stop = True
-          elif now() >= next_test_time:
-            if not self.test():
+          # check for process exit
+          if self.subp is not None and not self.probe():
+            self.reap()
+            if self.once:
+              break
+            next_start_time = now() + self.restart_delay
+          if self.subp is None:
+            # not running - see if it should start
+            if now() >= max(next_test_time, next_start_time):
+              if self.test():
+                # test passes, start service
+                self.spawn()
+              next_test_time = now() + self.test_rate
+          else:
+            # running - see if it should stop
+            stop = False
+            if self.flag_restart:
+              self.flag_restart = False
               stop = True
-            next_test_time = now() + self.test_rate
-          if not stop and self.sig_func is not None:
-            new_sig = self.sig_func()
-            if new_sig is not None and new_sig != old_sig:
-              old_sig = new_sig
-              stop = True
-          if stop:
-            self._kill_subproc()
-            sleep(self.restart_delay)
-        sleep(1)
-      if self.subp is not None:
-        self._kill_subproc()
-    T = Thread(name=str(self)+':monitor', target=monitor)
-    T.start()
-    self.monitor = T
+            elif now() >= next_test_time:
+              if not self.test():
+                stop = True
+              next_test_time = now() + self.test_rate
+            if not stop and self.sig_func is not None:
+              new_sig = self.sig_func()
+              if new_sig is not None and new_sig != old_sig:
+                old_sig = new_sig
+                stop = True
+            if stop:
+              self._kill_subproc()
+              sleep(self.restart_delay)
+          sleep(1)
+        if self.subp is not None:
+          self._kill_subproc()
+      T = Thread(name=str(self)+':monitor', target=monitor)
+      T.start()
+      self.monitor = T
 
   def stop(self):
     self.flag_stop = True
