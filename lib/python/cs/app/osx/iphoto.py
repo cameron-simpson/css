@@ -924,12 +924,10 @@ class iPhoto(O):
               try:
                 P = self.match_one_person(person_name)
               except ValueError as e:
-                warning("rejected face name: %s", e)
-                badopts = True
-              else:
-                if P.name != operson_name:
-                  info("%r ==> %r", operson_name, P.name)
-                selector = SelectByPerson_Name(self, P.name, invert)
+                raise KeyError("rejected face name: %r: %s" % (person_name, e))
+              if P.name != operson_name:
+                info("%r ==> %r", operson_name, P.name)
+              selector = SelectByPerson_Name(self, P.name, invert)
           else:
             raise ValueError("unknown selector type %r" % (sel_type,))
         elif selection[0] in '<=>':
