@@ -522,8 +522,6 @@ def RelationVia(via, via_left_column, left, via_right_column, right,
         `left_column`: left Table column containing the value, default `left.id_column`
         `right_column`: right Table column containing the value, default `right.id_column`
     '''
-    X("RelationVia: via=%s, via_left_column=%s, left=%s, via_right_column=%s, right=%s, left_column=%s, right_column=%s",
-      via, via_left_column, left, via_right_column, right, left_column, right_column)
     if left_column is None:
       left_column = left.id_column
     if right_column is None:
