@@ -440,60 +440,87 @@ class Row(object):
     else:
       self.__dict__[attr] = value
 
-_IdRelation = namedtuple('IdRelation',
-                         'id_column relation left_column left right_column right')
+def IdRelation(relation, left_column, left, right_column, right,
+               left_local_column=None, right_local_column=None):
+    ''' Manage a relationship between 2 Tables based on their id_columns.
+        Initialised with:
+        `relation`: the relation Table
+        `left_column`: relation Table column containing the value for the left Table
+        `left`: the left Table
+        `right_column`: relation Table column containing the value for the right Table
+        `right`: the right Table
+        `left_local_column`: left Table column containing the value,
+            default `left.id_column`
+        `right_local_column`: right Table column containing the value,
+            default `right.id_column`
+    '''
+    X("IdRelation: relation=%s, left_column=%s, left=%s, right_column=%s, right=%s, left_local_column=%s, right_local_column=%s",
+      relation, left_column, left, right_column, right,
+               left_local_column, right_local_column)
+    if left_local_column is None:
+      left_local_column = left.id_column
+    if right_local_column is None:
+      right_local_column = right.id_column
+    return _IdRelation(relation, left_column, left, right_column, right,
+                       left_local_column, right_local_column)
 
-class IdRelation(_IdRelation):
+_IdRelationTuple = namedtuple('IdRelation',
+                         '''relation left_column left right_column right
+                            left_local_column right_local_column''')
+class _IdRelation(_IdRelationTuple):
   ''' Manage a relationship between 2 Tables based on their id_columns.
       Initialised with:
-      `id_column`: id column for the relation Table
       `relation`: the relation Table
-      `left_column`: relation Table column containing the id for the left Table
+      `left_column`: relation Table column containing the value for the left Table
       `left`: the left Table
-      `right_column`: relation Table column containing the id for the right Table
+      `right_column`: relation Table column containing the value for the right Table
       `right`: the right Table
+      `left_local_column`: left Table column containing the value,
+          default `left.id_column`
+      `right_local_column`: right Table column containing the value,
+          default `right.id_column`
   '''
 
-  def left_to_right(self, left_ids):
+  def left_to_right(self, left_values):
     ''' Fetch right rows given a pythonic index into left.
     '''
-    condition = where_index(self.left_column, left_ids)
+    condition = where_index(self.left_column, left_values)
     rel_rows = self.relation.rows(condition.where, *condition.params)
-    right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
-    if not right_ids:
+    right_values = set( [ rel[self.right_column] for rel in rel_rows ] )
+    if not right_values:
       return []
-    return self.right[right_ids]
+    return self.right.rows_by_value(self.right_local_column, right_values)
 
-  def right_to_left(self, right_ids):
+  def right_to_left(self, right_values):
     ''' Fetch left rows given a pythonic index into right.
     '''
-    condition = where_index(self.right_column, right_ids)
+    condition = where_index(self.right_column, right_values)
     rel_rows = self.relation.rows(condition.where, *condition.params)
-    left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
-    if not left_ids:
+    left_values = set( [ rel[self.left_column] for rel in rel_rows ] )
+    if not left_values:
       return []
-    return self.left[left_ids]
+    return self.left.rows_by_value(self.left_local_column, left_values)
 
-  def add(self, left_id, right_id):
+  def add(self, left_value, right_value):
     self.relation.insert( (self.left_column, self.right_column),
-                          [ (left_id, right_id) ] )
+                          [ (left_value, right_value) ] )
 
-  def remove(self, left_id, right_id):
+  def remove(self, left_value, right_value):
     self.relation.delete(
       '%s = ? and %s = ?' % (self.left_column, self.right_column),
-      left_id, right_id)
+      left_value, right_value)
 
-  def remove_left(self, left_ids):
+  def remove_left(self, left_values):
     ''' Remove all relation rows with the specified left_column values.
     '''
-    condition = where_index(self.left_column, left_ids)
-    return self.left.delete(condition.where, *condition.params)
+    condition = where_index(self.left_column, left_values)
+    return self.relation.delete(condition.where, *condition.params)
 
-  def remove_right(self, right_ids):
+  def remove_right(self, right_values):
     ''' Remove all relation rows with the specified right_column values.
     '''
-    condition = where_index(self.right_column, right_ids)
-    return self.right.delete(condition.where, *condition.params)
+    condition = where_index(self.right_column, right_values)
+    return self.relation.delete(condition.where, *condition.params)
 
 where_index_result = namedtuple(
                         'where_index_result',
