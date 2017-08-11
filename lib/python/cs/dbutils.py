@@ -202,13 +202,13 @@ class Table(object):
     sqlargs = []
     if where:
       sql += ' where ' + where
-      sqlargs.append(where_argv)
+      sqlargs.extend(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
     ##info("SQL = %r", sql)
     ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
-      return self.conn.cursor().execute(sql, *sqlargs)
+      return self.conn.cursor().execute(sql, sqlargs)
 
   def insert(self, column_names, valueses):
     sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
