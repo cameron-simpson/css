@@ -1413,7 +1413,7 @@ class SelectByPerson_Name(_SelectMasters):
   def __init__(self, iphoto, person_name, invert=False):
     self.iphoto = iphoto
     self.person_name = person_name
-    self.person = iphoto.person_by_name[person_name]
+    self.person = iphoto.match_one_person(person_name)
     self.invert = invert
 
   def select_masters(self, masters):
