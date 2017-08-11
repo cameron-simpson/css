@@ -679,13 +679,6 @@ class iPhoto(O):
     '''
     return self.load_albumdata()
 
-  def face(self, face_id):
-    return self.person_table[face_id]
-
-  @locked_property
-  def vfaces_by_master_id(self):
-    return self.iphoto._vfaces_by_master_id.get(self.modelId, ())
-
   def folder(self, folder_id):
     return self.folders_table[folder_id]
 
@@ -709,12 +702,6 @@ class iPhoto(O):
 
   def events_by_name(self, name):
     return [ event for event in self.events() if event.name == name ]
-
-  def person(self, faceKey):
-    return self.person_by_faceKey.get(faceKey)
-
-  def person_names(self):
-    return self.person_by_name.keys()
 
   def match_people(self, person_name):
     ''' User convenience: match string against all person names, return matches.
