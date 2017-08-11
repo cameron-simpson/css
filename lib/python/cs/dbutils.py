@@ -348,9 +348,8 @@ class Table(object):
     if rel_name in rels:
       raise KeyError("relation %r already defined" % (rel_name,))
     if other_column is None:
-      rels[rel_name] = lambda local_key: other[(local_key,)]
-    else:
-      rels[rel_name] = lambda local_key: other.rows_by_value(other_column, local_key)
+      other_column = other.id_column
+    rels[rel_name] = lambda local_key: other.rows_by_value(other_column, local_key)
 
   def link_via(self,
                via, via_left_column, via_right_column,
