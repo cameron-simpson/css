@@ -21,7 +21,7 @@ from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from .plist import ingest_plist
-from cs.dbutils import TableSpace, Table, Row, Relation
+from cs.dbutils import TableSpace, Table, Row, RelationVia
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
@@ -823,7 +823,7 @@ class iPhoto(O):
   def keywords_by_version(self, version_id):
     ''' Return version
     '''
-    return Relation(self.keywordForVersion_table,
+    return RelationVia(self.keywordForVersion_table,
                     'versionId', self.version_table,
                     'keywordId', self.keyword_table \
                    ).left_to_right(version_id)
@@ -1254,7 +1254,7 @@ class Keyword_Mixin(iPhotoRow):
     ''' Return the versions with this keyword.
     '''
     I = self.iphoto
-    return Relation(I.keywordForVersion_table,
+    return RelationVia(I.keywordForVersion_table,
                     'keywordId', I.keyword_table,
                     'versionId', I.version_table
                    ).left_to_right(self.modelId)
