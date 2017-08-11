@@ -333,18 +333,18 @@ class Table(object):
             self[int(new_id)] = new_name
             info("updated")
 
-  def link_to(self, other, local_column=None, rel_name=None):
+  def link_to(self, other, local_column=None, other_column=None, rel_name=None):
     ''' Associate this table with another via a column indexing `other`.
         `other`: the other table
         `local_column`: the column in this table with the other
-            table's column value
+            table's column value; default `self.id_column`
         `other_column`: the column in the other table with the
-            matching value; default from `other.id_column`
-        `rel_name`: name for this relation; default from `other.name`
+            matching value; default `other.id_column`
+        `rel_name`: name for this relation; default `other.name`
     '''
     if rel_name is None:
       rel_name = other.table_name
-    rels = self.realtions
+    rels = self.relations
     if rel_name in rels:
       raise KeyError("relation %r already defined" % (rel_name,))
     if other_column is None:
@@ -365,7 +365,7 @@ class Table(object):
     rels = self.realtions
     if rel_name in rels:
       raise KeyError("relation %r already defined" % (rel_name,))
-    rel = Relation(via, my_via_column, self, my_other_column, other)
+    rel = RelationVia(via, my_via_column, self, my_other_column, other)
     rels[rel_name] = lambda local_key: rel.left_to_right(local_key)
 
 class Row(object):
@@ -490,8 +490,8 @@ class Row(object):
       # TODO: use super().__setattr__ ?
       self.__dict__[attr] = value
 
-def Relation(relation, left_column, left, right_column, right,
-             left_local_column=None, right_local_column=None):
+def RelationVia(relation, left_column, left, right_column, right,
+                left_local_column=None, right_local_column=None):
     ''' Manage a relationship between 2 Tables based on their id_columns.
         Initialised with:
         `relation`: the relation Table
@@ -504,20 +504,20 @@ def Relation(relation, left_column, left, right_column, right,
         `right_local_column`: right Table column containing the value,
             default `right.id_column`
     '''
-    X("Relation: relation=%s, left_column=%s, left=%s, right_column=%s, right=%s, left_local_column=%s, right_local_column=%s",
+    X("RelationVia: relation=%s, left_column=%s, left=%s, right_column=%s, right=%s, left_local_column=%s, right_local_column=%s",
       relation, left_column, left, right_column, right,
                left_local_column, right_local_column)
     if left_local_column is None:
       left_local_column = left.id_column
     if right_local_column is None:
       right_local_column = right.id_column
-    return _Relation(relation, left_column, left, right_column, right,
+    return _RelationVia(relation, left_column, left, right_column, right,
                        left_local_column, right_local_column)
 
-_RelationTuple = namedtuple('Relation',
-                            '''relation left_column left right_column right
-                               left_local_column right_local_column''')
-class _Relation(_RelationTuple):
+_RelationViaTuple = namedtuple('RelationVia',
+                               '''relation left_column left right_column right
+                                  left_local_column right_local_column''')
+class _RelationVia(_RelationViaTuple):
   ''' Manage a relationship between 2 Tables based on their id_columns.
       Initialised with:
       `relation`: the relation Table
