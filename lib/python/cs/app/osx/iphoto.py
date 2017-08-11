@@ -1048,6 +1048,12 @@ class iPhotoRow(Row):
   def edit_string(self):
     return "%d:%s" % (self.modelId, self.name)
 
+  def __eq__(self, other):
+    return self.modelId == other.modelId
+
+  def __hash__(self):
+    return self.faceKey
+
 class Album_Mixin(iPhotoRow):
 
   @prop
