@@ -555,6 +555,9 @@ class _RelationVia(_RelationViaTuple):
       return []
     return self.right.rows_by_value(self.right_column, right_values)
 
+  # default indirection is from left to right
+  __call__ = left_to_right
+
   def right_to_left(self, right_values):
     ''' Fetch left rows given a pythonic index into right.
     '''
@@ -569,10 +572,18 @@ class _RelationVia(_RelationViaTuple):
     self.relation.insert( (self.via_left_column, self.via_right_column),
                           [ (left_value, right_value) ] )
 
+  def __iadd__(self, lr):
+    left_value, right_value = lr
+    self.add(left_value, right_value)
+
   def remove(self, left_value, right_value):
     self.relation.delete(
       '%s = ? and %s = ?' % (self.via_left_column, self.via_right_column),
       left_value, right_value)
+
+  def __isub__(self, lr):
+    left_value, right_value = lr
+    self.remove(left_value, right_value)
 
   def remove_left(self, left_values):
     ''' Remove all relation rows with the specified via_left_column values.
