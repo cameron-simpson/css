@@ -440,8 +440,8 @@ class Row(object):
     else:
       self.__dict__[attr] = value
 
-def IdRelation(relation, left_column, left, right_column, right,
-               left_local_column=None, right_local_column=None):
+def Relation(relation, left_column, left, right_column, right,
+             left_local_column=None, right_local_column=None):
     ''' Manage a relationship between 2 Tables based on their id_columns.
         Initialised with:
         `relation`: the relation Table
@@ -454,20 +454,20 @@ def IdRelation(relation, left_column, left, right_column, right,
         `right_local_column`: right Table column containing the value,
             default `right.id_column`
     '''
-    X("IdRelation: relation=%s, left_column=%s, left=%s, right_column=%s, right=%s, left_local_column=%s, right_local_column=%s",
+    X("Relation: relation=%s, left_column=%s, left=%s, right_column=%s, right=%s, left_local_column=%s, right_local_column=%s",
       relation, left_column, left, right_column, right,
                left_local_column, right_local_column)
     if left_local_column is None:
       left_local_column = left.id_column
     if right_local_column is None:
       right_local_column = right.id_column
-    return _IdRelation(relation, left_column, left, right_column, right,
+    return _Relation(relation, left_column, left, right_column, right,
                        left_local_column, right_local_column)
 
-_IdRelationTuple = namedtuple('IdRelation',
-                         '''relation left_column left right_column right
-                            left_local_column right_local_column''')
-class _IdRelation(_IdRelationTuple):
+_RelationTuple = namedtuple('Relation',
+                            '''relation left_column left right_column right
+                               left_local_column right_local_column''')
+class _Relation(_RelationTuple):
   ''' Manage a relationship between 2 Tables based on their id_columns.
       Initialised with:
       `relation`: the relation Table
