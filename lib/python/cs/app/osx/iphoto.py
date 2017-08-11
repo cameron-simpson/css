@@ -1239,6 +1239,16 @@ class Version_Mixin(iPhotoRow):
       .iphoto.table_by_nickname['keywordForVersion'] \
       .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
 
+  @locked_property
+  def detected_faces(self):
+    ''' Return face detections for this image version.
+    '''
+    return set(self.to_detected_face)
+
+  @locked_property
+  def faces(self):
+    return set(self.to_faces)
+
 class Folder_Mixin(Album_Mixin):
 
   def versions(self):
@@ -1596,6 +1606,10 @@ SCHEMAE = {'Faces':
                         'modelId',
                         'keywordForVersion', 'versionId', 'keywordId',
                         'keyword', 'modelId'),
+                    'detected_face': (
+                        'modelId',
+                        'vface', 'versionId', 'faceKey',
+                        'face', 'faceKey'),
                   },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'fileName',
