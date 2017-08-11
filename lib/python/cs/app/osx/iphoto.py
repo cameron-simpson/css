@@ -704,49 +704,49 @@ class iPhoto(O):
     return [ event for event in self.events() if event.name == name ]
 
   def match_people(self, person_name):
-    ''' User convenience: match string against all person names, return matches.
+    ''' User convenience: match string against all person names, return Person rows.
     '''
     lc_person_name = person_name.lower()
-    all_names = list(self.person_names())
+    people = self.persons()
     matches = set()
     # try exact match, ignoring case
-    for name in all_names:
-      if lc_person_name == name.lower():
-        matches.add(name)
+    for P in people:
+      if lc_person_name == P.name.lower():
+        matches.add(P)
     if not matches:
       # try "who aka who-else" and "formerly" and "was"
       for split_word in 'aka', 'formerly', 'was':
         split_word = ' ' + split_word + ' '
-        for name in all_names:
-          aliases = name.lower().split(split_word)
+        for P in people:
+          aliases = P.name.lower().split(split_word)
           if lc_person_name in aliases:
-            matches.add(name)
+            matches.add(P)
     if not matches:
       # try "who (where)"
-      for name in all_names:
+      for P in people:
         if name.endswith(')'):
           try:
-            left, etc = name.split(' (', 1)
+            left, etc = P.name.split(' (', 1)
           except ValueError:
             continue
           if left.lower().strip() == lc_person_name:
-            matches.add(name)
+            matches.add(P)
     if not matches:
       # try by word: all words but in any order
       lc_person_words = lc_person_name.split()
-      for name in all_names:
-        lc_words = name.lower().split()
+      for P in people:
+        lc_words = P.name.lower().split()
         match_count = 0
         for lc_person_word in lc_person_words:
           if lc_person_word in lc_words:
             match_count += 1
         if match_count == len(lc_person_words):
-          matches.add(name)
+          matches.add(P)
     if not matches:
       # try substrings
-      for name in all_names:
-        if lc_person_name in name.lower():
-          matches.add(name)
+      for P in people:
+        if lc_person_name in P.name.lower():
+          matches.add(P)
     return matches
 
   def match_one_person(self, person_name):
