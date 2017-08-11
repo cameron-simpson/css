@@ -725,7 +725,7 @@ class iPhoto(O):
     if not matches:
       # try "who (where)"
       for P in people:
-        if name.endswith(')'):
+        if P.name.endswith(')'):
           try:
             left, etc = P.name.split(' (', 1)
           except ValueError:
