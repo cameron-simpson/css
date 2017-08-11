@@ -588,6 +588,33 @@ class iPhoto(O):
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
     self.dbs.load_all()
+    # set up intertable links now that the Tables are defined
+    # direct relations
+    for nickname, table in sorted(self.table_by_nickname.items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_to', {}).items()):
+        with Pfx("%s.link_to[%r]:%r", nickname, rel_name, rel_defn):
+          info("LINK TO: %s.to_%ss => %r", nickname, rel_name, rel_defn)
+          local_column, other_table, other_column = rel_defn
+          if isinstance(other_table, str):
+            other_table = self.table_by_nickname[other_table]
+          table.link_to(other_table,
+                        local_column=local_column, other_column=other_column,
+                        rel_name=rel_name)
+    # relations via mapping tables
+    for nickname, table in sorted(self.table_by_nickname.items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_via', {}).items()):
+        with Pfx("%s.link_via[%r]:%r", nickname, rel_name, rel_defn):
+          info("LINK VIA: %s.to_%ss => %r", nickname, rel_name, rel_defn)
+          local_column, \
+            via_table, via_left_column, via_right_column, \
+            other_table, other_column = rel_defn
+          if isinstance(other_table, str):
+            other_table = self.table_by_nickname[other_table]
+          if isinstance(via_table, str):
+            via_table = self.table_by_nickname[via_table]
+          table.link_via(via_table, via_left_column, via_right_column,
+                         other_table, right_column=other_column,
+                         rel_name=rel_name)
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
