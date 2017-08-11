@@ -1139,8 +1139,7 @@ class Master_Mixin(iPhotoRow):
 
   @locked_property
   def versions(self):
-    I = self.iphoto
-    return I.version_table.rows_by_value('masterId', self.modelId)
+    return self.to_versions
 
   @prop
   def latest_version(self):
