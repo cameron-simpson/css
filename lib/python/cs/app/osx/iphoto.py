@@ -387,7 +387,8 @@ def cmd_tag(I, argv):
     masters = selector.select(masters)
   for master in masters:
     with Pfx(master.basename):
-      V = master.latest_version()
+      XP("examine %s", master.basename)
+      V = master.latest_version
       for add, tag in tagging:
         with Pfx("%s%s", "+" if add else "-", tag.name):
           kws = V.keywords
@@ -1141,6 +1142,7 @@ class Master_Mixin(iPhotoRow):
     I = self.iphoto
     return I.version_table.rows_by_value('masterId', self.modelId)
 
+  @prop
   def latest_version(self):
     vs = self.versions
     if not vs:
@@ -1150,37 +1152,31 @@ class Master_Mixin(iPhotoRow):
 
   @prop
   def width(self):
-    return self.latest_version().processedWidth
+    return self.latest_version.processedWidth
 
   @prop
   def height(self):
-    return self.latest_version().processedHeight
+    return self.latest_version.processedHeight
+
+  @locked_property
+  def detected_faces(self):
+    detected = set(self.latest_version.detected_faces)
+    ##if detected:
+    ##  X("master.detected_faces = %s", detected)
+    return detected
 
   @locked_property
   def faces(self):
-    I = self.iphoto
-    return I.faces_by_master_id.get(self.modelId, ())
-
-  @locked_property
-  def vfaces(self):
-    I = self.iphoto
-    return I.vfaces_by_master_id.get(self.modelId, ())
-
-  @locked_property
-  def people(self):
-    them = set()
-    for vface in self.vfaces:
-      who = vface.person()
-      if who is not None:
-        ##X("master %d + %s", self.modelId, who.name)
-        them.add(who)
+    them = set(self.latest_version.faces)
+    ##if them:
+    ##  X("master[%s].faces = %s", self.fileName, them)
     return them
 
   @prop
   def keywords(self):
     ''' Return the keywords for the latest version of this master.
     '''
-    return self.latest_version().keywords
+    return self.latest_version.keywords
 
   @prop
   def keyword_names(self):
@@ -1254,7 +1250,7 @@ class Version_Mixin(iPhotoRow):
 class Folder_Mixin(Album_Mixin):
 
   def versions(self):
-    return [ M.latest_version() for M in self.masters() ]
+    return [ M.latest_version for M in self.masters() ]
 
   def masters(self):
     ''' Return the masters from this album.
@@ -1453,11 +1449,11 @@ class SelectByFilenameRE(_SelectMasters):
     re = self.re
     if self.invert:
       for master in masters:
-        if not re.search(master.latest_version().fileName):
+        if not re.search(master.latest_version.fileName):
           yield master
     else:
       for master in masters:
-        if re.search(master.latest_version().fileName):
+        if re.search(master.latest_version.fileName):
           yield master
 
 class SelectByKeyword_Name(_SelectMasters):
