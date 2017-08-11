@@ -1138,8 +1138,9 @@ class Master_Mixin(iPhotoRow):
     vs = self.versions
     if not vs:
       raise RuntimeError("no versions for master %d: %r", self.modelId, self.pathname)
-      ##return None
-    return max(vs, key=lambda v: v.versionNumber)
+    if len(vs) == 1:
+      return vs[0]
+    return max(*vs, key=lambda v: v.versionNumber)
 
   @prop
   def width(self):
