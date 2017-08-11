@@ -145,6 +145,7 @@ class Table(object):
     self.name_column = name_column
     self.row_tuple = namedtuple('%s_Row' % (table_name,), column_names)
     self.row_class = row_class
+    self.relations = {}
     self._lock = lock
 
   def __str__(self):
@@ -332,6 +333,41 @@ class Table(object):
             self[int(new_id)] = new_name
             info("updated")
 
+  def link_to(self, other, local_column=None, rel_name=None):
+    ''' Associate this table with another via a column indexing `other`.
+        `other`: the other table
+        `local_column`: the column in this table with the other
+            table's column value
+        `other_column`: the column in the other table with the
+            matching value; default from `other.id_column`
+        `rel_name`: name for this relation; default from `other.name`
+    '''
+    if rel_name is None:
+      rel_name = other.table_name
+    rels = self.realtions
+    if rel_name in rels:
+      raise KeyError("relation %r already defined" % (rel_name,))
+    if other_column is None:
+      rels[rel_name] = lambda local_key: other[(local_key,)]
+    else:
+      rels[rel_name] = lambda local_key: other.rows_by_value(other_column, local_key)
+
+  def link_via(self, other, via, my_via_column, my_other_column, rel_name=None):
+    ''' Associate this table with another via a mapping table.
+        `other`: the other table
+        `via`: the mapping table
+        `my_via_column`: the column in `via` with this table's id
+        `my_other_column`: the column in `via` with the other table's id
+        `rel_name`: name for this relation; default from `other.name`
+    '''
+    if rel_name is None:
+      rel_name = other.table_name
+    rels = self.realtions
+    if rel_name in rels:
+      raise KeyError("relation %r already defined" % (rel_name,))
+    rel = Relation(via, my_via_column, self, my_other_column, other)
+    rels[rel_name] = lambda local_key: rel.left_to_right(local_key)
+
 class Row(object):
 
   def __init__(self, table, values, lock=None):
@@ -430,14 +466,28 @@ class Row(object):
     self._row = self._row._replace(**{key: value})
 
   def __getattr__(self, attr):
-    if not attr.startswith('_') and attr in self.column_names:
+    ''' Implement the following attributes:
+          .column_name  => column value
+          .to_{relnam}s => related rows from another table
+    '''
+    T = self._table
+    if not attr.startswith('_') and attr in T.column_names:
+      # .column_name => column value
       return getattr(self._row, attr)
+    if (
+      attr.startswith('to_')
+      and attr.endswith('s')
+      and attr[3:-1] in T.relations
+    ):
+      # .relname => related other rows
+      return T.relations[attr[3:-1]](self.id_value)
     raise AttributeError("%s: no attr %r" % (self.__class__, attr,))
 
   def __setattr__(self, attr, value):
     if not attr.startswith('_') and attr in self.column_names:
       self[attr] = value
     else:
+      # TODO: use super().__setattr__ ?
       self.__dict__[attr] = value
 
 def Relation(relation, left_column, left, right_column, right,
