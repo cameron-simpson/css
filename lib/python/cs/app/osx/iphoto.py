@@ -917,7 +917,7 @@ class iPhoto(O):
             person_name = selection
             if not person_name:
               selector = SelectByFunction(self,
-                                          lambda master: len(master.vfaces) > 0,
+                                          lambda master: len(master.faces) > 0,
                                           invert)
             else:
               operson_name = person_name
@@ -1419,11 +1419,12 @@ class SelectByPerson_Name(_SelectMasters):
     person = self.person
     if self.invert:
       for master in masters:
-        if person not in master.people:
+        if person not in master.faces:
           yield master
     else:
       for master in masters:
-        if person in master.people:
+        fs = master.faces
+        if person in fs:
           yield master
 
 class SelectByFilenameRE(_SelectMasters):
