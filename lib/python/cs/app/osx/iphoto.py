@@ -836,14 +836,6 @@ class iPhoto(O):
   def masters_by_keyword(self, kwname):
     return self.keyword(kwname).masters()
 
-  def keywords_by_version(self, version_id):
-    ''' Return version
-    '''
-    return RelationVia(self.keywordForVersion_table,
-                    'versionId', self.version_table,
-                    'keywordId', self.keyword_table \
-                   ).left_to_right(version_id)
-
   def replace_keywords(self, old_keyword_id, new_keyword_id):
     ''' Update image tags to replace one keyword with another.
     '''
@@ -1227,7 +1219,7 @@ class Version_Mixin(iPhotoRow):
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    return frozenset(self.iphoto.keywords_by_version(self.modelId))
+    return self.to_keywords
 
   @prop
   def keyword_names(self):
@@ -1594,9 +1586,14 @@ SCHEMAE = {'Faces':
                 { 'table_name': 'RKVersion',
                   'mixin': Version_Mixin,
                   'link_via': {
-                    'face': ('modelId',
-                             'vface', 'versionId', 'faceKey',
-                             'person', 'faceKey'),
+                    'face': (
+                        'modelId',
+                        'vface', 'versionId', 'faceKey',
+                        'person', 'faceKey'),
+                    'keyword': (
+                        'modelId',
+                        'keywordForVersion', 'versionId', 'keywordId',
+                        'keyword', 'modelId'),
                   },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'fileName',
