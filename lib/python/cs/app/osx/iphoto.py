@@ -628,34 +628,35 @@ class iPhoto(O):
     return self.dbs.pathto(db_name)
 
   def __getattr__(self, attr):
-    try:
-      if not attr.startswith('_'):
-        if attr.endswith('s'):
-          if '_' not in attr:
-            # *s ==> iterable of * (obtained from *_by_id)
-            nickname = attr[:-1]
+    with Pfx('.' + attr):
+      try:
+        if not attr.startswith('_'):
+          if attr.endswith('s'):
+            if '_' not in attr:
+              # *s ==> iterable of * (obtained from *_by_id)
+              nickname = attr[:-1]
+              if nickname in self.table_by_nickname:
+                return lambda: iter(self.table_by_nickname[nickname])
+            # *_rows ==> iterator of rows from table "*"
+            if attr.endswith('_rows'):
+              nickname = attr[:-5]
+              return iter(self.table_by_nickname[nickname])
+          if attr.startswith('select_by_'):
+            criterion_words = attr[10:].split('_')
+            class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
+            return partial(globals()[class_name], self)
+          if attr.endswith('_table'):
+            # *_table ==> table "*"
+            nickname = attr[:-6]
             if nickname in self.table_by_nickname:
-              return lambda: iter(self.table_by_nickname[nickname])
-          # *_rows ==> iterator of rows from table "*"
-          if attr.endswith('_rows'):
-            nickname = attr[:-5]
-            return iter(self.table_by_nickname[nickname])
-        if attr.startswith('select_by_'):
-          criterion_words = attr[10:].split('_')
-          class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
-          return partial(globals()[class_name], self)
-        if attr.endswith('_table'):
-          # *_table ==> table "*"
-          nickname = attr[:-6]
-          if nickname in self.table_by_nickname:
-            return self.table_by_nickname[nickname]
-          else:
-            X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
-    except AttributeError as e:
-      msg = "__getattr__ got internal AttributeError: %s" % (e,)
-      raise RuntimeError(msg)
-    msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
-    raise AttributeError(msg)
+              return self.table_by_nickname[nickname]
+            else:
+              X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
+      except AttributeError as e:
+        msg = "__getattr__ got internal AttributeError: %s" % (e,)
+        raise RuntimeError(msg)
+      msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
+      raise AttributeError(msg)
 
   def album(self, album_id):
     return self.albums_table[album_id]
