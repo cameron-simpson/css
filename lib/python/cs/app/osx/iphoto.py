@@ -1502,7 +1502,8 @@ class SelectByKeyword_Name(_SelectMasters):
           yield master
 
 SCHEMAE = {'Faces':
-            { 'person':
+            { # person definition: their name, etc
+              'person':
                 { 'table_name': 'RKFaceName',
                   'mixin': Person_Mixin,
                   'columns':
@@ -1512,6 +1513,7 @@ SCHEMAE = {'Faces':
                       'attrs',
                     ),
                 },
+              # detected faces in master images
               'face':
                 { 'table_name': 'RKDetectedFace',
                   'columns':
@@ -1529,9 +1531,14 @@ SCHEMAE = {'Faces':
                 },
             },
            'Library':
-            { 'master':
+            {
+              # master images
+              'master':
                 { 'table_name': 'RKMaster',
                   'mixin': Master_Mixin,
+                  'link_to': {
+                    'version': ('modelId', 'version', 'masterId'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
                       'fileVolumeUuid', 'alternateMasterUuid', 'originalVersionUuid',
@@ -1546,6 +1553,7 @@ SCHEMAE = {'Faces':
                       'streamAssetId', 'streamSourceUuid', 'burstUuid',
                     ),
                 },
+              # faces in image versions
               'vface':
                 { 'table_name': 'RKVersionFaceContent',
                   'mixin': VFace_Mixin,
@@ -1553,6 +1561,7 @@ SCHEMAE = {'Faces':
                     ( 'modelId', 'versionId', 'masterId', 'isNamed', 'faceKey', 'faceIndex', 'faceRectLeft', 'faceRectTop', 'faceRectWidth', 'faceRectHeight',
                     ),
                 },
+              # events
               'folder':
                 { 'table_name': 'RKFolder',
                   'mixin': Folder_Mixin,
@@ -1566,6 +1575,8 @@ SCHEMAE = {'Faces':
                       'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
                     ),
                 },
+              # keyword definitions
+              # TODO: keywords form a tree? always presented as flat in GUI
               'keyword':
                 { 'table_name': 'RKKeyword',
                   'mixin': Keyword_Mixin,
@@ -1574,6 +1585,7 @@ SCHEMAE = {'Faces':
                       'hasChildren', 'shortcut',
                     ),
                 },
+              # albums
               'album':
                 { 'table_name': 'RKAlbum',
                   'mixin': Album_Mixin,
@@ -1588,9 +1600,15 @@ SCHEMAE = {'Faces':
                       'queryData', 'viewData', 'selectedVersionIds',
                     ),
                 },
+              # image versions
               'version':
                 { 'table_name': 'RKVersion',
                   'mixin': Version_Mixin,
+                  'link_via': {
+                    'face': ('modelId',
+                             'vface', 'versionId', 'faceKey',
+                             'person', 'faceKey'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'fileName',
                       'versionNumber', 'stackUuid', 'masterUuid',
@@ -1612,11 +1630,13 @@ SCHEMAE = {'Faces':
                       'hasKeywords',
                     ),
                 },
+              # presence of image versions in albums
               'albumForVersion':
                 { 'table_name': 'RKAlbumVersion',
                   'columns':
                     ( 'modelId', 'versionId', 'albumId'),
                 },
+              # association of keywords with image versions
               'keywordForVersion':
                 { 'table_name': 'RKKeywordForVersion',
                   'columns':
