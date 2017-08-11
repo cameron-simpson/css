@@ -151,7 +151,7 @@ class Table(object):
     return "%s:name=%s" % (self.__class__.__name__, self.table_name)
 
   def __repr__(self):
-    return "%s[%s]" % (self, ','.join(self._column_names))
+    return "%s[%s]" % (self, ','.join(self.column_names))
 
   def new_params(self):
     return self.db.new_params()
@@ -176,11 +176,11 @@ class Table(object):
     P = self.new_params()
     conditions = []
     for column_name, value in zip(column_names, values):
-      if isinstance(value, (list, tuple)):
+      if isinstance(value, (list, tuple, set)):
         conditions.append('`%s` in (%s)'
                           % (column_name, ','.join(P.vadd(column_name, value))))
       else:
-        conditions.append('%s = %s' % (column_name, P.add(column_name, value)))
+        conditions.append('`%s` = %s' % (column_name, P.add(column_name, value)))
     where_clause = ' AND '.join(conditions)
     return self.rows(where_clause, *P.values)
 
