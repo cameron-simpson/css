@@ -1043,7 +1043,7 @@ class iPhotoRow(Row):
     return self.modelId == other.modelId
 
   def __hash__(self):
-    return self.faceKey
+    return self.modelId
 
 class Album_Mixin(iPhotoRow):
 
