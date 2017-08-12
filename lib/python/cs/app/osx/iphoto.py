@@ -1218,7 +1218,7 @@ class Version_Mixin(iPhotoRow):
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    return self.to_keywords
+    return set(self.to_keywords)
 
   @prop
   def keyword_names(self):
