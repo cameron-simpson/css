@@ -577,6 +577,7 @@ class _RelationVia(_RelationViaTuple):
     self.add(left_value, right_value)
 
   def remove(self, left_value, right_value):
+    # TODO: build the query with a Params
     self.relation.delete(
       '%s = ? and %s = ?' % (self.via_left_column, self.via_right_column),
       left_value, right_value)
