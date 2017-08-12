@@ -532,15 +532,15 @@ def RelationVia(via, via_left_column, left, via_right_column, right,
                        left_column, right_column)
 
 _RelationViaTuple = namedtuple('RelationVia',
-                               '''relation via_left_column left via_right_column right
+                               '''via via_left_column left via_right_column right
                                   left_column right_column''')
 class _RelationVia(_RelationViaTuple):
   ''' Manage a relationship between 2 Tables based on their id_columns.
       Initialised with:
-      `relation`: the relation Table
-      `via_left_column`: relation Table column containing the value for the left Table
+      `via`: the relation Table
+      `via_left_column`: via Table column containing the value for the left Table
       `left`: the left Table
-      `via_right_column`: relation Table column containing the value for the right Table
+      `via_right_column`: via Table column containing the value for the right Table
       `right`: the right Table
       `left_column`: left Table column containing the value,
           default `left.id_column`
@@ -548,12 +548,22 @@ class _RelationVia(_RelationViaTuple):
           default `right.id_column`
   '''
 
-  def left_to_right(self, left_values):
-    ''' Fetch right rows given a pythonic index into left.
+  def right_keys(self, left_values):
+    ''' Fetch the right hand keys associated with the supplied `left_keys`.
+        Returns a set.
     '''
     condition = where_index(self.via_left_column, left_values)
-    rel_rows = self.relation.rows(condition.where, *condition.params)
-    right_values = set( [ row[self.via_right_column] for row in rel_rows ] )
+    rel_rows = self.via.rows(condition.where, *condition.params)
+    return set( [ row[self.via_right_column] for row in rel_rows ] )
+
+  def left_to_right(self, left_values):
+    ''' Fetch right hand rows given a pythonic index into left.
+    '''
+    if isinstance(left_values, (int, float, str)):
+      ''' A single key gets a proxy for the result, allowing modification.
+      '''
+      return RelatedRows(left_values, self)
+    right_values = self.right_keys(left_values)
     if not right_values:
       return []
     return self.right.rows_by_value(self.right_column, right_values)
@@ -561,31 +571,30 @@ class _RelationVia(_RelationViaTuple):
   # default indirection is from left to right
   __call__ = left_to_right
 
-  def right_to_left(self, right_values):
-    ''' Fetch left rows given a pythonic index into right.
-    '''
-    condition = where_index(self.via_right_column, right_values)
-    rel_rows = self.relation.rows(condition.where, *condition.params)
-    left_values = set( [ rel[self.via_left_column] for rel in rel_rows ] )
-    if not left_values:
-      return []
-    return self.left.rows_by_value(self.left_column, left_values)
-
   def add(self, left_value, right_value):
-    self.relation.insert( (self.via_left_column, self.via_right_column),
-                          [ (left_value, right_value) ] )
+    ''' Add the pair (`left_value`, `right_value`) to the mapping.
+    '''
+    self.via.insert(
+      (self.via_left_column, self.via_right_column),
+      [ (left_value, right_value) ],
+      ignore=True
+    )
 
   def __iadd__(self, lr):
+    ''' Insert the (left_value, right_value) pair `lr` into the mapping.
+    '''
     left_value, right_value = lr
     self.add(left_value, right_value)
 
   def remove(self, left_value, right_value):
     # TODO: build the query with a Params
-    self.relation.delete(
+    self.via.delete(
       '%s = ? and %s = ?' % (self.via_left_column, self.via_right_column),
       left_value, right_value)
 
   def __isub__(self, lr):
+    ''' Remove the (left_value, right_value) pair `lr` from the mapping.
+    '''
     left_value, right_value = lr
     self.remove(left_value, right_value)
 
@@ -593,7 +602,7 @@ class _RelationVia(_RelationViaTuple):
     ''' Remove all relation rows with the specified via_left_column values.
     '''
     condition = where_index(self.via_left_column, left_values)
-    return self.relation.delete(condition.where, *condition.params)
+    return self.via.delete(condition.where, *condition.params)
 
   def remove_right(self, right_values):
     ''' Remove all relation rows with the specified via_right_column values.
