@@ -210,8 +210,9 @@ class Table(object):
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, sqlargs)
 
-  def insert(self, column_names, valueses):
-    sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
+  def insert(self, column_names, valueses, ignore=False):
+    ins_cmd = 'insert or ignore' if ignore else 'insert'
+    sql = ins_cmd + ' into %s(%s) values ' % (self.table_name, ','.join(column_names))
     sqlargs = []
     tuple_param = '(%s)' % ( ','.join( '?' for _ in column_names ), )
     tuple_params = []
@@ -220,6 +221,8 @@ class Table(object):
       sqlargs.extend(values)
     sql += ', '.join(tuple_params)
     C = self.conn.cursor()
+    ##info("SQL = %r", sql)
+    ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       C.execute(sql, sqlargs)
     self.conn.commit()
