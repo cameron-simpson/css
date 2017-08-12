@@ -1214,28 +1214,25 @@ class Version_Mixin(iPhotoRow):
                        % (self.modelId, self.masterId))
     return master
 
-  @locked_property
+  @prop
   def keywords(self):
-    ''' Return the keywords for this version.
-    '''
-    return set(self.to_keywords)
+    return self.to_keywords
 
   @prop
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
   def add_keyword(self, kw):
-    # remove keyword from versions
-    self \
-      .iphoto.table_by_nickname['keywordForVersion'] \
-      .insert( ('keywordId', 'versionId'),
-               ( (kw.modelId, self.modelId), ) )
+    # add keyword to version
+    if isinstance(kw, str):
+      kw = self.iphoto.keyword(kw)
+    self.keywords += kw.modelId
 
   def del_keyword(self, kw):
-    # remove keyword from versions
-    self \
-      .iphoto.table_by_nickname['keywordForVersion'] \
-      .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
+    # remove keyword from version
+    if isinstance(kw, str):
+      kw = self.iphoto.keyword(kw)
+    self.keywords -= kw.modelId
 
   @locked_property
   def detected_faces(self):
