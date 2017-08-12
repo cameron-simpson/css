@@ -599,7 +599,55 @@ class _RelationVia(_RelationViaTuple):
     ''' Remove all relation rows with the specified via_right_column values.
     '''
     condition = where_index(self.via_right_column, right_values)
-    return self.relation.delete(condition.where, *condition.params)
+    return self.via.delete(condition.where, *condition.params)
+
+class RelatedRows(object):
+  def __init__(self, left_key, via):
+    ''' A proxy for rows related to `left_key` throught the relation `via`.
+        `left_key`: the key of the left side of `via`
+        `via`: the RelationVia defining the relationship
+    '''
+    self.via = via
+    self.key = left_key
+    self._rows = None
+    self._row_set = None
+
+  def rows(self):
+    ''' Return the related rows from the right table.
+    '''
+    if self._rows is None:
+      self._rows = self.via.left_to_right([self.key])
+    return self._rows
+
+  def row_keys(self):
+    return self.via.right_keys(self.key)
+
+  def row_keyset(self):
+    ''' Return the related rows from the right table as a set.
+    '''
+    if self._row_set is None:
+      self._row_set = set(self.rows())
+    return self._row_set
+
+  def __iter__(self):
+    ''' Return an iterator of the rows.
+    '''
+    return iter(self.rows())
+
+  def __contains__(self, right_key):
+    ''' Test if `right_key` is in the relation.
+    '''
+    return right_key in self.row_keys()
+
+  def __iadd__(self, right_key):
+    ''' Add (`self.key`, `right_key`) to the mapping.
+    '''
+    self.via += (self.key, right_key)
+
+  def __isub__(self, right_key):
+    ''' Remove (`self.key`, `right_key`) from the mapping.
+    '''
+    self.via -= (self.key, right_key)
 
 where_index_result = namedtuple(
                         'where_index_result',
