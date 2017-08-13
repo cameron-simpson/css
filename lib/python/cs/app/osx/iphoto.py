@@ -1148,12 +1148,9 @@ class Master_Mixin(iPhotoRow):
   def height(self):
     return self.latest_version.processedHeight
 
-  @locked_property
+  @prop
   def detected_faces(self):
-    detected = set(self.latest_version.detected_faces)
-    ##if detected:
-    ##  X("master.detected_faces = %s", detected)
-    return detected
+    return self.latest_version.detected_faces
 
   @locked_property
   def faces(self):
@@ -1234,11 +1231,11 @@ class Version_Mixin(iPhotoRow):
       kw = self.iphoto.keyword(kw)
     self.keywords -= kw.modelId
 
-  @locked_property
+  @prop
   def detected_faces(self):
     ''' Return face detections for this image version.
     '''
-    return set(self.to_detected_face)
+    return self.to_detected_faces
 
   @locked_property
   def faces(self):
