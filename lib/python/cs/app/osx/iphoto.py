@@ -1131,7 +1131,7 @@ class Master_Mixin(iPhotoRow):
   def versions(self):
     return self.to_versions
 
-  @prop
+  @locked_property
   def latest_version(self):
     vs = self.versions
     if not vs:
@@ -1152,22 +1152,17 @@ class Master_Mixin(iPhotoRow):
   def detected_faces(self):
     return self.latest_version.detected_faces
 
-  @locked_property
+  @prop
   def faces(self):
-    them = set(self.latest_version.faces)
-    ##if them:
-    ##  X("master[%s].faces = %s", self.fileName, them)
-    return them
+    return self.latest_version.faces
 
   @prop
   def keywords(self):
-    ''' Return the keywords for the latest version of this master.
-    '''
     return self.latest_version.keywords
 
   @prop
   def keyword_names(self):
-    return [ kw.name for kw in self.keywords ]
+    return self.latest_version.keyword_names
 
   def Image(self):
     ''' Obtain an open Image of this master.
