@@ -21,7 +21,7 @@ from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from .plist import ingest_plist
-from cs.dbutils import TableSpace, Table, Row, RelationVia
+from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
