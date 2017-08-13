@@ -191,13 +191,6 @@ def cmd_ls(I, argv):
       rows = I.persons
     else:
       raise GetoptError("unknown class")
-      I.load_versions()
-      names = []
-      for version in I.versions():
-        if version.mainRating == rating:
-          pathname = version.master.pathname
-          if pathname is not None:
-            names.append(pathname)
     for row in sorted(rows):
       name = row.name
       with Pfx(name):
