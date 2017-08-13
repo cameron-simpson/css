@@ -631,12 +631,20 @@ class RelatedRows(object):
   def row_keys(self):
     return self.via.right_keys(self.key)
 
-  def row_keyset(self):
+  def rowset(self):
     ''' Return the related rows from the right table as a set.
     '''
     if self._row_set is None:
       self._row_set = set(self.rows())
     return self._row_set
+
+  def __len__(self):
+    return len(self.row_keys())
+
+  def __nonzero__(self):
+    return len(self) > 0
+
+  __bool__ = __nonzero__
 
   def __iter__(self):
     ''' Return an iterator of the rows.
@@ -646,7 +654,9 @@ class RelatedRows(object):
   def __contains__(self, right_key):
     ''' Test if `right_key` is in the relation.
     '''
-    return right_key in self.row_keys()
+    if isinstance(right_key, (int, float, str)):
+      return right_key in self.row_keys()
+    return right_key in self.rowset()
 
   def __iadd__(self, right_key):
     ''' Add (`self.key`, `right_key`) to the mapping.
