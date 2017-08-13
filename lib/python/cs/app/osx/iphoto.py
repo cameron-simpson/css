@@ -157,7 +157,7 @@ def cmd_info(I, argv):
   obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass == 'masters':
-      for master in sorted(I.masters(), key=lambda m: m.pathname):
+      for master in sorted(I.masters, key=lambda m: m.pathname):
         with Pfx(master.pathname):
           iminfo = master.image_info
           if iminfo is None:
@@ -178,15 +178,15 @@ def cmd_ls(I, argv):
       rating = int(obclass)
       rows = I.versions_table.rows_by_value('rating', rating)
     elif obclass == 'events':
-      rows = I.events()
+      rows = I.events
     elif obclass == 'folders':
-      rows = I.folders()
+      rows = I.folders
     elif obclass in ('keywords', 'tags'):
-      rows = I.keywords()
+      rows = I.keywords
     elif obclass == 'masters':
-      rows = I.masters()
+      rows = I.masters
     elif obclass in ('faces', 'people'):
-      rows = I.persons()
+      rows = I.persons
     else:
       raise GetoptError("unknown class")
       I.load_versions()
@@ -222,7 +222,7 @@ def cmd_ls(I, argv):
             print("filter:")
             apalbum.dump()
         if obclass in ('folders', 'events'):
-          for master in row.masters():
+          for master in row.masters:
             print('   ', master.pathname)
   return xit
 
@@ -633,11 +633,15 @@ class iPhoto(O):
       try:
         if not attr.startswith('_'):
           if attr.endswith('s'):
+            # {nickname}s => iter(table-nickname)
             if '_' not in attr:
               # *s ==> iterable of * (obtained from *_by_id)
               nickname = attr[:-1]
-              if nickname in self.table_by_nickname:
-                return lambda: iter(self.table_by_nickname[nickname])
+              try:
+                T = self.table_by_nickname[nickname]
+              except KeyError:
+                raise RuntimeError("no table with nickname %r" % (nickname,))
+              return iter(T)
             # *_rows ==> iterator of rows from table "*"
             if attr.endswith('_rows'):
               nickname = attr[:-5]
@@ -686,8 +690,9 @@ class iPhoto(O):
   def folder_names(self):
     return self.folders_by_name.keys()
 
+  @prop
   def folders_simple(self):
-    return [ folder for folder in self.folders() if folder.is_simple_folder ]
+    return [ folder for folder in self.folders if folder.is_simple_folder ]
 
   def event(self, event_id):
     folder = self.folder(event_id)
@@ -695,14 +700,16 @@ class iPhoto(O):
       return None
     return folder
 
+  @prop
   def events(self):
-    return [ folder for folder in self.folders() if folder.is_event ]
+    return [ folder for folder in self.folders if folder.is_event ]
 
+  @prop
   def event_names(self):
-    return [ event.name for event in self.events() ]
+    return [ event.name for event in self.events ]
 
   def events_by_name(self, name):
-    return [ event for event in self.events() if event.name == name ]
+    return [ event for event in self.events if event.name == name ]
 
   def match_people(self, person_name):
     ''' User convenience: match string against all person names, return Person rows.
@@ -1238,13 +1245,14 @@ class Version_Mixin(iPhotoRow):
 
 class Folder_Mixin(Album_Mixin):
 
+  @prop
   def masters(self):
     ''' Return the masters from this album.
     '''
     return self.iphoto.master_table.rows_by_value('projectUuid', self['uuid'])
 
   def versions(self):
-    return [ M.latest_version for M in self.masters() ]
+    return [ M.latest_version for M in self.masters ]
 
   @property
   def is_event(self):
@@ -1265,6 +1273,7 @@ class Keyword_Mixin(iPhotoRow):
                     'versionId', I.version_table
                    ).left_to_right(self.modelId)
 
+  @prop
   def masters(self):
     ''' Return the masters with this keyword.
     '''
@@ -1276,7 +1285,7 @@ class Keyword_Mixin(iPhotoRow):
   def latest_versions(self):
     ''' Return the latest version of all masters with this keyword.
     '''
-    return set(master.latest_version for master in self.masters())
+    return set(master.latest_version for master in self.masters)
 
 class Person_Mixin(iPhotoRow):
 
@@ -1333,7 +1342,7 @@ class _SelectMasters(object):
       return self.select_masters(masters)
 
   def select_from_all(self):
-    return self.select_masters(self.iphoto.masters())
+    return self.select_masters(self.iphoto.masters)
 
 class SelectByFunction(_SelectMasters):
   ''' Select by arbitrary function on a master.
@@ -1459,14 +1468,14 @@ class SelectByKeyword_Name(_SelectMasters):
     if self.kwname is None:
       if self.invert:
         if masters is None:
-          masters = self.iphoto.masters()
+          masters = self.iphoto.masters
         return masters
       return ()
     return super().select(masters)
 
   def select_from_all(self):
     if self.invert:
-      return self.select_masters(self.iphoto.masters())
+      return self.select_masters(self.iphoto.masters)
     else:
       return self.iphoto.masters_by_keyword(self.kwname)
 
@@ -1545,6 +1554,9 @@ SCHEMAE = {'Faces':
               'folder':
                 { 'table_name': 'RKFolder',
                   'mixin': Folder_Mixin,
+                  'link_to': {
+                    'master': ('uuid', 'master', 'projectUuid'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
                       'implicitAlbumUuid', 'posterVersionUuid',
