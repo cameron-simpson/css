@@ -1244,7 +1244,7 @@ class Folder_Mixin(Album_Mixin):
   def masters(self):
     ''' Return the masters from this album.
     '''
-    return self.iphoto.master_table.rows_by_value('projectUuid', self['uuid'])
+    return self.to_masters
 
   def versions(self):
     return [ M.latest_version for M in self.masters ]
