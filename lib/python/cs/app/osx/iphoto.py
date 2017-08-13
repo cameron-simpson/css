@@ -514,7 +514,7 @@ def cmd_autotag(I, argv):
             else:
               kws.add(kw)
       if kws:
-        for V in event.versions():
+        for V in event.versions:
           vkws = V.keywords
           for kw in sorted(kws):
             if kw not in vkws:
@@ -833,10 +833,10 @@ class iPhoto(O):
       return None
 
   def versions_by_keyword(self, kwname):
-    return self.keyword(kwname).versions()
+    return self.keyword(kwname).versions
 
   def masters_by_keyword(self, kwname):
-    return self.keyword(kwname).masters()
+    return self.keyword(kwname).masters
 
   def replace_keywords(self, old_keyword_id, new_keyword_id):
     ''' Update image tags to replace one keyword with another.
@@ -1246,6 +1246,7 @@ class Folder_Mixin(Album_Mixin):
     '''
     return self.to_masters
 
+  @prop
   def versions(self):
     return [ M.latest_version for M in self.masters ]
 
@@ -1259,24 +1260,22 @@ class Folder_Mixin(Album_Mixin):
 
 class Keyword_Mixin(iPhotoRow):
 
+  @prop
   def versions(self):
     ''' Return the versions with this keyword.
     '''
-    I = self.iphoto
-    return RelationVia(I.keywordForVersion_table,
-                    'keywordId', I.keyword_table,
-                    'versionId', I.version_table
-                   ).left_to_right(self.modelId)
+    return self.to_versions
 
   @prop
   def masters(self):
     ''' Return the masters with this keyword.
     '''
     ms = set()
-    for version in self.versions():
+    for version in self.versions:
       ms.add(version.master)
     return ms
 
+  @prop
   def latest_versions(self):
     ''' Return the latest version of all masters with this keyword.
     '''
@@ -1567,6 +1566,12 @@ SCHEMAE = {'Faces':
               'keyword':
                 { 'table_name': 'RKKeyword',
                   'mixin': Keyword_Mixin,
+                  'link_via': {
+                    'version': (
+                        'modelId',
+                        'keywordForVersion', 'keywordId', 'versionId',
+                        'version', 'modelId'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
                       'hasChildren', 'shortcut',
