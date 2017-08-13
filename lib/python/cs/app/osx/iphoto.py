@@ -710,7 +710,7 @@ class iPhoto(O):
     ''' User convenience: match string against all person names, return Person rows.
     '''
     lc_person_name = person_name.lower()
-    people = self.persons()
+    people = self.persons
     matches = set()
     # try exact match, ignoring case
     for P in people:
@@ -794,7 +794,7 @@ class iPhoto(O):
     if kw:
       return kw,
     kws = []
-    for kw in self.keywords():
+    for kw in self.keywords:
       words = kw.name.split()
       if words and lc_kwname == words[0].lower():
         kws.append(kw)
