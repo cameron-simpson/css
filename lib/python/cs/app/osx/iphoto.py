@@ -408,7 +408,7 @@ def cmd_autotag(I, argv):
     ptn = None
   if argv:
     raise GetoptError('extra arguments: %s' % (' '.join(argv),))
-  events = I.events()
+  events = I.events
   if ptn:
     X("winnow %d events", len(events))
     events = [ E for E in events if ptn_re.search(E.name) ]
