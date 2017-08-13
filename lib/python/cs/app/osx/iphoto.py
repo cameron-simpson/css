@@ -1206,7 +1206,7 @@ class Master_Mixin(iPhotoRow):
 
 class Version_Mixin(iPhotoRow):
 
-  @prop
+  @locked_property
   def master(self):
     master = self.iphoto.master_table[self.masterId]
     if master is None:
