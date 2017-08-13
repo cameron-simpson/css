@@ -37,7 +37,7 @@ def unrfc2047(s, warning=None):
       if coding == 'B':
         try:
           decoded = base64.b64decode(coded)
-        except TypeError as e:
+        except (ValueError, TypeError) as e:
           warning("%r: %e", coded, e)
           realtext = m.group()
       elif coding == 'Q':
