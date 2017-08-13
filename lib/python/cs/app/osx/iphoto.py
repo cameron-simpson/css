@@ -1232,19 +1232,19 @@ class Version_Mixin(iPhotoRow):
     '''
     return self.to_detected_faces
 
-  @locked_property
+  @prop
   def faces(self):
-    return set(self.to_faces)
+    return self.to_faces
 
 class Folder_Mixin(Album_Mixin):
-
-  def versions(self):
-    return [ M.latest_version for M in self.masters() ]
 
   def masters(self):
     ''' Return the masters from this album.
     '''
     return self.iphoto.master_table.rows_by_value('projectUuid', self['uuid'])
+
+  def versions(self):
+    return [ M.latest_version for M in self.masters() ]
 
   @property
   def is_event(self):
