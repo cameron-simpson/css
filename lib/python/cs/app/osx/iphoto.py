@@ -47,10 +47,9 @@ RE_PART = r'p0(\d+)[a-z]?'
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
     info masters        List info about masters.
-    ls                  List apdb names.
-    ls [0-5]            List master pathnames with specific rating.
+    ls {0,1,2,3,4,5}    List master pathnames with specific rating.
     ls albums           List album names.
-    ls events           List events names.
+    ls [event]          List events names (default mode).
     ls folders          List folder names (includes events).
     ls {keywords|tags}  List keywords/tags.
     ls masters          List master pathnames.
@@ -172,7 +171,10 @@ def cmd_info(I, argv):
 
 def cmd_ls(I, argv):
   xit = 0
-  obclass = argv.pop(0)
+  if not argv:
+    obclass = 'events'
+  else:
+    obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass.isdigit():
       rating = int(obclass)
