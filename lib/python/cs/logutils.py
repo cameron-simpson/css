@@ -49,8 +49,8 @@ DISTINFO = {
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
-DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
-DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 loginfo = O(upd_mode=None)
 logging_level = logging.INFO
@@ -246,15 +246,13 @@ class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
   '''
 
-  def __init__(self, fmt=None, datefmt=None, cmd=None, context_level=None):
+  def __init__(self, fmt=None, datefmt=None, cmd=None):
     ''' Initialise the PfxFormatter.
         `fmt` and `datefmt` are passed to Formatter.
         If `fmt` is None, DEFAULT_PFX_FORMAT is used.
         If `cmd` is not None, the message is prefixed with the string `cmd`.
-        If `context_level` is None, records with .level < context_level will not have the Pfx state inserted at the front of the message.
     '''
     self.cmd = cmd
-    self.context_level = context_level
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
@@ -266,17 +264,10 @@ class PfxFormatter(Formatter):
     try:
       s = Formatter.format(self, record)
     except TypeError as e:
-      X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
-      X("record=%s", record.__dict__)
-      X("self=%s", self.__dict__)
+      X("cs.logutils: PfxFormatter.format: record=%r, self=%s: %s", record, self, e)
       raise
-    message_parts = []
-    if self.context_level is None or record.level >= self.context_level:
-      message_parts.append(self.formatTime(record))
-      message_parts.append(record.pfx)
-    message_parts.append(s)
-    record.message = ': '.join(message_parts)
-    return record.message
+    record.message = s
+    return s
 
 def infer_logging_level(env_debug=None, environ=None):
   ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.

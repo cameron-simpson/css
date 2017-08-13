@@ -1,13 +1,14 @@
 #!/bin/sh
 #
-# Wrapper for cryptsetup to 
+# Wrapper for cryptsetup to do common partition crypto tasks.
+# - Cameron Simpson <cs@cskk.id.au> 
 #
 
 set -ue
 
 cmd=$(basename "$0")
 usage="Usage:
-  $cmd partition init name <passphrase
+  $cmd partition init name
   $cmd partition dump
   $cmd partition add [-f] slotnum <passphrase 3<newpassphrase
   $cmd partition mount name mountpoint <passphrase
@@ -17,7 +18,7 @@ partition=
 op=
 trace=
 fstype=xfs
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 
 badopts=
 

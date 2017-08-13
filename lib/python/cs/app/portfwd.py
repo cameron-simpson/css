@@ -15,6 +15,7 @@ from signal import signal, SIGHUP, SIGINT, SIGTERM
 import subprocess
 from subprocess import DEVNULL
 import sys
+from threading import RLock
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
@@ -70,7 +71,7 @@ def main(argv, environ=None):
   doit = True
   sshcfg = None
   auto_mode = False
-  flags = Flags(environ=environ)
+  flags = Flags(environ=environ, lock=RLock())
   trace = sys.stderr.isatty()
   verbose = False
 
@@ -193,6 +194,7 @@ class Portfwd(FlaggedMixin):
       self.flag_connected = False
     self.svcd = SvcD(self.ssh_argv,
                      name=self.svcd_name,
+                     flags=self.flags,
                      trace=trace,
                      sig_func=self.sig_func,
                      test_func=self.test_func,
