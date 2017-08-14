@@ -51,7 +51,7 @@ def unrfc2047(s, warning=None):
       if realtext is None:
         try:
           realtext = decoded.decode(charset)
-        except LookupError as e:
+        except (UnicodeDecodeError, LookupError) as e:
           warning("decode(%r): %e", decoded, e)
           realtext = decoded.decode('iso8859-1')
       chunks.append(realtext)
