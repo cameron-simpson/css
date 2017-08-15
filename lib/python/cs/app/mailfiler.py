@@ -480,7 +480,6 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     if flags.replied: maildir_flags += 'R'
     if flags.seen:    maildir_flags += 'S'
     if flags.trashed: maildir_flags += 'T'
-    mdirpath = mdir.dir
     if message_path is None:
       savekey = mdir.save_message(M, flags=maildir_flags)
     else:
@@ -674,7 +673,6 @@ class MessageFiler(O):
         The rule label, if any, is appended to the .labels attribute.
         Each target is applied to the state.
     '''
-    M = self.message
     with Pfx(R.context):
       self.flags.alert = max(self.flags.alert, R.flags.alert)
       if R.label:
@@ -685,7 +683,7 @@ class MessageFiler(O):
         except (AttributeError, NameError):
           raise
         except Exception as e:
-          warning("EXCEPTION %r", e)
+          exception("EXCEPTION %r", e)
           ##failed_actions.append( (action, arg, e) )
           raise
 
@@ -829,8 +827,9 @@ class MessageFiler(O):
   def alert_message(self, M):
     ''' Return the alert message filled out with parameters from the Message `M`.
     '''
+    fmt = self.alert_format
     try:
-      msg = self.format_message(M, self.alert_format)
+      msg = self.format_message(M, fmt)
     except KeyError as e:
       error("alert_message: format=%r, message keys=%s: %s",
             fmt, ','.join(sorted(list(M.keys()))), e)
@@ -875,7 +874,7 @@ class MessageFiler(O):
         if msg_id is None:
           warning("message-id is None!")
         else:
-          msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+          msg_ids = [ msg_id_word for msg_id_word in msg_id.split() if len(msg_id_word) > 0 ]
           if msg_ids:
             msg_id = msg_ids[0]
             subargv.extend( ['-e',
@@ -1297,7 +1296,7 @@ def get_target(s, offset, quoted=False):
       if not m:
         raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
       arglist_offset = m.end()
-      args.append(arg)
+      args.append(m.group(0))
       if arglist_offset >= len(arglist):
         break
       if arglist[arglist_offset] != ',':
@@ -1559,7 +1558,7 @@ class Condition_InGroups(_Condition):
         for group_name in self.group_names:
           # look for <...@domain>
           if group_name.startswith('@'):
-            if msgid_inner.lower().endswith(groupname):
+            if msgid_inner.lower().endswith(group_name):
               debug("match %s to %s", msgid, group_name)
               return True
           # look for specific <local@domain>
