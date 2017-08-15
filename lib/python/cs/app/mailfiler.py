@@ -24,15 +24,11 @@ DISTINFO = {
 
 from collections import namedtuple
 from copy import deepcopy
-from email import message_from_string, message_from_file
+from email import message_from_file
 from email.header import decode_header, make_header
-import email.parser
 from email.utils import getaddresses
-from functools import partial
 from getopt import getopt, GetoptError
-import io
 from logging import DEBUG
-import mailbox
 import os
 import os.path
 import re
