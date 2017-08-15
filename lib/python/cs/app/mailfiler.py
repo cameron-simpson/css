@@ -339,7 +339,12 @@ class MailFiler(O):
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
-            self.sweep(wmdir, justone=justone, no_remove=no_remove)
+            try:
+              self.sweep(wmdir, justone=justone, no_remove=no_remove)
+            except KeyboardInterrupt:
+              raise
+            except Exception as e:
+              exception("exception during sweep(%r): %s", wmdir, e)
         if delay is None:
           break
         debug("sleep %ds", delay)
