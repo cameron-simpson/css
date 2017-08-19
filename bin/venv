@@ -12,7 +12,7 @@ set -ue
 pyver() {
   # NB: before python 3.4 "python --version" wrote to stderr
   # http://bugs.python.org/issue18338
-  $trace "$1" --version 2>&1 | awk '{print$2}'
+  "$1" --version 2>&1 | awk '{print$2}'
 }
 
 : ${VENV_DIR:=$HOME/var/venv}
