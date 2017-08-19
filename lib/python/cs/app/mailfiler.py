@@ -41,26 +41,29 @@ from threading import Lock, RLock
 import time
 from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
+from cs.deco import cached
 import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
-from cs.fileutils import abspath_from_file, file_property, files_property, \
-                         longpath, Pathname
+from cs.filestate import FileState
+from cs.fileutils import abspath_from_file, longpath, Pathname
 import cs.lex
 from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
                    get_qstr, match_tokens, get_delimited
 from cs.logutils import setup_logging, with_log, \
                         debug, info, warning, error, exception, \
-                        D, X, LogTime
+                        D, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
 from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.pfx import Pfx
+from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
+from cs.x import X
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
@@ -249,8 +252,6 @@ class MailFiler(O):
     self._maildb_path = path
     self._maildb = None
 
-  ##@file_property
-  ##def maildb(self, path):
   @locked_property
   def maildb(self):
     path = self.maildb_path
@@ -1686,9 +1687,11 @@ class WatchedMaildir(O):
   def __init__(self, mdir, context, rules_path=None):
     self.mdir = Maildir(resolve_mail_path(mdir, os.environ['MAILDIR']))
     self.context = context
+    self.rules_path = rules_path
     if rules_path is None:
       # default to looking for .mailfiler inside the Maildir
       rules_path = os.path.join(self.mdir.dir, '.mailfiler')
+    self._rules = ()
     self._rules_paths = [ rules_path ]
     self._rules_lock = Lock()
     self.lurking = set()
@@ -1698,8 +1701,19 @@ class WatchedMaildir(O):
   def __str__(self):
     return "<WatchedMaildir modes=%s, %d rules, %d lurking>" \
            % (self.shortname,
-              len(self.rules),
+              len(self._rules),
               len(self.lurking))
+
+  def _rules_state(self):
+    states = []
+    for path in self._rules_paths:
+      try:
+        S = FileState(path)
+      except OSError as e:
+        states.append(None)
+      else:
+        states.append( (path, S.mtime, S.size, S.dev, S.ino) )
+    return states
 
   def close(self):
     self.flush()
@@ -1739,14 +1753,16 @@ class WatchedMaildir(O):
     info("unlurk %s", key)
     self.lurking.remove(key)
 
-  @files_property
-  def rules(self, rules_paths):
+  @prop
+  @cached(sig_func=lambda md: md._rules_state())
+  def rules(self):
     # base file is at index 0
-    path0 = rules_paths[0]
+    path0 = self.rules_path
     R = Rules(path0)
     # produce rules file list with base file at index 0
-    paths = [ path0 ] + [ path for path in R.rule_files if path != path0 ]
-    return paths, R
+    self._rules_paths = [ path0 ] + [ path for path in R.rule_files if path != path0 ]
+    ##X("_rules_paths ==> %r", self._rules_paths)
+    return R
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
