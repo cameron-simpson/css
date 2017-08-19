@@ -145,13 +145,14 @@ class Table(object):
     self.name_column = name_column
     self.row_tuple = namedtuple('%s_Row' % (table_name,), column_names)
     self.row_class = row_class
+    self.relations = {}
     self._lock = lock
 
   def __str__(self):
     return "%s:name=%s" % (self.__class__.__name__, self.table_name)
 
   def __repr__(self):
-    return "%s[%s]" % (self, ','.join(self._column_names))
+    return "%s[%s]" % (self, ','.join(self.column_names))
 
   def new_params(self):
     return self.db.new_params()
@@ -176,11 +177,11 @@ class Table(object):
     P = self.new_params()
     conditions = []
     for column_name, value in zip(column_names, values):
-      if isinstance(value, (list, tuple)):
+      if isinstance(value, (list, tuple, set)):
         conditions.append('`%s` in (%s)'
                           % (column_name, ','.join(P.vadd(column_name, value))))
       else:
-        conditions.append('%s = %s' % (column_name, P.add(column_name, value)))
+        conditions.append('`%s` = %s' % (column_name, P.add(column_name, value)))
     where_clause = ' AND '.join(conditions)
     return self.rows(where_clause, *P.values)
 
@@ -201,16 +202,17 @@ class Table(object):
     sqlargs = []
     if where:
       sql += ' where ' + where
-      sqlargs.append(where_argv)
+      sqlargs.extend(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
     ##info("SQL = %r", sql)
     ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
-      return self.conn.cursor().execute(sql, *sqlargs)
+      return self.conn.cursor().execute(sql, sqlargs)
 
-  def insert(self, column_names, valueses):
-    sql = 'insert into %s(%s) values ' % (self.table_name, ','.join(column_names))
+  def insert(self, column_names, valueses, ignore=False):
+    ins_cmd = 'insert or ignore' if ignore else 'insert'
+    sql = ins_cmd + ' into %s(%s) values ' % (self.table_name, ','.join(column_names))
     sqlargs = []
     tuple_param = '(%s)' % ( ','.join( '?' for _ in column_names ), )
     tuple_params = []
@@ -219,6 +221,8 @@ class Table(object):
       sqlargs.extend(values)
     sql += ', '.join(tuple_params)
     C = self.conn.cursor()
+    ##info("SQL = %r", sql)
+    ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       C.execute(sql, sqlargs)
     self.conn.commit()
@@ -332,6 +336,50 @@ class Table(object):
             self[int(new_id)] = new_name
             info("updated")
 
+  def link_to(self, other, local_column=None, other_column=None, rel_name=None):
+    ''' Associate this table with another via a column indexing `other`.
+        `other`: the other table
+        `local_column`: the column in this table with the other
+            table's column value; default `self.id_column`
+        `other_column`: the column in the other table with the
+            matching value; default `other.id_column`
+        `rel_name`: name for this relation; default `other.name`
+    '''
+    if rel_name is None:
+      rel_name = other.table_name
+    rels = self.relations
+    if rel_name in rels:
+      raise KeyError("relation %r already defined" % (rel_name,))
+    if other_column is None:
+      other_column = other.id_column
+    rels[rel_name] = lambda local_key: other.rows_by_value(other_column, local_key)
+
+  def link_via(self,
+               via, via_left_column, via_right_column,
+               other, left_column=None, right_column=None,
+               rel_name=None):
+    ''' Associate this table with another via a mapping table.
+        `via`: the mapping table
+        `via_left_column`: the column in `via` with this table's value
+        `via_right_column`: the column in `via` with the other table's value
+        `other`: the other table
+        `left_column`: value in this Table; default `self.id_column`
+        `right_column`: value in other Table; default `other.id_column`
+        `rel_name`: name for this relation; default from `other.name`
+    '''
+    if rel_name is None:
+      rel_name = other.table_name
+    if left_column is None:
+      left_column = self.id_column
+    if right_column is None:
+      right_column = other.id_column
+    rels = self.relations
+    if rel_name in rels:
+      raise KeyError("relation %r already defined" % (rel_name,))
+    rel = RelationVia(via, via_left_column, self, via_right_column, other,
+                      left_column=left_column, right_column=right_column)
+    rels[rel_name] = lambda left_key: rel.left_to_right(left_key)
+
 class Row(object):
 
   def __init__(self, table, values, lock=None):
@@ -430,70 +478,195 @@ class Row(object):
     self._row = self._row._replace(**{key: value})
 
   def __getattr__(self, attr):
-    if not attr.startswith('_') and attr in self.column_names:
+    ''' Implement the following attributes:
+          .column_name  => column value
+          .to_{relnam}s => related rows from another table
+    '''
+    T = self._table
+    if not attr.startswith('_') and attr in T.column_names:
+      # .column_name => column value
       return getattr(self._row, attr)
+    # .to_{relname}s => related rows in other table
+    if (
+      attr.startswith('to_')
+      and attr.endswith('s')
+    ):
+      rel_name = attr[3:-1]
+      if rel_name in T.relations:
+        return T.relations[rel_name](self.id_value)
+      warning("Row %s.to_%ss: NO SUCH RELATION %r", self, rel_name, rel_name)
     raise AttributeError("%s: no attr %r" % (self.__class__, attr,))
 
   def __setattr__(self, attr, value):
     if not attr.startswith('_') and attr in self.column_names:
       self[attr] = value
     else:
+      # TODO: use super().__setattr__ ?
       self.__dict__[attr] = value
 
-_IdRelation = namedtuple('IdRelation',
-                         'id_column relation left_column left right_column right')
-
-class IdRelation(_IdRelation):
-  ''' Manage a relationship between 2 Tables based on their id_columns.
-      Initialised with:
-      `id_column`: id column for the relation Table
-      `relation`: the relation Table
-      `left_column`: relation Table column containing the id for the left Table
-      `left`: the left Table
-      `right_column`: relation Table column containing the id for the right Table
-      `right`: the right Table
+_RelationTo = namedtuple('RelationTo', 'left via_left_column right via_right_column')
+class RelationTo(_RelationTo):
+  ''' Manage a relationship between 2 Tables.
   '''
 
-  def left_to_right(self, left_ids):
-    ''' Fetch right rows given a pythonic index into left.
+  def left_to_right(self, left_values):
+    return self.right.rows_by_value(self.via_right_column, left_values)
+
+def RelationVia(via, via_left_column, left, via_right_column, right,
+                left_column=None, right_column=None):
+    ''' Manage a relationship between 2 Tables based via a third mapping Table.
+        Initialised with:
+        `via`: the relation Table
+        `via_left_column`: via Table column containing the value for the left Table
+        `left`: the left Table
+        `via_right_column`: via Table column containing the value for the right Table
+        `right`: the right Table
+        `left_column`: left Table column containing the value, default `left.id_column`
+        `right_column`: right Table column containing the value, default `right.id_column`
     '''
-    condition = where_index(self.left_column, left_ids)
-    rel_rows = self.relation.rows(condition.where, *condition.params)
-    right_ids = set( [ rel[self.right_column] for rel in rel_rows ] )
-    if not right_ids:
+    if left_column is None:
+      left_column = left.id_column
+    if right_column is None:
+      right_column = right.id_column
+    return _RelationVia(via, via_left_column, left, via_right_column, right,
+                       left_column, right_column)
+
+_RelationViaTuple = namedtuple('RelationVia',
+                               '''via via_left_column left via_right_column right
+                                  left_column right_column''')
+class _RelationVia(_RelationViaTuple):
+  ''' Manage a relationship between 2 Tables based on their id_columns.
+      Initialised with:
+      `via`: the relation Table
+      `via_left_column`: via Table column containing the value for the left Table
+      `left`: the left Table
+      `via_right_column`: via Table column containing the value for the right Table
+      `right`: the right Table
+      `left_column`: left Table column containing the value,
+          default `left.id_column`
+      `right_column`: right Table column containing the value,
+          default `right.id_column`
+  '''
+
+  def right_keys(self, left_values):
+    ''' Fetch the right hand keys associated with the supplied `left_keys`.
+        Returns a set.
+    '''
+    condition = where_index(self.via_left_column, left_values)
+    rel_rows = self.via.rows(condition.where, *condition.params)
+    return set( [ row[self.via_right_column] for row in rel_rows ] )
+
+  def left_to_right(self, left_values):
+    ''' Fetch right hand rows given a pythonic index into left.
+    '''
+    if isinstance(left_values, (int, float, str)):
+      ''' A single key gets a proxy for the result, allowing modification.
+      '''
+      return RelatedRows(left_values, self)
+    right_values = self.right_keys(left_values)
+    if not right_values:
       return []
-    return self.right[right_ids]
+    return self.right.rows_by_value(self.right_column, right_values)
 
-  def right_to_left(self, right_ids):
-    ''' Fetch left rows given a pythonic index into right.
+  # default indirection is from left to right
+  __call__ = left_to_right
+
+  def add(self, left_value, right_value):
+    ''' Add the pair (`left_value`, `right_value`) to the mapping.
     '''
-    condition = where_index(self.right_column, right_ids)
-    rel_rows = self.relation.rows(condition.where, *condition.params)
-    left_ids = set( [ rel[self.left_column] for rel in rel_rows ] )
-    if not left_ids:
-      return []
-    return self.left[left_ids]
+    self.via.insert(
+      (self.via_left_column, self.via_right_column),
+      [ (left_value, right_value) ],
+      ignore=True
+    )
 
-  def add(self, left_id, right_id):
-    self.relation.insert( (self.left_column, self.right_column),
-                          [ (left_id, right_id) ] )
-
-  def remove(self, left_id, right_id):
-    self.relation.delete(
-      '%s = ? and %s = ?' % (self.left_column, self.right_column),
-      left_id, right_id)
-
-  def remove_left(self, left_ids):
-    ''' Remove all relation rows with the specified left_column values.
+  def __iadd__(self, lr):
+    ''' Insert the (left_value, right_value) pair `lr` into the mapping.
     '''
-    condition = where_index(self.left_column, left_ids)
-    return self.left.delete(condition.where, *condition.params)
+    left_value, right_value = lr
+    self.add(left_value, right_value)
 
-  def remove_right(self, right_ids):
-    ''' Remove all relation rows with the specified right_column values.
+  def remove(self, left_value, right_value):
+    # TODO: build the query with a Params
+    self.via.delete(
+      '%s = ? and %s = ?' % (self.via_left_column, self.via_right_column),
+      left_value, right_value)
+
+  def __isub__(self, lr):
+    ''' Remove the (left_value, right_value) pair `lr` from the mapping.
     '''
-    condition = where_index(self.right_column, right_ids)
-    return self.right.delete(condition.where, *condition.params)
+    left_value, right_value = lr
+    self.remove(left_value, right_value)
+
+  def remove_left(self, left_values):
+    ''' Remove all relation rows with the specified via_left_column values.
+    '''
+    condition = where_index(self.via_left_column, left_values)
+    return self.via.delete(condition.where, *condition.params)
+
+  def remove_right(self, right_values):
+    ''' Remove all relation rows with the specified via_right_column values.
+    '''
+    condition = where_index(self.via_right_column, right_values)
+    return self.via.delete(condition.where, *condition.params)
+
+class RelatedRows(object):
+  def __init__(self, left_key, via):
+    ''' A proxy for rows related to `left_key` throught the relation `via`.
+        `left_key`: the key of the left side of `via`
+        `via`: the RelationVia defining the relationship
+    '''
+    self.via = via
+    self.key = left_key
+    self._rows = None
+    self._row_set = None
+
+  def rows(self):
+    ''' Return the related rows from the right table.
+    '''
+    if self._rows is None:
+      self._rows = self.via.left_to_right([self.key])
+    return self._rows
+
+  def row_keys(self):
+    return self.via.right_keys(self.key)
+
+  def rowset(self):
+    ''' Return the related rows from the right table as a set.
+    '''
+    if self._row_set is None:
+      self._row_set = set(self.rows())
+    return self._row_set
+
+  def __len__(self):
+    return len(self.row_keys())
+
+  def __nonzero__(self):
+    return len(self) > 0
+
+  __bool__ = __nonzero__
+
+  def __iter__(self):
+    ''' Return an iterator of the rows.
+    '''
+    return iter(self.rows())
+
+  def __contains__(self, right_key):
+    ''' Test if `right_key` is in the relation.
+    '''
+    if isinstance(right_key, (int, float, str)):
+      return right_key in self.row_keys()
+    return right_key in self.rowset()
+
+  def __iadd__(self, right_key):
+    ''' Add (`self.key`, `right_key`) to the mapping.
+    '''
+    self.via += (self.key, right_key)
+
+  def __isub__(self, right_key):
+    ''' Remove (`self.key`, `right_key`) from the mapping.
+    '''
+    self.via -= (self.key, right_key)
 
 where_index_result = namedtuple(
                         'where_index_result',
