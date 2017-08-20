@@ -143,9 +143,6 @@ class Test_Misc(unittest.TestCase):
     self.assertTrue(data1 is None)
     PC.write1("data1 value 1")
     self.assertTrue(os.path.exists(PC._test1__filename))
-    data1 = PC.test1
-    # too soon after last poll
-    self.assertTrue(data1 is None)
     sleep(1.1)
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1")
@@ -165,115 +162,15 @@ class Test_Misc(unittest.TestCase):
     # too soon to poll
     self.assertEqual(data1, "data1 value 1b")
     sleep(1)
-    # poll should fail and keep cached value
+    # poll should return None
     data1 = PC.test1
-    self.assertEqual(data1, "data1 value 1b")
+    self.assertEqual(data1, None)
     PC.write1("data1 value 1bc")
     self.assertTrue(os.path.exists(PC._test1__filename))
-    data1 = PC.test1
-    # too soon to poll
-    self.assertEqual(data1, "data1 value 1b")
     sleep(1)
     # poll should succeed and load new value
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1bc")
-
-  def test_make_file_property_01(self):
-    PC = self.fileprop = TestFileProperty()
-    self.assertTrue(not os.path.exists(PC._test2__filename))
-    data2 = PC.test2
-    self.assertTrue(data2 is None)
-    PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2__filename))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.1)
-    data2 = PC.test2
-    # still soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.2)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1")
-    PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2__filename))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.1)
-    data2 = PC.test2
-    # still too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.3)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2__filename)
-    self.assertTrue(not os.path.exists(PC._test2__filename))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should fail and keep cached value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2__filename))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should succeed and load new value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1bc")
-
-  def test_make_files_property_01(self):
-    PC = self.filesprop = TestFilesProperty()
-    self.assertTrue(not os.path.exists(PC._test2s[0]))
-    with self.assertRaises(IOError) as cmgr:
-      data2 = PC.test2
-    self.assertEqual(cmgr.exception.errno, errno.ENOENT)
-    PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2s[0]))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.1)
-    data2 = PC.test2
-    # still soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.2)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1")
-    PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2s[0]))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.1)
-    data2 = PC.test2
-    # still too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.3)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2s[0])
-    self.assertTrue(not os.path.exists(PC._test2s[0]))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should fail and keep cached value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2s[0]))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should succeed and load new value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1bc")
 
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.
