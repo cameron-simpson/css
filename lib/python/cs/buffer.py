@@ -138,9 +138,14 @@ class CornuCopyBuffer(object):
         `one_fetch`: do a single data fetch, default False
         In `one_fetch` mode the read behaves
     '''
+    if size < 1:
+      raise ValueError("size < 1: %r" % (size,))
     if one_fetch and size >= len(self):
       return next(self)
-    return self.take(size)
+    try:
+      return self.take(size)
+    except ValueError as e:
+      raise EOFError("insufficient data available: %s" % (e,))
 
   def tell(self):
     ''' Compatibility method to allow using the buffer like a file.
