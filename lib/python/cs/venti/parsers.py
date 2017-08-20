@@ -70,7 +70,7 @@ scan_text_from_chunks = chunky(scan_text)
 
 def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
-      `bfr`: a CornuCopyBuffer
+      `bfr`: a CornuCopyBuffer providing data to parse
       `run_parser`: a callable which runs the parser; it should accept a
         CornuCopyBuffer as its sole argument.
       This function allocates an IterableQueue to receive the parser offset
