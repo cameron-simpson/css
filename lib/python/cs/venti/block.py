@@ -203,7 +203,7 @@ class _Block(object):
     offset2 = 0 # offset of start of leaf2
     leaf2 = None
     for leaf1 in leaves1:
-      end1 = offset1 + len(data1)
+      end1 = offset1 + len(leaf1)
       while offset < end1:
         # still more bytes in leaf1 needing comparison
         # fetch leaf2 if required
