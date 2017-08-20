@@ -290,6 +290,8 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
       If the `sig_func` is not specified it defaults to
         cs.filestate.FileState({filename}).
+      If the decorated function raises OSError with errno == ENOENT,
+      this returns None. Other exceptions are reraised.
   '''
   if attr_name is None:
     attr_name = func.__name__
@@ -312,7 +314,12 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       else:
         filename = filename0
     kw['filename'] = filename
-    return func(self, *a, **kw)
+    try:
+      return func(self, *a, **kw)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return None
+      raise
   dkw['attr_name'] = attr_name
   dkw['sig_func'] = sig_func
   return cached(wrap0, **dkw)
