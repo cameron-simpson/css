@@ -1,3 +1,4 @@
+cs.buffer.CornuCopyBuffer: automatically upgrade iterables to iterators?
 salt entries for Dirs,
 text serialisation: all human readable, regular syntax
 "live" xattr: x-vt-blockref => block reference as text
