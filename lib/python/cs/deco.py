@@ -2,10 +2,9 @@
 #
 # Decorators.
 #   - Cameron Simpson <cs@zip.com.au> 02jul2017
-# 
+#
 
 import time
-from cs.x import X
 
 def decorator(deco, *da, **dkw):
   ''' Wrapper for decorator functions to support optional keyword arguments.
@@ -20,12 +19,9 @@ def decorator(deco, *da, **dkw):
         def func2(...):
           ...
   '''
-  X("@decorator: deco=%s, da=%r, dkw=%r)", deco, da, dkw)
   def overdeco(*da, **dkw):
-    X("@decorator:overdeco: da=%r, dkw=%r)", da, dkw)
     if not da:
       def wrapper(*a, **dkw):
-        X("@decorator:wrapper:a=%r,kw=%r", a, dkw)
         func, = a
         return deco(func, **dkw)
       return wrapper
