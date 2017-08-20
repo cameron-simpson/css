@@ -76,6 +76,8 @@ def cached(func, **dkw):
   '''
   attr_name = dkw.pop('attr_name', None)
   poll_delay = dkw.pop('poll_delay', None)
+  if poll_delay is not None and poll_delay <= 0:
+    raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   sig_func = dkw.pop('sig_func', None)
   unset_value = dkw.pop('unset_value', None)
   if dkw:
