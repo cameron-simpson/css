@@ -154,6 +154,7 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
+    fp = self.Eopen._open_file
     with fp:
       with self._lock:
         fp.seek(offset)
