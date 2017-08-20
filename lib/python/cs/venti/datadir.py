@@ -4,6 +4,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+from binascii import hexlify
 from collections.abc import Mapping
 import csv
 import errno
@@ -15,19 +16,19 @@ from time import sleep
 from types import SimpleNamespace
 from uuid import uuid4
 from cs.cache import LRU_Cache
-from cs.csvutils import csv_reader, csv_writerow
+from cs.csvutils import csv_reader
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import D, debug, warning, error, exception
-from cs.pfx import Pfx, XP
+from cs.logutils import debug, warning, error, exception
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
-from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
-from cs.threads import locked, locked_property
+from cs.serialise import get_bs, put_bs
+from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -237,14 +238,14 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       added = False
       with Pfx("listdir(%r)", self.datadirpath):
         try:
-          listing = os.listdir(self.datadirpath)
+          listing = list(os.listdir(self.datadirpath))
         except OSError as e:
           if e.errno == errno.ENOENT:
             error("listing failed: %s", e)
             sleep(2)
             continue
           raise
-        for filename in os.listdir(self.datadirpath):
+        for filename in listing:
           if ( not filename.startswith('.')
            and filename.endswith(DATAFILE_DOT_EXT)
            and filename not in filemap):
@@ -323,7 +324,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     statefilepath = self.statefilepath
     ##if existspath(statefilepath):
     ##  os.system('sed "s/^/IN  /" %r' % (statefilepath,))
-    filemap = self._filemap
     with Pfx('_load_state(%r)', statefilepath):
       if existspath(statefilepath):
         with open(statefilepath, 'r') as fp:
@@ -389,7 +389,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       if filenum is None:
         filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
       elif filenum in filemap:
-        raise KeyError('already in filemap: %r' % (filennum,))
+        raise KeyError('already in filemap: %r' % (filenum,))
       F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
       filemap[filenum] = F
       filemap[filename] = F

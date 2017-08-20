@@ -8,16 +8,11 @@ from io import RawIOBase
 from os import SEEK_SET
 import sys
 from threading import RLock
-from cs.fileutils import BackedFile
-from cs.queues import IterableQueue
 from cs.threads import locked
 from cs.fileutils import BackedFile, ReadMixin
 from cs.pfx import Pfx, PfxThread, XP
-from cs.queues import IterableQueue
 from cs.threads import LockableMixin
-from cs.x import X
 from . import defaults
-from .meta import Meta
 from .block import Block
 from .blockify import top_block_for, blockify
 
@@ -256,7 +251,7 @@ class File(LockableMixin,ReadMixin):
     return b''.join(bss)
 
   @locked
-  def high_level_blocks(self, start=None, end=None):
+  def high_level_blocks(self, start=None, end=None, scanner=None):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
     return self._high_level_blocks_from_front_back(

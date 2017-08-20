@@ -6,14 +6,11 @@
 
 import sys
 import unittest
-from random import randint
-from cs.fileutils import BackedFile, BackedFile_TestMethods
-from cs.logutils import X, XP
+from cs.fileutils import BackedFile_TestMethods
 from . import defaults
-from .block import Block
 from .blockify import blockify, top_block_for
 from .store import MappingStore
-from .file import BlockFile, File
+from .file import File
 
 class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
 

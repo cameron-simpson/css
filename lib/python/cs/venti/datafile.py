@@ -5,26 +5,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from collections import namedtuple
 import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END, \
-               O_CREAT, O_EXCL, O_RDWR, O_RDONLY, O_WRONLY, O_APPEND
-import errno
+               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
 from threading import Lock
 from zlib import compress, decompress
 from cs.buffer import CornuCopyBuffer
-from cs.excutils import LogExceptions
 from cs.fileutils import fdreader
-import cs.logutils; cs.logutils.X_via_tty = True
-from cs.logutils import D, debug, warning, error, exception
-from cs.x import X
-from cs.pfx import XP
 from cs.pfx import Pfx
-from cs.obj import O
 from cs.resources import MultiOpenMixin
-from cs.seq import imerge
-from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
+from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
@@ -74,7 +65,7 @@ def scan_chunks(fp, do_decompress=False):
   ''' Read data chunks from `fp` and yield (offset, flags, data, offset2).
       Raises EOFError on premature end of file.
   '''
-  fp = fp.tell()
+  offset = fp.tell()
   while True:
     flags, data, offset2 = read_chunk(fp)
     yield offset, flags, data, offset2
@@ -101,7 +92,7 @@ class DataFile(MultiOpenMixin):
       raise ValueError("do_create=true requires readwrite=true")
     self.appending = False
     if do_create:
-      fd = os.open(pathname, O_CREAT|O_EXCL|O_WRONLY)
+      fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
       os.close(fd)
 
   def __str__(self):
@@ -114,7 +105,7 @@ class DataFile(MultiOpenMixin):
       self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384))
       self._rlock = Lock()
       if self.readwrite:
-        self._wfd = os.open(self.pathname, O_WRONLY|O_APPEND)
+        self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
         os.lseek(self._wfd, 0, SEEK_END)
         self._wlock = Lock()
 

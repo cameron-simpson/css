@@ -2,26 +2,27 @@ import os
 import os.path
 from cmd import Cmd
 from collections import namedtuple
-import pwd
+import errno
+from getopt import GetoptError
 import grp
+import pwd
+import shlex
 import stat
 import sys
-from threading import Lock, RLock
+from threading import RLock
 import time
 from cs.cmdutils import docmd
-from cs.logutils import D, debug, error, info, warning
-from cs.pfx import Pfx, XP
-from cs.lex import hexify, texthexify
-from cs.py.stack import stack_dump
+from cs.logutils import debug, error, info, warning
+from cs.pfx import Pfx
+from cs.lex import texthexify
 from cs.queues import MultiOpenMixin
-from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
-from cs.threads import locked, locked_property
-from cs.x import X
+from cs.threads import locked
 from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta, rwx
+from .paths import path_split, resolve
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -72,7 +73,6 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       name = namedata.decode()
     else:
       name = ""
-    meta = None
     if flags & F_HASMETA:
       metatext, offset = get_bss(data, offset)
     else:
@@ -343,7 +343,7 @@ class InvalidDirent(_Dirent):
       if M is None:
         M = Meta(self)
       elif isinstance(M, str):
-        M = Meta.from_text(meta, self)
+        M = Meta.from_text(M, self)
       self._meta = M
     return M
 
@@ -857,7 +857,6 @@ class DirFTP(Cmd):
           error("not found: unresolved path elements: %r", tail)
         else:
           M = E.meta
-          S = M.stat()
           u, g, perms = M.unix_perms
           typemode = M.unix_typemode
           typechar = ( '-' if typemode == stat.S_IFREG

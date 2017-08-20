@@ -3,13 +3,12 @@
 ''' Hooks for attaching cs.venti storage to a NodeDB.
 '''
 
-from cs.venti import texthexify, untexthexify
 import cs.venti.dir
 
 def register_with(nodedb, scheme='cs.venti'):
   ''' Register the cs.venti transcriptions with the supplied NodeDB.
   '''
-  nodedb.register_attr_type(cs.venti.dir.Dirent, scheme+'.Dirent',
+  nodedb.register_attr_type(cs.venti.dir.Dirent, scheme + '.Dirent',
                             dirent_totext, dirent_fromtext,
                             dirent_tobytes, dirent_frombytes)
 

@@ -5,10 +5,9 @@
 #
 
 import os
-from cs.logutils import D, info, warning, error
+from cs.logutils import error
 from cs.pfx import Pfx
-from .file import file_top_block
-from .dir import decode_Dirent_text, FileDirent
+from .dir import decode_Dirent_text
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)

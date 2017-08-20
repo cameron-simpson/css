@@ -7,12 +7,10 @@
 
 from functools import partial
 from os.path import basename, splitext
-import sys
-from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import exception
+from cs.buffer import chunky
+from cs.logutils import warning, exception
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
-from cs.x import X
 from .datafile import scan_chunks
 
 def linesof(chunks):
@@ -185,7 +183,6 @@ SCANNERS_BY_MIME_TYPE = {
   'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
   'audio/mpeg':    scan_mp3,
   'video/mp4':     scan_mp4,
-  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
   'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),

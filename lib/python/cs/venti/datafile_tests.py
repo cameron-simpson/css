@@ -6,7 +6,6 @@
 
 import os
 import sys
-from functools import partial
 import random
 import tempfile
 import unittest
@@ -14,13 +13,10 @@ try:
   import kyotocabinet
 except ImportError:
   kyotocabinet = None
-from cs.debug import thread_dump
-import cs.logutils
-cs.logutils.X_via_tty = True
-from cs.logutils import X
+##from cs.debug import thread_dump
 from cs.randutils import rand0, randblock
 from .datafile import DataFile
-from .hash_tests import _TestHashCodeUtils
+# from .hash_tests import _TestHashCodeUtils
 # TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
 
 # arbitrary limit
@@ -47,12 +43,12 @@ class TestDataFile(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    self.datafile.add(randblock(rand0(MAX_BLOCK_SIZE+1)))
+    self.datafile.add(randblock(rand0(MAX_BLOCK_SIZE + 1)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    data = randblock(rand0(MAX_BLOCK_SIZE+1))
+    data = randblock(rand0(MAX_BLOCK_SIZE + 1))
     self.datafile.add(data)
     data2 = self.datafile.fetch(0)
     self.assertEqual(data, data2)
@@ -63,7 +59,7 @@ class TestDataFile(unittest.TestCase):
     blocks = {}
     for n in range(RUN_SIZE):
       with self.subTest(put_block_n=n):
-        data = randblock(rand0(MAX_BLOCK_SIZE+1))
+        data = randblock(rand0(MAX_BLOCK_SIZE + 1))
         offset, offset2 = self.datafile.add(data)
         blocks[offset] = data
     offsets = list(blocks.keys())

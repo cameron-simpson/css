@@ -7,38 +7,27 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from functools import partial
 from collections import namedtuple
 from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFormatter
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
-from os.path import basename
-from pprint import pformat
 import stat
 import sys
 from threading import Thread, RLock
-import time
 from types import SimpleNamespace as NS
-from cs.debug import DummyMap, TracingObject
 from cs.lex import texthexify, untexthexify
 from cs.logutils import X, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
-from cs.pfx import XP
 from cs.pfx import Pfx
-from cs.obj import O, obj_as_dict
-from cs.py.func import funccite, funcname
+from cs.obj import O
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
 from . import defaults
 from .archive import strfor_Dirent, write_Dirent_str
-from .block import Block
-from .cache import FileCacheStore
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
-from .file import File
-from .meta import NOUSERID, NOGROUPID
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 from .store import MissingHashcodeError
@@ -375,7 +364,7 @@ class Inodes(object):
     H = HardlinkDirent.to_inum(inum, E.name)
     self._inode_map[inum] = Inode(inum, E)
     E.meta.nlink = 1
-    return Edst
+    return E
 
   @locked
   def inum_for_Dirent(self, E):
@@ -485,11 +474,6 @@ class _StoreFS_core(object):
           dump_Dirent(self.E, recurse=False)
           dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
-  def i2E(self, inum):
-    ''' Return the Dirent associated with the supplied `inum`.
-    '''
-    return self._inodes.dirent(inum)
-
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
     '''
@@ -523,6 +507,8 @@ class _StoreFS_core(object):
     return inum
 
   def i2E(self, inum):
+    ''' Return the Dirent associated with the supplied `inum`.
+    '''
     return self._inodes.dirent(inum)
 
   def _Estat(self, E):
@@ -680,7 +666,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       E = self._vt_core.i2E(inode)
     except ValueError as e:
       warning("access(inode=%d): %s", inode, e)
-      raise FUSEOSError(errno.EINVAL)
+      raise FuseOSError(errno.EINVAL)
     return E
 
   def _vt_EntryAttributes(self, E):
@@ -832,7 +818,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     Pdst[new_name] = EdstLink
     # increment link count on underlying Dirent
     Esrc.meta.nlink += 1
-    return self._vt_EntryAttributes(E)
+    return self._vt_EntryAttributes(Esrc)
 
   @handler
   def listxattr(self, inode, ctx):
@@ -1032,7 +1018,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def rmdir(self, parent_inode, name_b, ctx):
     name = self._vt_str(name_b)
     P = self._vt_core.i2E(parent_inode)
-    if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
+    if not self._vt_core._Eaccess(P, os.X_OK|os.W_OK, ctx):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]

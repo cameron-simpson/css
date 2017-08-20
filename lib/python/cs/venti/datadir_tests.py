@@ -23,7 +23,7 @@ RUN_SIZE = 100
 def mktmpdir(flavour=None):
   ''' Create a temporary scratch directory.
   '''
-  prefix="cs.venti.datafile.testdir"
+  prefix = "cs.venti.datafile.testdir"
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
@@ -98,7 +98,7 @@ class TestDataDir(unittest.TestCase):
       # store RUN_SIZE random blocks
       for n in range(RUN_SIZE):
         with self.subTest(store_block_n=n):
-          data = randblock(rand0(MAX_BLOCK_SIZE+1))
+          data = randblock(rand0(MAX_BLOCK_SIZE + 1))
           if data in by_data:
             continue
           hashcode = hashfunc(data)
