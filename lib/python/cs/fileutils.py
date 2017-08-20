@@ -303,7 +303,7 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       filename = filename0
       if filename is None:
         filename = getattr(self, filename_attr)
-      return FileState(filename)
+      return FileState(filename, missing_ok=True)
   def wrap0(self, *a, **kw):
     filename = kw.pop('filename', None)
     if filename is None:
