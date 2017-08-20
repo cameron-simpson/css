@@ -11,8 +11,8 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import debug, warning, error, exception, PrePfx
-from cs.pfx import Pfx, XP
+from cs.logutils import debug, warning, error, exception
+from cs.pfx import Pfx, XP, PrePfx
 from cs.predicate import post_condition
 from cs.py3 import BytesFile
 from cs.queues import IterableQueue
