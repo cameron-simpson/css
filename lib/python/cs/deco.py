@@ -88,12 +88,15 @@ def cached(func, **dkw):
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
   lastpoll_attr = val_attr + '__lastpoll'
+  firstpoll_attr = val_attr + '__firstpoll'
 
   def wrapper(self, *a, **kw):
+    first = getattr(self, firstpoll_attr, True)
+    setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
     # see if we should use the cached value
     try:
-      if poll_delay is not None:
+      if poll_delay is not None and not first:
         # too early to check the signature function?
         now = time.time()
         lastpoll = getattr(self, lastpoll_attr, None)
