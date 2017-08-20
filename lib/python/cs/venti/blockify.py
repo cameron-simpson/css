@@ -9,8 +9,8 @@ from functools import partial
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import PfxThread, debug, warning, exception, D
-from cs.pfx import Pfx
+from cs.logutils import debug, warning, exception, D
+from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.x import X

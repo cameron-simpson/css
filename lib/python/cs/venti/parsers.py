@@ -9,9 +9,10 @@ from functools import partial
 from os.path import basename, splitext
 import sys
 from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import X, PfxThread, exception
-from cs.pfx import Pfx
+from cs.logutils import exception
+from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
+from cs.x import X
 from .datafile import scan_chunks
 
 def linesof(chunks):
