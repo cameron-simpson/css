@@ -321,6 +321,7 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
         return None
       raise
   dkw['attr_name'] = attr_name
+  dkw['poll_delay'] = poll_delay
   dkw['sig_func'] = sig_func
   return cached(wrap0, **dkw)
 
