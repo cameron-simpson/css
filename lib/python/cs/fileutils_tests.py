@@ -32,7 +32,7 @@ class TestFileProperty(object):
     with open(self._test1__filename, "w") as fp:
       fp.write(data)
   def write2(self, data):
-    with open(self._test2_path__filename, "w") as fp:
+    with open(self._test2__filename, "w") as fp:
       fp.write(data)
   @file_property
   def test1(self, path):
@@ -48,10 +48,10 @@ class TestFilesProperty(object):
     self._test1__filenames = ('testfileprop1',)
     self._test1_lock = Lock()
   def write1(self, data):
-    with open(self._test1_paths[0], "w") as fp:
+    with open(self._test1s[0], "w") as fp:
       fp.write(data)
   def write2(self, data):
-    with open(self._test2_paths[0], "w") as fp:
+    with open(self._test2s[0], "w") as fp:
       fp.write(data)
 
   ##@files_property
@@ -80,10 +80,10 @@ class Test_Misc(unittest.TestCase):
     tidyup = [ self.proppath, self.lockpath ]
     if self.fileprop:
       tidyup.append(self.fileprop._test1__filename)
-      tidyup.append(self.fileprop._test2_path__filename)
+      tidyup.append(self.fileprop._test2__filename)
     if self.filesprop:
-      tidyup.extend(self.filesprop._test1_paths)
-      tidyup.extend(self.filesprop._test2_paths)
+      tidyup.extend(self.filesprop._test1s)
+      tidyup.extend(self.filesprop._test2s)
     for path in tidyup:
       try:
         os.remove(path)
@@ -160,7 +160,7 @@ class Test_Misc(unittest.TestCase):
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1b")
     os.remove(PC._test1__filename)
-    self.assertTrue(not os.path.exists(PC._test1_path__filename))
+    self.assertTrue(not os.path.exists(PC._test1__filename))
     data1 = PC.test1
     # too soon to poll
     self.assertEqual(data1, "data1 value 1b")
@@ -169,7 +169,7 @@ class Test_Misc(unittest.TestCase):
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1b")
     PC.write1("data1 value 1bc")
-    self.assertTrue(os.path.exists(PC._test1_path__filename))
+    self.assertTrue(os.path.exists(PC._test1__filename))
     data1 = PC.test1
     # too soon to poll
     self.assertEqual(data1, "data1 value 1b")
@@ -180,11 +180,11 @@ class Test_Misc(unittest.TestCase):
 
   def test_make_file_property_01(self):
     PC = self.fileprop = TestFileProperty()
-    self.assertTrue(not os.path.exists(PC._test2_path__filename))
+    self.assertTrue(not os.path.exists(PC._test2__filename))
     data2 = PC.test2
     self.assertTrue(data2 is None)
     PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2_path__filename))
+    self.assertTrue(os.path.exists(PC._test2__filename))
     data2 = PC.test2
     # too soon after last poll
     self.assertTrue(data2 is None)
@@ -196,7 +196,7 @@ class Test_Misc(unittest.TestCase):
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1")
     PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2_path__filename))
+    self.assertTrue(os.path.exists(PC._test2__filename))
     data2 = PC.test2
     # too soon after last poll
     self.assertEqual(data2, "data2 value 1")
@@ -207,8 +207,8 @@ class Test_Misc(unittest.TestCase):
     sleep(0.3)
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2_path__filename)
-    self.assertTrue(not os.path.exists(PC._test2_path__filename))
+    os.remove(PC._test2__filename)
+    self.assertTrue(not os.path.exists(PC._test2__filename))
     data2 = PC.test2
     # too soon to poll
     self.assertEqual(data2, "data2 value 1b")
@@ -217,7 +217,7 @@ class Test_Misc(unittest.TestCase):
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2_path__filename))
+    self.assertTrue(os.path.exists(PC._test2__filename))
     data2 = PC.test2
     # too soon to poll
     self.assertEqual(data2, "data2 value 1b")
@@ -228,12 +228,12 @@ class Test_Misc(unittest.TestCase):
 
   def test_make_files_property_01(self):
     PC = self.filesprop = TestFilesProperty()
-    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(not os.path.exists(PC._test2s[0]))
     with self.assertRaises(IOError) as cmgr:
       data2 = PC.test2
     self.assertEqual(cmgr.exception.errno, errno.ENOENT)
     PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2s[0]))
     data2 = PC.test2
     # too soon after last poll
     self.assertTrue(data2 is None)
@@ -245,7 +245,7 @@ class Test_Misc(unittest.TestCase):
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1")
     PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2s[0]))
     data2 = PC.test2
     # too soon after last poll
     self.assertEqual(data2, "data2 value 1")
@@ -256,8 +256,8 @@ class Test_Misc(unittest.TestCase):
     sleep(0.3)
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2_paths[0])
-    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
+    os.remove(PC._test2s[0])
+    self.assertTrue(not os.path.exists(PC._test2s[0]))
     data2 = PC.test2
     # too soon to poll
     self.assertEqual(data2, "data2 value 1b")
@@ -266,7 +266,7 @@ class Test_Misc(unittest.TestCase):
     data2 = PC.test2
     self.assertEqual(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2s[0]))
     data2 = PC.test2
     # too soon to poll
     self.assertEqual(data2, "data2 value 1b")
