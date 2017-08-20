@@ -21,14 +21,11 @@
       http://csbp.backpackit.com/pub/1356606
 '''
 
-import re
 import os
-from os.path import abspath
 from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X
 from cs.seq import isordered
 
 # Default OS level file high water mark.
@@ -83,7 +80,11 @@ class _TestAdditionsMixin:
 
   @staticmethod
   def mktmpdir(prefix="cs.venti"):
-    return tempfile.TemporaryDirectory(prefix="test-"+prefix+"-", suffix=".tmpdir", dir=os.getcwd())
+    return tempfile.TemporaryDirectory(
+        prefix="test-" + prefix + "-",
+        suffix=".tmpdir",
+        dir=os.getcwd()
+    )
 
   def assertLen(self, o, length, *a, **kw):
     ''' Test len(o) unless it raises NotImplementedError.
@@ -98,4 +99,6 @@ class _TestAdditionsMixin:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
-    self.assertTrue(isordered(s, reverse, strict), "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+    self.assertTrue(
+        isordered(s, reverse, strict),
+        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))

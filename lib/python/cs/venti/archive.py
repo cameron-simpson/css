@@ -15,11 +15,10 @@ from __future__ import print_function
 import os
 import stat
 import sys
-import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile, chain
+from itertools import chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
