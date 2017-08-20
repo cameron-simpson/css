@@ -35,8 +35,8 @@ class TestFileProperty(object):
     with open(self._test2__filename, "w") as fp:
       fp.write(data)
   @file_property
-  def test1(self, path):
-    with open(path) as fp:
+  def test1(self, filename):
+    with open(filename) as fp:
       data = fp.read()
     ##D("test1 loads \"%s\" => %s", path, data)
     return data
