@@ -141,7 +141,7 @@ def blocked_chunks_of(chunks, scanner,
         histogram=None):
   ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `scanner`
-      `scanner`: a callable accepting an iterable of data chunks and
+      `scanner`: a callable accepting a CornuCopyBuffer and
         returning an iterable of ints, such as a generator. `scanner`
         may be None, in which case only the rolling hash is used
         to locate boundaries.
