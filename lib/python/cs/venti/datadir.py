@@ -28,7 +28,7 @@ from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
