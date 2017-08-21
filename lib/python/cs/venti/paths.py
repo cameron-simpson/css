@@ -22,7 +22,9 @@ def decode_Dirent_text(text):
   return E
 
 def dirent_dir(direntpath, do_mkdir=False):
-  dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
+  dir, name, unresolved = dirent_resolve(direntpath, do_mkdir=do_mkdir)
+  if unresolved:
+    raise ValueError("unresolved remaining path: %r" % (unresolved,))
   if name is not None:
     if name in dir or not do_mkdir:
       dir = dir.chdir1(name)
@@ -31,7 +33,9 @@ def dirent_dir(direntpath, do_mkdir=False):
   return dir
 
 def dirent_file(direntpath, do_create=False):
-  E, name = dirent_resolve(direntpath)
+  E, name, unresolved = dirent_resolve(direntpath)
+  if unresolved:
+    raise ValueError("unresolved remaining path: %r" % (unresolved,))
   if name is None:
     return E
   if name in E:
