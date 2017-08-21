@@ -48,17 +48,6 @@ F_HASMETA = 0x01
 F_HASNAME = 0x02
 F_NOBLOCK = 0x04
 
-def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Dirent, such as from
-      Dirent.textencode(), and return the corresponding Dirent.
-  '''
-  data = fromtext(text)
-  E, offset = decode_Dirent(data, 0)
-  if offset < len(data):
-    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
-                     % (text, E, data[offset:]))
-  return E
-
 class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
 
   @classmethod

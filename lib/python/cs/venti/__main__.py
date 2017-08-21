@@ -32,10 +32,10 @@ from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
-from .dir import Dir, decode_Dirent_text
+from .dir import Dir, DirFTP
 from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
-from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
 
@@ -362,9 +362,9 @@ def cmd_catblock(args, verbose=None, log=None):
   for hctext in args:
     h = S.hashclass(fromtext(hctext))
     if indirect:
-      B = IndirectBlock(hashcode)
+      B = IndirectBlock(h)
     else:
-      B = Block(hashcode)
+      B = Block(h)
     for subB in B.leaves:
       sys.stdout.write(subB.data)
   return 0

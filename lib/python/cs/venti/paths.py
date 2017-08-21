@@ -7,7 +7,19 @@
 import os
 from cs.logutils import error
 from cs.pfx import Pfx
-from .dir import decode_Dirent_text
+from . import fromtext
+
+def decode_Dirent_text(text):
+  ''' Accept `text`, a text transcription of a Dirent, such as from
+      Dirent.textencode(), and return the corresponding Dirent.
+  '''
+  from .dir import decode_Dirent
+  data = fromtext(text)
+  E, offset = decode_Dirent(data, 0)
+  if offset < len(data):
+    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
+                     % (text, E, data[offset:]))
+  return E
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)

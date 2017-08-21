@@ -8,7 +8,8 @@ from random import shuffle
 import sys
 import unittest
 from cs.randutils import randbool
-from .dir import FileDirent, Dir, decode_Dirent, decode_Dirent_text
+from .dir import FileDirent, Dir, decode_Dirent
+from .paths import decode_Dirent_text
 from .store import MappingStore
 
 class TestAll(unittest.TestCase):
