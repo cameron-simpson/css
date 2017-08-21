@@ -706,9 +706,15 @@ def lsDirent(fp, E, name):
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
   t = datetime.datetime.fromtimestamp(int(st_mtime))
+  try:
+    h = B.hashcode
+  except AttributeError:
+    detail = repr(B)
+  else:
+    detail = hexify(B.hashcode)
   fp.write("%c %-41s %s %6d %s\n" \
            % (('d' if E.isdir else 'f'),
-              hexify(B.hashcode), t, st_size, name))
+              detail, t, st_size, name))
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.
