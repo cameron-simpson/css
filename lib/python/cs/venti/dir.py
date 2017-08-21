@@ -261,7 +261,7 @@ class _Dirent(object):
   def stat(self):
     from pwd import getpwnam
     meta = self.meta
-    user, group, unixmode = meta.unixPerms()
+    user, group, unixmode = meta.unix_perms
     if user is None:
       uid = uid_nobody
     else:
