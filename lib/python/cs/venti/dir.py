@@ -264,6 +264,8 @@ class _Dirent(object):
     user, group, unixmode = meta.unix_perms
     if user is None:
       uid = uid_nobody
+    elif isinstance(user, int):
+      uid = user
     else:
       try:
         uid = getpwnam(user)[2]
@@ -272,6 +274,8 @@ class _Dirent(object):
 
     if group is None:
       gid = gid_nogroup
+    elif isinstance(group, int):
+      gid = group
     else:
       try:
         gid = getpwnam(user)[2]
