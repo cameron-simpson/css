@@ -87,13 +87,13 @@ class _TestAdditionsMixin:
     )
 
   def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises NotImplementedError.
+    ''' Test len(o) unless it raises TypeError.
     '''
     try:
       olen = len(o)
     except TypeError:
-      import cs.logutils
-      cs.logutils.debug("skip assertLen(o, %d): no len(%s)", length, type(o))
+      from cs.x import X
+      X("no len(0) for o=%s:%r", type(o), o)
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
