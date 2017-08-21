@@ -67,7 +67,8 @@ def fromtext(s):
 # Because we transcribe Dir blocks this way it includes some common
 # characters used for metadata, notably including the double quote
 # because it is heavily using in JSON.
-_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*/'
+# It does NOT include '/' because these appear at the start of paths.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
