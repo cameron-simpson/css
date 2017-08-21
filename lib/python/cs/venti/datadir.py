@@ -225,7 +225,10 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     del self._filemap
     self.index.close()
     # release lockfile
-    os.remove(self.lockpath)
+    try:
+      os.remove(self.lockpath)
+    except OSError as e:
+      error("cannot remove lock file: %s", e)
     del self.lockpath
 
   def _monitor_datafiles(self):
