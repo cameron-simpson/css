@@ -93,6 +93,9 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     MultiOpenMixin.__init__(self, lock=self._lock)
     self.open()
 
+  def __str__(self):
+    return "File(backing_block=%s)" % (self._backing_block,)
+
   def _reset(self, new_backing_block):
     self._backing_block = new_backing_block
     self._file = BackedFile(BlockFile(new_backing_block))
