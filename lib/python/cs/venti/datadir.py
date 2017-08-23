@@ -68,8 +68,10 @@ class _DataDirFile(SimpleNamespace):
   def scan(self, offset=0, do_decompress=False):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (data, offset, post_offset).
     '''
+    X("TODO: WHY ALWAYS FROM 0? should pick up from statefile")
     X("_DataDirFile.scan(%r, offset=%d)...", self.pathname, offset)
-    return scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
+    yield from scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
+    X("_DataDirFile.scan(%r,..) COMPLETE", self.pathname)
 
   def scan_new(self, do_decompress=False):
     ''' Scan this datafile for new data.
