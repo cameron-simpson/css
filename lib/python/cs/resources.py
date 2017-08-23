@@ -106,10 +106,13 @@ class MultiOpenMixin(O):
           cs.py.stack.caller when needed. Presently the caller of the
           final close is recorded to help debugging extra close calls.
     '''
+    if not self.opened:
+      raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
     with self._lock:
       if self._opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
+        error("  final close was from %s", self._final_close_from)
         for Fkey in sorted(self._opened_from.keys()):
           error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
         ##from cs.debug import thread_dump
