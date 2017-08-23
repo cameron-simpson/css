@@ -40,7 +40,10 @@ class TCPStoreServer(MultiOpenMixin):
 
   def startup(self):
     self.S.open()
-    self.T = Thread(name="%s[server-thread]" % (self,), target=self.server.serve_forever, kwargs={'poll_interval': 0.5})
+    self.T = Thread(
+        name="%s[server-thread]" % (self,),
+        target=self.server.serve_forever,
+        kwargs={'poll_interval': 0.5})
     self.T.daemon = True
     self.T.start()
 
