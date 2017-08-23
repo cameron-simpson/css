@@ -212,6 +212,9 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
   def seek(self, offset, whence=SEEK_SET):
     return self._file.seek(offset, whence=whence)
 
+  def write(self, data):
+    return self._file.write(data)
+
   @locked
   def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
