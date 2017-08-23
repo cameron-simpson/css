@@ -129,14 +129,14 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
         `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
-      if not self._file.front_range:
+      old_file = self._file
+      if not old_file.front_range:
         XP("empty front_range, no action")
       else:
         # only do work if there are new data in the file
-        XP("front_range=%s", self.front_range)
+        XP("front_range=%s", old_file.front_range)
         # push the current state as the backing file
         # and initiate a sync to the Store
-        old_file = self._file
         old_file.read_only = True
         old_syncer = self._syncer
         new_file = BackedFile(old_file)
@@ -150,7 +150,8 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
               XP("File.update_store: syncing to Store...")
               B = top_block_for(
                     self._high_level_blocks_from_front_back(
-                        old_file.front_file, back_block, front_range,
+                        old_file.front_file, self.backing_block,
+                        old_file.front_range,
                         scanner=scanner))
             old_file.close()
             XP("File.update_store: syncing to Store: stored")
