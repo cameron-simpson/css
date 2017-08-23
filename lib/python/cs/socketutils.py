@@ -70,17 +70,18 @@ class OpenSocket(object):
             self._sock.shutdown(shut_mode)
           except socket.error as e:
             if e.errno == errno.ENOTCONN:
-              info("%s", e)
+              ##info("%s", e)
+              pass
             elif e.errno == errno.EBADF:
               warning("closed: %s", e)
             else:
-              warning("%s", e)
               raise
           except OSError as e:
             if e.errno == errno.EBADF:
               warning("already closed: %s", e)
             elif e.errno == errno.ENOTCONN:
-              warning("not connected: %s", e)
+              ##warning("not connected: %s", e)
+              pass
             else:
               raise
           self._close()
