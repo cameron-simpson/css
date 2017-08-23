@@ -8,10 +8,10 @@ from io import RawIOBase
 from os import SEEK_SET
 import sys
 from threading import RLock
-from cs.threads import locked
 from cs.fileutils import BackedFile, ReadMixin
 from cs.pfx import Pfx, PfxThread, XP
-from cs.threads import LockableMixin
+from cs.resources import MultiOpenMixin
+from cs.threads import locked, LockableMixin
 from . import defaults
 from .block import Block
 from .blockify import top_block_for, blockify
@@ -74,10 +74,11 @@ class BlockFile(RawIOBase,ReadMixin):
     self._offset += nread
     return nread
 
-class File(LockableMixin,ReadMixin):
+class File(MultiOpenMixin,LockableMixin,ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
+      Note that a File starts open and must be closed.
   '''
 
   def __init__(self, backing_block=None):
@@ -89,10 +90,21 @@ class File(LockableMixin,ReadMixin):
     self._syncer = None # syncing Thread, close waits for it
     self._reset(backing_block)
     self._lock = RLock()
+    MultiOpenMixin.__init__(self, lock=self._lock)
+    self.open()
 
   def _reset(self, new_backing_block):
     self._backing_block = new_backing_block
     self._file = BackedFile(BlockFile(new_backing_block))
+
+  def startup(self):
+    pass
+
+  def shutdown(self):
+    ''' Close the File, return the top Block.
+    '''
+    B = self.sync()
+    return B
 
   def __len__(self):
     return len(self._file)
@@ -192,13 +204,6 @@ class File(LockableMixin,ReadMixin):
       # extend the front_file and front_range
       self.front_file.truncate(length)
       front_range.add_span(front_range.end, length)
-
-  @locked
-  def close(self):
-    ''' Close the File, return the top Block.
-    '''
-    B = self.sync()
-    return B
 
   def seek(self, offset, whence=SEEK_SET):
     return self._file.seek(offset, whence=whence)
