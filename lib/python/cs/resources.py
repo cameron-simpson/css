@@ -97,7 +97,14 @@ class MultiOpenMixin(O):
 
   def close(self, enforce_final_close=False, caller_frame=None):
     ''' Decrement the open count.
-        If the count goes to zero, call self.shutdown().
+        If the count goes to zero, call self.shutdown() and return its value.
+        `enforce_final_close`: if true, the caller expects this to
+          be the final close for the object and a RuntimeError is
+          raised if this is not actually the case.
+        `caller_frame`: used for debugging; the caller may specify
+          this if necessary, otherwise it is computed from
+          cs.py.stack.caller when needed. Presently the caller of the
+          final close is recorded to help debugging extra close calls.
     '''
     retval = None
     with self._lock:
@@ -112,8 +119,9 @@ class MultiOpenMixin(O):
       self._opens -= 1
       opens = self._opens
     if opens == 0:
-      if caller_frame is not None:
-        self._final_close_from = caller_frame
+      if caller_frame is None:
+        caller_frame = caller()
+      self._final_close_from = caller_frame
       retval = self.shutdown()
       if not self._finalise_later:
         self.finalise()
