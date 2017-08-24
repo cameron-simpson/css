@@ -171,7 +171,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       old_file.read_only = True
       old_syncer = self._syncer
       new_file = BackedFile(old_file)
-      self._syncher = T
+      self._syncer = T
       self._file = new_file
       S.open()
       T.start()
