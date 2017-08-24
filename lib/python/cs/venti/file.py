@@ -144,11 +144,12 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
         # As a side-effect of setting .backing_block we discard the
         # front file data, which are now saved to the Store.
         XP("syncing to Store...")
-        B = top_block_for(
-              self._high_level_blocks_from_front_back(
-                  old_file.front_file, old_block,
-                  old_file.front_range,
-                  scanner=scanner))
+        with S:
+          B = top_block_for(
+                self._high_level_blocks_from_front_back(
+                    old_file.front_file, old_block,
+                    old_file.front_range,
+                    scanner=scanner))
         old_file.close()
         XP("syncing to Store: stored")
         with self._lock:
