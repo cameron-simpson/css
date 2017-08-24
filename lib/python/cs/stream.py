@@ -7,12 +7,12 @@
 import sys
 import errno
 from collections import namedtuple
-from threading import Thread, Lock
+from threading import Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, XP, PrePfx
+from cs.pfx import Pfx, PrePfx, PfxThread as Thread
 from cs.predicate import post_condition
 from cs.py3 import BytesFile, unicode
 from cs.queues import IterableQueue
@@ -250,7 +250,9 @@ class PacketConnection(object):
           try:
             packet = read_Packet(self._recv_fp)
           except EOFError:
+            X("EOF, leaving _receive loop")
             break
+          X("got packet: %s", packet)
           channel = packet.channel
           tag = packet.tag
           flags = packet.flags
@@ -360,15 +362,9 @@ class PacketConnection(object):
         try:
           write_Packet(fp, eof_packet)
           fp.close()
-        except IOError as e:
+        except (OSError, IOError) as e:
           if e.errno == errno.EPIPE:
-            debug("remote end closed: %s", e)
-          elif e.errno == errno.EBADF:
-            warning("local end closed: %s", e)
-          else:
-            raise
-        except OSError as e:
-          if e.errno == errno.EPIPE:
+            X("REMOTE CLOSED")
             debug("remote end closed: %s", e)
           elif e.errno == errno.EBADF:
             warning("local end closed: %s", e)
