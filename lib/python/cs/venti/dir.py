@@ -13,11 +13,12 @@ from threading import RLock
 import time
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, info, warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
 from cs.lex import texthexify
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked
+from cs.x import X
 from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
@@ -421,7 +422,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     Eopen = self._open_file
     Eopen.filename = self.name
-    self._block = Eopen.close()
+    self._block = Eopen.close(enforce_final_close=True)
     self._open_file = None
     self._check()
 
@@ -462,9 +463,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
         Otherwise get the length of the top Block.
     '''
     self._check()
-    if self._open_file is not None:
-      return len(self._open_file)
-    return len(self.block)
+    if self._open_file is None:
+      sz = len(self.block)
+    else:
+      sz = len(self._open_file)
+    return sz
 
   def flush(self, scanner=None):
     return self._open_file.flush(scanner)
