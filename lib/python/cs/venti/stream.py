@@ -34,6 +34,7 @@ class StreamStore(BasicStoreAsync):
 
   def __init__(self, name, send_fp, recv_fp, local_store=None, addif=False, **kw):
     ''' Initialise the Stream Store.
+        `name`: the Store name.
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.
         `local_store`: optional local Store for serving requests from the peer.
@@ -41,7 +42,7 @@ class StreamStore(BasicStoreAsync):
             the data chunk's hash and to only submit a T_ADD request
             if the block is missing; this is a bandwith optimisation
             at the expense of latency.
-        `name`: the Store name.
+        Other keyword arguments are passed to BasicStoreAsync.__init__.
     '''
     BasicStoreAsync.__init__(self, 'StreamStore:%s' % (name,), **kw)
     if local_store is not None:
