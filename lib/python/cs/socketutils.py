@@ -58,33 +58,32 @@ class OpenSocket(object):
 
   def close(self):
     with Pfx("%s.close", self):
-      if self._sock is not None:
-        if self._for_write:
-          shut_mode = socket.SHUT_WR
-          shut_mode_s = 'SHUT_WR'
-        else:
-          shut_mode = socket.SHUT_RD
-          shut_mode_s = 'SHUT_RD'
-        with Pfx("_sock.shutdown(%s)", shut_mode_s):
-          try:
-            self._sock.shutdown(shut_mode)
-          except socket.error as e:
-            if e.errno == errno.ENOTCONN:
-              ##info("%s", e)
-              pass
-            elif e.errno == errno.EBADF:
-              warning("closed: %s", e)
-            else:
-              raise
-          except OSError as e:
-            if e.errno == errno.EBADF:
-              warning("already closed: %s", e)
-            elif e.errno == errno.ENOTCONN:
-              ##warning("not connected: %s", e)
-              pass
-            else:
-              raise
-          self._close()
+      if self._sock is None:
+        warning("close when _sock=None")
+        return
+      if self._for_write:
+        shut_mode = socket.SHUT_WR
+        shut_mode_s = 'SHUT_WR'
+        self.flush()
+      else:
+        shut_mode = socket.SHUT_RD
+        shut_mode_s = 'SHUT_RD'
+      with Pfx("_sock.shutdown(%s)", shut_mode_s):
+        try:
+          self._sock.shutdown(shut_mode)
+        except (socket.error, OSError) as e:
+          if e.errno == errno.ENOTCONN:
+            # client end went away
+            ##info("%s", e)
+            pass
+          elif e.errno == errno.EBADF:
+            warning("closed: %s", e)
+          else:
+            X("UNEXPECTED ERROR 1: %s:%r", type(e), e)
+            raise
+        except:
+          X("UNEXPECTED ERROR 2: %s:%r", type(e), e)
+        self._close()
 
   def __del__(self):
     self._close()
