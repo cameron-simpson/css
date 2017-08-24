@@ -130,47 +130,51 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     '''
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       old_file = self._file
+      # only do work if there are new data in the file
       if not old_file.front_range:
         XP("empty front_range, no action")
-      else:
-        # only do work if there are new data in the file
-        XP("front_range=%s", old_file.front_range)
-        # push the current state as the backing file
-        # and initiate a sync to the Store
-        old_file.read_only = True
-        old_syncer = self._syncer
-        new_file = BackedFile(old_file)
-        S = defaults.S
-        with S:
-          def update_store():
-            # Recompute the top Block from the current high level blocks.
-            # As a side-effect of setting .backing_block we discard the
-            # front file data, which are now saved to the Store.
-            with S:
-              XP("File.update_store: syncing to Store...")
-              B = top_block_for(
-                    self._high_level_blocks_from_front_back(
-                        old_file.front_file, self.backing_block,
-                        old_file.front_range,
-                        scanner=scanner))
-            old_file.close()
-            XP("File.update_store: syncing to Store: stored")
-            with self._lock:
-              if self._file is old_file:
-                XP("File.update_store: syncing to Store: still using old _file, update to use new stored Block")
-                self._reset(B)
-              else:
-                XP("File.update_store: self has moved on, do not update _file")
-            if old_syncer:
-              XP("File.update_store: wait for previous _syncher...")
-              old_syncer.join()
-            XP("File.update_store: syncing to Store DONE")
-          T = PfxThread(name="%s.flush(): update_store" % (self,),
-                        target=update_store)
-          T.start()
-        self._syncher = T
-        self._file = new_file
-    XP("DONE")
+        return
+      XP("front_range=%s", old_file.front_range)
+      def update_store():
+        if old_syncer:
+          XP("wait for pending prior flush...")
+          old_syncer.join()
+        old_block = old_file.back_file.block
+        # Recompute the top Block from the current high level blocks.
+        # As a side-effect of setting .backing_block we discard the
+        # front file data, which are now saved to the Store.
+        XP("syncing to Store...")
+        B = top_block_for(
+              self._high_level_blocks_from_front_back(
+                  old_file.front_file, old_block,
+                  old_file.front_range,
+                  scanner=scanner))
+        old_file.close()
+        XP("syncing to Store: stored")
+        with self._lock:
+          if self._file is new_file:
+            XP("still using our new_file, update to use new stored Block")
+            self._reset(B)
+          else:
+            XP("File.update_store: self has moved on, do not update _file")
+        if old_syncer:
+          XP("File.update_store: wait for previous _syncher...")
+          old_syncer.join()
+        XP("File.update_store: syncing to Store DONE")
+        S.close()
+      S = defaults.S
+      T = PfxThread(name="%s.flush(): update_store" % (self,),
+                    target=update_store)
+      # push the current state as the backing file
+      # and initiate a sync to the Store
+      old_file.read_only = True
+      old_syncer = self._syncer
+      new_file = BackedFile(old_file)
+      self._syncher = T
+      self._file = new_file
+      S.open()
+      T.start()
+      XP("DONE")
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
