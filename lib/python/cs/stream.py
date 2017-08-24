@@ -252,7 +252,6 @@ class PacketConnection(object):
           except EOFError:
             X("EOF, leaving _receive loop")
             break
-          X("got packet: %s", packet)
           channel = packet.channel
           tag = packet.tag
           flags = packet.flags
