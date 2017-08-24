@@ -758,7 +758,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def fsync(self, fh, datasync):
-    self._fh(fh).flush()
+    self._vt_core._fh(fh).flush()
 
   @handler
   def fsyncdir(self, fh, datasync):
