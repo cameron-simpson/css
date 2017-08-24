@@ -214,6 +214,9 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       self.front_file.truncate(length)
       front_range.add_span(front_range.end, length)
 
+  def tell(self):
+    return self._file.tell()
+
   def seek(self, offset, whence=SEEK_SET):
     return self._file.seek(offset, whence=whence)
 
@@ -224,6 +227,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
   def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
+    f = self._file
     if offset is not None:
       with self._lock:
         self.seek(offset)
@@ -232,39 +236,43 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       return self.readall()
     if size < 1:
       raise ValueError("%s.read: size(%r) < 1 but not -1", self, size)
-    start = self._offset
+    start = f.tell()
     end = start + size
-    for inside, span in self.front_range.slices(start, end):
+    data = b''
+    for inside, span in f.front_range.slices(start, end):
       if inside:
         # data from the front file; return the first chunk
-        for chunk in filedata(self.front_file, start=span.start, end=span.end):
-          self._offset += len(chunk)
-          return chunk
+        for chunk in filedata(f.front_file, start=span.start, end=span.end):
+          data = chunk
+          break
       else:
         # data from the backing block: return the first chunk
         for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
           data = B[Bstart:Bend]
-          self._offset += len(data)
-          return data
-    return b''
+          break
+    f.seek(start + len(data))
+    return data
 
   @locked
   def readall(self):
     ''' Concatenate all the data from the current offset to the end of the file.
     '''
+    f = self._file
+    offset = self.tell()
     bss = []
-    for inside, span in self.front_range.slices(self._offset, len(self)):
+    for inside, span in f.front_range.slices(offset, len(self)):
       if inside:
         # data from the front file; return the spanned chunks
-        for chunk in filedata(self.front_file, start=span.start, end=span.end):
-          self._offset += len(chunk)
+        for chunk in filedata(f.front_file, start=span.start, end=span.end):
           bss.append(chunk)
+          offset += len(chunk)
       else:
         # data from the backing block: return the first chunk
         for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
           chunk = B[Bstart:Bend]
-          self._offset += len(chunk)
           bss.append(chunk)
+          offset += len(chunk)
+    f.seek(offset)
     return b''.join(bss)
 
   @locked
