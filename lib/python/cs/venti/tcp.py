@@ -81,6 +81,7 @@ class _RequestHandler(StreamRequestHandler):
                      OpenSocket(self.request, True),
                      local_store=self.S,
                     )
+    RS.startup()
     self.server.handlers.add(RS)
     RS.join()
     RS.shutdown()
