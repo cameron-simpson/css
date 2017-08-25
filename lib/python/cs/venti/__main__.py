@@ -15,7 +15,6 @@ from getopt import getopt, GetoptError
 import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
-from stat import S_ISDIR, S_ISREG
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
@@ -471,12 +470,12 @@ def cmd_import(args, verbose=None, log=None):
         error("%s", e)
         xit = 1
         continue
-      if S_ISDIR(S.st_mode):
+      if isdirpath(srcpath):
         E, errors = import_dir(srcpath)
         if errors:
           error("directory not fully imported")
           xit = 1
-      elif S_ISREG(S.st_mode):
+      elif isfilepath(srcpath):
         E = import_file(srcpath)
       else:
         error("not a file or directory")
