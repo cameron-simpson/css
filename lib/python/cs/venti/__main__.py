@@ -15,6 +15,7 @@ from getopt import getopt, GetoptError
 import datetime
 import shutil
 from signal import signal, SIGINT, SIGHUP
+from stat import S_ISDIR, S_ISREG
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
@@ -37,6 +38,7 @@ from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
+from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
 
 def main(argv):
@@ -64,6 +66,7 @@ def main(argv):
       dump filerefs
       fsck block blockref...
       ftp archive.vt
+      import paths...
       listen {-|host:port}
       ls [-R] dirrefs...
       mount archive.vt [mountpoint [subpath]]
@@ -453,6 +456,34 @@ def cmd_ftp(args, verbose=None, log=None):
       D = decode_Dirent_text(target)
       DirFTP(D).cmdloop()
     return 0
+
+def cmd_import(args, verbose=None, log=None):
+  ''' Import paths into the Store, print top Dirent for each.
+  '''
+  xit = 0
+  if not args:
+    raise GetoptError("missing paths")
+  for srcpath in args:
+    with Pfx(srcpath):
+      try:
+        S = os.lstat(srcpath)
+      except OSError as e:
+        error("%s", e)
+        xit = 1
+        continue
+      if S_ISDIR(S.st_mode):
+        E, errors = import_dir(srcpath)
+        if errors:
+          error("directory not fully imported")
+          xit = 1
+      elif S_ISREG(S.st_mode):
+        E = import_file(srcpath)
+      else:
+        error("not a file or directory")
+        xit = 1
+        continue
+    print(str(E))
+  return xit
 
 # TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
