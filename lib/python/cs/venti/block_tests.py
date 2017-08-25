@@ -13,16 +13,17 @@ from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.x import X
 from . import totext
-from .block import Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, \
+from .block import Block, HashCodeBlock, IndirectBlock, RLEBlock, \
+                LiteralBlock, SubBlock, \
                 verify_block, \
                 BlockType, \
                 encodeBlock, decodeBlock
-from .cache import MemoryCacheStore
+from .store import MappingStore
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.S = MemoryCacheStore("TestAll")
+    self.S = MappingStore("TestAll", {})
 
   def _verify_block(self, B, **kw):
     errs = list(verify_block(B, **kw))
@@ -38,6 +39,9 @@ class TestAll(unittest.TestCase):
       if block_type == BlockType.BT_HASHCODE:
         rs = randblock(size)
         B = Block(data=rs)
+        # we can get a literal block back - this is acceptable
+        if B.type == BlockType.BT_LITERAL:
+          block_type = BlockType.BT_LITERAL
       elif block_type == BlockType.BT_RLE:
         rb = bytes((rand0(256),))
         B = RLEBlock(size, rb)
