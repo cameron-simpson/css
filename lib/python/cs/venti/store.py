@@ -14,26 +14,17 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
-from binascii import hexlify
-from contextlib import contextmanager
-import os
-import os.path
 import sys
-from threading import Lock, RLock, Thread
-from time import sleep
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import status, info, debug, warning, D
-from cs.pfx import Pfx, XP
+from cs.logutils import info, debug, warning, error
+from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py3 import Queue
-from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
-from cs.threads import Q1, Get1
 from cs.x import X
-from . import defaults, totext
-from .datadir import DataDir, DEFAULT_INDEXCLASS
+from . import defaults
+from .datadir import DataDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
@@ -154,14 +145,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
-  def __str__(self):
-    return "Store(%s)" % self.name
-
   def hash(self, data):
     ''' Return a Hash object from data bytes.
         NB: does _not_ store the data.
     '''
-    return self.hashclass.from_data(data)
+    return self.hashclass.from_chunk(data)
 
   def startup(self):
     # Later already open

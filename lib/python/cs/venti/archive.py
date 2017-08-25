@@ -15,24 +15,21 @@ from __future__ import print_function
 import os
 import stat
 import sys
-import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile, chain
+from itertools import chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, info, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.seq import last
 from cs.x import X
-from . import totext, fromtext
-from .block import dump_block
 from .blockify import blockify, top_block_for
-from .dir import decode_Dirent_text, Dir, FileDirent, DirFTP
+from .dir import Dir, FileDirent, DirFTP
 from .file import filedata
-from .paths import resolve, path_split, walk
+from .paths import decode_Dirent_text, resolve, path_split, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 

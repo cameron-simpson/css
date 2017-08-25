@@ -5,13 +5,26 @@
 #
 
 import os
-from cs.logutils import D, info, warning, error
+from cs.logutils import error
 from cs.pfx import Pfx
-from .file import file_top_block
-from .dir import decode_Dirent_text, FileDirent
+from . import fromtext
+
+def decode_Dirent_text(text):
+  ''' Accept `text`, a text transcription of a Dirent, such as from
+      Dirent.textencode(), and return the corresponding Dirent.
+  '''
+  from .dir import decode_Dirent
+  data = fromtext(text)
+  E, offset = decode_Dirent(data, 0)
+  if offset < len(data):
+    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
+                     % (text, E, data[offset:]))
+  return E
 
 def dirent_dir(direntpath, do_mkdir=False):
-  dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
+  dir, name, unresolved = dirent_resolve(direntpath, do_mkdir=do_mkdir)
+  if unresolved:
+    raise ValueError("unresolved remaining path: %r" % (unresolved,))
   if name is not None:
     if name in dir or not do_mkdir:
       dir = dir.chdir1(name)
@@ -20,7 +33,9 @@ def dirent_dir(direntpath, do_mkdir=False):
   return dir
 
 def dirent_file(direntpath, do_create=False):
-  E, name = dirent_resolve(direntpath)
+  E, name, unresolved = dirent_resolve(direntpath)
+  if unresolved:
+    raise ValueError("unresolved remaining path: %r" % (unresolved,))
   if name is None:
     return E
   if name in E:

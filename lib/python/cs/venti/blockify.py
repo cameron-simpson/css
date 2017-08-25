@@ -5,16 +5,15 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from functools import partial
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import PfxThread, debug, warning, exception, D
-from cs.pfx import Pfx
+from cs.logutils import debug, warning, exception, D
+from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.x import X
-from .block import Block, IndirectBlock, dump_block
+from .block import Block, IndirectBlock
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
@@ -142,10 +141,10 @@ def blocked_chunks_of(chunks, scanner,
         histogram=None):
   ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `scanner`
-      `scanner`: a callable accepting an iterable of data chunks and
-        returning an iterable, such as a generator. `scanner` may
-        be None, in which case only the rolling hash is used to
-        locate boundaries.
+      `scanner`: a callable accepting a CornuCopyBuffer and
+        returning an iterable of ints, such as a generator. `scanner`
+        may be None, in which case only the rolling hash is used
+        to locate boundaries.
       `min_block`: the smallest amount of data that will be used
         to create a Block, default MIN_BLOCKSIZE
       `max_block`: the largest amount of data that will be used to
@@ -377,8 +376,6 @@ def blocked_chunks_of(chunks, scanner,
           scan_to = min(scan_to, max_rolling_point)
         if scan_to > offset:
           scan_len = scan_to - offset
-          found_offset = None
-          chunk_prefix = chunk[:scan_len]
           ##X("SCAN %d bytes...", scan_len)
           for upto, b in enumerate(chunk[:scan_len]):
             hash_value = ( ( ( hash_value & 0x001fffff ) << 7

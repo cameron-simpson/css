@@ -40,6 +40,8 @@ class CornuCopyBuffer(object):
     self.copy_offsets = copy_offsets
 
   def __len__(self):
+    ''' The length is the length of the internal buffer: data available without a fetch.
+    '''
     return len(self.buf)
 
   def __bool__(self):
@@ -47,6 +49,8 @@ class CornuCopyBuffer(object):
   __nonzero__ = __bool__
 
   def __getitem__(self, index):
+    ''' Fetch a byte form the internal buffer.
+    '''
     return self.buf[index]
 
   def __iter__(self):
@@ -99,17 +103,23 @@ class CornuCopyBuffer(object):
           # which returns an empty chunk at the current EOF
           # but can continue iteration
           break
-      self.buf = memoryview(b''.join(bufs))
+      if not bufs:
+        newbuf = b''
+      elif len(bufs) == 1:
+        newbuf = bufs[0]
+      else:
+        newbuf = b''.join(bufs)
+      self.buf = memoryview(newbuf)
 
-  def tail_extend(self, min_size):
+  def tail_extend(self, size):
     ''' Extend method for parsers reading "tail"-like chunk streams,
         typically raw reads from a growing file. These may read 0 bytes
         at EOF, but a future read may read more bytes of the file grows.
         Such an iterator can be obtained from
         cs.fileutils.read_from(..,tail_mode=True).
     '''
-    while min_size < self.length:
-      self.extend(min_size, short_ok=True)
+    while size < len(self):
+      self.extend(size, short_ok=True)
 
   def take(self, size, short_ok=False):
     ''' Return the next `size` bytes.
@@ -122,10 +132,20 @@ class CornuCopyBuffer(object):
     self.offset += size
     return taken
 
-  def read(self, size):
+  def read(self, size, one_fetch=False):
     ''' Compatibility method to allow using the buffer like a file.
+        `size`: the desired data size
+        `one_fetch`: do a single data fetch, default False
+        In `one_fetch` mode the read behaves
     '''
-    return self.take(size, short_ok=True)
+    if size < 1:
+      raise ValueError("size < 1: %r" % (size,))
+    if one_fetch and size >= len(self):
+      return next(self)
+    try:
+      return self.take(size)
+    except ValueError as e:
+      raise EOFError("insufficient data available: %s" % (e,))
 
   def tell(self):
     ''' Compatibility method to allow using the buffer like a file.
