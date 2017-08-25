@@ -27,7 +27,7 @@ from cs.x import X
 from . import fromtext, defaults
 from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import MemoryCacheStore, FileCacheStore
+from .cache import FileCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
@@ -46,16 +46,14 @@ def main(argv):
   setup_logging(cmd_name=cmd)
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
-      -C store    Use this as a front end cache store.
-                  "-" means no front end cache.
-      -M          Don't use an additional MemoryCacheStore front end.
-      -S store    Specify the store to use:
-                    [clause]        Specification from .vtrc.
-                    /path/to/dir    GDBMStore
-                    tcp:[host]:port TCPStore
-                    |sh-command     StreamStore via sh-command
-      -q          Quiet; not verbose. Default if stdout is not a tty.
-      -v          Verbose; not quiet. Default it stdout is a tty.
+      -C        Do not put a cache in from of the store.
+      -S store  Specify the store to use:
+                  [clause]        Specification from .vtrc.
+                  /path/to/dir    GDBMStore
+                  tcp:[host]:port TCPStore
+                  |sh-command     StreamStore via sh-command
+      -q        Quiet; not verbose. Default if stdout is not a tty.
+      -v        Verbose; not quiet. Default it stdout is a tty.
     Operations:
       ar tar-options paths..
       cat filerefs...
@@ -84,14 +82,13 @@ def main(argv):
     verbose = False
 
   dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-  dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
-  useMemoryCacheStore = True
+  no_cache = False
 
   args = argv[1:]
   try:
-    opts, args = getopt(args, 'C:MS:qv')
+    opts, args = getopt(args, 'CS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -99,14 +96,7 @@ def main(argv):
 
   for opt, val in opts:
     if opt == '-C':
-      # specify caching Store
-      if val == '-':
-        dflt_cache = None
-      else:
-        dflt_cache = val
-    elif opt == '-M':
-      # do not use the in-memory caching store
-      useMemoryCacheStore = False
+      no_cache = True
     elif opt == '-S':
       # specify Store
       dflt_vt_store = val
@@ -135,7 +125,7 @@ def main(argv):
   signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
 
   try:
-    xit = cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore)
+    xit = cmd_op(args, verbose, log, config, dflt_vt_store, no_cache)
   except GetoptError as e:
     error("%s", e)
     badopts = True
@@ -152,7 +142,7 @@ def main(argv):
 
   return xit
 
-def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore):
+def cmd_op(args, verbose, log, config, dflt_vt_store, no_cache):
   try:
     op = args.pop(0)
   except IndexError:
@@ -160,7 +150,7 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
   with Pfx(op):
     if op == "profile":
       return cmd_profile(args, verbose, log, config,
-                         dflt_vt_store, dflt_cache, useMemoryCacheStore)
+                         dflt_vt_store, no_cache)
     try:
       op_func = getattr(sys.modules[__name__], "cmd_" + op)
     except AttributeError:
@@ -176,19 +166,8 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
     except Exception as e:
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    S = FileCacheStore("vtfuse", S)
-    ### optional CacheStore
-    ##if dflt_cache is not None:
-    ##  try:
-    ##    C = Store(dflt_cache)
-    ##  except:
-    ##    exception("can't open cache store \"%s\"", dflt_cache)
-    ##    raise GetoptError("can't open cache: %s" % (dflt_cache,))
-    ##  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-    ### put an in-memory cache in front of the main cache
-    ##if useMemoryCacheStore:
-    ##  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-    ##                 S, MemoryCacheStore("MemoryCacheStore"))
+    if not no_cache:
+      S = FileCacheStore("vtfuse", S)
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
