@@ -370,7 +370,8 @@ class ChainStore(BasicStoreSync):
     ''' Fetch a block from the first Store which has it.
     '''
     for result in self._multicall('get_bg', (h,), parallel=False):
-      return result
+      if result is not None:
+        return result
 
   def contains(self, h):
     ''' Is the hashcode `h` in any of the subStores?
