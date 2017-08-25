@@ -10,9 +10,11 @@ from os import SEEK_SET, SEEK_CUR, SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
 from threading import Lock
+import time
 from zlib import compress, decompress
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import fdreader
+from cs.logutils import info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
@@ -157,8 +159,10 @@ def scan_datafile(pathname, offset=None, do_decompress=False):
       If `do_decompress` is true, decompress the data and strip
       that flag value.
   '''
+  start = time.time()
   if offset is None:
     offset = 0
+  offset0 = offset
   D = DataFile(pathname)
   with D:
     while True:
@@ -168,6 +172,10 @@ def scan_datafile(pathname, offset=None, do_decompress=False):
         break
       yield offset, flags, data, offset2
       offset = offset2
+  end = time.time()
+  if offset > offset0 and end > start:
+    info("%r: scanned %d bytes in %ss at %sB/s",
+         pathname, offset - offset0, end - start, (offset - offset0) / (end - start))
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests

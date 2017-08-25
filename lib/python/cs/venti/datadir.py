@@ -12,13 +12,13 @@ import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
 from threading import Lock, RLock, Thread
-from time import sleep
+import time
 from types import SimpleNamespace
 from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import debug, warning, error, exception
+from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -71,10 +71,7 @@ class _DataDirFile(SimpleNamespace):
   def scan(self, offset=0, do_decompress=False):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (data, offset, post_offset).
     '''
-    X("TODO: WHY ALWAYS FROM 0? should pick up from statefile")
-    X("_DataDirFile.scan(%r, offset=%d)...", self.pathname, offset)
     yield from scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
-    X("_DataDirFile.scan(%r,..) COMPLETE", self.pathname)
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
@@ -110,8 +107,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
-    X("STATEDIRPATH=%r", statedirpath)
-    X("DATADIRPATH=%r", datadirpath)
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
       # the "default" data dir may be created if the statedir exists
@@ -234,18 +229,17 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         except OSError as e:
           if e.errno == errno.ENOENT:
             error("listing failed: %s", e)
-            sleep(2)
+            time.sleep(2)
             continue
           raise
         for filename in listing:
           if ( not filename.startswith('.')
            and filename.endswith(DATAFILE_DOT_EXT)
            and filename not in filemap):
-            X("MONITOR: add new filename %r", filename)
+            info("MONITOR: add new filename %r", filename)
             self._add_datafile(filename, no_save=True)
             added = True
       if added:
-        X("new file: save state")
         self._save_state()
       # now scan datafiles for new data
       for filenum in filemap.keys():
@@ -274,9 +268,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
               break
           # update state after completion of a scan
           if advanced:
-            X("new blocks from file %d: save state", filenum)
             self._save_state()
-      sleep(1)
+      time.sleep(1)
 
   def localpathto(self, rpath):
     return joinpath(self.statedirpath, rpath)
