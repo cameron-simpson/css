@@ -1039,7 +1039,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
     with Pfx(E):
       M = E.meta
       if fields.update_atime:
-        info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
+        ##info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
+        pass
       if fields.update_mtime:
         M.mtime = attr.st_mtime_ns / 1000000000.0
       if fields.update_mode:
