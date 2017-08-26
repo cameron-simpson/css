@@ -6,6 +6,7 @@
 
 import os
 from os.path import basename, relpath, join as joinpath
+import time
 from cs.fileutils import read_from
 from cs.logutils import info
 from cs.pfx import Pfx, XP
@@ -35,7 +36,6 @@ def import_dir(srcpath, do_merge=False):
                 errors.append( ('conflict', filepath, joinpath(rpath, filename)) )
                 ok = False
                 continue
-            info("import %r ...", filepath)
             F = import_file(filepath)
             subD[filename] = F
   return D, errors
@@ -44,8 +44,15 @@ def import_file(srcpath):
   ''' Read an OS file into the Store, return a FileDirent.
   '''
   with Pfx("import_file(%r)", srcpath):
+    start = time.time()
     with open(srcpath, 'rb') as fp:
       scanner = scanner_from_filename(srcpath)
       blocks = blocks_of(read_from(fp), scanner)
       B = top_block_for(blocks)
+    end = time.time()
+    if end > start:
+      elapsed = end - start
+      print("%r: %d bytes in %ss at %s B/s" % (srcpath, len(B), elapsed, len(B) / elapsed))
+    else:
+      print("%r: %d bytes in 0s" % (srcpath, len(B)))
     return FileDirent(basename(srcpath), block=B)
