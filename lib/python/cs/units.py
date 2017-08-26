@@ -7,9 +7,10 @@
 Functions for decomposing nonnegative integers according to various unit scales.
 
 Presupplied scales:
-  TIME_SCALE    Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
   BINARY_BYTES_SCALE  Units of (B)ytes, KiB, MiB, GiB etc.
   DECIMAL_BYTES_SCALE Units of (B)ytes, KB, MB, GB etc.
+  DECIMAL_SCALE       Unit prefixes K, M, G etc.
+  TIME_SCALE          Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
 '''
 
 TIME_SCALE = (
@@ -36,6 +37,15 @@ DECIMAL_BYTES_SCALE = (
     ( 1000, 'GB' ),
     ( 1000, 'TB' ),
     ( 0, 'PB' ),
+)
+
+DECIMAL_SCALE = (
+    ( 1000, '' ),
+    ( 1000, 'K' ),
+    ( 1000, 'M' ),
+    ( 1000, 'G' ),
+    ( 1000, 'T' ),
+    ( 0, 'P' ),
 )
 
 def human(n, scale):
