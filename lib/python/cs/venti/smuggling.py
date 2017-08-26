@@ -10,6 +10,7 @@ import time
 from cs.fileutils import read_from
 from cs.logutils import info
 from cs.pfx import Pfx, XP
+from cs.units import transcribe, TIME_SCALE, BINARY_BYTES_SCALE, DECIMAL_SCALE
 from .blockify import blocks_of, top_block_for
 from .dir import Dir, FileDirent
 from .parsers import scanner_from_filename
@@ -50,9 +51,12 @@ def import_file(srcpath):
       blocks = blocks_of(read_from(fp), scanner)
       B = top_block_for(blocks)
     end = time.time()
+    len_text = transcribe(len(B), BINARY_BYTES_SCALE, max=1, sep=' ')
     if end > start:
       elapsed = end - start
-      print("%r: %d bytes in %ss at %s B/s" % (srcpath, len(B), elapsed, len(B) / elapsed))
+      elapsed_text = transcribe(elapsed, TIME_SCALE)
+      KBps = int(len(B) / elapsed / 1024)
+      print("%r: %s in %ss at %dKiBps" % (srcpath, len_text, elapsed, KBps))
     else:
-      print("%r: %d bytes in 0s" % (srcpath, len(B)))
+      print("%r: %s in 0s" % (srcpath, len(B)))
     return FileDirent(basename(srcpath), block=B)
