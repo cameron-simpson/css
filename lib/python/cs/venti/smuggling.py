@@ -6,9 +6,12 @@
 
 import os
 from os.path import basename, relpath, join as joinpath
+from cs.fileutils import read_from
 from cs.logutils import info
-from cs.pfx import Pfx
-from .dir import Dir
+from cs.pfx import Pfx, XP
+from .blockify import blocks_of, top_block_for
+from .dir import Dir, FileDirent
+from .parsers import scanner_from_filename
 
 def import_dir(srcpath, do_merge=False):
   ''' Import a directory tree, return a Dir and list of errors.
@@ -31,10 +34,10 @@ def import_dir(srcpath, do_merge=False):
                 error("already exists, merge not yet implemented")
                 errors.append( ('conflict', filepath, joinpath(rpath, filename)) )
                 ok = False
-              else:
-                info("import %r ...", filepath)
-                F = import_file(filepath)
-                subD[filename] = F
+                continue
+            info("import %r ...", filepath)
+            F = import_file(filepath)
+            subD[filename] = F
   return D, errors
 
 def import_file(srcpath):
@@ -43,5 +46,6 @@ def import_file(srcpath):
   with Pfx("import_file(%r)", srcpath):
     with open(srcpath, 'rb') as fp:
       scanner = scanner_from_filename(srcpath)
-      B = top_block_for(blocks_of(read_from(fp), scanner))
+      blocks = blocks_of(read_from(fp), scanner)
+      B = top_block_for(blocks)
     return FileDirent(basename(srcpath), block=B)
