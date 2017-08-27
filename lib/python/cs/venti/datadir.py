@@ -316,10 +316,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Read STATE_FILENAME.
     '''
     statefilepath = self.statefilepath
-    X("LOAD STATE FROM %r", statefilepath)
     ##if existspath(statefilepath):
     ##  os.system('sed "s/^/IN  /" %r' % (statefilepath,))
-    with Pfx('_load_state(%r)', statefilepath):
+    with Pfx('_load_state(%r)', shortpath(statefilepath)):
       if existspath(statefilepath):
         with open(statefilepath, 'r') as fp:
           extras = self._extra_state
@@ -349,7 +348,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 else:
                   _, filename, size = row
                   size = int(size)
-                  XP("add datafile %r n=%d size=%d", filename, filenum, size)
                   self._add_datafile(filename, filenum=filenum, size=size, no_save=True)
     # presume data in state dir if not specified
     if self.datadirpath is None:
@@ -381,8 +379,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `filenum`: optional index number.
         `size`: optional size, default 0.
     '''
-    X("_ADD_DATAFILE(filename=%r,filenum=%s,size=%d,no_save=%s)...",
-        filename,filenum,size,no_save)
     filemap = self._filemap
     if filename in filemap:
       raise KeyError('already in filemap: %r' % (filename,))
