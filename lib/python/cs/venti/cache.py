@@ -28,9 +28,14 @@ class FileCacheStore(BasicStoreSync):
   '''
 
   def __init__(self, name, backend, dirpath=None, **kw):
-    BasicStoreSync.__init__(self, "%s(%s)" % (self.__class__.__name__, name,), **kw)
+    BasicStoreSync.__init__(self, name, **kw)
+    self._attrs.update(backend=backend)
     self.backend = backend
     self.cache = FileDataMappingProxy(backend, dirpath=dirpath)
+    self._attrs.update(
+        cachefiles=self.cache.max_cachefiles,
+        cachesize=self.cache.max_cachefile_size
+    )
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
