@@ -92,7 +92,8 @@ def parse_store_spec(s, offset, config=None):
   else:
     # /path/to/datadir
     if s.startswith('/', offset) or s.startswith('./', offset):
-      S = DataDirStore(s, s, None, None, None)
+      dirpath = s[offset:]
+      S = DataDirStore(dirpath, dirpath)
       offset = len(s)
     # |shell command
     elif s.startswith('|', offset):
