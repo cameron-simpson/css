@@ -158,6 +158,10 @@ PREFIXES_GO = (
 PREFIXES_PERL = (
     'package ', 'sub ',
 )
+PREFIXES_PDF = (
+    '<<',
+    'stream',
+)
 PREFIXES_SH = (
     'function ',
 )
@@ -171,6 +175,7 @@ SCANNERS_BY_EXT = {
   'go':     partial(scan_text, prefixes=PREFIXES_GO),
   'mp3':    scan_mp3,
   'mp4':    scan_mp4,
+  'pdf':    partial(scan_text, prefixes=PREFIXES_PDF),
   'pl':     partial(scan_text, prefixes=PREFIXES_PERL),
   'pm':     partial(scan_text, prefixes=PREFIXES_PERL),
   'py':     partial(scan_text, prefixes=PREFIXES_PYTHON),
