@@ -47,14 +47,14 @@ def main(argv):
   setup_logging(cmd_name=cmd)
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
-      -C        Do not put a cache in from of the store.
+      -C        Do not put a cache in front of the store.
       -S store  Specify the store to use:
                   [clause]        Specification from .vtrc.
                   /path/to/dir    GDBMStore
                   tcp:[host]:port TCPStore
                   |sh-command     StreamStore via sh-command
-      -q        Quiet; not verbose. Default if stdout is not a tty.
-      -v        Verbose; not quiet. Default it stdout is a tty.
+      -q        Quiet; not verbose. Default if stderr is not a tty.
+      -v        Verbose; not quiet. Default if stderr is a tty.
     Operations:
       ar tar-options paths..
       cat filerefs...
@@ -72,15 +72,16 @@ def main(argv):
       pack paths...
       scan datafile
       pull other-store objects...
+      report
       unpack dirrefs...
 ''' % (cmd,)
 
   badopts = False
 
-  # verbose if stdout is a tty
+  # verbose if stderr is a tty
   try:
-    verbose = sys.stdout.isatty()
-  except:
+    verbose = sys.stderr.isatty()
+  except AttributeError:
     verbose = False
 
   dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
@@ -169,7 +170,7 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, no_cache):
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
     if not no_cache:
-      S = FileCacheStore("vtfuse", S)
+      S = FileCacheStore("main", S)
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
@@ -348,6 +349,12 @@ def cmd_catblock(args, verbose=None, log=None):
       B = Block(h)
     for subB in B.leaves:
       sys.stdout.write(subB.data)
+  return 0
+
+def cmd_report(args, verbose=None, log=None):
+  ''' Report stuff after store setup.
+  '''
+  print("S =", defaults.S)
   return 0
 
 def cmd_datadir(args, verbose=None, log=None):
