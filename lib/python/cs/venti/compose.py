@@ -7,7 +7,7 @@
 from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
-from cs.fileutils import longpath
+from cs.fileutils import longpath, shortpath
 from cs.lex import get_qstr
 from cs.logutils import debug
 from cs.pfx import Pfx
@@ -148,7 +148,7 @@ class ConfigFile(ConfigWatcher):
     debug("ConfigFile.Store(clause_name=%r)...", clause_name)
     S = self._stores.get(clause_name)
     if S is None:
-      store_name = "%s[%s]" % (self, clause_name)
+      store_name = "%s[%s]" % (shortpath(self._config__filename), clause_name)
       with Pfx(store_name):
         clause = self[clause_name]
         stype = clause.get('type')
