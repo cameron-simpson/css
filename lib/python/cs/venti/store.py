@@ -433,10 +433,6 @@ class DataDirStore(MappingStore):
     datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
-    self._attrs.update(
-        data=shortpath(datadir.datadirpath),
-        state=shortpath(datadir.statedirpath),
-    )
 
   def startup(self, **kw):
     X("DataDirStore.startup: _datadir.open...")
