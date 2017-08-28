@@ -18,7 +18,7 @@ DISTINFO = {
     'install_requires': [],
 }
 
-# set to true to log as a warning
+# set to a logger to log as a warning
 X_logger = None
 # set to true to write direct to /dev/tty
 X_via_tty = False
