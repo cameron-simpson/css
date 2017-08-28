@@ -7,10 +7,9 @@
 
 from functools import partial
 from os.path import basename, splitext
-import sys
-from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import X, PfxThread, exception
-from cs.pfx import Pfx
+from cs.buffer import chunky
+from cs.logutils import warning, exception
+from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from .datafile import scan_chunks
 
@@ -69,7 +68,7 @@ scan_text_from_chunks = chunky(scan_text)
 
 def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
-      `bfr`: a CornuCopyBuffer
+      `bfr`: a CornuCopyBuffer providing data to parse
       `run_parser`: a callable which runs the parser; it should accept a
         CornuCopyBuffer as its sole argument.
       This function allocates an IterableQueue to receive the parser offset
@@ -184,7 +183,6 @@ SCANNERS_BY_MIME_TYPE = {
   'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
   'audio/mpeg':    scan_mp3,
   'video/mp4':     scan_mp4,
-  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
   'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),

@@ -68,7 +68,12 @@ class _PfxThreadState(threading.local):
     global cmd
     stack = self.stack
     if not stack:
-      return Pfx(cmd if cmd else sys.argv.get(0, "NO_SYS_ARGV_0"))
+      if not cmd:
+        try:
+          cmd = sys.argv[0]
+        except IndexError:
+          cmd = "NO_SYS_ARGV_0"
+      return Pfx(cmd)
     return stack[-1]
 
   @property

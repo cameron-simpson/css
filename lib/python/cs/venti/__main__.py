@@ -24,18 +24,18 @@ from cs.logutils import exception, error, warning, info, debug, setup_logging, l
 from cs.pfx import Pfx
 from cs.tty import statusline
 from cs.x import X
-from . import totext, fromtext, defaults
+from . import fromtext, defaults
 from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import CacheStore, MemoryCacheStore, FileCacheStore
+from .cache import MemoryCacheStore, FileCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
-from .dir import Dir, decode_Dirent_text
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .dir import Dir, DirFTP
+from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
-from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import ProgressStore, DataDirStore
 
@@ -362,9 +362,9 @@ def cmd_catblock(args, verbose=None, log=None):
   for hctext in args:
     h = S.hashclass(fromtext(hctext))
     if indirect:
-      B = IndirectBlock(hashcode)
+      B = IndirectBlock(h)
     else:
-      B = Block(hashcode)
+      B = Block(h)
     for subB in B.leaves:
       sys.stdout.write(subB.data)
   return 0
@@ -504,7 +504,7 @@ def cmd_listen(args, verbose=None, log=None):
     raise GetoptError("expected a port")
   arg = args[0]
   if arg == '-':
-    from cs.venti.stream import StreamDaemon
+    from cs.venti.stream import StreamStore
     RS = StreamStore("%s listen -" % (cmd,), sys.stdin, sys.stdout,
                      local_store=S)
     RS.join()
@@ -658,7 +658,7 @@ def cmd_scan(args, verbose=None, log=None):
       D = DataDir(dirpath)
       with D:
         for n, offset, data in D.scan():
-          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
     else:
       filepath = arg
       F = DataFile(filepath)
@@ -666,7 +666,7 @@ def cmd_scan(args, verbose=None, log=None):
         for offset, flags, data in F.scan():
           if flags & F_COMPRESSED:
             data = decompress(data)
-          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
   return 0
 
 def cmd_unpack(args, verbose=None, log=None):
@@ -706,9 +706,15 @@ def lsDirent(fp, E, name):
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
   t = datetime.datetime.fromtimestamp(int(st_mtime))
+  try:
+    h = B.hashcode
+  except AttributeError:
+    detail = repr(B)
+  else:
+    detail = hexify(B.hashcode)
   fp.write("%c %-41s %s %6d %s\n" \
            % (('d' if E.isdir else 'f'),
-              hexify(B.hashcode), t, st_size, name))
+              detail, t, st_size, name))
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.

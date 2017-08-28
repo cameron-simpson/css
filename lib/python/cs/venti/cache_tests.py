@@ -4,15 +4,11 @@
 #       - Cameron Simpson <cs@zip.com.au> 25aug2015
 #
 
-import os
-import random
 import sys
 import unittest
-from cs.logutils import X
 from .store import MappingStore
 from .store_tests import TestStore
 from .cache import CacheStore, MemoryCacheStore
-from .hash import DEFAULT_HASHCLASS
 
 class TestCacheStore(TestStore, unittest.TestCase):
   def _init_Store(self):

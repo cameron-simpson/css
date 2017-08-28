@@ -4,19 +4,16 @@ from __future__ import print_function
 import errno
 import json
 import os
-from os import geteuid, getegid
 import stat
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.lex import texthexify, untexthexify
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
+from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
-from cs.x import X
-from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -199,9 +196,9 @@ class AC_Other(AC):
     AC.__init__(self, '*', allow, deny)
 
 _AC_prefix_map = {
-  'o':  AC_Owner,
-  'g':  AC_Group,
-  '*':  AC_Other,
+  'o': AC_Owner,
+  'g': AC_Group,
+  '*': AC_Other,
 }
 
 def decodeAC(ac_text):
@@ -516,7 +513,7 @@ class Meta(dict):
     '''
     return self.get('sg', False)
 
-  @setuid.setter
+  @setgid.setter
   def setgid(self, flag):
     ''' Set the setgidness of this Meta.
     '''
@@ -753,7 +750,7 @@ class Meta(dict):
 
   @mime_type.setter
   def mime_type(self, new_type):
-    self.setxattr('user.mime_type', value)
+    self.setxattr('user.mime_type', new_type)
 
   @mime_type.deleter
   def mime_type(self):

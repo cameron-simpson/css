@@ -16,7 +16,6 @@ from cs.logutils import X
 from cs.progress import Progress
 from cs.queues import IterableQueue
 from . import MAX_FILE_SIZE
-from .datafile import DATAFILE_DOT_EXT
 from .store import BasicStoreSync
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE

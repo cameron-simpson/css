@@ -8,10 +8,10 @@ from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath
-from cs.logutils import X, debug
+from cs.lex import get_qstr
+from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.threads import locked
-from cs.py.func import prop
 from .store import ChainStore, DataDirStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
@@ -27,7 +27,7 @@ def Store(store_spec, config=None):
     stores = []
     offset = 0
     while offset < len(store_spec):
-      with Pfx(offset+1):
+      with Pfx(offset + 1):
         S, offset = parse_store_spec(store_spec, offset, config=config)
         stores.append(S)
         if offset < len(store_spec):
@@ -36,7 +36,7 @@ def Store(store_spec, config=None):
           if sep == ':':
             continue
           raise ValueError("unexpected separator %r at offset %d, expected ':'"
-                           % (sep, offset-1))
+                           % (sep, offset - 1))
     if not stores:
       raise ValueError("no stores in %r" % (store_spec,))
     if len(stores) == 1:
@@ -88,7 +88,7 @@ def parse_store_spec(s, offset, config=None):
       raise ValueError("no config supplied, rejecting %r" % (s[offset0:],))
     S = config.Store(clause_name)
     if S is None:
-      raise ValueError("no config clause [%s]" %(clause_name,))
+      raise ValueError("no config clause [%s]" % (clause_name,))
   else:
     # /path/to/datadir
     if s.startswith('/', offset) or s.startswith('./', offset):
@@ -96,7 +96,7 @@ def parse_store_spec(s, offset, config=None):
       offset = len(s)
     # |shell command
     elif s.startswith('|', offset):
-      shcmd = s[offset+1:].strip()
+      shcmd = s[offset + 1:].strip()
       S = CommandStore(shcmd)
       offset = len(s)
     # TCP connection
@@ -113,7 +113,7 @@ def parse_store_spec(s, offset, config=None):
       # collect port
       portpart = s[offset:]
       offset = len(s)
-      S = TCPStoreClient((hostpart, int(port)))
+      S = TCPStoreClient((hostpart, int(portpart)))
     else:
       raise ValueError("unrecognised Store spec")
   return S, offset
@@ -125,7 +125,7 @@ def get_colon(s, offset):
   cpos = s.find(':', offset)
   if cpos < 0:
     return None, offset
-  return s[offset:cps], cpos + 1
+  return s[offset:cpos], cpos + 1
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to command.

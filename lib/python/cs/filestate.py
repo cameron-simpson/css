@@ -11,19 +11,27 @@
 '''
 
 from collections import namedtuple
+import errno
 import os
 
 _FileState = namedtuple('FileState', 'stat mtime size dev ino')
 
-def FileState(path, do_lstat=False):
+def FileState(path, do_lstat=False, missing_ok=False):
   ''' Return a signature object for a file state derived from os.stat
       (or os.lstat if `do_lstat` is true).
       `path` may also be an int, in which case os.fstat is used.
-      lThis returns an object with mtime, size, dev and ino attributes
+      This returns an object with mtime, size, dev and ino attributes
       and can be compared for equality with other signatures.
+      `missing_ok`: return None if the target file is missing,
+        otherwise raise. Default False.
   '''
   if isinstance(path, int):
     S = os.fstat(path)
   else:
-    S = os.lstat(path) if do_lstat else os.stat(path)
+    try:
+      S = os.lstat(path) if do_lstat else os.stat(path)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return None
+      raise
   return _FileState(S, S.st_mtime, S.st_size, S.st_dev, S.st_ino)

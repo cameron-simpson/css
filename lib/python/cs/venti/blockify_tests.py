@@ -11,7 +11,7 @@ import sys
 import time
 import unittest
 from unittest import skip
-from cs.buffer import chunky
+from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
 from cs.logutils import D
 from cs.randutils import rand0, randblock
@@ -48,63 +48,57 @@ class TestAll(unittest.TestCase):
   def tearDown(self):
     self.fp.close()
 
-  @skip
-  def test01parsers(self):
-    rand_total = sum(len(chunk) for chunk in random_data)
-    for parser in (scan_text, scan_mp3):
-      with self.subTest(parser.__name__):
+  def test01scanners(self):
+    rand_total = sum(len(chunk) for chunk in self.random_data)
+    for scanner in (scan_text, scan_mp3):
+      with self.subTest(scanner.__name__):
         input_chunks = self.random_data
-        if parser is scan_mp3:
+        if scanner is scan_mp3:
           if os.path.exists('TEST.mp3'):
             ##X("mp3 parse: replace input data with chunks from TEST.mp3")
             input_chunks = read_from(open('TEST.mp3', 'rb'))
-            input_desc = 'TEST.mp3'
           else:
             ##X("no TEST.mp3 in ".os.getcwd())
             pass
-        Q = parser(input_chunks)
+        Q = scanner(CornuCopyBuffer(iter(input_chunks)))
         offset = 0
         last_qoffset = 0
-        for qitem in Q:
-          if isinstance(qitem, int):
-            qoffset = qitem
-            self.assertTrue(last_qoffset < qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
-            last_qoffset = qoffset
-          else:
-            chunk = qitem
-            self.assertTrue(len(chunk) > 0)
-            offset += len(chunk)
-        if input_chunks is self.random_data:
-          self.assertEqual(rand_total, offset)
+        for qoffset in Q:
+          self.assertIsInstance(
+            qoffset, int,
+            'scanner must yield only ints, received %s:%r'
+            % (type(qoffset), qoffset))
+          self.assertTrue(last_qoffset <= qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
+          last_qoffset = qoffset
 
   def test02blocked_chunks_of(self):
-    for parser in (
+    for scanner in (
         ##None,
         ##scan_text,
         ##scan_mp3,
         scan_mp4,
       ):
-      parser_desc = 'None' if parser is None else parser.__name__
+      scanner_desc = 'None' if scanner is None else scanner.__name__
       for input_desc, input_chunks in (
           ##('random data', self.random_data),
           ('100 x ' + __file__, [ self.mycode for _ in range(100) ]),
         ):
         testfile = None
         rfp = None
-        if parser is scan_mp3:
+        if scanner is scan_mp3:
           testfile = 'TEST.mp3'
-        elif parser is scan_mp4:
+        elif scanner is scan_mp4:
           testfile = 'TEST.mp4'
         if testfile is not None:
           if os.path.exists(testfile):
-            X("%s: replace input data with chunks from %s", parser, testfile)
+            X("%s: replace input data with chunks from %s", scanner, testfile)
             rfp = open(testfile, 'rb')
             input_chunks = read_from(rfp)
             input_desc = testfile
           else:
-            X("%s: no %s in %s", parser, testfile, os.getcwd())
+            X("%s: no %s in %s", scanner, testfile, os.getcwd())
         with self.subTest("blocked_chunks_of",
-                          parser=parser_desc,
+                          scanner=scanner_desc,
                           source=input_desc):
           if True:
             source_chunks = input_chunks
@@ -121,9 +115,9 @@ class TestAll(unittest.TestCase):
           start_time = time.time()
           offset = 0
           prev_chunk = None
-          chunky_parser = chunky(parser) if parser else None
+          chunky_scanner = chunky(scanner) if scanner else None
           histogram = defaultdict(int)
-          for chunk in blocked_chunks_of(source_chunks, chunky_parser, histogram=histogram):
+          for chunk in blocked_chunks_of(source_chunks, chunky_scanner, histogram=histogram):
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
@@ -144,10 +138,10 @@ class TestAll(unittest.TestCase):
             prev_chunk = chunk
           end_time = time.time()
           X("%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
-            input_desc, parser_desc,
+            input_desc, scanner_desc,
             nchunks, end_time-start_time, chunk_total,
             float(chunk_total) / (end_time-start_time))
-          X("    %d offsets from parser, %d offsets from hash scan",
+          X("    %d offsets from scanner, %d offsets from hash scan",
             histogram['offsets_from_scanner'],
             histogram['offsets_from_hash_scan'])
           if src_total is not None:

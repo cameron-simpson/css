@@ -4,14 +4,11 @@
 #       - Cameron Simpson <cs@zip.com.au> 07dec2007
 #
 
-import os
-import sys
-from socket import socket, SHUT_WR, SHUT_RD
+from socket import socket
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
-from threading import Lock, Thread
+from threading import Thread
 from .stream import StreamStore
 from cs.excutils import logexc
-from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
 from cs.socketutils import OpenSocket
@@ -43,7 +40,10 @@ class TCPStoreServer(MultiOpenMixin):
 
   def startup(self):
     self.S.open()
-    self.T = Thread(name="%s[server-thread]" % (self,), target=self.server.serve_forever, kwargs={'poll_interval': 0.5})
+    self.T = Thread(
+        name="%s[server-thread]" % (self,),
+        target=self.server.serve_forever,
+        kwargs={'poll_interval': 0.5})
     self.T.daemon = True
     self.T.start()
 
@@ -81,6 +81,7 @@ class _RequestHandler(StreamRequestHandler):
                      OpenSocket(self.request, True),
                      local_store=self.S,
                     )
+    RS.startup()
     self.server.handlers.add(RS)
     RS.join()
     RS.shutdown()

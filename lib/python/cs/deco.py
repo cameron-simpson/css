@@ -2,12 +2,37 @@
 #
 # Decorators.
 #   - Cameron Simpson <cs@zip.com.au> 02jul2017
-# 
+#
 
 import time
-from cs.x import X
 
-def cached(*da, **dkw):
+def decorator(deco, *da, **dkw):
+  ''' Wrapper for decorator functions to support optional keyword arguments.
+      Examples:
+        @decorator
+        def dec(func, **dkw):
+          ...
+        @dec
+        def func1(...):
+          ...
+        @dec(foo='bah')
+        def func2(...):
+          ...
+  '''
+  def overdeco(*da, **dkw):
+    if not da:
+      def wrapper(*a, **dkw):
+        func, = a
+        return deco(func, **dkw)
+      return wrapper
+    if len(da) > 1:
+      raise ValueError("extra positional arguments after function: %r" % (da[1:],))
+    func = da[0]
+    return deco(func, **dkw)
+  return overdeco
+
+@decorator
+def cached(func, **dkw):
   ''' Decorator to cache the result of a method and keep a revision counter for changes.
       The revision supports the @revised decorator.
 
@@ -45,17 +70,10 @@ def cached(*da, **dkw):
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
-  if not da:
-    def wrapper(func):
-      return cached(func, **dkw)
-    return wrapper
-
-  func = da[0]
-  if len(da) > 1:
-    raise ValueError("extra positional arguments after function: %r" % (da[1:],))
-
   attr_name = dkw.pop('attr_name', None)
   poll_delay = dkw.pop('poll_delay', None)
+  if poll_delay is not None and poll_delay <= 0:
+    raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   sig_func = dkw.pop('sig_func', None)
   unset_value = dkw.pop('unset_value', None)
   if dkw:
@@ -68,12 +86,15 @@ def cached(*da, **dkw):
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
   lastpoll_attr = val_attr + '__lastpoll'
+  firstpoll_attr = val_attr + '__firstpoll'
 
   def wrapper(self, *a, **kw):
+    first = getattr(self, firstpoll_attr, True)
+    setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
     # see if we should use the cached value
     try:
-      if poll_delay is not None:
+      if poll_delay is not None and not first:
         # too early to check the signature function?
         now = time.time()
         lastpoll = getattr(self, lastpoll_attr, None)
