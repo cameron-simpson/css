@@ -5,26 +5,29 @@
 #
 
 from __future__ import print_function
-import sys
-import os
-import os.path
 from collections import namedtuple
 from functools import partial
+from getopt import GetoptError
+import os
+import os.path
 import re
 import sqlite3
+import sys
 from threading import RLock
 from types import SimpleNamespace as NS
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from cs.dbutils import TableSpace, Table, Row
+from cs.dbutils import TableSpace, Table, Row, IdRelation
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.py.func import prop
 from cs.lex import get_identifier
-from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
+from cs.logutils import info, warning, error, setup_logging
 from cs.obj import O
+from cs.pfx import Pfx, XP
 from cs.seq import the
 from cs.threads import locked, locked_property
+from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Calibre_Library'
 METADB_NAME = 'metadata.db'
@@ -54,27 +57,29 @@ def main(argv=None):
   setup_logging(cmd)
   with Pfx(cmd):
     badopts = False
-    if argv and argv[0].startswith('/'):
-      library_path = argv.pop(0)
-    else:
-      library_path = None
-    CL = Calibre_Library(library_path)
-    xit = 0
-    if not argv:
-      warning("missing op")
+    try:
+      if argv and argv[0].startswith('/'):
+        library_path = argv.pop(0)
+      else:
+        library_path = None
+      CL = Calibre_Library(library_path)
+      xit = 0
+      if not argv:
+        raise GetoptError("missing op")
+        badopts = True
+      else:
+        op = argv.pop(0)
+        with Pfx(op):
+          if op == 'ls':
+            return CL.cmd_ls(argv)
+          if op == 'rename':
+            return CL.cmd_rename(argv)
+          if op == 'tag':
+            return CL.cmd_tag(argv)
+          raise GetoptError("unrecognised op")
+    except GetoptError as e:
+      warning("%s", e)
       badopts = True
-    else:
-      op = argv.pop(0)
-      with Pfx(op):
-        if op == 'ls':
-          xit, badopts = CL.cmd_ls(argv)
-        elif op == 'rename':
-          xit, badopts = CL.cmd_rename(argv)
-        elif op == 'tag':
-          xit, badopts = CL.cmd_tag(argv)
-        else:
-          warning("unrecognised op")
-          badopts = True
     if badopts:
       print(usage, file=sys.stderr)
       return 2
@@ -88,6 +93,7 @@ class Calibre_Library(O):
     '''
     if libpath is None:
       libpath = os.environ.get('CALIBRE_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
+    info("%s: libpath=%r", self.__class__.__name__, libpath)
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
@@ -95,6 +101,11 @@ class Calibre_Library(O):
     self.metadbpath = self.pathto(METADB_NAME)
     self.metadb = CalibreMetaDB(self, self.metadbpath)
     self.table = self.metadb.table
+
+  def __getattr__(self, attr):
+    if attr.startswith('table_'):
+      return self.table(attr[6:])
+    raise AttributeError(attr)
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -107,85 +118,78 @@ class Calibre_Library(O):
 
   def cmd_rename(self, argv):
     xit = 0
-    badopts = False
     if not argv:
-      warning("missing 'tags'")
-      badopts = True
+      raise GetoptError("missing 'tags'")
+    entity = argv.pop(0)
+    if entity == "tags":
+      table = self.table('tags')
     else:
-      entity = argv.pop(0)
-      if entity == "tags":
-        table = self.table('tags')
-      else:
-        warning("unsupported entity type: %r", entity)
-        badopts = True
-      if argv:
-        warning("extra arguments after %s: %s", entity, ' '.join(argv))
-        badopts = True
-    if not badopts:
-      names = [ obj.name for obj in table.instances() ]
-      if not names:
-        warning
-      for name, newname in edit_strings(names):
-        if newname != name:
-          table[name].rename(newname)
-    return xit, badopts
+      raise GetoptError("unsupported entity type: %r" % (entity,))
+    if argv:
+      raise GetoptError("extra arguments after %s: %s" % (entity, ' '.join(argv)))
+    names = [ obj.name for obj in table.instances() ]
+    if not names:
+      warning("nothing to rename")
+    for name, newname in edit_strings(names):
+      if newname != name:
+        table[name].rename(newname)
+    return xit
 
   def cmd_ls(self, argv):
     xit = 0
-    badopts = False
     if not argv:
       obclass = 'books'
     else:
       obclass = argv.pop(0)
     with Pfx(obclass):
       if obclass == 'books':
-        for B in self.table_books.instances():
-          print(B,
-                ' '.join(str(T) for T in B.tags),
-                'rating:'+str(B.rating),
-                'series:'+str(B.series),
-               )
-          print(' ', '+'.join(str(A) for A in B.authors))
-          S = B.series
-          if S:
-            for B2 in sorted(S.books):
+        for B in sorted(self.table_books.instances(),
+                        key=lambda B: B.sort):
+          series = B.series
+          if series:
+            print(B, '%s[%g]' % (series, B.series_index))
+          else:
+            print(B)
+          for label, value in (
+            ( 'author', ', '.join(sorted(str(A) for A in B.authors)) ),
+            ( 'tags', ' '.join(sorted(str(T) for T in B.tags))),
+            ( 'rating', B.rating ),
+            ( 'identifiers', ','.join("%s:%s" % I for I in B.identifiers) ),
+          ):
+            if value:
+              print(' ', label+':', value)
+          if series:
+            for B2 in sorted(series.books, key=lambda B: B.series_index):
               if B2.id != B.id:
-                print('  also', B2)
+                print('  also', B2, '[%g]' % (B2.series_index,))
       elif obclass in ('authors', 'tags'):
         for obj in self.table(obclass).instances():
           print(obj)
           for B in obj.books:
             print(' ', B)
       else:
-        warning("unknown class %r", obclass)
-        badopts = True
+        raise GetoptError("unknown class %r" % (obclass,))
       if argv:
-        warning("extra arguments: %r", argv)
-        badopts = True
-    return xit, badopts
+        raise GetoptError("extra arguments: %r" % (argv,))
+    return xit
 
   def cmd_tag(self, argv):
     xit = 0
-    badopts = False
     if not argv:
-      warning('missing book-title')
-      badopts = True
-    else:
-      book_title = argv.pop(0)
-    if not badopts:
-      with Pfx(book_title):
-        for B in self.books_by_title(book_title):
-          for tag_op in argv:
-            if tag_op.startswith('+'):
-              tag_name = tag_op[1:]
-              B.add_tag(tag_name)
-            elif tag_op.startswith('-'):
-              tag_name = tag_op[1:]
-              B.remove_tag(tag_name)
-            else:
-              warning('unsupported tag op %r', tag_op)
-              badopts = True
-    return xit, badopts
+      raise GetoptError('missing book-title')
+    book_title = argv.pop(0)
+    with Pfx(book_title):
+      for B in self.books_by_title(book_title):
+        for tag_op in argv:
+          if tag_op.startswith('+'):
+            tag_name = tag_op[1:]
+            B.add_tag(tag_name)
+          elif tag_op.startswith('-'):
+            tag_name = tag_op[1:]
+            B.remove_tag(tag_name)
+          else:
+            raise GetoptError('unsupported tag op %r' % (tag_op,))
+    return xit
 
 class CalibreMetaDB(TableSpace):
 
@@ -193,6 +197,7 @@ class CalibreMetaDB(TableSpace):
     TableSpace.__init__(self, CalibreTable, db_name=dbpath, lock=CL._lock)
     self.library = CL
     self.conn = sqlite3.connect(CL.metadbpath)
+    self.param_style = '?'
 
   def dosql_ro(self, sql, *params):
     return self.conn.execute(sql, params)
@@ -210,7 +215,7 @@ class CalibreMetaDB(TableSpace):
     return the(self.books_by_title(book_title))
 
   def tag_by_name(self, tag_name):
-    return the( T for T in self.tags if T.name == tag_name )
+    return the( T for T in self.table_tags if T.name == tag_name )
 
   def __getattr__(self, attr):
     if attr.startswith('table_'):
@@ -223,9 +228,10 @@ class CalibreTable(Table):
 
   def __init__(self, db, table_name):
     meta = self.META_DATA[table_name]
+    klass = getattr(meta, 'klass', CalibreTableRow)
     Table.__init__(self, db, table_name,
                    column_names=meta.columns.split(),
-                   row_class=meta.klass,
+                   row_class=klass,
                    id_column='id')
     CL = db.library
     self.library = CL
@@ -234,25 +240,7 @@ class CalibreTable(Table):
   def instances(self):
     ''' Return rows sorted by name.
     '''
-    return sorted(self.read_rows(), key=lambda row: row.name)
-
-  def __getitem__(self, row_id):
-    ''' Retrieve row by id or name.
-    '''
-    if isinstance(row_id, int):
-      where = 'id = %d' % (row_id,)
-      where_argv = ()
-    elif isinstance(row_id, str):
-      where = '%s = ?' % (self.name_column,)
-      where_argv = (row_id,)
-    else:
-      raise TypeError("invalid type, expected int or str, got: %s" % (type(row_id),))
-    rows = self.rows(where, *where_argv)
-    try:
-      row = the(rows)
-    except IndexError as e:
-      raise KeyError(row_id)
-    return row
+    return sorted(self, key=lambda row: row.name)
 
   def make(self, name):
     try:
@@ -297,13 +285,7 @@ class CalibreTable(Table):
   def update(self, attr, value, where=None, *where_params):
     ''' Update an attribute in selected table rows.
     '''
-    sql = "update %s set %s=?" % (self.name, attr)
-    params = [value]
-    if where:
-      sql += ' WHERE ' + where
-      if where_params:
-        params.extend(where_params)
-    return self.dosql_rw(sql, *params)
+    return self.update_columns((attr,), (value,), where, *where_params)
 
 class CalibreTableRow(Row):
   ''' A snapshot of a row from a table, with column values as attributes.
@@ -318,10 +300,16 @@ class CalibreTableRow(Row):
   @prop
   def name(self):
     name_column = self._table.name_column
+    if name_column is None:
+      raise AttributeError("no .name attribute for %r" % (self,))
     return getattr(self._row, name_column)
 
   def __str__(self):
-    return self.name
+    try:
+      s = self.name
+    except AttributeError:
+      s = repr(self)
+    return s
 
   def __hash__(self):
     return self.id
@@ -335,21 +323,13 @@ class CalibreTableRow(Row):
 
   def related_entities(self, link_table_name, our_column_name, related_column_name, related_table_name=None):
     ''' Look up related entities via a link table.
-        Return l
     '''
     if related_table_name is None:
-     related_table_name = related_column_name + 's'
-    LT = self.db.table(link_table_name)
-    entity_ids = set( row[related_column_name]
-                      for row in LT.read_rows('%s = %d'
-                                              % (our_column_name, self.id))
-                    )
-    RT = self.db.table(related_table_name)
-    return RT.read_rows('%s in (%s)' \
-             % (RT.id_column,
-                ','.join( str(eid) for eid in sorted(entity_ids) )
-               )
-          )
+      related_table_name = related_column_name + 's'
+    R = IdRelation('id', self.db.table(link_table_name),
+                   our_column_name, self._table,
+                   related_column_name, self.db.table(related_table_name))
+    return R.left_to_right(self.id)
 
 class Author(CalibreTableRow):
 
@@ -364,15 +344,20 @@ class Book(CalibreTableRow):
     return self.related_entities('books_authors_link', 'book', 'author')
 
   @prop
+  def identifiers(self):
+    identifier_rows = self.db.table_identifiers.rows('book = %d' % (self.id,))
+    return set( (row.type, row.val) for row in identifier_rows )
+
+  @prop
   def rating(self):
-    Rs = self.related_entities('books_ratings_link', 'book', 'rating')
+    Rs = list(self.related_entities('books_ratings_link', 'book', 'rating'))
     if Rs:
       return the(Rs).rating
     return None
 
   @prop
   def series(self):
-    Ss = self.related_entities('books_series_link', 'book', 'series', 'series')
+    Ss = list(self.related_entities('books_series_link', 'book', 'series', 'series'))
     if Ss:
       return the(Ss)
     return None
@@ -384,17 +369,13 @@ class Book(CalibreTableRow):
   def add_tag(self, tag_name):
     if tag_name not in [ str(T) for T in self.tags ]:
       T = self.library.table_tags.make(tag_name)
-      sql = 'INSERT INTO books_tags_link(book, tag) VALUES (%d, %d)' \
-            % (self.id, T.id)
-      self.dosql_rw(sql)
+      self.library.table_books_tags_link.insert(('book', 'tag'), [(self.id, T.id)])
 
   def remove_tag(self, tag_name):
     CL = self.library
     if tag_name in [ str(T) for T in self.tags ]:
       T = CL.tag_by_name(tag_name)
-      sql = 'DELETE FROM books_tags_link WHERE book = %d and tag = %d' \
-            % (self.id, T.id)
-      CL.dosql_rw(sql)
+      CL.table_books_tags_link.delete('book = %d and tag = %d', self.id, T.id)
 
 class Rating(CalibreTableRow):
 
@@ -417,20 +398,28 @@ class Tag(CalibreTableRow):
     if self.name == new_name:
       warning("rename tag %r: no change", self.name)
       return
-    T = self.table
+    X("Tag[%d:%r].rename(new_name=%r)", self.id, self.name, new_name)
+    T = self._table
     try:
       otag = T[new_name]
     except KeyError:
+      # name not in use, rename current tag
       T.update('name', new_name, 'id = %d' % (self.id,))
     else:
-      # update related objects (books?)
-      # to point at the other tag
-      for B in self.books:
-        B.add_tag(new_name)
-        B.remove_tag(self.name)
-      # delete our tag, become the other tag
-      T.delete('id = ?', self.id)
-      self.ns.id = otag.id
+      X("other tag for new_name = %d:%r", otag.id, otag.name)
+      if otag.id == self.id:
+        # case insensitive or the like: update the name in place
+        T.update('name', new_name, 'id = %d' % (self.id,))
+      else:
+        # update related objects (books?)
+        # to point at the other tag
+        for B in self.books:
+          X("  update Book[%d:%r]{%s} ...", B.id, B.name, ','.join(T.name for T in B.tags))
+          B.add_tag(new_name)
+          B.remove_tag(self.name)
+        # delete our tag, become the other tag
+        T.delete('id = ?', self.id)
+        self.ns.id = otag.id
     self.name = new_name
 
 CalibreTable.META_DATA = {
@@ -440,8 +429,15 @@ CalibreTable.META_DATA = {
   'books': NS(klass=Book,
               columns='id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified',
               name_column='title'),
+  'books_authors_link': NS(klass=CalibreTableRow,
+                        columns='id book author'),
+  'books_ratings_link': NS(klass=CalibreTableRow,
+                        columns='id book rating'),
+  'books_series_link': NS(klass=CalibreTableRow,
+                        columns='id book series'),
   'books_tags_link': NS(klass=CalibreTableRow,
                         columns='id book tag'),
+  'identifiers': NS(columns='id book type val'),
   'ratings': NS(klass=Rating,
                 columns='id rating',
                 name_column='rating'),

@@ -15,22 +15,21 @@ from __future__ import print_function
 import os
 import stat
 import sys
-import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile, chain
-from cs.fileutils import lockfile
+from itertools import chain
+from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, Pfx, info, warning, error, X
+from cs.logutils import warning, error
+from cs.pfx import Pfx
 from cs.seq import last
-from . import totext, fromtext
-from .block import dump_block
+from cs.x import X
 from .blockify import blockify, top_block_for
-from .dir import decode_Dirent_text, Dir, FileDirent
+from .dir import Dir, FileDirent, DirFTP
 from .file import filedata
-from .paths import resolve, path_split, walk
+from .paths import decode_Dirent_text, resolve, path_split, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -409,3 +408,18 @@ def copy_out_file(E, ospath, modes=None, log=None):
     if Blen != wrote:
       error("Block len = %d, wrote %d", Blen, wrote)
     M.apply_posix(ospath)
+
+class ArchiveFTP(DirFTP):
+
+  def __init__(self, archivepath, prompt=None):
+    if prompt is None:
+      prompt = shortpath(archivepath)
+    when, root = last_Dirent(archivepath, missing_ok=True)
+    self._archivepath = archivepath
+    super().__init__(root, prompt=prompt)
+
+  def postloop(self):
+    super().postloop()
+    text = strfor_Dirent(self.root)
+    with open(self._archivepath, "a") as afp:
+      write_Dirent_str(afp, text, etc=self.root.name)

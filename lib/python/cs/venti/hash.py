@@ -7,9 +7,10 @@ if sys.hexversion < 0x02060000:
   bytes = str
 from bisect import bisect_left, bisect_right
 from cs.lex import hexify
-from cs.logutils import D, X
+from cs.logutils import D
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
+from cs.x import X
 from .pushpull import missing_hashcodes
 
 # enums for hash types, used in encode/decode
@@ -33,7 +34,7 @@ def hash_of_byteses(bss):
   H = sha1()
   for bs in bss:
     H.update(bs)
-  return Hash_SHA1.from_data(H.digest())
+  return Hash_SHA1.from_chunk(H.digest())
 
 class _Hash(bytes):
   ''' All hashes are bytes subclasses.
@@ -79,17 +80,17 @@ class _Hash(bytes):
     return cls(hashbytes)
 
   @classmethod
-  def from_data(cls, data):
+  def from_chunk(cls, chunk):
     ''' Factory function returning a _Hash object from a data block.
     '''
-    hashbytes = cls.HASHFUNC(data).digest()
+    hashbytes = cls.HASHFUNC(chunk).digest()
     return cls.from_hashbytes(hashbytes)
 
   @property
   def hashfunc(self):
-    ''' Convenient hook to this Hash's class' .from_data method.
+    ''' Convenient hook to this Hash's class' .from_chunk method.
     '''
-    return self.__class__.from_data
+    return self.__class__.from_chunk
 
 class Hash_SHA1(_Hash):
   HASHFUNC = sha1
@@ -263,7 +264,7 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
 
   def add(self, data):
-    hashcode = Hash_SHA1.from_data(data)
+    hashcode = Hash_SHA1.from_chunk(data)
     self[hashcode] = data
     return hashcode
 

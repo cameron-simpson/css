@@ -25,13 +25,15 @@ import sys
 import threading
 import time
 import traceback
-from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, Pfx, PrePfx, ifdebug, X
+from cs.logutils import infer_logging_level, debug, error, warning, setup_logging, D, ifdebug
 from cs.obj import O, Proxy
+from cs.pfx import Pfx, PrePfx
+from cs.py.stack import caller
+from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.timeutils import sleep
+from cs.x import X
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG

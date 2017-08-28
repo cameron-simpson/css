@@ -29,7 +29,9 @@ from types import SimpleNamespace as NS
 from cs.app.ffmpeg import multiconvert as ffmconvert, \
                           MetaData as FFmpegMetaData, \
                           ConversionSource as FFSource
-from cs.logutils import info, warning, error, Pfx, X
+from cs.logutils import info, warning, error
+from cs.pfx import Pfx
+from cs.x import X
 
 # UNUSED
 def trailing_nul(bs):
@@ -136,8 +138,9 @@ class _Recording(object):
                .replace('/', '|') \
                .replace(' ', '-') \
                .replace('----', '--')
-    filename = filename[:255 - (len(outext) + 1)]
-    return filename + '.' + outext
+    filename = filename[:250 - (len(outext) + 1)]
+    filename += '.' + outext
+    return filename
 
   # TODO: move into cs.fileutils?
   @staticmethod

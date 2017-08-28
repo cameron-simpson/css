@@ -4,9 +4,11 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
-from cs.logutils import D, error, debug, X, Pfx
+from cs.logutils import D, error, debug
+from cs.pfx import Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
+from cs.x import X
 from . import defaults, totext
 from .hash import decode as hash_decode
 
@@ -81,7 +83,7 @@ def decodeBlock(bs, offset=0, length=None):
       return decodeBlock(bs, offset, length)
     if length > len(bs) - offset:
       raise ValueError("length(%d) > len(bs[%d:]):%d"
-                       % (ength, offset, len(bs) - offset))
+                       % (length, offset, len(bs) - offset))
     bs0 = bs
     offset0 = offset
     # Note offset after length field, used to sanity check decoding.
@@ -147,7 +149,6 @@ def decodeBlock(bs, offset=0, length=None):
 def encodeBlocks(blocks):
   ''' Generator yielding byte chunks encoding Blocks; inverse of decodeBlocks.
   '''
-  encs = []
   for B in blocks:
     enc = B.encode()
     yield put_bs(len(enc))
@@ -201,7 +202,7 @@ class _Block(object):
     offset2 = 0 # offset of start of leaf2
     leaf2 = None
     for leaf1 in leaves1:
-      end1 = offset1 + len(data1)
+      end1 = offset1 + len(leaf1)
       while offset < end1:
         # still more bytes in leaf1 needing comparison
         # fetch leaf2 if required
@@ -222,7 +223,6 @@ class _Block(object):
           offset = end1
           leaf2 = None
           continue
-        end2 = offset2 + len(data2)
         cmplen = min(offset1, offset2) - offset
         if cmplen < 0:
           raise RuntimeError("cmplen(%d) < 0: offset=%d, offset1=%d, offset2=%d"
@@ -234,6 +234,7 @@ class _Block(object):
              != data2[offset-offset2:offset-offset2+cmplen] 
            ):
           return False
+        end2 = offset2 + len(data2)
         offset += cmplen
         if offset > end1 or offset > end2:
           raise RuntimeError("offset advanced beyond end of leaf1 or leaf2: offset=%d, end(leaf1)=%d, end(leaf2)= %d" % ( offset, end1, end2))
@@ -275,12 +276,12 @@ class _Block(object):
       h = self.hashcode
     except AttributeError:
       return self.data == odata
-    return h == h.from_data(odata)
+    return h == h.from_chunk(odata)
 
   @locked_property
   def subblocks(self):
     if not self.indirect:
-      raise TypeError("Block is direct, no .subblocks")
+      raise AttributeError("Block is direct, no .subblocks")
     return tuple(decodeBlocks(self.data))
 
   @property
@@ -530,13 +531,7 @@ class RLEBlock(_Block):
     return self.octet * self.span
 
   def encode(self):
-    ''' Encoded form of Block.
-    '''
-    return put_bs(F_BLOCK_TYPED) + put_bs(BlockType.BT_RLE) + put_bs(self.span) + self.octet
-
-  def encode(self):
-    return self._encode(0, self.span, BlockType.BT_RLE, 0,
-                        ( self.octet, ))
+    return self._encode(0, self.span, BlockType.BT_RLE, 0, ( self.octet, ))
 
 class LiteralBlock(_Block):
   ''' A LiteralBlock is for data too short to bother hashing and Storing.
@@ -612,7 +607,7 @@ def chunksOf(B, start, stop=None):
   rangelen = stop - start
 
   # skip subblocks preceeding the range
-  Bs = iter(self.subblocks())
+  Bs = iter(B.subblocks())
   while True:
     try:
       B = Bs.next()
@@ -674,7 +669,6 @@ def verify_block(B, recurse=False, S=None):
   '''
   if S is None:
     S = defaults.S
-  errs = []
   try:
     hashcode = B.hashcode
   except AttributeError:

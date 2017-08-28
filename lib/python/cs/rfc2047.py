@@ -3,6 +3,12 @@
 # RFC2047 - MIME Part 3 - http://tools.ietf.org/html/rfc2047
 #
 
+import base64
+import quopri
+import re
+from cs.pfx import Pfx
+from cs.py3 import unicode
+
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
@@ -19,41 +25,37 @@ def unrfc2047(s, warning=None):
   chunks = []
   sofar = 0
   for m in re_RFC2047.finditer(s):
-    start = m.start()
-    end = m.end()
-    if start > sofar:
-      chunks.append(s[sofar:start])
-    enccset = m.group(1)
-    enctype = m.group(2).upper()
-    # default to undecoded text
-    enctext = m.group(3)
-    if enctype == 'B':
-      try:
-        enctext = base64.b64decode(enctext)
-      except TypeError as e:
-        warning("%r: %e", enctext, e)
-        enctext = m.group()
-    elif enctype == 'Q':
-      try:
-        enctext = quopri.decodestring(enctext.replace('_', ' '))
-      except UnicodeEncodeError as e:
-        warning("%r: %e", enctext, e)
-        ##enctext = enctext.decode('iso8859-1')
-    else:
-      raise RuntimeError("unhandled RFC2047 string: %r" % (m.group(),))
-    try:
-      enctext = enctext.decode(enccset)
-    except LookupError as e:
-      warning("decode(%s): %e: %r", enccset, e, enctext)
-      enctext = enctext.decode('iso8859-1')
-    except UnicodeDecodeError as e:
-      warning("decode(%s): %s: %r", enccset, e, enctext)
-      enctext = enctext.decode(enccset, 'replace')
-    except UnicodeEncodeError as e:
-      warning("decode(%s): %e: %r", enccset, e, enctext)
-      enctext = enctext.decode(enccset, 'replace')
-    chunks.append(enctext)
-    sofar = end
+    with Pfx("%r", m.group(0)):
+      start = m.start()
+      end = m.end()
+      if start > sofar:
+        chunks.append(s[sofar:start])
+      charset = m.group(1)
+      coding = m.group(2).upper()
+      coded = m.group(3)
+      realtext = None
+      if coding == 'B':
+        try:
+          decoded = base64.b64decode(coded)
+        except (ValueError, TypeError) as e:
+          warning("%r: %e", coded, e)
+          realtext = m.group()
+      elif coding == 'Q':
+        try:
+          decoded = quopri.decodestring(coded.replace('_', ' '))
+        except (UnicodeEncodeError, ValueError) as e:
+          warning("%r: %e", coded, e)
+          realtext = m.group()
+      else:
+        raise RuntimeError("unhandled RFC2047 string: %r" % (m.group(),))
+      if realtext is None:
+        try:
+          realtext = decoded.decode(charset)
+        except (UnicodeDecodeError, LookupError) as e:
+          warning("decode(%r): %e", decoded, e)
+          realtext = decoded.decode('iso8859-1')
+      chunks.append(realtext)
+      sofar = end
   if sofar < len(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)

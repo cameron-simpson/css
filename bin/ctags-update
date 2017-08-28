@@ -35,10 +35,10 @@ if [ -s "$tags" -a $# -gt 0 ]
 then
   set -- -a "$@"
 else
-  set -- -R
+  set -- -R --exclude='bin/*' --exclude='*.pl' --exclude='*.pm'
   cd "$(dirname "$tags")"
 fi
 
-set -- ctags -o "$tags" --tag-relative "$@"
+set -- ctags -o "$tags" --tag-relative --links=no "$@"
 
 exec "$@"

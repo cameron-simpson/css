@@ -5,19 +5,22 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-import sys
-from collections import namedtuple
 import os
-from os import SEEK_SET, SEEK_END
-import errno
+from os import SEEK_SET, SEEK_CUR, SEEK_END, \
+               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
+import sys
+from threading import Lock
+import time
 from zlib import compress, decompress
-from cs.excutils import LogExceptions
-import cs.logutils; cs.logutils.X_via_tty = True
-from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
-from cs.obj import O
+from cs.buffer import CornuCopyBuffer
+from cs.fileutils import fdreader
+from cs.logutils import info
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
-from cs.seq import imerge
-from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
+from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
+
+DATAFILE_EXT = 'vtd'
+DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 F_COMPRESSED = 0x01
 
@@ -60,21 +63,15 @@ def read_chunk(fp, do_decompress=False):
     flags &= ~F_COMPRESSED
   return flags, data, offset
 
-def write_chunk(fp, data, no_compress=False):
-  ''' Write a data chunk to a file at the current position, return the starting and ending offsets.
-      If not no_compress, try to compress the chunk.
-      Note: does _not_ call .flush().
+def scan_chunks(fp, do_decompress=False):
+  ''' Read data chunks from `fp` and yield (offset, flags, data, offset2).
+      Raises EOFError on premature end of file.
   '''
-  flags = 0
-  if not no_compress:
-    data2 = compress(data)
-    if len(data2) < len(data):
-      data = data2
-      flags |= F_COMPRESSED
-    offset = fp.tell()
-    fp.write(put_bs(flags))
-    fp.write(put_bsdata(data))
-  return offset, fp.tell()
+  offset = fp.tell()
+  while True:
+    flags, data, offset2 = read_chunk(fp)
+    yield offset, flags, data, offset2
+    offset = offset2
 
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
@@ -97,7 +94,7 @@ class DataFile(MultiOpenMixin):
       raise ValueError("do_create=true requires readwrite=true")
     self.appending = False
     if do_create:
-      fd = os.open(pathname, os.O_CREAT|os.O_EXCL|os.O_RDWR)
+      fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
       os.close(fd)
 
   def __str__(self):
@@ -105,19 +102,21 @@ class DataFile(MultiOpenMixin):
 
   def startup(self):
     with Pfx("%s.startup: open(%r)", self, self.pathname):
-      self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
+      rfd = os.open(self.pathname, O_RDONLY)
+      self._rfd = rfd
+      self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384))
+      self._rlock = Lock()
+      if self.readwrite:
+        self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
+        os.lseek(self._wfd, 0, SEEK_END)
+        self._wlock = Lock()
 
   def shutdown(self):
-    self.flush()
-    self.fp.close()
-    self.fp = None
-
-  def flush(self):
-    ''' Flush any buffered writes to the filesystem.
-    '''
-    with self._lock:
-      if self.appending:
-        self.fp.flush()
+    if self.readwrite:
+      os.close(self._wfd)
+      del self._wfd
+    os.close(self._rfd)
+    del self._rfd
 
   def fetch(self, offset):
     flags, data, offset2 = self._fetch(offset, do_decompress=True)
@@ -128,15 +127,13 @@ class DataFile(MultiOpenMixin):
   def _fetch(self, offset, do_decompress=False):
     ''' Fetch data bytes from the supplied offset.
     '''
-    fp = self.fp
-    with self._lock:
-      if self.appending:
-        fp.flush()
-        self.appending = False
-      if fp.tell() != offset:
-        fp.flush()
-        fp.seek(offset, SEEK_SET)
-      flags, data, offset2 = read_chunk(fp, do_decompress=do_decompress)
+    rfd = self._rfd
+    bfr = self._rbuf
+    with self._rlock:
+      if bfr.offset != offset:
+        os.lseek(rfd, offset, SEEK_SET)
+        bfr = self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384), offset=offset)
+      flags, data, offset2 = read_chunk(bfr, do_decompress=do_decompress)
     return flags, data, offset2
 
   def add(self, data, no_compress=False):
@@ -144,30 +141,41 @@ class DataFile(MultiOpenMixin):
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
-    fp = self.fp
-    with self._lock:
-      if not self.appending:
-        self.appending = True
-        fp.flush()
-      fp.seek(0, SEEK_END)
-      return write_chunk(fp, data, no_compress=no_compress)
+    data2 = compress(data)
+    flags = 0
+    if len(data2) < len(data):
+      data = data2
+      flags |= F_COMPRESSED
+    bs = put_bs(flags) + put_bsdata(data)
+    wfd = self._wfd
+    with self._wlock:
+      offset = os.lseek(wfd, 0, SEEK_CUR)
+      os.write(wfd, bs)
+    return offset, offset + len(bs)
 
-  def scan(self, do_decompress=False, offset=0):
-    ''' Scan the data file and yield (start_offset, flags, zdata, end_offset) tuples.
-        Start the scan ot `offset`, default 0.
-        If `do_decompress` is true, decompress the data and strip
-        that flag value.
-        This can be used in parallel with other activity, though
-        it may impact performance.
-    '''
-    with self:
-      while True:
-        try:
-          flags, data, offset2 = self._fetch(offset, do_decompress=do_decompress)
-        except EOFError:
-          break
-        yield offset, flags, data, offset2
-        offset = offset2
+def scan_datafile(pathname, offset=None, do_decompress=False):
+  ''' Scan a data file and yield (start_offset, flags, zdata, end_offset) tuples.
+      Start the scan ot `offset`, default 0.
+      If `do_decompress` is true, decompress the data and strip
+      that flag value.
+  '''
+  start = time.time()
+  if offset is None:
+    offset = 0
+  offset0 = offset
+  D = DataFile(pathname)
+  with D:
+    while True:
+      try:
+        flags, data, offset2 = D._fetch(offset, do_decompress=do_decompress)
+      except EOFError:
+        break
+      yield offset, flags, data, offset2
+      offset = offset2
+  end = time.time()
+  if offset > offset0 and end > start:
+    info("%r: scanned %d bytes in %ss at %sB/s",
+         pathname, offset - offset0, end - start, (offset - offset0) / (end - start))
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests

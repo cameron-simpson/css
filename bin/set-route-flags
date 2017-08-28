@@ -7,7 +7,6 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
 do_monitor=
 interval=7
 
@@ -19,6 +18,8 @@ badopts=
 if [ $# -gt 0 ]
 then
   case "$1" in
+    -x) trace=set-x
+        ;;
     --monitor)
         shift
         do_monitor=1

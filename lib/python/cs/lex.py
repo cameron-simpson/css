@@ -25,7 +25,7 @@ from cs.py3 import bytes, unicode, ustr, sorted, StringTypes, joinbytes
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
   def hexify(bs):
-    return binascii.hexlify(bs.as_str()).decode()
+    return binascii.hexlify(bs).decode()
 else:
   hexify = binascii.hexlify
 
@@ -127,9 +127,10 @@ _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
-      `whitelist`: a bytes or string object indicating byte values which may be represented directly in text; string objects are converted to 
-      hexify() and texthexify() output strings may be freely
-      concatenated and decoded with untexthexify().
+      `whitelist`: a bytes or string object indicating byte values
+        which may be represented directly in text; string objects are
+        converted to hexify() and texthexify() output strings may be
+        freely concatenated and decoded with untexthexify().
   '''
   if sys.hexversion < 0x03000000:
     bschr = lambda bs, ndx: bs[ndx]
@@ -179,28 +180,33 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   return ''.join(chunks)
 
 def untexthexify(s, shiftin='[', shiftout=']'):
+  ''' Decode a textual representation of binary data into binary data.
+      Outside of the `shiftin`/`shiftout` markers the binary data
+      are represented as hexadecimal. Within the markers the bytes
+      have the values of the ordinals of the characters.
+  '''
   chunks = []
-  while len(s) > 0:
+  while s:
     hexlen = s.find(shiftin)
     if hexlen < 0:
       break
     if hexlen > 0:
       hextext = s[:hexlen]
       if hexlen % 2 != 0:
-        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
+        raise ValueError("uneven hex sequence %r" % (hextext,))
       chunks.append(unhexify(s[:hexlen]))
     s = s[hexlen + len(shiftin):]
     textlen = s.find(shiftout)
     if textlen < 0:
-      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
+      raise ValueError("missing shift out marker \"%s\"" % (shiftout,))
     if sys.hexversion < 0x03000000:
       chunks.append(s[:textlen])
     else:
       chunks.append(bytes(ord(c) for c in s[:textlen]))
     s = s[textlen + len(shiftout):]
-  if len(s) > 0:
+  if s:
     if len(s) % 2 != 0:
-      raise TypeError("uneven hex sequence \"%s\"" % (s,))
+      raise ValueError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
   return joinbytes(chunks)
 

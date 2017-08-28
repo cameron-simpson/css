@@ -14,24 +14,17 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
-from binascii import hexlify
-from contextlib import contextmanager
-import os
-import os.path
 import sys
-from threading import Lock, RLock, Thread
-from time import sleep
-from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
+from cs.logutils import info, debug, warning, error
+from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
-from cs.threads import Q1, Get1
-from . import defaults, totext
-from .datadir import DataDir, DEFAULT_INDEXCLASS
+from cs.x import X
+from . import defaults
+from .datadir import DataDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
@@ -131,6 +124,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       raise MissingHashcodeError(h)
     return block
 
+  def __setitem__(self, h, data):
+    ''' Save `data` against hash key `h`.
+        Actually saves the data against the Store's hash function
+        and raises ValueError if that does not match the supplied
+        `h`.
+    '''
+    h2 = self.add(data)
+    if h != h2:
+      raise ValueError("h:%s != hash(data):%s" % (h, h2))
+
   def __enter__(self):
     defaults.pushStore(self)
     return MultiOpenMixin.__enter__(self)
@@ -142,14 +145,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
-  def __str__(self):
-    return "Store(%s)" % self.name
-
   def hash(self, data):
     ''' Return a Hash object from data bytes.
         NB: does _not_ store the data.
     '''
-    return self.hashclass.from_data(data)
+    return self.hashclass.from_chunk(data)
 
   def startup(self):
     # Later already open
@@ -419,63 +419,14 @@ class DataDirStore(MappingStore):
     MappingStore.__init__(self, name, self._datadir, **kw)
 
   def startup(self, **kw):
+    X("DataDirStore.startup: _datadir.open...")
     self._datadir.open()
-    self._store_queued = {}
-    self._storeQ = IterableQueue(1024)
-    self._store_lock = Lock()
-    self._store_thread = Thread(name="%s-storer", target=self._storer)
-    self._store_thread.start()
     super().startup(**kw)
 
   def shutdown(self):
-    self._storeQ.close()
-    self._store_thread.join()
-    self._datadir.close()
     super().shutdown()
-
-  def add(self, data):
-    ''' Accept data, cache it and queue it for storage. Return hashcode.
-    '''
-    ##X("ADD %d bytes", len(data))
-    h = self.hash(data)
-    ##X("ADD %d bytes => %s", len(data), h)
-    queued = self._store_queued
-    with self._store_lock:
-      if h in queued:
-        return h
-      queued[h] = data
-    self._storeQ.put(data)
-    return h
-
-  def get(self, h, default=None):
-    try:
-      data = self._store_queued[h]
-    except KeyError:
-      return MappingStore.get(self, h, default=default)
-    else:
-      return data
-
-  def contains(self, h):
-    if h in self._store_queued:
-      return True
-    return MappingStore.contains(self, h)
-
-  def _storer(self):
-    ''' Store queued data and flush the map of stored data items.
-    '''
-    Q = self._storeQ
-    lock = self._store_lock
-    queued = self._store_queued
-    for data in Q:
-      ##X("STORER: MappingStore.add %d bytes", len(data))
-      h = MappingStore.add(self, data)
-      ##X("STORER: MappingStore.add %d bytes => %s", len(data), h)
-      with lock:
-        try:
-          del queued[h]
-        except KeyError:
-          pass
-      ##X("STORER: removed from queued")
+    self._datadir.close()
+    X("DataDirStore.shutdown: _datadir.close...")
 
 class _ProgressStoreTemplateMapping(object):
 

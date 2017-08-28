@@ -7,16 +7,17 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [-H] [-i] [-o] sed-regexps...
+usage="Usage: $cmd [-H]... [-i] [-o] sed-regexps...
     -C  Highlight regexp matches in colour. Default if stdout is a tty.
     -H  Always print the first (header) line.
+        Additional -H options increment the number of header lines.
     -i  Ignore case.
     -o  OR words instead of AND.
     -x  Trace execution."
 
 any=
 icase=
-header=
+nheaders=0
 trace=
 colour=
 [ -t 1 ] && colour=1
@@ -26,7 +27,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -C) colour=1 ;;
-    -H) header=1 ;;
+    -H) nheaders=$((nheaders + 1)) ;;
     -i) icase=1 ;;
     -o) any=1 ;;
     -x) trace=set-x ;;
@@ -84,6 +85,10 @@ done
 [ $any ] && set -- ${1+"$@"} -e d -e ':ok'
 [ $icase ] && set -- ${1+"$@"} -e g
 [ $colour ] && set -- ${1+"$@"} -e "$replwords"
-[ $header ] && set -- -e '1{p;d;}' ${1+"$@"}
+while [ $nheaders -gt 0 ]
+do
+  set -- -e "${nheaders}{p;d;}" ${1+"$@"}
+  nheaders=$((nheaders - 1))
+done
 
 exec $trace sed "$@"

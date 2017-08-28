@@ -14,7 +14,8 @@ import re
 from string import whitespace, digits
 import unittest
 from cs.lex import get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, warning, info, debug, exception, D
+from cs.logutils import error, warning, info, debug, exception, D
+from cs.pfx import Pfx
 from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions

@@ -83,6 +83,8 @@ def short_path(path, no_tilde=False, no_symlinks=False):
   pos = 0
   while pos < len(components) - 1:
     P = components[pos]
+    if not P.is_dir:
+      break
     probe_dir = P.path
     # examine symbolic links at this level
     matched_name = None
@@ -119,6 +121,8 @@ def short_path(path, no_tilde=False, no_symlinks=False):
       components = components[:pos+1] + components[matched_pos:]
       matched_P.present_as = matched_name
     pos += 1
+  if components[0].path == '.':
+    components.pop(0)
   return joinpath(*[P.present_as for P in components])
 
 def statkey(S):
@@ -130,6 +134,8 @@ statinfo = {}
 class PathInfo(O):
   def __init__(self, path):
     global pathinfo, statinfo
+    if path == '':
+      path = '.'
     self.path = path
     self.present_as = self.base
     try:
@@ -142,7 +148,7 @@ class PathInfo(O):
   def __repr__(self):
     if self.present_as == self.path:
       return "PathInfo(%r)" % (self.path,)
-    return "PathInfo(%r:%r)" % (self.path,self.present_as)
+    return "PathInfo(%r:%r)" % (self.path, self.present_as)
   def __eq__(self, other):
     key = self.key
     if key is None:
@@ -159,7 +165,7 @@ class PathInfo(O):
     return statkey(S)
   @property
   def base(self):
-    return os.path.basename(self.path)
+    return basename(self.path)
   @property
   def uid(self):
     S = self.stat
@@ -168,7 +174,12 @@ class PathInfo(O):
     return S.st_uid
   @property
   def is_lnk(self):
-    return stat.S_ISLNK(self.stat.st_mode)
+    S = self.stat
+    return S is not None and stat.S_ISLNK(S.st_mode)
+  @property
+  def is_dir(self):
+    S = self.stat
+    return S is not None and stat.S_ISDIR(S.st_mode)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

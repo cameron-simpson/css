@@ -10,7 +10,7 @@ import re
 import string
 import unittest
 from itertools import product
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 
 def re_alt(res, name=None):
   return '(' + '|'.join(res) + ')'

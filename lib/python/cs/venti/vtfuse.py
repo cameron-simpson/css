@@ -7,35 +7,28 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from functools import partial
 from collections import namedtuple
 from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFormatter
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
-from os.path import basename
-from pprint import pformat
 import stat
 import sys
 from threading import Thread, RLock
-import time
 from types import SimpleNamespace as NS
-from cs.debug import DummyMap, TracingObject
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X, XP, debug, info, warning, error, exception, Pfx, DEFAULT_BASE_FORMAT
-from cs.obj import O, obj_as_dict
-from cs.py.func import funccite, funcname
+from cs.logutils import X, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.pfx import Pfx
+from cs.obj import O
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
 from . import defaults
 from .archive import strfor_Dirent, write_Dirent_str
-from .block import Block
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
-from .file import File
-from .meta import NOUSERID, NOGROUPID
+from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 from .store import MissingHashcodeError
 
@@ -49,6 +42,8 @@ LOGGER_FILENAME = 'vtfuse.log'
 XATTR_NOFOLLOW = 0x0001
 XATTR_CREATE   = 0x0002
 XATTR_REPLACE  = 0x0004
+
+XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
 # records associated with an open file
 # TODO: no support for multiple links or path-=open renames
@@ -74,14 +69,16 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
 def handler(method):
   ''' Decorator for FUSE handlers.
       Prefixes exceptions with the method name, associated with the
-      Store, prevents anything other than a FUSEOSError being raised.
+      Store, prevents anything other than a FuseOSError being raised.
   '''
   def handle(self, *a, **kw):
-    ##X("OP %s %r %r", method.__name__, a, kw)
+    ##X("OP %s %r %r ...", method.__name__, a, kw)
     try:
       with Pfx(method.__name__):
         with self._vt_core.S:
-          return method(self, *a, **kw)
+          result = method(self, *a, **kw)
+          ##X("OP %s %r %r => %r", method.__name__, a, kw, result)
+          return result
     except FuseOSError:
       raise
     except MissingHashcodeError as e:
@@ -91,11 +88,11 @@ def handler(method):
       error("raising FuseOSError from OSError: %s", e)
       raise FuseOSError(e.errno) from e
     except Exception as e:
-      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s", method.__name__, a, kw, e)
+      exception("unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s", method.__name__, a, kw, type(e), e)
       raise FuseOSError(errno.EINVAL) from e
-    except:
+    except BaseException as e:
       error("UNCAUGHT EXCEPTION")
-      raise RuntimeError("UNCAUGHT EXCEPTION")
+      raise RuntimeError("UNCAUGHT EXCEPTION") from e
   return handle
 
 def log_traces_queued(Q):
@@ -131,6 +128,8 @@ class FileHandle(O):
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
   def write(self, data, offset):
+    ''' Write data to the file.
+    '''
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
@@ -140,26 +139,44 @@ class FileHandle(O):
     return written
 
   def read(self, offset, size):
+    ''' Read data from the file.
+    '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
-        fp.flush()
         fp.seek(offset)
         data = fp.read(size)
     return data
 
   def truncate(self, length):
+    ''' Truncate the file, mark it as modified.
+    '''
     self.Eopen._open_file.truncate(length)
     self.E.touch()
 
   def flush(self):
-    self.Eopen.flush()
+    ''' Commit file contents to Store.
+        Chooses a scanner based on the Dirent.name.
+    '''
+    X("FileHandle.flush: self.E.name=%r", self.E.name)
+    mime_type = self.E.meta.mime_type
+    if mime_type is None:
+      scanner = None
+    else:
+      X("look up scanner from mime_type %r", mime_type)
+      scanner = scanner_from_mime_type(mime_type)
+    if scanner is None:
+      X("look up scanner from filename %r", self.E.name)
+      scanner = scanner_from_filename(self.E.name)
+    self.Eopen.flush(scanner)
     ## no touch, already done by any writes
-    ## self.E.touch()
+    X("FileHandle.Flush DONE")
 
   def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
     self.Eopen.close()
     self.E.parent.change()
 
@@ -347,7 +364,7 @@ class Inodes(object):
     H = HardlinkDirent.to_inum(inum, E.name)
     self._inode_map[inum] = Inode(inum, E)
     E.meta.nlink = 1
-    return Edst
+    return E
 
   @locked
   def inum_for_Dirent(self, E):
@@ -457,11 +474,6 @@ class _StoreFS_core(object):
           dump_Dirent(self.E, recurse=False)
           dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
-  def i2E(self, inum):
-    ''' Return the Dirent associated with the supplied `inum`.
-    '''
-    return self._inodes.dirent(inum)
-
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
     '''
@@ -495,6 +507,8 @@ class _StoreFS_core(object):
     return inum
 
   def i2E(self, inum):
+    ''' Return the Dirent associated with the supplied `inum`.
+    '''
     return self._inodes.dirent(inum)
 
   def _Estat(self, E):
@@ -652,7 +666,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       E = self._vt_core.i2E(inode)
     except ValueError as e:
       warning("access(inode=%d): %s", inode, e)
-      raise FUSEOSError(errno.EINVAL)
+      raise FuseOSError(errno.EINVAL)
     return E
 
   def _vt_EntryAttributes(self, E):
@@ -729,19 +743,22 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def flush(self, fh):
+    ''' Handle close() system call.
+    '''
     FH = self._vt_core._fh(fh)
     FH.flush()
-    inum = self._vt_core.E2i(FH.E)
-    self._vt_core.kref_dec(inum)
+    ## DONE BY FORGET? ## inum = self._vt_core.E2i(FH.E)
+    ## DONE BY FORGET? ## self._vt_core.kref_dec(inum)
 
   @handler
   def forget(self, inode_list):
+    X("FORGET %r", inode_list)
     for inode, nlookup in inode_list:
       self._vt_core.kref_dec(inode, nlookup)
 
   @handler
   def fsync(self, fh, datasync):
-    self._fh(fh).flush()
+    self._vt_core._fh(fh).flush()
 
   @handler
   def fsyncdir(self, fh, datasync):
@@ -757,6 +774,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def getxattr(self, inode, xattr_name, ctx):
     # TODO: test for permission to access inode?
     E = self._vt_core.i2E(inode)
+    if xattr_name == XATTR_NAME_BLOCKREF:
+        return E.block.encode()
     # bit of a hack: pretend all attributes exist, empty if missing
     # this is essentially to shut up llfuse, which otherwise reports ENOATTR
     # with a stack trace
@@ -799,13 +818,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
     Pdst[new_name] = EdstLink
     # increment link count on underlying Dirent
     Esrc.meta.nlink += 1
-    return self._vt_EntryAttributes(E)
+    return self._vt_EntryAttributes(Esrc)
 
   @handler
   def listxattr(self, inode, ctx):
     # TODO: ctx allows to access inode?
     E = self._vt_core.i2E(inode)
-    return list(E.meta.listxattrs())
+    xattrs = set(E.meta.listxattrs())
+    xattrs.add(XATTR_NAME_BLOCKREF)
+    return list(xattrs)
 
   @handler
   def lookup(self, parent_inode, name_b, ctx):
@@ -965,6 +986,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def removexattr(self, inode, xattr_name, ctx):
     # TODO: test for inode ownership?
+    if xattr_name == XATTR_NAME_BLOCKREF:
+      # TODO: should we support this as "force recompute"?
+      # feels like that would be a bug workaround
+      raise FuseOSError(errno.EINVAL)
     E = self._vt_core.i2E(inode)
     meta = E.meta
     try:
@@ -993,7 +1018,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def rmdir(self, parent_inode, name_b, ctx):
     name = self._vt_str(name_b)
     P = self._vt_core.i2E(parent_inode)
-    if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
+    if not self._vt_core._Eaccess(P, os.X_OK|os.W_OK, ctx):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]
@@ -1039,6 +1064,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
     # TODO: check perms (ownership?)
+    if xattr_name == XATTR_NAME_BLOCKREF:
+      # TODO: support this as a "switch out the content action"?
+      raise FuseOSError(errno.EINVAL)
     E = self._vt_core.i2E(inode)
     E.meta.setxattr(xattr_name, value)
 
