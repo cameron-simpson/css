@@ -73,10 +73,6 @@ class Enigma2(_Recording):
         }
       }
     return Enigma2MetaData(**data)
-  
-  @property
-  def start_dt_iso(self):
-    return self.metadata.start_dt_iso
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.

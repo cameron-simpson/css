@@ -96,6 +96,10 @@ class _Recording(object):
     self.path = path
     self._lock = Lock()
 
+  @property
+  def start_dt_iso(self):
+    return self.metadata.start_dt_iso
+
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
