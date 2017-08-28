@@ -104,7 +104,7 @@ class _Recording(object):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
     '''
-    if type(output) is str:
+    if isinstance(output, str):
       outpath = output
       with open(outpath, "wb") as output:
         self.copyto(output)
@@ -161,13 +161,13 @@ class _Recording(object):
 
   def convert(self,
               dstpath, dstfmt='mp4', max_n=None,
-              timespans=(),
-              do_copyto=False):
+              timespans=()):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if not timespans:
       timespans = ( (None, None), )
     srcfmt = 'mpegts'
+    do_copyto = hasattr(self, 'data')
     if do_copyto:
       srcpath = None
       if len(timespans) > 1:
@@ -196,35 +196,39 @@ class _Recording(object):
             ok = True
         else:
           error("file exists")
-      if ok:
-        if os.path.exists(dstpath):
-          raise ValueError("dstpath exists")
-        if dstfmt is None:
-          _, ext = os.path.splitext(dstpath)
-          if not ext:
-            raise ValueError("can't infer output format from dstpath, no extension")
-          dstfmt = ext[1:]
-        ffmeta = self.ffmpeg_metadata(dstfmt)
-        sources = []
-        for timespan in timespans:
-          sources.append(FFSource(srcpath, srcfmt, timespan[0], timespan[1]))
-        P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
-        info("running %r", ffargv)
-        if do_copyto:
-          # feed .copyto data to FFmpeg
-          try:
-            self.copyto(P.stdin)
-          except OSError as e:
-            if e.errno == errno.EPIPE:
-              warning("broken pipe writing to ffmpeg")
-          P.stdin.close()
-        xit = P.wait()
-        if xit == 0:
-          ok = True
-        else:
-          warning("ffmpeg failed, exit status %d", xit)
-          ok = False
+      if not ok:
         return ok
+      if os.path.exists(dstpath):
+        raise ValueError("dstpath exists")
+      if dstfmt is None:
+        _, ext = os.path.splitext(dstpath)
+        if not ext:
+          raise ValueError("can't infer output format from dstpath, no extension")
+        dstfmt = ext[1:]
+      ffmeta = self.ffmpeg_metadata(dstfmt)
+      sources = []
+      for start_s, end_s in timespans:
+        sources.append(FFSource(srcpath, srcfmt, start_s, end_s))
+      P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
+      info("running %r", ffargv)
+      if do_copyto:
+        # feed .copyto data to FFmpeg
+        try:
+          self.copyto(P.stdin)
+        except OSError as e:
+          if e.errno == errno.EPIPE:
+            warning("broken pipe writing to ffmpeg")
+            ok = False
+          else:
+            raise
+        P.stdin.close()
+      xit = P.wait()
+      if xit == 0:
+        ok = True
+      else:
+        warning("ffmpeg failed, exit status %d", xit)
+        ok = False
+      return ok
 
   def ffmpeg_metadata(self, dstfmt='mp4'):
     M = self.metadata
