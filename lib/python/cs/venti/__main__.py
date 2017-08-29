@@ -66,7 +66,7 @@ def main(argv):
       dump filerefs
       fsck block blockref...
       ftp archive.vt
-      import path archive.vt
+      import [-oW] path {-|archive.vt}
       listen {-|host:port}
       ls [-R] dirrefs...
       mount archive.vt [mountpoint [subpath]]
@@ -482,11 +482,10 @@ def cmd_import(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing path")
   srcpath = args.pop(0)
-  if args:
-    special = args.pop(0)
-    if special == '-':
-      special = None
-  else:
+  if not args:
+    raise GetoptError("missing archive.vt")
+  special = args.pop(0)
+  if special == '-':
     special = None
   if args:
     raise GetoptError("extra arguments: %s" % (' '.join(args),))
