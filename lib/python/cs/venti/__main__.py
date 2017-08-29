@@ -632,7 +632,7 @@ def cmd_mount(args, verbose=None, log=None):
   else:
     spfx, sext = splitext(special)
     if sext != '.vt':
-      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt"): %r', special)
       badopts = True
     else:
       mountpoint = spfx
