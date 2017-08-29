@@ -142,20 +142,20 @@ def read_Dirents(fp):
     yield when, E
 
 def last_Dirent(arpath, missing_ok=False):
-  ''' Return the latest archive entry.
+  ''' Return the latest archive entry as (unixtime, Dirent).
   '''
   try:
     with open(arpath, "r") as arfp:
       try:
         return last(read_Dirents(arfp))
       except IndexError:
+        # no entries
         return None, None
   except OSError as e:
     if e.errno == errno.ENOENT:
       if missing_ok:
         return None, None
     raise
-  raise RuntimeError("NOTREACHED")
 
 def strfor_Dirent(E):
   ''' Exposed function for 
