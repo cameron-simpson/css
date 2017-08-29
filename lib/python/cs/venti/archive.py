@@ -168,7 +168,7 @@ def write_Dirent(fp, E, when=None):
         isodatetime unixtime totext(dirent) dirent.name
   '''
   encoded = strfor_Dirent(E)
-  write_Dirent_str(fp, when, encoded, E.name)
+  write_Dirent_str(fp, encoded, when, E.name)
   return encoded
 
 def write_Dirent_str(fp, text, when=None, etc=None):
