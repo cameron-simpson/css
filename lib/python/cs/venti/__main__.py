@@ -25,7 +25,8 @@ from cs.pfx import Pfx
 from cs.tty import statusline
 from cs.x import X
 from . import fromtext, defaults
-from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
+from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, \
+                        last_Dirent, save_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
 from .compose import Store, ConfigFile
@@ -65,7 +66,7 @@ def main(argv):
       dump filerefs
       fsck block blockref...
       ftp archive.vt
-      import paths...
+      import path archive.vt
       listen {-|host:port}
       ls [-R] dirrefs...
       mount archive.vt [mountpoint [subpath]]
@@ -467,28 +468,80 @@ def cmd_import(args, verbose=None, log=None):
   ''' Import paths into the Store, print top Dirent for each.
   '''
   xit = 0
-  if not args:
-    raise GetoptError("missing paths")
-  for srcpath in args:
-    with Pfx(srcpath):
-      try:
-        S = os.lstat(srcpath)
-      except OSError as e:
-        error("%s", e)
-        xit = 1
-        continue
-      if isdirpath(srcpath):
-        E, errors = import_dir(srcpath)
-        if errors:
-          error("directory not fully imported")
-          xit = 1
-      elif isfilepath(srcpath):
-        E = import_file(srcpath)
+  overlay = False
+  whole_read = False
+  opts, args = getopt(args, 'oW')
+  for opt, val in opts:
+    with Pfx(opt):
+      if opt == '-o':
+        overlay = True
+      elif opt == '-W':
+        whole_read = True
       else:
-        error("not a file or directory")
+        raise RuntimeError("unhandled option: %r" % (opt,))
+  if not args:
+    raise GetoptError("missing path")
+  srcpath = args.pop(0)
+  if args:
+    special = args.pop(0)
+    if special == '-':
+      special = None
+  else:
+    special = None
+  if args:
+    raise GetoptError("extra arguments: %s" % (' '.join(args),))
+  if special is None:
+    D = None
+  else:
+    with Pfx(repr(special)):
+      try:
+        with open(special, 'a'):
+          pass
+      except OSError as e:
+        error("cannot open archive for append: %s", e)
+        return 1
+      when, D = last_Dirent(special)
+  if D is None:
+    D = Dir('import')
+  srcbase = basename(srcpath.rstrip(os.sep))
+  E = D.get(srcbase)
+  with Pfx(srcpath):
+    try:
+      S = os.lstat(srcpath)
+    except OSError as e:
+      error("%s", e)
+      return 1
+    if isdirpath(srcpath):
+      if E is None:
+        E = D.mkdir(srcbase)
+      elif not overlay:
+        error("name %r already imported", srcbase)
+        return 1
+      elif not E.isdir:
+        error("name %r is not a directory", srcbase)
+      E, errors = import_dir(srcpath, E, overlay=overlay, whole_read=whole_read)
+      if errors:
+        warning("directory not fully imported")
+        for err in errors:
+          warning("  %s", err)
         xit = 1
-        continue
-    print(str(E))
+    elif isfilepath(srcpath):
+      if E is not None:
+        error("name %r already imported", srcbase)
+        return 1
+      E = D[srcbase] = import_file(srcpath)
+    else:
+      error("not a file or directory")
+      xit = 1
+      return 1
+  if xit != 0:
+    fp = sys.stderr
+    print("updated dirent after import:", file=fp)
+  elif special is None:
+    fp = sys.stdout
+  else:
+    fp = special
+  save_Dirent(fp, D)
   return xit
 
 # TODO: create dir, dir/data
