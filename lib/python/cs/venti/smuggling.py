@@ -15,8 +15,9 @@ from .blockify import blocks_of, top_block_for
 from .dir import Dir, FileDirent
 from .parsers import scanner_from_filename
 
-def import_dir(srcpath, D, overlay=False, whole_read=False):
+def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
   ''' Import a directory tree, return a Dir and list of errors.
+      `delete`: delete entries for things not in `srcpath`
       `overlay`: replace existing entries, default False
       `whole_read`: read file contents even if size and mtime match
   '''
@@ -31,16 +32,13 @@ def import_dir(srcpath, D, overlay=False, whole_read=False):
           dirnames[:] = sorted(dirnames)
           subD = D.makedirs(rpath)
           for filename in sorted(filenames):
-            with Pfx("file %r", filename):
-              filepath = joinpath(dirpath, filename)
+            filepath = joinpath(dirpath, filename)
+            with Pfx(filepath):
               if filename in subD:
                 E = subD[filename]
                 if overlay:
                   if not whole_read:
-                    Estat0 = E.stat()
-                    XP("Estat0=%s", Estat0)
                     Estat = E.meta.stat()
-                    XP("Estat=%s", Estat)
                     try:
                       S = os.stat(filepath)
                     except OSError as e:
@@ -48,18 +46,26 @@ def import_dir(srcpath, D, overlay=False, whole_read=False):
                       errors.append( ('stat', filepath, joinpath(rpath, filename)) )
                       ok = False
                       continue
-                    XP("S=%s", S)
                     if Estat.st_size == S.st_size and Estat.st_mtime == S.st_mtime:
                       info("same size and mtime, considering unchanged")
                       continue
-                    X("%r: differing size/mtime", filepath)
                 else:
                   error("already exists")
                   errors.append( ('conflict', filepath, joinpath(rpath, filename)) )
                   ok = False
                   continue
+                info("update")
+              else:
+                info("new")
               F = import_file(filepath)
               subD[filename] = F
+          if delete:
+            existing = list(subD.keys())
+            for name in existing:
+              with Pfx(repr(name)):
+                if name not in dirnames and name not in filenames:
+                  info("delete")
+                  del subD[name]
     except KeyboardInterrupt as e:
       error("keyboard interrupt: %s, returning partial import", e)
       errors.append( ('interrupt',) )

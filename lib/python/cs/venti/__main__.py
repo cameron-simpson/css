@@ -364,12 +364,15 @@ def cmd_import(args, verbose=None, log=None):
   ''' Import paths into the Store, print top Dirent for each.
   '''
   xit = 0
+  delete = False
   overlay = False
   whole_read = False
   opts, args = getopt(args, 'oW')
   for opt, val in opts:
     with Pfx(opt):
-      if opt == '-o':
+      if opt == '-D':
+        delete = True
+      elif opt == '-o':
         overlay = True
       elif opt == '-W':
         whole_read = True
@@ -414,7 +417,8 @@ def cmd_import(args, verbose=None, log=None):
         return 1
       elif not E.isdir:
         error("name %r is not a directory", srcbase)
-      E, errors = import_dir(srcpath, E, overlay=overlay, whole_read=whole_read)
+      E, errors = import_dir(srcpath, E,
+                    delete=delete, overlay=overlay, whole_read=whole_read)
       if errors:
         warning("directory not fully imported")
         for err in errors:
