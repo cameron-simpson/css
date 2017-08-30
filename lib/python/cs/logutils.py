@@ -396,32 +396,6 @@ def status(msg, *args, **kwargs):
   file.write(msg)
   file.flush()
 
-def nl(msg, *args, **kw):
-  ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-  '''
-  try:
-    fp = kw.pop('file')
-  except KeyError:
-    fp = sys.stdout
-  if kw:
-    raise ValueError("unexpected keyword arguments: %r" % (kw,))
-  msg = str(msg)
-  if args:
-    try:
-      msg = msg % args
-    except TypeError as e:
-      nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
-      msg = "%s[%r]" % (msg, args)
-  fp.write(msg)
-  fp.write("\n")
-  try:
-    flush = fp.flush
-  except AttributeError:
-    pass
-  else:
-    flush()
-
 def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None, no_prefix=False):
   ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
       If `logger` is supplied and not None, add the FileHandler to that
