@@ -45,10 +45,6 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-# records associated with an open file
-# TODO: no support for multiple links or path-=open renames
-OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
-
 def mount(mnt, E, S, syncfp=None, subpath=None):
   ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
       `mnt`: mount point
