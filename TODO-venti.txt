@@ -1,3 +1,4 @@
+audit fs: append only, no deletes, maybe no renames
 import: import_file for existing files: efficient content comparison etc
 vtfuse close file should not block, but update mtime and queue sync with callback to update Block on Dirent - wait for all same on fs sync/umount
 SIGINT clean shutdown of mount
