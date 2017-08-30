@@ -1,3 +1,8 @@
+import: import_file for existing files: efficient content comparison etc
+vtfuse close file should not block, but update mtime and queue sync with callback to update Block on Dirent - wait for all same on fs sync/umount
+SIGINT clean shutdown of mount
+make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
+recognise .foo.ext.xxxxxx rsync temp files, infer scanner from .ext embedded extension
 cs.buffer.CornuCopyBuffer: automatically upgrade iterables to iterators?
 salt entries for Dirs,
 text serialisation: all human readable, regular syntax

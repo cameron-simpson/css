@@ -23,11 +23,13 @@ from cs.lex import hexify
 from cs.logutils import exception, error, warning, info, debug, setup_logging, logTo, nl
 from cs.pfx import Pfx
 from cs.tty import statusline
+import cs.x
 from cs.x import X
 from . import fromtext, defaults
-from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
+from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, \
+                        last_Dirent, save_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import MemoryCacheStore, FileCacheStore
+from .cache import FileCacheStore
 from .compose import Store, ConfigFile
 from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
@@ -37,6 +39,7 @@ from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
+from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
 
 def main(argv):
@@ -46,16 +49,14 @@ def main(argv):
   setup_logging(cmd_name=cmd)
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
-      -C store    Use this as a front end cache store.
-                  "-" means no front end cache.
-      -M          Don't use an additional MemoryCacheStore front end.
-      -S store    Specify the store to use:
-                    [clause]        Specification from .vtrc.
-                    /path/to/dir    GDBMStore
-                    tcp:[host]:port TCPStore
-                    |sh-command     StreamStore via sh-command
-      -q          Quiet; not verbose. Default if stdout is not a tty.
-      -v          Verbose; not quiet. Default it stdout is a tty.
+      -C        Do not put a cache in front of the store.
+      -S store  Specify the store to use:
+                  [clause]        Specification from .vtrc.
+                  /path/to/dir    GDBMStore
+                  tcp:[host]:port TCPStore
+                  |sh-command     StreamStore via sh-command
+      -q        Quiet; not verbose. Default if stderr is not a tty.
+      -v        Verbose; not quiet. Default if stderr is a tty.
     Operations:
       ar tar-options paths..
       cat filerefs...
@@ -66,32 +67,33 @@ def main(argv):
       dump filerefs
       fsck block blockref...
       ftp archive.vt
+      import [-oW] path {-|archive.vt}
       listen {-|host:port}
       ls [-R] dirrefs...
       mount archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
+      report
       unpack dirrefs...
 ''' % (cmd,)
 
   badopts = False
 
-  # verbose if stdout is a tty
+  # verbose if stderr is a tty
   try:
-    verbose = sys.stdout.isatty()
-  except:
+    verbose = sys.stderr.isatty()
+  except AttributeError:
     verbose = False
 
   dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-  dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
-  useMemoryCacheStore = True
+  no_cache = False
 
   args = argv[1:]
   try:
-    opts, args = getopt(args, 'C:MS:qv')
+    opts, args = getopt(args, 'CS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -99,14 +101,7 @@ def main(argv):
 
   for opt, val in opts:
     if opt == '-C':
-      # specify caching Store
-      if val == '-':
-        dflt_cache = None
-      else:
-        dflt_cache = val
-    elif opt == '-M':
-      # do not use the in-memory caching store
-      useMemoryCacheStore = False
+      no_cache = True
     elif opt == '-S':
       # specify Store
       dflt_vt_store = val
@@ -135,7 +130,7 @@ def main(argv):
   signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
 
   try:
-    xit = cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore)
+    xit = cmd_op(args, verbose, log, config, dflt_vt_store, no_cache)
   except GetoptError as e:
     error("%s", e)
     badopts = True
@@ -152,7 +147,7 @@ def main(argv):
 
   return xit
 
-def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCacheStore):
+def cmd_op(args, verbose, log, config, dflt_vt_store, no_cache):
   try:
     op = args.pop(0)
   except IndexError:
@@ -160,7 +155,7 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
   with Pfx(op):
     if op == "profile":
       return cmd_profile(args, verbose, log, config,
-                         dflt_vt_store, dflt_cache, useMemoryCacheStore)
+                         dflt_vt_store, no_cache)
     try:
       op_func = getattr(sys.modules[__name__], "cmd_" + op)
     except AttributeError:
@@ -176,19 +171,8 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, dflt_cache, useMemoryCache
     except Exception as e:
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    S = FileCacheStore("vtfuse", S)
-    ### optional CacheStore
-    ##if dflt_cache is not None:
-    ##  try:
-    ##    C = Store(dflt_cache)
-    ##  except:
-    ##    exception("can't open cache store \"%s\"", dflt_cache)
-    ##    raise GetoptError("can't open cache: %s" % (dflt_cache,))
-    ##  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
-    ### put an in-memory cache in front of the main cache
-    ##if useMemoryCacheStore:
-    ##  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
-    ##                 S, MemoryCacheStore("MemoryCacheStore"))
+    if not no_cache:
+      S = FileCacheStore("main", S)
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
@@ -369,6 +353,12 @@ def cmd_catblock(args, verbose=None, log=None):
       sys.stdout.write(subB.data)
   return 0
 
+def cmd_report(args, verbose=None, log=None):
+  ''' Report stuff after store setup.
+  '''
+  print("S =", defaults.S)
+  return 0
+
 def cmd_datadir(args, verbose=None, log=None):
   ''' Perform various operations on DataDirs.
   '''
@@ -475,6 +465,85 @@ def cmd_ftp(args, verbose=None, log=None):
       DirFTP(D).cmdloop()
     return 0
 
+def cmd_import(args, verbose=None, log=None):
+  ''' Import paths into the Store, print top Dirent for each.
+  '''
+  xit = 0
+  overlay = False
+  whole_read = False
+  opts, args = getopt(args, 'oW')
+  for opt, val in opts:
+    with Pfx(opt):
+      if opt == '-o':
+        overlay = True
+      elif opt == '-W':
+        whole_read = True
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
+  if not args:
+    raise GetoptError("missing path")
+  srcpath = args.pop(0)
+  if not args:
+    raise GetoptError("missing archive.vt")
+  special = args.pop(0)
+  if special == '-':
+    special = None
+  if args:
+    raise GetoptError("extra arguments: %s" % (' '.join(args),))
+  if special is None:
+    D = None
+  else:
+    with Pfx(repr(special)):
+      try:
+        with open(special, 'a'):
+          pass
+      except OSError as e:
+        error("cannot open archive for append: %s", e)
+        return 1
+      when, D = last_Dirent(special)
+  if D is None:
+    D = Dir('import')
+  srcbase = basename(srcpath.rstrip(os.sep))
+  E = D.get(srcbase)
+  with Pfx(srcpath):
+    try:
+      S = os.lstat(srcpath)
+    except OSError as e:
+      error("%s", e)
+      return 1
+    if isdirpath(srcpath):
+      if E is None:
+        E = D.mkdir(srcbase)
+      elif not overlay:
+        error("name %r already imported", srcbase)
+        return 1
+      elif not E.isdir:
+        error("name %r is not a directory", srcbase)
+      E, errors = import_dir(srcpath, E, overlay=overlay, whole_read=whole_read)
+      if errors:
+        warning("directory not fully imported")
+        for err in errors:
+          warning("  %s", err)
+        xit = 1
+    elif isfilepath(srcpath):
+      if E is not None:
+        error("name %r already imported", srcbase)
+        return 1
+      E = D[srcbase] = import_file(srcpath)
+    else:
+      error("not a file or directory")
+      xit = 1
+      return 1
+  if xit != 0:
+    fp = sys.stderr
+    print("updated dirent after import:", file=fp)
+  elif special is None:
+    fp = sys.stdout
+  else:
+    fp = special
+  save_Dirent(fp, D)
+  return xit
+
 # TODO: create dir, dir/data
 def cmd_init(args, verbose=None, log=None):
   ''' Initialise a directory for use as a store.
@@ -563,7 +632,7 @@ def cmd_mount(args, verbose=None, log=None):
   else:
     spfx, sext = splitext(special)
     if sext != '.vt':
-      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt": %r', special)
+      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt"): %r', special)
       badopts = True
     else:
       mountpoint = spfx
@@ -577,19 +646,22 @@ def cmd_mount(args, verbose=None, log=None):
   if badopts:
     raise GetoptError("bad arguments")
   # import vtfuse before doing anything with side effects
-  from .vtfuse import mount
+  from .vtfuse import mount, umount
   with Pfx(mountpoint):
+    need_rmdir = False
     if not isdirpath(mountpoint):
       # autocreate mountpoint
       info('mkdir %r ...', mountpoint)
       try:
         os.mkdir(mountpoint)
+        need_rmdir = True
       except OSError as e:
         if e.errno == errno.EEXIST:
           error("mountpoint is not a directory", mountpoint)
           return 1
         else:
           raise
+  xit = 0
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
@@ -607,8 +679,22 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       with open(special, 'a') as syncfp:
-        mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
-  return 0
+        try:
+          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
+          cs.x.X_via_tty = True
+          T.join()
+        except KeyboardInterrupt as e:
+          error("keyboard interrupt, unmounting %r", mountpoint)
+          xit = umount(mountpoint)
+          T.join()
+    if need_rmdir:
+      info("rmdir %r ...", mountpoint)
+      try:
+        os.rmdir(mountpoint)
+      except OSError as e:
+        error("%r: rmdir fails: %s", mountpoint, e)
+        xit = 1
+  return xit
 
 def cmd_pack(args, verbose=None, log=None):
   ''' Replace each I<path> with an archive file I<path>B<.vt> referring

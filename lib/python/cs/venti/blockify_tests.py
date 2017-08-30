@@ -18,8 +18,8 @@ from cs.randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
                       blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
-from .cache import MemoryCacheStore
 from .parsers import scan_text, scan_mp3, scan_mp4
+from .store import MappingStore
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
@@ -157,7 +157,7 @@ class TestAll(unittest.TestCase):
           rfp = None
 
   def test03blockifyAndRetrieve(self):
-    with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
+    with MappingStore("TestAll.test00blockifyAndRetrieve", {}):
       data = self.fp.read()
       blocks = list(blockify([data]))
       ##X("blocks=%r", blocks)

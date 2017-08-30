@@ -8,17 +8,13 @@ import sys
 import unittest
 from .store import MappingStore
 from .store_tests import TestStore
-from .cache import CacheStore, MemoryCacheStore
+from .cache import FileCacheStore
 
-class TestCacheStore(TestStore, unittest.TestCase):
+class TestFileCacheStore(TestStore, unittest.TestCase):
   def _init_Store(self):
     self.fastS = MappingStore("TestCacheStore.fastS", {}, hashclass=self.hashclass)
     self.slowS = MappingStore("TestCacheStore.slowS", {}, hashclass=self.hashclass)
-    self.S = CacheStore("TestCacheStore.S", self.fastS, self.slowS, hashclass=self.hashclass)
-
-class TestMemoryCacheStore(TestStore, unittest.TestCase):
-  def _init_Store(self):
-    self.S = MemoryCacheStore(16, hashclass=self.hashclass)
+    self.S = FileCacheStore("TestCacheStore.S", self.fastS, self.slowS, hashclass=self.hashclass)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
