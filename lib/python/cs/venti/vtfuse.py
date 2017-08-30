@@ -454,6 +454,11 @@ class _StoreFS_core(object):
   def __del__(self):
     self.logQ.close()
 
+  def __getitem__(self, inum):
+    ''' Lookup inode numbers.
+    '''
+    return self._inodes[inum]
+
   def _sync(self):
     with Pfx("_sync"):
       if defaults.S is None:
@@ -560,14 +565,6 @@ class _StoreFS_core(object):
 
   def make_hardlink(self, E):
     return self._inodes.make_hardlink(E)
-
-  def kref_inc(self, inum, delta=1):
-    I = self._inodes[inum]
-    I += delta
-
-  def kref_dec(self, inum, delta=1):
-    I = self._inodes[inum]
-    I -= delta
 
   @locked
   def _fh(self, fhndx):
@@ -725,13 +722,16 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def create(self, parent_inode, name_b, mode, flags, ctx):
     ''' Create a new file and open it. Return file handle index and EntryAttributes.
     '''
+    core = self._vt_core
+    I = core[parent_inode]
+    I += 1
     name = self._vt_str(name_b)
     P = self._vt_i2E(parent_inode)
     if name in P:
       warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
               parent_inode, P, name)
-    fhndx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
-    E = self._vt_core._fh(fhndx).E
+    fhndx = core.open2(P, name, flags|O_CREAT, ctx)
+    E = core._fh(fhndx).E
     E.meta.chmod(mode)
     P[name] = E
     return fhndx, self._vt_EntryAttributes(E)
@@ -747,14 +747,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     FH = self._vt_core._fh(fh)
     FH.flush()
-    ## DONE BY FORGET? ## inum = self._vt_core.E2i(FH.E)
-    ## DONE BY FORGET? ## self._vt_core.kref_dec(inum)
 
   @handler
-  def forget(self, inode_list):
-    X("FORGET %r", inode_list)
-    for inode, nlookup in inode_list:
-      self._vt_core.kref_dec(inode, nlookup)
+  def forget(self, ideltae):
+    X("FORGET %r", ideltae)
+    core = self._vt_core
+    for inum, nlookup in ideltae:
+      I = core[inum]
+      I -= nlookup
 
   @handler
   def fsync(self, fh, datasync):
@@ -783,12 +783,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def link(self, inode, new_parent_inode, new_name_b, ctx):
+    core = self._vt_core
+    I = core[parent_inode]
+    I += 1
     new_name = self._vt_str(new_name_b)
     # TODO: test for write access to new_parent_inode
-    Esrc = self._vt_core.i2E(inode)
+    Esrc = core.i2E(inode)
     if not Esrc.isfile and not Esrc.ishardlink:
       raise FuseOSError(errno.EPERM)
-    Pdst = self._vt_core.i2E(new_parent_inode)
+    Pdst = core.i2E(new_parent_inode)
     if new_name in Pdst:
       raise FuseOSError(errno.EEXIST)
     # the final component must be a directory in order to create the new link
@@ -797,15 +800,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if Esrc.ishardlink:
       # point Esrc at the master Dirent in ._inodes
       inum = Esrc.inum
-      Esrc = self._vt_core.i2E(inum)
+      Esrc = core.i2E(inum)
     else:
       # new hardlink, update the source
       # keep Esrc as the master
       # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
       # put EsrcLink into the enclosing Dir, replacing Esrc
       src_name = Esrc.name
-      inum0 = self._vt_core.E2i(Esrc)
-      EsrcLink = self._vt_core.make_hardlink(Esrc)
+      inum0 = core.E2i(Esrc)
+      EsrcLink = core.make_hardlink(Esrc)
       Esrc.parent[src_name] = EsrcLink
       inum = EsrcLink.inum
       if inum != inum0:
@@ -830,12 +833,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def lookup(self, parent_inode, name_b, ctx):
+    core = self._vt_core
+    I = core[parent_inode]
+    I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search parent_inode
-    if parent_inode == self._vt_core.mnt_inum:
-      P = self._vt_core.mntE
+    if parent_inode == core.mnt_inum:
+      P = core.mntE
     else:
-      P = self._vt_core.i2E(parent_inode)
+      P = core.i2E(parent_inode)
     if name == '.':
       E = P
     elif name == '..':
@@ -854,9 +860,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def mkdir(self, parent_inode, name_b, mode, ctx):
+    core = self._vt_core
+    I = core[parent_inode]
+    I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search and write parent_inode
-    P = self._vt_core.i2E(parent_inode)
+    P = core.i2E(parent_inode)
     if not P.isdir:
       error("parent (%r) not a directory, raising ENOTDIR", P.name)
       raise FuseOSError(errno.ENOTDIR)
@@ -870,8 +879,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def mknod(self, parent_inode, name_b, mode, rdev, ctx):
+    core = self._vt_core
+    I = core[parent_inode]
+    I += 1
     name = self._vt_str(name_b)
-    P = self._vt_core.i2E(parent_inode)
+    P = core.i2E(parent_inode)
     if not P.isdir:
       error("parent (%r) not a directory, raising ENOTDIR", P.name)
       raise FuseOSError(errno.ENOTDIR)
@@ -1084,10 +1096,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def symlink(self, parent_inode, name_b, target_b, ctx):
     with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
+      core = self._vt_core
+      I = core[parent_inode]
+      I += 1
       name = self._vt_str(name_b)
       target = self._vt_str(target_b)
       # TODO: check search/write on P
-      P = self._vt_core.i2E(parent_inode)
+      P = core.i2E(parent_inode)
       if not P.isdir:
         raise FuseOSError(errno.ENOTDIR)
       if name in P:
