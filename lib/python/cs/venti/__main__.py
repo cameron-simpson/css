@@ -647,11 +647,13 @@ def cmd_mount(args, verbose=None, log=None):
   # import vtfuse before doing anything with side effects
   from .vtfuse import mount, umount
   with Pfx(mountpoint):
+    need_rmdir = False
     if not isdirpath(mountpoint):
       # autocreate mountpoint
       info('mkdir %r ...', mountpoint)
       try:
         os.mkdir(mountpoint)
+        need_rmdir = True
       except OSError as e:
         if e.errno == errno.EEXIST:
           error("mountpoint is not a directory", mountpoint)
@@ -684,6 +686,13 @@ def cmd_mount(args, verbose=None, log=None):
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
           T.join()
+    if need_rmdir:
+      info("rmdir %r ...", mountpoint)
+      try:
+        os.rmdir(mountpoint)
+      except OSError as e:
+        error("%r: rmdir fails: %s", mountpoint, e)
+        xit = 1
   return xit
 
 def cmd_pack(args, verbose=None, log=None):
