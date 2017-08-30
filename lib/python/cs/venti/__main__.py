@@ -13,6 +13,7 @@ from os.path import basename, dirname, splitext, \
 import errno
 from getopt import getopt, GetoptError
 import datetime
+import logging
 import shutil
 from signal import signal, SIGINT, SIGHUP
 from threading import Thread
@@ -20,7 +21,9 @@ from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.env import envsub
 from cs.lex import hexify
-from cs.logutils import exception, error, warning, info, debug, setup_logging, logTo, nl
+import cs.logutils
+from cs.logutils import exception, error, warning, info, debug, \
+                        setup_logging, logTo, nl
 from cs.pfx import Pfx
 from cs.tty import statusline
 import cs.x
@@ -46,7 +49,6 @@ def main(argv):
   cmd = basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
-  setup_logging(cmd_name=cmd)
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
       -C        Do not put a cache in front of the store.
@@ -85,6 +87,8 @@ def main(argv):
   except AttributeError:
     verbose = False
 
+  setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=verbose)
+
   dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
   dflt_vt_store = os.environ.get('VT_STORE')
   dflt_log = os.environ.get('VT_LOGFILE')
@@ -112,6 +116,9 @@ def main(argv):
       verbose = True
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
+
+  if verbose:
+    cs.logutils.loginfo.level = logging.INFO
 
   config = ConfigFile(dflt_configpath)
 
