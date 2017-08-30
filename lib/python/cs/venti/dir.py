@@ -260,43 +260,7 @@ class _Dirent(object):
       E = E.parent
 
   def stat(self):
-    from pwd import getpwnam
-    meta = self.meta
-    user, group, unixmode = meta.unix_perms
-    if user is None:
-      uid = uid_nobody
-    elif isinstance(user, int):
-      uid = user
-    else:
-      try:
-        uid = getpwnam(user)[2]
-      except KeyError:
-        uid = uid_nobody
-
-    if group is None:
-      gid = gid_nogroup
-    elif isinstance(group, int):
-      gid = group
-    else:
-      try:
-        gid = getpwnam(user)[2]
-      except KeyError:
-        gid = gid_nogroup
-
-    if self.type == D_DIR_T:
-      unixmode |= stat.S_IFDIR
-    else:
-      unixmode |= stat.S_IFREG
-
-    dev = None          # make it clear that we have no associated filesystem
-    nlink = 1
-    ino = None          # also needs a filesystem
-    size = self.size
-    atime = 0
-    mtime = self.mtime
-    ctime = 0
-
-    return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+    return self.meta.stat()
 
   def complete(self, S2, recurse=False):
     ''' Complete this Dirent from alternative Store `S2`.
