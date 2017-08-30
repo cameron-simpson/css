@@ -61,7 +61,7 @@ def ifdebug():
   global logging_level
   return logging_level <= logging.DEBUG
 
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None, verbose=None):
   ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
       Sets cs.pfx.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
@@ -79,17 +79,20 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       it to False (was from main_log.isatty()).
       A true value causes the root logger to use cs.upd for logging.
       If `ansi_mode` is None, set it from main_log.isatty().
-      A true value causes the root logger to colour certain logging levels
-      using ANSI terminal sequences (currently only if cs.upd is used).
+        A true value causes the root logger to colour certain logging levels
+        using ANSI terminal sequences (currently only if cs.upd is used).
       If `trace_mode` is None, set it according to the presence of
-      'TRACE' in flags.
-      If trace_mode is true, set the global trace_level to logging_level;
-      otherwise it defaults to logging.DEBUG.
+        'TRACE' in flags. Otherwisef trace_mode is true, set the
+        global trace_level to logging_level; otherwise it defaults
+        to logging.DEBUG.
+      If `verbose` is None, then if stderr is a tty then the log
+        level is INFO otherwise WARNING. Otherwise, if `verbose` is
+        true then the log level is INFO otherwise WARNING.
   '''
   global logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
-  inferred = infer_logging_level()
+  inferred = infer_logging_level(verbose=verbose)
   if level is None:
     level = inferred.level
   loginfo.level = level
@@ -269,7 +272,7 @@ class PfxFormatter(Formatter):
     record.message = s
     return s
 
-def infer_logging_level(env_debug=None, environ=None):
+def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
@@ -296,8 +299,13 @@ def infer_logging_level(env_debug=None, environ=None):
       environ = os.environ
     env_debug = os.environ.get('DEBUG', '')
   level = logging.WARNING
-  if sys.stderr.isatty():
+  if verbose is None:
+    if sys.stderr.isatty():
+      level = logging.INFO
+  elif verbose:
     level = logging.INFO
+  else:
+    level = logging.WARNING
   flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
   module_names = []
   function_names = []
