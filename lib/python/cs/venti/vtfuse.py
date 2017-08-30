@@ -685,8 +685,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
     ## EA.attr_timeout
     EA.st_mode = st.st_mode
     EA.st_nlink = st.st_nlink
-    EA.st_uid = st.st_uid if st.st_uid >= 0 else self._vt_core._fs_uid
-    EA.st_gid = st.st_gid if st.st_gid >= 0 else self._vt_core._fs_gid
+    uid = st.st_uid
+    if uid is None or uid < 0:
+      uid = self._vt_core._fs_uid
+    gid = st.st_gid
+    if gid is None or gid < 0:
+      gid = self._vt_core._fs_gid
+    EA.st_uid = uid
+    EA.st_gid = gid
     ## EA.st_rdev
     EA.st_size = st.st_size
     ## EA.st_blksize
