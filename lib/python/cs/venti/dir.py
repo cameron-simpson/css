@@ -530,6 +530,7 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
+      X("Dir(%r): recompute block (_block=%s,changed=%s) ...",self.name, self._block, self.changed)
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:

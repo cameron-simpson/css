@@ -23,6 +23,7 @@ from cs.lex import hexify
 from cs.logutils import exception, error, warning, info, debug, setup_logging, logTo, nl
 from cs.pfx import Pfx
 from cs.tty import statusline
+import cs.x
 from cs.x import X
 from . import fromtext, defaults
 from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, \

@@ -764,7 +764,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def forget(self, ideltae):
-    X("FORGET %r", ideltae)
     core = self._vt_core
     for inum, nlookup in ideltae:
       I = core[inum]
