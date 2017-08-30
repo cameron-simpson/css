@@ -1,5 +1,14 @@
 #!/usr/bin/python
 
+from collections import namedtuple
+import datetime
+import os
+import os.path
+import struct
+from types import SimpleNamespace as NS
+from cs.pfx import Pfx
+from cs.threads import locked_property
+from cs.x import X
 from . import _Recording, RecordingMetaData
 
 # constants related to headers
@@ -49,6 +58,8 @@ TVWizFileHeader = struct.Struct('<HHHHHBBBB')
 TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
+
+TVWiz_Header = namedtuple('TVWiz_Header', 'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff')
 
 def bytes0_to_str(bs0, encoding='utf8'):
   ''' Decode a NUL terminated chunk of bytes into a string.
@@ -145,13 +156,13 @@ class TVWiz(_Recording):
   @locked_property
   def metadata(self):
     H = self.read_header()
-    hd = H._asdict()
+    hdata = H._asdict()
     hdata['pathname'] = self.headerpath
     data = {
-        'channel': H.channel,
+        'channel': H.svcName,
         'title': H.evtName,
         'episode': H.episode,
-        'synopsys': H.synopsis,
+        'description': H.synopsis,
         'start_unixtime':  H.start,
         'tags': set(),
         'sources': {
@@ -176,7 +187,7 @@ class TVWiz(_Recording):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
     with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
-      for trec in self.parse_trunc(tfp):
+      for trec in self.tvwiz_parse_trunc(tfp):
         yield trec
 
   def data(self):
