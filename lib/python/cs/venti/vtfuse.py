@@ -18,7 +18,7 @@ from threading import Thread, RLock
 from types import SimpleNamespace as NS
 from cs.lex import texthexify, untexthexify
 from cs.logutils import X, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
-from cs.pfx import Pfx
+from cs.pfx import Pfx, PfxThread
 from cs.obj import O
 from cs.queues import IterableQueue
 from cs.range import Range
@@ -46,7 +46,7 @@ XATTR_REPLACE  = 0x0004
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
 def mount(mnt, E, S, syncfp=None, subpath=None):
-  ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
+  ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
       `S`: backing Store
@@ -60,7 +60,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
   FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
-  FS._vt_runfuse(mnt)
+  return FS._vt_runfuse(mnt)
 
 def handler(method):
   ''' Decorator for FUSE handlers.
@@ -649,10 +649,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def _vt_runfuse(self, mnt):
     ''' Run the filesystem once.
     '''
-    with self._vt_core.S:
+    S = self._vt_core.S
+    with S:
       llfuse.init(self, mnt, self._vt_llf_opts)
-      llfuse.main()
-      llfuse.close()
+      def mainloop():
+        llfuse.main()
+        llfuse.close()
+        S.close()
+      T = PfxThread(target=mainloop)
+      S.open()
+      T.start()
+      return T
 
   def _vt_i2E(self, inode):
     try:
