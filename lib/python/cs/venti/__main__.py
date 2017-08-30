@@ -645,7 +645,7 @@ def cmd_mount(args, verbose=None, log=None):
   if badopts:
     raise GetoptError("bad arguments")
   # import vtfuse before doing anything with side effects
-  from .vtfuse import mount
+  from .vtfuse import mount, umount
   with Pfx(mountpoint):
     if not isdirpath(mountpoint):
       # autocreate mountpoint
@@ -658,6 +658,7 @@ def cmd_mount(args, verbose=None, log=None):
           return 1
         else:
           raise
+  xit = 0
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
@@ -675,8 +676,15 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       with open(special, 'a') as syncfp:
-        mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
-  return 0
+        try:
+          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
+          cs.x.X_via_tty = True
+          T.join()
+        except KeyboardInterrupt as e:
+          error("keyboard interrupt, unmounting %r", mountpoint)
+          xit = umount(mountpoint)
+          T.join()
+  return xit
 
 def cmd_pack(args, verbose=None, log=None):
   ''' Replace each I<path> with an archive file I<path>B<.vt> referring

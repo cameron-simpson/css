@@ -62,6 +62,11 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
   return FS._vt_runfuse(mnt)
 
+def umount(mnt):
+  ''' Unmount the filesystem mounted at `mnt`, return umount(8) exit status.
+  '''
+  return subprocess.call(['umount', mnt])
+
 def handler(method):
   ''' Decorator for FUSE handlers.
       Prefixes exceptions with the method name, associated with the
