@@ -26,7 +26,7 @@ from cs.tty import statusline
 import cs.x
 from cs.x import X
 from . import fromtext, defaults
-from .archive import ArchiveFTP, CopyModes, update_archive, toc_archive, \
+from .archive import ArchiveFTP, CopyModes, \
                         last_Dirent, save_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
@@ -58,7 +58,6 @@ def main(argv):
       -q        Quiet; not verbose. Default if stderr is not a tty.
       -v        Verbose; not quiet. Default if stderr is a tty.
     Operations:
-      ar tar-options paths..
       cat filerefs...
       catblock [-i] hashcodes...
       datadir [indextype:[hashname:]]/dirpath index
@@ -212,117 +211,6 @@ def cmd_profile(*a, **kw):
   P.disable()
   P.create_stats()
   P.print_stats(sort='cumulative')
-  return xit
-
-def cmd_ar(args, verbose=None, log=None):
-  ''' Archive or retrieve files.
-      Usage: ar tar-like-options pathnames...
-  '''
-  if len(args) < 1:
-    raise GetoptError("missing options")
-  opts = args.pop(0)
-  if len(opts) == 0:
-    raise GetoptError("empty options")
-
-  badopts = False
-  modes = CopyModes(trust_size_mtime=True)
-  modes.trust_size_mtime = True
-  arpath = '-'
-  mode = opts[0]
-  for opt in opts[1:]:
-    if opt == 'f':
-      # archive filename
-      arpath = args.pop(0)
-    elif opt == 'q':
-      # quiet: not verbose
-      verbose = False
-    elif opt == 'v':
-      # verbose: not quiet
-      verbose = True
-    elif opt == 'A':
-      # archive all files, not just those with differing size or mtime
-      modes.trust_size_mtime = False
-    else:
-      error("%s: unsupported option", opt)
-      badopts = True
-
-  if (mode == 'c' or mode == 'u') and len(args) < 1:
-    error("missing pathnames")
-    badopts = True
-
-  if badopts:
-    raise GetoptError("bad options")
-
-  # log message function(msg, *args)
-  if verbose:
-    log = nl
-  else:
-    log = silent
-
-  xit = 0
-  
-  if mode == 't':
-    if args:
-      ospaths = args
-    else:
-      ospaths = None
-    with Pfx("tf %s" % (arpath,)):
-      toc_archive(arpath, ospaths)
-  elif mode == 'c' or mode == 'u':
-    for ospath in args:
-      try:
-        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath, log=log)
-      except IOError as e:
-        error("archive %s: %s" % (ospath, e))
-        xit = 1
-  elif mode == 'x':
-    if args:
-      ospaths = args
-    else:
-      ospaths = ('.',)
-    xit = 0
-    with Pfx("xf %s" % (arpath,)):
-      with Pfx(arpath):
-        last_entry = last_Dirent(arpath)
-        if last_entry is None:
-          error("no entries in archive")
-          return 1
-      when, rootE = last_entry
-      for ospath in ospaths:
-        with Pfx(ospath):
-          E, Eparent, tail = resolve(rootE, ospath)
-          if tail:
-            error("not in archive")
-            xit = 1
-            continue
-          log("ar x %s", ospath)
-          if E.isdir:
-            with Pfx("makedirs"):
-              try:
-                os.makedirs(ospath, exist_ok=True)
-              except OSError as e:
-                error("%s", e)
-                xit = 1
-                continue
-            copy_out_dir(E, ospath, modes, log=log)
-          else:
-            if existspath(ospath):
-              error("already exists")
-              xit = 1
-              continue
-            osparent = dirname(ospath)
-            if not isdirpath(osparent):
-              with Pfx("makedirs(%s)", osparent):
-                try:
-                  os.makedirs(osparent)
-                except OSError as e:
-                  error("%s", e)
-                  xit = 1
-                  continue
-            copy_out_file(E, ospath, modes, log=log)
-  else:
-    raise GetoptError("%s: unsupported mode" % (mode,))
-
   return xit
 
 def cmd_cat(args, verbose=None, log=None):
