@@ -8,7 +8,7 @@ import os
 from os.path import basename, relpath, join as joinpath
 import time
 from cs.fileutils import read_from
-from cs.logutils import info, warning, error
+from cs.logutils import info, warning, error, loginfo
 from cs.pfx import Pfx, XP
 from cs.units import transcribe, TIME_SCALE, BINARY_BYTES_SCALE, DECIMAL_SCALE
 from .blockify import blocks_of, top_block_for
@@ -21,6 +21,10 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
       `overlay`: replace existing entries, default False
       `whole_read`: read file contents even if size and mtime match
   '''
+  global loginfo
+  U = loginfo.upd
+  out = U.out
+  nl = U.nl
   with Pfx("import_dir(%r,overlay=%s,whole_read=%s)...", srcpath, overlay, whole_read):
     base = basename(srcpath)
     errors = []
@@ -33,6 +37,8 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
           subD = D.makedirs(rpath)
           for filename in sorted(filenames):
             filepath = joinpath(dirpath, filename)
+            rfilepath = joinpath(rpath, filename)
+            out(rfilepath)
             with Pfx(filepath):
               if filename in subD:
                 E = subD[filename]
@@ -54,9 +60,9 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
                   errors.append( ('conflict', filepath, joinpath(rpath, filename)) )
                   ok = False
                   continue
-                info("update")
+                nl("%s: update", rfilepath)
               else:
-                info("new")
+                nl("%s: new", rfilepath)
               F = import_file(filepath)
               subD[filename] = F
           if delete:
@@ -64,7 +70,7 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
             for name in existing:
               with Pfx(repr(name)):
                 if name not in dirnames and name not in filenames:
-                  info("delete")
+                  nl("%s: delete", joinpath(rpath, name))
                   del subD[name]
     except KeyboardInterrupt as e:
       error("keyboard interrupt: %s, returning partial import", e)
@@ -87,9 +93,9 @@ def import_file(srcpath):
       elapsed = end - start
       elapsed_text = transcribe(elapsed, TIME_SCALE)
       KBps = int(len(B) / elapsed / 1024)
-      print("%r: %s in %ss at %dKiBps" % (srcpath, len_text, elapsed, KBps))
+      info("%r: %s in %ss at %dKiBps" % (srcpath, len_text, elapsed, KBps))
     else:
-      print("%r: %s in 0s" % (srcpath, len(B)))
+      info("%r: %s in 0s" % (srcpath, len(B)))
     F = FileDirent(basename(srcpath), block=B)
     F.meta.mtime = S.st_mtime
     return F
