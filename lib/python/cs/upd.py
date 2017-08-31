@@ -70,15 +70,11 @@ class Upd(object):
   def state(self):
     return self._state
 
-  def out(self, txt, *a, **kw):
-    noStrip = kw.pop('noStrip', False)
-    if kw:
-      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+  def out(self, txt, *a):
     if a:
       txt = txt % a
     # normalise text
-    if not noStrip:
-      txt = txt.rstrip()
+    txt = txt.rstrip()
     txt = unctrl(txt)
     # crop for terminal width
     if self.columns is not None:
@@ -121,13 +117,10 @@ class Upd(object):
 
     return old
 
-  def nl(self, txt, *a, **kw):
-    noStrip = kw.pop('noStrip', False)
-    if kw:
-      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+  def nl(self, txt, *a):
     if a:
       txt = txt % a
-    self.without(self._backend.write, txt+'\n', noStrip=noStrip)
+    self.without(self._backend.write, txt+'\n')
 
   def flush(self):
     ''' Flush the output stream.
@@ -144,18 +137,13 @@ class Upd(object):
     return self._backend == None
 
   def without(self, func, *args, **kw):
-    if 'noStrip' in kw:
-      noStrip = kw['noStrip']
-      del kw['noStrip']
-    else:
-      noStrip = False
-    with self._withoutContext(noStrip):
+    with self._withoutContext():
       ret = func(*args, **kw)
     return ret
 
   @contextmanager
-  def _withoutContext(self, noStrip=False):
+  def _withoutContext(self):
     with self._lock:
-      old = self.out('', noStrip=noStrip)
+      old = self.out('')
       yield
-      self.out(old, noStrip=True)
+      self.out(old)
