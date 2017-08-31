@@ -1,3 +1,4 @@
+mount -e command...
 readonly: do not update /vt file
 mount -a to mount live readon
 ticker to regularly sync the fs
