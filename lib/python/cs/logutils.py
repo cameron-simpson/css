@@ -26,7 +26,7 @@ from cs.lex import is_dotted_identifier
 from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import Upd
+from cs.upd import upd_for
 from cs.x import X
 
 DISTINFO = {
@@ -172,9 +172,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if upd_mode:
     main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
-    # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = info
   else:
+    loginfo.upd = None
     main_handler = logging.StreamHandler(main_log)
 
   rootLogger = logging.getLogger()
@@ -184,6 +183,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   logging_level = level
   if trace_mode:
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = info
     trace_level = logging_level
 
   if module_names or function_names:
@@ -536,14 +537,14 @@ class UpdHandler(StreamHandler):
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.upd = Upd(strm)
-    self.__nlLevel = nlLevel
+    self.upd = upd_for(strm)
+    self.nl_level = nlLevel
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
     with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
+      if logrec.levelno >= self.nl_level:
         if self.__ansi_mode:
           if logrec.levelno >= logging.ERROR:
             logrec.msg = colourise(logrec.msg, 'red')
