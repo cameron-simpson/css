@@ -23,8 +23,12 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
   '''
   global loginfo
   U = loginfo.upd
-  out = U.out
-  nl = U.nl
+  if U:
+    out = U.out
+    nl = U.nl
+  else:
+    out = lambda txt, *a: None
+    nl = info
   with Pfx("import_dir(%r,overlay=%s,whole_read=%s)...", srcpath, overlay, whole_read):
     base = basename(srcpath)
     errors = []

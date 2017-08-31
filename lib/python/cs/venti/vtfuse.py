@@ -45,13 +45,14 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-def mount(mnt, E, S, syncfp=None, subpath=None):
+def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
       `S`: backing Store
       `syncfp`: if not None, a file to which to write sync lines
       `subpath`: relative path from `E` to the directory to attach to the mountpoint
+      `readonly`: forbid data modification operations
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
