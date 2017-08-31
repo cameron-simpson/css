@@ -3,7 +3,7 @@
 # Update a solaris /etc/system file with the specified values.
 # Reads /etc/system formatted lines from stdin and updates the file with
 # the max of the input value and the value in the file.
-#	- Cameron Simpson <cs@zip.com.au> 18jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 18jan2001
 #
 
 use strict qw(vars);

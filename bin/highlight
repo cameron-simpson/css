@@ -2,7 +2,7 @@
 #
 # Highlist (by overstriking) text matching a regexp in the input.
 # On a terminal you probably want colour_highlight instead of this.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 ($cmd=$0) =~ s:.*::;

@@ -1,7 +1,7 @@
 #!/opt/bin/perl
 #
 # Read rawdb from stdin, write useful db to stdout.
-#	- Cameron Simpson <cs@zip.com.au> 30jul99
+#	- Cameron Simpson <cs@cskk.id.au> 30jul99
 #
 
 use strict qw(vars);

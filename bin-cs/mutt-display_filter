@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Mutt display filter, whose behaviour adjusts accoridng to some flags.
-#   - Cameron Simpson <cs@zip.com.au> 29jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 29jan2017
 #
 
 if flag MUTT_ROT13

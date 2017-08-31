@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Incant fresh menus for named desktops.
-#	- Cameron Simpson <cs@zip.com.au> 25aug2005
+#	- Cameron Simpson <cs@cskk.id.au> 25aug2005
 #
 
 cmd=$0

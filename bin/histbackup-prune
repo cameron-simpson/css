@@ -2,7 +2,7 @@
 #
 # Prune a tree from a histbackup directory
 # if the disc is too full.
-#	- Cameron Simpson <cs@zip.com.au> 22jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 22jun2003
 #
 
 trace=eecho

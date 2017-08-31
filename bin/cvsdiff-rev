@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Print diff that made a particular cvs revision of a file.
-#	- Cameron Simpson <cs@zip.com.au> 11jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 11jun2005
 #
 
 cmd=$0

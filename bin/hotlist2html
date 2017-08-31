@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read hotlist data from stdin and emit HTML equivalent.
-#	- Cameron Simpson, cs@zip.com.au, 10jun94
+#	- Cameron Simpson <cs@cskk.id.au> 10jun94
 #
 
 

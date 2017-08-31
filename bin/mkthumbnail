@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Make thumbnail of image, report pagename.
-#	- Cameron Simpson <cs@zip.com.au> 19feb1995
+#	- Cameron Simpson <cs@cskk.id.au> 19feb1995
 #
 # Prefer PNG to GIF, handle other input types. - cameron, 26may1999
 # Prefer JPG to PNG, handle other input types. - cameron, 26nov2005

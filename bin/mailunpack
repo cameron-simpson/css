@@ -8,7 +8,7 @@
 #   If no command is supplied and if the shell script autoexec.sh is present in
 #   the directory, run that after extraction.
 #   Otherwise use "mrg" to merge the files into the target directory.
-#	- Cameron Simpson <cs@zip.com.au> 03dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 03dec2001
 #
 
 usemunpack=

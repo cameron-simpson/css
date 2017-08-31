@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Connect to pilot21.   - Cameron Simpson <cs@zip.com.au> 11jun2015
+# Connect to pilot21.   - Cameron Simpson <cs@cskk.id.au> 11jun2015
 #
 
 set -x

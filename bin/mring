@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Ring my mail data.
-#	- Cameron Simpson <cs@zip.com.au> 21may98
+#	- Cameron Simpson <cs@cskk.id.au> 21may98
 #
 
 exec ring -f "$MAILRC.rawdb" -f "$MAILRC" ${1+"$@"}

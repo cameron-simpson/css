@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Create a named pipe, run chosen command with it as input, remove pipe.
-#       - Cameron Simpson <cs@zip.com.au> 01oct2011
+#       - Cameron Simpson <cs@cskk.id.au> 01oct2011
 #
 
 set -ue

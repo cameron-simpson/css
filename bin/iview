@@ -2,7 +2,7 @@
 #
 # Trivial convenience wrapper for the essential iview-python tool:
 #  https://github.com/vadmium/python-iview
-# Cameron Simpson <cs@zip.com.au>
+# Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function, absolute_import

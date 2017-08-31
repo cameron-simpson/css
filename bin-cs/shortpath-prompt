@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Shorten a path (the current directory by default) using various criteria.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 # prefix ==> ~ or ~user
 # do not shorten VCS top

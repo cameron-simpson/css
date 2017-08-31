@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Resolve pathnames to their post-symlink paths.
-#   - Cameron Simpson <cs@zip.com.au> 24mar2017
+#   - Cameron Simpson <cs@cskk.id.au> 24mar2017
 #
 
 from __future__ import print_function

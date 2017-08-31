@@ -2,7 +2,7 @@
 #
 # Find several words (egrep regexps) in files;
 # order the found files on the hit rate.
-#	- Cameron Simpson <cs@zip.com.au> 30jan97
+#	- Cameron Simpson <cs@cskk.id.au> 30jan97
 #
 
 cmd=`basename "$0"`

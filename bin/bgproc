@@ -4,7 +4,7 @@
 # Copy output to a log.
 # Record the pid in a file.
 # NoHUP it.
-#	- Cameron Simpson <cs@zip.com.au> 25aug1999
+#	- Cameron Simpson <cs@cskk.id.au> 25aug1999
 # 
 
 : ${LOGDIR:=$HOME/var/log}

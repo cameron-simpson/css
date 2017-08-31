@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Pop up a google map.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 doit=1

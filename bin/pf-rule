@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Print the numbered PF rules. - Cameron Simpson <cs@zip.com.au> 31dec2016
+# Print the numbered PF rules. - Cameron Simpson <cs@cskk.id.au> 31dec2016
 #
 
 renums=$( echo "$*" | tr ' ' '|' )

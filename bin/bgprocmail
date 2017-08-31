@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Copy input, run procmail in the background.
-#	- Cameron Simpson <cs@zip.com.au> 05may2002
+#	- Cameron Simpson <cs@cskk.id.au> 05may2002
 #
 
 wkdir=$HOME/private/tmp

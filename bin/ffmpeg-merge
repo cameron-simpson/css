@@ -2,7 +2,7 @@
 #
 # Trite FFMpeg incantation to merge multiple streams (eg a video
 # stream and an audio stream) to standard output.
-#   - Cameron Simpson <cs@zip.com.au> 13jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 13jan2017
 #
 
 set -ue

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Report the revision of a particular file within a CVS checkout.
-#	- Cameron Simpson <cs@zip.com.au> 11jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 11jun2005
 #
 
 usage="Usage: $0 filename"

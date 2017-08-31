@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Fetch a URL and save with apphelper.
-#	- Cameron Simpson <cs@zip.com.au> 17oct2003
+#	- Cameron Simpson <cs@cskk.id.au> 17oct2003
 # 
 
 url=$1; shift

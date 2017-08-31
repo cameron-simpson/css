@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Query my dlog.
-#       - Cameron Simpson <cs@zip.com.au> 14dec2005
+#       - Cameron Simpson <cs@cskk.id.au> 14dec2005
 #
 
 import os

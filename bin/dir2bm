@@ -2,7 +2,7 @@
 #
 # Walk a directory unpacked from a bookmark file with bm2dir
 # and emit a bookmark file.
-#	- Cameron Simpson <cs@zip.com.au> 07apr2003
+#	- Cameron Simpson <cs@cskk.id.au> 07apr2003
 #
 
 cmd=$0

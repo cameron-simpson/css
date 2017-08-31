@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Pop and return the last value from a value stack.
-#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 28jul2003
 #
 
 exec lastvalue -p ${1+"$@"}

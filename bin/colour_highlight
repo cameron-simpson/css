@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Highlight content matching regexps with a colour.
-#	- Cameron Simpson <cs@zip.com.au> 22sep1999
+#	- Cameron Simpson <cs@cskk.id.au> 22sep1999
 #
 
 from __future__ import print_function
