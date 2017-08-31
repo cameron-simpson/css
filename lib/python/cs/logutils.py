@@ -170,7 +170,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, logging_level, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
   else:
     loginfo.upd = None
@@ -520,10 +520,10 @@ class UpdHandler(StreamHandler):
   ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
   '''
 
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
+  def __init__(self, strm=None, nl_level=None, ansi_mode=None):
     ''' Initialise the UpdHandler.
         `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
+        `nl_level` is the logging level at which conventional line-of-text
         output is written; log messages of a lower level go via the
         update-the-current-line method. Default is logging.WARNING.
         If `ansi_mode` is None, set if from strm.isatty().
@@ -532,13 +532,13 @@ class UpdHandler(StreamHandler):
     '''
     if strm is None:
       strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
+    if nl_level is None:
+      nl_level = logging.WARNING
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
     self.upd = upd_for(strm)
-    self.nl_level = nlLevel
+    self.nl_level = nl_level
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
 
