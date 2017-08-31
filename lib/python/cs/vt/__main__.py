@@ -514,6 +514,24 @@ def cmd_mount(args, verbose=None):
       Requires FUSE support.
   '''
   badopts = False
+  readonly = False
+  opts, args = getopt(args, 'o:r')
+  for opt, val in opts:
+    with Pfx(opt):
+      if opt == '-o':
+        for option in val.split(','):
+          with Pfx(option):
+            if option == '':
+              pass
+            elif option == 'readonly':
+              readonly = True
+            else:
+              warning("unrecognised option")
+              badopts = True
+      elif opt == '-r':
+        readonly = True
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
   try:
     special = args.pop(0)
   except IndexError:
@@ -576,7 +594,7 @@ def cmd_mount(args, verbose=None):
     with Pfx("open('a')"):
       with open(special, 'a') as syncfp:
         try:
-          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
+          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath, readonly=readonly)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:
