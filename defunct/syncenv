@@ -3,7 +3,7 @@
 # Emit output to re-source the environment files if they've been
 # updated since lastmtime.
 # Have to do them all if any are new because of ordering.
-#	- Cameron Simpson <cs@zip.com.au> 25dec2004
+#	- Cameron Simpson <cs@cskk.id.au> 25dec2004
 #
 
 set -ue

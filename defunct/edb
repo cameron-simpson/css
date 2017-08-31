@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }
