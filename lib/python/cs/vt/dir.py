@@ -859,5 +859,5 @@ class DirFTP(Cmd):
         self.cwd
 
 if __name__ == '__main__':
-  import cs.vt.dir_tests
-  cs.vt.dir_tests.selftest(sys.argv)
+  import .dir_tests
+  dir_tests.selftest(sys.argv)

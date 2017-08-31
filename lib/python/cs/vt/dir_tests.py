@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.vt.dir.
+# Dir tests.
 #       - Cameron Simpson <cs@cskk.id.au> 25aug2015
 #
 

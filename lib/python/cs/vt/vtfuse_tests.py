@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Unit tests for cs.vt.vtfuse.
+# FUSE tests.
 #       - Cameron Simpson <cs@cskk.id.au> 10jul2014
 #
 

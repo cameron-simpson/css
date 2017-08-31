@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-''' Archive files for venti data.
+''' Archive files.
 
     Archive files are records of data saved to a Store.
     Lines are appended to the archive file of the form:
@@ -8,7 +8,7 @@
       isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
-    encoding of a cs.vt.dir.Dirent.
+    encoding of a Dirent.
 '''
 
 from __future__ import print_function

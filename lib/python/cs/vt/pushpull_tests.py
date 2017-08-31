@@ -1,12 +1,12 @@
 #!/usr/bin/python
 #
-# Tests for cs.vt.pushpull.  - Cameron Simpson <cs@cskk.id.au> 18dec2015
+# Pushpull tests. - Cameron Simpson <cs@cskk.id.au> (formerly cs@zip.com.au) 18dec2015
 #
 
 import unittest
 from random import randint
-from cs.logutils import X
 from cs.randutils import rand0, randblock
+from cs.x import X
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
 

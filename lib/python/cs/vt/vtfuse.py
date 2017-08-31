@@ -35,7 +35,7 @@ from .store import MissingHashcodeError
 import llfuse
 FuseOSError = llfuse.FUSEError
 
-LOGGER_NAME = 'cs.vt.vtfuse'     # __qualname__ ?
+LOGGER_NAME = __name__
 LOGGER_FILENAME = 'vtfuse.log'
 
 # OSX setxattr option values
@@ -482,7 +482,7 @@ class _StoreFS_core(object):
           dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
   def _resolve(self, path):
-    ''' Call cs.vt.paths.resolve and return its result.
+    ''' Call paths.resolve and return its result.
     '''
     return resolve(self.mntE, path)
 
@@ -1148,5 +1148,5 @@ class StoreFS_LLFUSE(llfuse.Operations):
 StoreFS = StoreFS_LLFUSE
 
 if __name__ == '__main__':
-  from cs.vt.vtfuse_tests import selftest
+  from .vtfuse_tests import selftest
   selftest(sys.argv)

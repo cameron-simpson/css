@@ -710,5 +710,5 @@ def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
   return DataDir(indexdirpath, datadirpath, hashclass, indexclass, rollover=rollover)
 
 if __name__ == '__main__':
-  import cs.vt.datadir_tests
-  cs.vt.datadir_tests.selftest(sys.argv)
+  import .datadir_tests
+  datadir_tests.selftest(sys.argv)

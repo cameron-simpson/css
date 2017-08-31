@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.vt.stream.
+# Stream tests.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

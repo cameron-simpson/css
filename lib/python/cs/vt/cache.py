@@ -229,5 +229,5 @@ class FileDataMappingProxy(object):
       self.backend[h] = data
 
 if __name__ == '__main__':
-  import cs.vt.cache_tests
-  cs.vt.cache_tests.selftest(sys.argv)
+  import .cache_tests
+  cache_tests.selftest(sys.argv)

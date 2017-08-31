@@ -6,6 +6,7 @@
 
 from socket import socket
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
+import sys
 from threading import Thread
 from .stream import StreamStore
 from cs.excutils import logexc
@@ -106,5 +107,5 @@ class TCPStoreClient(StreamStore):
     self.sock.close()
 
 if __name__ == '__main__':
-  from cs.debug import selftest
-  selftest('cs.vt.tcp_tests')
+  import .tcp_tests
+  tcp_tests.selftest(sys.argv)

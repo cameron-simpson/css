@@ -5,6 +5,7 @@
 # 
 
 from functools import partial
+import sys
 from cs.asynchron import OnDemandFunction
 from cs.logutils import X
 
@@ -184,5 +185,5 @@ def complete_Block(B, S, S2):
   X("complete: completed")
 
 if __name__ == '__main__':
-  from cs.debug import selftest
-  selftest('cs.vt.pushpull_tests')
+  import .pushpull_tests
+  pushpull_tests.selftest(sys.argv)

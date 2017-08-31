@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Stream protocol for vt stores.
+# Stream protocol for stores.
 #       - Cameron Simpson <cs@cskk.id.au> 06dec2007
 #
 # TODO: T_SYNC, to wait for pending requests before returning
@@ -407,5 +407,5 @@ class StreamStore(BasicStoreAsync):
       after = True
 
 if __name__ == '__main__':
-  import cs.vt.stream_tests
-  cs.vt.stream_tests.selftest(sys.argv)
+  import .stream_tests
+  stream_tests.selftest(sys.argv)

@@ -469,7 +469,7 @@ def cmd_listen(args, verbose=None):
     raise GetoptError("expected a port")
   arg = args[0]
   if arg == '-':
-    from cs.vt.stream import StreamStore
+    from .stream import StreamStore
     RS = StreamStore("%s listen -" % (cmd,), sys.stdin, sys.stdout,
                      local_store=S)
     RS.join()
@@ -481,8 +481,8 @@ def cmd_listen(args, verbose=None):
       if len(host) == 0:
         host = '127.0.0.1'
       port = int(port)
-      import cs.vt.tcp
-      with cs.vt.tcp.TCPStoreServer((host, port), defaults.S) as srv:
+      from .tcp import TCPStoreServer
+      with TCPStoreServer((host, port), defaults.S) as srv:
         signal(SIGHUP, lambda signum, frame: srv.cancel())
         signal(SIGINT, lambda signum, frame: srv.cancel())
         srv.join()

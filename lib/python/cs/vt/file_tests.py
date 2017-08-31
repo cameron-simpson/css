@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Unit tests for cs.vt.file.
+# File tests.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

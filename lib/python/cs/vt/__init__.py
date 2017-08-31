@@ -71,8 +71,10 @@ class _TestAdditionsMixin:
   ''' Some common methods uses in tests.
   '''
 
-  @staticmethod
-  def mktmpdir(prefix="cs.vt"):
+  @classmethod
+  def mktmpdir(cls, prefix=None):
+    if prefix is None:
+      prefix = cls.__qualname__
     return tempfile.TemporaryDirectory(
         prefix="test-" + prefix + "-",
         suffix=".tmpdir",

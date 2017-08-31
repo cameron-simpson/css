@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
-# Self tests for cs.vt.cache.
-#       - Cameron Simpson <cs@cskk.id.au> 25aug2015
+# Cache tests.
+# - Cameron Simpson <cs@cskk.id.au> 25aug2015
 #
 
 import sys
