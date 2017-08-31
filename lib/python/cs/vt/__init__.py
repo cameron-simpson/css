@@ -1,24 +1,16 @@
 #!/usr/bin/python
 
-''' A data store after the style of the Venti scheme, but not at all binary
-    compatible.
-
-    The Plan 9 Venti system is decribed here:
-      http://library.pantek.com/general/plan9.documents/venti/venti.html
-      http://en.wikipedia.org/wiki/Venti
-
-    cs.vt implements a similar scheme that supports variable
-    sized blocks and arbitrary data sizes, with some domain knowledge
-    to aid efficient block boundary selection.
+''' A content hash based data store with a filesystem layer, using
+    variable sized blocks, arbitrarily sized data and utilising some
+    domain knowledge to aid efficient block boundary selection.
 
     Man page:
       http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
-    See also the Plan 9 Venti support manual pages:
-      http://swtch.com/plan9port/man/man7/venti.html
-    and the Wikipedia entry:
-      http://en.wikipedia.org/wiki/Venti
-    To do list now at:
-      http://csbp.backpackit.com/pub/1356606
+
+    See also:
+        The Plan 9 Venti system:
+          http://library.pantek.com/general/plan9.documents/venti/venti.html
+          http://en.wikipedia.org/wiki/Venti
 '''
 
 import os
