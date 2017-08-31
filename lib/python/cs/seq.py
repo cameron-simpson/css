@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Stuff to do with counters, sequences and iterables.
-#       - Cameron Simpson <cs@zip.com.au> 20jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 20jul2008
 #
 
 DISTINFO = {

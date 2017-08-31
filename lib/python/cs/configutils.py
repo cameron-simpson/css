@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Utility functions and classes for configuration files.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {

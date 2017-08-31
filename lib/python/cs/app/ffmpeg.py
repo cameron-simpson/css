@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for using FFmpeg (ffmpeg.org).
-#   - Cameron Simpson <cs@zip.com.au> 30oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
 from collections import namedtuple

@@ -2,7 +2,7 @@
 #
 # Python 2 specific implementations.
 # Provided to separate non-portable syntax across python 2 and 3.
-#   - Cameron Simpson <cs@zip.com.au> 12nov2015
+#   - Cameron Simpson <cs@cskk.id.au> 12nov2015
 # 
 
 DISTINFO = {

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Operations on pathnames using a Venti store.
-#       - Cameron Simpson <cs@zip.com.au> 07may2013
+#       - Cameron Simpson <cs@cskk.id.au> 07may2013
 #
 
 import os

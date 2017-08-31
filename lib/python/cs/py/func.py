@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for python functions.
-#       - Cameron Simpson <cs@zip.com.au> 15apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 15apr2014
 #
 
 import sys

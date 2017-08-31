@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Processes for pushing or pulling blocks between Stores.
-#   - Cameron Simpson <cs@zip.com.au> 13dec2015
+#   - Cameron Simpson <cs@cskk.id.au> 13dec2015
 # 
 
 from functools import partial

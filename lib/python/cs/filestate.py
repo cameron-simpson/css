@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # A class for tracking file state.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 ''' Facility to track file state.

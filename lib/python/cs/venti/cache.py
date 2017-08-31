@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # A cache store, connected to a fast cache and a slower backend.
-#       - Cameron Simpson <cs@zip.com.au> 07dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
 from __future__ import with_statement

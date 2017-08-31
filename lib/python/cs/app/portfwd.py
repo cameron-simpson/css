@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Manage ssh based port forwards.
-# - Cameron Simpson <cs@zip.com.au> May 2017
+# - Cameron Simpson <cs@cskk.id.au> May 2017
 #
 
 from __future__ import print_function

@@ -4,7 +4,7 @@
 # Uses llfuse: https://bitbucket.org/nikratio/python-llfuse/
 # Formerly used fusepy: https://github.com/terencehonles/fusepy
 # but that doesn't work with Python 3 and has some other problems.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from collections import namedtuple

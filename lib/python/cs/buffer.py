@@ -2,7 +2,7 @@
 #
 # Functions associated with bytes, bytearrays, memoryviews and buffers in general.
 # Also CornuCopyBuffer for managing a buffer and an input source.
-#   - Cameron Simpson <cs@zip.com.au> 18mar2017
+#   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
 import os

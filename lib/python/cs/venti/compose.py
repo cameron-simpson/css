@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # The generic Store factory.
-#   - Cameron Simpson <cs@zip.com.au> 20dec2016
+#   - Cameron Simpson <cs@cskk.id.au> 20dec2016
 #
 
 from os.path import isabs as isabspath, abspath, join as joinpath

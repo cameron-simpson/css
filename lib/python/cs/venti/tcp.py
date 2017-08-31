@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # TCP client/server code.
-#       - Cameron Simpson <cs@zip.com.au> 07dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
 from socket import socket

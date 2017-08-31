@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Handler for rulesets similar to the format of cats2procmailrc(1cs).
-#       - Cameron Simpson <cs@zip.com.au> 22may2011
+#       - Cameron Simpson <cs@cskk.id.au> 22may2011
 #
 
 from __future__ import print_function

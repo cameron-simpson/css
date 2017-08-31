@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience stuff for SQLAlchemy.
-#       - Cameron Simpson <cs@zip.com.au> 02mar2013
+#       - Cameron Simpson <cs@cskk.id.au> 02mar2013
 #
 
 from __future__ import print_function

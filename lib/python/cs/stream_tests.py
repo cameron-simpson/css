@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.stream.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import absolute_import

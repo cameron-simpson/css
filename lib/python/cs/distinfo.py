@@ -2,7 +2,7 @@
 #
 # Default distutils info for all packages in cs.* and utility
 # functions to prep and release packages to PyPI.
-#   - Cameron Simpson <cs@zip.com.au> 01jan2015
+#   - Cameron Simpson <cs@cskk.id.au> 01jan2015
 #
 
 from __future__ import print_function
@@ -35,7 +35,7 @@ LIBDIR = 'lib/python'
 # defaults for packages without their own specifics
 DISTINFO_DEFAULTS = {
     'author': "Cameron Simpson",
-    'author_email': "cs@zip.com.au",
+    'author_email': "cs@cskk.id.au",
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
 }
 

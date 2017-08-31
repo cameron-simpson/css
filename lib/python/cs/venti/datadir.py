@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # The sharable directory storing DataFiles used by DataDirStores.
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 from binascii import hexlify

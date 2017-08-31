@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.app.mailfiler.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os

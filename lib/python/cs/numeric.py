@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Ad hoc assortment of numeric functions.
-#   - Cameron Simpson <cs@zip.com.au> 10mar2015
+#   - Cameron Simpson <cs@cskk.id.au> 10mar2015
 #
 
 DISTINFO = {

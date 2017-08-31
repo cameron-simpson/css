@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Classes for modern Beyonwiz T2, T3 etc.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 import errno

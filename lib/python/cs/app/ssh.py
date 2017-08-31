@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Parse ssh command line options and config files.
-#   - Cameron Simpson <cs@zip.com.au> 01oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 01oct2016
 #
 
 from __future__ import print_function
