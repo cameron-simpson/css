@@ -333,14 +333,12 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                   with Pfx("%s=%r", col1, col2):
                     if col1 == 'datadir':
                       datadirpath = longpath(col2)
-                      XP("datadir = %r", datadirpath)
                       if self.datadirpath is None:
                         self.datadirpath = datadirpath
                       elif not samefile(datadirpath, self.datadirpath):
                         warning("not the same directory as supplied self.datadirpath=%r, will be updated",
                                 self.datadirpath)
                     elif col1 == 'current':
-                      XP("current = %s", col2)
                       self._n = int(col2)
                     else:
                       warning("unrecognised parameter")
