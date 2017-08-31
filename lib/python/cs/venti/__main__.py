@@ -23,7 +23,7 @@ from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, logTo, nl
+                        setup_logging, loginfo, logTo
 from cs.pfx import Pfx
 from cs.tty import statusline
 import cs.x
@@ -46,6 +46,7 @@ from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
 
 def main(argv):
+  global loginfo
   cmd = basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
@@ -88,6 +89,7 @@ def main(argv):
     verbose = False
 
   setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=verbose)
+  cs.x.X_logger = logging.getLogger()
 
   dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
   dflt_vt_store = os.environ.get('VT_STORE')
@@ -118,25 +120,20 @@ def main(argv):
       raise RuntimeError("unhandled option: %s" % (opt,))
 
   if verbose:
-    cs.logutils.loginfo.level = logging.INFO
+    loginfo.level = logging.INFO
+    loginfo.upd.nl_level = logging.INFO
 
   config = ConfigFile(dflt_configpath)
 
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
 
-  # log message function(msg, *args)
-  if verbose:
-    log = nl
-  else:
-    log = silent
-
   xit = None
   signal(SIGHUP, lambda sig, frame: thread_dump())
   signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
 
   try:
-    xit = cmd_op(args, verbose, log, config, dflt_vt_store, no_cache)
+    xit = cmd_op(args, verbose, config, dflt_vt_store, no_cache)
   except GetoptError as e:
     error("%s", e)
     badopts = True
@@ -153,14 +150,14 @@ def main(argv):
 
   return xit
 
-def cmd_op(args, verbose, log, config, dflt_vt_store, no_cache):
+def cmd_op(args, verbose, config, dflt_vt_store, no_cache):
   try:
     op = args.pop(0)
   except IndexError:
     raise GetoptError("missing command")
   with Pfx(op):
     if op == "profile":
-      return cmd_profile(args, verbose, log, config,
+      return cmd_profile(args, verbose, config,
                          dflt_vt_store, no_cache)
     try:
       op_func = getattr(sys.modules[__name__], "cmd_" + op)
@@ -198,7 +195,7 @@ def cmd_op(args, verbose, log, config, dflt_vt_store, no_cache):
     else:
       run_ticker = False
     with S:
-      xit = op_func(args, verbose=verbose, log=log)
+      xit = op_func(args, verbose=verbose)
     if run_ticker:
       run_ticker = False
     return xit
@@ -220,7 +217,7 @@ def cmd_profile(*a, **kw):
   P.print_stats(sort='cumulative')
   return xit
 
-def cmd_cat(args, verbose=None, log=None):
+def cmd_cat(args, verbose=None):
   ''' Concatentate the contents of the supplied filerefs to stdout.
   '''
   if not args:
@@ -229,7 +226,7 @@ def cmd_cat(args, verbose=None, log=None):
     cat(path)
   return 0
 
-def cmd_catblock(args, verbose=None, log=None):
+def cmd_catblock(args, verbose=None):
   '''  Emit the content of the blocks specified by the supplied hashcodes.
   '''
   indirect = False
@@ -248,13 +245,13 @@ def cmd_catblock(args, verbose=None, log=None):
       sys.stdout.write(subB.data)
   return 0
 
-def cmd_report(args, verbose=None, log=None):
+def cmd_report(args, verbose=None):
   ''' Report stuff after store setup.
   '''
   print("S =", defaults.S)
   return 0
 
-def cmd_datadir(args, verbose=None, log=None):
+def cmd_datadir(args, verbose=None):
   ''' Perform various operations on DataDirs.
   '''
   xit = 1
@@ -293,7 +290,7 @@ def cmd_datadir(args, verbose=None, log=None):
         raise GetoptError('unrecognised subop')
   return xit
 
-def cmd_dump(args, verbose=None, log=None):
+def cmd_dump(args, verbose=None):
   ''' Do a Block dump of the filerefs.
   '''
   if not args:
@@ -302,7 +299,7 @@ def cmd_dump(args, verbose=None, log=None):
     dump(path)
   return 0
 
-def cmd_fsck(args, verbose=None, log=None):
+def cmd_fsck(args, verbose=None):
   import cs.logutils
   cs.logutils.X_via_log = True
   if not args:
@@ -316,9 +313,9 @@ def cmd_fsck(args, verbose=None, log=None):
       }[fsck_type]
     except KeyError:
       raise GetoptError("unsupported fsck type")
-    return fsck_op(args, verbose=verbose, log=log)
+    return fsck_op(args, verbose=verbose)
 
-def cmd_fsck_block(args, verbose=None, log=None):
+def cmd_fsck_block(args, verbose=None):
   xit = 0
   if not args:
     raise GetoptError("missing blockrefs")
@@ -333,7 +330,7 @@ def cmd_fsck_block(args, verbose=None, log=None):
         xit = 1
   return xit
 
-def cmd_fsck_dir(args, verbose=None, log=None):
+def cmd_fsck_dir(args, verbose=None):
   xit = 0
   if not args:
     raise GetoptError("missing dirents")
@@ -345,7 +342,7 @@ def cmd_fsck_dir(args, verbose=None, log=None):
         xit = 1
   return xit
 
-def cmd_ftp(args, verbose=None, log=None):
+def cmd_ftp(args, verbose=None):
   if not args:
     raise GetoptError("missing dirent or archive")
   target = args.pop(0)
@@ -360,7 +357,7 @@ def cmd_ftp(args, verbose=None, log=None):
       DirFTP(D).cmdloop()
     return 0
 
-def cmd_import(args, verbose=None, log=None):
+def cmd_import(args, verbose=None):
   ''' Import paths into the Store, print top Dirent for each.
   '''
   xit = 0
@@ -444,7 +441,7 @@ def cmd_import(args, verbose=None, log=None):
   return xit
 
 # TODO: create dir, dir/data
-def cmd_init(args, verbose=None, log=None):
+def cmd_init(args, verbose=None):
   ''' Initialise a directory for use as a store.
       Usage: init dirpath [datadir]
   '''
@@ -465,7 +462,7 @@ def cmd_init(args, verbose=None, log=None):
       os.system("ls -la %s" % (statedirpath,))
   return 0
 
-def cmd_listen(args, verbose=None, log=None):
+def cmd_listen(args, verbose=None):
   ''' Start a daemon listening on a TCP port or on stdin/stdout.
   '''
   if len(args) != 1:
@@ -493,7 +490,7 @@ def cmd_listen(args, verbose=None, log=None):
       raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
   return 0
 
-def cmd_ls(args, verbose=None, log=None):
+def cmd_ls(args, verbose=None):
   ''' Do a directory listing of the specified I<dirrefs>.
   '''
   recurse = False
@@ -512,7 +509,7 @@ def cmd_ls(args, verbose=None, log=None):
     ls(path, D, recurse, sys.stdout)
   return 0
 
-def cmd_mount(args, verbose=None, log=None):
+def cmd_mount(args, verbose=None):
   ''' Mount the specified special as on the specified mountpoint directory.
       Requires FUSE support.
   '''
@@ -595,7 +592,7 @@ def cmd_mount(args, verbose=None, log=None):
         xit = 1
   return xit
 
-def cmd_pack(args, verbose=None, log=None):
+def cmd_pack(args, verbose=None):
   ''' Replace each I<path> with an archive file I<path>B<.vt> referring
       to the stored content of I<path>.
   '''
@@ -612,26 +609,26 @@ def cmd_pack(args, verbose=None, log=None):
         continue
       arpath = ospath + '.vt'
       try:
-        update_archive(arpath, ospath, modes, create_archive=True, log=log)
+        update_archive(arpath, ospath, modes, create_archive=True)
       except IOError as e:
         error("%s" % (e,))
         xit = 1
         continue
-      log("remove %r", ospath)
+      info("remove %r", ospath)
       if isdirpath(ospath):
         shutil.rmtree(ospath)
       else:
         os.remove(ospath)
   return xit
 
-def cmd_pull(args, verbose=None, log=None):
+def cmd_pull(args, verbose=None):
   ''' Pull missing content from other Stores.
   '''
   if not args:
     raise GetoptError("missing stores")
   raise NotImplementedError
 
-def cmd_scan(args, verbose=None, log=None):
+def cmd_scan(args, verbose=None):
   ''' Read a datafile and report.
   '''
   if len(args) < 1:
@@ -654,7 +651,7 @@ def cmd_scan(args, verbose=None, log=None):
           print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
   return 0
 
-def cmd_unpack(args, verbose=None, log=None):
+def cmd_unpack(args, verbose=None):
   ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
   '''
   if len(args) < 1:
@@ -678,9 +675,9 @@ def cmd_unpack(args, verbose=None, log=None):
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), log=log)
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
     else:
-      copy_out_file(rootE, arbase, log=log)
+      copy_out_file(rootE, arbase)
   return 0
 
 def lsDirent(fp, E, name):
@@ -750,11 +747,6 @@ def dump(path, fp=None):
   if subname:
     E = E[subname]
   dump_block(E.block, fp)
-
-def silent(msg, *args, file=None):
-  ''' Dummy function to discard messages.
-  '''
-  pass
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
