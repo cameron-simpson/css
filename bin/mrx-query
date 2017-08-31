@@ -2,7 +2,7 @@
 #
 # Look up the mairix indices of the specified folders,
 # report mairix-result folder path.
-#	- Cameron Simpson <cs@zip.com.au> 17mar2004
+#	- Cameron Simpson <cs@cskk.id.au> 17mar2004
 #
 
 # catch accidental stdout

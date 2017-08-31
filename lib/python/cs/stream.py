@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for streams.
-#       - Cameron Simpson <cs@zip.com.au> 21aug2015
+#       - Cameron Simpson <cs@cskk.id.au> 21aug2015
 #
 
 import sys

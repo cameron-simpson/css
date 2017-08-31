@@ -2,7 +2,7 @@
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
-#       - Cameron Simpson <cs@zip.com.au> 21may2006
+#       - Cameron Simpson <cs@cskk.id.au> 21may2006
 #
 
 import sys

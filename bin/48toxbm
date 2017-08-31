@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read a 48x48x1 face file and write an xbm bitmap.
-#	- Cameron Simpson <cs@zip.com.au>, 15jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 15jul94
 #
 
 print <<'X'

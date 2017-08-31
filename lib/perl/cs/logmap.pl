@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Logging subsystem.
-#	- Cameron Simpson <cs@zip.com.au>, 21jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 21jul94
 #
 # The environment variable $HOSTNAME is prefixed to 
 # &logmap(mapfile)

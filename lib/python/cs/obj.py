@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
+# Random stuff for "objects". - Cameron Simpson <cs@cskk.id.au>
 #
 
 from copy import copy as copy0

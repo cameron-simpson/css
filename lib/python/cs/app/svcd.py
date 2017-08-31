@@ -2,7 +2,7 @@
 #
 # Daemon to run and restart a command that provides a service, such
 # as an ssh port forward.
-#       - Cameron Simpson <cs@zip.com.au> 10dec2012
+#       - Cameron Simpson <cs@cskk.id.au> 10dec2012
 #
 # Recode as Python module.  - cameron 14may2017
 #

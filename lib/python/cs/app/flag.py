@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Python API for the flag(1cs) command.
-#       - Cameron Simpson <cs@zip.com.au> 24apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 24apr2014
 #
 
 from __future__ import print_function

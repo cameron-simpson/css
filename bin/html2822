@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Like htsave, but prepare plain HTML as RFC2822.
-#       - Cameron Simpson <cs@zip.com.au> 26sep2008
+#       - Cameron Simpson <cs@cskk.id.au> 26sep2008
 # 
 
 cmd=`basename "$0"`

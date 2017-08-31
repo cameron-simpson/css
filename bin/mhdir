@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Make a mailbox folder and .mh_sequences (so mutt recognises it).
-#	- Cameron Simpson <cs@zip.com.au> 11oct1999
+#	- Cameron Simpson <cs@cskk.id.au> 11oct1999
 #
 
 xit=0

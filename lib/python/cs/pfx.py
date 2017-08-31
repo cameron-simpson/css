@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Pfx: a framework for easy to use dynamic message prefixes.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function

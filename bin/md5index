@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read filenames, emit "size:MD5 filename".
-#	- Cameron Simpson <cs@zip.com.au> 27oct1997
+#	- Cameron Simpson <cs@cskk.id.au> 27oct1997
 #
 # Recoded to use MD5 module and be simpler. - cameron 30nov1998
 # Now lives off the cs::Image::DB module so they use the same hashes.

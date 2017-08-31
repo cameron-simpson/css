@@ -3,7 +3,7 @@
 # Conform a machine.
 #	-d	Run in daemon mode (the target end of the rsh).
 #
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

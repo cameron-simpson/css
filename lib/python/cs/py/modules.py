@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions related to modules and importing.
-#   - Cameron Simpson <cs@zip.com.au> 21dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 21dec2014
 #
 
 DISTINFO = {

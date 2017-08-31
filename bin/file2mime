@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Infer MIME type from file(1) output.
-#	- Cameron Simpson <cs@zip.com.au> 14nov2002
+#	- Cameron Simpson <cs@cskk.id.au> 14nov2002
 #
 
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}

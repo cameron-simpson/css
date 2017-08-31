@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Decorators.
-#   - Cameron Simpson <cs@zip.com.au> 02jul2017
+#   - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
 import time
@@ -21,7 +21,8 @@ def decorator(deco, *da, **dkw):
   '''
   def overdeco(*da, **dkw):
     if not da:
-      def wrapper(*a, **dkw):
+      def wrapper(*a, **dkw2):
+        dkw.update(dkw2)
         func, = a
         return deco(func, **dkw)
       return wrapper

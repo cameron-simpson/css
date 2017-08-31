@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions to work with processes.
-#       - Cameron Simpson <cs@zip.com.au> 02sep2011
+#       - Cameron Simpson <cs@cskk.id.au> 02sep2011
 #
 
 from __future__ import print_function

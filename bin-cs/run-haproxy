@@ -2,7 +2,7 @@
 #
 # Start local haproxy. Normally invoked as:
 #  svcd -n haproxy run-haproxy
-# - Cameron Simpson <cs@zip.com.au> 10sep2015
+# - Cameron Simpson <cs@cskk.id.au> 10sep2015
 # 
 
 set -ue

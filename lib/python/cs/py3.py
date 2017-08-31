@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Python3 helpers to aid code sharing between python2 and python3.
-#       - Cameron Simpson <cs@zip.com.au> 28jun2012
+#       - Cameron Simpson <cs@cskk.id.au> 28jun2012
 #
 
 DISTINFO = {

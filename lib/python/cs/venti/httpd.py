@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Serve store contents via HTTP.
-#       - Cameron Simpson <cs@zip.com.au> 23jun2010
+#       - Cameron Simpson <cs@cskk.id.au> 23jun2010
 #
 
 import cherrypy

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # Read services data in the format of services(5) and write a merged services
-#   - Cameron Simpson <cs@zip.com.au> 23jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 23jan2017
 #
 
 import sys

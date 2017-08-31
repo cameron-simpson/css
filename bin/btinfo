@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Get info from the budtool system.
-#	- Cameron Simpson <cs@zip.com.au> 07nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 07nov2000
 #
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);

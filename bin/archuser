@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Archive a user directory.
-#	- Cameron Simpson <cs@zip.com.au> 21feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 21feb2001
 #
 
 archhost=shot

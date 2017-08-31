@@ -2,7 +2,7 @@
 #
 # Locate and update the local tags file.
 # Recite "set tags=/path/to/tagsfile".
-#   - Cameron Simpson <cs@zip.com.au> 28feb2017
+#   - Cameron Simpson <cs@cskk.id.au> 28feb2017
 #
 
 exec 0</dev/null 3>&1 2>/dev/tty 1>&2

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Make an autoforwarding HTML page from one spot to another.
-#	- Cameron Simpson <cs@zip.com.au> 11jan2003
+#	- Cameron Simpson <cs@cskk.id.au> 11jan2003
 #
 
 cmd=`basename "$0"`
@@ -34,7 +34,7 @@ cat <<X
   but if it does not please follow the above link.<BR>
   Thanks,<BR>
   <A HREF="http://www.zip.com.au/~cs/">Cameron Simpson</A>
-  &lt;<A HREF="mailto:cs@zip.com.au">cs@zip.com.au</A>&gt;
+  &lt;<A HREF="mailto:cs@cskk.id.au">cs@cskk.id.au</A>&gt;
 </BODY>
 </HTML>
 X

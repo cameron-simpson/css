@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Block stores.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 ''' Basic Store classes.

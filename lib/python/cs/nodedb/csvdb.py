@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # CSV file backend.
-#       - Cameron Simpson <cs@zip.com.au> 02may2010
+#       - Cameron Simpson <cs@cskk.id.au> 02may2010
 #
 
 import csv

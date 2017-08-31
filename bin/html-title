@@ -2,7 +2,7 @@
 #
 # Try to guess suitable title string from HTML data. Try TITLE then H1.
 # Doomed to failure because MANY MANY web pages are completely badly formed.
-#	- Cameron Simpson <cs@zip.com.au> 15may2005
+#	- Cameron Simpson <cs@cskk.id.au> 15may2005
 #
 
 : ${TMPDIR:=/tmp}

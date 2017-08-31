@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for logging.
-#       - Cameron Simpson <cs@zip.com.au> 29aug2009
+#       - Cameron Simpson <cs@cskk.id.au> 29aug2009
 #
 
 from __future__ import with_statement

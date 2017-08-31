@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Textual representation and parsing of Nodes and attribute values.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from contextlib import closing

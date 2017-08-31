@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.venti.cache.
-#       - Cameron Simpson <cs@zip.com.au> 25aug2015
+#       - Cameron Simpson <cs@cskk.id.au> 25aug2015
 #
 
 import sys

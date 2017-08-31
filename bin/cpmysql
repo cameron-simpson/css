@@ -8,7 +8,7 @@
 #       db.schema.gz            DATABASE schema dump.
 #       user@host.grants        USER GRANTs dump.
 #
-#	- Cameron Simpson <cs@zip.com.au> 28dec2006
+#	- Cameron Simpson <cs@cskk.id.au> 28dec2006
 #
 
 : ${USER:=`id -un`}

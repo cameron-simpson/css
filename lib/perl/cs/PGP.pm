@@ -2,7 +2,7 @@
 #
 # Parser for PGP data structures.
 # Based on RFC 1991 - PGP Message Exchange Formats.
-#	- Cameron Simpson <cs@zip.com.au> 26may98
+#	- Cameron Simpson <cs@cskk.id.au> 26may98
 #
 
 use strict qw(vars);

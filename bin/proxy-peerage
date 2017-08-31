@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Emit configuration lines computed from my proxy peerage file.
-#   - Cameron Simpson <cs@zip.com.au> 09sep2015
+#   - Cameron Simpson <cs@cskk.id.au> 09sep2015
 #
 
 from __future__ import print_function

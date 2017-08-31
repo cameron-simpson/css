@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Handle events reported by FvwmEvent.
-#	- Cameron Simpson <cs@zip.com.au> 03nov2004
+#	- Cameron Simpson <cs@cskk.id.au> 03nov2004
 #
 
 cmd=$0

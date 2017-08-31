@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Command script for venti-ish implementation.
-#       - Cameron Simpson <cs@zip.com.au> 01may2007
+#       - Cameron Simpson <cs@cskk.id.au> 01may2007
 #
 
 from __future__ import with_statement

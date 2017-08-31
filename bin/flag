@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Simple boolean states kept as files.
-#       - Cameron Simpson <cs@zip.com.au> 25sep2006
+#       - Cameron Simpson <cs@cskk.id.au> 25sep2006
 #
 
 trace=${DEBUG:+set-x}

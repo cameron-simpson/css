@@ -9,7 +9,7 @@
 #   /System/Library/Frameworks/Python.framework/Versions/2.6/Extras/lib/python/PyObjC
 # so I may need to add that to sys.path in for other python installs.
 #
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function

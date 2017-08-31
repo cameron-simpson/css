@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Add mailto: URLs to $BUGSYSTEMS and run a command.
-#	- Cameron Simpson <cs@zip.com.au> 09jan2005
+#	- Cameron Simpson <cs@cskk.id.au> 09jan2005
 #
 
 cmd=$0

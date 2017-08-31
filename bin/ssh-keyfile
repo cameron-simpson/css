@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Return the base name of the ssh key file for the given type and purpose.
-#	- Cameron Simpson <cs@zip.com.au> 31aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 31aug2003
 #
 
 purpose=

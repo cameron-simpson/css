@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Examine the named files and attach correct extensions to misnamed ones.
-#	- Cameron Simpson <cs@zip.com.au> 22feb1999
+#	- Cameron Simpson <cs@cskk.id.au> 22feb1999
 #
 # Base entirely on file2mime and mime-ext now. - cameron 24jul2003
 # Added "-i type" option to bypass file2mime. - cameron 19apr2005

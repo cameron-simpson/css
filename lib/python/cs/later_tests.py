@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.later.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from functools import partial

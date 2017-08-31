@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Do simple things with revision controlled source.
-# - Cameron Simpson <cs@zip.com.au> 25apr2007
+# - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
 # Huge revsision. - cameron 11may2017
 #

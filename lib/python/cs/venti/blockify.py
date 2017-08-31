@@ -2,7 +2,7 @@
 #
 # Utility routines to parse data streams into Blocks and Block streams
 # into IndirectBlocks.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from itertools import chain

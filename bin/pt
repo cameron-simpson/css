@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Print a process tree.
-#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 25sep2000
 #
 
 =head1 NAME
@@ -170,6 +170,6 @@ ps(1)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut

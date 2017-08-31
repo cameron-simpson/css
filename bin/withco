@@ -9,7 +9,7 @@
 #   or  inco module command args...
 #   or  inco -f module/file command args...
 # to run command _in_ the checkout.
-# - Cameron Simpson <cs@zip.com.au> 04jul2003
+# - Cameron Simpson <cs@cskk.id.au> 04jul2003
 #
 
 : ${TMPDIR:=/tmp}

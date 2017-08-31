@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# File interfaces.      - Cameron Simpson <cs@zip.com.au>
+# File interfaces.      - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function, absolute_import

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted convenience functions for files and filenames/pathnames.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import with_statement, print_function, absolute_import

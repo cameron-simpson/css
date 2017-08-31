@@ -2,7 +2,7 @@
 #
 # Rsync my account from one place to others.
 # Usually I use putacc to call this, but occasionally getacc.
-#	- Cameron Simpson <cs@zip.com.au> 29jun2004
+#	- Cameron Simpson <cs@cskk.id.au> 29jun2004
 #
 
 set -ue

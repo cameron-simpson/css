@@ -2,7 +2,7 @@
 #
 # Parsers for data streams, emitting data and offsets.
 # These sit in front of the core rolling hash blockifier.
-#   - Cameron Simpson <cs@zip.com.au> 05mar2017
+#   - Cameron Simpson <cs@cskk.id.au> 05mar2017
 #
 
 from functools import partial

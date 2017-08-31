@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Make a query for a GET-style form.
-#	- Cameron Simpson <cs@zip.com.au> 11dec96
+#	- Cameron Simpson <cs@cskk.id.au> 11dec96
 #
 
 ($cmd=$0) =~ s:.*/::;

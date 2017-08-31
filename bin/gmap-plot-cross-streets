@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Read |-separated cross street locations on stdin, plot map.
-#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#       - Cameron Simpson <cs@cskk.id.au> 28jun2007
 #
 
 sep=\|

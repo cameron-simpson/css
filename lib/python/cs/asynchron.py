@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Result and related classes for asynchronous dispatch and collection.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {
