@@ -72,7 +72,7 @@ def main(argv):
       import [-oW] path {-|archive.vt}
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount archive.vt [mountpoint [subpath]]
+      mount [-r] [-o {append_only,readonly}] archive.vt [mountpoint [subpath]]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -515,6 +515,7 @@ def cmd_mount(args, verbose=None):
   '''
   badopts = False
   readonly = False
+  append_only = False
   opts, args = getopt(args, 'o:r')
   for opt, val in opts:
     with Pfx(opt):
@@ -523,6 +524,8 @@ def cmd_mount(args, verbose=None):
           with Pfx(option):
             if option == '':
               pass
+            elif option == 'append':
+              append_only = True
             elif option == 'readonly':
               readonly = True
             else:
@@ -594,7 +597,7 @@ def cmd_mount(args, verbose=None):
     with Pfx("open('a')"):
       with open(special, 'a') as syncfp:
         try:
-          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath, readonly=readonly)
+          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:

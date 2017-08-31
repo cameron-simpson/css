@@ -45,7 +45,7 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False):
+def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False, append_only=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -53,6 +53,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False):
       `syncfp`: if not None, a file to which to write sync lines
       `subpath`: relative path from `E` to the directory to attach to the mountpoint
       `readonly`: forbid data modification operations
+      `append_only`: files may not be truncated or overwritten
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
@@ -60,7 +61,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False):
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly)
+  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
   return FS._vt_runfuse(mnt)
 
 def umount(mnt):
@@ -135,6 +136,10 @@ class FileHandle(O):
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
+        if self.for_append and offset != len(fp):
+          error("%s: file open for append but offset(%s) != length(%s)",
+                fp, offset, len(fp))
+          raise FuseOSError(errno.EFAULT)
         fp.seek(offset)
         written = fp.write(data)
     self.E.touch()
@@ -401,7 +406,7 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, syncfp=None, subpath=None, readonly=False):
+  def __init__(self, E, S, oserror=None, syncfp=None, subpath=None, readonly=False, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -412,10 +417,19 @@ class _StoreFS_core(object):
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    self.S = S
     self.E = E
+    self.S = S
+    if oserror is None:
+      oserror = OSError
+    self.oserror = oserror
+    if readonly:
+      if syncfp is not None:
+        warning("readonly: setting syncfp=None, was %s", syncfp)
+        syncfp = None
+    self.syncfp = syncfp
     self.subpath = subpath
     self.readonly = readonly
+    self.append_only = append_only
     if subpath:
       # locate subdirectory to display at mountpoint
       mntE, mntP, tail_path = resolve(E, subpath)
@@ -428,7 +442,7 @@ class _StoreFS_core(object):
       self.mntE = E
       mntP = None
     # set up a queue to collect logging requests
-    # and a thread to process then asynchronously
+    # and a thread to process them asynchronously
     self.log = getLogger(LOGGER_NAME)
     self.logQ = IterableQueue()
     T = Thread(name="log-queue(%s)" % (self,),
@@ -436,7 +450,6 @@ class _StoreFS_core(object):
                args=(self.logQ,))
     T.daemon = True
     T.start()
-    self.syncfp = syncfp
     self._syncfp_last_dirent_text = None
     self.do_fsync = False
     self._fs_uid = os.geteuid()
@@ -489,15 +502,15 @@ class _StoreFS_core(object):
     return resolve(self.mntE, path)
 
   def _namei2(self, path):
-    ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent, parent.
+    ''' Look up path. Raise oserror(ENOENT) if missing. Return Dirent, parent.
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      raise FuseOSError(errno.ENOENT)
+      raise self.oserror(errno.ENOENT)
     return E, P
 
   def _namei(self, path):
-    ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent.
+    ''' Look up path. Raise oserror(ENOENT) if missing. Return Dirent.
     '''
     E, P = self._namei2(path)
     return E
@@ -536,13 +549,13 @@ class _StoreFS_core(object):
     '''
     if not P.isdir:
       error("parent (name=%r) not a directory, raising ENOTDIR", P.name)
-      raise FuseOSError(errno.ENOTDIR)
+      raise self.oserror(errno.ENOTDIR)
     if name in P:
       if flags & O_EXCL:
-        raise FuseOSError(errno.EEXIST)
+        raise self.oserror(errno.EEXIST)
       E = P[name]
     elif not flags & O_CREAT:
-      raise FuseOSError(errno.ENOENT)
+      raise self.oserror(errno.ENOENT)
     else:
       E = FileDirent(name)
       P[name] = E
@@ -555,10 +568,24 @@ class _StoreFS_core(object):
     for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
+    for_trunc = (flags & O_TRUNC) == O_TRUNC
     debug("for_read=%s, for_write=%s, for_append=%s",
           for_read, for_write, for_append)
+    if for_trunc and not for_write:
+      error("O_TRUNC requires O_WRONLY or O_RDWR")
+      raise self.oserror(errno.EINVAL)
+    if for_append and not for_write:
+      error("O_APPEND requires O_WRONLY or O_RDWR")
+      raise self.oserror(errno.EINVAL)
+    if (for_write and not for_append) and self.append_only:
+      error("fs is append_only but no O_APPEND")
+      raise self.oserror(errno.EINVAL)
+    if for_trunc and self.append_only:
+      error("fs is append_only but O_TRUNC")
+      raise self.oserror(errno.EINVAL)
     if (for_write or for_append) and self.readonly:
-      raise OSError(errno.EROFS)
+      error("fs is readonly")
+      raise self.oserror(errno.EROFS)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     inum = self.E2i(E)
     I = self._inodes[inum]
@@ -621,15 +648,16 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, syncfp=None, subpath=None, options=None, readonly=False):
+  def __init__(self, E, S, syncfp=None, subpath=None, options=None, readonly=False, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
         `syncfp`: if not None, a file to which to write sync lines
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
+        `append_only`: forbid truncation or oervwrite of file data
     '''
-    self._vt_core = _StoreFS_core(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly)
+    self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
     llf_opts = set(llfuse.default_options)
