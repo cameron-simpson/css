@@ -8,7 +8,7 @@ import os
 from os.path import basename, relpath, join as joinpath
 import time
 from cs.fileutils import read_from
-from cs.logutils import info, warning, error, loginfo
+from cs.logutils import debug, info, warning, error, loginfo
 from cs.pfx import Pfx, XP
 from cs.units import transcribe, TIME_SCALE, BINARY_BYTES_SCALE, DECIMAL_SCALE
 from .blockify import blocks_of, top_block_for
@@ -53,7 +53,7 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
                       ok = False
                       continue
                     if Estat.st_size == S.st_size and Estat.st_mtime == S.st_mtime:
-                      info("same size and mtime, considering unchanged")
+                      debug("same size and mtime, considering unchanged")
                       continue
                 else:
                   error("already exists")
