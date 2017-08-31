@@ -60,7 +60,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False):
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
+  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly)
   return FS._vt_runfuse(mnt)
 
 def umount(mnt):
@@ -401,12 +401,13 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, syncfp=None, subpath=None):
+  def __init__(self, E, S, syncfp=None, subpath=None, readonly=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
         `syncfp`: if not None, a file to which to write sync lines
         `subpath`: relative path to mount Dir
+        `readonly`: forbid data modification
     '''
     O.__init__(self)
     if not E.isdir:
@@ -414,6 +415,7 @@ class _StoreFS_core(object):
     self.S = S
     self.E = E
     self.subpath = subpath
+    self.readonly = readonly
     if subpath:
       # locate subdirectory to display at mountpoint
       mntE, mntP, tail_path = resolve(E, subpath)
@@ -555,6 +557,8 @@ class _StoreFS_core(object):
     for_append = (flags & O_APPEND) == O_APPEND
     debug("for_read=%s, for_write=%s, for_append=%s",
           for_read, for_write, for_append)
+    if (for_write or for_append) and self.readonly:
+      raise OSError(errno.EROFS)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     inum = self.E2i(E)
     I = self._inodes[inum]
@@ -617,14 +621,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, syncfp=None, subpath=None, options=None):
+  def __init__(self, E, S, syncfp=None, subpath=None, options=None, readonly=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
         `syncfp`: if not None, a file to which to write sync lines
         `subpath`: relative path to mount Dir
+        `readonly`: forbid data modification
     '''
-    self._vt_core = _StoreFS_core(E, S, syncfp=syncfp, subpath=subpath)
+    self._vt_core = _StoreFS_core(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
     llf_opts = set(llfuse.default_options)
@@ -737,6 +742,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def create(self, parent_inode, name_b, mode, flags, ctx):
     ''' Create a new file and open it. Return file handle index and EntryAttributes.
     '''
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     core = self._vt_core
     I = core[parent_inode]
     I += 1
@@ -797,6 +804,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def link(self, inode, new_parent_inode, new_name_b, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     core = self._vt_core
     I = core[parent_inode]
     I += 1
@@ -874,6 +883,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def mkdir(self, parent_inode, name_b, mode, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     core = self._vt_core
     I = core[parent_inode]
     I += 1
@@ -893,6 +904,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def mknod(self, parent_inode, name_b, mode, rdev, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     core = self._vt_core
     I = core[parent_inode]
     I += 1
@@ -922,10 +935,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
       warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
               inode, E, flags, O_CREAT, O_EXCL)
       flags &= ~(O_CREAT|O_EXCL)
-    fhndx = self._vt_core.open(E, flags, ctx)
-    # TODO: mark parent, not root?
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
+    if (for_write or for_append) and self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
+    fhndx = self._vt_core.open(E, flags, ctx)
     if for_write or for_append:
       E.change()
     return fhndx
@@ -1011,6 +1025,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def removexattr(self, inode, xattr_name, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     # TODO: test for inode ownership?
     if xattr_name == XATTR_NAME_BLOCKREF:
       # TODO: should we support this as "force recompute"?
@@ -1025,6 +1041,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     name_old = self._vt_str(name_old_b)
     name_new = self._vt_str(name_new_b)
     Psrc = self._vt_core.i2E(parent_inode_old)
@@ -1042,6 +1060,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def rmdir(self, parent_inode, name_b, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     P = self._vt_core.i2E(parent_inode)
     if not self._vt_core._Eaccess(P, os.X_OK|os.W_OK, ctx):
@@ -1061,6 +1081,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def setattr(self, inode, attr, fields, fhndx, ctx):
     # TODO: test CTX for permission to chmod/chown/whatever
     # TODO: sanity check fields for other update_* flags?
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     E = self._vt_core.i2E(inode)
     with Pfx(E):
       M = E.meta
@@ -1090,6 +1112,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     # TODO: check perms (ownership?)
     if xattr_name == XATTR_NAME_BLOCKREF:
       # TODO: support this as a "switch out the content action"?
@@ -1109,6 +1133,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def symlink(self, parent_inode, name_b, target_b, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r", parent_inode, name_b, target_b, ctx):
       core = self._vt_core
       I = core[parent_inode]
@@ -1127,6 +1153,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def unlink(self, parent_inode, name_b, ctx):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     # TODO: check search/write on P
     P = self._vt_core.i2E(parent_inode)
@@ -1139,6 +1167,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def write(self, fhndx, off, buf):
+    if self._vt_core.readonly:
+      raise FuseOSError(errno.EROFS)
     FH = self._vt_core._fh(fhndx)
     written = FH.write(buf, off)
     if written != len(buf):
