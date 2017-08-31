@@ -185,5 +185,5 @@ def complete_Block(B, S, S2):
   X("complete: completed")
 
 if __name__ == '__main__':
-  import .pushpull_tests
-  pushpull_tests.selftest(sys.argv)
+  from .pushpull_tests import selftest
+  selftest(sys.argv)

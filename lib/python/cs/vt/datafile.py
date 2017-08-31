@@ -178,5 +178,5 @@ def scan_datafile(pathname, offset=None, do_decompress=False):
          pathname, offset - offset0, end - start, (offset - offset0) / (end - start))
 
 if __name__ == '__main__':
-  import .datafile_tests
-  datafile_tests.selftest(sys.argv)
+  from .datafile_tests import selftest
+  selftest(sys.argv)

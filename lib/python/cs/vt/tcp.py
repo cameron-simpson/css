@@ -107,5 +107,5 @@ class TCPStoreClient(StreamStore):
     self.sock.close()
 
 if __name__ == '__main__':
-  import .tcp_tests
-  tcp_tests.selftest(sys.argv)
+  from .tcp_tests import selftest
+  selftest(sys.argv)

@@ -537,5 +537,5 @@ class ProgressStore(BasicStoreSync):
     return self._progress['requests'].position
 
 if __name__ == '__main__':
-  import .store_tests
-  store_tests.selftest(sys.argv)
+  from .store_tests import selftest
+  selftest(sys.argv)

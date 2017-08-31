@@ -407,5 +407,5 @@ class StreamStore(BasicStoreAsync):
       after = True
 
 if __name__ == '__main__':
-  import .stream_tests
-  stream_tests.selftest(sys.argv)
+  from .stream_tests import selftest
+  selftest(sys.argv)

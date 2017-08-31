@@ -694,5 +694,5 @@ def verify_block(B, recurse=False, S=None):
                (B.span, len(data))
 
 if __name__ == '__main__':
-  import .block_tests
-  block_tests.selftest(sys.argv)
+  from .block_tests import selftest
+  selftest(sys.argv)
