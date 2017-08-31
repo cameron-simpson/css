@@ -143,8 +143,8 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-              prefix, text.__class__, text, sys.exc_info())
+            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            ##  prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix \
                  + ': ' \
