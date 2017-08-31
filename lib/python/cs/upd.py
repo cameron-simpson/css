@@ -27,12 +27,25 @@ from cs.lex import unctrl
 from cs.tty import ttysize
 
 instances = []
+instances_by_id = {}
+
+def upd_for(stream):
+  ''' Factory for Upd singletons keyed by the id of their backend.
+  '''
+  global instances_by_id
+  U = instances_by_id.get(id(stream))
+  if not U:
+    U = Upd(stream)
+    instances_by_id[id(stream)] = U
+  return U
 
 def cleanupAtExit():
   global instances
+  global instances_by_id
   for i in instances:
     i.close()
   instances = ()
+  instances_by_id = {}
 
 atexit.register(cleanupAtExit)
 
