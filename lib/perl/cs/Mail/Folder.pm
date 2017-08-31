@@ -9,7 +9,7 @@
 #		Type is either Source for a message, or Directory for
 #		a browsable object.
 #
-#	- Cameron Simpson <cs@zip.com.au> 15aug96
+#	- Cameron Simpson <cs@cskk.id.au> 15aug96
 #
 
 use strict qw(vars);

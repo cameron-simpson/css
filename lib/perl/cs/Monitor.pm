@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Watch a Source for interesting lines and report context.
-#	- Cameron Simpson <cs@zip.com.au> 13aug96
+#	- Cameron Simpson <cs@cskk.id.au> 13aug96
 #
 
 use strict qw(vars);

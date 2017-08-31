@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # HTTP daemon code.
-#	- Cameron Simpson <cs@zip.com.au> 27oct95
+#	- Cameron Simpson <cs@cskk.id.au> 27oct95
 #
 
 use strict qw(vars);

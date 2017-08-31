@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::DBI::Table::RowObject: a base class for objects wrapping a table row.
-#	- Cameron Simpson <cs@zip.com.au> 10mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 10mar2000
 #
 
 =head1 NAME
@@ -155,7 +155,7 @@ cs::DBI(3), cs::DBI::Table::Hash(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 
