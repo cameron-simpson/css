@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.hash.
+# Self tests for cs.vt.hash.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

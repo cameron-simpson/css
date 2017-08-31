@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.block.
+# Self tests for cs.vt.block.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

@@ -8,7 +8,7 @@
       isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
-    encoding of a cs.venti.dir.Dirent.
+    encoding of a cs.vt.dir.Dirent.
 '''
 
 from __future__ import print_function

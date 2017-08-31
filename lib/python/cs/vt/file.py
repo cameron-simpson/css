@@ -327,5 +327,5 @@ def file_top_block(fp, rsize=8192, start=None, end=None):
   return top_block_for(blockify(filedata(fp, rsize=rsize, start=start, end=end)))
 
 if __name__ == '__main__':
-  from cs.venti.file_tests import selftest
+  from cs.vt.file_tests import selftest
   selftest(sys.argv)

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.tcp.
+# Self tests for cs.vt.tcp.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

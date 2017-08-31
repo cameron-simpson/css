@@ -107,4 +107,4 @@ class TCPStoreClient(StreamStore):
 
 if __name__ == '__main__':
   from cs.debug import selftest
-  selftest('cs.venti.tcp_tests')
+  selftest('cs.vt.tcp_tests')

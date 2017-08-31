@@ -185,4 +185,4 @@ def complete_Block(B, S, S2):
 
 if __name__ == '__main__':
   from cs.debug import selftest
-  selftest('cs.venti.pushpull_tests')
+  selftest('cs.vt.pushpull_tests')

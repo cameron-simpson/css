@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.blockify.
+# Self tests for cs.vt.blockify.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

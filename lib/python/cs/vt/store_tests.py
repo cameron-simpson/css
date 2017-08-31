@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.store.
+# Self tests for cs.vt.store.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Tests for cs.venti.pushpull.  - Cameron Simpson <cs@cskk.id.au> 18dec2015
+# Tests for cs.vt.pushpull.  - Cameron Simpson <cs@cskk.id.au> 18dec2015
 #
 
 import unittest

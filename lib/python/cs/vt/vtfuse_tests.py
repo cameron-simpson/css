@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Unit tests for cs.venti.vtfuse.
+# Unit tests for cs.vt.vtfuse.
 #       - Cameron Simpson <cs@cskk.id.au> 10jul2014
 #
 

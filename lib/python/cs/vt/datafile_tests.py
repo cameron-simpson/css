@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.datafile.
+# Self tests for cs.vt.datafile.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -27,7 +27,7 @@ class TestDataFile(unittest.TestCase):
 
   def setUp(self):
     random.seed()
-    tfd, pathname = tempfile.mkstemp(prefix="cs.venti.datafile.test", suffix=".vtd", dir='.')
+    tfd, pathname = tempfile.mkstemp(prefix="cs.vt.datafile.test", suffix=".vtd", dir='.')
     os.close(tfd)
     self.pathname = pathname
     self.datafile = DataFile(pathname, readwrite=True)

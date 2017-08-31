@@ -279,5 +279,5 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     pass
 
 if __name__ == '__main__':
-  import cs.venti.hash_tests
-  cs.venti.hash_tests.selftest(sys.argv)
+  import cs.vt.hash_tests
+  cs.vt.hash_tests.selftest(sys.argv)

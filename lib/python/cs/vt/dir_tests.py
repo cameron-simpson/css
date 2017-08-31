@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.dir.
+# Self tests for cs.vt.dir.
 #       - Cameron Simpson <cs@cskk.id.au> 25aug2015
 #
 

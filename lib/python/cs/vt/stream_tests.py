@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.stream.
+# Self tests for cs.vt.stream.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 

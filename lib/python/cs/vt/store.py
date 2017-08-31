@@ -537,5 +537,5 @@ class ProgressStore(BasicStoreSync):
     return self._progress['requests'].position
 
 if __name__ == '__main__':
-  import cs.venti.store_tests
-  cs.venti.store_tests.selftest(sys.argv)
+  import cs.vt.store_tests
+  cs.vt.store_tests.selftest(sys.argv)

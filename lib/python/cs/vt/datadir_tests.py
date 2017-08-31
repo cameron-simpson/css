@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.venti.datadir.
+# Self tests for cs.vt.datadir.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -23,12 +23,12 @@ RUN_SIZE = 100
 def mktmpdir(flavour=None):
   ''' Create a temporary scratch directory.
   '''
-  prefix = "cs.venti.datafile.testdir"
+  prefix = "cs.vt.datafile.testdir"
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
            tempfile.mkdtemp(
-             prefix="cs.venti.datafile.testdir",
+             prefix="cs.vt.datafile.testdir",
              suffix=".dir",
              dir='.'))
 

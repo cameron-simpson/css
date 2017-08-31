@@ -7,7 +7,7 @@
       http://library.pantek.com/general/plan9.documents/venti/venti.html
       http://en.wikipedia.org/wiki/Venti
 
-    cs.venti implements a similar scheme that supports variable
+    cs.vt implements a similar scheme that supports variable
     sized blocks and arbitrary data sizes, with some domain knowledge
     to aid efficient block boundary selection.
 
@@ -80,7 +80,7 @@ class _TestAdditionsMixin:
   '''
 
   @staticmethod
-  def mktmpdir(prefix="cs.venti"):
+  def mktmpdir(prefix="cs.vt"):
     return tempfile.TemporaryDirectory(
         prefix="test-" + prefix + "-",
         suffix=".tmpdir",

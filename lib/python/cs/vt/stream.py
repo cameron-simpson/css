@@ -407,5 +407,5 @@ class StreamStore(BasicStoreAsync):
       after = True
 
 if __name__ == '__main__':
-  import cs.venti.stream_tests
-  cs.venti.stream_tests.selftest(sys.argv)
+  import cs.vt.stream_tests
+  cs.vt.stream_tests.selftest(sys.argv)

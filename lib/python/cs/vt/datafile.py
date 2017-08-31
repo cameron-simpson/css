@@ -74,7 +74,7 @@ def scan_chunks(fp, do_decompress=False):
     offset = offset2
 
 class DataFile(MultiOpenMixin):
-  ''' A cs.venti data file, storing data chunks in compressed form.
+  ''' A cs.vt data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local venti Store.
 
       A DataFile is a MultiOpenMixin and supports:
@@ -178,5 +178,5 @@ def scan_datafile(pathname, offset=None, do_decompress=False):
          pathname, offset - offset0, end - start, (offset - offset0) / (end - start))
 
 if __name__ == '__main__':
-  import cs.venti.datafile_tests
-  cs.venti.datafile_tests.selftest(sys.argv)
+  import cs.vt.datafile_tests
+  cs.vt.datafile_tests.selftest(sys.argv)

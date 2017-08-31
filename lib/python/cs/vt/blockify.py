@@ -425,5 +425,5 @@ def Xoffsets(d):
   X(' => '.join([ "%s:%s" % (k2,v2) for v2, k2 in sorted([ ((-1 if v is None else v), k) for k, v in d.items() ]) ]))
 
 if __name__ == '__main__':
-  import cs.venti.blockify_tests
-  cs.venti.blockify_tests.selftest(sys.argv)
+  import cs.vt.blockify_tests
+  cs.vt.blockify_tests.selftest(sys.argv)
