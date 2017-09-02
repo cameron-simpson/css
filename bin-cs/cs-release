@@ -176,7 +176,7 @@ def main(argv):
         elif op == 'testpypi':
           N.submit_testpypi(force=force)
         else:
-          warning("unrecognised op")
+          warning("unrecognised op %r", op)
           badopts = True
           break
   if badopts:
