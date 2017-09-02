@@ -4,18 +4,23 @@
 #       - Cameron Simpson <cs@cskk.id.au> 28jun2012
 #
 
+r'''
+Aids for code sharing between python2 and python3.
+
+Presents various names in python 3 flavour for common use in python 2 and python 3.
+'''
+
+import sys
+
 DISTINFO = {
-    'description': "Aids for code sharing between python2 and python3.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.py3_for2', 'cs.py3_for3'],
+    'install_requires': [],
 }
-
-import sys
 
 if sys.hexversion >= 0x03000000:
 
@@ -36,7 +41,7 @@ if sys.hexversion >= 0x03000000:
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
   from struct import pack, unpack
-  from .py3_for3 import raise3, exec_code, bytes, BytesFile, joinbytes
+  from ._for3 import raise3, exec_code, BytesFile, joinbytes
 
 else:
 
@@ -61,7 +66,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-  from .py3_for2 import raise3, exec_code, ustr, \
+  from ._for2 import raise3, exec_code, ustr, \
                         bytes, BytesFile, joinbytes, \
                         pack, unpack
 

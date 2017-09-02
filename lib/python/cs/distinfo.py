@@ -20,7 +20,6 @@ from tempfile import mkdtemp
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
-from cs.py.modules import import_module_name
 import cs.sh
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
@@ -347,24 +346,6 @@ class PyPI_Package(O):
       rpath = joinpath(prefix_dir, rpath)
     return rpath
 
-  def pkg_readme_rpath(self, package_name=None, prefix_dir=None):
-    if package_name is None:
-      package_name = self.package_name
-    package_paths = package_name.split('.')
-    if self.is_package(package_name):
-      return joinpath(
-          self.pkg_rpath(
-              package_name=package_name,
-              prefix_dir=prefix_dir),
-          'README.rst')
-    else:
-      return joinpath(
-          self.pkg_rpath(
-              package_name=package_name,
-              prefix_dir=prefix_dir,
-              up=True),
-          'README-' + package_paths[-1] + '.rst')
-
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
         If `pkg_dir` is not supplied, create a temporary directory.
@@ -376,25 +357,18 @@ class PyPI_Package(O):
 
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with open(manifest_path, "w") as mfp:
-      # TODO: support extra files
-      pass
+       # TODO: support extra files
+      self.copyin(pkg_dir)
 
-    self.copyin(self.package_name, pkg_dir)
-
-    readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
-    readme_path = joinpath(pkg_dir, readme_subpath)
-    if pathexists(readme_path):
-      if 'long_description' in distinfo:
-        warning(
-            'long_description: already provided, ignoring %s', readme_subpath)
-      else:
-        with open(readme_path) as readmefp:
-          distinfo['long_description'] = readmefp.read()
-      shutil.copy2(readme_path, joinpath(pkg_dir, 'README.rst'))
-      with open(manifest_path, "a") as mfp:
-        mfp.write('include README.rst\n')
-    else:
-      warning('no README at %r', readme_path)
+      # create README.rst
+      with open('README.rst', 'w') as fp:
+        print(distinfo['description'], file=fp)
+        print('=' * len(distinfo['description']), file=fp)
+        long_desc = distinfo.get('long_description', '')
+        if long_desc:
+          print(file=fp)
+          print(long_desc, file=fp)
+      mfp.write('include README.rst\n')
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(joinpath(pkg_dir, 'setup.py'))
@@ -479,18 +453,16 @@ class PyPI_Package(O):
             yield joinpath(dirpath[len(libprefix):], filename)
             continue
           warning("skipping %s", joinpath(dirpath, filename))
-    readme_subpath = self.pkg_readme_rpath(package_name)
-    readme_path = joinpath(libdir, readme_subpath)
-    if pathexists(readme_path):
-      yield readme_subpath
 
-  def copyin(self, package_name, dstdir):
+  def copyin(self, dstdir):
+    ''' Write the contents of the tagged release into `dstdir`.
+    '''
     hgargv = ['set-x', 'hg',
               'archive',
               '-r', '"%s"' % self.hg_tag,
               ]
     first = True
-    package_parts = package_name.split('.')
+    package_parts = self.package_name.split('.')
     while package_parts:
       superpackage_name = '.'.join(package_parts)
       base = self.package_base(superpackage_name)
