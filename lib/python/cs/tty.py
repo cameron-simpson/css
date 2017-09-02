@@ -4,6 +4,18 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Functions related to terminals.
+
+``ttysize(fd)``
+  return a namedtuple (rows, columns) with the current terminal size;
+  UNIX only (uses the stty command)
+``statusline(text,...)``
+  update the terminal status line with ``text``
+``statusline_bs(text,...)``
+  return a byte string to update the terminal status line with ``text``
+'''
+
 from __future__ import print_function
 import os
 
