@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Handle mail profiles.
-#	- Cameron Simpson <cs@zip.com.au> 04jun98
+#	- Cameron Simpson <cs@cskk.id.au> 04jun98
 #
 
 use strict qw(vars);

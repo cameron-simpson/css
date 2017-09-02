@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Construct an ssh keypair for a VPN.
-#	- Cameron Simpson <cs@zip.com.au> 03feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 03feb2002
 #
 
 [ $# = 3 ] || { echo "Usage: $0 -t type from2to" >&2; exit 2; }

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run the named port forwards indefinitely.
-#       - Cameron Simpson <cs@zip.com.au> 08jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 08jul2008
 #
 # Convert to Python module cs.app.portfwd. - cameron, may2017
 #

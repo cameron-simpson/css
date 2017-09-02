@@ -3,7 +3,7 @@
 # Apply the date of last changeset for files in the manifest to the
 # corresponding files in a target directory.
 # Closely based on suggested code from Dirkjan Ochtman.
-#       - Cameron Simpson <cs@zip.com.au> 24oct2009
+#       - Cameron Simpson <cs@cskk.id.au> 24oct2009
 #
 
 from __future__ import print_function

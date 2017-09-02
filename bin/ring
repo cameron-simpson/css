@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Look up phone lists. Each entry has a non-blank in column one.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use POSIX;

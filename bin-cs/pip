@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run pip from my default virtualenv.
-#       - Cameron Simpson <cs@zip.com.au> 08mar2014
+#       - Cameron Simpson <cs@cskk.id.au> 08mar2014
 #
 
 set -uex

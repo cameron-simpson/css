@@ -2,7 +2,7 @@
 #
 # Put (fetch-from-remote-end) a local git ref to a remote work directory.
 # Printed the resolved reference to stdout for use.
-#   - Cameron Simpson <cs@zip.com.au> 14oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 14oct2016
 # 
 
 set -ue

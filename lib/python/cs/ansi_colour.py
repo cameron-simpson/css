@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # ANSI terminal sequences.
-#       - Cameron Simpson <cs@zip.com.au> 16nov2010
+#       - Cameron Simpson <cs@cskk.id.au> 16nov2010
 #
 
 DISTINFO = {

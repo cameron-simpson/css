@@ -2,7 +2,7 @@
 #
 # Walk an existing histbackup directory looking for adjacent identical
 # hardlinked trees that can be turned into symlinks, and symlink.
-#       - Cameron Simpson <cs@zip.com.au> 16mar2013
+#       - Cameron Simpson <cs@cskk.id.au> 16mar2013
 #
 
 set -ue

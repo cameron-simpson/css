@@ -9,7 +9,7 @@
 #      SSH_AUTH_SOCK=`rig-ssh-agent ${1+"$@"}`; export SSH_AUTH_SOCK
 #    }
 #
-# - Cameron Simpson <cs@zip.com.au> 30jul2001
+# - Cameron Simpson <cs@cskk.id.au> 30jul2001
 #
 
 set -ue

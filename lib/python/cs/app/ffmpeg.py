@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for using FFmpeg (ffmpeg.org).
-#   - Cameron Simpson <cs@zip.com.au> 30oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
 from collections import namedtuple
@@ -110,16 +110,21 @@ def convert(src, srcfmt, dst, dstfmt, meta=None, overwrite=False,
                         dst, dstfmt, meta=meta, overwrite=overwrite)
 
 def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
-    ''' Convert video `src` to `dst`, return a subprocess.Popen object and the ffmpeg argv.
-        `src`: input source.
-          If `src` is None, pass '-' to ffmpeg(1) as the input path and
-          attach a pipe to its standard input.
-          If `src` is a string it is considered to be a filename and
-            passed to ffmpeg's -i option.
-          Otherwise `src` is considered to be an open file and is attached
-            to ffmpeg's standard input.
-        `srcfmt`: FFmpeg format string. It is required if `src` is None or
-          `src` is an open file.
+    ''' Convert multiple supplied video `sources` to a single `dst`, return a subprocess.Popen object and the ffmpeg argv.
+        `sources`: input source.
+          An iterable of input sources, each of which is a 4-tuple of:
+            (src, srcfmt, start_s, end_s)
+          For each such input:
+            If `src` is None, pass '-' to ffmpeg(1) as the input path and
+            attach a pipe to its standard input.
+            If `src` is a string it is considered to be a filename and
+              passed to ffmpeg's -i option.
+            Otherwise `src` is considered to be an open file and is attached
+              to ffmpeg's standard input.
+            `srcfmt`: FFmpeg format string. It is required if `src` is None or
+              `src` is an open file.
+            `start_s`: start offset in seconds. Used for cropping.
+            `end_s`: end offset in seconds. Used for cropping.
         `dst`: output destination.
           If `dst` is None, pass '-' as the output path and attach a
             pipe to its standard output.
@@ -133,8 +138,6 @@ def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
           options. If meta is not None, meta.format must match
           `dstfmt` if that not None. If `dstfmt` is None, it is set
           from `meta.format`.
-        `start_s`: start offset in seconds. Used for cropping.
-        `end_s`: end offset in seconds. Used for cropping.
     '''
     with Pfx("multiconvert"):
       argv = [ 'ffmpeg',

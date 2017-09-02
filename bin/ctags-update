@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Update the tags file from the specified files, or from all files.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -35,7 +35,7 @@ if [ -s "$tags" -a $# -gt 0 ]
 then
   set -- -a "$@"
 else
-  set -- -R
+  set -- -R --exclude='bin/*' --exclude='*.pl' --exclude='*.pm'
   cd "$(dirname "$tags")"
 fi
 

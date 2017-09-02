@@ -1,12 +1,20 @@
 #!/bin/sh
 #
 # Trace execution of a command.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
 
 : ${DEBUG:=}
+
+# normal behaviour: trace the command
+[ $DEBUG ] || {
+  set -x
+  exec "$@"
+}
+
+# debug mode, detailed tracing
 
 datestamp=
 no_tag_fd=
@@ -36,7 +44,7 @@ if [ $no_tag_fd ]
 then
   :
 else
-  if [ "x$DEBUG" = x1 ]
+  if [ $DEBUG ]
   then  exec tag_fd 2 "$1" "$0" --no-tag_fd $subopts -- "$@"
   fi
 fi

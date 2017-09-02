@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Grep the node information from a GNU info file.
-#	- Cameron Simpson <cs@zip.com.au> 08sep99
+#	- Cameron Simpson <cs@cskk.id.au> 08sep99
 #
 
 exec sed -n -e ':top

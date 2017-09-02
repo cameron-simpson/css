@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted convenience functions for files and filenames/pathnames.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import with_statement, print_function, absolute_import
@@ -14,50 +14,33 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-<<<<<<< working copy
-    'requires': ['cs.env', 'cs.lex', 'cs.logutils', 'cs.range', 'cs.threads', 'cs.py3'],
-=======
     'requires': ['cs.asynchron', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
->>>>>>> merge rev
 }
 
-from functools import partial
+from contextlib import contextmanager
+import datetime
+import errno
+import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
-import errno
-import sys
-from contextlib import contextmanager
-import datetime
-import os
 import shutil
 import stat
+import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
-<<<<<<< working copy
-import unittest
-=======
-from cs.deco import cached
->>>>>>> merge rev
+from cs.deco import cached, decorator
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-<<<<<<< working copy
-from cs.logutils import exception, error, warning, debug, Pfx, D, X
-=======
-from cs.logutils import exception, error, warning, debug
+from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes
->>>>>>> merge rev
 from cs.range import Range
-<<<<<<< working copy
-from cs.threads import locked, locked_property
-from cs.py3 import ustr, bytes
-=======
 from cs.threads import locked
+from cs.timeutils import TimeoutError
 from cs.x import X
->>>>>>> merge rev
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
@@ -182,7 +165,7 @@ def rewrite(filepath, data,
     if do_rename:
       # rename new file into old path
       # tries to preserve perms, but does nothing for other metadata
-      copymode(filepath, T.name)
+      shutil.copymode(filepath, T.name)
       if backup_ext:
         os.link(filepath, filepath + backup_ext)
       os.rename(T.name, filepath)
@@ -295,6 +278,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
+@decorator
 def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
   ''' A decorator which caches a value obtained from a file.
       In addition to all the keyword arguments for @cs.deco.cached,
@@ -305,6 +289,8 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
       If the `sig_func` is not specified it defaults to
         cs.filestate.FileState({filename}).
+      If the decorated function raises OSError with errno == ENOENT,
+      this returns None. Other exceptions are reraised.
   '''
   if attr_name is None:
     attr_name = func.__name__
@@ -318,7 +304,7 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       filename = filename0
       if filename is None:
         filename = getattr(self, filename_attr)
-      return FileState(filename)
+      return FileState(filename, missing_ok=True)
   def wrap0(self, *a, **kw):
     filename = kw.pop('filename', None)
     if filename is None:
@@ -327,15 +313,22 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       else:
         filename = filename0
     kw['filename'] = filename
-    return func(self, *a, **kw)
+    try:
+      return func(self, *a, **kw)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return None
+      raise
   dkw['attr_name'] = attr_name
+  dkw['poll_delay'] = poll_delay
   dkw['sig_func'] = sig_func
   return cached(wrap0, **dkw)
 
-def file_property(func, **kw):
+@decorator
+def file_property(func, **dkw):
   ''' A property whose value reloads if a file changes.
   '''
-  return property(file_based(func, **kw))
+  return property(file_based(func, **dkw))
 
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.
@@ -474,6 +467,83 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
       return getattr(self, attr_value, unset_object)
     return property(getprop)
   return made_files_property
+
+def makelockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' Create a lockfile and return its path.
+      The file can be removed with os.remove.
+      This is the core functionality supporting the lockfile()
+      context manager.
+      `path`: the base associated with the lock file, often the
+              filesystem object whose access is being managed.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
+  '''
+  if poll_interval is None:
+    poll_interval = DEFAULT_POLL_INTERVAL
+  if ext is None:
+    ext = '.lock'
+  if timeout is not None and timeout < 0:
+    raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
+  start = None
+  lockpath = path + ext
+  while True:
+    try:
+      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+    except OSError as e:
+      if e.errno != errno.EEXIST:
+        raise
+      if timeout is not None and timeout <= 0:
+        # immediate failure
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      now = time.time()
+      # post: timeout is None or timeout > 0
+      if start is None:
+        # first try - set up counters
+        start = now
+        complaint_last = start
+        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+      else:
+        if now - complaint_last >= complaint_interval:
+          from cs.logutils import warning
+          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
+                  os.getpid(), now - start, lockpath)
+          complaint_last = now
+          complaint_interval *= 2
+      # post: start is set
+      if timeout is None:
+        sleep_for = poll_interval
+      else:
+        sleep_for = min(poll_interval, start + timeout - now)
+      # test for timeout
+      if sleep_for <= 0:
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      time.sleep(sleep_for)
+      continue
+    else:
+      break
+  os.close(lockfd)
+  return lockpath
+
+@contextmanager
+def lockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' A context manager which takes and holds a lock file.
+      `path`: the base associated with the lock file.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
+  '''
+  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
+  yield lockpath
+  os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
@@ -634,7 +704,61 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class BackedFile(object):
+class ReadMixin(object):
+  ''' Useful read methods to accodmodate modes not necessarily available in a class.
+  '''
+
+  def read_n(self, n):
+    ''' Read `n` bytes of data and return them.
+        Unlike traditional file.read(), RawIOBase.read() may return short
+        data, thus this workalike, which may only return short data if it
+        hits EOF.
+    '''
+    if n < 1:
+      raise ValueError("n two low, expected >=1, got %r" % (n,))
+    data = bytearray(n)
+    nread = self.readinto(data)
+    return memoryview(data)[:nread] if nread != n else data
+
+  def read_natural(self, n, rsize=None):
+    ''' A generator that yields data from the file in its natural blocking if possible.
+        `n`: the maximum number of bytes to read.
+        `rsize`: read size hint if relevant.
+        WARNING: this function may move the current file offset.
+        This function should be overridden by classes with natural
+        direct and efficient data streams. Example override cases
+        include a BackedFile which has natural blocks from the front
+        and back files and a CornuCopyBuffer which has natural
+        blocks from its source iterator.
+    '''
+    return file_data(self, n, rsize=None)
+
+  def read(self, n):
+    ''' Do a single potentially short read.
+    '''
+    for bs in self.file_data(n):
+      return bs
+
+  @locked
+  def readinto(self, barray):
+    ''' Read data into a bytearray.
+        Uses read_natural to obtain data in as efficient a fashion as possible.
+    '''
+    X("readinto(barray=%s:len=%d)", id(barray), len(barray))
+    needed = len(barray)
+    boff = 0
+    for bs in self.read_natural(needed):
+      bs_len = len(bs)
+      X("readinfo: got %d bytes from read_natural(needed=%d)", bs_len, needed)
+      assert bs_len <= needed
+      boff2 = boff + bs_len
+      barray[boff:boff2] = bs
+      boff = boff2
+      needed -= bs_len
+    X("readinto: final boff=%d", boff)
+    return boff
+
+class BackedFile(ReadMixin):
   ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
   '''
 
@@ -648,6 +772,19 @@ class BackedFile(object):
     self.front_file = TemporaryFile(dir=dirpath, buffering=0)
     self.front_range = Range()
     self.read_only = False
+
+  def __len__(self):
+    back_file = self.back_file
+    try:
+      back_len = len(back_file)
+    except TypeError:
+      back_pos = back_file.tell()
+      X("BackedFile.__len__: tell=%d", back_pos)
+      back_len = back_file.seek(0, 2)
+      X("BackedFile.__len__: seek(0,2)=%d", back_len)
+      back_file.seek(back_pos, 0)
+      X("BackedFile.__len__: after seek(%d,0), tell=%d", back_pos, back_file.tell())
+    return max(self.front_range.end, back_len)
 
   @locked
   def switch_back_file(self, new_back_file):
@@ -693,48 +830,56 @@ class BackedFile(object):
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
 
-  def read_n(self, n):
-    ''' Read `n` bytes of data and return them.
-        Unlike file.read(), RawIOBase.read() may return short data,
-        thus this workalike, which may only return short data if
-        it hits EOF.
+  def file_data(self, n, rsize=None):
+    ''' Return "natural" file data.
+        This is used to support readinto efficiently.
     '''
+    X("file_data: n=%d", n)
     if n < 1:
-      raise ValueError("n two low, expected >=1, got %r" % (n,))
-    data = bytearray(n)
-    nread = self.readinto(data)
-    return data[:nread]
-
-  @locked
-  def readinto(self, b):
-    ''' Read data into a bytearray.
-    '''
+      return
     start = self._offset
-    end = start + len(b)
+    end = start + n
     back_file = self.back_file
     front_file = self.front_file
-    boff = 0
-    bspace = len(b)
-    for in_front, span in self.front_range.slices(start, end):
-      offset = span.start
+    X("front_range=%s", self.front_range)
+    SLICES = list(self.front_range.slices(start, end))
+    X("front_range slices=%r", SLICES)
+    for in_front, span in SLICES:
+      X("offset=%d, in_front=%s, span=%s", self._offset, in_front, span)
+      assert span.start == self._offset
+      assert span.end <= end
       size = span.size
-      if size > bspace:
-        size = bspace
-      data = bytearray(size)
-      if in_front:
-        front_file.seek(offset)
-        nread = front_file.readinto(data)
+      src_file = front_file if in_front else back_file
+      X("seek %d", self._offset)
+      src_file.seek(self._offset)
+      try:
+        rn = src_file.read_natural
+      except AttributeError:
+        while size > 0:
+          X("read %d ...", size)
+          bs = src_file.read(size)
+          bs_len = len(bs)
+          assert bs_len <= size
+          if bs:
+            X("bs = %r...", bs[:16])
+            self._offset += bs_len
+            yield bs
+          else:
+            X("EMPTY READ, leave loop")
+            break
+          size -= bs_len
+          X("offset => %d", self._offset)
+          assert self._offset <= end
       else:
-        back_file.seek(offset)
-        nread = back_file.readinto(data)
-      assert nread <= size
-      b[boff:boff+nread] = data[:nread]
-      boff += nread
-      self._offset = offset + nread
-      if nread < size:
-        # short read
+        for bs in rn(size, rsize=rsize):
+          self._offset += bs_len
+          yield bs
+          assert self._offset <= end
+      if self._offset < span.end:
+        # short data, infer EOF, exit loop
         break
-    return boff
+      raise RuntimeError("BANG")
+    X("EXIT file_data")
 
   @locked
   def write(self, b):
@@ -780,7 +925,7 @@ class BackedFile_TestMethods(object):
     bfp.seek(512)
     bfp.write(random_chunk)
     # check that the front file has a single span of the right dimensions
-    ffp = bfp._front_file
+    ffp = bfp.front_file
     fr = bfp.front_range
     self.assertIsNotNone(ffp)
     self.assertIsNotNone(fr)

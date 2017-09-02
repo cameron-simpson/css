@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Tests for cs.socketutils.
-#   - Cameron Simpson <cs@zip.com.au> 01nov2015
+#   - Cameron Simpson <cs@cskk.id.au> 01nov2015
 #
 
 import sys

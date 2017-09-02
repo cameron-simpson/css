@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # "vm all" - shortcut to my mixed inbox.
-#	- Cameron Simpson <cs@zip.com.au> 19jan99
+#	- Cameron Simpson <cs@cskk.id.au> 19jan99
 #
 
 exec vm -T ${1+"$@"} +in

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Compute an MD5 hash of something.
-#	- Cameron Simpson <cs@zip.com.au> 28aug96
+#	- Cameron Simpson <cs@cskk.id.au> 28aug96
 #
 
 use strict qw(vars);

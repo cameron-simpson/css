@@ -2,7 +2,7 @@
 #
 # Generate FVWM input to run up an FVWMButtons module with the
 # commands read from stdin.
-#       - Cameron Simpson <cs@zip.com.au> 07oct2008
+#       - Cameron Simpson <cs@cskk.id.au> 07oct2008
 #
 
 : ${TMPDIR:=/tmp}

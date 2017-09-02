@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Export and import NodeDB data.
-#       - Cameron Simpson <cs@zip.com.au> 07may2011
+#       - Cameron Simpson <cs@cskk.id.au> 07may2011
 #
 
 import os

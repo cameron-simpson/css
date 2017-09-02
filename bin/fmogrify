@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for ImageMagick's mogrify so I can pipe into it.
-#	- Cameron Simpson <cs@zip.com.au> 16oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 16oct2000
 #
 
 TMPDIR=$HOME/tmp

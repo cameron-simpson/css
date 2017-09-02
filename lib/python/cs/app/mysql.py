@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 #
-#       - Cameron Simpson <cs@zip.com.au> 01may2009
+#       - Cameron Simpson <cs@cskk.id.au> 01may2009
 #
 
 from __future__ import print_function

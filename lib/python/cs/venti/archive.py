@@ -15,24 +15,21 @@ from __future__ import print_function
 import os
 import stat
 import sys
-import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile, chain
+from itertools import chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, info, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.seq import last
 from cs.x import X
-from . import totext, fromtext
-from .block import dump_block
 from .blockify import blockify, top_block_for
-from .dir import decode_Dirent_text, Dir, FileDirent, DirFTP
+from .dir import Dir, FileDirent, DirFTP
 from .file import filedata
-from .paths import resolve, path_split, walk
+from .paths import decode_Dirent_text, resolve, path_split, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -51,73 +48,6 @@ def toc_archive(arpath, paths=None, verbose=False, fp=None):
       E = thisD[name]
       print(os.path.join(relpath, name), E.meta)
   return 0
-
-def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None, log=None):
-  ''' Update the archive file `arpath` from `ospath`.
-     `ospath` is taken to match with the top of the archive plus the `arsubpath` if supplied.
-  '''
-  with Pfx("update %r <== %r", arpath, ospath):
-    base = os.path.basename(ospath)
-    # stat early once, fail early if necessary
-    st = os.stat(ospath)
-    if stat.S_ISDIR(st.st_mode):
-      isdir = True
-    elif stat.S_ISREG(st.st_mode):
-      isdir = False
-    else:
-      raise ValueError("unsupported OS file type 0o%o, expected file or directory" % (st.st_mode,))
-
-    # load latest archive root
-    last_entry = last_Dirent(arpath)
-
-    # prep the subpath components
-    if arsubpath is not None:
-      subpaths = path_split(arsubpath)
-    else:
-      subpaths = []
-
-    if last_entry is not None:
-      # attach to entry
-      when, rootE = last_entry
-    elif subpaths:
-      # new archive point: make dir if subpath
-      rootE = Dir('.')
-    elif isdir:
-      # new archive point: make dir if source is dir
-      rootE = Dir(base)
-    else:
-      # new archive point: make file
-      rootE = FileDirent(base)
-
-    # create subdirectories
-    E = rootE
-    while len(subpaths) > 1:
-      name = subpaths.pop(0)
-      subE = E.get(name)
-      if subE is None or not subE.isdir:
-        subE = E.mkdir(name)
-      E = subE
-
-    # create leaf node
-    if subpaths:
-      name, = subpaths
-      subE = E.get(name)
-      if isdir and (subE is None or not subE.isdir):
-        if subE is not None:
-          del E[name]
-        subE = E.mkdir(name)
-      elif not isdir and (subE is None or not subE.isfile):
-        subE = E[name] = FileDirent(name)
-      E = subE
-
-    # update target node
-    if isdir:
-      copy_in_dir(E, ospath, modes, log=log)
-    else:
-      copy_in_file(E, ospath, modes, log=log)
-
-    # save archive state
-    save_Dirent(arpath, rootE)
 
 def save_Dirent(fp, E, when=None):
   ''' Save the supplied Dirent `E` to the file `path` (open file or pathname) with timestamp `when` (default now).
@@ -145,20 +75,20 @@ def read_Dirents(fp):
     yield when, E
 
 def last_Dirent(arpath, missing_ok=False):
-  ''' Return the latest archive entry.
+  ''' Return the latest archive entry as (unixtime, Dirent).
   '''
   try:
     with open(arpath, "r") as arfp:
       try:
         return last(read_Dirents(arfp))
       except IndexError:
+        # no entries
         return None, None
   except OSError as e:
     if e.errno == errno.ENOENT:
       if missing_ok:
         return None, None
     raise
-  raise RuntimeError("NOTREACHED")
 
 def strfor_Dirent(E):
   ''' Exposed function for 
@@ -171,7 +101,7 @@ def write_Dirent(fp, E, when=None):
         isodatetime unixtime totext(dirent) dirent.name
   '''
   encoded = strfor_Dirent(E)
-  write_Dirent_str(fp, when, encoded, E.name)
+  write_Dirent_str(fp, encoded, when, E.name)
   return encoded
 
 def write_Dirent_str(fp, text, when=None, etc=None):

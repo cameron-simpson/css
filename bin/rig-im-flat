@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Update a directory with a flat listing of symlinks to pictures.
-#       - Cameron Simpson <cs@zip.com.au> 24mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 24mar2008
 #
 
 trace=  ##eecho

@@ -4,7 +4,7 @@
 # to the standard output.
 # The patch file contains lines of the form:
 #       keyword value
-# - Cameron Simpson <cs@zip.com.au> 18sep2008
+# - Cameron Simpson <cs@cskk.id.au> 18sep2008
 #
 
 from __future__ import with_statement

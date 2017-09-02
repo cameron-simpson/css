@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Date related functions.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME

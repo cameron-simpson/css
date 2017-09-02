@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for logging.
-#       - Cameron Simpson <cs@zip.com.au> 29aug2009
+#       - Cameron Simpson <cs@cskk.id.au> 29aug2009
 #
 
 from __future__ import with_statement
@@ -26,7 +26,7 @@ from cs.lex import is_dotted_identifier
 from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import Upd
+from cs.upd import upd_for
 from cs.x import X
 
 DISTINFO = {
@@ -49,8 +49,8 @@ DISTINFO = {
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
-DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
-DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 loginfo = O(upd_mode=None)
 logging_level = logging.INFO
@@ -61,7 +61,7 @@ def ifdebug():
   global logging_level
   return logging_level <= logging.DEBUG
 
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None, verbose=None):
   ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
       Sets cs.pfx.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
@@ -76,20 +76,23 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       infer_logging_level().
       If `upd_mode` is None, set it to True if flags contains 'UPD',
       otherwise to False if flags contains 'NOUPD', otherwise set
-      it from main_log.isatty().
+      it to False (was from main_log.isatty()).
       A true value causes the root logger to use cs.upd for logging.
       If `ansi_mode` is None, set it from main_log.isatty().
-      A true value causes the root logger to colour certain logging levels
-      using ANSI terminal sequences (currently only if cs.upd is used).
+        A true value causes the root logger to colour certain logging levels
+        using ANSI terminal sequences (currently only if cs.upd is used).
       If `trace_mode` is None, set it according to the presence of
-      'TRACE' in flags.
-      If trace_mode is true, set the global trace_level to logging_level;
-      otherwise it defaults to logging.DEBUG.
+        'TRACE' in flags. Otherwisef trace_mode is true, set the
+        global trace_level to logging_level; otherwise it defaults
+        to logging.DEBUG.
+      If `verbose` is None, then if stderr is a tty then the log
+        level is INFO otherwise WARNING. Otherwise, if `verbose` is
+        true then the log level is INFO otherwise WARNING.
   '''
   global logging_level, trace_level, D_mode, loginfo
 
   # infer logging modes, these are the initial defaults
-  inferred = infer_logging_level()
+  inferred = infer_logging_level(verbose=verbose)
   if level is None:
     level = inferred.level
   loginfo.level = level
@@ -143,7 +146,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     elif 'NOUPD' in flags:
       upd_mode = False
     else:
-      upd_mode = is_tty
+      ##upd_mode = is_tty
+      upd_mode = False
   loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
@@ -166,11 +170,10 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, None, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, logging_level, ansi_mode=ansi_mode)
     loginfo.upd = main_handler.upd
-    # enable tracing in the thread that called setup_logging
-    Pfx._state.trace = info
   else:
+    loginfo.upd = None
     main_handler = logging.StreamHandler(main_log)
 
   rootLogger = logging.getLogger()
@@ -180,6 +183,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   logging_level = level
   if trace_mode:
+    # enable tracing in the thread that called setup_logging
+    Pfx._state.trace = info
     trace_level = logging_level
 
   if module_names or function_names:
@@ -245,15 +250,13 @@ class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
   '''
 
-  def __init__(self, fmt=None, datefmt=None, cmd=None, context_level=None):
+  def __init__(self, fmt=None, datefmt=None, cmd=None):
     ''' Initialise the PfxFormatter.
         `fmt` and `datefmt` are passed to Formatter.
         If `fmt` is None, DEFAULT_PFX_FORMAT is used.
         If `cmd` is not None, the message is prefixed with the string `cmd`.
-        If `context_level` is None, records with .level < context_level will not have the Pfx state inserted at the front of the message.
     '''
     self.cmd = cmd
-    self.context_level = context_level
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
@@ -265,19 +268,12 @@ class PfxFormatter(Formatter):
     try:
       s = Formatter.format(self, record)
     except TypeError as e:
-      X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
-      X("record=%s", record.__dict__)
-      X("self=%s", self.__dict__)
+      X("cs.logutils: PfxFormatter.format: record=%r, self=%s: %s", record, self, e)
       raise
-    message_parts = []
-    if self.context_level is None or record.level >= self.context_level:
-      message_parts.append(self.formatTime(record))
-      message_parts.append(record.pfx)
-    message_parts.append(s)
-    record.message = ': '.join(message_parts)
-    return record.message
+    record.message = s
+    return s
 
-def infer_logging_level(env_debug=None, environ=None):
+def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
@@ -304,8 +300,13 @@ def infer_logging_level(env_debug=None, environ=None):
       environ = os.environ
     env_debug = os.environ.get('DEBUG', '')
   level = logging.WARNING
-  if sys.stderr.isatty():
+  if verbose is None:
+    if sys.stderr.isatty():
+      level = logging.INFO
+  elif verbose:
     level = logging.INFO
+  else:
+    level = logging.WARNING
   flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
   module_names = []
   function_names = []
@@ -395,32 +396,6 @@ def status(msg, *args, **kwargs):
     msg = '\033]0;' + msg + '\007'
   file.write(msg)
   file.flush()
-
-def nl(msg, *args, **kw):
-  ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-  '''
-  try:
-    fp = kw.pop('file')
-  except KeyError:
-    fp = sys.stdout
-  if kw:
-    raise ValueError("unexpected keyword arguments: %r" % (kw,))
-  msg = str(msg)
-  if args:
-    try:
-      msg = msg % args
-    except TypeError as e:
-      nl("cannot expand msg: TypeError(%s); msg=%r, args=%r", e, msg, args, file=sys.stderr)
-      msg = "%s[%r]" % (msg, args)
-  fp.write(msg)
-  fp.write("\n")
-  try:
-    flush = fp.flush
-  except AttributeError:
-    pass
-  else:
-    flush()
 
 def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None, no_prefix=False):
   ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
@@ -545,10 +520,10 @@ class UpdHandler(StreamHandler):
   ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
   '''
 
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
+  def __init__(self, strm=None, nl_level=None, ansi_mode=None):
     ''' Initialise the UpdHandler.
         `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
+        `nl_level` is the logging level at which conventional line-of-text
         output is written; log messages of a lower level go via the
         update-the-current-line method. Default is logging.WARNING.
         If `ansi_mode` is None, set if from strm.isatty().
@@ -557,26 +532,25 @@ class UpdHandler(StreamHandler):
     '''
     if strm is None:
       strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
+    if nl_level is None:
+      nl_level = logging.WARNING
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.upd = Upd(strm)
-    self.__nlLevel = nlLevel
+    self.upd = upd_for(strm)
+    self.nl_level = nl_level
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
     with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
-        with self.upd._withoutContext():
-          if self.__ansi_mode:
-            if logrec.levelno >= logging.ERROR:
-              logrec.msg = colourise(logrec.msg, 'red')
-            elif logrec.levelno >= logging.WARN:
-              logrec.msg = colourise(logrec.msg, 'yellow')
-          self.upd.without(StreamHandler.emit, self, logrec)
+      if logrec.levelno >= self.nl_level:
+        if self.__ansi_mode:
+          if logrec.levelno >= logging.ERROR:
+            logrec.msg = colourise(logrec.msg, 'red')
+          elif logrec.levelno >= logging.WARN:
+            logrec.msg = colourise(logrec.msg, 'yellow')
+        self.upd.without(StreamHandler.emit, self, logrec)
       else:
         self.upd.out(logrec.getMessage())
 

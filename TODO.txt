@@ -1,3 +1,5 @@
+speed up cs.lex.unctrl using enumerate and join of substrs
+make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
 fvwm: move cs-fvwm-blah python code into cs.app.fvwm
@@ -34,4 +36,96 @@ cs.fileutils:
   tail() with blocking and nonblocking mode; follow mode? emits chunks
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter rendition of .samples
+cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.blockify
+venti:
+  FIXED? BUG: new files forget their correct size on umount
+  blockify
+    sniff files to infer high level syntax
+    parsers:
+      blockify should cope with parsers which exception
+      should blockify dup the source chunks and verify that the
+        chunks from the parser match the chunks from the source?
+      would that imply the parsers need only consume the chunks and
+        emit offsets, and not need to emit chunks?
+        that would avoid needing verification, and possibly avoid
+          some chunk reblocking a parser might do, and also allow
+          us to cope with parsers that exception out
+        * still need to accomodate data generation with offsets, eg big
+          Dirents being emitted with Dirent boundaries
+  control module
+    vtftp to be an API to it
+  BackedFile to set change-on-close flag on write/truncate etc
+  move to SHA-3-256, check hash size etc
+    v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
+      for k in S1: S2.add[S1[k]
+      for E in S1.walk(D):
+        E2 = copy of E using S2
+        flush E2
+      think about ways to work against 2 Stores, current per thread
+        default store doesn't work here; pipe info to another thread?
+  rename cs.venti => cs.vt
+  support ranges on GET requests
+  URIs:
+    x-vt:[//host[:port]]/textblockref-of-Dir/path...
+  vt publish pathname
+    construct and Store Dir:{basename(pathname)=>tree} and recite dirent as x-vt:/textblockref/basename/
+  ftp(Dir)
+    Dir can be the basis for a mount, or from a blockref etc
+    CD path                     Change working path
+    INSPECT name                Report metadata
+    PEER other-store-name
+    GET name [local-fs-name]    Export tree/file
+    PUT local-fs-name [name]    Import tree/file
+    BIND name textdirent        Attach existing tree/file
+    PULL name   # needs peer    Fill in missing Blocks for name from peer
+    PUSH name   # needs peer    Export Blocks for name to peer
+    join/merge live mount points
+    QUIT => sync and recite top Dirref?
+  file
+    start syncing appended data immediately?
+      => better file-close behaviour
+  vtfuse:
+    OSX Finder name of mountpoint
+    umount: drop inode_data if empty (no hard links)?
+            predrop of inodes with < 2 links?
+    open of symlink
+    do not sync unlinked files
+    include/exclude rules, like rsync?
+      * use a context when computing Dir.block etc, thus usable outside vtfuse
+      do not sync (or Store?) excluded items
+      need to promote unbacked files to backed at fs sync time based on name?
+    include/exclude mount options
+      include/exclude general syntax?
+    support multiple mount points?
+      off a single "live" antecedant Dir?
+    control:
+      control channel/cmd line?
+      link pathname to blockspec
+      merge trees
+  Dir:
+    rsync -a: setgid bit not preserved? possibly fuse nosetuid mount setting
+    vtftp command which accesses a Dir
+      hook to vtfuse to run vtftp against live Dir
+  datadir
+    ticker to sync gdbm index? or just on _indexQ empty?
+    report degree of gdbm batching
+    maxsize setting, to be used for caches
+  ProgressStore
+    proxy for a single subStore with various Progress attributes .progress_*
+    convenient status line:
+      {progress_add_bytes|human}:{progress_add_count} {progress_get_bytes|human} {progress_outstanding}
+  S3Store
+    stores Blocks directly as texthashcode.sha1
+  HTTPStore
+    /texthashcode.sha1
+  HTTPDaemon
+    /h/texthashcode.sha1 block (redirect to other http? eg an S3 backed one)
+    /i/texthashcode.sha1 indirect block contents
+    /d/textblockref/... Dir
+      /d/textblockref/path/to/file content (internally retrieves content, presents with Content-Type)
+  CloudFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
+  SyncProcess: context manager object performing some long operation
+    .progress_{total|outstanding|done}
+    SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents
+    SyncDir(Dirent): pull in contents of dir, optionally including file contents
   how is video stored? decoder for common formats

@@ -2,7 +2,7 @@
 #
 # Convenience routines to access MegaRAID adapters via the megacli
 # command line tool.
-#       - Cameron Simpson <cs@zip.com.au> 29jan2013
+#       - Cameron Simpson <cs@cskk.id.au> 29jan2013
 #
 
 DISTINFO = {

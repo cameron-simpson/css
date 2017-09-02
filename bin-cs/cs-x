@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Extract various archive formats.
-#	- Cameron Simpson <cs@zip.com.au> 17dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 17dec2002
 #
 
 : ${TMPDIR:=/tmp}

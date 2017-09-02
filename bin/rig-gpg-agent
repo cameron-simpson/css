@@ -2,7 +2,7 @@
 #
 # Set up a gpg-agent in daemon mode, much like rig-ssh-agent.
 # Emit $GPG_AGENT_INFO to stdout.
-#	- Cameron Simpson <cs@zip.com.au> 30mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 30mar2005
 #
 
 set -ue

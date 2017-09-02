@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # The wiring database.
-#	- Cameron Simpson <cs@zip.com.au> 05jul1998
+#	- Cameron Simpson <cs@cskk.id.au> 05jul1998
 #
 
 use strict qw(vars);

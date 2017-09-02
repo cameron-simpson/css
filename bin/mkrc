@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Regenerate an rc file.
-#	- Cameron Simpson <cs@zip.com.au> 23aug98
+#	- Cameron Simpson <cs@cskk.id.au> 23aug98
 #
 
 cmd=`basename "$0"`

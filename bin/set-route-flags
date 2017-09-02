@@ -1,13 +1,12 @@
 #!/bin/sh
 #
 # Probe "netstat -rn" routes, set flags accordingly.
-#   - Cameron Simpson <cs@zip.com.au> 02feb2015
+#   - Cameron Simpson <cs@cskk.id.au> 02feb2015
 #
 
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
 do_monitor=
 interval=7
 
@@ -19,6 +18,8 @@ badopts=
 if [ $# -gt 0 ]
 then
   case "$1" in
+    -x) trace=set-x
+        ;;
     --monitor)
         shift
         do_monitor=1

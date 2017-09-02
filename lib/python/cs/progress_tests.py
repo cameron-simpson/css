@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.progress.
-#       - Cameron Simpson <cs@zip.com.au> 23dec2015
+#       - Cameron Simpson <cs@cskk.id.au> 23dec2015
 #
 
 from __future__ import absolute_import

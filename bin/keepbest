@@ -2,7 +2,7 @@
 #
 # Keep best instances of lines.
 # Deliberately Python 2.4 compatible because I use this on RedHat RHEL5.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys

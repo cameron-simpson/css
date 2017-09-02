@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions for working with external commands.
-#   - Cameron Simpson <cs@zip.com.au> 03sep2015
+#   - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
 
 from __future__ import print_function, absolute_import

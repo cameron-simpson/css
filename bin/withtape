@@ -2,7 +2,7 @@
 #
 # Load a tape from the specified jukebox slot, run a command, return the tape
 # to its slot.
-#	- Cameron Simpson <cs@zip.com.au> 01aug2005
+#	- Cameron Simpson <cs@cskk.id.au> 01aug2005
 #
 
 : ${TAPE:='/dev/tape'}

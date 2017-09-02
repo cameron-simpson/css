@@ -213,24 +213,24 @@ into which the message should be placed.
 A condition may be preceeded by an exclaimation symbol ('!') to invert its meaning.
 Example:
 
-  !from:cs@zip.com.au
+  !from:cs@cskk.id.au
 
-matches a message not from "cs@zip.com.au".
+matches a message not from "cs@cskk.id.au".
 
 Conditions are tested against specific message headers.
 Unless specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
 Example:
 
-  cs@zip.com.au
+  cs@cskk.id.au
 
-matches a message addressed to "cs@zip.com.au".
+matches a message addressed to "cs@cskk.id.au".
 
 A condition may be preceeded by a comma separated list of headers.
 Example:
 
-  to,from:cs@zip.com.au
+  to,from:cs@cskk.id.au
 
-matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
+matches a message from "cs@cskk.id.au" or addressed to "cs@cskk.id.au" in the 'To:' header.
 
 A header may be matched against any of multiple addresses by grouping the alternatives in brackets, example:
 
@@ -313,5 +313,5 @@ mailfiler(1cs)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 

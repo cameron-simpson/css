@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Pull out a change log from a CVS archive, reformat it nicely.
-#	- Cameron Simpson <cs@zip.com.au> 12apr1997
+#	- Cameron Simpson <cs@cskk.id.au> 12apr1997
 #
 
 sortargs=

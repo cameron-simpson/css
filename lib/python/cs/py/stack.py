@@ -2,7 +2,7 @@
 #
 # I find the supplied python traceback facilities quite awkward.
 # These functions provide convenient facilities.
-#       - Cameron Simpson <cs@zip.com.au> 14apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 14apr2014
 #
 
 DISTINFO = {

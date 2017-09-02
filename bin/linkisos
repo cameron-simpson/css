@@ -2,7 +2,7 @@
 #
 # Locate ISO images in a directory tree and make available
 # for loopback mount in the local tree.
-#	- Cameron Simpson <cs@zip.com.au> 09mar2004
+#	- Cameron Simpson <cs@cskk.id.au> 09mar2004
 #
 
 trace=set-x

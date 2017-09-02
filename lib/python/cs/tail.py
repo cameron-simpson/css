@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Tail text files.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os

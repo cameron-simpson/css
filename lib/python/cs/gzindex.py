@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access a gzipped header index file.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os

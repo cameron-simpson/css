@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions and classes to work with email.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import absolute_import

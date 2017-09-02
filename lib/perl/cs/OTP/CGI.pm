@@ -2,7 +2,7 @@
 #
 # Require an OTP challenge and if successful set up a cookie
 # to be used by the calling CGI.
-#	- Cameron Simpson <cs@zip.com.au> 17dec96
+#	- Cameron Simpson <cs@cskk.id.au> 17dec96
 #
 
 use strict qw(vars);

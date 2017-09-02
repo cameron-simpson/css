@@ -2,7 +2,7 @@
 #
 # Generate current BOM rainfall KML.
 # All radars from http://mirror.bom.gov.au/weather/radar/
-#       - Cameron Simpson <cs@zip.com.au> 16jan2007
+#       - Cameron Simpson <cs@cskk.id.au> 16jan2007
 #
 
 if [ "x$SYSTEMID" = xhome ]

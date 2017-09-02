@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Read stdin and report IP addresses with names from /etc/hosts.
-#   - Cameron Simpson <cs@zip.com.au> 05apr2017
+#   - Cameron Simpson <cs@cskk.id.au> 05apr2017
 #
 
 sedf=$(

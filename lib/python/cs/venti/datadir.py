@@ -1,9 +1,10 @@
 #!/usr/bin/python -tt
 #
 # The sharable directory storing DataFiles used by DataDirStores.
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
+from binascii import hexlify
 from collections.abc import Mapping
 import csv
 import errno
@@ -11,23 +12,23 @@ import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
 from threading import Lock, RLock, Thread
-from time import sleep
+import time
 from types import SimpleNamespace
 from uuid import uuid4
 from cs.cache import LRU_Cache
-from cs.csvutils import csv_reader, csv_writerow
+from cs.csvutils import csv_reader
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import D, debug, warning, error, exception
+from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
-from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
-from cs.threads import locked, locked_property
+from cs.serialise import get_bs, put_bs
+from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -48,12 +49,15 @@ def encode_index_entry(n, offset):
 
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
+      Attributes:
+      F = _DataDirFile(datadir=self, filenum=filenum, filename=filename,
+                       size=size, scanned_to=size)
+      `datadir`: the DataDir tracking this state
+      `filenum`: our file number in that DataDir
+      `filename`: out path relative to the DataDir's data directory
+      `size`: the maximum amount of data indexed
+      `scanned_to`: the maximum amount of data scanned so far
   '''
-
-  def __init__(self, **kw):
-    self._last_scan_offset = 0
-    self._last_stat_size = 0
-    SimpleNamespace.__init__(self, **kw)
 
   @property
   def pathname(self):
@@ -67,26 +71,7 @@ class _DataDirFile(SimpleNamespace):
   def scan(self, offset=0, do_decompress=False):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (data, offset, post_offset).
     '''
-    X("_DataDirFile.scan(%r, offset=%d)...", self.pathname, offset)
-    return scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
-
-  def scan_new(self, do_decompress=False):
-    ''' Scan this datafile for new data.
-        This is used by the monitor thread to add new third party data to the index.
-    '''
-    try:
-      size = self.stat_size()
-    except OSError as e:
-      warning("%s: stat: %s", self.pathname, e)
-    else:
-      osize = self._last_stat_size
-      if osize is None or size > osize:
-        offset2 = self._last_scan_offset
-        for offset, flags, data, offset2 \
-            in self.scan(offset=self._last_scan_offset, do_decompress=do_decompress):
-          yield offset, flags, data, offset2
-        self._last_scan_offset = offset2
-        self._last_stat_size = size
+    yield from scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
@@ -224,7 +209,10 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     del self._filemap
     self.index.close()
     # release lockfile
-    os.remove(self.lockpath)
+    try:
+      os.remove(self.lockpath)
+    except OSError as e:
+      error("cannot remove lock file: %s", e)
     del self.lockpath
 
   def _monitor_datafiles(self):
@@ -237,17 +225,18 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       added = False
       with Pfx("listdir(%r)", self.datadirpath):
         try:
-          listing = os.listdir(self.datadirpath)
+          listing = list(os.listdir(self.datadirpath))
         except OSError as e:
           if e.errno == errno.ENOENT:
             error("listing failed: %s", e)
-            sleep(2)
+            time.sleep(2)
             continue
           raise
-        for filename in os.listdir(self.datadirpath):
+        for filename in listing:
           if ( not filename.startswith('.')
            and filename.endswith(DATAFILE_DOT_EXT)
            and filename not in filemap):
+            info("MONITOR: add new filename %r", filename)
             self._add_datafile(filename, no_save=True)
             added = True
       if added:
@@ -267,17 +256,20 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         except KeyError:
           warning("missing entry %d in filemap", filenum)
           continue
-        advanced = False
-        for offset, flags, data, offset2 in F.scan_new():
-          hashcode = self.hashclass.from_data(data)
-          indexQ.put( (hashcode, filenum, offset) )
-          advanced = True
-          if self._monitor_halt:
-            break
-        # update state after completion of a scan
-        if advanced:
-          self._save_state()
-      sleep(1)
+        new_size = F.stat_size()
+        if new_size > F.scanned_to:
+          advanced = False
+          for offset, flags, data, offset2 in F.scan(offset=F.scanned_to):
+            hashcode = self.hashclass.from_chunk(data)
+            indexQ.put( (hashcode, filenum, offset, offset2) )
+            F.scanned_to = offset2
+            advanced = True
+            if self._monitor_halt:
+              break
+          # update state after completion of a scan
+          if advanced:
+            self._save_state()
+      time.sleep(1)
 
   def localpathto(self, rpath):
     return joinpath(self.statedirpath, rpath)
@@ -296,10 +288,10 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                             % (self.hashclass.HASHNAME,
                                self.indexclass.SUFFIX))
 
-  def _queue_index(self, hashcode, n, offset):
+  def _queue_index(self, hashcode, n, offset, offset2):
     with self._lock:
       self._unindexed[hashcode] = n, offset
-    self._indexQ.put( (hashcode, n, offset) )
+    self._indexQ.put( (hashcode, n, offset, offset2) )
 
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from .indexQ and store it.
@@ -307,7 +299,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     with Pfx("_index_updater"):
       index = self.index
       unindexed = self._unindexed
-      for hashcode, n, offset in self._indexQ:
+      filemap = self._filemap
+      for hashcode, n, offset, offset2 in self._indexQ:
         with self._lock:
           index[hashcode] = n, offset
           try:
@@ -316,6 +309,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             # this can happens when the same key is indexed twice
             # entirely plausible if a new datafile is added to the datadir
             pass
+          F = filemap[n]
+          F.size = max(F.size, offset2)
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
@@ -323,8 +318,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     statefilepath = self.statefilepath
     ##if existspath(statefilepath):
     ##  os.system('sed "s/^/IN  /" %r' % (statefilepath,))
-    filemap = self._filemap
-    with Pfx('_load_state(%r)', statefilepath):
+    with Pfx('_load_state(%r)', shortpath(statefilepath)):
       if existspath(statefilepath):
         with open(statefilepath, 'r') as fp:
           extras = self._extra_state
@@ -362,6 +356,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Rewrite STATE_FILENAME.
     '''
     statefilepath = self.statefilepath
+    X("SAVE STATE ==> %r", statefilepath)
     with Pfx("_save_state(%r)", statefilepath):
       with open(statefilepath, 'w') as fp:
         csvw = csv.writer(fp)
@@ -389,8 +384,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       if filenum is None:
         filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
       elif filenum in filemap:
-        raise KeyError('already in filemap: %r' % (filennum,))
-      F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
+        raise KeyError('already in filemap: %r' % (filenum,))
+      F = _DataDirFile(datadir=self, filenum=filenum, filename=filename,
+                       size=size, scanned_to=size)
       filemap[filenum] = F
       filemap[filename] = F
     if not no_save:
@@ -456,14 +452,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       with D:
         offset, offset2 = D.add(data)
         ##X("DataDir.add: added data: %d bytes => %d consumed", len(data), offset2-offset)
-      F = self._filemap[n]
-      if offset2 <= F.size:
-        raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
-                           % (F.filename, offset2, F.size))
-      F.size = offset2
-    hashcode = self.hashclass.from_data(data)
+    hashcode = self.hashclass.from_chunk(data)
     ##X("DataDir.add: hashcode=%s", hashcode)
-    self._queue_index(hashcode, n, offset)
+    self._queue_index(hashcode, n, offset, offset2)
     rollover = self.rollover
     with self._lock:
       if rollover is not None and offset2 >= rollover:

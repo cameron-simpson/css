@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # MetaProxy: content rewriting aggressive cache web proxy toolkit.
-#   - Cameron Simpson <cs@zip.com.au> 26dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 26dec2014
 #
 # Design:
 #  local squid:

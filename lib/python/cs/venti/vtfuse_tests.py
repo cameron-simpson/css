@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.venti.vtfuse.
-#       - Cameron Simpson <cs@zip.com.au> 10jul2014
+#       - Cameron Simpson <cs@cskk.id.au> 10jul2014
 #
 
 import os

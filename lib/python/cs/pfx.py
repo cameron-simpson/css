@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Pfx: a framework for easy to use dynamic message prefixes.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function
@@ -68,7 +68,12 @@ class _PfxThreadState(threading.local):
     global cmd
     stack = self.stack
     if not stack:
-      return Pfx(cmd if cmd else sys.argv.get(0, "CMD"))
+      if not cmd:
+        try:
+          cmd = sys.argv[0]
+        except IndexError:
+          cmd = "NO_SYS_ARGV_0"
+      return Pfx(cmd)
     return stack[-1]
 
   @property
@@ -138,7 +143,6 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            # DP
             X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
               prefix, text.__class__, text, sys.exc_info())
             return text
@@ -146,7 +150,6 @@ class Pfx(object):
                  + ': ' \
                  + ustr(text, errors='replace').replace('\n', '\n' + prefix)
         for attr in 'args', 'message', 'msg', 'reason':
-          X("probe %s.%s ...", exc_value, attr)
           try:
             value = getattr(exc_value, attr)
           except AttributeError:
@@ -158,7 +161,7 @@ class Pfx(object):
               try:
                 vlen = len(value)
               except TypeError:
-                print("warning: %s.%s: " % (exc_value, attr),
+                print("warning: %s: %s.%s: " % (prefix, exc_value, attr),
                       prefixify("do not know how to prefixify: %r" % (value,)),
                       file=sys.stderr)
                 continue

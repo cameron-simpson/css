@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Miscellaneous routines.
-#	- Cameron Simpson <cs@zip.com.au> 31jul1996
+#	- Cameron Simpson <cs@cskk.id.au> 31jul1996
 #
 
 use strict qw(vars);

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Access a webster server. - Cameron Simpson, cs@zip.com.au
+# Access a webster server. - Cameron Simpson <cs@cskk.id.au>
 #
 
 ($cmd=$0) =~ s:.*/::;

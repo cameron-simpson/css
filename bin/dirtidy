@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Tidy up directories.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 usage="Usage: $0 [-r] [-x] [dirs]
