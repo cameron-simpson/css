@@ -14,7 +14,6 @@
 from __future__ import print_function
 import os
 import stat
-import sys
 import time
 from datetime import datetime
 import errno
@@ -22,100 +21,124 @@ from itertools import chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import warning, error
+from cs.logutils import info, warning, error
 from cs.pfx import Pfx
-from cs.seq import last
+from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
-from .dir import Dir, FileDirent, DirFTP
+from .dir import FileDirent, DirFTP
 from .file import filedata
-from .paths import decode_Dirent_text, resolve, path_split, walk
+from .paths import decode_Dirent_text, resolve, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
-def toc_archive(arpath, paths=None, verbose=False, fp=None):
-  if fp is None:
-    fp = sys.stdout
-  with Pfx(arpath):
-    last_entry = last_Dirent(arpath)
-    if last_entry is None:
-      error("no entries in archive")
-      return 1
-  when, rootD = last_entry
-  for thisD, relpath, dirs, files in walk(rootD, topdown=True):
-    print((relpath if len(relpath) else '.'), thisD.meta)
-    for name in files:
-      E = thisD[name]
-      print(os.path.join(relpath, name), E.meta)
-  return 0
-
-def save_Dirent(fp, E, when=None):
-  ''' Save the supplied Dirent `E` to the file `path` (open file or pathname) with timestamp `when` (default now).
+class Archive(object):
+  ''' Manager for an archive.vt file.
   '''
-  if isinstance(fp, str):
-    path = fp
+
+  def __init__(self, arpath):
+    self.path = arpath
+    self._entries__filename = arpath
+
+  @prop
+  def last(self):
+    ''' Return the last (unixtime, Dirent) from the file, or (None, None).
+    '''
+    entry = None, None
+    for entry in self:
+      pass
+    return entry
+
+  def __iter__(self):
+    ''' Generator yielding (unixtime, Dirent) from the archive file.
+    '''
+    path = self.path
+    # The funny control structure is because we're using Pfx in a generator.
+    # It needs to be set up and torn down between yields.
+    with Pfx(path):
+      try:
+        fp = open(path)
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
+    entries = self.parse(fp)
+    while True:
+      with Pfx(path):
+        when, E = next(entries)
+        if when is None and E is None:
+          break
+      # note: yield _outside_ Pfx
+      yield when, E
+
+  def save(self, E, when=None):
+    ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
+    '''
+    path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        return save_Dirent(fp, E, when=when)
-  return write_Dirent(fp, E, when=when)
+        return self.write(fp, E, when=when, etc=E.name)
 
-def read_Dirents(fp):
-  ''' Generator to yield (unixtime, Dirent) from an open archive file.
-  '''
-  for lineno, line in enumerate(fp, 1):
-    with Pfx("%s:%d", fp, lineno):
-      if not line.endswith('\n'):
-        raise ValueError("incomplete? no trailing newline")
-      line = line.rstrip()
-      # allow optional trailing text, which will be the E.name part normally
-      isodate, unixtime, dent = line.split(None, 3)[:3]
-      when = float(unixtime)
-      E = decode_Dirent_text(dent)
-    # note: yield _outside_ Pfx
-    yield when, E
-
-def last_Dirent(arpath, missing_ok=False):
-  ''' Return the latest archive entry as (unixtime, Dirent).
-  '''
-  try:
-    with open(arpath, "r") as arfp:
-      try:
-        return last(read_Dirents(arfp))
-      except IndexError:
-        # no entries
-        return None, None
-  except OSError as e:
-    if e.errno == errno.ENOENT:
-      if missing_ok:
-        return None, None
-    raise
-
-def strfor_Dirent(E):
-  ''' Exposed function for 
-  '''
-  return E.textencode()
-
-def write_Dirent(fp, E, when=None):
-  ''' Write a Dirent to an open archive file; return the E.textencode() value used.
-      Archive lines have the form:
-        isodatetime unixtime totext(dirent) dirent.name
-  '''
-  encoded = strfor_Dirent(E)
-  write_Dirent_str(fp, encoded, when, E.name)
-  return encoded
-
-def write_Dirent_str(fp, text, when=None, etc=None):
-  if when is None:
-    when = time.time()
-  fp.write(datetime.fromtimestamp(when).isoformat())
-  fp.write(' ')
-  fp.write(str(when))
-  fp.write(' ')
-  fp.write(text)
-  if etc is not None:
+  @staticmethod
+  def write(fp, E, when=None, etc=None):
+    ''' Write a Dirent to an open archive file; return the textual form of `E` used.
+        Archive lines have the form:
+          isodatetime unixtime totext(dirent) dirent.name
+       Note: does not flush the file.
+    '''
+    encoded = Archive.strfor_Dirent(E)
+    if when is None:
+      when = time.time()
+    # produce a local time with knowledge of its timezone offset
+    dt = datetime.fromtimestamp(when).astimezone()
+    assert dt.tzinfo is not None
+    fp.write(dt.isoformat())
     fp.write(' ')
-    fp.write(unctrl(etc))
-  fp.write('\n')
+    fp.write(str(when))
+    fp.write(' ')
+    fp.write(encoded)
+    if etc is not None:
+      fp.write(' ')
+      fp.write(unctrl(etc))
+    fp.write('\n')
+    return encoded
+
+  @staticmethod
+  def parse(fp, first_lineno=1):
+    ''' Parse lines from an open archive file, yield (when, E).
+    '''
+    for lineno, line in enumerate(fp, first_lineno):
+      with Pfx(str(lineno)):
+        if not line.endswith('\n'):
+          raise ValueError("incomplete? no trailing newline")
+        line = line.strip()
+        if not line or line.startswith('#'):
+          continue
+        # allow optional trailing text, which will be the E.name part normally
+        fields = line.split(None, 3)
+        isodate, unixtime, dent = fields[:3]
+        when = float(unixtime)
+        E = decode_Dirent_text(dent)
+        info("when=%s, E=%s", when, E)
+      # note: yield _outside_ Pfx
+      yield when, E
+
+  @staticmethod
+  def read(fp, first_lineno=1):
+    ''' Read the next entry from an open archive file, return (when, E).
+        Return (None, None) at EOF.
+    '''
+    for when, E in Archive._parselines(fp, first_lineno=first_lineno):
+      return when, E
+    return None, None
+
+  @staticmethod
+  def strfor_Dirent(E):
+    ''' Exposed function for obtaining the text form of a Dirent.
+        This is to support callers optimising away calls to .save
+        if they know the previous save state, obtainable from this
+        function.
+    '''
+    return E.textencode()
 
 def copy_in_dir(rootD, rootpath, modes, log=None):
   ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
@@ -148,7 +171,7 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
               warning("surprise: resolve stopped at a subdir! subpaths=%r", subpaths)
               dirD = E
             else:
-              del D[name]
+              del dirD[name]
               dirD = dirD.chdir1(name)
         else:
           warning("unexpected ospath, SKIPPED")
@@ -203,7 +226,7 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
                   continue
                 else:
                   error("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
-                    B.span, M.mtime, fst.st_size, fst.st_mtime)
+                        B.span, M.mtime, fst.st_size, fst.st_mtime)
             log("file     %s", relfilename)
             try:
               copy_in_file(fileE, filepath, modes)
@@ -344,15 +367,15 @@ def copy_out_file(E, ospath, modes=None, log=None):
 
 class ArchiveFTP(DirFTP):
 
-  def __init__(self, archivepath, prompt=None):
+  def __init__(self, arpath, prompt=None):
+    self.path = arpath
+    self.archive = Archive(arpath)
     if prompt is None:
-      prompt = shortpath(archivepath)
-    when, root = last_Dirent(archivepath, missing_ok=True)
-    self._archivepath = archivepath
-    super().__init__(root, prompt=prompt)
+      prompt = shortpath(arpath)
+    when, rootD = self.archive.last
+    self.rootD = rootD
+    super().__init__(rootD, prompt=prompt)
 
   def postloop(self):
     super().postloop()
-    text = strfor_Dirent(self.root)
-    with open(self._archivepath, "a") as afp:
-      write_Dirent_str(afp, text, etc=self.root.name)
+    self.archive.save(self.rootD)
