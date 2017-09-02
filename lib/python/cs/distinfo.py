@@ -534,8 +534,6 @@ class PyPI_PackageCheckout(O):
         joinpath('dist', basename(distpath))
         for distpath in glob(joinpath(self.pkg_dir, 'dist/*'))
     ]
-    for upload_file in upload_files:
-      self.inpkg_argv(['twine', 'register', upload_file])
     return self.inpkg_argv(['twine', 'upload'] + upload_files)
 
 if __name__ == '__main__':
