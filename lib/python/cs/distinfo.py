@@ -198,7 +198,7 @@ class Package(O):
 
   @property
   def hg_tag(self):
-    return self.package.name + '-' + self.package.version
+    return self.name + '-' + self.version
 
 class PyPI_Package(O):
   ''' Operations for a package at PyPI.
