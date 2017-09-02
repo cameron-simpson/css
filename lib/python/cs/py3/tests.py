@@ -6,8 +6,7 @@
 
 import sys
 import unittest
-from cs.py3 import bytes
-from cs.logutils import X
+from . import bytes
 
 class TestBytes(unittest.TestCase):
 
