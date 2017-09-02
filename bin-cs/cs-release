@@ -648,13 +648,6 @@ class ReleaseName(object):
       with Pfx("%r->%r", last_pypi_release, last_suffix):
         defaults = dict(DISTINFO_DEFAULTS)
         PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
-        if not PKG.check():
-          warning("package check fails")
-          if force:
-            warning("submitting anyway")
-          else:
-            return
-        PKG.register()
         PKG.upload()
         self.lv[lastvalue_key] = last_suffix
 
