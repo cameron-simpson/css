@@ -12,7 +12,7 @@ from os.path import basename, splitext, \
     isabs as isabspath, isdir as isdirpath, isfile as isfilepath
 import errno
 from getopt import getopt, GetoptError
-import datetime
+from datetime import datetime
 import logging
 import shutil
 from signal import signal, SIGINT, SIGHUP
@@ -23,7 +23,7 @@ from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, logTo
+                        setup_logging, loginfo, logTo
 from cs.pfx import Pfx
 from cs.tty import statusline
 import cs.x
@@ -70,7 +70,13 @@ def main(argv):
       import [-oW] path {-|archive.vt}
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount [-r] [-o {append_only,readonly}] archive.vt [mountpoint [subpath]]
+      mount [-a] [-o {append_only,readonly}] [-r] archive.vt [mountpoint [subpath]]
+        -a  All dates. Implies readonly.
+        -o options
+            Mount options:
+              append_only Files may not be truncated or overwritten.
+              readonly    Read only; data may not be modified.
+        -r  Readonly, the same as "-o readonly".
       pack paths...
       scan datafile
       pull other-store objects...
@@ -506,12 +512,15 @@ def cmd_mount(args, verbose=None):
       Requires FUSE support.
   '''
   badopts = False
-  readonly = False
+  all_dates = False
   append_only = False
-  opts, args = getopt(args, 'o:r')
+  readonly = False
+  opts, args = getopt(args, 'ao:r')
   for opt, val in opts:
     with Pfx(opt):
-      if opt == '-o':
+      if opt == '-a':
+        all_dates = True
+      elif opt == '-o':
         for option in val.split(','):
           with Pfx(option):
             if option == '':
@@ -554,29 +563,15 @@ def cmd_mount(args, verbose=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
-  # import vtfuse before doing anything with side effects
-  from .vtfuse import mount, umount
-  with Pfx(mountpoint):
-    need_rmdir = False
-    if not isdirpath(mountpoint):
-      # autocreate mountpoint
-      info('mkdir %r ...', mountpoint)
-      try:
-        os.mkdir(mountpoint)
-        need_rmdir = True
-      except OSError as e:
-        if e.errno == errno.EEXIST:
-          error("mountpoint is not a directory", mountpoint)
-          return 1
-        else:
-          raise
+  if all_dates:
+    readonly = True
   xit = 0
   with Pfx(special):
     A = Archive(special)
     if all_dates:
       E = Dir(basename(mountpoint))
-      for when, E in A:
-        iso = isodate
+      for when, subD in A:
+        E[datetime.fromtimestamp(when).isoformat()] = subD
     else:
       try:
         when, E = A.last
@@ -725,7 +720,7 @@ def lsDirent(fp, E, name):
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
-  t = datetime.datetime.fromtimestamp(int(st_mtime))
+  t = datetime.fromtimestamp(int(st_mtime))
   try:
     h = B.hashcode
   except AttributeError:
