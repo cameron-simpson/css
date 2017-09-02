@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@cskk.id.au> 28jun2012
 #
 
+import sys
+
 DISTINFO = {
     'description': "Aids for code sharing between python2 and python3.",
     'keywords': ["python2", "python3"],
@@ -14,8 +16,6 @@ DISTINFO = {
         ],
     'install_requires': ['cs.py3_for2', 'cs.py3_for3'],
 }
-
-import sys
 
 if sys.hexversion >= 0x03000000:
 
@@ -36,7 +36,7 @@ if sys.hexversion >= 0x03000000:
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
   from struct import pack, unpack
-  from ._for3 import raise3, exec_code, bytes, BytesFile, joinbytes
+  from ._for3 import raise3, exec_code, BytesFile, joinbytes
 
 else:
 
