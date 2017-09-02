@@ -208,6 +208,8 @@ class Package(O):
     return self.package.name + '-' + self.package.version
 
 class PyPI_Package(O):
+  ''' Operations for a package at PyPI.
+  '''
 
   def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_package_version=None):
     ''' Initialise: save package_name and its name in PyPI.
