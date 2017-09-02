@@ -26,6 +26,11 @@ from cs.py.modules import module_files
 
 PYLIBTOP = 'lib/python'
 
+# defaults for packages without their own specifics
+DISTINFO_DEFAULTS = {
+    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
+}
+
 USAGE = '''Usage: %s [-f] [op [names...]]
   -f  Force. Sanity checks that would stop some actions will not prevent them.
   With no op, report all pypi and testpypi lastvalues.
@@ -52,127 +57,128 @@ def main(argv):
 
   xit = 0
   badopts = False
-  try:
-    if argv and argv[0] == '-f':
-      argv.pop(0)
-      force = True
 
-    Ms = Modules()
-    LV = LastValues()
-    VCS = VCS_Hg()
+  if argv and argv[0] == '-f':
+    argv.pop(0)
+    force = True
+  modules = Modules()
+  LV = LastValues()
+  VCS = VCS_Hg()
 
-    if not argv:
-      for k in sorted(LV.keys()):
-        if k.startswith("pypi-css-cs."):
-          print(k[9:], LV[k])
+  if not argv:
+    for k in sorted(LV.keys()):
+      if k.startswith("pypi-css-cs."):
+        print(k[9:], LV[k])
+    return 0
+
+  op = argv.pop(0)
+  with Pfx(op):
+    if argv:
+      names = argv
     else:
-      op = argv.pop(0)
-      if argv:
-        names = argv
-      else:
-        names = sorted(VCS.release_prefixes())
-      ok = True
-      for name in names:
-        if not ok:
-          break
-        with Pfx(op):
-          with Pfx(name):
-            N = ReleaseName(name, Ms, VCS, LV)
-            if op == 'check':
-              if name.startswith('cs.'):
-                if N.check():
-                  print(name, 'OK')
-                else:
-                  print(name, 'NOT OK')
-                  xit = 1
-              else:
-                warning('not a "cs." module name')
-                xit = 1
-            elif op == 'last':
-              print(name, N.last_suffix())
-            elif op == 'log':
-              first = True
-              for files, firstline in N.log_since():
-                if first:
-                  print(name)
-                  first = False
-                files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
-                print(' ', ' '.join(files)+':', firstline)
-            elif op == 'ls':
-              for suffix in sorted(N.release_suffixes()):
-                print(name, suffix)
-            elif op == 'next':
-              print(name, N.next_suffix())
-            elif op == 'pypi':
-              # upload latest release to pypi
-              N.submit_pypi(force=force)
-            elif op == 'release':
-              # issue new release tag
-              print("new release for %s ..." % (name,))
-              outstanding = N.uncommitted()
-              if outstanding:
-                print("Uncommited changes exist for these files:")
-                for path in sorted(outstanding):
-                  print(' ', path)
-                print("These changes will not be included in the release.")
-                if not ask("Proceed with release anyway"):
-                  error("aborting release at user request")
-                  return 1
-              changes = list(N.log_since())
-              if not changes:
-                error("no changes since last release, not making new release")
-                xit = 1
-              else:
-                print("Changes since the last release:")
-                for files, firstline in changes:
-                  print(" ", ' '.join(files) + ': ' + firstline)
-                print()
-                with pipefrom('readdottext', keep_stdin=True) as dotfp:
-                  release_message = dotfp.read().rstrip()
-                if not release_message:
-                  error("empty release message, not making new release")
-                  xit = 1
-                else:
-                  next_tag = N.next_release_tag()
-                  if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-                    error("aborting release at user request")
-                    xit = 1
-                  else:
-                    rel_dir = os.path.join('release', next_tag)
-                    with Pfx("mkdir(%s)", rel_dir):
-                      os.mkdir(rel_dir)
-                    summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-                    with Pfx(summary_filename):
-                      with open(summary_filename, 'w') as sfp:
-                        print(release_message, file=sfp)
-                    changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-                    with Pfx(changes_filename):
-                      with open(changes_filename, 'w') as cfp:
-                        for files, firstline in changes:
-                          print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-                    VCS = N.vcs
-                    VCS.add_files(summary_filename, changes_filename)
-                    VCS.commit('Release information for %s.\nSummary:\n%s'
-                               % (next_tag, release_message),
-                               summary_filename, changes_filename)
-                    VCS.tag(next_tag)
-            elif op == 'status':
-              tagged = N.last_suffix()
-              result = [name, tagged]
-              for pypi_flavour in 'testpypi', 'pypi':
-                lvkey, last_upload = N.last_upload(pypi_flavour)
-                if last_upload != tagged:
-                  result.append("%s:%s" % (pypi_flavour, last_upload))
-              print(*result)
-            elif op == 'testpypi':
-              N.submit_testpypi(force=force)
+      # all the release tags starting with "cs."
+      names = [
+          name
+          for name in sorted(VCS.release_prefixes())
+          if name.startswith('cs.')
+      ]
+    for name in names:
+      if xit != 0:
+        break
+      with Pfx(name):
+        N = ReleaseName(name, modules, VCS, LV)
+        if op == 'check':
+          if name.startswith('cs.'):
+            if N.check():
+              print(name, 'OK')
             else:
-              warning("unrecognised op")
-              badopts = True
-  except GetoptError as e:
-    warning("invocation error: %s", e)
-    badopts = True
-
+              print(name, 'NOT OK')
+              xit = 1
+          else:
+            warning('not a "cs." module name')
+            xit = 1
+        elif op == 'last':
+          print(name, N.last_suffix())
+        elif op == 'log':
+          first = True
+          for files, firstline in N.log_since():
+            if first:
+              print(name)
+              first = False
+            files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
+            print(' ', ' '.join(files)+':', firstline)
+        elif op == 'ls':
+          for suffix in sorted(N.release_suffixes()):
+            print(name, suffix)
+        elif op == 'next':
+          print(name, N.next_suffix())
+        elif op == 'pypi':
+          # upload latest release to pypi
+          N.submit_pypi(force=force)
+        elif op == 'release':
+          # issue new release tag
+          print("new release for %s ..." % (name,))
+          outstanding = N.uncommitted()
+          if outstanding:
+            print("Uncommited changes exist for these files:")
+            for path in sorted(outstanding):
+              print(' ', path)
+            print("These changes will not be included in the release.")
+            if not ask("Proceed with release anyway"):
+              error("aborting release at user request")
+              return 1
+          changes = list(N.log_since())
+          if not changes:
+            error("no changes since last release, not making new release")
+            xit = 1
+          else:
+            print("Changes since the last release:")
+            for files, firstline in changes:
+              print(" ", ' '.join(files) + ': ' + firstline)
+            print()
+            with pipefrom('readdottext', keep_stdin=True) as dotfp:
+              release_message = dotfp.read().rstrip()
+            if not release_message:
+              error("empty release message, not making new release")
+              xit = 1
+            else:
+              next_tag = N.next_release_tag()
+              if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+                error("aborting release at user request")
+                xit = 1
+              else:
+                rel_dir = os.path.join('release', next_tag)
+                with Pfx("mkdir(%s)", rel_dir):
+                  os.mkdir(rel_dir)
+                summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+                with Pfx(summary_filename):
+                  with open(summary_filename, 'w') as sfp:
+                    print(release_message, file=sfp)
+                changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+                with Pfx(changes_filename):
+                  with open(changes_filename, 'w') as cfp:
+                    for files, firstline in changes:
+                      print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+                VCS = N.vcs
+                VCS.add_files(summary_filename, changes_filename)
+                VCS.commit('Release information for %s.\nSummary:\n%s'
+                           % (next_tag, release_message),
+                           summary_filename, changes_filename)
+                VCS.tag(next_tag)
+        elif op == 'status':
+          tagged = N.last_suffix()
+          result = [name, tagged]
+          for pypi_flavour in 'testpypi', 'pypi':
+            lvkey, last_upload = N.last_upload(pypi_flavour)
+            if last_upload != tagged:
+              result.append("%s:%s" % (pypi_flavour, last_upload))
+          print(*result)
+        elif op == 'testpypi':
+          N.submit_testpypi(force=force)
+        else:
+          warning("unrecognised op %r", op)
+          badopts = True
+          break
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
@@ -360,7 +366,7 @@ class Module(object):
         silent or warning("not imported")
     return ok
 
-  def _check_imports(self, module_name, filename, install_requires, silent, Ms):
+  def _check_imports(self, module_name, filename, install_requires, silent, modules):
     ''' Scan the supplied filename for imports, check against `install_requires`.
         Returns (ok, subimports).
     '''
@@ -395,7 +401,7 @@ class Module(object):
                     continue
                   subimports.add(subimport)
                   if subimport.startswith('cs.'):
-                    subM = Ms[subimport]
+                    subM = modules[subimport]
                     if subM is None:
                       warning("NO IMPORT FOR %r", subimport)
                     if subimport not in install_requires:
@@ -498,9 +504,9 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, Ms, VCS, LV):
+  def __init__(self, prefix, modules, VCS, LV):
     self.prefix = prefix
-    self.modules = Ms
+    self.modules = modules
     self.vcs = VCS
     self.lv = LV
 
@@ -521,6 +527,8 @@ class ReleaseName(object):
     return ok
 
   def tagname(self, suffix):
+    ''' Compute a tag name for this release with the supplied `suffix`.
+    '''
     tag = self.prefix + '-' + suffix
     m = re_RELEASE_TAG.match(tag)
     if not m:
@@ -572,6 +580,8 @@ class ReleaseName(object):
     return next_suffix
 
   def next_release_tag(self):
+    ''' Compute the next release tag.
+    '''
     return self.prefix + '-' + self.next_suffix()
 
   def paths(self):
@@ -597,6 +607,8 @@ class ReleaseName(object):
       yield files, firstline
 
   def uncommitted(self):
+    ''' List of paths relevant to this release with uncommited changes.
+    '''
     pathset = set(self.paths())
     changed = []
     for path in self.vcs.uncommitted():
@@ -616,6 +628,8 @@ class ReleaseName(object):
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+    ''' Submit the latest release of this package to PyPI.
+    '''
     if not self.check():
       warning("check fails")
       if force:
@@ -632,14 +646,8 @@ class ReleaseName(object):
         else:
           return
       with Pfx("%r->%r", last_pypi_release, last_suffix):
-        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix)
-        if not PKG.check():
-          warning("package check fails")
-          if force:
-            warning("submitting anyway")
-          else:
-            return
-        PKG.register()
+        defaults = dict(DISTINFO_DEFAULTS)
+        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         PKG.upload()
         self.lv[lastvalue_key] = last_suffix
 
