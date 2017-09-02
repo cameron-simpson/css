@@ -4,17 +4,22 @@
 #       - Cameron Simpson <cs@cskk.id.au> 28jun2012
 #
 
+r'''
+Aids for code sharing between python2 and python3.
+
+Presents various names in python 3 flavour for common use in python 2 and python 3.
+'''
+
 import sys
 
 DISTINFO = {
-    'description': "Aids for code sharing between python2 and python3.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.py3_for2', 'cs.py3_for3'],
+    'install_requires': [],
 }
 
 if sys.hexversion >= 0x03000000:
