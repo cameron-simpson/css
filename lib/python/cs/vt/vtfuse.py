@@ -25,7 +25,6 @@ from cs.range import Range
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
 from . import defaults
-from .archive import strfor_Dirent, write_Dirent_str
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
 from .parsers import scanner_from_filename, scanner_from_mime_type
@@ -45,12 +44,12 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False, append_only=False):
+def mount(mnt, E, S, archive=None, subpath=None, readonly=False, append_only=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
       `S`: backing Store
-      `syncfp`: if not None, a file to which to write sync lines
+      `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
       `subpath`: relative path from `E` to the directory to attach to the mountpoint
       `readonly`: forbid data modification operations
       `append_only`: files may not be truncated or overwritten
@@ -61,7 +60,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None, readonly=False, append_only=Fals
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
+  FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
   return FS._vt_runfuse(mnt)
 
 def umount(mnt):
@@ -406,11 +405,11 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, oserror=None, syncfp=None, subpath=None, readonly=False, append_only=False):
+  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=False, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
-        `syncfp`: if not None, a file to which to write sync lines
+        `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
     '''
@@ -423,10 +422,14 @@ class _StoreFS_core(object):
       oserror = OSError
     self.oserror = oserror
     if readonly:
-      if syncfp is not None:
-        warning("readonly: setting syncfp=None, was %s", syncfp)
-        syncfp = None
-    self.syncfp = syncfp
+      if archive is not None:
+        warning("readonly: setting archive=None, was %s", archive)
+        archive = None
+    self.archive = archive
+    if archive is None:
+      self._last_sync_state = None
+    else:
+      self._last_sync_state = archive.strfor_Dirent(E)
     self.subpath = subpath
     self.readonly = readonly
     self.append_only = append_only
@@ -449,8 +452,6 @@ class _StoreFS_core(object):
                args=(self.logQ,))
     T.daemon = True
     T.start()
-    self._syncfp_last_dirent_text = None
-    self.do_fsync = False
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
@@ -479,20 +480,21 @@ class _StoreFS_core(object):
     with Pfx("_sync"):
       if defaults.S is None:
         raise RuntimeError("RUNTIME: defaults.S is None!")
+      E = self.E
       # update the inode table state
-      self.E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
-      text = strfor_Dirent(self.E)
-      if self.syncfp is not None:
+      E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
+      archive = self.archive
+      if archive is not None:
         with self._lock:
-          last_text = self._syncfp_last_dirent_text
-          if last_text is not None and text == last_text:
-            text = None
-        if text is not None:
-          write_Dirent_str(self.syncfp, text, etc=self.E.name)
-          self.syncfp.flush()
-          self._syncfp_last_dirent_text = text
-          # debugging
-          dump_Dirent(self.E, recurse=False)
+          updated = False
+          new_state = archive.strfor_Dirent(E)
+          if new_state != self._last_sync_state:
+            archive.save(E)
+            self._last_sync_state = new_state
+            updated = True
+        # debugging
+        if updated:
+          dump_Dirent(E, recurse=False)
           dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
   def _resolve(self, path):
@@ -647,16 +649,16 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, syncfp=None, subpath=None, options=None, readonly=False, append_only=False):
+  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=False, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
-        `syncfp`: if not None, a file to which to write sync lines
+        `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
         `append_only`: forbid truncation or oervwrite of file data
     '''
-    self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
+    self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
     llf_opts = set(llfuse.default_options)
