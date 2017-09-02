@@ -7,7 +7,7 @@
 from __future__ import with_statement
 import sys
 import os
-from os.path import basename, dirname, splitext, \
+from os.path import basename, splitext, \
     exists as existspath, join as joinpath, \
     isabs as isabspath, isdir as isdirpath, isfile as isfilepath
 import errno
@@ -23,24 +23,22 @@ from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, loginfo, logTo
+                        setup_logging, logTo
 from cs.pfx import Pfx
 from cs.tty import statusline
 import cs.x
 from cs.x import X
 from . import fromtext, defaults
-from .archive import ArchiveFTP, CopyModes, \
-                        last_Dirent, save_Dirent, copy_out_dir
+from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
 from .compose import Store, ConfigFile
-from .debug import dump_Dirent
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir, DirFTP
 from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
-from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, resolve
+from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
@@ -236,7 +234,7 @@ def cmd_catblock(args, verbose=None):
   if not args:
     raise GetoptError("missing hashcodes")
   for hctext in args:
-    h = S.hashclass(fromtext(hctext))
+    h = defaults.S.hashclass(fromtext(hctext))
     if indirect:
       B = IndirectBlock(h)
     else:
@@ -401,11 +399,6 @@ def cmd_import(args, verbose=None):
   srcbase = basename(srcpath.rstrip(os.sep))
   E = D.get(srcbase)
   with Pfx(srcpath):
-    try:
-      S = os.lstat(srcpath)
-    except OSError as e:
-      error("%s", e)
-      return 1
     if isdirpath(srcpath):
       if E is None:
         E = D.mkdir(srcbase)
@@ -458,7 +451,7 @@ def cmd_init(args, verbose=None):
     with Pfx(dirpath):
       if not isdirpath(dirpath):
         raise GetoptError("not a directory")
-    with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS) as S:
+    with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS):
       os.system("ls -la %s" % (statedirpath,))
   return 0
 
@@ -470,8 +463,8 @@ def cmd_listen(args, verbose=None):
   arg = args[0]
   if arg == '-':
     from .stream import StreamStore
-    RS = StreamStore("%s listen -" % (cmd,), sys.stdin, sys.stdout,
-                     local_store=S)
+    RS = StreamStore("listen -", sys.stdin, sys.stdout,
+                     local_store=defaults.S)
     RS.join()
   else:
     cpos = arg.rfind(':')
@@ -714,7 +707,7 @@ def lsDirent(fp, E, name):
   except AttributeError:
     detail = repr(B)
   else:
-    detail = hexify(B.hashcode)
+    detail = hexify(h)
   fp.write("%c %-41s %s %6d %s\n" \
            % (('d' if E.isdir else 'f'),
               detail, t, st_size, name))
