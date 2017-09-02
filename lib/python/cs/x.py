@@ -4,11 +4,14 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
+'''
+X(), for low level debugging
+'''
+
 from __future__ import print_function
 import sys
 
 DISTINFO = {
-    'description': "X(), for low level debugging",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
