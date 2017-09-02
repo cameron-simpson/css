@@ -7,12 +7,12 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-from collections import namedtuple
 from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFormatter
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 import stat
+import subprocess
 import sys
 from threading import Thread, RLock
 from types import SimpleNamespace as NS
@@ -440,7 +440,6 @@ class _StoreFS_core(object):
       self.mntE = mntE
     else:
       self.mntE = E
-      mntP = None
     # set up a queue to collect logging requests
     # and a thread to process them asynchronously
     self.log = getLogger(LOGGER_NAME)
@@ -835,7 +834,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if self._vt_core.readonly:
       raise FuseOSError(errno.EROFS)
     core = self._vt_core
-    I = core[parent_inode]
+    I = core[inode]
     I += 1
     new_name = self._vt_str(new_name_b)
     # TODO: test for write access to new_parent_inode
