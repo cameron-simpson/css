@@ -8,6 +8,7 @@
 from __future__ import print_function
 from functools import partial
 from getopt import getopt, GetoptError
+import importlib
 import os
 import os.path
 from subprocess import Popen, PIPE
@@ -231,7 +232,7 @@ class PyPI_Package(O):
     self.package = Package(package_name)
     self.package.version = package_version
     self._pypi_package_name = pypi_package_name
-    self._pypi_version = pypi_package_version
+    self._pypi_package_version = pypi_package_version
     self.defaults = defaults
     self.libdir = LIBDIR
     self._prep_distinfo()
@@ -259,19 +260,36 @@ class PyPI_Package(O):
     return self.package.hg_tag
 
   def _prep_distinfo(self):
-    ''' Property containing the distutils infor for this package.
+    ''' Property containing the distutils info for this package.
     '''
     global DISTINFO_DEFAULTS
     global DISTINFO_CLASSIFICATION
 
-    dinfo = dict(import_module_name(self.package_name, 'DISTINFO'))
+    dinfo = dict(self.defaults)
+    M = importlib.import_module(self.package_name)
+    dinfo.update(M.DISTINFO)
+
+    doc = M.__doc__.strip()
+    try:
+      doc_line1, doc_tail = doc.split('\n', 1)
+    except ValueError:
+      doc_line1 = doc
+      doc_tail = ''
+    else:
+      doc_tail = doc_tail.lstrip()
+
+    # fill in some missing info if it can be inferred
+    for field in 'description', 'long_description':
+      if field in dinfo:
+        continue
+      if field == 'description':
+        if doc_line1:
+          dinfo[field] = doc_line1
+      elif field == 'long_description':
+        if doc_tail:
+          dinfo[field] = doc_tail
 
     dinfo['package_dir'] = {'': self.libdir}
-
-    for kw, value in DISTINFO_DEFAULTS.items():
-      with Pfx(kw):
-        if kw not in dinfo:
-          dinfo[kw] = value
 
     classifiers = dinfo['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
@@ -291,7 +309,7 @@ class PyPI_Package(O):
       dinfo['py_modules'] = [self.package_name]
 
     for kw, value in (('name', self.pypi_package_name),
-                      ('version', self.pypi_version),
+                      ('version', self.pypi_package_version),
                       ):
       if value is None:
         warning("_prep: no value for %r", kw)
@@ -365,7 +383,7 @@ class PyPI_Package(O):
     readme_path = os.path.join(pkg_dir, readme_subpath)
     if os.path.exists(readme_path):
       if 'long_description' in distinfo:
-        info(
+        warning(
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
