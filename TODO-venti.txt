@@ -1,3 +1,4 @@
+mount -a: live mode, tracing new .vt entries
 mount -e command...
 readonly: do not update /vt file
 mount -a to mount live readon
