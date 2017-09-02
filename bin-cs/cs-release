@@ -385,8 +385,6 @@ class Module(object):
                   silent or warning("missing module name")
                   continue
                 subimport = words[1]
-                if subimport == '.':
-                  continue
                 if subimport.startswith('.'):
                   # resolve relative import name
                   preparts = module_name.split('.')
