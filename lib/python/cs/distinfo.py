@@ -8,9 +8,11 @@
 from __future__ import print_function
 from functools import partial
 from getopt import getopt, GetoptError
+from glob import glob
 import importlib
 import os
 import os.path
+from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
 from subprocess import Popen, PIPE
 import shutil
 import sys
@@ -58,7 +60,7 @@ USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-ar
     upload      Upload the package source distribution.'''
 
 def main(argv):
-  cmd = os.path.basename(argv.pop(0))
+  cmd = basename(argv.pop(0))
   usage = USAGE % (cmd, URL_PYPI_TEST, URL_PYPI_PROD)
   setup_logging(cmd)
 
@@ -147,7 +149,7 @@ def pathify(package_name):
 def needdir(dirpath):
   ''' Create the directory `dirpath` if missing.
   '''
-  if not os.path.isdir(dirpath):
+  if not pathisdir(dirpath):
     warning("makedirs(%r)", dirpath)
     os.makedirs(dirpath)
 
@@ -176,19 +178,19 @@ def test_is_package(libdir, package_name):
       Do some sanity checks and complain loudly.
   '''
   package_subpath = pathify(package_name)
-  package_dir = os.path.join(libdir, package_subpath)
+  package_dir = joinpath(libdir, package_subpath)
   package_py = package_dir + '.py'
-  package_init_path = os.path.join(package_dir, '__init__.py')
-  is_pkg = os.path.isdir(package_dir)
+  package_init_path = joinpath(package_dir, '__init__.py')
+  is_pkg = pathisdir(package_dir)
   if is_pkg:
-    if os.path.exists(package_py):
+    if pathexists(package_py):
       error("both %s/ and %s exist", package_dir, package_py)
       is_pkg = False
-    if not os.path.exists(package_init_path):
+    if not pathexists(package_init_path):
       error("%s/ exists, but not %s", package_dir, package_init_path)
       is_pkg = False
   else:
-    if not os.path.exists(package_py):
+    if not pathexists(package_py):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
@@ -340,9 +342,9 @@ class PyPI_Package(O):
     package_paths = package_name.split('.')
     if up:
       package_paths = package_paths[:-1]
-    rpath = os.path.join(*package_paths)
+    rpath = joinpath(*package_paths)
     if prefix_dir:
-      rpath = os.path.join(prefix_dir, rpath)
+      rpath = joinpath(prefix_dir, rpath)
     return rpath
 
   def pkg_readme_rpath(self, package_name=None, prefix_dir=None):
@@ -350,13 +352,13 @@ class PyPI_Package(O):
       package_name = self.package_name
     package_paths = package_name.split('.')
     if self.is_package(package_name):
-      return os.path.join(
+      return joinpath(
           self.pkg_rpath(
               package_name=package_name,
               prefix_dir=prefix_dir),
           'README.rst')
     else:
-      return os.path.join(
+      return joinpath(
           self.pkg_rpath(
               package_name=package_name,
               prefix_dir=prefix_dir,
@@ -372,7 +374,7 @@ class PyPI_Package(O):
 
     distinfo = self.distinfo
 
-    manifest_path = os.path.join(pkg_dir, 'MANIFEST.in')
+    manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with open(manifest_path, "w") as mfp:
       # TODO: support extra files
       pass
@@ -380,38 +382,31 @@ class PyPI_Package(O):
     self.copyin(self.package_name, pkg_dir)
 
     readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
-    readme_path = os.path.join(pkg_dir, readme_subpath)
-    if os.path.exists(readme_path):
+    readme_path = joinpath(pkg_dir, readme_subpath)
+    if pathexists(readme_path):
       if 'long_description' in distinfo:
         warning(
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
           distinfo['long_description'] = readmefp.read()
-      shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
+      shutil.copy2(readme_path, joinpath(pkg_dir, 'README.rst'))
       with open(manifest_path, "a") as mfp:
         mfp.write('include README.rst\n')
     else:
       warning('no README at %r', readme_path)
 
     # final step: write setup.py with information gathered earlier
-    self.write_setup(os.path.join(pkg_dir, 'setup.py'))
+    self.write_setup(joinpath(pkg_dir, 'setup.py'))
 
     return pkg_dir
 
   def checkout(self):
     return PyPI_PackageCheckout(self)
 
-  def check(self):
-    with self.checkout() as pkg_co:
-      pkg_co.check()
-
-  def register(self):
-    with self.checkout() as pkg_co:
-      pkg_co.register()
-
   def upload(self):
     with self.checkout() as pkg_co:
+      pkg_co.prepare_dist()
       pkg_co.upload()
 
   def write_setup(self, setup_path):
@@ -454,7 +449,7 @@ class PyPI_Package(O):
     ''' Return the base of `package_name`, a relative directory or filename.
     '''
     package_subpath = pathify(package_name)
-    base = os.path.join(self.libdir, package_subpath)
+    base = joinpath(self.libdir, package_subpath)
     if not self.is_package(package_name):
       base += '.py'
     return base
@@ -467,26 +462,26 @@ class PyPI_Package(O):
       # simple case - module file and its tests
       yield package_subpath + '.py'
       test_subpath = package_subpath + '_tests.py'
-      test_path = os.path.join(libdir, test_subpath)
-      if os.path.exists(test_path):
+      test_path = joinpath(libdir, test_subpath)
+      if pathexists(test_path):
         yield test_subpath
     else:
       # packages - all .py files in directory
       # warning about unexpected other files
       libprefix = libdir + os.path.sep
-      for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
+      for dirpath, dirnames, filenames in os.walk(joinpath(libdir, package_subpath)):
         for filename in filenames:
           if filename.startswith('.'):
             continue
           if filename.endswith('.pyc'):
             continue
           if filename.endswith('.py'):
-            yield os.path.join(dirpath[len(libprefix):], filename)
+            yield joinpath(dirpath[len(libprefix):], filename)
             continue
-          warning("skipping %s", os.path.join(dirpath, filename))
+          warning("skipping %s", joinpath(dirpath, filename))
     readme_subpath = self.pkg_readme_rpath(package_name)
-    readme_path = os.path.join(libdir, readme_subpath)
-    if os.path.exists(readme_path):
+    readme_path = joinpath(libdir, readme_subpath)
+    if pathexists(readme_path):
       yield readme_subpath
 
   def copyin(self, package_name, dstdir):
@@ -502,10 +497,10 @@ class PyPI_Package(O):
       if first:
         # collect entire package contents
         for subpath in self.package_paths(superpackage_name, self.libdir):
-          hgargv.extend(['-I', os.path.join(self.libdir, subpath)])
+          hgargv.extend(['-I', joinpath(self.libdir, subpath)])
       else:
         # just collecting required __init__.py files
-        hgargv.extend(['-I', os.path.join(base, '__init__.py')])
+        hgargv.extend(['-I', joinpath(base, '__init__.py')])
       package_parts.pop()
       first = False
     hgargv.append(dstdir)
@@ -524,7 +519,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
-    ##self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
+    self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -559,14 +554,15 @@ class PyPI_PackageCheckout(O):
     '''
     return self.inpkg_argv(['python3', 'setup.py'] + list(argv))
 
-  def check(self):
-    self.setup_py('check', '-s', '--restructuredtext')
-
-  def register(self):
-    self.setup_py('register', '-r', self.pypi_url)
+  def prepare_dist(self):
+    self.setup_py('check', 'sdist')
 
   def upload(self):
-    self.setup_py('sdist', 'upload', '-r', self.pypi_url)
+    upload_files = [
+        joinpath('dist', basename(distpath))
+        for distpath in glob(joinpath(self.pkg_dir, 'dist/*'))
+    ]
+    return self.inpkg_argv(['twine', 'upload'] + upload_files)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
