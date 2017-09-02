@@ -393,7 +393,7 @@ def cmd_import(args, verbose=None):
       except OSError as e:
         error("cannot open archive for append: %s", e)
         return 1
-      when, D = last_Dirent(special)
+      when, D = Archive(special).last
   if D is None:
     D = Dir('import')
   srcbase = basename(srcpath.rstrip(os.sep))
@@ -427,10 +427,9 @@ def cmd_import(args, verbose=None):
     fp = sys.stderr
     print("updated dirent after import:", file=fp)
   elif special is None:
-    fp = sys.stdout
+    Archive.write(sys.stdout, D)
   else:
-    fp = special
-  save_Dirent(fp, D)
+    Archive(special).save(D)
   return xit
 
 # TODO: create dir, dir/data
@@ -573,30 +572,56 @@ def cmd_mount(args, verbose=None):
           raise
   xit = 0
   with Pfx(special):
-    try:
-      when, E = last_Dirent(special, missing_ok=True)
-    except OSError as e:
-      error("can't access special: %s", e)
-      return 1
-    # no "last entry" (==> first use) - make an empty directory
-    if E is None:
-      E = Dir('/')
-      X("cmd_mount: new E=%s", E)
+    A = Archive(special)
+    if all_dates:
+      E = Dir(basename(mountpoint))
+      for when, E in A:
+        iso = isodate
     else:
-      ##dump_Dirent(E, recurse=True)
-      if not E.isdir:
-        error("expected directory, not file: %s", E)
+      try:
+        when, E = A.last
+      except OSError as e:
+        error("can't access special: %s", e)
         return 1
-    with Pfx("open('a')"):
-      with open(special, 'a') as syncfp:
+      except ValueError as e:
+        error("invalid contents: %s", e)
+        return 1
+      # no "last entry" (==> first use) - make an empty directory
+      if E is None:
+        E = Dir(basename(mountpoint))
+        X("cmd_mount: new E=%s", E)
+      else:
+        ##dump_Dirent(E, recurse=True)
+        if not E.isdir:
+          error("expected directory, not file: %s", E)
+          return 1
+    # forget the archive if readonly
+    if readonly:
+      A = None
+    # import vtfuse before doing anything with side effects
+    from .vtfuse import mount, umount
+    with Pfx(mountpoint):
+      need_rmdir = False
+      if not isdirpath(mountpoint):
+        # autocreate mountpoint
+        info('mkdir %r ...', mountpoint)
         try:
-          T = mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath, readonly=readonly, append_only=append_only)
-          cs.x.X_via_tty = True
-          T.join()
-        except KeyboardInterrupt as e:
-          error("keyboard interrupt, unmounting %r", mountpoint)
-          xit = umount(mountpoint)
-          T.join()
+          os.mkdir(mountpoint)
+          need_rmdir = True
+        except OSError as e:
+          if e.errno == errno.EEXIST:
+            error("mountpoint is not a directory", mountpoint)
+            return 1
+          else:
+            raise
+      try:
+        T = mount(mountpoint, E, defaults.S, archive=A, subpath=subpath, readonly=readonly, append_only=append_only)
+        cs.x.X_via_tty = True
+        T.join()
+      except KeyboardInterrupt as e:
+        error("keyboard interrupt, unmounting %r", mountpoint)
+        xit = umount(mountpoint)
+        T.join()
     if need_rmdir:
       info("rmdir %r ...", mountpoint)
       try:
@@ -681,11 +706,10 @@ def cmd_unpack(args, verbose=None):
     error("archive base already exists: %r", arbase)
     return 1
   with Pfx(arpath):
-    last_entry = last_Dirent(arpath)
-    if last_entry is None:
+    when, rootE = Archive(arpath).last
+    if rootE is None:
       error("no entries in archive")
       return 1
-  when, rootE = last_entry
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
