@@ -26,6 +26,11 @@ from cs.py.modules import module_files
 
 PYLIBTOP = 'lib/python'
 
+# defaults for packages without their own specifics
+DISTINFO_DEFAULTS = {
+    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
+}
+
 USAGE = '''Usage: %s [-f] [op [names...]]
   -f  Force. Sanity checks that would stop some actions will not prevent them.
   With no op, report all pypi and testpypi lastvalues.
@@ -641,7 +646,8 @@ class ReleaseName(object):
         else:
           return
       with Pfx("%r->%r", last_pypi_release, last_suffix):
-        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix)
+        defaults = dict(DISTINFO_DEFAULTS)
+        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         if not PKG.check():
           warning("package check fails")
           if force:

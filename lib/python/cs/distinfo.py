@@ -29,13 +29,6 @@ URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 # local directory where the files live
 LIBDIR = 'lib/python'
 
-# defaults for packages without their own specifics
-DISTINFO_DEFAULTS = {
-    'author': "Cameron Simpson",
-    'author_email': "cs@cskk.id.au",
-    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
-}
-
 DISTINFO_CLASSIFICATION = {
     "Programming Language": "Python",
     "Development Status": "4 - Beta",
@@ -211,14 +204,35 @@ class PyPI_Package(O):
   ''' Operations for a package at PyPI.
   '''
 
-  def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_package_version=None):
+  def __init__(self, pypi_url,
+    package_name, package_version,
+    pypi_package_name=None, pypi_package_version=None,
+    defaults=None,
+  ):
     ''' Initialise: save package_name and its name in PyPI.
     '''
+    if defaults is None:
+      defaults = {}
+    if 'author' not in defaults:
+      try:
+        author_name = os.environ['NAME']
+      except KeyError:
+        pass
+      else:
+        defaults['author'] = author_name
+    if 'author_email' not in defaults:
+      try:
+        author_email = os.environ['EMAIL']
+      except KeyError:
+        pass
+      else:
+        defaults['author_email'] = author_email
     self.pypi_url = pypi_url
     self.package = Package(package_name)
     self.package.version = package_version
     self._pypi_package_name = pypi_package_name
     self._pypi_version = pypi_package_version
+    self.defaults = defaults
     self.libdir = LIBDIR
     self._prep_distinfo()
 
