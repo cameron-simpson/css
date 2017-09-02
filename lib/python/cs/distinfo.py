@@ -20,7 +20,6 @@ from tempfile import mkdtemp
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
-from cs.py.modules import import_module_name
 import cs.sh
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
@@ -358,10 +357,8 @@ class PyPI_Package(O):
 
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with open(manifest_path, "w") as mfp:
-      # TODO: support extra files
-      pass
-
-    self.copyin(self.package_name, pkg_dir)
+       # TODO: support extra files
+      self.copyin(pkg_dir)
 
       # create README.rst
       with open('README.rst', 'w') as fp:
@@ -457,13 +454,15 @@ class PyPI_Package(O):
             continue
           warning("skipping %s", joinpath(dirpath, filename))
 
-  def copyin(self, package_name, dstdir):
+  def copyin(self, dstdir):
+    ''' Write the contents of the tagged release into `dstdir`.
+    '''
     hgargv = ['set-x', 'hg',
               'archive',
               '-r', '"%s"' % self.hg_tag,
               ]
     first = True
-    package_parts = package_name.split('.')
+    package_parts = self.package_name.split('.')
     while package_parts:
       superpackage_name = '.'.join(package_parts)
       base = self.package_base(superpackage_name)
@@ -535,6 +534,8 @@ class PyPI_PackageCheckout(O):
         joinpath('dist', basename(distpath))
         for distpath in glob(joinpath(self.pkg_dir, 'dist/*'))
     ]
+    for upload_file in upload_files:
+      self.inpkg_argv(['twine', 'register', upload_file])
     return self.inpkg_argv(['twine', 'upload'] + upload_files)
 
 if __name__ == '__main__':
