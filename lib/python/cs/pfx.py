@@ -4,6 +4,38 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Dynamic message prefixes providing execution context.
+
+The primary facility here is Pfx,
+a context manager which manitains a per thread stack of context prefixes.
+Usage is like this::
+
+  from cs.pfx import Pfx
+  ...
+  def parser(filename):
+    with Pfx("parse(%r)", filename):
+      with open(filename) as f:
+        for line, lineno in enumerate(f, 1):
+          with Pfx("%d", lineno) as P:
+            if line_is_invalid(line):
+              raise ValueError("problem!")
+            P.info("line = %r", line)
+
+This produces log messages like::
+
+  datafile: 1: line = 'foo\n'
+
+and exception messages like::
+
+  datafile: 17: problem!
+
+which lets one put just the relevant complaint in exception and log
+messages and get useful calling context on the output.
+This does make for wordier logs and exceptions
+but used with a little discretion produces far more debugable results.
+'''
+
 from __future__ import print_function
 from contextlib import contextmanager
 import logging
@@ -11,6 +43,20 @@ import sys
 import threading
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
+
+DISTINFO = {
+    'description': "Easy context prefixes for messages.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.py3',
+        'cs.x',
+    ],
+}
 
 cmd = None
 
@@ -111,6 +157,12 @@ class Pfx(object):
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
+    ''' Initialise a new Pfx instance.
+        `mark`: message prefix string
+        `args`: if not empty, apply to the prefix string with `%`
+        `absolute`: optional keyword argument, default False. If true, this message forms the base of the message prefixes; existing prefixes will be suppressed.
+        `loggers`: which loggers should receive log messages.
+    '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
     if kwargs:
@@ -143,8 +195,6 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-              prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix \
                  + ': ' \
