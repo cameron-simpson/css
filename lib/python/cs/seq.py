@@ -31,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.logutils', 'cs.py.stack', 'cs.py3'],
+    'install_requires': ['cs.logutils'],
 }
 
 class Seq(object):
