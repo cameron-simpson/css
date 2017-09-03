@@ -4,6 +4,51 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Result and friends.
+
+A Result is the base class for several callable subclasses
+which will receive values at a later point in time,
+and can also be used standalone without subclassing.
+
+A call to a Result will block until the value is received or the Result is cancelled,
+which will raise an exception in the caller.
+A Result may be called by multiple users, before or after the value has been delivered;
+if the value has been delivered the caller returns with it immediately.
+A Result's state may be inspected (pending, running, ready, cancelled).
+Callbacks can be registered via an Asychron's .notify method.
+
+An incomplete Result can be told to call a function to compute its value;
+the function return will be stored as the value unless the function raises an exception,
+in which case the exception information is recorded instead.
+If an exception occurred, it will be reraised for any caller of the Result.
+
+Trite example::
+
+  R = Result(name="my demo")
+
+  Thread 1:
+    value = R()
+    # blocks...
+    print(value)
+    # prints 3 once Thread 2 (below) assigns to it
+
+  Thread 2:
+    R.result = 3
+
+  Thread 3:
+    value = R()
+    # returns immediately with 3
+
+You can also collect multiple Results in completion order using the report() function::
+
+  Rs = [ ... list of Results or whatever type ... ]
+  ...
+  for R in report(Rs):
+    x = R()     # collect result, will return immediately
+    print(x)    # print result
+'''
+
 from functools import partial
 import sys
 from threading import Lock
