@@ -4,6 +4,34 @@
 #       - Cameron Simpson <cs@cskk.id.au> 29aug2009
 #
 
+r'''
+Logging convenience routines.
+
+The logging package is very useful, but a little painful to use.
+This package provides low impact logging setup and some extremely useful if unconventional context hooks for logging.
+
+The logging verbosity output format has different defaults based on whether an output log file is a tty and whether the environment variable $DEBUG is set, and to what.
+
+Some examples:
+--------------
+
+Program initialisation::
+
+  from cs.logutils import setup_logging
+
+  def main(argv):
+    cmd = os.path.basename(argv.pop(0))
+    setup_logging(cmd)
+
+Basic logging from anywhere::
+
+  from cs.logutils import info, warning, error
+  [...]
+  def some_function(...):
+    [...]
+    error("nastiness found! bad value=%r", bad_value)
+'''
+
 from __future__ import with_statement
 import codecs
 from contextlib import contextmanager
@@ -36,7 +64,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [
         'cs.ansi_colour',
         'cs.lex',
@@ -45,7 +73,7 @@ DISTINFO = {
         'cs.py.func',
         'cs.py3',
         'cs.upd'
-        ],
+    ],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -457,8 +485,9 @@ def OBSOLETE(func):
     import traceback
     frame = traceback.extract_stack(None, 2)[0]
     warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-         func.__code__.co_filename, func.__code__.co_firstlineno,
-         func.__name__, frame[0], frame[1], frame[2])
+        func.__code__.co_filename, func.__code__.co_firstlineno,
+        func.__name__, frame[0], frame[1], frame[2]
+    )
     return func(*args, **kwargs)
   return wrapped
 
