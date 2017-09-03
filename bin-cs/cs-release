@@ -22,7 +22,7 @@ import cs.cmdutils
 from cs.dateutils import isodate
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
 from cs.logutils import setup_logging, exception, error, warning, info
-from cs.Pfx import Pfx, XP
+from cs.pfx import Pfx, XP
 from cs.py.modules import module_files
 from cs.x import X
 
