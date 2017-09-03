@@ -4,19 +4,23 @@
 #       - Cameron Simpson <cs@cskk.id.au> 20apr2013
 #
 
+r'''
+Assorted debugging facilities.
+
+* Lock, RLock, Thread: wrappers for threading facilties; simply import from here instead of there
+
+* thread_dump, stack_dump: dump thread and stack state
+
+* @DEBUG: decorator to wrap functions in timing and value debuggers
+
+* @trace: decorator to report call and return from functions
+
+* @trace_caller: decorator to report caller of function
+
+* TracingObject: subclass of cs.obj.Proxy that reports attribute use
+'''
+
 from __future__ import print_function
-
-DISTINFO = {
-    'description': "assorted debugging facilities",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
-}
-
 from contextlib import contextmanager
 from cmd import Cmd
 import inspect
@@ -34,6 +38,17 @@ from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.timeutils import sleep
 from cs.x import X
+
+DISTINFO = {
+    'description': "assorted debugging facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+}
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
