@@ -12,6 +12,10 @@ This package provides low impact logging setup and some extremely useful if unco
 
 The logging verbosity output format has different defaults based on whether an output log file is a tty and whether the environment variable $DEBUG is set, and to what.
 
+On terminals warnings and errors get ANSI colouring.
+
+A mode is available that uses cs.upd.
+
 Some examples:
 --------------
 
