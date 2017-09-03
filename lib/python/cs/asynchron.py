@@ -4,6 +4,14 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+from functools import partial
+import sys
+from threading import Lock
+from cs.logutils import exception, warning, debug
+from cs.obj import O
+from cs.seq import seq
+from cs.py3 import Queue, raise3, StringTypes
+
 DISTINFO = {
     'description': "Result and friends: callable objects which will receive a value at a later point in time.",
     'keywords': ["python2", "python3"],
@@ -15,14 +23,9 @@ DISTINFO = {
     'install_requires': ['cs.obj', 'cs.seq', 'cs.py3'],
 }
 
-import sys
-from cs.debug import Lock
-from cs.logutils import error, exception, warning, debug
-from cs.obj import O
-from cs.seq import seq
-from cs.py3 import Queue, raise3, StringTypes
-
 class AsynchState(object):
+  ''' State tokens for Results.
+  '''
   pending = 'pending'
   running = 'running'
   ready = 'ready'
@@ -192,12 +195,14 @@ class Result(O):
       if state == AsynchState.ready:
         warning("<%s>.state is AsynchState.ready, ignoring result=%r, exc_info=%r",
                 self, result, exc_info)
-        raise RuntimeError("REPEATED _COMPLETE of %s: result=%r, exc_info=%r" % (self,result, exc_info))
-        return
-      else:
-        raise RuntimeError("<%s>.state is not one of (AsynchState.cancelled, AsynchState.running, AsynchState.pending, AsynchState.ready): %r"
-                           % (self, state))
-      return
+        raise RuntimeError(
+            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r"
+            % (self, result, exc_info)
+        )
+      raise RuntimeError(
+          "<%s>.state is not one of (AsynchState.cancelled, AsynchState.running, AsynchState.pending, AsynchState.ready): %r"
+          % (self, state)
+      )
     if self.final is not None:
       try:
         final_result = self.final()
@@ -277,7 +282,7 @@ def report(LFs):
   for LF in LFs:
     n += 1
     LF.notify(notify)
-  for i in range(n):
+  for _ in range(n):
     yield Q.get()
 
 def after(Rs, R, func, *a, **kw):
@@ -335,7 +340,7 @@ class OnDemandFunction(_PendingFunction):
   def __call__(self):
     with self._lock:
       state = self.state
-      if state == ASYNC_CANCELLED:
+      if state == AsynchState.cancelled:
         raise CancellationError()
       if state == AsynchState.pending:
         self.state = AsynchState.running
