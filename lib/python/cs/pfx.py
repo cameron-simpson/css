@@ -8,7 +8,7 @@ r'''
 Dynamic message prefixes providing execution context.
 
 The primary facility here is Pfx,
-a context manager which manitains a per thread stack of context prefixes.
+a context manager which maintains a per thread stack of context prefixes.
 Usage is like this::
 
   from cs.pfx import Pfx
@@ -16,7 +16,7 @@ Usage is like this::
   def parser(filename):
     with Pfx("parse(%r)", filename):
       with open(filename) as f:
-        for line, lineno in enumerate(f, 1):
+        for lineno, line in enumerate(f, 1):
           with Pfx("%d", lineno) as P:
             if line_is_invalid(line):
               raise ValueError("problem!")
