@@ -1,3 +1,4 @@
+PyPI: remove cs.asynchron once dependent packages updated
 cs.logutils.status: fold into cs.statusline, merge features
 speed up cs.lex.unctrl using enumerate and join of substrs
 make Asynchrons __await__able
