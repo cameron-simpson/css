@@ -4,6 +4,16 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Convenience functions for constructing shell commands
+
+Functions for safely constructing shell command lines from bare strings.
+Somewhat like the inverse of the shlex stdlib module.
+'''
+
+import string
+import sys
+
 DISTINFO = {
     'description': "Convenience functions for constructing shell commands.",
     'keywords': ["python2", "python3"],
@@ -14,14 +24,11 @@ DISTINFO = {
     ],
     'install_requires': [],
     'entry_points': {
-      'console_scripts': [
-        'shqstr = cs.sh:main_shqstr'
-      ],
+        'console_scripts': [
+            'shqstr = cs.sh:main_shqstr'
+        ],
     },
 }
-
-import string
-import sys
 
 # characters than do not need to be quoted
 SAFECHARS = string.digits + string.ascii_letters + '-+_./:'
@@ -78,7 +85,9 @@ def quotecmd(argv):
   return ' '.join(quote(argv))
 
 def main_shqstr(argv):
-  cmd = argv.pop(0)
+  ''' shqstr: emit shell-quoted form of the command line arguments.
+  '''
+  argv.pop(0)
   print(quotecmd(argv))
 
 if __name__ == '__main__':
