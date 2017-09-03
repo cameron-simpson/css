@@ -5,7 +5,7 @@
 # 
 
 from functools import partial
-from cs.asynchron import OnDemandFunction
+from cs.result import OnDemandFunction
 from cs.logutils import X
 
 def pull_hashcode(S1, S2, hashcode):

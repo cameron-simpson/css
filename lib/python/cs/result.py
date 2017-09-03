@@ -403,5 +403,5 @@ class OnDemandFunction(_PendingFunction):
     return result
 
 if __name__ == '__main__':
-  import cs.asynchron_tests
-  cs.asynchron_tests.selftest(sys.argv)
+  import cs.result_tests
+  cs.result_tests.selftest(sys.argv)

@@ -13,4 +13,4 @@ Use is simple enough: create a Later instance and typically queue functions with
   ...
   x = LF()          # collect result
 
-The .defer method and its sublings return a LateFunction, which is a subclass of cs.asynchron.Asynchron. As such it is a callable, so to collect the result you just call the LateFunction.
+The .defer method and its sublings return a LateFunction, which is a subclass of cs.result.Asynchron. As such it is a callable, so to collect the result you just call the LateFunction.

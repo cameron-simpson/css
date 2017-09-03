@@ -124,7 +124,7 @@ def DEBUG(f):
   if not ifdebug():
     return f
   def inner(*a, **kw):
-    from cs.asynchron import Result
+    from cs.result import Result
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()

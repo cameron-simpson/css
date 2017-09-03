@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
+    'install_requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.result', 'cs.seq', 'cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -21,7 +21,7 @@ from collections import deque
 import threading
 import time
 import traceback
-from cs.asynchron import Result, _PendingFunction, AsynchState, report, after
+from cs.result import Result, _PendingFunction, AsynchState, report, after
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump, stack_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.logutils import error, info, warning, debug, exception, D, OBSOLETE
@@ -435,7 +435,7 @@ class Later(MultiOpenMixin):
 
       Methods are provided for submitting functions to run ASAP or
       after a delay or after other pending functions. These methods
-      return LateFunctions, a subclass of cs.asynchron.Asynchon.
+      return LateFunctions, a subclass of cs.result.Asynchon.
 
       A Later instance' shutdown method closes the Later for further
       submission (except by functions run by this Later). Shutdown
