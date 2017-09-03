@@ -7,4 +7,4 @@
 # Trivial python recode; some places don't have perl. - cameron 27mar2009
 #
 
-exec python -c 'import sys; import cs.sh; sys.exit(cs.sh.main_shqstr(sys.argv))' ${1+"$@"}
+exec python -c 'import sys; import cs.sh; sys.exit(cs.sh.main_shqstr())' ${1+"$@"}
