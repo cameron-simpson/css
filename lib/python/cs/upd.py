@@ -2,29 +2,37 @@
 #
 # Single line status updates.
 #   - Cameron Simpson <cs@cskk.id.au>
-#
+
+r'''
+Single line status updates with minimal update sequences.
+
+* Upd: a class accepting update strings which emits minimal text to update a progress line.
+
+-- out(s): update the line to show the string ``s``
+
+-- nl(s): flush the output line, write ``s`` with a newline, restore the status line
+
+-- without(func,...): flush the output line, call func, restore the status line
+
+This is available as an output mode in cs.logutils.
+'''
 
 from __future__ import with_statement
+import atexit
+from contextlib import contextmanager
+from threading import RLock
+from cs.lex import unctrl
+from cs.tty import ttysize
 
 DISTINFO = {
-    'description': "single line status updates with minimal update sequences",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': ['cs.lex', 'cs.tty'],
 }
-
-from threading import Lock
-import threading
-from contextlib import contextmanager
-import atexit
-import logging
-from logging import StreamHandler
-from cs.lex import unctrl
-from cs.tty import ttysize
 
 instances = []
 instances_by_id = {}
@@ -62,7 +70,7 @@ class Upd(object):
     self._backend = backend
     self.columns = columns
     self._state = ''
-    self._lock = threading.RLock()
+    self._lock = RLock()
     global instances
     instances.append(self)
 
@@ -78,7 +86,7 @@ class Upd(object):
     txt = unctrl(txt)
     # crop for terminal width
     if self.columns is not None:
-      txt = txt[:self.columns-1]
+      txt = txt[:self.columns - 1]
     txtlen = len(txt)
     with self._lock:
       old = self._state
@@ -97,16 +105,16 @@ class Upd(object):
       #    string, erase trailing extent if any.
       # Therefore compare backspaces against cr+pfxlen.
       #
-      if buflen-pfxlen < 1+pfxlen:
+      if buflen - pfxlen < 1 + pfxlen:
         # backspace and partial overwrite
-        self._backend.write( '\b' * (buflen-pfxlen) )
+        self._backend.write( '\b' * (buflen - pfxlen) )
         self._backend.write( txt[pfxlen:] )
       else:
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
       # trailing text to overwrite with spaces?
-      extlen = buflen-txtlen
+      extlen = buflen - txtlen
       if extlen > 0:
         # old line was longer - write spaces over the old tail
         self._backend.write( ' ' * extlen )
@@ -120,7 +128,7 @@ class Upd(object):
   def nl(self, txt, *a):
     if a:
       txt = txt % a
-    self.without(self._backend.write, txt+'\n')
+    self.without(self._backend.write, txt + '\n')
 
   def flush(self):
     ''' Flush the output stream.
@@ -134,7 +142,7 @@ class Upd(object):
       self._backend = None
 
   def closed(self):
-    return self._backend == None
+    return self._backend is None
 
   def without(self, func, *args, **kw):
     with self._withoutContext():
