@@ -20,9 +20,13 @@ import importlib
 from cs.app.lastvalue import LastValues
 import cs.cmdutils
 from cs.dateutils import isodate
+from cs.deco import cached
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
-from cs.logutils import setup_logging, Pfx, exception, error, warning, info, X, XP
+from cs.logutils import setup_logging, exception, error, warning, info
+from cs.pfx import Pfx, XP
+from cs.py.func import prop
 from cs.py.modules import module_files
+from cs.x import X
 
 PYLIBTOP = 'lib/python'
 
@@ -229,24 +233,10 @@ class Module(object):
       self.module = None
       self.check_status = False
 
-  @property
-  def in_package(self):
-    ''' Is this module part of a package?
-    '''
-    M = self.module
-    if M is None:
-      return False
-    return hasattr(M, '__package__')
-
-  @property
-  def is_package(self):
-    ''' Is this module a package?
-    '''
-    pkg_name = self.package_name
-    return pkg_name is not None and pkg_name == self.name
-
-  @property
+  @prop
   def package_name(self):
+    ''' The name of the package containing this module, or None if this is not inside a package.
+    '''
     M = self.module
     if M is None:
       X("%r.package_name: self.module is None", self.name)
@@ -258,7 +248,23 @@ class Module(object):
       return None
     return pkg_name
 
-  @property
+  @prop
+  def in_package(self):
+    ''' Is this module part of a package?
+    '''
+    M = self.module
+    if M is None:
+      return False
+    return hasattr(M, '__package__')
+
+  @prop
+  def is_package(self):
+    ''' Is this module a package?
+    '''
+    pkg_name = self.package_name
+    return pkg_name is not None and pkg_name == self.name
+
+  @prop
   def dirpath(self):
     M = self.module
     if M is None:
@@ -268,10 +274,11 @@ class Module(object):
     return os.path.dirname(M.__file__)
 
   def paths(self):
-    ''' Generator returning the .py filenames comprising this package.
+    ''' Generator yield the .py filenames comprising this package.
     '''
     M = self.module
     if M is None:
+      XP("paths: no module found")
       return
     filename = self.module.__file__
     if not self.is_package:
@@ -283,7 +290,7 @@ class Module(object):
           if basename.endswith('.py'):
             yield os.path.join(dirpath, basename)
 
-  @property
+  @prop
   def DISTINFO(self):
     D = self._distinfo
     if D is None:
@@ -316,7 +323,15 @@ class Module(object):
         self._distinfo = D
     return D
 
+  @prop
+  def requires(self):
+    ''' Return other nonstdlib packages required by this module.
+    '''
+    return self.DISTINFO.get('install_requires')
+
   def check(self, silent=False):
+    ''' Sanity check a package.
+    '''
     if self._check_status is not None:
       return self._check_status
     if not self._checking:
@@ -328,7 +343,7 @@ class Module(object):
   def _check(self, silent):
     ok = True
     distinfo = self.DISTINFO
-    install_requires = distinfo.get('install_requires')
+    install_requires = self.requires
     if install_requires is None:
       silent or error("missing DISTINFO[install_requires]")
       ok = False
@@ -338,41 +353,39 @@ class Module(object):
       else:
         silent or warning("working off DISTINFO[requires]=%r", install_requires)
     install_requires = set(install_requires)
+    pkg_name = self.package_name
+    if pkg_name is None:
+      pkg_prefix = None
+    else:
+      pkg_prefix = pkg_name + '.'
     # check imports against install_requires
-    subimports = set()
-    # check the imports for every file in the package
-    for pathname in sorted(self.paths()):
-      if not self.is_package:
-        module_name = self.name
-      else:
-        # compute module name from pathname
-        relpath = os.path.relpath(pathname, self.dirpath)
-        dirpart, basepart = os.path.split(relpath)
-        if basepart == '__init__.py':
-          module_name = dirpart.replace(os.sep, '.')
-        else:
-          mod_part, mod_ext = os.path.splitext(relpath)
-          if mod_ext != '.py':
-            warning("relpath %r does not end in '.py', computing module_name from %r", relpath, mod_part)
-          module_name = mod_part.replace(os.sep, '.')
-        module_name = self.package_name + '.' + module_name
-      # check the file
-      fok, fimports = self._check_imports(module_name, pathname, install_requires, silent, self.modules)
-      subimports.update(fimports)
-      if not fok:
+    for name in sorted(self.imports):
+      if not name.startswith('cs.'):
+        continue
+      if pkg_prefix and name.startswith(pkg_prefix):
+        continue
+      if name not in install_requires:
+        silent or warning("import %r not mentioned in install_requires", name)
         ok = False
-    for required in sorted(install_requires - subimports):
-      with Pfx("install_required[%s]", required):
-        silent or warning("not imported")
+    for name in sorted(install_requires):
+      if name not in self.imports:
+        silent or warning("requirement %r not imported", name)
+        ok = False
     return ok
 
-  def _check_imports(self, module_name, filename, install_requires, silent, modules):
-    ''' Scan the supplied filename for imports, check against `install_requires`.
-        Returns (ok, subimports).
-    '''
-    with Pfx("check_imports(%r)", filename):
-      ok = True
-      subimports = set()
+  @prop
+  @cached
+  def imports(self):
+    subnames = set()
+    for path in self.paths():
+      for name in self._direct_imports(self.name, path):
+        if name in subnames:
+          continue
+        subnames.add(name)
+    return subnames
+
+  def _direct_imports(self, module_name, filename, silent=False):
+    with Pfx(filename):
       with open(filename) as codefp:
         for lineno, line in enumerate(codefp, 1):
           with Pfx(lineno):
@@ -384,45 +397,26 @@ class Module(object):
                 if len(words) < 2:
                   silent or warning("missing module name")
                   continue
-                subimport = words[1]
+                subimport0 = subimport = words[1]
                 if subimport == '.':
                   # don't recurse into ourself
-                  continue
-                if subimport.startswith('.'):
+                  pkg_name = self.package_name
+                  if pkg_name is None:
+                    silent or warning("import of '.' from non-package")
+                    continue
+                  subimport = pkg_name
+                elif subimport.startswith('.'):
                   # resolve relative import name
                   preparts = module_name.split('.')
+                  subimport = subimport[1:]
                   while subimport.startswith('.'):
                     preparts.pop(-1)
                     subimport = subimport[1:]
                   if preparts:
                     if subimport:
                       preparts.append(subimport)
-                    subimport = '.'.join(preparts)
-                with Pfx("import %s", subimport):
-                  if subimport in subimports:
-                    ##silent or warning("repeated")
-                    continue
-                  subimports.add(subimport)
-                  if subimport.startswith('cs.'):
-                    subM = modules[subimport]
-                    if subM is None:
-                      warning("NO IMPORT FOR %r", subimport)
-                    if subimport not in install_requires:
-                      subpkg_name = subM.package_name
-                      if subpkg_name is None:
-                        warning("no package name?")
-                      elif subpkg_name != self.package_name:
-                        silent or error("not mentioned in install_requires")
-                        ok = False
-                    subcheck = subM.check(True)
-                    if subcheck is None:
-                      # already in progress
-                      ##silent or warning("subcheck(%r): None: already in progress?", subimport)
-                      pass
-                    elif not subcheck:
-                      silent or error("module NOT OK")
-                      ok = False
-    return ok, subimports
+                  subimport = '.'.join(preparts)
+                yield subimport
 
 #                              name       - YYYYMMDD                            [.n]
 re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
@@ -521,12 +515,17 @@ class ReleaseName(object):
       ok = False
     unreleased_changes = list(self.log_since())
     if unreleased_changes:
+      show_log = not silent and ok
       ok = False
       if not silent:
         error("unreleased changes")
-        for files, firstline in unreleased_changes:
-          files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
-          info("  %s: %s", ' '.join(files)+':', firstline)
+        if show_log:
+          for files, firstline in unreleased_changes:
+            files = [
+                filename[11:] if filename.startswith('lib/python/') else filename
+                for filename in files
+            ]
+            info("  %s: %s", ' '.join(files)+':', firstline)
     return ok
 
   def tagname(self, suffix):

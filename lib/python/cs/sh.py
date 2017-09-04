@@ -92,4 +92,4 @@ def main_shqstr():
   print(quotecmd(argv))
 
 if __name__ == '__main__':
-  sys.exit(main_shqstr(sys.argv))
+  sys.exit(main_shqstr())

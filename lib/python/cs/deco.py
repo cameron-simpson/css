@@ -56,7 +56,8 @@ def cached(func, **dkw):
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
         expected the instance (self) as its first parameter.
-        Default: None, meaning no signature function.
+        Default: None, meaning no signature function. The first
+        computed value will be kept and never updated.
       `unset_value`: the value to return before the method has been
         called successfully.
         Default: None.
@@ -111,6 +112,8 @@ def cached(func, **dkw):
         sig = sig_func(self)
         if sig0 is not None and sig0 == sig:
           return value0
+      if value0 is not unset_value:
+        return value0
       # compute the current value
       value = func(self, *a, **kw)
       setattr(self, val_attr, value)

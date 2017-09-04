@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.asynchron.
+# Self tests for cs.result.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 import unittest
-from cs.asynchron import Result, after
+from cs.result import Result, after
 
 def D(msg, *a):
   if a:

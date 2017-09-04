@@ -496,10 +496,10 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if (c == slosh
-          or (delim is not None and c == delim)
-          or (specials is not None and c in special_starts)
-          ):
+      if ( c == slosh
+           or (delim is not None and c == delim)
+           or (specials is not None and c in special_starts)
+      ):
         break
       offset += 1
     chunks.append(s[offset0:offset])

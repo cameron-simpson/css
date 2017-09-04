@@ -8,7 +8,7 @@ import sys
 import errno
 from collections import namedtuple
 from threading import Lock
-from cs.asynchron import Result
+from cs.result import Result
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
