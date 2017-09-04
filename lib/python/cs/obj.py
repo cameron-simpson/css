@@ -3,11 +3,23 @@
 # Random stuff for "objects". - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Convenience facilities for objects.
+
+Presents:
+* flavour, for deciding whether an object resembles a mapping or sequence.
+
+* O, an object subclass with a nice __str__ and convenient __init__.
+
+* Some O_* functions for working with objects, particularly O subclasses.
+
+* Proxy, a very simple minded object proxy intened to aid debugging.
+'''
+
 from copy import copy as copy0
 from cs.py3 import StringTypes
 
 DISTINFO = {
-    'description': "Convenience facilities for objects.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -52,7 +64,7 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
       then the new value overwrites the old if _overwrite is true.
   '''
   for attr, value in kw.items():
-    if not len(attr) or not attr[0].isalpha():
+    if attr or not attr[0].isalpha():
       if not attr.startswith('_O_'):
         ##warning(".%s: ignoring, does not start with a letter", attr)
         pass
@@ -97,15 +109,15 @@ def O_attritems(o):
 def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
-  t = type(o)
-  if t in StringTypes:
+  obj_type = type(o)
+  if obj_type in StringTypes:
     return repr(o)
-  if t in (tuple, int, float, bool, list):
+  if obj_type in (tuple, int, float, bool, list):
     return str(o)
-  if t is dict:
+  if obj_type is dict:
     o2 = dict([(k, str(v)) for k, v in o.items()])
     return str(o2)
-  if t is set:
+  if obj_type is set:
     return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
   seen.add(id(o))
   if no_recurse:
@@ -198,21 +210,20 @@ def obj_as_dict(o, attr_prefix=None, attr_match=None):
   '''
   if attr_match is None:
     if attr_prefix is None:
-      match = lambda attr: len(attr) > 0 and not attr.startswith('_')
+      match = lambda attr: attr and not attr.startswith('_')
     else:
       match = lambda attr: attr.startswith(attr_prefix)
   elif attr_prefix is None:
     match = attr_match
   else:
     raise ValueError("cannot specify both attr_prefix and attr_match")
-  d = {}
+  obj_attrs = {}
   for attr in dir(o):
     if match(attr):
-      d[attr] = getattr(o, attr)
-  return d
+      obj_attrs[attr] = getattr(o, attr)
+  return obj_attrs
 
 class Proxy(object):
-
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
       Note that setattr and delattr work directly on the proxy, not the proxied object.
   '''
