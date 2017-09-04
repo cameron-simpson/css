@@ -31,7 +31,6 @@ import sys
 import threading
 import time
 import traceback
-from cs.result import Result, _PendingFunction, AsynchState, report, after
 from cs.debug import ifdebug, Lock, Thread
 from cs.excutils import logexc, logexc_gen
 from cs.logutils import error, warning, debug, exception, D, OBSOLETE
@@ -39,9 +38,9 @@ from cs.pfx import Pfx, PrePfx, XP
 from cs.py.func import funcname
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
+from cs.result import Result, _PendingFunction, AsynchState, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, bg
+from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -54,6 +53,7 @@ DISTINFO = {
         'cs.debug',
         'cs.excutils',
         'cs.logutils',
+        'cs.pfx',
         'cs.py.func',
         'cs.queues',
         'cs.result',
