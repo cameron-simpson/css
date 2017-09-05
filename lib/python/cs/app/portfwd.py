@@ -19,13 +19,12 @@ from threading import RLock
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
-from cs.cmdutils import pipefrom
 from cs.env import envsub
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
+from cs.psutils import pipefrom
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
-from cs.x import X
 
 USAGE = '''Usage:
   %s -d [targets...]
