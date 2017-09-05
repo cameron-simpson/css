@@ -5,9 +5,9 @@
 #
 
 r'''
-Environment related functions.
+Some environment related functions.
 
-* LOGDIR, VARRUN, FLAGDIR: constants defining standard places used in other modules
+* LOGDIR, VARRUN, FLAGDIR: lambdas defining standard places used in other modules
 
 * envsub: replace substrings of the form '$var' with the value of 'var' from `environ`.
 
@@ -18,7 +18,6 @@ import os
 from cs.lex import get_qstr
 
 DISTINFO = {
-    'description': "a few environment related functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
