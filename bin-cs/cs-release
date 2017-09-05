@@ -278,7 +278,7 @@ class Module(object):
     '''
     M = self.module
     if M is None:
-      XP("paths: no module found")
+      warning("paths: no module found")
       return
     filename = self.module.__file__
     if not self.is_package:
