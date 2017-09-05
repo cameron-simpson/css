@@ -288,8 +288,6 @@ class TrackingCounter(object):
           warning("%s.dec: more .decs than .incs for tag %r", self, tag)
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
-      elif self.value == 0:
-        raise RuntimeError("ZERO HERE!")
       self._notify()
 
   def check(self):
