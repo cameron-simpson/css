@@ -4,11 +4,28 @@
 #       - Cameron Simpson <cs@cskk.id.au> 02sep2011
 #
 
+r'''
+Assorted process management functions.
+'''
+
 from __future__ import print_function
 from contextlib import contextmanager
 import errno
 import os
 from signal import SIGTERM, SIGKILL
+import time
+from cs.pfx import Pfx
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+    ],
+}
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`.
@@ -23,7 +40,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
       if `do_SIGKILL` is true then send the process signal.SIGKILL
       as a final measure before return.
   '''
-  if type(pid) is str:
+  if isinstance(pid, str):
     with Pfx(pid):
       return stop(int(open(pid).read().strip()))
   os.kill(pid, signum)
@@ -38,7 +55,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
       try:
         os.kill(pid, 0)
       except OSError as e:
-        if e.errno != os.ESRCH:
+        if e.errno != errno.ESRCH:
           raise
         # process no longer present
         return True
@@ -47,7 +64,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         try:
           os.kill(pid, SIGKILL)
         except OSError as e:
-          if e.errno != os.ESRCH:
+          if e.errno != errno.ESRCH:
             raise
       return False
 
@@ -65,7 +82,7 @@ def remove_pidfile(path):
   ''' Truncate and remove a pidfile, permissions permitting.
   '''
   try:
-    with open(path, "w") as pidfp:
+    with open(path, "w"):
       pass
     os.remove(path)
   except OSError as e:
