@@ -4,6 +4,10 @@
 #       - Cameron Simpson <cs@cskk.id.au> 24apr2014
 #
 
+r'''
+Persistent filesystem based flags for state and control.
+'''
+
 from __future__ import print_function
 from collections import MutableMapping, defaultdict
 from contextlib import contextmanager
@@ -16,6 +20,17 @@ from threading import Thread
 from time import sleep
 from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.env', 'cs.lex'],
+}
+
 
 USAGE = '''Usage:
   %s            Recite all flag values.
