@@ -78,9 +78,7 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
     property_name = '_' + func.__name__
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
-
-  from cs.logutils import X
-
+  from cs.x import X
   @transmute(AttributeError)
   def property_value(self):
     ''' Attempt lockless fetch of property first.
