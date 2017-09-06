@@ -4,40 +4,53 @@
 #   - Cameron Simpson <cs@cskk.id.au> 30oct2016
 #
 
+r'''
+Wrapper for the ffmpeg command for video conversion.
+'''
+
 from collections import namedtuple
 import os.path
 from subprocess import Popen, PIPE
 from cs.pfx import Pfx
 from cs.obj import O
 
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.obj', 'cs.pfx'],
+}
+
 class MetaData(O):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
   '''
 
-  FIELDNAMES = { 'mp4':
-                  [ 'album',
-                    'album_artist',
-                    'author',
-                    'comment',
-                    'composer',
-                    'copyright',
-                    'description',
-                    'episode_id',
-                    'genre',
-                    'grouping',
-                    'lyrics',
-                    'network',
-                    'show',
-                    'synopsis',
-                    'title',
-                    'track',
-                    'year',
-                  ],
-                }
+  FIELDNAMES = {
+      'mp4': [
+          'album',
+          'album_artist',
+          'author',
+          'comment',
+          'composer',
+          'copyright',
+          'description',
+          'episode_id',
+          'genre',
+          'grouping',
+          'lyrics',
+          'network',
+          'show',
+          'synopsis',
+          'title',
+          'track',
+          'year',
+      ],
+  }
 
-  def __init__(self,
-                format,
-                **kw):
+  def __init__(self, format, **kw):
     ''' Initialise .format, .fields and .values.
     '''
     try:
@@ -51,7 +64,7 @@ class MetaData(O):
       if k == 'format':
         raise ValueError("forbidden keyword name %r" % (k,))
       if k not in fields:
-        raise ValueError("format %r does not support field %r" % (format, field))
+        raise ValueError("format %r does not support field %r" % (format, k))
       self.values[k] = v
 
   def options(self):
@@ -65,7 +78,7 @@ class MetaData(O):
     return opts
 
 # source specification
-# 
+#
 # src: input source.
 #   If `src` is None, pass '-' to ffmpeg(1) as the input path and
 #     attach a pipe to its standard input.
