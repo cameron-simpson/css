@@ -6,6 +6,38 @@
 
 r'''
 Persistent filesystem based flags for state and control.
+
+Filesystem visible boolean flags
+for control and status,
+allowing easy monitoring of services or other status,
+and control by flag management
+for programmes which also monitor the flags.
+
+The flags are expressed as individual files with uppercase names
+in a common directory ($HOME/var/flags by default);
+an empty or missing file is "false"
+and a nonempty file is "true".
+
+The Flags class provides easy Pythonic access.
+If presents as a modifiable mapping whose keys are the flag names.
+
+The is also a FlaggedMixin class providing convenient methods and attributes
+for maintaining a collection of flags associated with some object
+with flag names prefixed by the object's .name attribute uppercased and with an underscore appended::
+
+  class SvcD(...,FlaggedMixin):
+    def __init__(self, name, ...)
+      self.name = name
+      FlaggedMixin.__init__(self)
+      ...
+    def disable(self):
+      self.flag_disabled = True
+    def restart(self):
+      self.flag_restart = True
+    def _restart(self):
+      self.flag_restart = False
+      ... restart the SvcD ...
+
 '''
 
 from __future__ import print_function
