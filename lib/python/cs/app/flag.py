@@ -19,7 +19,7 @@ an empty or missing file is "false"
 and a nonempty file is "true".
 
 The Flags class provides easy Pythonic access to this directory.
-It presents as a modifiable mapping whose keys are the flag names:
+It presents as a modifiable mapping whose keys are the flag names::
 
   flags = Flags()
   flags['UNTOPPOST'] = True
