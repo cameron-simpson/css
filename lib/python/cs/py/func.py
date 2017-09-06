@@ -10,7 +10,7 @@ Convenience facilities related to Python functions.
 * funcname: return a function's name, preferably __name__
 * funccite: cite a function (name and code location)
 * @prop: replacement for @property which turns internal AttributeErrors into RuntimeErrors
-* some decorators to verifying the return types of functions
+* some decorators to verify the return types of functions
 '''
 
 import sys
