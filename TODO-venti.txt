@@ -1,7 +1,6 @@
 stream protocol: error flag, json flag (implies JSON additional payload)
 stream protocol: new channel
-datafile: use os.open(O_APPEND) and raw fds, no buffering, no
-  seek, no flush, separate fd for read
+√ datafile: use os.open(O_APPEND) and raw fds, separate fd for read
 flat file cache - keep multiple caches, set of hashes per file,
   upper limit, drop oldest file once set empty and >8 files
 mount -o append: accept O_TRUNC for empty/missing files
