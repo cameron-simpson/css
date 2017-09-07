@@ -47,6 +47,7 @@ USAGE = '''Usage: %s [-f] [op [names...]]
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
     status      Report latest release tag and differing releases at pypi.
+'''
 
 ##  export      Export release to temporary directory, report directory.
 ##  freshmeat-submit Announce last release to freshmeat.
