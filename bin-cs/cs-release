@@ -18,12 +18,12 @@ from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
 import importlib
 from cs.app.lastvalue import LastValues
-import cs.cmdutils
 from cs.dateutils import isodate
 from cs.deco import cached
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
 from cs.logutils import setup_logging, exception, error, warning, info
 from cs.pfx import Pfx, XP
+import cs.psutils
 from cs.py.func import prop
 from cs.py.modules import module_files
 from cs.x import X
@@ -37,7 +37,7 @@ DISTINFO_DEFAULTS = {
 
 USAGE = '''Usage: %s [-f] [op [names...]]
   -f  Force. Sanity checks that would stop some actions will not prevent them.
-  With no op, report all pypi and testpypi lastvalues.
+  With no op, report all pypi lastvalues.
   op:
     check       Check simple things about a module's DISTINFO map.
     last        Report last release issued.
@@ -46,8 +46,7 @@ USAGE = '''Usage: %s [-f] [op [names...]]
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
-    status      Report latest release tag and differing releases at pypi and testpypi.
-    testpypi    Upload latest release to test PyPI.'''
+    status      Report latest release tag and differing releases at pypi.
 
 ##  export      Export release to temporary directory, report directory.
 ##  freshmeat-submit Announce last release to freshmeat.
@@ -172,13 +171,11 @@ def main(argv):
         elif op == 'status':
           tagged = N.last_suffix()
           result = [name, tagged]
-          for pypi_flavour in 'testpypi', 'pypi':
+          for pypi_flavour in 'pypi':
             lvkey, last_upload = N.last_upload(pypi_flavour)
             if last_upload != tagged:
               result.append("%s:%s" % (pypi_flavour, last_upload))
           print(*result)
-        elif op == 'testpypi':
-          N.submit_testpypi(force=force)
         else:
           warning("unrecognised op %r", op)
           badopts = True
@@ -200,7 +197,7 @@ def ask(message):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  P = cs.cmdutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, trace=False, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -278,7 +275,7 @@ class Module(object):
     '''
     M = self.module
     if M is None:
-      XP("paths: no module found")
+      warning("paths: no module found")
       return
     filename = self.module.__file__
     if not self.is_package:
@@ -620,9 +617,6 @@ class ReleaseName(object):
 
   def submit_pypi(self, force=False):
     return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
-
-  def submit_testpypi(self, force=False):
-    return self._submit_pypi('testpypi', URL_PYPI_TEST, force=force)
 
   def last_upload(self, pypi_flavour):
     lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)

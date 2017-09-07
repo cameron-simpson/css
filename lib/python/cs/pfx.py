@@ -197,8 +197,8 @@ class Pfx(object):
           if not isinstance(text, StringTypes):
             return text
           return prefix \
-                 + ': ' \
-                 + ustr(text, errors='replace').replace('\n', '\n' + prefix)
+              + ': ' \
+              + ustr(text, errors='replace').replace('\n', '\n' + prefix)
         for attr in 'args', 'message', 'msg', 'reason':
           try:
             value = getattr(exc_value, attr)

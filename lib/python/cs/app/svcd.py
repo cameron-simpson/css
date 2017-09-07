@@ -7,6 +7,42 @@
 # Recode as Python module.  - cameron 14may2017
 #
 
+r'''
+SvcD class and "svcd" command to run persistent service programmes.
+
+This provides the features one wants from a daemon
+for arbitrary commands providing a service:
+
+* process id (pid) files for both svcd and the service command
+* filesystem visible status (command running, service enabled)
+  via `cs.app.flag <https://pypi.org/project/cs.app.flag/>`_
+* command restart if the command exits
+* command control (stop, restart, disable)
+  via `cs.app.flag <https://pypi.org/project/cs.app.flag/>`_
+* test function to monitor for service viability;
+  if the test function fails, do not run the service.
+  This typically monitors something like
+  network routing (suspend service while laptop offline)
+  or a ping (suspend ssh tunnel while target does not answer pings).
+* signature function to monitor for service restart;
+  if the signature changes, restart the service.
+  This typically monitors something like
+  file contents (restart service on configuration change)
+  or network routing (restart ssh tunnel on network change)
+* callbacks for service command start and end,
+  for example to display desktop notifications
+
+I use this to run persistent ssh port forwards
+and a small collection of other personal services.
+I have convenient shell commands to look up service status
+and to start/stop/restart services.
+
+See `cs.app.portfwd <https://pypi.org/project/cs.app.portfwd/>`_
+which I use to manage my ssh tunnels;
+it is a single Python programme
+running multiple ssh commands, each via its own SvcD instance.
+'''
+
 from __future__ import print_function
 from getopt import getopt, GetoptError
 import os
@@ -18,10 +54,30 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, debug
+from cs.logutils import setup_logging, warning, info
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
-from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.app.flag',
+        'cs.env',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.psutils',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'svcd = cs.app.main:main'
+        ],
+    },
+}
 
 TEST_RATE = 7       # frequency of polling of test condition
 KILL_TIME = 5       # how long to wait for a terminated process to exit
@@ -70,7 +126,9 @@ USAGE = '''Usage:
           Run test and related commands as the specified username.
     -x    Trace execution.'''
 
-def main(argv, environ=None):
+def main(argv=None, environ=None):
+  if argv is None:
+    argv = sys.argv
   cmd = basename(argv.pop(0))
   usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
   setup_logging(cmd)
