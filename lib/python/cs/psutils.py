@@ -108,7 +108,7 @@ def PidFileManager(path, pid=None):
   yield
   remove_pidfile(path)
 
-def run(argv, trace=False):
+def run(argv, trace=False, **kw):
   ''' Run a command. Optionally trace invocation. Return result of subprocess.call.
       `argv`: the command argument list
       `trace`: Default False. If True, recite invocation to stderr.
@@ -118,7 +118,7 @@ def run(argv, trace=False):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+'] + argv
     print(*pargv, file=tracefp)
-  return subprocess.call(argv)
+  return subprocess.call(argv, **kw)
 
 def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command. Optionally trace invocation. Return the Popen object with .stdout decoded as text.
