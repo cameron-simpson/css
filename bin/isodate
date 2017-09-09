@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Return today's day code.	- Cameron Simpson <cs@zip.com.au> 16jun1994
+# Return today's day code.	- Cameron Simpson <cs@cskk.id.au> 16jun1994
 # ISOise the returns.		- cameron 27mar1998
 # Solaris 2.6 is feeding me full day and month names!	- cameron 05apr2000
 # Believe the claims that -% works everywhere these days. - cameron 06jun2000

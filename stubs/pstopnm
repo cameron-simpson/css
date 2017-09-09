@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for pstopnm which has the courtesy to act as a pipe.
-#	- Cameron Simpson <cs@zip.com.au> 07may97
+#	- Cameron Simpson <cs@cskk.id.au> 07may97
 #
 
 opts=

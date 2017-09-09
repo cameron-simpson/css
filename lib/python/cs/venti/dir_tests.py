@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.venti.dir.
-#       - Cameron Simpson <cs@zip.com.au> 25aug2015
+#       - Cameron Simpson <cs@cskk.id.au> 25aug2015
 #
 
 from random import shuffle

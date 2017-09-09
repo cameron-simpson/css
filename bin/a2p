@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Yet another ASCII to PostScript.
-#	- Cameron Simpson <cs@zip.com.au> 10may97
+#	- Cameron Simpson <cs@cskk.id.au> 10may97
 #
 
 use cs::Misc;

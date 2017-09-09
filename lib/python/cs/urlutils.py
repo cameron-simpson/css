@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # URL related utility functions and classes.
-#       - Cameron Simpson <cs@zip.com.au> 26dec2011
+#       - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
 from __future__ import with_statement, print_function

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Miscellaneous things to do with sockets.
-#   - Cameron Simpson <cs@zip.com.au> 28oct2015
+#   - Cameron Simpson <cs@cskk.id.au> 28oct2015
 #
 
 import os

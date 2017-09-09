@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Summarise the named mail items to stdout.
-#	- Cameron Simpson <cs@zip.com.au>, 13jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 13jul94
 #
 
 use cs::Source;

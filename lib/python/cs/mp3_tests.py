@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.mp3.
-#   - Cameron Simpson <cs@zip.com.au> 06may2017
+#   - Cameron Simpson <cs@cskk.id.au> 06may2017
 #
 
 from __future__ import print_function

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Collect together the appropriate public keys for this site.
-#	- Cameron Simpson <cs@zip.com.au> 14jul2001
+#	- Cameron Simpson <cs@cskk.id.au> 14jul2001
 #
 
 host=$HOST

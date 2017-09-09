@@ -2,7 +2,7 @@
 #
 # Show grants for the specified user, nicely sorted for readability
 # and diffability. Code adapted from cpmysql.
-#       - Cameron Simpson <cs@zip.com.au> 10sep2012
+#       - Cameron Simpson <cs@cskk.id.au> 10sep2012
 #
 
 set -ue

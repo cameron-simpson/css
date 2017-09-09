@@ -3,7 +3,7 @@
 # Patch /etc/hosts (by default) with raw /etc/hosts content from another file.
 # I use this to wire certain special addresses into my /etc/hosts files such
 # as IP addresses of specific machines on known local LANs.
-#   - Cameron Simpson <cs@zip.com.au> 15apr2016
+#   - Cameron Simpson <cs@cskk.id.au> 15apr2016
 #
 
 set -ue

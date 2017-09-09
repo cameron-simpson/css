@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Quick vmware fire up. - Cameron Simpson <cs@zip.com.au> 29nov2002
+# Quick vmware fire up. - Cameron Simpson <cs@cskk.id.au> 29nov2002
 #
 
 cmd=$0

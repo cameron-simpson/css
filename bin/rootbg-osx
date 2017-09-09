@@ -5,7 +5,7 @@
 # "set desktop picture" just sets the magic string for the static
 # desktop and fires the "refresh the desktop" activity; if that is
 # set to pick from a directory etc that action will fire.
-#   - Cameron Simpson <cs@zip.com.au> 01dec2016
+#   - Cameron Simpson <cs@cskk.id.au> 01dec2016
 #
 
 [ $# = 1 ] || { echo "Usage: $0 imgpath" >&2; exit 2; }

@@ -1,0 +1,9 @@
+  lib/python/cs/lex.py: merge default ==> beyonwiz
+  lib/python/cs/lex.py: cs.lex: python 2 fix for hexify and untexthexify
+  lib/python/cs/lex.py: cs.lex,cs.rfc2047,cs.app.mailfiler: move unrfc2047 into new cs.rfc2047 module
+  lib/python/cs/lex.py: cs.lex: some docstrings
+  lib/python/cs/lex.py: merge default ==> venti
+  lib/python/cs/lex.py: cs.lex: hexify: python 3 fix - takes bytes, returns str
+  lib/python/cs/lex.py: cs.lex: untexthexify: raise ValueError instead of TypeError, tweak string length test
+  lib/python/cs/README-lex.rst lib/python/cs/lex.py: cs.lex: lint and PyPI prep
+  lib/python/cs/lex.py: cs.lex: tiny linting

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access Calibre ebook library data.
-#       - Cameron Simpson <cs@zip.com.au> 13feb2016
+#       - Cameron Simpson <cs@cskk.id.au> 13feb2016
 #
 
 from __future__ import print_function

@@ -24,7 +24,7 @@
 # Example:
 #       macify my-unix-music-dir my-mac-dir-for-copying
 #
-# - Cameron Simpson <cs@zip.com.au> 09may2006
+# - Cameron Simpson <cs@cskk.id.au> 09may2006
 #
 
 import os

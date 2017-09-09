@@ -3,7 +3,7 @@
 # Read shell command lines from stdin, run.
 # This is intended as a crude service daemon to run in a privileged
 # environment (for example, with raised ulimits).
-#       - Cameron Simpson <cs@zip.com.au> 01oct2011
+#       - Cameron Simpson <cs@cskk.id.au> 01oct2011
 #
 
 set -ue

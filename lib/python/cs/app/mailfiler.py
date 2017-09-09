@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Handler for rulesets similar to the format of cats2procmailrc(1cs).
-#       - Cameron Simpson <cs@zip.com.au> 22may2011
+#       - Cameron Simpson <cs@cskk.id.au> 22may2011
 #
 
 from __future__ import print_function
@@ -304,7 +304,7 @@ class MailFiler(O):
     return Pathname(longpath(folderspec, None,  ( (self.maildir_path + '/', '+'), )))
 
   def maildir_watcher(self, folderspec):
-    ''' Return the singleton MaildirWatcher indicated by the `folderspec`.
+    ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
     '''
     folderpath = self.maildir_from_folderspec(folderspec)
     watchers = self._maildir_watchers
@@ -1704,17 +1704,6 @@ class WatchedMaildir(O):
               len(self._rules),
               len(self.lurking))
 
-  def _rules_state(self):
-    states = []
-    for path in self._rules_paths:
-      try:
-        S = FileState(path)
-      except OSError as e:
-        states.append(None)
-      else:
-        states.append( (path, S.mtime, S.size, S.dev, S.ino) )
-    return states
-
   def close(self):
     self.flush()
     self.mdir.close()
@@ -1753,6 +1742,17 @@ class WatchedMaildir(O):
     info("unlurk %s", key)
     self.lurking.remove(key)
 
+  def _rules_state(self):
+    states = []
+    for path in self._rules_paths:
+      try:
+        S = FileState(path)
+      except OSError as e:
+        states.append(None)
+      else:
+        states.append( (path, S.mtime, S.size, S.dev, S.ino) )
+    return states
+
   @prop
   @cached(sig_func=lambda md: md._rules_state())
   def rules(self):
@@ -1761,7 +1761,6 @@ class WatchedMaildir(O):
     R = Rules(path0)
     # produce rules file list with base file at index 0
     self._rules_paths = [ path0 ] + [ path for path in R.rule_files if path != path0 ]
-    ##X("_rules_paths ==> %r", self._rules_paths)
     return R
 
 if __name__ == '__main__':

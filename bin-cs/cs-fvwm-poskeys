@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Emit positioning key bindings for FVWM.
-#       - Cameron Simpson <cs@zip.com.au> 20oct2007
+#       - Cameron Simpson <cs@cskk.id.au> 20oct2007
 #
 
 import os

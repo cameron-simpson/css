@@ -3,7 +3,7 @@
 # Given a listing of files, emit only the latest versions.
 # Aimed primarily at things like the GNU source archive, which has many
 # versions of things but of which we want to mirror only the latest.
-#	- Cameron Simpson <cs@zip.com.au> 17apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 17apr2001
 #
 # Add -o to pass other, unversioned, files through.
 #	- cameron 07jun2001

@@ -2,7 +2,7 @@
 #
 # Make a directory tree matching another, hardlinking the contents
 # from the original to the new one.
-#	- Cameron Simpson <cs@zip.com.au> 25nov99
+#	- Cameron Simpson <cs@cskk.id.au> 25nov99
 #
 
 use cs::Misc;

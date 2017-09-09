@@ -1,15 +1,23 @@
 #!/usr/bin/python
 #
 # Convenience routines for python functions.
-#       - Cameron Simpson <cs@zip.com.au> 15apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 15apr2014
 #
+
+r'''
+Convenience facilities related to Python functions.
+
+* funcname: return a function's name, preferably __name__
+* funccite: cite a function (name and code location)
+* @prop: replacement for @property which turns internal AttributeErrors into RuntimeErrors
+* some decorators to verify the return types of functions
+'''
 
 import sys
 from functools import partial
 from cs.excutils import transmute
 
 DISTINFO = {
-    'description': "convenience facilities related to Python functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -78,9 +86,7 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
     property_name = '_' + func.__name__
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
-
-  from cs.logutils import X
-
+  from cs.x import X
   @transmute(AttributeError)
   def property_value(self):
     ''' Attempt lockless fetch of property first.
@@ -121,7 +127,7 @@ def derived_from(property_name):
   return partial(derived_property, original_revision_name='_' + property_name + '__revision')
 
 def yields_type(func, basetype):
-  ''' Decrator which checks that a generator yields values of type `basetype`.
+  ''' Decorator which checks that a generator yields values of type `basetype`.
   '''
   citation = funccite(func)
   def check_yields_type(*a, **kw):

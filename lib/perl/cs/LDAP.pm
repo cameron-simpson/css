@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # LDAP routines.
-#	- Cameron Simpson <cs@zip.com.au> 07jan1998
+#	- Cameron Simpson <cs@cskk.id.au> 07jan1998
 #
 
 use strict qw(vars);

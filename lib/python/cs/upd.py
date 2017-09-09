@@ -1,38 +1,59 @@
 #!/usr/bin/python
 #
 # Single line status updates.
-#   - Cameron Simpson <cs@zip.com.au>
-#
+#   - Cameron Simpson <cs@cskk.id.au>
+
+r'''
+Single line status updates with minimal update sequences.
+
+* Upd: a class accepting update strings which emits minimal text to update a progress line.
+
+-- out(s): update the line to show the string ``s``
+
+-- nl(s): flush the output line, write ``s`` with a newline, restore the status line
+
+-- without(func,...): flush the output line, call func, restore the status line
+
+This is available as an output mode in cs.logutils.
+'''
 
 from __future__ import with_statement
+import atexit
+from contextlib import contextmanager
+from threading import RLock
+from cs.lex import unctrl
+from cs.tty import ttysize
 
 DISTINFO = {
-    'description': "single line status updates with minimal update sequences",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': ['cs.lex', 'cs.tty'],
 }
 
-from threading import Lock
-import threading
-from contextlib import contextmanager
-import atexit
-import logging
-from logging import StreamHandler
-from cs.lex import unctrl
-from cs.tty import ttysize
-
 instances = []
+instances_by_id = {}
+
+def upd_for(stream):
+  ''' Factory for Upd singletons keyed by the id of their backend.
+  '''
+  global instances_by_id
+  U = instances_by_id.get(id(stream))
+  if not U:
+    U = Upd(stream)
+    instances_by_id[id(stream)] = U
+  return U
 
 def cleanupAtExit():
   global instances
+  global instances_by_id
   for i in instances:
     i.close()
   instances = ()
+  instances_by_id = {}
 
 atexit.register(cleanupAtExit)
 
@@ -49,7 +70,7 @@ class Upd(object):
     self._backend = backend
     self.columns = columns
     self._state = ''
-    self._lock = threading.RLock()
+    self._lock = RLock()
     global instances
     instances.append(self)
 
@@ -57,19 +78,15 @@ class Upd(object):
   def state(self):
     return self._state
 
-  def out(self, txt, *a, **kw):
-    noStrip = kw.pop('noStrip', False)
-    if kw:
-      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+  def out(self, txt, *a):
     if a:
       txt = txt % a
     # normalise text
-    if not noStrip:
-      txt = txt.rstrip()
+    txt = txt.rstrip()
     txt = unctrl(txt)
     # crop for terminal width
     if self.columns is not None:
-      txt = txt[:self.columns-1]
+      txt = txt[:self.columns - 1]
     txtlen = len(txt)
     with self._lock:
       old = self._state
@@ -88,16 +105,16 @@ class Upd(object):
       #    string, erase trailing extent if any.
       # Therefore compare backspaces against cr+pfxlen.
       #
-      if buflen-pfxlen < 1+pfxlen:
+      if buflen - pfxlen < 1 + pfxlen:
         # backspace and partial overwrite
-        self._backend.write( '\b' * (buflen-pfxlen) )
+        self._backend.write( '\b' * (buflen - pfxlen) )
         self._backend.write( txt[pfxlen:] )
       else:
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
       # trailing text to overwrite with spaces?
-      extlen = buflen-txtlen
+      extlen = buflen - txtlen
       if extlen > 0:
         # old line was longer - write spaces over the old tail
         self._backend.write( ' ' * extlen )
@@ -108,13 +125,10 @@ class Upd(object):
 
     return old
 
-  def nl(self, txt, *a, **kw):
-    noStrip = kw.pop('noStrip', False)
-    if kw:
-      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+  def nl(self, txt, *a):
     if a:
       txt = txt % a
-    self.without(self._backend.write, txt+'\n', noStrip=noStrip)
+    self.without(self._backend.write, txt + '\n')
 
   def flush(self):
     ''' Flush the output stream.
@@ -128,21 +142,16 @@ class Upd(object):
       self._backend = None
 
   def closed(self):
-    return self._backend == None
+    return self._backend is None
 
   def without(self, func, *args, **kw):
-    if 'noStrip' in kw:
-      noStrip = kw['noStrip']
-      del kw['noStrip']
-    else:
-      noStrip = False
-    with self._withoutContext(noStrip):
+    with self._withoutContext():
       ret = func(*args, **kw)
     return ret
 
   @contextmanager
-  def _withoutContext(self, noStrip=False):
+  def _withoutContext(self):
     with self._lock:
-      old = self.out('', noStrip=noStrip)
+      old = self.out('')
       yield
-      self.out(old, noStrip=True)
+      self.out(old)

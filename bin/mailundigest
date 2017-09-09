@@ -2,7 +2,7 @@
 #
 # Wrapper for procmail and formail to explode a digest into a particular folder.
 # Based on the undigestifier in "man procmailex" but considerably fleshed out.
-#	- Cameron Simpson <cs@zip.com.au> 09jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 09jan2002
 #
 
 : ${TMPDIR:=/tmp}

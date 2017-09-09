@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Read peer access patterns and emit squid directives.
-#       - Cameron Simpson <cs@zip.com.au> 23jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 23jul2012
 #
 
 from __future__ import print_function

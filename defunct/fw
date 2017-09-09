@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Usage: fw [-p subject_prefix] m-args...
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 tmp=${TMP-/tmp}/fw$$

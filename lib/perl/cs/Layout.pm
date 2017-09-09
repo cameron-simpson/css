@@ -3,7 +3,7 @@
 # Layout class for marked up text-like stuff.
 # This is a base class and expects the geometry and semantic information
 # to come from the super-class.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

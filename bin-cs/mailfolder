@@ -3,7 +3,7 @@
 # Read a mail folder.
 # Sync with remote copies first.
 # Run self remotely if no local folder.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

@@ -1,0 +1,9 @@
+  lib/python/cs/tty.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/tty.py: merge default ==> beyonwiz
+  lib/python/cs/tty.py: cs.tty: add statusline and statusline_s functions
+  lib/python/cs/tty.py: cs.tty: statusline stuff deals in bytes
+  lib/python/cs/tty.py: cs.tty: ttysize: support BSD stty output format
+  lib/python/cs/tty.py: my email address has changed - update Python code
+  lib/python/cs/tty.py: cs.tty: fill out module docstring from obsolete README file
+  lib/python/cs/README-tty.rst: README-tty.rst: obsoleted by module docstring
+  lib/python/cs/tty.py: cs.tty: lint

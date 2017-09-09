@@ -7,7 +7,7 @@
 # the save directory and joins all such pairs found together using
 # ffmpeg-merge and, if successful, moves the pair into a DONE
 # subdirectory for later removal.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -uex

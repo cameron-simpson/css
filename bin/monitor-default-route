@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Monitor the presence of a default route.
-#   - Cameron Simpson <cs@zip.com.au> 05nov2014
+#   - Cameron Simpson <cs@cskk.id.au> 05nov2014
 #
 
 svc_name=route_default

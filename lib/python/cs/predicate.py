@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for expressing and testing predicates.
-#   - Cameron Simpson <cs@zip.com.au> 07nov2015
+#   - Cameron Simpson <cs@cskk.id.au> 07nov2015
 #
 
 from contextlib import contextmanager

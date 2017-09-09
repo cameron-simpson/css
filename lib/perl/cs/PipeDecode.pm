@@ -4,7 +4,7 @@
 # comes from the Source constructed with the args supplied.
 # $pipefn is a ref to a function to munge the Source and supply the output.
 # See MD5.pm for an example use.
-#	- Cameron Simpson <cs@zip.com.au> 28aug96
+#	- Cameron Simpson <cs@cskk.id.au> 28aug96
 #
 
 use strict qw(vars);

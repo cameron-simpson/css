@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Mail related facilities.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os

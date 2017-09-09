@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Grep all lines from stdin containing all the command line regexps.
-# - Cameron Simpson <cs@zip.com.au> 12nov2001
+# - Cameron Simpson <cs@cskk.id.au> 12nov2001
 #
 
 set -ue

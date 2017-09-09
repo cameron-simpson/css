@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Show IP addresses and their "Cleared" timestamps from a PF table.
-#       - Cameron Simpson <cs@zip.com.au> 07oct2009
+#       - Cameron Simpson <cs@cskk.id.au> 07oct2009
 #
 
 set -ue

@@ -3,7 +3,7 @@
 # Permit PASV FTP to hosts.
 # This needs to be upgraded to do the stateful FTP connection tracking
 # instead of this open slather for the high ports.
-#	- Cameron Simpson <cs@zip.com.au> 21mar2004
+#	- Cameron Simpson <cs@cskk.id.au> 21mar2004
 #
 fw-tcp-out ftp ${1+"$@"}
 fw-tcp-out 1024:65535 ${1+"$@"}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # UDBadmin - administer the DAP User Database.
-#	- Cameron Simpson <cs@zip.com.au> 27mar95
+#	- Cameron Simpson <cs@cskk.id.au> 27mar95
 #
 
 %Param =(	YPdir = '/usr/etc/yp/src',

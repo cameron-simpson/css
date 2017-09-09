@@ -2,7 +2,7 @@
 #
 # Strip double spacing from text.
 # Try to cope with mixtures and nondoublespaced text.
-#	- Cameron Simpson <cs@zip.com.au> 26mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 26mar2000
 #
 
 $inbreak=1;

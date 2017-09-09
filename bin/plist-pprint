@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Dump an OS X plist file as xml. Trite wrapper for a plutil(1) incantation.
-#   - Cameron Simpson <cs@zip.com.au> 12feb2017
+#   - Cameron Simpson <cs@cskk.id.au> 12feb2017
 #
 
 cmd=$0

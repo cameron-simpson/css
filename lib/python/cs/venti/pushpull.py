@@ -1,11 +1,11 @@
 #!/usr/bin/python
 #
 # Processes for pushing or pulling blocks between Stores.
-#   - Cameron Simpson <cs@zip.com.au> 13dec2015
+#   - Cameron Simpson <cs@cskk.id.au> 13dec2015
 # 
 
 from functools import partial
-from cs.asynchron import OnDemandFunction
+from cs.result import OnDemandFunction
 from cs.logutils import X
 
 def pull_hashcode(S1, S2, hashcode):

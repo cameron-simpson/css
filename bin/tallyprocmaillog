@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Process a procmail log and tally delivery totals.
-#	- Cameron Simpson <cs@zip.com.au> 04aug2002
+#	- Cameron Simpson <cs@cskk.id.au> 04aug2002
 #
 
 ($::cmd=$0) =~ s:.*/::;

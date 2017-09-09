@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Stream protocol for vt stores.
-#       - Cameron Simpson <cs@zip.com.au> 06dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 06dec2007
 #
 # TODO: T_SYNC, to wait for pending requests before returning
 #

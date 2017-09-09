@@ -7,7 +7,7 @@
 # but since AFAIK in perl you can't test for a signal being in "ignored" state
 # some of my perl scripts which catch SIGHUP were undoing the simplicity of
 # that, so I want a setsid as well, which means this becomes a perl script.
-#	- Cameron Simpson <cs@zip.com.au> 01aug2001
+#	- Cameron Simpson <cs@cskk.id.au> 01aug2001
 #
 
 ($cmd=$0) =~ s:.*/::;

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to support YP maps.
-#	- Cameron Simpson <cs@zip.com.au> 15mar95
+#	- Cameron Simpson <cs@cskk.id.au> 15mar95
 #
 # Each map is represented by a record containing:
 #	Name => official name

@@ -3,7 +3,7 @@
 # Simple jukebox.
 # Runs a player in the background, reads keyword selections and commands
 # in the foreground.
-#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 01jun2002
 #
 
 : ${TMPDIR:=/tmp}

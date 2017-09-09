@@ -2,7 +2,7 @@
 #
 # The basic flat file data store for venti blocks.
 # These are kept in a directory accessed by a DataDir class.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os

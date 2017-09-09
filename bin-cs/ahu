@@ -1,6 +1,6 @@
 #!/bin/sh
 #
 # Run ah with the -u (unlink-after) option.
-#	- Cameron Simpson <cs@zip.com.au> 25may2005
+#	- Cameron Simpson <cs@cskk.id.au> 25may2005
 #
 exec ah -u ${1+"$@"}

@@ -1,3 +1,6 @@
+PyPI: remove cs.asynchron once dependent packages updated
+cs.logutils.status: fold into cs.statusline, merge features
+speed up cs.lex.unctrl using enumerate and join of substrs
 make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this

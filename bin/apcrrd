@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Use apcaccess(1) and rrdtool(1) to monitor and graph APC UPS status.
-#       - Cameron Simpson <cs@zip.com.au> 23jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 23jan2009
 #
 
 set -ue
