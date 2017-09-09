@@ -1,18 +1,25 @@
 #!/usr/bin/python
 
-''' Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
-    structures and to access Beyonwiz devices via the net. Also support for
-    newer Beyonwiz devices running Enigma and their recording format.
+r'''
+Beyonwiz PVR and TVWiz recording utilities.
+
+Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
+structures and to access Beyonwiz devices via the net. Also support for
+newer Beyonwiz devices running Enigma and their recording format.
 '''
 
 DISTINFO = {
-    'description': "Beyonwiz PVR and TVWiz recording utilities",
     'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.app.ffmpeg', 'cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'requires': [
+        'cs.app.ffmpeg',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.urlutils',
+    ],
     'entry_points': {
       'console_scripts': [
           'beyonwiz = cs.app.beyonwiz:main',
