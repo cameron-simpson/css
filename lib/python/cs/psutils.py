@@ -25,7 +25,6 @@ from signal import SIGTERM, SIGKILL
 import subprocess
 import sys
 import time
-from cs.pfx import Pfx
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -52,8 +51,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
       as a final measure before return.
   '''
   if isinstance(pid, str):
-    with Pfx(pid):
-      return stop(int(open(pid).read().strip()))
+    return stop(int(open(pid).read().strip()))
   os.kill(pid, signum)
   if wait is None:
     return True
@@ -108,7 +106,7 @@ def PidFileManager(path, pid=None):
   yield
   remove_pidfile(path)
 
-def run(argv, trace=False):
+def run(argv, trace=False, **kw):
   ''' Run a command. Optionally trace invocation. Return result of subprocess.call.
       `argv`: the command argument list
       `trace`: Default False. If True, recite invocation to stderr.
@@ -118,7 +116,7 @@ def run(argv, trace=False):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+'] + argv
     print(*pargv, file=tracefp)
-  return subprocess.call(argv)
+  return subprocess.call(argv, **kw)
 
 def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command. Optionally trace invocation. Return the Popen object with .stdout decoded as text.

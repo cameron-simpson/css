@@ -9,7 +9,6 @@ from os import lstat, sep as pathsep, readlink
 from os.path import isabs as isabspath, join as joinpath, split as splitpath
 from stat import S_ISLNK
 import sys
-from cs.logutils import X
 
 USAGE = 'Usage: %s [-v] pathnames...'
 

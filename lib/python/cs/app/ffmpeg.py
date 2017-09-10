@@ -122,7 +122,7 @@ def convert(src, srcfmt, dst, dstfmt, meta=None, overwrite=False,
     return multiconvert([ConversionSource(src, srcfmt, start_s, end_s)],
                         dst, dstfmt, meta=meta, overwrite=overwrite)
 
-def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
+def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False, extra_opts=None):
     ''' Convert multiple supplied video `sources` to a single `dst`, return a subprocess.Popen object and the ffmpeg argv.
         `sources`: input source.
           An iterable of input sources, each of which is a 4-tuple of:
@@ -151,12 +151,16 @@ def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False):
           options. If meta is not None, meta.format must match
           `dstfmt` if that not None. If `dstfmt` is None, it is set
           from `meta.format`.
+        `extra_opts': optional list of options to pass to ffmpeg(1)
     '''
     with Pfx("multiconvert"):
-      argv = [ 'ffmpeg',
-               '-y' if overwrite else '-n',
-               '-strict', '-2',     # enables experimental codes
-               ]
+      argv = [
+        'ffmpeg',
+        '-y' if overwrite else '-n',
+        '-strict', '-2',     # enables experimental codes
+      ]
+      if extra_opts:
+        argv.extend(extra_opts)
       # assemble input arguments
       stdin = None
       stdout = None

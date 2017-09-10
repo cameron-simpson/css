@@ -168,7 +168,8 @@ class _Recording(object):
 
   def convert(self,
               dstpath, dstfmt='mp4', max_n=None,
-              timespans=()):
+              timespans=(),
+              extra_opts=None):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if not timespans:
