@@ -176,7 +176,7 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push --new-branch $(hg_bitbucket)
+        hg push --new-branch -r tip $(hg_bitbucket)
         @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release

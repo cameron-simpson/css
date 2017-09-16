@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Scan the output of diskutil and report the CD devices.
-#   - Cameron Simpson <cs@zip.com.au> 31mar2016
+#   - Cameron Simpson <cs@cskk.id.au> 31mar2016
 #
 
 set -ue

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Resourcing related classes and functions.
-#       - Cameron Simpson <cs@zip.com.au> 11sep2014
+#       - Cameron Simpson <cs@cskk.id.au> 11sep2014
 #
 
 DISTINFO = {

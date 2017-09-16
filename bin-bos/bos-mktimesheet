@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Emit a timesheet based on my daily logs.
-#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 14mar2008
 #
 
 exec cs-mktimesheet ${1+"$@"} BOS

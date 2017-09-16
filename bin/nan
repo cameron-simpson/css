@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Shortcut for "netstat -an" with optional grepping.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 if [ $# = 0 ]

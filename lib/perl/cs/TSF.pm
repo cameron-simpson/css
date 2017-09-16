@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # TSF - tab separated files.
-#	- Cameron Simpson <cs@zip.com.au> 11jun98
+#	- Cameron Simpson <cs@cskk.id.au> 11jun98
 #
 
 use strict qw(vars);

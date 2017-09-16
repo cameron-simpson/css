@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manipulate the image db.
-#	- Cameron Simpson <cs@zip.com.au> 09nov99
+#	- Cameron Simpson <cs@cskk.id.au> 09nov99
 #
 
 use strict vars;

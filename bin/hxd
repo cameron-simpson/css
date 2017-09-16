@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Hex dump.	- Cameron Simpson <cs@zip.com.au>, 04jul94
+# Hex dump.	- Cameron Simpson <cs@cskk.id.au>, 04jul94
 #
 
 ($cmd=$0) =~ s:.*/::;

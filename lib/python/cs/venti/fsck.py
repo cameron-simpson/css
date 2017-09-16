@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Filesystem checks.
-#   - Cameron Simpson <cs@zip.com.au> 11feb2017
+#   - Cameron Simpson <cs@cskk.id.au> 11feb2017
 #
 
 from cs.logutils import error, warning, info

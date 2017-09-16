@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Resize a JPEG image, outputs JPEG by default, with a few simple alternatives.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"`

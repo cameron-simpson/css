@@ -2,7 +2,7 @@
 #
 # Crude parser for MP3 data based on:
 #   http://www.mp3-tech.org/programmer/frame_header.html
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 from cs.buffer import CornuCopyBuffer

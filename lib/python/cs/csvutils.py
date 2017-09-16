@@ -2,7 +2,7 @@
 #
 # Utility functions for CSV files, particularly to provide consistent
 # decoding in python 2 and 3.
-#       - Cameron Simpson <cs@zip.com.au> 02may2013
+#       - Cameron Simpson <cs@cskk.id.au> 02may2013
 #
 # In python 2 the CSV reader reads 8 bit byte data and returns str objects;
 # these need to be decoded into unicode objects.
@@ -21,7 +21,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.debug', 'cs.logutils'],
+    'install_requires': ['cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -29,7 +29,6 @@ import csv
 from io import BytesIO
 import sys
 from threading import Thread
-from cs.debug import trace
 from cs.logutils import warning
 from cs.pfx import Pfx
 

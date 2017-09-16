@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::DBI::Table::Array: Treat a DBI table as an array.
-#	- Cameron Simpson <cs@zip.com.au> 01jun2000
+#	- Cameron Simpson <cs@cskk.id.au> 01jun2000
 #
 
 =head1 NAME
@@ -113,7 +113,7 @@ sub PUSH($$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.au<gt>
+Cameron Simpson E<lt>cs@cskk.id.au<gt>
 
 =cut
 

@@ -5,7 +5,7 @@
 # We expect to be called as:
 #	passphrase=`nread prompttstring`
 #
-# - Cameron Simpson <cs@zip.com.au> 22oct96
+# - Cameron Simpson <cs@cskk.id.au> 22oct96
 # 
 
 # set -vx

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.nodedb.node.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys

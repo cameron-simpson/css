@@ -2,7 +2,7 @@
 #
 # Yet another wrapper for notmuch, to construct a results maildir from a
 # notmuch search.
-#       - Cameron Simpson <cs@zip.com.au> 18apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 18apr2014
 #
 
 set -ue

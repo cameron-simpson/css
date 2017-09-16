@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Thread convenience facilities.
-#       - Cameron Simpson <cs@zip.com.au> 18nov2007
+#       - Cameron Simpson <cs@cskk.id.au> 18nov2007
 #
 
 from __future__ import with_statement

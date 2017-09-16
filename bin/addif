@@ -2,7 +2,7 @@
 #
 # Add a logical interface with the specified address.
 # Allocates a fresh logical interface on the fly.
-#	- Cameron Simpson <cs@zip.com.au> 12may2005
+#	- Cameron Simpson <cs@cskk.id.au> 12may2005
 #
 
 set -ue

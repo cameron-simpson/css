@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.seq.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys

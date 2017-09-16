@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Enter my mail folder and run vi as a user agent.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 usage="Usage: $0 [-g] [-u] [mailbox [msgnum]]

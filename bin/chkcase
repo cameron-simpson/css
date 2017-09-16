@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Look for case conflicts in directories.
-#	- Cameron Simpson <cs@zip.com.au> 24oct98
+#	- Cameron Simpson <cs@cskk.id.au> 24oct98
 #
 
 $::Xit=0;

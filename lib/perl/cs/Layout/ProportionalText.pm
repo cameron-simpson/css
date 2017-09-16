@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Layout rules for proportional text.
-#	- Cameron Simpson <cs@zip.com.au> 06jul97
+#	- Cameron Simpson <cs@cskk.id.au> 06jul97
 #
 
 use strict qw(vars);

@@ -2,7 +2,7 @@
 #
 # Stash strings for later.
 # Adapted from noteurl.
-#	- Cameron Simpson <cs@zip.com.au> 15nov96
+#	- Cameron Simpson <cs@cskk.id.au> 15nov96
 #
 
 usage="Usage: note [-t tagpfx] [-T tagsfx] [-m tagprematch] notefile strings..."

@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Emit a Nagios report for the MegaRAID hardware RAID state.
-#       - Cameron Simpson <cs@zip.com.au> 24oct2008
+#       - Cameron Simpson <cs@cskk.id.au> 24oct2008
 #
 
 usage="Usage: $0"

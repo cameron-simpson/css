@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Record build timestamp in suitable .java file for use as a String.
-#	- Cameron Simpson <cs@zip.com.au> 19dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 19dec2002
 #
 
 cmd=$0

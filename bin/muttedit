@@ -6,7 +6,7 @@
 #
 #  macro index g ":set editor=muttedit<enter><group-reply>:set editor=$EDITOR<enter>" "group reply"
 #   
-# - Cameron Simpson <cs@zip.com.au> 31mar2006
+# - Cameron Simpson <cs@cskk.id.au> 31mar2006
 # 
 
 set -ue

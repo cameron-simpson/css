@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Emit more succinct Mercurial change log.
-#       - Cameron Simpson <cs@zip.com.au> 15jan2008
+#       - Cameron Simpson <cs@cskk.id.au> 15jan2008
 #
 
 template='{date|shortdate} {author|email} {files} [{branch}]\n\t{desc|strip|fill68|tabindent}\n'

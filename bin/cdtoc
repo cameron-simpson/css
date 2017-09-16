@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Emit a table of contents for a CD.
-#	- Cameron Simpson <cs@zip.com.au> 14mar2001
+#	- Cameron Simpson <cs@cskk.id.au> 14mar2001
 #
 # See also: cdtoc2, modern python version using MusicBrainz and working on OSX.
 # 

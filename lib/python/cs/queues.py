@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Some Queue subclasses and ducktypes.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {

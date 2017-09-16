@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Remove an empty maildir.
-#	- Cameron Simpson <cs@zip.com.au> 05jun2006
+#	- Cameron Simpson <cs@cskk.id.au> 05jun2006
 #
 
 xit=0
