@@ -259,8 +259,10 @@ class Flags(MutableMapping, FlaggedMixin):
     flagpath = self._flagpath(k)
     try:
       S = os.stat(flagpath)
-    except OSError:
+    except OSError as e:
       value = False
+      if e.errno != errno.ENOENT:
+        print("os.stat(%r): %s", flagpath, e, file=sys.stderr)
     else:
       value = S.st_size > 0
     self._track(k, value)
