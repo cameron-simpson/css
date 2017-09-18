@@ -11,7 +11,8 @@ from getopt import GetoptError
 from re import escape
 from cs.app.haproxy import quote as haquote
 from cs.lex import get_uc_identifier
-from cs.logutils import setup_logging, Pfx, X, error, warning, info
+from cs.logutils import setup_logging, error, warning, info
+from cs.pfx import Pfx
 from cs.seq import seq
 
 USAGE = '''Usage:
@@ -355,7 +356,7 @@ class Pattern(_Pattern):
           return r'hdr_end(host) %s || hdr_reg(host) %s:[1-9][0-9]*$' \
                  % (haquote(pattern[1:]), haquote(escape(pattern[1:])))
         if style == 'proxy.pac': return 'shExpMatch(hosts, %r)' % (pattern,)
-        if style == 'squid_acl': return 'dstdomain -i -n %s' % (pattern[1:],)
+        if style == 'squid_acl': return 'dstdomain -n %s' % (pattern[1:],)
         raise ValueError('unsupported .domain pattern')
       # hostname or fqdn
       if pattern[0].isalpha():
