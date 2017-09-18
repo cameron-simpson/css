@@ -1691,7 +1691,7 @@ class WatchedMaildir(O):
     if rules_path is None:
       # default to looking for .mailfiler inside the Maildir
       rules_path = os.path.join(self.mdir.dir, '.mailfiler')
-    self._rules = ()
+    self._rules = None
     self._rules_paths = [ rules_path ]
     self._rules_lock = Lock()
     self.lurking = set()
