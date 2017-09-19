@@ -6,8 +6,8 @@
 
 from functools import partial
 import sys
-from cs.asynchron import OnDemandFunction
-from cs.logutils import X
+from cs.result import OnDemandFunction
+from cs.x import X
 
 def pull_hashcode(S1, S2, hashcode):
   ''' Fetch the data for `hashcode` from `S2` and store in `S1`; return the data.

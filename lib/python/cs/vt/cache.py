@@ -8,7 +8,7 @@ from __future__ import with_statement
 from collections import namedtuple
 import sys
 from threading import Lock, Thread
-from cs.asynchron import Result
+from cs.result import Result
 from cs.fileutils import RWFileBlockCache
 import cs.later
 from cs.lex import hexify

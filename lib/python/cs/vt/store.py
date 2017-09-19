@@ -15,7 +15,7 @@
 from __future__ import with_statement
 from abc import ABC, abstractmethod
 import sys
-from cs.asynchron import report as reportLFs
+from cs.result import report as reportLFs
 from cs.fileutils import shortpath
 from cs.later import Later
 from cs.logutils import info, debug, warning, error

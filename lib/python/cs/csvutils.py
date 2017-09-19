@@ -21,7 +21,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.debug', 'cs.logutils'],
+    'install_requires': ['cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -29,7 +29,6 @@ import csv
 from io import BytesIO
 import sys
 from threading import Thread
-from cs.debug import trace
 from cs.logutils import warning
 from cs.pfx import Pfx
 

@@ -26,26 +26,27 @@ force=
 
 statefile=$HOME/var/run/ssh-agent-$HOST
 
+exec 3>&1 1>&2
+
 need_agent=
 if [ "$force" ]
 then
   need_agent=1
 else
   # test for existing ssh-agent
-  exec 3>&1 1>&2
   { ssh-add -l >/dev/null || [ $? = 1 ]; } \
   || { [ -s "$statefile" ] \
        && . "$statefile" \
        && { ssh-add -l >/dev/null || [ $? = 1 ]; }
      } \
   || need_agent=1
-  exec 1>&3 3>&1
 fi
 
 if [ $need_agent ]
 then
   # start per-host agent, update state file
-  eval $(ssh-agent -s | tee "$statefile")
+  eval $(exec 3>&-; ssh-agent -s | tee "$statefile")
 fi
 
-echo "$SSH_AUTH_SOCK" >&3
+exec 1>&3 3>&-
+echo "$SSH_AUTH_SOCK"

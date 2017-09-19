@@ -11,13 +11,12 @@ import os.path
 import filecmp
 from stat import S_ISREG
 from collections import namedtuple
-import filecmp
 from tempfile import NamedTemporaryFile
 if sys.hexversion >= 0x02050000:
   from hashlib import md5
 else:
   from md5 import md5
-from cs.logutils import setup_logging, error, warn, info, debug
+from cs.logutils import setup_logging, error
 from cs.pfx import Pfx
 from cs.py3 import StringTypes
 

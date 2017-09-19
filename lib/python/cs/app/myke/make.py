@@ -12,7 +12,7 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
-from cs.asynchron import Result, report as report_LFs, AsynchState
+from cs.result import Result, report as report_LFs, AsynchState
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later

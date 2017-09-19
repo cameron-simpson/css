@@ -4,6 +4,35 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Convenience facilities for managing exceptions.
+
+Presents:
+
+* return_exc_info: call supplied function with arguments, return either (function_result, None) or (None, exc_info) if an exception was raised.
+
+* @returns_exc_info, a decorator for a function which wraps in it return_exc_info.
+
+* @noexc, a decorator for a function whose exceptions should never escape; instead they are logged. The initial use case was inside logging functions, where I have had a failed logging action abort a program. Obviously this is a decorator which should see very little use.
+
+* @noexc_gen, a decorator for generators with similar effect to @noexc for ordinary functions.
+
+* NoExceptions, a context manager to intercept most exceptions
+
+* LogExceptions, a context manager to log exceptions
+
+* @logexc, a decorator to make a function log exceptions it raises
+
+* @transmute, a decorator to transmute an inner exception to another exception type
+
+* @unattributable, a decorator to transmute inner AttributeError into a RuntimeError
+
+* @unimplemented, a decorator to make a method raise NotImplementedError
+'''
+
+import sys
+import traceback
+
 DISTINFO = {
     'description': "Convenience facilities for managing exceptions.",
     'keywords': ["python2", "python3"],
@@ -14,10 +43,6 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
-
-import sys
-import logging
-import traceback
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
@@ -91,11 +116,11 @@ def noexc_gen(func):
     except Exception as e0:
       try:
         exception(
-            "exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+            "exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e0)
       except Exception as e2:
         try:
           X("exception calling %s(*%s, **(%s)): %s",
-            func.__name__, args, kwargs, e)
+            func.__name__, args, kwargs, e2)
         except Exception:
           pass
       return
@@ -198,7 +223,7 @@ def LogExceptions(conceal=False):
   def handler(exc_type, exc_value, exc_tb):
     exception("EXCEPTION: <%s> %s", exc_type, exc_value)
     for line in traceback.format_exception(exc_type, exc_value, exc_tb):
-      exception("EXCEPTION> "+line)
+      exception("EXCEPTION> " + line)
     return conceal
   return NoExceptions(handler)
 

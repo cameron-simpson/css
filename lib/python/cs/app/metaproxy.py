@@ -41,7 +41,7 @@ try:
   from urllib.parse import urlparse
 except ImportError:
   from urlparse import urlparse
-from cs.asynchron import Asynchron
+from cs.result import Asynchron
 from cs.env import envsub
 from cs.excutils import LogExceptions
 from cs.fileutils import copy_data, Tee

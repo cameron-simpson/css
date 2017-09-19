@@ -1,0 +1,1 @@
+  lib/python/cs/sh.py: cs.sh: bugfix __main__ boilerplate after setuptools workaround

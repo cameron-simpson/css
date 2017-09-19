@@ -4,6 +4,45 @@
 #       - Cameron Simpson <cs@cskk.id.au> 24apr2014
 #
 
+r'''
+Persistent filesystem based flags for state and control.
+
+Filesystem visible boolean flags
+for control and status,
+allowing easy monitoring of services or other status,
+and control by flag management
+for programmes which also monitor the flags.
+
+The flags are expressed as individual files with uppercase names
+in a common directory ($HOME/var/flags by default);
+an empty or missing file is "false"
+and a nonempty file is "true".
+
+The Flags class provides easy Pythonic access to this directory.
+It presents as a modifiable mapping whose keys are the flag names::
+
+  flags = Flags()
+  flags['UNTOPPOST'] = True
+
+The is also a FlaggedMixin class providing convenient methods and attributes
+for maintaining a collection of flags associated with some object
+with flag names prefixed by the object's .name attribute uppercased and with an underscore appended::
+
+  class SvcD(...,FlaggedMixin):
+    def __init__(self, name, ...)
+      self.name = name
+      FlaggedMixin.__init__(self)
+      ...
+    def disable(self):
+      self.flag_disabled = True
+    def restart(self):
+      self.flag_restart = True
+    def _restart(self):
+      self.flag_restart = False
+      ... restart the SvcD ...
+
+'''
+
 from __future__ import print_function
 from collections import MutableMapping, defaultdict
 from contextlib import contextmanager
@@ -16,6 +55,17 @@ from threading import Thread
 from time import sleep
 from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.env', 'cs.lex'],
+}
+
 
 USAGE = '''Usage:
   %s            Recite all flag values.
@@ -209,8 +259,10 @@ class Flags(MutableMapping, FlaggedMixin):
     flagpath = self._flagpath(k)
     try:
       S = os.stat(flagpath)
-    except OSError:
+    except OSError as e:
       value = False
+      if e.errno != errno.ENOENT:
+        print("os.stat(%r): %s", flagpath, e, file=sys.stderr)
     else:
       value = S.st_size > 0
     self._track(k, value)

@@ -57,6 +57,7 @@ dosync()
         '--exclude=*.tmp' \
         '--exclude=CVS/' \
         '--exclude=*.pyc' \
+        '--exclude=__pycache__/' \
         ${1+"$@"} \
         "$_ds_from." "$_ds_to."
 }

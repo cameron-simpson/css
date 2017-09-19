@@ -98,6 +98,16 @@ class TVWiz(_Recording):
     self.path_title, self.path_datetime = self._parse_path()
     self.headerpath = os.path.join(self.dirpath, TVHDR)
 
+  def convert(self, dstpath, extra_opts=None, **kw):
+    ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
+    '''
+    tvwiz_extra_opts = [
+        '-c:a', 'aac',       # convert all audio to AAC
+    ]
+    if extra_opts:
+      tvwiz_extra_opts.extend(extra_opts)
+    super().convert(dstpath, extra_opts=tvwiz_extra_opts)
+
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
     if ext != '.tvwiz':

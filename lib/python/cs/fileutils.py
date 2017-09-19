@@ -14,20 +14,19 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.asynchron', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
+    'requires': ['cs.result', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
 }
 
-from functools import partial
+from contextlib import contextmanager
+import datetime
+import errno
+import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
-import errno
-import sys
-from contextlib import contextmanager
-import datetime
-import os
 import shutil
 import stat
+import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
@@ -35,12 +34,12 @@ from cs.deco import cached, decorator
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import exception, error, warning, debug
+from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes
 from cs.range import Range
-from cs.timeutils import TimeoutError
 from cs.threads import locked
+from cs.timeutils import TimeoutError
 from cs.x import X
 
 DEFAULT_POLL_INTERVAL = 1.0
