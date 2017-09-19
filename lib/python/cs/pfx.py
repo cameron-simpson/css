@@ -166,7 +166,9 @@ class Pfx(object):
     ''' Initialise a new Pfx instance.
         `mark`: message prefix string
         `args`: if not empty, apply to the prefix string with `%`
-        `absolute`: optional keyword argument, default False. If true, this message forms the base of the message prefixes; existing prefixes will be suppressed.
+        `absolute`: optional keyword argument, default False. If
+          true, this message forms the base of the message prefixes;
+          existing prefixes will be suppressed.
         `loggers`: which loggers should receive log messages.
     '''
     absolute = kwargs.pop('absolute', False)
