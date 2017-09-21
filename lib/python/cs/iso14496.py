@@ -2,7 +2,7 @@
 #
 # Facilities for ISO14496 files - the ISO Base Media File Format,
 # the basis for several things including MP4.
-#   - Cameron Simpson <cs@zip.com.au> 26mar2016
+#   - Cameron Simpson <cs@cskk.id.au> 26mar2016
 #
 # ISO make the standard available here:
 #   http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html

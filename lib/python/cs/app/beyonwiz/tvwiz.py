@@ -1,5 +1,14 @@
 #!/usr/bin/python
 
+from collections import namedtuple
+import datetime
+import os
+import os.path
+import struct
+from types import SimpleNamespace as NS
+from cs.pfx import Pfx
+from cs.threads import locked_property
+from cs.x import X
 from . import _Recording, RecordingMetaData
 
 # constants related to headers
@@ -50,6 +59,8 @@ TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
+TVWiz_Header = namedtuple('TVWiz_Header', 'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff')
+
 def bytes0_to_str(bs0, encoding='utf8'):
   ''' Decode a NUL terminated chunk of bytes into a string.
   '''
@@ -86,6 +97,16 @@ class TVWiz(_Recording):
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
     self.headerpath = os.path.join(self.dirpath, TVHDR)
+
+  def convert(self, dstpath, extra_opts=None, **kw):
+    ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
+    '''
+    tvwiz_extra_opts = [
+        '-c:a', 'aac',       # convert all audio to AAC
+    ]
+    if extra_opts:
+      tvwiz_extra_opts.extend(extra_opts)
+    super().convert(dstpath, extra_opts=tvwiz_extra_opts)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -145,13 +166,13 @@ class TVWiz(_Recording):
   @locked_property
   def metadata(self):
     H = self.read_header()
-    hd = H._asdict()
+    hdata = H._asdict()
     hdata['pathname'] = self.headerpath
     data = {
-        'channel': H.channel,
+        'channel': H.svcName,
         'title': H.evtName,
         'episode': H.episode,
-        'synopsys': H.synopsis,
+        'description': H.synopsis,
         'start_unixtime':  H.start,
         'tags': set(),
         'sources': {
@@ -176,7 +197,7 @@ class TVWiz(_Recording):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
     with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
-      for trec in self.parse_trunc(tfp):
+      for trec in self.tvwiz_parse_trunc(tfp):
         yield trec
 
   def data(self):

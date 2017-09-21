@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Resourcing related classes and functions.
-#       - Cameron Simpson <cs@zip.com.au> 11sep2014
+#       - Cameron Simpson <cs@cskk.id.au> 11sep2014
 #
 
 DISTINFO = {
@@ -64,6 +64,7 @@ class MultiOpenMixin(O):
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
+    self._final_close_from = None
     self._lock = lock
     self._finalise_later = finalise_later
     self._finalise = None
@@ -73,7 +74,7 @@ class MultiOpenMixin(O):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
+    self.close(caller_frame=caller())
     return False
 
   def open(self, caller_frame=None):
@@ -94,13 +95,24 @@ class MultiOpenMixin(O):
       self.startup()
     return self
 
-  def close(self, enforce_final_close=False):
+  def close(self, enforce_final_close=False, caller_frame=None):
     ''' Decrement the open count.
-        If the count goes to zero, call self.shutdown().
+        If the count goes to zero, call self.shutdown() and return its value.
+        `enforce_final_close`: if true, the caller expects this to
+          be the final close for the object and a RuntimeError is
+          raised if this is not actually the case.
+        `caller_frame`: used for debugging; the caller may specify
+          this if necessary, otherwise it is computed from
+          cs.py.stack.caller when needed. Presently the caller of the
+          final close is recorded to help debugging extra close calls.
     '''
+    if not self.opened:
+      raise RuntimeError("%s: close before initial open" % (self,))
+    retval = None
     with self._lock:
       if self._opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
+        error("  final close was from %s", self._final_close_from)
         for Fkey in sorted(self._opened_from.keys()):
           error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
         ##from cs.debug import thread_dump
@@ -110,12 +122,16 @@ class MultiOpenMixin(O):
       self._opens -= 1
       opens = self._opens
     if opens == 0:
-      self.shutdown()
+      if caller_frame is None:
+        caller_frame = caller()
+      self._final_close_from = caller_frame
+      retval = self.shutdown()
       if not self._finalise_later:
         self.finalise()
     else:
       if enforce_final_close:
         raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+    return retval
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -159,7 +175,7 @@ class MultiOpenMixin(O):
     '''
     def is_opened_wrapper(self, *a, **kw):
       if self.closed:
-        raise RuntimeError("%s: %s: already closed" % (is_opened_wrapper.__name__, self))
+        raise RuntimeError("%s: %s: already closed from %s" % (is_opened_wrapper.__name__, self, self._final_close_from))
       if not self.opened:
         raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
       return func(self, *a, **kw)

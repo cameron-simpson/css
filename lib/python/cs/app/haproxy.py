@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for working with HAProxy.
-#       - Cameron Simpson <cs@zip.com.au> 14jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 14jul2012
 #
 
 from __future__ import print_function

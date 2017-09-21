@@ -2,7 +2,7 @@
 #
 # Redirect all requests to a given URL.
 # Once used by the ad zapping proxy.pac.
-#	- Cameron Simpson <cs@zip.com.au> 31jul97
+#	- Cameron Simpson <cs@cskk.id.au> 31jul97
 #
 
 BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }

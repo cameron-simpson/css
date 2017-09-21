@@ -2,7 +2,7 @@
 #
 # Gcc with pretty much everything turned on, for maximally
 # paranoid code (well, it gets a lot of the common things).
-#	- Cameron Simpson <cs@zip.com.au> 28mar1999
+#	- Cameron Simpson <cs@cskk.id.au> 28mar1999
 #
 # Filter out some noise. - cameron, 24may1999
 # And then the superficially bogus "In function" message. - cameron 11jun2000

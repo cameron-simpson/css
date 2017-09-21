@@ -3,7 +3,7 @@
 # Read a titled listing (such as from ps) from stdin and sort on the named
 # columns. Functions by translating column names into sort(1) arguments and
 # passing the header line through directly.
-#	- Cameron Simpson <cs@zip.com.au> 28sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 28sep2000
 #
 
 use strict vars;

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Construct an unbound.conf(5) file then dispatch unbound(8) via svcd.
-#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 26jul2012
 #
 
 set -ue

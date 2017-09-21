@@ -2,7 +2,7 @@
 #
 # Wrapper for xplanet which makes all config file options tunable
 # on the command line and provides a number of convenience features.
-#	- Cameron Simpson <cs@zip.com.au> 13jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 13jul2004
 #
 # =head1 NAME
 #
@@ -511,5 +511,5 @@ exit "$xit"
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au> July 2004
+# Cameron Simpson <cs@cskk.id.au> July 2004
 #

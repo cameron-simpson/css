@@ -1,16 +1,15 @@
 #!/usr/bin/python
 #
 # Miscellaneous things to do with sockets.
-#   - Cameron Simpson <cs@zip.com.au> 28oct2015
+#   - Cameron Simpson <cs@cskk.id.au> 28oct2015
 #
 
 import os
-import sys
 import errno
 import socket
-from cs.logutils import X, PrePfx, warning, info
-from cs.pfx import XP
+from cs.logutils import warning, info
 from cs.pfx import Pfx
+from cs.x import X
 
 def bind_next_port(sock, host, base_port):
   ''' Bind a the socket `sock` to the first free (`host`, port); return the port.
@@ -37,11 +36,13 @@ class OpenSocket(object):
   '''
 
   def __init__(self, sock, for_write):
+    X("OpenSocket: sock=%s, for_write=%s", sock, for_write)
     self._for_write = for_write
     self._sock = sock
     self._fd0 = self._sock.fileno()
     self._fd = os.dup(self._fd0)
     self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
+    X("OpenSocket init done")
 
   def __str__(self):
     return "OpenSocket[fd=%d,fd0=%d]" % (self._fd, self._fd0)
@@ -57,32 +58,32 @@ class OpenSocket(object):
 
   def close(self):
     with Pfx("%s.close", self):
-      if self._sock is not None:
-        if self._for_write:
-          shut_mode = socket.SHUT_WR
-          shut_mode_s = 'SHUT_WR'
-        else:
-          shut_mode = socket.SHUT_RD
-          shut_mode_s = 'SHUT_RD'
-        with Pfx("_sock.shutdown(%s)", shut_mode_s):
-          try:
-            self._sock.shutdown(shut_mode)
-          except socket.error as e:
-            if e.errno == errno.ENOTCONN:
-              info("%s", e)
-            elif e.errno == errno.EBADF:
-              warning("closed: %s", e)
-            else:
-              warning("%s", e)
-              raise
-          except OSError as e:
-            if e.errno == errno.EBADF:
-              warning("already closed: %s", e)
-            elif e.errno == errno.ENOTCONN:
-              warning("not connected: %s", e)
-            else:
-              raise
-          self._close()
+      if self._sock is None:
+        warning("close when _sock=None")
+        return
+      if self._for_write:
+        shut_mode = socket.SHUT_WR
+        shut_mode_s = 'SHUT_WR'
+        self.flush()
+      else:
+        shut_mode = socket.SHUT_RD
+        shut_mode_s = 'SHUT_RD'
+      with Pfx("_sock.shutdown(%s)", shut_mode_s):
+        try:
+          self._sock.shutdown(shut_mode)
+        except (socket.error, OSError) as e:
+          if e.errno == errno.ENOTCONN:
+            # client end went away
+            ##info("%s", e)
+            pass
+          elif e.errno == errno.EBADF:
+            warning("closed: %s", e)
+          else:
+            X("UNEXPECTED ERROR 1: %s:%r", type(e), e)
+            raise
+        except:
+          X("UNEXPECTED ERROR 2: %s:%r", type(e), e)
+        self._close()
 
   def __del__(self):
     self._close()
@@ -97,10 +98,10 @@ class OpenSocket(object):
     st1 = os.fstat(self._fd)
     st2 = os.fstat(self._fd0)
     st3 = os.fstat(self._sock)
-    if s1 != s2:
-      raise ValueError("fstat mismatch s1!=s2 (%s, %s)" % (s1, s2))
-    if s1 != s3:
-      raise ValueError("fstat mismatch s1!=s3 (%s, %s)" % (s1, s3))
+    if st1 != st2:
+      raise ValueError("fstat mismatch st1!=st2 (%s, %s)" % (st1, st2))
+    if st1 != st3:
+      raise ValueError("fstat mismatch st1!=st3 (%s, %s)" % (st1, st3))
 
 if __name__ == '__main__':
   from cs.debug import selftest

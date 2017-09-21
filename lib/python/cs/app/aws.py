@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access Amazon AWS services.
-# - Cameron Simpson <cs@zip.com.au> 2016
+# - Cameron Simpson <cs@cskk.id.au> 2016
 #
 
 from __future__ import print_function

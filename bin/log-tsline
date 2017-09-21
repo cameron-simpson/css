@@ -2,7 +2,7 @@
 #
 # Insert a timesheet line into my timesheet file.
 # Used as a backend to buglog and dlog.
-#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 14mar2008
 #
 
 set -ue

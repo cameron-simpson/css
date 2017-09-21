@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Translate place name into Australian postcode.
-#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#       - Cameron Simpson <cs@cskk.id.au> 28jun2007
 #
 
 where=\"`printf "%s\n" "$*" | tr '[a-z]' '[A-Z]'`\"

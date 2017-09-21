@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Save an md5index of a whole medium.
-#	- Cameron Simpson <cs@zip.com.au> 03jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 03jul2000
 #
 
 cmd=`basename "$0"`

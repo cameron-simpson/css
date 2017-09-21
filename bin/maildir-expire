@@ -2,7 +2,7 @@
 #
 # Roll messages older than "days" from maildir
 # into archivedir/date/`basename maildir`.
-#       - Cameron Simpson <cs@zip.com.au> 05aug2006
+#       - Cameron Simpson <cs@cskk.id.au> 05aug2006
 #
 
 import sys

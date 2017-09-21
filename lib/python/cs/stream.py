@@ -1,20 +1,20 @@
 #!/usr/bin/python
 #
 # Convenience facilities for streams.
-#       - Cameron Simpson <cs@zip.com.au> 21aug2015
+#       - Cameron Simpson <cs@cskk.id.au> 21aug2015
 #
 
 import sys
 import errno
 from collections import namedtuple
-from threading import Thread, Lock
-from cs.asynchron import Result
+from threading import Lock
+from cs.result import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import debug, warning, error, exception, PrePfx
-from cs.pfx import Pfx, XP
+from cs.logutils import debug, warning, error, exception
+from cs.pfx import Pfx, PrePfx, PfxThread as Thread
 from cs.predicate import post_condition
-from cs.py3 import BytesFile
+from cs.py3 import BytesFile, unicode
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.seq import seq, Seq
@@ -176,10 +176,13 @@ class PacketConnection(object):
     except ClosedError as e:
       warning("%s: packet not sent: %s (P=%s)", self._sendQ, e, P)
 
-  def _reject(self, channel, tag):
+  def _reject(self, channel, tag, payload=bytes(())):
     ''' Issue a rejection of the specified request.
     '''
-    P = Packet(channel, tag, False, 0, bytes(()))
+    error("rejecting request: " + str(payload))
+    if isinstance(payload, unicode):
+      payload = payload.encode('utf-8')
+    P = Packet(channel, tag, False, 0, payload)
     self._queue_packet(P)
 
   def _respond(self, channel, tag, flags, payload):
@@ -231,7 +234,7 @@ class PacketConnection(object):
             result_flags, result_payload = result
       except Exception as e:
         exception("exception: %s", e)
-        self._reject(channel, tag)
+        self._reject(channel, tag, "exception during handler")
       else:
         self._respond(channel, tag, result_flags, result_payload)
       self._channel_request_tags[channel].remove(tag)
@@ -247,6 +250,7 @@ class PacketConnection(object):
           try:
             packet = read_Packet(self._recv_fp)
           except EOFError:
+            X("EOF, leaving _receive loop")
             break
           channel = packet.channel
           tag = packet.tag
@@ -259,25 +263,25 @@ class PacketConnection(object):
                 debug("rejecting request: closed")
                 # NB: no rejection packet sent since sender also closed
               elif self.request_handler is None:
-                error("rejecting request: no self.request_handler")
-                self._reject(channel, tag)
+                self._reject(channel, tag, "no request handler")
               else:
                 requests = self._channel_request_tags
                 if channel not in requests:
                   # unknown channel
-                  error("rejecting request: unknown channel %d", channel)
-                  self._reject(channel, tag)
+                  self._reject(channel, tag, "unknown channel %d")
                 elif tag in self._channel_request_tags[channel]:
-                  error("rejecting request: channel %d: tag already in use: %d",
-                        channel, tag)
-                  self._reject(channel, tag)
+                  self._reject(
+                      channel, tag,
+                      "channel %d: tag already in use: %d" % (channel, tag))
                 else:
                   # payload for requests is the request enum and data
                   try:
                     rq_type, offset = get_bs(payload)
                   except IndexError as e:
                     error("invalid request: truncated request type, payload=%r", payload)
-                    self._reject(channel, tag)
+                    self._reject(
+                        channel, tag,
+                        "truncated request type, payload=%r" % (payload,))
                   else:
                     if rq_type == 0:
                       # catch magic EOF request: rq_type 0
@@ -357,15 +361,9 @@ class PacketConnection(object):
         try:
           write_Packet(fp, eof_packet)
           fp.close()
-        except IOError as e:
+        except (OSError, IOError) as e:
           if e.errno == errno.EPIPE:
-            debug("remote end closed: %s", e)
-          elif e.errno == errno.EBADF:
-            warning("local end closed: %s", e)
-          else:
-            raise
-        except OSError as e:
-          if e.errno == errno.EPIPE:
+            X("REMOTE CLOSED")
             debug("remote end closed: %s", e)
           elif e.errno == errno.EBADF:
             warning("local end closed: %s", e)

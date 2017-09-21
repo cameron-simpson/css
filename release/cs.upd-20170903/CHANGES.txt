@@ -1,0 +1,6 @@
+  lib/python/cs/upd.py: merge default ==> beyonwiz
+  lib/python/cs/README-upd.rst: README-upd.rst: fix typo
+  lib/python/cs/upd.py: cs.upd: new function upd_for(stream) returning singleton Upds, new global instances_by_id to support it
+  lib/python/cs/upd.py: cs.upd: drop noStrip keyword argument/mode - always strip trailing whitespace
+  lib/python/cs/upd.py: my email address has changed - update Python code
+  lib/python/cs/README-upd.rst lib/python/cs/upd.py: cs.upd: move README into module docstring

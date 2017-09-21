@@ -3,7 +3,7 @@
 # Bang style ssh for hopping through firewalls etc.
 # Sshes from host to host to reach destination.
 # Assorted other minor features.
-#       - Cameron Simpson <cs@zip.com.au> 28may2004
+#       - Cameron Simpson <cs@cskk.id.au> 28may2004
 #
 
 set -ue

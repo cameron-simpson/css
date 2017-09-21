@@ -3,7 +3,7 @@
 # Wrapper for xwd to produce common data formats.
 # Saves window in $HOME/var/xwd and puts the pathname into the X cut buffer
 # and on stdout.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"`

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # urlshow for opera, URLs on stdin, no smarts.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2006
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2006
 #
 
 : ${BROWSER_DISPLAY:=$DISPLAY}

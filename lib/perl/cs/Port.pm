@@ -2,7 +2,7 @@
 #
 # An object composed of a cs::Sink and cs::Source which has calls for each.
 # Will take file handles in place of Sinks or Sources.
-#	- Cameron Simpson <cs@zip.com.au> 11dec96
+#	- Cameron Simpson <cs@cskk.id.au> 11dec96
 #
 
 =head1 NAME
@@ -161,7 +161,7 @@ cs::Source(3), cs::Sink(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

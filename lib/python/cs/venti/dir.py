@@ -2,26 +2,28 @@ import os
 import os.path
 from cmd import Cmd
 from collections import namedtuple
-import pwd
+import errno
+from getopt import GetoptError
 import grp
+import pwd
+import shlex
 import stat
 import sys
-from threading import Lock, RLock
+from threading import RLock
 import time
 from cs.cmdutils import docmd
-from cs.logutils import D, debug, error, info, warning
+from cs.logutils import debug, error, info, warning
 from cs.pfx import Pfx, XP
-from cs.lex import hexify, texthexify
-from cs.py.stack import stack_dump
+from cs.lex import texthexify
 from cs.queues import MultiOpenMixin
-from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
-from cs.threads import locked, locked_property
+from cs.threads import locked
 from cs.x import X
 from . import totext, fromtext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta, rwx
+from .paths import path_split, resolve
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -47,21 +49,10 @@ F_HASMETA = 0x01
 F_HASNAME = 0x02
 F_NOBLOCK = 0x04
 
-def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Dirent, such as from
-      Dirent.textencode(), and return the corresponding Dirent.
-  '''
-  data = fromtext(text)
-  E, offset = decode_Dirent(data, 0)
-  if offset < len(data):
-    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
-                     % (text, E, data[offset:]))
-  return E
-
 class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
 
   @classmethod
-  def from_data(cls, data, offset=0):
+  def from_bytes(cls, data, offset=0):
     ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
         Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
     '''
@@ -72,7 +63,6 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       name = namedata.decode()
     else:
       name = ""
-    meta = None
     if flags & F_HASMETA:
       metatext, offset = get_bss(data, offset)
     else:
@@ -119,7 +109,7 @@ def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
   '''
   offset0 = offset
-  components, offset = DirentComponents.from_data(data, offset)
+  components, offset = DirentComponents.from_bytes(data, offset)
   type_, name, metatext, block = components
   try:
     if type_ == D_DIR_T:
@@ -270,39 +260,7 @@ class _Dirent(object):
       E = E.parent
 
   def stat(self):
-    from pwd import getpwnam
-    meta = self.meta
-    user, group, unixmode = meta.unixPerms()
-    if user is None:
-      uid = uid_nobody
-    else:
-      try:
-        uid = getpwnam(user)[2]
-      except KeyError:
-        uid = uid_nobody
-
-    if group is None:
-      gid = gid_nogroup
-    else:
-      try:
-        gid = getpwnam(user)[2]
-      except KeyError:
-        gid = gid_nogroup
-
-    if self.type == D_DIR_T:
-      unixmode |= stat.S_IFDIR
-    else:
-      unixmode |= stat.S_IFREG
-
-    dev = None          # make it clear that we have no associated filesystem
-    nlink = 1
-    ino = None          # also needs a filesystem
-    size = self.size
-    atime = 0
-    mtime = self.mtime
-    ctime = 0
-
-    return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+    return self.meta.stat()
 
   def complete(self, S2, recurse=False):
     ''' Complete this Dirent from alternative Store `S2`.
@@ -343,7 +301,7 @@ class InvalidDirent(_Dirent):
       if M is None:
         M = Meta(self)
       elif isinstance(M, str):
-        M = Meta.from_text(meta, self)
+        M = Meta.from_text(M, self)
       self._meta = M
     return M
 
@@ -394,7 +352,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       If open, ._open_file refers to the content.
       NOTE: multiple opens return the _same_ backing file, with a
       shared read/write offset. File systems must share this, and
-      keep their own offsets in their file handles.
+      maintain their own offsets in their file handle objects.
   '''
 
   def __init__(self, name, metatext=None, block=None):
@@ -428,7 +386,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     Eopen = self._open_file
     Eopen.filename = self.name
-    self._block = Eopen.close()
+    self._block = Eopen.close(enforce_final_close=True)
     self._open_file = None
     self._check()
 
@@ -452,8 +410,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ##stack_dump(indent=2)
     if self._open_file is None:
       return self._block
-    else:
-      return self._open_file.sync()
+    return self._open_file.sync()
 
   @block.setter
   @locked
@@ -470,9 +427,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
         Otherwise get the length of the top Block.
     '''
     self._check()
-    if self._open_file is not None:
-      return len(self._open_file)
-    return len(self.block)
+    if self._open_file is None:
+      sz = len(self.block)
+    else:
+      sz = len(self._open_file)
+    return sz
 
   def flush(self, scanner=None):
     return self._open_file.flush(scanner)
@@ -571,6 +530,7 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
+      X("Dir(%r): recompute block (_block=%s,changed=%s) ...",self.name, self._block, self.changed)
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
@@ -857,7 +817,6 @@ class DirFTP(Cmd):
           error("not found: unresolved path elements: %r", tail)
         else:
           M = E.meta
-          S = M.stat()
           u, g, perms = M.unix_perms
           typemode = M.unix_typemode
           typechar = ( '-' if typemode == stat.S_IFREG

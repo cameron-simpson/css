@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Require existence of directory, creating it if needed.
-#	- Cameron Simpson <cs@zip.com.au> 04may2002
+#	- Cameron Simpson <cs@cskk.id.au> 04may2002
 #
 
 [ $# = 0 ] && { echo "Usage: $0 dirs..." >&2; exit 2; }

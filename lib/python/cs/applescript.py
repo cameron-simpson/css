@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# AppleScript related stuff. - Cameron Simpson <cs@zip.com.au> 29oct2016
+# AppleScript related stuff. - Cameron Simpson <cs@cskk.id.au> 29oct2016
 #
 
 def quotestr(s):

@@ -3,11 +3,30 @@
 # RFC2047 - MIME Part 3 - http://tools.ietf.org/html/rfc2047
 #
 
+r'''
+Decoder for RFC2047 (MIME Part 3) encoded text.
+'''
+
+from __future__ import print_function
 import base64
 import quopri
 import re
+import sys
 from cs.pfx import Pfx
 from cs.py3 import unicode
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.pfx',
+        'cs.py3',
+    ],
+}
 
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
@@ -16,10 +35,17 @@ def unrfc2047(s, warning=None):
   ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
-      `warning`: optional parameter specifying function to report warning messages, default cs.logutils.warning
+      `warning`: optional parameter specifying function to report
+        warning messages, default is to use cs.logutils.warning if
+        cs.logutils has been imported, otherwise it just prints to
+        sys.stderr
   '''
   if warning is None:
-    from cs.logutils import warning
+    if 'cs.logutils' in sys.modules:
+      import cs.logutils
+      warning = cs.logutils.warning
+    else:
+      warning = _warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -51,7 +77,7 @@ def unrfc2047(s, warning=None):
       if realtext is None:
         try:
           realtext = decoded.decode(charset)
-        except LookupError as e:
+        except (UnicodeDecodeError, LookupError) as e:
           warning("decode(%r): %e", decoded, e)
           realtext = decoded.decode('iso8859-1')
       chunks.append(realtext)
@@ -59,3 +85,8 @@ def unrfc2047(s, warning=None):
   if sofar < len(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)
+
+def _warning(msg, *args):
+  if args:
+    msg = msg % args
+  print(msg, file=sys.stderr)

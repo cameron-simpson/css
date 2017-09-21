@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Return the contents of a symlink.
-#	- Cameron Simpson <cs@zip.com.au> 04dec2000
+#	- Cameron Simpson <cs@cskk.id.au> 04dec2000
 #
 
 use strict qw(vars);

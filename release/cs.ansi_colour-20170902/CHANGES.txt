@@ -1,0 +1,4 @@
+  lib/python/cs/ansi_colour.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/ansi_colour.py: merge default ==> beyonwiz
+  lib/python/cs/ansi_colour.py: my email address has changed - update Python code
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: add module docstring, drop description from DISTINFO as we will get it from the docstring

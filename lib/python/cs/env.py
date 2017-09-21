@@ -1,11 +1,23 @@
 #!/usr/bin/python
 #
 # Environment access and substitution.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Some environment related functions.
+
+* LOGDIR, VARRUN, FLAGDIR: lambdas defining standard places used in other modules
+
+* envsub: replace substrings of the form '$var' with the value of 'var' from `environ`.
+
+* getenv: fetch environment value, optionally performing substitution
+'''
+
+import os
+from cs.lex import get_qstr
+
 DISTINFO = {
-    'description': "a few environment related functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -15,14 +27,9 @@ DISTINFO = {
     'install_requires': ['cs.lex'],
 }
 
-import os
-import string
-import types
-from cs.lex import get_qstr
-
 # various standard locations used in the cs.* modules
-LOGDIR  = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
-VARRUN  = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
+LOGDIR = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
+VARRUN = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
 FLAGDIR = lambda environ=None: get_standard_var('FLAGDIR', '$HOME/var/flags', environ=environ)
 
 def get_standard_var(varname, default, environ=None):

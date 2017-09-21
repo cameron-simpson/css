@@ -2,7 +2,7 @@
 #
 # Run an ssh ProxyCommand for the specified target based on ~/.ssh/proxies.
 # Falls back to netcat to the hostname from the bare ssh config.
-#   - Cameron Simpson <cs@zip.com.au> 17may2017
+#   - Cameron Simpson <cs@cskk.id.au> 17may2017
 #
 # The configuration file has the format:
 #  target address port [test shell command]

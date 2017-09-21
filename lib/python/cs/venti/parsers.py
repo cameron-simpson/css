@@ -2,15 +2,14 @@
 #
 # Parsers for data streams, emitting data and offsets.
 # These sit in front of the core rolling hash blockifier.
-#   - Cameron Simpson <cs@zip.com.au> 05mar2017
+#   - Cameron Simpson <cs@cskk.id.au> 05mar2017
 #
 
 from functools import partial
 from os.path import basename, splitext
-import sys
-from cs.buffer import CornuCopyBuffer, chunky
-from cs.logutils import X, PfxThread, exception
-from cs.pfx import Pfx
+from cs.buffer import chunky
+from cs.logutils import warning, exception
+from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from .datafile import scan_chunks
 
@@ -69,7 +68,7 @@ scan_text_from_chunks = chunky(scan_text)
 
 def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
-      `bfr`: a CornuCopyBuffer
+      `bfr`: a CornuCopyBuffer providing data to parse
       `run_parser`: a callable which runs the parser; it should accept a
         CornuCopyBuffer as its sole argument.
       This function allocates an IterableQueue to receive the parser offset
@@ -159,6 +158,10 @@ PREFIXES_GO = (
 PREFIXES_PERL = (
     'package ', 'sub ',
 )
+PREFIXES_PDF = (
+    '<<',
+    'stream',
+)
 PREFIXES_SH = (
     'function ',
 )
@@ -172,6 +175,7 @@ SCANNERS_BY_EXT = {
   'go':     partial(scan_text, prefixes=PREFIXES_GO),
   'mp3':    scan_mp3,
   'mp4':    scan_mp4,
+  'pdf':    partial(scan_text, prefixes=PREFIXES_PDF),
   'pl':     partial(scan_text, prefixes=PREFIXES_PERL),
   'pm':     partial(scan_text, prefixes=PREFIXES_PERL),
   'py':     partial(scan_text, prefixes=PREFIXES_PYTHON),
@@ -184,7 +188,6 @@ SCANNERS_BY_MIME_TYPE = {
   'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
   'audio/mpeg':    scan_mp3,
   'video/mp4':     scan_mp4,
-  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
   'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
   'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),

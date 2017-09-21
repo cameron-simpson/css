@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import sys
 from cs.lex import hexify, texthexify
 from cs.logutils import X
 from .block import BlockType
@@ -38,7 +37,7 @@ def dump_Dirent(E, indent='', recurse=False, not_dir=False):
     'd' if E.isdir else '-',
     E.name,
     details,
-   )
+  )
   if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):

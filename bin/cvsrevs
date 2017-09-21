@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Report revisions for a file in a CVS checkout.
-#	- Cameron Simpson <cs@zip.com.au> 06nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 06nov2003
 #
 
 cmd=$0

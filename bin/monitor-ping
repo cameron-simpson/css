@@ -2,7 +2,7 @@
 #
 # Monitor an IP target using ping.
 # Run commands on "up" and "down"; repeat until successful or state change.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

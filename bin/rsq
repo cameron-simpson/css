@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # List the shares offered by rsync servers.
-#	- Cameron Simpson <cs@zip.com.au> 25may2004
+#	- Cameron Simpson <cs@cskk.id.au> 25may2004
 #
 
 servers=${RSQ_SERVERLIST:-"mirror.pacific.net.au,mirror.aarnet.edu.au,orff.orchestra.cse.unsw.edu.au,rsync.planetmirror.com"}

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions related to modules and importing.
-#   - Cameron Simpson <cs@zip.com.au> 21dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 21dec2014
 #
 
 DISTINFO = {
@@ -15,8 +15,9 @@ DISTINFO = {
     'install_requires': [],
 }
 
-import sys
+import importlib
 import os.path
+import sys
 
 def import_module_name(module_name, name, path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
@@ -26,7 +27,6 @@ def import_module_name(module_name, name, path=None, lock=None):
       `path`: an array of paths to use as sys.path during the import.
       `lock`: a lock to hold during the import (recommended).
   '''
-  import importlib
   if lock:
     with lock:
       return import_module_name(module_name, name, path)

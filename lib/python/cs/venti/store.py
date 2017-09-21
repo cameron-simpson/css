@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Block stores.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 ''' Basic Store classes.
@@ -14,26 +14,18 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
-from binascii import hexlify
-from contextlib import contextmanager
-import os
-import os.path
 import sys
-from threading import Lock, RLock, Thread
-from time import sleep
-from cs.asynchron import report as reportLFs
+from cs.result import report as reportLFs
+from cs.fileutils import shortpath
 from cs.later import Later
-from cs.logutils import status, info, debug, warning, D
-from cs.pfx import Pfx, XP
+from cs.logutils import info, debug, warning, error
+from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py3 import Queue
-from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
-from cs.threads import Q1, Get1
 from cs.x import X
-from . import defaults, totext
-from .datadir import DataDir, DEFAULT_INDEXCLASS
+from . import defaults
+from .datadir import DataDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
@@ -95,6 +87,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
         capacity = 4
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
+      self._attrs = {}
       MultiOpenMixin.__init__(self, lock=lock)
       self.name = name
       self.hashclass = hashclass
@@ -104,7 +97,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       self.writeonly = False
 
   def __str__(self):
-    return "%s(%s)" % (self.__class__.__name__, self.name)
+    params = [
+        attr + '=' + str(val) for attr, val in sorted(self._attrs.items())
+    ]
+    return "%s:%s(%s)" % (
+        self.__class__.__name__, self.hashclass.HASHNAME,
+        ','.join([repr(self.name)] + params)
+    )
 
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
@@ -154,14 +153,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
-  def __str__(self):
-    return "Store(%s)" % self.name
-
   def hash(self, data):
     ''' Return a Hash object from data bytes.
         NB: does _not_ store the data.
     '''
-    return self.hashclass.from_data(data)
+    return self.hashclass.from_chunk(data)
 
   def startup(self):
     # Later already open
@@ -260,8 +256,9 @@ class MappingStore(BasicStoreSync):
   '''
 
   def __init__(self, name, mapping, **kw):
-    BasicStoreSync.__init__(self, "MappingStore(%s)" % (name,), **kw)
+    BasicStoreSync.__init__(self, name, **kw)
     self.mapping = mapping
+    self._attrs.update(mapping=mapping)
 
   def startup(self):
     mapping = self.mapping
@@ -341,7 +338,7 @@ class ChainStore(BasicStoreSync):
 
   def __init__(self, name, stores, save_all=False, parallel=False):
     ''' Initialise a ChainStore.
-        `name`: ChainSTore name.
+        `name`: ChainStore name.
         `stores`: sequence of Stores
         `save_all`: add new data to all Stores, not just the first one
         `parallel`: run requests to the Stores in parallel instead of in sequence
@@ -349,6 +346,11 @@ class ChainStore(BasicStoreSync):
     if not stores:
       raise ValueError("stores may not be empty: %r" %(stores,))
     BasicStoreSync.__init__(self, name)
+    self._attrs.update(
+        stores='[' + ','.join(str(S) for S in stores) + ']',
+        parallel=parallel,
+        save_all=save_all,
+    )
     self.stores = stores
     self.save_all = save_all
     self.parallel = parallel
@@ -382,7 +384,8 @@ class ChainStore(BasicStoreSync):
     ''' Fetch a block from the first Store which has it.
     '''
     for result in self._multicall('get_bg', (h,), parallel=False):
-      return result
+      if result is not None:
+        return result
 
   def contains(self, h):
     ''' Is the hashcode `h` in any of the subStores?
@@ -427,8 +430,9 @@ class DataDirStore(MappingStore):
   '''
 
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
-    MappingStore.__init__(self, name, self._datadir, **kw)
+    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
+    MappingStore.__init__(self, name, datadir, **kw)
+    self._datadir = datadir
 
   def startup(self, **kw):
     X("DataDirStore.startup: _datadir.open...")

@@ -21,14 +21,11 @@
       http://csbp.backpackit.com/pub/1356606
 '''
 
-import re
 import os
-from os.path import abspath
 from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X
 from cs.seq import isordered
 
 # Default OS level file high water mark.
@@ -70,7 +67,8 @@ def fromtext(s):
 # Because we transcribe Dir blocks this way it includes some common
 # characters used for metadata, notably including the double quote
 # because it is heavily using in JSON.
-_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*/'
+# It does NOT include '/' because these appear at the start of paths.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
@@ -83,19 +81,25 @@ class _TestAdditionsMixin:
 
   @staticmethod
   def mktmpdir(prefix="cs.venti"):
-    return tempfile.TemporaryDirectory(prefix="test-"+prefix+"-", suffix=".tmpdir", dir=os.getcwd())
+    return tempfile.TemporaryDirectory(
+        prefix="test-" + prefix + "-",
+        suffix=".tmpdir",
+        dir=os.getcwd()
+    )
 
   def assertLen(self, o, length, *a, **kw):
-    ''' Test len(o) unless it raises NotImplementedError.
+    ''' Test len(o) unless it raises TypeError.
     '''
     try:
       olen = len(o)
     except TypeError:
-      import cs.logutils
-      cs.logutils.debug("skip assertLen(o, %d): no len(%s)", length, type(o))
+      from cs.x import X
+      X("no len(0) for o=%s:%r", type(o), o)
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
-    self.assertTrue(isordered(s, reverse, strict), "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+    self.assertTrue(
+        isordered(s, reverse, strict),
+        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))

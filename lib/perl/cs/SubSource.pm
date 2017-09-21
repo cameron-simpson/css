@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # A source attached to a byte-range.
-#	- Cameron Simpson <cs@zip.com.au> 23jul96
+#	- Cameron Simpson <cs@cskk.id.au> 23jul96
 #
 # Note: This is built on top of an existing Source.
 #	If you make more than one of these from the same source

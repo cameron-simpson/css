@@ -2,7 +2,7 @@
 #
 # MacOSX plist facilities. Supports binary plist files, which the
 # stdlib plistlib module does not.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import base64

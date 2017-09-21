@@ -2,7 +2,7 @@
 #
 # Convert the DoD list to a mailrc.
 # Emit classification problems to stdout.
-#	- Cameron Simpson <cs@zip.com.au>, 09sep94
+#	- Cameron Simpson <cs@cskk.id.au>, 09sep94
 #
 
 ($cmd=$0) =~ s:.*/::;

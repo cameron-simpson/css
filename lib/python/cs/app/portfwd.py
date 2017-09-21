@@ -1,8 +1,25 @@
 #!/usr/bin/python
 #
 # Manage ssh based port forwards.
-# - Cameron Simpson <cs@zip.com.au> May 2017
+# - Cameron Simpson <cs@cskk.id.au> May 2017
 #
+
+r'''
+Manage persistent ssh tunnels and port forwards.
+
+Portfwd runs a collection of ssh tunnel commands persistently,
+each it its own `cs.app.svcd <https://pypi.org/project/cs.app.svcd>`_ instance
+with all the visibility and process control that SvcD brings.
+
+It reads tunnel preconditions from special comments within the ssh config file.
+It uses the configuration options from the config file
+as the SvcD signature function
+thus restarting particular ssh tunnels when their specific configuration changes.
+It has an "automatic" mode (the -A option)
+which monitors the desired list of tunnels
+from status expressed via `cs.app.flag <https://pypi.org/project/cs.app.flag>`_
+which allows live addition or removal of tunnels as needed.
+'''
 
 from __future__ import print_function
 from collections import defaultdict
@@ -19,13 +36,36 @@ from threading import RLock
 from time import sleep
 from cs.app.flag import Flags, uppername, lowername, FlaggedMixin
 from cs.app.svcd import SvcD
-from cs.cmdutils import pipefrom
 from cs.env import envsub
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
+from cs.psutils import pipefrom
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
-from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.app.flag',
+        'cs.app.svcd',
+        'cs.env',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.psutils',
+        'cs.py.func',
+        'cs.sh',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'portfwd = cs.app.portfwd:main'
+        ],
+    },
+}
 
 USAGE = '''Usage:
   %s -d [targets...]
@@ -59,7 +99,9 @@ group name, and the targets are found by collating the first hostname
 in each Host claus with the group name appended.
 Example: "Host home ALL"'''
 
-def main(argv, environ=None):
+def main(argv=None, environ=None):
+  if argv is None:
+    argv = sys.argv
   if environ is None:
     environ = os.environ
   cmd = basename(argv.pop(0))
@@ -192,19 +234,20 @@ class Portfwd(FlaggedMixin):
     self.flag_connected = False
     def on_reap():
       self.flag_connected = False
-    self.svcd = SvcD(self.ssh_argv,
-                     name=self.svcd_name,
-                     flags=self.flags,
-                     trace=trace,
-                     sig_func=self.sig_func,
-                     test_func=self.test_func,
-                     test_flags={
-                        'PORTFWD_DISABLE': False,
-                        'PORTFWD_SSH_READY': True,
-                        'ROUTE_DEFAULT': True,
-                     },
-                     on_reap=on_reap
-                    )
+    self.svcd = SvcD(
+        self.ssh_argv,
+        name=self.svcd_name,
+        flags=self.flags,
+        trace=trace,
+        sig_func=self.sig_func,
+        test_func=self.test_func,
+        test_flags={
+            'PORTFWD_DISABLE': False,
+            'PORTFWD_SSH_READY': True,
+            'ROUTE_DEFAULT': True,
+        },
+        on_reap=on_reap
+    )
 
   def __str__(self):
     return "Portfwd %s %s" % (self.target, shq(self.ssh_argv))
@@ -353,16 +396,17 @@ class Portfwds(object):
       targets.update(self.resolve_target_spec(spec))
     if self.auto_mode:
       for flagname in self.flags:
-        if ( flagname.startswith('PORTFWD_')
-         and flagname.endswith('_AUTO')
-         and self.flags[flagname]
+        if (
+            flagname.startswith('PORTFWD_')
+            and flagname.endswith('_AUTO')
+            and self.flags[flagname]
         ):
           targets.add(lowername(flagname[8:-5]))
     return targets
 
   GROUP_NAME = r'[A-Z][A-Z0-9_]*'
   GROUP_NAME_RE = re.compile(GROUP_NAME)
-  SPECIAL_RE = re.compile(r'^\s*#\s*(' + GROUP_NAME + '):\s*')
+  SPECIAL_RE = re.compile(r'^\s*#\s*(' + GROUP_NAME + r'):\s*')
 
   @prop
   def ssh_config(self):
@@ -471,11 +515,14 @@ class _PortfwdCondition(object):
     self.invert = invert
 
   def __str__(self):
-    return "%s%s[%s]" % (self.__class__.__name__,
-                       '!' if self.invert else '',
-                       ','.join("%s=%r" % (attr, getattr(self, attr))
-                                for attr in sorted(self._attrnames)
-                               ))
+    return "%s%s[%s]" % (
+        self.__class__.__name__,
+        '!' if self.invert else '',
+        ','.join(
+            "%s=%r" % (attr, getattr(self, attr))
+            for attr in sorted(self._attrnames)
+        )
+    )
   def __bool__(self):
     if self.test():
       return not self.invert

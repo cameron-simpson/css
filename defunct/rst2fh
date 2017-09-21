@@ -2,7 +2,7 @@
 #
 # Nab header and then feed rest to "restore tf -" and parse the output,
 # emitting stuff for the budtool file history.
-#	- Cameron Simpson <cs@zip.com.au> 24sep96
+#	- Cameron Simpson <cs@cskk.id.au> 24sep96
 #
 
 @Restore=('restore','tf','-');

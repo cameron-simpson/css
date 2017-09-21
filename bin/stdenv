@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run a command with a specific environment setup.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }

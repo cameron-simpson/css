@@ -1,0 +1,24 @@
+  lib/python/cs/fileutils.py: merge pypi ==> venti: cs-release: new "check" mode to report module status, related changes
+  lib/python/cs/fileutils.py: cs.fileutils: bugfix SharedAppendFile: fix initialisation of count in _monitor
+  lib/python/cs/fileutils.py: merge default ==> beyonwiz
+  lib/python/cs/fileutils.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile: arrange to close temp files we open; initial setup to shuffle front and back files, supporting cs.venti.vtfuse flush operations
+  lib/python/cs/README-fileutils.rst lib/python/cs/fileutils.py: cs.fileutils etc: rename chunks_of to read_from
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: improve docstring, acquire abspath(pathname) on init to guard against chdir
+  lib/python/cs/fileutils.py: cs.fileutils: cs.logutils now a normal import, remove special case imports
+  lib/python/cs/fileutils.py: cs.fileutils: initial implementation of SharedAppendFile.rewrite, untested
+  lib/python/cs/fileutils.py: cs.fileutils: add SharedAppendLines.rewrite which transcodes lines into binary chunks for SharedAppendFile
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendLines.rewrite: accept optional `encoding` parameter
+  lib/python/cs/fileutils.py: cs.fileutils: shorten calls to os.path functions
+  lib/python/cs/fileutils.py: cs.fileutils: add missing import
+  lib/python/cs/fileutils.py: merge default ==> nodedb
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile._monitor: set count; tweak docstring
+  lib/python/cs/fileutils.py: cs.fileutils: complete record of SharedAppendFile and SharedAppendLines with a much simpler interface and behaviour
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: support `poll_interval` parameter
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: set .closed=False at initialisation
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: text files need to be buffered
+  lib/python/cs/fileutils.py: cs.fileutils: import and typo fixes
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: fix docstring typo
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppend*: honour the newline= open() parameter
+  lib/python/cs/fileutils.py: cs.sharedfile: move cs.fileutils.{lockfile,Shared*} into this
+  lib/python/cs/fileutils.py: cs.fileutils: remove unused imports
