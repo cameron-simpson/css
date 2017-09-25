@@ -8,12 +8,7 @@ from __future__ import with_statement
 from collections import namedtuple
 import sys
 from threading import Lock, Thread
-from cs.result import Result
 from cs.fileutils import RWFileBlockCache
-import cs.later
-from cs.lex import hexify
-from cs.logutils import X
-from cs.progress import Progress
 from cs.queues import IterableQueue
 from . import MAX_FILE_SIZE
 from .store import BasicStoreSync
@@ -86,9 +81,10 @@ class FileDataMappingProxy(object):
       storage.
   '''
 
-  def __init__(self, backend, dirpath=None,
-               max_cachefile_size=None, max_cachefiles=None,
-              ):
+  def __init__(
+      self, backend, dirpath=None,
+      max_cachefile_size=None, max_cachefiles=None,
+  ):
     ''' Initialise the cache.
         `backend`: mapping underlying us
         `dirpath`: directory to store cache files
@@ -113,7 +109,7 @@ class FileDataMappingProxy(object):
     self.cachefiles = []
     self._add_cachefile()
     self._workQ = IterableQueue()
-    self._worker = Thread(target=self._worker)
+    self._worker = Thread(target=self._work)
     self._worker.start()
 
   def _add_cachefile(self):
@@ -158,11 +154,11 @@ class FileDataMappingProxy(object):
     ''' Mapping method for .keys.
     '''
     seen = set()
-    for h in self.cached.keys():
+    for h in self.cached:
       yield h
       seen.add(h)
     saved = self.saved
-    for h in saved.keys():
+    for h in saved:
       if h not in seen and self._getref(h):
         yield h
         seen.add(h)
@@ -207,7 +203,7 @@ class FileDataMappingProxy(object):
     # queue for file cache and backend
     self._workQ.put( (h, data) )
 
-  def _worker(self):
+  def _work(self):
     for h, data in self._workQ:
       with self._lock:
         if self._getref(h):
