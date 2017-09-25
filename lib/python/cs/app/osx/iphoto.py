@@ -661,9 +661,6 @@ class iPhoto(O):
   def album(self, album_id):
     return self.albums_table[album_id]
 
-  def album_names(self):
-    return self.albums_by_name.keys()
-
   @property
   def albumdata_path(self):
     ''' Pathname of the AlbumData.xml file, saved when iPhoto quits.
@@ -682,9 +679,6 @@ class iPhoto(O):
   def folder(self, folder_id):
     return self.folders_table[folder_id]
 
-  def folder_names(self):
-    return self.folders_by_name.keys()
-
   @prop
   def folders_simple(self):
     return [ folder for folder in self.folders if folder.is_simple_folder ]
@@ -698,13 +692,6 @@ class iPhoto(O):
   @prop
   def events(self):
     return [ folder for folder in self.folders if folder.is_event ]
-
-  @prop
-  def event_names(self):
-    return [ event.name for event in self.events ]
-
-  def events_by_name(self, name):
-    return [ event for event in self.events if event.name == name ]
 
   def match_people(self, person_name):
     ''' User convenience: match string against all person names, return Person rows.
@@ -765,18 +752,6 @@ class iPhoto(O):
 
   def master_pathnames(self):
     return [ master.pathname for master in self.masters_table ]
-
-  def version(self, version_id):
-    return self.versions_table[version_id]
-
-  def _load_table_keywords(self):
-    ''' Load Library.RKKeyword into memory and set up mappings.
-    '''
-    by_id = self.keyword_by_id = {}
-    by_name = self.keyword_by_name = {}
-    for kw in self.keyword_rows:
-      by_id[kw.modelId] = kw
-      by_name[kw.name] = kw
 
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords())

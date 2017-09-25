@@ -10,8 +10,9 @@ from threading import RLock
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked
-from cs.logutils import X, debug, info, warning, error
+from cs.logutils import debug, info, warning, error
 from cs.pfx import Pfx, XP
+from cs.x import X
 
 class Params(object):
   ''' A manager for query parameters.
