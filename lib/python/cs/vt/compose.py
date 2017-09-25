@@ -66,8 +66,8 @@ def parse_store_spec(s, offset, config=None):
                         Connect to a daemon implementing the streaming protocol.
           http[s]://host/prefix
                         A Store presenting content under prefix:
-                          /h/hashtype/hashcode  Block data by hashcode
-                          /i/hashtype/hashcode  Indirect block by hashcode.
+                          /h/hashcode.hashtype  Block data by hashcode
+                          /i/hashcode.hashtype  Indirect block by hashcode.
   '''
   offset0 = offset
   if offset >= len(s):
