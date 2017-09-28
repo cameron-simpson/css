@@ -9,8 +9,10 @@ import re
 import sys
 from collections import namedtuple
 from cs.env import envsub
-from cs.logutils import setup_logging, Pfx, error, warning, X
+from cs.logutils import setup_logging, error, warning
 from cs.obj import O
+from cs.pfx import Pfx
+from cs.x import X
 
 PEERAGE = "$HOME/.peerage"
 
