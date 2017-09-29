@@ -55,7 +55,7 @@ from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info
-from cs.pfx import Pfx, PfxThread as Thread
+from cs.pfx import Pfx, PfxThread as Thread, XP
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 
 DISTINFO = {
@@ -315,6 +315,8 @@ class SvcD(FlaggedMixin, object):
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if debug is None:
       debug = sys.stderr.isatty()
+    self.debug = debug
+    XP("SvcD(name=%r): debug=%r", name, debug)
     if flags is None:
       if name is None:
         name = 'UNNAMED'
@@ -355,20 +357,33 @@ class SvcD(FlaggedMixin, object):
   def __repr__(self):
     return str(self) + repr(self.argv)
 
+  def dbg(self, msg, *a):
+    if not self.debug:
+      return
+    XP("%s: " + msg, self, *a)
+
   def test(self):
-    if self.flag_override:
-      return True
-    if self.flag_disable:
-      return False
-    for flagname, truish in self.test_flags.items():
-      if self.flags[flagname]:
-        if not truish:
-          return False
-      elif truish:
+    with Pfx("test"):
+      if self.flag_override:
+        self.dbg("flag_override true -> True")
+        return True
+      if self.flag_disable:
+        self.dbg("flag_disable true -> False")
         return False
-    if self.test_func is not None:
-      return self.test_func()
-    return True
+      for flagname, truish in self.test_flags.items():
+        if self.flags[flagname]:
+          if not truish:
+            self.dbg("flags[%r] -> False", flagname)
+            return False
+        elif truish:
+          self.dbg("!flags[%r] -> False", flagname)
+          return False
+      if self.test_func is not None:
+        result = self.test_func()
+        self.dbg("test_func -> %r", result)
+        return result
+      self.dbg("default -> True")
+      return True
 
   def alert(self, msg, *a):
     if self.quiet:
@@ -429,6 +444,7 @@ class SvcD(FlaggedMixin, object):
         while True:
           # check for termination state
           if self.flag_stop:
+            XP("flag_stop: set to False and break")
             self.flag_stop = False
             break
           # check for process exit
@@ -438,11 +454,15 @@ class SvcD(FlaggedMixin, object):
               break
             next_start_time = now() + self.restart_delay
           if self.subp is None:
+            XP("subp=None: check for spawn")
             # not running - see if it should start
             if now() >= max(next_test_time, next_start_time):
               if self.test():
                 # test passes, start service
+                XP("test ok, spawning...")
                 self.spawn()
+              else:
+                XP("self.test() failed")
               next_test_time = now() + self.test_rate
           else:
             # running - see if it should stop
