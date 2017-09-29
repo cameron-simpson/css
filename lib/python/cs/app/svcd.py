@@ -454,7 +454,6 @@ class SvcD(FlaggedMixin, object):
               break
             next_start_time = now() + self.restart_delay
           if self.subp is None:
-            XP("subp=None: check for spawn")
             # not running - see if it should start
             if now() >= max(next_test_time, next_start_time):
               if self.test():
