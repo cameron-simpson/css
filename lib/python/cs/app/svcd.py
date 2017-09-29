@@ -253,6 +253,7 @@ def main(argv=None, environ=None):
   def signal_handler(signum, frame):
     S.stop()
     S.wait()
+    S.flag_stop = False
     sys.exit(1)
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
