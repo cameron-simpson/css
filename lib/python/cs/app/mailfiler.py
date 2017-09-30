@@ -549,13 +549,16 @@ class MessageFiler(O):
     with with_log(os.path.join(cs.env.LOGDIR(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = message_path
-      info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                 unrfc2047(M.get('subject', '_no_subject'))))
-                 .replace('\n', ' ') )
-      info("  " + self.format_message(M, "{short_from}->{short_recipients}"))
-      info("  " + M.get('message-id', '<?>'))
-      if self.message_path:
-        info("  " + shortpath(self.message_path))
+      info( (u("%s %s: %s") % (
+          time.strftime("%Y-%m-%d %H:%M:%S"),
+          self.format_message(M, "{short_from}->{short_recipients}"),
+          unrfc2047(M.get('subject', '_no_subject'))
+      )).replace('\n', ' ') )
+      msg_id = M.get('message-id', '<?>').replace('\n', ' ')
+      if message_path:
+        info("  " + shortpath(self.message_path) + " " + msg_id)
+      else:
+        info("  " + msg_id)
 
       # match the rules, gathering labels and save destinations
       try:
