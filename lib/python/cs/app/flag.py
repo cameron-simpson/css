@@ -41,6 +41,12 @@ with flag names prefixed by the object's .name attribute uppercased and with an 
       self.flag_restart = False
       ... restart the SvcD ...
 
+so that an object set up as::
+
+  svcd - SvcD("portfwd")
+  print(svcd.flag_disabled)
+
+accesses the flag named "PORTFWD_DISABLED".
 '''
 
 from __future__ import print_function
