@@ -74,7 +74,7 @@ DISTINFO = {
     ],
     'entry_points': {
         'console_scripts': [
-            'svcd = cs.app.main:main'
+            'svcd = cs.app.svcd:main'
         ],
     },
 }
