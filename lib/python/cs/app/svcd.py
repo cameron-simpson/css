@@ -54,7 +54,7 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, DummyFlags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info
+from cs.logutils import setup_logging, warning, info, debug
 from cs.pfx import Pfx, PfxThread as Thread, XP
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 
@@ -285,7 +285,6 @@ class SvcD(FlaggedMixin, object):
         trace=False,
         on_spawn=None,
         on_reap=None,
-        debug=None,
     ):
     ''' Initialise the SvcD.
         `argv`: command to run as a subprocess.
@@ -307,22 +306,17 @@ class SvcD(FlaggedMixin, object):
         `trace`: trace actions, default False
         `on_spawn`: to be called after a new subprocess is spawned
         `on_reap`: to be called after a subprocess is reaped
-        `debug`: turns on tracing of flag changes
     '''
     if environ is None:
       environ = os.environ
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
-    if debug is None:
-      debug = sys.stderr.isatty()
-    self.debug = debug
-    XP("SvcD(name=%r): debug=%r", name, debug)
     if flags is None:
       if name is None:
         name = 'UNNAMED'
         flags = DummyFlags()
       else:
-        flags = Flags(environ=environ, debug=debug)
+        flags = Flags(environ=environ, debug=trace)
     elif name is None:
       raise ValueError("no name specified but flags=%r" % (flags,))
     FlaggedMixin.__init__(self, flags=flags)
@@ -358,9 +352,9 @@ class SvcD(FlaggedMixin, object):
     return str(self) + repr(self.argv)
 
   def dbg(self, msg, *a):
-    if not self.debug:
+    if not self.trace:
       return
-    XP("%s: " + msg, self, *a)
+    debug("%s: " + msg, self, *a)
 
   def test(self):
     with Pfx("test"):
@@ -380,7 +374,8 @@ class SvcD(FlaggedMixin, object):
           return False
       if self.test_func is not None:
         result = self.test_func()
-        self.dbg("test_func -> %r", result)
+        if not result:
+          self.dbg("test_func -> %r", result)
         return result
       self.dbg("default -> True")
       return True
@@ -414,7 +409,7 @@ class SvcD(FlaggedMixin, object):
     returncode = self.subp.wait()
     self.flag_running = False
     if self.trace:
-      info("%s: subprocess returncode = %s", self.name, returncode)
+      info("%s: subprocess returncode = %s %r", self.name, returncode, self.argv)
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
@@ -458,7 +453,6 @@ class SvcD(FlaggedMixin, object):
             if now() >= max(next_test_time, next_start_time):
               if self.test():
                 # test passes, start service
-                XP("test ok, spawning...")
                 self.spawn()
               else:
                 XP("self.test() failed")
