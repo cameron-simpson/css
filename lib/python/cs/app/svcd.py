@@ -393,8 +393,7 @@ class SvcD(FlaggedMixin, object):
   def spawn(self):
     if self.subp is not None:
       raise RuntimeError("already running")
-    if self.trace:
-      info("%s: spawn %r", self.name, self.argv)
+    self.dbg("%s: spawn %r", self.name, self.argv)
     self.subp = Popen(self.argv, stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
@@ -408,8 +407,7 @@ class SvcD(FlaggedMixin, object):
       raise RuntimeError("not running")
     returncode = self.subp.wait()
     self.flag_running = False
-    if self.trace:
-      info("%s: subprocess returncode = %s %r", self.name, returncode, self.argv)
+    self.dbg("subprocess returncode = %s %r", returncode, self.argv)
     self.alert('EXITED')
     self.subp = None
     if self.pidfile is not None:
