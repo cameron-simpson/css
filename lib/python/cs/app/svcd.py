@@ -437,7 +437,7 @@ class SvcD(FlaggedMixin, object):
         while True:
           # check for termination state
           if self.flag_stop:
-            XP("flag_stop: set to False and break")
+            XP("flag_stop(%s): was true, set to False and break", self.flagname_stop)
             self.flag_stop = False
             break
           # check for process exit
@@ -477,6 +477,9 @@ class SvcD(FlaggedMixin, object):
         if self.subp is not None:
           self._kill_subproc()
       T = Thread(name=str(self)+':monitor', target=monitor)
+      if self.flag_stop:
+        warning("clear flag %s before starting thread", self.flagname_stop)
+        self.flag_stop = False
       T.start()
       self.monitor = T
 
