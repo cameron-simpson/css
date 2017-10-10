@@ -9,6 +9,7 @@ from collections import namedtuple
 import sys
 from threading import Lock, Thread
 from cs.fileutils import RWFileBlockCache
+from cs.result import Result
 from cs.queues import IterableQueue
 from . import MAX_FILE_SIZE
 from .store import BasicStoreSync
@@ -59,6 +60,10 @@ class FileCacheStore(BasicStoreSync):
     h = backend.hash(data)
     self.cache[h] = data
     return h
+
+  # add is deliberately very fast; just return a completed Result directly
+  def add_bg(self, data):
+    return Result(result=self.add(data))
 
   def get(self, h):
     try:
