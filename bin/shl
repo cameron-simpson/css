@@ -81,6 +81,9 @@ then
 fi
 
 colors=$( tput colors ) || colors=
+case "$colors" in
+  8)    colors= ;;  # no esc8.outlang, use esc.outlang
+esac
 
 set -- source-highlight \
         "--outlang-def=esc${colors}.outlang" \
