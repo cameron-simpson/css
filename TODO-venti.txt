@@ -16,6 +16,7 @@ import: import_file for existing files: efficient content comparison etc
     prepare a CornuCopyBuffer fed from the existing vt blocks as the leading comparison process blockifier, use .take to 
     compare a pair of CornuCopyBuffers using one as the reference blockifer source
 vt level file ops using setxattr? nasty but the only way? clone, patch, snip, assemble-archive
+    control: x-vt-control=op (set-content, splice, crop, compose, ...)
     set: x-vt-clone=new-rpath
     set: Dir:x-vt-archive-as:type[=name], archive available as name (or computed default)
         tar, iso, zip(?), udf(?)
