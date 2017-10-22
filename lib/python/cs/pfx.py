@@ -60,12 +60,18 @@ DISTINFO = {
 
 cmd = None
 
-def pfx_iter(tag, iter):
-  ''' Wrapper for iterators to prefix exceptions with `tag`.
+def pfx_iter(tag, iterable):
+  ''' Wrapper for iterables to prefix exceptions with `tag`.
   '''
   with Pfx(tag):
-    for i in iter:
-      yield i
+    I = iter(iterable)
+  while True:
+    with Pfx(tag):
+      try:
+        i = next(I)
+      except StopIteration:
+        break
+    yield i
 
 def pfx(func):
   ''' Decorator for functions that should run inside:
@@ -150,7 +156,7 @@ class _PfxThreadState(threading.local):
     return self.stack.pop()
 
 class Pfx(object):
-  ''' A context manager to maintain a per-thread stack of message prefices.
+  ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
   # instantiate the thread-local state object
@@ -160,7 +166,9 @@ class Pfx(object):
     ''' Initialise a new Pfx instance.
         `mark`: message prefix string
         `args`: if not empty, apply to the prefix string with `%`
-        `absolute`: optional keyword argument, default False. If true, this message forms the base of the message prefixes; existing prefixes will be suppressed.
+        `absolute`: optional keyword argument, default False. If
+          true, this message forms the base of the message prefixes;
+          existing prefixes will be suppressed.
         `loggers`: which loggers should receive log messages.
     '''
     absolute = kwargs.pop('absolute', False)
@@ -195,6 +203,8 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
+            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            ##  prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix \
               + ': ' \
@@ -246,10 +256,10 @@ class Pfx(object):
       self._umark = u
     return u
 
-  def logto(self, newLoggers):
+  def logto(self, new_loggers):
     ''' Define the Loggers anew.
     '''
-    self._loggers = newLoggers
+    self._loggers = new_loggers
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
@@ -308,14 +318,14 @@ def prefix():
   return Pfx._state.prefix
 
 @contextmanager
-def PrePfx(pfx, *args):
+def PrePfx(tag, *args):
   ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
   '''
   if args:
-    pfx = pfx % args
+    tag = tag % args
   state = Pfx._state
   old_ur_prefix = state._ur_prefix
-  state._ur_prefix = pfx
+  state._ur_prefix = tag
   yield None
   state._ur_prefix = old_ur_prefix
 

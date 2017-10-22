@@ -1,2 +1,2 @@
 #!/bin/sh
-exec python3 -m cs.venti ${1+"$@"}
+exec python3 -m cs.vt ${1+"$@"}
