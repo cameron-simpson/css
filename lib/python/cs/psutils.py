@@ -112,6 +112,7 @@ def run(argv, logger=None, **kw):
       `argv`: the command argument list
       `trace`: Default False. If True, recite invocation to stderr.
         Otherwise presume a stream to which to recite the invocation.
+      Other keyword arguments are passed to subprocess.call.
   '''
   if logger is True:
     logger = logging.getLogger()
