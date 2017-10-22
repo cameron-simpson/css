@@ -2,9 +2,8 @@
 
 import sys
 from collections import deque
-from threading import Lock, RLock
+from threading import RLock
 from cs.threads import locked
-from cs.logutils import X
 
 _caches = []
 def overallHitRatio():
@@ -127,7 +126,7 @@ class LRU_Cache(object):
     cache_seq = self._cache_seq
     for qseq, qkey in stash:
       try:
-        seq = cache_seq[key]
+        seq = cache_seq[qkey]
       except KeyError:
         continue
       if qseq == seq:
