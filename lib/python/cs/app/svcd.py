@@ -57,6 +57,7 @@ from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, debug
 from cs.pfx import Pfx, PfxThread as Thread, XP
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
+from cs.sh import quotecmd
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -71,6 +72,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
+        'cs.sh',
     ],
     'entry_points': {
         'console_scripts': [
@@ -227,7 +229,7 @@ def main(argv=None, environ=None):
     def sig_func():
       argv = ['sh', '-c', sig_shcmd]
       if test_uid != uid:
-        argv = ['sux', '-u', test_username, '--'] + argv
+        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
       P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()
@@ -241,10 +243,10 @@ def main(argv=None, environ=None):
     def test_func():
       argv = ['sh', '-c', test_shcmd]
       if test_uid != uid:
-        argv = ['sux', '-u', test_username, '--'] + argv
+        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
       return callproc(argv, stdin=DEVNULL) == 0
   if run_uid != uid:
-    argv = ['sux', '-u', run_username, '--'] + argv
+    argv = ['su', run_username, 'exec ' + quotecmd(argv)]
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
   S = SvcD(argv, name=name, pidfile=svc_pidfile,
