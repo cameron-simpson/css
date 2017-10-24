@@ -84,32 +84,32 @@ KILL_TIME = 5       # how long to wait for a terminated process to exit
 RESTART_DELAY = 3   # delay be restart of an exited process
 
 USAGE = '''Usage:
-  %s disable names...
-          FOr each name set the flag {NAME}_DISABLE, causing the matching
+  {cmd} disable names...
+          For each name set the flag {{NAME}}_DISABLE, causing the matching
           svcd to shut down its daemon process.
-  %s enable names
-          For each name clear the flag {NAME}_DISABLE, allowing the matching
+  {cmd} enable names
+          For each name clear the flag {{NAME}}_DISABLE, allowing the matching
           svcd to start up its daemon process.
-  %s restart names...
-          For each name set the flag {NAME}_RESTART, causing the matching
+  {cmd} restart names...
+          For each name set the flag {{NAME}}_RESTART, causing the matching
           svcd to shut down and then restart its daemon process.
-  %s stop names...
-          For each name set the flag {NAME}_STOP, causing the the
+  {cmd} stop names...
+          For each name set the flag {{NAME}}_STOP, causing the the
           montior thread to kill the daemon process and exit.
-  %s [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
+  {cmd} [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
     -1    Run command only once.
     -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
     -L lockname
           Use lock \"lockname\" to prevent multiple instances of this svcd.
     -n name
           Specify a name for this svcd.
-          Also create a subprocess pid file at $VARRUN/name.pid for the command.
-          This also causes svcd to consult the flags {NAME}_OVERRIDE
-          and {NAME}_DISABLE and {NAME}_RESTART.
+          Also create a subprocess pid file at {VARRUN}/name.pid for the command.
+          This also causes svcd to consult the flags {{NAME}}_OVERRIDE
+          and {{NAME}}_DISABLE and {{NAME}}_RESTART.
     -p svcd-pidfile
-          Specify $cmd pid file instead of default.
+          Specify {cmd} pid file instead of default.
     -P subp-pidfile
-          Specify $cmd subprocess pid file instead of default.
+          Specify {cmd} subprocess pid file instead of default.
     -q    Quiet. Do not issue alerts.
     -s sigcmd
           Run the signature shell command \"sigcmd\" whose output is
@@ -119,7 +119,7 @@ USAGE = '''Usage:
           Run the test shell command \"testcmd\" periodically to
           govern whether the command should be active.
     -T testrate
-          Interval between test polls in seconds. Default: $testrate
+          Interval between test polls in seconds. Default: {TEST_RATE}
     -u username
           Run command as the specified username.
     -U username
@@ -130,7 +130,7 @@ def main(argv=None, environ=None):
   if argv is None:
     argv = sys.argv
   cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE.format(cmd=cmd, TEST_RATE=TEST_RATE, VARRUN=VARRUN)
   setup_logging(cmd)
   badopts = False
   try:
