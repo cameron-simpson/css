@@ -52,7 +52,7 @@ from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, PIPE, DEVNULL, call as callproc
 import sys
 from time import sleep, time as now
-from cs.app.flag import Flags, DummyFlags, FlaggedMixin
+from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, debug
 from cs.pfx import Pfx, PfxThread as Thread, XP
@@ -444,7 +444,7 @@ class SvcD(FlaggedMixin, object):
   def start(self):
     with Pfx("SvcD.start(%s)", self):
       def monitor():
-        old_sig = ''
+        old_sig = None
         next_test_time = now()
         next_start_time = now()
         while True:
@@ -480,9 +480,14 @@ class SvcD(FlaggedMixin, object):
               next_test_time = now() + self.test_rate
             if not stop and self.sig_func is not None:
               new_sig = self.sig_func()
-              if new_sig is not None and new_sig != old_sig:
-                old_sig = new_sig
-                stop = True
+              if new_sig is not None:
+                if old_sig is None:
+                  # initial signature probe
+                  old_sig = new_sig
+                elif new_sig != old_sig:
+                  # changed signature, trigger restart
+                  old_sig = new_sig
+                  stop = True
             if stop:
               self._kill_subproc()
               sleep(self.restart_delay)
