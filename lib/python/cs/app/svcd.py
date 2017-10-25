@@ -101,6 +101,9 @@ USAGE = '''Usage:
   {cmd} [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
     -1    Run command only once.
     -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
+    -F [!]flag,...
+          Flags to include in the run test. Flags with a leading
+          exclaimation point (!) must test false, others true.
     -L lockname
           Use lock \"lockname\" to prevent multiple instances of this svcd.
     -n name
@@ -175,14 +178,27 @@ def main(argv=None, environ=None):
     run_username = username
     test_uid = uid
     test_username = username
+    test_flags = {}
     trace = sys.stderr.isatty()
-    opts, argv = getopt(argv, '1lL:n:p:P:qs:t:T:u:U:x')
+    opts, argv = getopt(argv, '1lF:L:n:p:P:qs:t:T:u:U:x')
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-1':
           once = True
         elif opt == '-l':
           use_lock = True
+        elif opt == '-F':
+          for flagname in value.split(','):
+            with Pfx(flagname):
+              truthiness = True
+              if flagname.startswith('!'):
+                truthiness = False
+                flagname = flagname[1:]
+              if not flagname:
+                warning("invalid empty flag name")
+                badopts = True
+              else:
+                test_flags[flagname] = truthiness
         elif opt == '-L':
           use_lock = True
           lock_name = value
@@ -249,8 +265,8 @@ def main(argv=None, environ=None):
     argv = ['su', run_username, 'exec ' + quotecmd(argv)]
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(argv, name=name, pidfile=svc_pidfile,
-           sig_func=sig_func, test_func=test_func, test_rate=test_rate,
+  S = SvcD(argv, name=name, pidfile=svc_pidfile, sig_func=sig_func,
+           test_flags=test_flags, test_func=test_func, test_rate=test_rate,
            once=once, quiet=quiet, trace=trace)
   def signal_handler(signum, frame):
     S.stop()
@@ -292,7 +308,6 @@ class SvcD(FlaggedMixin, object):
         `argv`: command to run as a subprocess.
         `flags`: a cs.app.flag.Flags -like object, default None;
           if None the default flags will be used.
-          It is an error to supply this and not specify a `name`.
         `pidfile`: path to pid file, default $VARRUN/{name}.pid.
         `sig_func`: signature function to compute a string which
           causes a restart if it changes
@@ -314,20 +329,16 @@ class SvcD(FlaggedMixin, object):
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
-      if name is None:
-        name = 'UNNAMED'
-        flags = DummyFlags()
-      else:
-        flags = Flags(environ=environ, debug=trace)
-    elif name is None:
-      raise ValueError("no name specified but flags=%r" % (flags,))
-    FlaggedMixin.__init__(self, flags=flags)
+      flags = Flags(environ=environ, debug=trace)
+    if name is None:
+      name = 'UNNAMED'
     if test_flags is None:
       test_flags = {}
     if test_rate is None:
       test_rate = TEST_RATE
     if restart_delay is None:
       restart_delay = RESTART_DELAY
+    FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
     self.name = name
     self.test_flags = test_flags
