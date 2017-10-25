@@ -484,10 +484,19 @@ class SvcD(FlaggedMixin, object):
                 if old_sig is None:
                   # initial signature probe
                   old_sig = new_sig
-                elif new_sig != old_sig:
-                  # changed signature, trigger restart
-                  old_sig = new_sig
-                  stop = True
+                else:
+                  try:
+                    changed = new_sig != old_sig
+                  except TypeError as e:
+                    warning(
+                        "type error comparing old_sig %s with new_sig %s",
+                        type(old_sig), type(new_sig),
+                    )
+                    old_sig = new_sig
+                  else:
+                    if changed:
+                      old_sig = new_sig
+                      stop = True
             if stop:
               self._kill_subproc()
               sleep(self.restart_delay)
