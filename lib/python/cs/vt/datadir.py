@@ -85,8 +85,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       file-level service such as Dropbox or plain old rsync.
   '''
 
-  STATE_FILENAME_FORMAT = 'index-%s-state.csv'
-  INDEX_FILENAME_FORMAT = 'index-%s.%s'
+  STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
+  INDEX_FILENAME_FORMAT = 'index-{hashname}.{suffix}'
 
   def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -279,14 +279,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   @property
   def statefilepath(self):
-    return self.localpathto(self.STATE_FILENAME_FORMAT
-                            % (self.hashclass.HASHNAME,))
+    return self.localpathto(
+        self.STATE_FILENAME_FORMAT.format(
+            hashname=self.hashclass.HASHNAME))
 
   @property
   def indexpath(self):
-    return self.localpathto(self.INDEX_FILENAME_FORMAT
-                            % (self.hashclass.HASHNAME,
-                               self.indexclass.SUFFIX))
+    return self.localpathto(
+        self.INDEX_FILENAME_FORMAT.format(
+            hashname=self.hashclass.HASHNAME,
+            suffix=self.indexclass.SUFFIX))
 
   def _queue_index(self, hashcode, n, offset, offset2):
     with self._lock:
