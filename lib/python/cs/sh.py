@@ -84,10 +84,11 @@ def quotecmd(argv):
   '''
   return ' '.join(quote(argv))
 
-def main_shqstr():
+def main_shqstr(argv=None):
   ''' shqstr: emit shell-quoted form of the command line arguments.
   '''
-  argv = sys.argv
+  if argv is None:
+    argv = sys.argv
   argv.pop(0)
   print(quotecmd(argv))
 

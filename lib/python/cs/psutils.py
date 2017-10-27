@@ -20,6 +20,7 @@ from __future__ import print_function
 from contextlib import contextmanager
 import errno
 import io
+import logging
 import os
 from signal import SIGTERM, SIGKILL
 import subprocess
@@ -106,17 +107,33 @@ def PidFileManager(path, pid=None):
   yield
   remove_pidfile(path)
 
-def run(argv, trace=False, **kw):
+def run(argv, logger=None, pids=None, **kw):
   ''' Run a command. Optionally trace invocation. Return result of subprocess.call.
       `argv`: the command argument list
-      `trace`: Default False. If True, recite invocation to stderr.
-        Otherwise presume a stream to which to recite the invocation.
+      `pids`: if supplied and not None, call .add and .remove with
+              the subprocess pid around the execution
+      Other keyword arguments are passed to subprocess.call.
   '''
-  if trace:
-    tracefp = sys.stderr if trace is True else trace
-    pargv = ['+'] + argv
-    print(*pargv, file=tracefp)
-  return subprocess.call(argv, **kw)
+  if logger is True:
+    logger = logging.getLogger()
+  try:
+    if logger:
+      pargv = ['+'] + argv
+      logger.info("RUN COMMAND: %r", pargv)
+    P = subprocess.Popen(argv, **kw)
+    if pids is not None:
+        pids.add(P.pid)
+    returncode = P.wait()
+    if pids is not None:
+        pids.remove(P.pid)
+    if returncode != 0:
+      if logger:
+        logger.error("NONZERO EXIT STATUS: %s: %r", returncode, pargv)
+    return returncode
+  except BaseException as e:
+    if logger:
+      logger.exception("RUNNING COMMAND: %s", e)
+    raise
 
 def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command. Optionally trace invocation. Return the Popen object with .stdout decoded as text.
