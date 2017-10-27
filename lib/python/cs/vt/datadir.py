@@ -581,6 +581,69 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
+class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
+  ''' LMDB index for a DataDir.
+  '''
+
+  INDEXNAME = 'lmdb'
+  SUFFIX = 'lmdb'
+
+  @classmethod
+  def is_supported(cls):
+    try:
+      import lmdb
+    except ImportError:
+      return False
+    return True
+
+  def __init__(self, lmdbpath, hashclass, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self.hashclass = hashclass
+    self._lmdb_path = lmdbpath
+    self._lmdb = None
+
+  def startup(self):
+    import lmdb
+    self._lmdb = lmdb.Environment(self._lmdbpath, subdir=True, readonly=False, metasync=False, sync=False)
+
+  def shutdown(self):
+    self.flush()
+    self._lmdb.close()
+
+  def flush(self):
+    self._lmdb.sync(force=True)
+
+  def __iter__(self):
+    mkhash = self.hashclass.from_hashbytes
+    with self._lmdb.begin() as txn:
+      cursor = txn.cursor()
+      for hashcode in cursor.iternext(keys=True, values=False):
+        yield mkhash(hashcode)
+
+  def _get(self, hashcode):
+    with self._lmdb.begin() as txn:
+      return txn.get(hashcode)
+
+  def __contains__(self, hashcode):
+    return self._get(hashcode) is not None
+
+  def __getitem__(self, hashcode):
+    entry = self._get(hashcode)
+    if entry is None:
+      raise KeyError(hashcode)
+    return decode_index_entry(entry)
+
+  def get(self, hashcode, default=None):
+    entry = self._get(hashcode)
+    if entry is None:
+      return default
+    return decode_index_entry(entry)
+
+  def __setitem__(self, hashcode, value):
+    entry = encode_index_entry(*value)
+    with self._lmdb.begin() as txn:
+      txn.put(hashcode, entry, overwrite=True)
+
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
@@ -756,7 +819,7 @@ def register_index(indexclass, indexname=None, priority=False):
 
 INDEX_CLASSES = []
 INDEXCLASS_BY_NAME = {}
-for indexclass in KyotoIndex, GDBMIndex:
+for indexclass in LMDBIndex, KyotoIndex, GDBMIndex:
   if indexclass.is_supported():
     register_index(indexclass)
 
