@@ -141,6 +141,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
+    self.statedirpath = statedirpath
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
       # the "default" data dir may be created if the statedir exists
@@ -149,14 +150,18 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
        and not existspath(datadirpath)
          ):
         create_datadir = True
+    self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
     if indexclass is None:
-      indexclass = DEFAULT_INDEXCLASS
+      indexclass = self.choose_indexclass()
+    self.indexclass = indexclass
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    self.rollover = rollover
     if create_statedir is None:
       create_statedir = False
     if create_datadir is None:
@@ -174,11 +179,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       else:
         raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
     MultiOpenMixin.__init__(self, lock=RLock())
-    self.statedirpath = statedirpath
-    self.datadirpath = datadirpath
-    self.hashclass = hashclass
-    self.indexclass = indexclass
-    self.rollover = rollover
     self._filemap = {}
     self._extra_state = {}
     self._n = None
@@ -604,7 +604,7 @@ class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def startup(self):
     import lmdb
-    self._lmdb = lmdb.Environment(self._lmdbpath, subdir=True, readonly=False, metasync=False, sync=False)
+    self._lmdb = lmdb.Environment(self._lmdb_path, subdir=True, readonly=False, metasync=False, sync=False)
 
   def shutdown(self):
     self.flush()
@@ -813,9 +813,9 @@ def register_index(indexclass, indexname=None, priority=False):
             % (indexclass, indexname, INDEXCLASS_BY_NAME[indexname]))
   INDEXCLASS_BY_NAME[indexname] = indexclass
   if priority:
-    INDEX_CLASSES.insert(0, (indexclass.NAME, indexclass))
+    INDEX_CLASSES.insert(0, (indexclass.INDEXNAME, indexclass))
   else:
-    INDEX_CLASSES.append((indexclass.NAME, indexclass))
+    INDEX_CLASSES.append((indexclass.INDEXNAME, indexclass))
 
 INDEX_CLASSES = []
 INDEXCLASS_BY_NAME = {}
