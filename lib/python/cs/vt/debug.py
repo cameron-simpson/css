@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from cs.lex import hexify, texthexify
-from cs.logutils import X
+from cs.x import X
 from .block import BlockType
 from .dir import InvalidDirent
 

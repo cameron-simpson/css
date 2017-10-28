@@ -17,13 +17,14 @@ import sys
 from threading import Thread, RLock
 from types import SimpleNamespace as NS
 from cs.lex import texthexify, untexthexify
-from cs.logutils import X, debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.logutils import debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.obj import O
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
+from cs.x import X
 from . import defaults
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
