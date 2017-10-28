@@ -642,7 +642,7 @@ class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __setitem__(self, hashcode, value):
     entry = encode_index_entry(*value)
-    with self._lmdb.begin() as txn:
+    with self._lmdb.begin(write=True) as txn:
       txn.put(hashcode, entry, overwrite=True)
 
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
