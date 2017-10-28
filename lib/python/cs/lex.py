@@ -169,6 +169,7 @@ def dict2js(d):
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
+#  { } - used for JSON data and 
 #  / - path separator
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'

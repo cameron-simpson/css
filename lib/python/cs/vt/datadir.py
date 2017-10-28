@@ -18,8 +18,8 @@ from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
 from cs.fileutils import makelockfile, shortpath, longpath
-from cs.logutils import debug, info, warning, error, exception
-from cs.pfx import Pfx, XP
+from cs.logutils import info, warning, error, exception
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
@@ -28,7 +28,7 @@ from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -73,6 +73,38 @@ class _DataDirFile(SimpleNamespace):
     '''
     yield from scan_datafile(self.pathname, offset=offset, do_decompress=do_decompress)
 
+def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
+  ''' Accept `spec` of the form:
+        [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
+      and return a DataDir.
+  '''
+  global INDEXCLASS_BY_NAME, DEFAULT_INDEXCLASS
+  global HASHCLASS_BY_NAME, DEFAULT_HASHCLASS
+  indexdirpath = None
+  datadirpath = None
+  with Pfx(spec):
+    specpath = spec.split(os.pathsep)
+    for partnum, specpart in enumerate(specpath, 1):
+      with Pfx("%d:%r", partnum, specpart):
+        if indexclass is None:
+          if specpart in INDEXCLASS_BY_NAME:
+            indexclass = INDEXCLASS_BY_NAME[specpart]
+            continue
+        if hashclass is None:
+          if specpart in HASHCLASS_BY_NAME:
+            hashclass = HASHCLASS_BY_NAME[specpart]
+            continue
+        if indexdirpath is None:
+          indexdirpath = specpart
+          continue
+        if datadirpath is None:
+          datadirpath = specpart
+          continue
+        raise ValueError("unexpected part")
+  if hashclass is None:
+    hashclass = DEFAULT_HASHCLASS
+  return DataDir(indexdirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
+
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
       A DataDir may be used as the Mapping for a MappingStore.
@@ -85,28 +117,31 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       file-level service such as Dropbox or plain old rsync.
   '''
 
-  STATE_FILENAME_FORMAT = 'index-%s-state.csv'
-  INDEX_FILENAME_FORMAT = 'index-%s.%s'
+  STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
+  INDEX_FILENAME_FORMAT = 'index-{hashname}.{suffix}'
 
-  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None, create_statedir=None, create_datadir=None):
+  def __init__(self, statedirpath, datadirpath, hashclass, indexclass=None, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
-          about the DataFiles; this is the index-state.csv file and
-          the associated index dbm-ish files.
+            about the DataFiles; this is the index-state.csv file and
+            the associated index dbm-ish files.
         `datadirpath`: the directory containing the DataFiles.
-          If this is shared by other clients then it should be
-          different from the `statedirpath`.
-          If None, default to "statedirpath/data", which might be
-          a symlink to a shared area such as a NAS.
+            If this is shared by other clients then it should be
+            different from the `statedirpath`.
+            If None, default to "statedirpath/data", which might be
+            a symlink to a shared area such as a NAS.
         `hashclass`: the hash class used to index chunk contents.
         `indexclass`: the IndexClass providing the index to chunks
-          in the DataFiles.
+            in the DataFiles. If not specified, a supported index
+            class with an existing index file will be chosen, otherwise
+            the most favoured indexclass available will be chosen.
         `rollover`: data file roll over size; if a data file grows
             beyond this a new datafile is commenced for new blocks.
             Default: DEFAULT_ROLLOVER
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
+    self.statedirpath = statedirpath
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
       # the "default" data dir may be created if the statedir exists
@@ -115,14 +150,18 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
        and not existspath(datadirpath)
          ):
         create_datadir = True
+    self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
     if indexclass is None:
-      indexclass = DEFAULT_INDEXCLASS
+      indexclass = self.choose_indexclass()
+    self.indexclass = indexclass
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    self.rollover = rollover
     if create_statedir is None:
       create_statedir = False
     if create_datadir is None:
@@ -140,15 +179,36 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       else:
         raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
     MultiOpenMixin.__init__(self, lock=RLock())
-    self.statedirpath = statedirpath
-    self.datadirpath = datadirpath
-    self.hashclass = hashclass
-    self.indexclass = indexclass
-    self.rollover = rollover
     self._filemap = {}
     self._extra_state = {}
     self._n = None
     self._load_state()
+
+  def choose_indexclass(self, preferred_indexclass=None):
+    global INDEX_CLASSES
+    global INDEXCLASS_BY_NAME
+    if preferred_indexclass is not None:
+      if isinstance(preferred_indexclass, str):
+        indexname = preferred_indexclass
+        try:
+          preferred_indexclass = INDEXCLASS_BY_NAME[indexname]
+        except KeyError:
+          warning("ignoring unknown indexclass name %r", indexname)
+          preferred_indexclass = None
+    indexclasses = list(INDEX_CLASSES)
+    if preferred_indexclass is not None and preferred_indexclass.is_supported():
+      indexclasses.insert( (preferred_indexclass.INDEXNAME, preferred_indexclass) )
+    for indexname, indexclass in indexclasses:
+      if not indexclass.is_supported():
+        continue
+      indexpath = self.localpathto(self.index_localpath(self.hashclass, indexclass))
+      if existspath(indexpath):
+        return indexclass
+    for indexname, indexclass in indexclasses:
+      if not indexclass.is_supported():
+        continue
+      return indexclass
+    raise ValueError("no supported index classes available")
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
@@ -277,16 +337,21 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def datapathto(self, rpath):
     return joinpath(self.datadirpath, rpath)
 
+  def state_localpath(self, hashclass):
+    return self.STATE_FILENAME_FORMAT.format(hashname=hashclass.HASHNAME)
+
   @property
   def statefilepath(self):
-    return self.localpathto(self.STATE_FILENAME_FORMAT
-                            % (self.hashclass.HASHNAME,))
+    return self.localpathto(self.state_localpath(self.hashclass))
+
+  def index_localpath(self, hashclass, indexclass):
+    return self.INDEX_FILENAME_FORMAT.format(
+        hashname=hashclass.HASHNAME,
+        suffix=indexclass.SUFFIX)
 
   @property
   def indexpath(self):
-    return self.localpathto(self.INDEX_FILENAME_FORMAT
-                            % (self.hashclass.HASHNAME,
-                               self.indexclass.SUFFIX))
+    return self.localpathto(self.index_localpath(self.hashclass, self.indexclass))
 
   def _queue_index(self, hashcode, n, offset, offset2):
     with self._lock:
@@ -516,6 +581,70 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
+class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
+  ''' LMDB index for a DataDir.
+  '''
+
+  INDEXNAME = 'lmdb'
+  SUFFIX = 'lmdb'
+
+  @classmethod
+  def is_supported(cls):
+    try:
+      import lmdb
+    except ImportError:
+      return False
+    return True
+
+  def __init__(self, lmdbpath, hashclass, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self.hashclass = hashclass
+    self._lmdb_path = lmdbpath
+    self._lmdb = None
+
+  def startup(self):
+    import lmdb
+    self._lmdb = lmdb.Environment(self._lmdb_path, subdir=True, readonly=False, metasync=False, sync=False)
+
+  def shutdown(self):
+    self.flush()
+    self._lmdb.close()
+
+  def flush(self):
+    # no force=True param?
+    self._lmdb.sync()
+
+  def __iter__(self):
+    mkhash = self.hashclass.from_hashbytes
+    with self._lmdb.begin() as txn:
+      cursor = txn.cursor()
+      for hashcode in cursor.iternext(keys=True, values=False):
+        yield mkhash(hashcode)
+
+  def _get(self, hashcode):
+    with self._lmdb.begin() as txn:
+      return txn.get(hashcode)
+
+  def __contains__(self, hashcode):
+    return self._get(hashcode) is not None
+
+  def __getitem__(self, hashcode):
+    entry = self._get(hashcode)
+    if entry is None:
+      raise KeyError(hashcode)
+    return decode_index_entry(entry)
+
+  def get(self, hashcode, default=None):
+    entry = self._get(hashcode)
+    if entry is None:
+      return default
+    return decode_index_entry(entry)
+
+  def __setitem__(self, hashcode, value):
+    entry = encode_index_entry(*value)
+    with self._lmdb.begin(write=True) as txn:
+      txn.put(hashcode, entry, overwrite=True)
+
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
@@ -523,8 +652,15 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   INDEXNAME = 'gdbm'
   SUFFIX = 'gdbm'
 
+  @classmethod
+  def is_supported(cls):
+    try:
+      import dbm.gnu
+    except ImportError:
+      return False
+    return True
+
   def __init__(self, gdbmpath, hashclass, lock=None):
-    import dbm.gnu
     MultiOpenMixin.__init__(self, lock=lock)
     self.hashclass = hashclass
     self._gdbm_path = gdbmpath
@@ -592,6 +728,14 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
   INDEXNAME = 'kyoto'
   SUFFIX = 'kct'
 
+  @classmethod
+  def is_supported(cls):
+    try:
+      import kyotocabinet
+    except ImportError:
+      return False
+    return True
+
   def __init__(self, kyotopath, hashclass, lock=None):
     MultiOpenMixin.__init__(self, lock=lock)
     self.hashclass = hashclass
@@ -654,60 +798,31 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
           yield hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
-INDEXCLASS_BY_NAME = {}
-
-def register_index(indexname, indexclass):
+def register_index(indexclass, indexname=None, priority=False):
+  ''' Register a new `indexclass`, making it known.
+      `indexclass`: the index class
+      `indexname`: the index class name, default from indexclass.INDEXNAME
+      `priority`: if true, prepend the class to the INDEX_CLASSES list otherwise append
+  '''
+  global INDEX_CLASSES
   global INDEXCLASS_BY_NAME
+  if indexname is None:
+    indexname = indexclass.INDEXNAME
   if indexname in INDEXCLASS_BY_NAME:
     raise ValueError(
             'cannot register index class %s: indexname %r already registered to %s'
             % (indexclass, indexname, INDEXCLASS_BY_NAME[indexname]))
   INDEXCLASS_BY_NAME[indexname] = indexclass
+  if priority:
+    INDEX_CLASSES.insert(0, (indexclass.INDEXNAME, indexclass))
+  else:
+    INDEX_CLASSES.append((indexclass.INDEXNAME, indexclass))
 
-register_index('gdbm', GDBMIndex)
-try:
-    import kyotocabinet
-except ImportError:
-    pass
-else:
-    register_index('kyoto', KyotoIndex)
-
-DEFAULT_INDEXCLASS = GDBMIndex
-
-def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
-  ''' Accept `spec` of the form:
-        [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
-      and return a DataDir.
-  '''
-  global INDEXCLASS_BY_NAME, DEFAULT_INDEXCLASS
-  global HASHCLASS_BY_NAME, DEFAULT_HASHCLASS
-  indexdirpath = None
-  datadirpath = None
-  with Pfx(spec):
-    specpath = spec.split(os.pathsep)
-    for partnum, specpart in enumerate(specpath, 1):
-      with Pfx("%d:%r", partnum, specpart):
-        if indexclass is None:
-          if specpart in INDEXCLASS_BY_NAME:
-            indexclass = INDEXCLASS_BY_NAME[specpart]
-            continue
-          indexclass = DEFAULT_INDEXCLASS
-        if hashclass is None:
-          if specpart in HASHCLASS_BY_NAME:
-            hashclass = HASHCLASS_BY_NAME[specpart]
-            continue
-        if indexdirpath is None:
-          indexdirpath = specpart
-          continue
-        if datadirpath is None:
-          datadirpath = specpart
-          continue
-        raise ValueError("unexpected part")
-  if indexclass is None:
-    indexclass = DEFAULT_INDEXCLASS
-  if hashclass is None:
-    hashclass = DEFAULT_HASHCLASS
-  return DataDir(indexdirpath, datadirpath, hashclass, indexclass, rollover=rollover)
+INDEX_CLASSES = []
+INDEXCLASS_BY_NAME = {}
+for indexclass in LMDBIndex, KyotoIndex, GDBMIndex:
+  if indexclass.is_supported():
+    register_index(indexclass)
 
 if __name__ == '__main__':
   from .datadir_tests import selftest
