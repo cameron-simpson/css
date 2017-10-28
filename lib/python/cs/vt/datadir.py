@@ -611,7 +611,8 @@ class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
     self._lmdb.close()
 
   def flush(self):
-    self._lmdb.sync(force=True)
+    # no force=True param?
+    self._lmdb.sync()
 
   def __iter__(self):
     mkhash = self.hashclass.from_hashbytes
