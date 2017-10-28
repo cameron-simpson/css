@@ -1,3 +1,4 @@
+index of hashcode to remote store refs, to support multistore cooperation and proxying
 stream protocol: error flag, json flag (implies JSON additional payload)
 stream protocol: new channel
 √ datafile: use os.open(O_APPEND) and raw fds, separate fd for read
