@@ -1,3 +1,4 @@
+store specs: support readlist, savelist, read-by-not-save i.e. proxy-for
 index of hashcode to remote store refs, to support multistore cooperation and proxying
 stream protocol: error flag, json flag (implies JSON additional payload)
 stream protocol: new channel
