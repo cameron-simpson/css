@@ -23,7 +23,12 @@ class FileCacheStore(BasicStoreSync):
       asynchronous updates to the backing Store.
   '''
 
-  def __init__(self, name, backend, dirpath=None, **kw):
+  def __init__(self, name, backend, dirpath, **kw):
+    ''' Initialise the FileCacheStore.
+        `name`: the Store name
+        `backend`: the backing Store
+        `dirpath`: directory to hold the cache files
+    '''
     BasicStoreSync.__init__(self, name, **kw)
     self._attrs.update(backend=backend)
     self.backend = backend
