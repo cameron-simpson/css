@@ -371,7 +371,7 @@ class ChainStore(BasicStoreSync):
       S.close()
 
   def add(self, data):
-    ''' Add a block to the first subStore, or to all if elf.save_all.
+    ''' Add a block to the first subStore, or to all if self.save_all.
     '''
     first = True
     for result in self._multicall('add_bg', (data,),
@@ -405,7 +405,7 @@ class ChainStore(BasicStoreSync):
   def flush(self):
     ''' Flush all the subStores.
     '''
-    for result in self._multicall('flush_bg', (h,)):
+    for result in self._multicall('flush_bg', ()):
       pass
 
   def _multicall(self, method_name, args, parallel=None):
