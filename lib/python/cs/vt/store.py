@@ -105,6 +105,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
         ','.join([repr(self.name)] + params)
     )
 
+  # Basic support for putting Stores in sets.
+  def __hash__(self):
+      return id(self)
+
+  def __eq__(self, other):
+      return self is other
+
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
 
