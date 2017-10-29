@@ -22,6 +22,7 @@ from cs.logutils import info, debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
+from cs.result import report
 from cs.seq import Seq
 from cs.x import X
 from . import defaults
@@ -431,6 +432,134 @@ class ChainStore(BasicStoreSync):
         result = LF()
         if self.parallel:
           yield result
+
+class ProxyStore(BasicStoreSync):
+  ''' A Store managing various subsidiary Stores.
+
+      Two classes of Stores are managed:
+
+      Save stores. All data added to the Proxy is added to these Stores.
+
+      Read Stores. Requested data may be ontained from these Stores.
+
+      A typical setup utilising a working ProxyStore might look like this:
+
+        FileCacheStore(
+          ProxyStore(
+            save=local,upstream
+            read=local
+            read2=upstream
+          ),
+          cache_dir
+        )
+
+      where "local" is a local low latency store such as a DataDirStore
+      and "upstream" is a remote high latency Store such as a
+      TCPStore. This setup causes all saved data to be saved to
+      both Stores and data is fetched from the local Store in
+      preference to the remote Store. A FileCacheStore is placed
+      in front of the proxy to provide very low latency saves and
+      very low latency reads if data are in the cache.
+  '''
+
+  def __init__(self, name, save, read, read2=()):
+    ''' Initialise a ProxyStore.
+        `name`: ProxyStore name.
+        `save`: iterable of Stores to which to save blocks
+        `read`: iterable of Stores from which to fetch blocks
+        `read2`: optional fallback iterable of Stores from which
+          to fetch blocks if not found via `read`. Typically these
+          would be higher latency upstream Stores.
+    '''
+    BasicStoreSync.__init__(self, name)
+    save = frozenset(save)
+    read = frozenset(read)
+    read2 = frozenset(read2)
+    self._attrs.update(save=save, read=read)
+    if read2:
+      self._attrs.update(read2=read2)
+
+  def startup(self):
+    for S in self.save | self.read | self.read2:
+      S.open()
+
+  def shutdown(self):
+    for S in self.save | self.read | self.read2:
+      S.close()
+
+  def _multicall(self, stores, method_name, args):
+    ''' Generator yielding (S, value) for each call to S.method_name(args).
+        The method_name should be one of the *_bg names which return
+        LateFunctions.
+        Methods are called in parallel and values returned as
+        completed, so the (S, value) returns may not be in the same
+        order as the supplied `stores`.
+        `stores`: iterable of Stores on which to call `method_name`
+        `method_name`: name of Store method
+        `args`: positional arguments for the method call
+    '''
+    assert method_name.endswith('_bg')
+    stores = list(stores)
+    LFs = []
+    for S in stores:
+      with Pfx("%s.%s()", S, method_name):
+        LF = getattr(S, method_name)(*args)
+        LFs.append(LF)
+    for LF in report(LFs):
+      # locate the correspnding store for context
+      for i, iLF in LFs:
+        if iLF is LF:
+          S = stores[i]
+          with Pfx(S):
+            yield S, LF()
+          continue
+      raise RuntimeError("LF %r not one of the original LFs: %r" % (LF, LFs))
+
+  def add(self, data):
+    ''' Add a data chunk to the save Stores.
+    '''
+    if not self.save:
+      raise RuntimeError("add but no save Stores")
+    hashcode = None
+    for S, result in self._multicall(self.save, 'add_bg', (data,)):
+      if result is None:
+        raise RuntimeError("None returned from %s.add" % (S,))
+      if hashcode is None:
+        hashcode = result
+      elif result != hashcode:
+        warning("%s: different hashcodes returns from .add: %s vs %s", S, hashcode, result)
+    if hashcode is None:
+      raise RuntimeError("no hashcodes returned from .add")
+    return hashcode
+
+  def get(self, h):
+    ''' Fetch a block from the first Store which has it.
+    '''
+    for stores in self.read, self.read2:
+      for S, data in self._multicall(stores, 'get_bg', (h,)):
+        if data is not None:
+          # save the fetched data into the other save Stores
+          def fill():
+            for fillS in self.save:
+              if fillS is not S:
+                fillS.add_bg(data)
+          self._defer(fill)
+          return data
+
+  def contains(self, h):
+    ''' Test whether the hashcode `h` is in any of the read Stores.
+    '''
+    for stores in self.read, self.read2:
+      for result in self._multicall(stores, 'contains_bg', (h,)):
+        if result:
+          return True
+    return False
+
+  def flush(self):
+    ''' Flush all the save Stores.
+    '''
+    for result in self._multicall(self.save, 'flush_bg', ()):
+      pass
 
 class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
