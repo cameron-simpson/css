@@ -65,7 +65,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.obj', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.seq', 'cs.py3'],
 }
 
 class AsynchState(object):
