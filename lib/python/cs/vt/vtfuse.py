@@ -1061,6 +1061,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if xattr_name == XATTR_NAME_BLOCKREF:
       # TODO: should we support this as "force recompute"?
       # feels like that would be a bug workaround
+      X("removexattr(inode=%s,xattr_name=%r)", inode, xattr_name)
       raise FuseOSError(errno.EINVAL)
     E = self._vt_core.i2E(inode)
     meta = E.meta
