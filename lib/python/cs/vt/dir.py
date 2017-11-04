@@ -11,10 +11,12 @@ import stat
 import sys
 from threading import RLock
 import time
+from uuid import UUID, uuid4
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, info, warning
 from cs.pfx import Pfx, XP
 from cs.lex import texthexify
+from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked
@@ -48,8 +50,9 @@ def D_type2str(type_):
 F_HASMETA = 0x01
 F_HASNAME = 0x02
 F_NOBLOCK = 0x04
+F_HASUUID = 0x08
 
-class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
+class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid block')):
 
   @classmethod
   def from_bytes(cls, data, offset=0):
@@ -67,15 +70,25 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       metatext, offset = get_bss(data, offset)
     else:
       metatext = None
+    uu = None
+    if flags & F_HASUUID:
+      uubs = data[:16]
+      offset += 16
+      if offset > len(data):
+        raise ValueError(
+            "needed 16 bytes for UUID, only got %d bytes (%r)"
+            % (len(uubs), uubs))
+      uu = UUID(bytes=uubs)
     if flags & F_NOBLOCK:
       block = None
     else:
       block, offset = decodeBlock(data, offset)
-    return cls(type_, name, metatext, block), offset
+    E = cls(type_, name, metatext, uu, block)
+    return E, offset
 
   def encode(self):
     ''' Serialise the components.
-        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)][uuid]blockref
     '''
     flags = 0
     name = self.name
@@ -99,18 +112,26 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    return put_bs(self.type) \
-         + put_bs(flags) \
-         + namedata \
-         + metadata \
-         + blockref
+    if self.uuid is None:
+      uubs = b''
+    else:
+      flags |= F_HASUUID
+      uubs = self.uuid.bytes
+    return (
+        put_bs(self.type)
+        + put_bs(flags)
+        + namedata
+        + metadata
+        + uubs
+        + blockref
+    )
 
 def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
   '''
   offset0 = offset
   components, offset = DirentComponents.from_bytes(data, offset)
-  type_, name, metatext, block = components
+  type_, name, metatext, block, uu = components
   try:
     if type_ == D_DIR_T:
       E = Dir(name, metatext=metatext, parent=None, block=block)
@@ -122,6 +143,7 @@ def decode_Dirent(data, offset):
       E = HardlinkDirent(name, metatext=metatext)
     else:
       E = _Dirent(type_, name, metatext=metatext, block=block)
+    E._uuid = uu
   except ValueError as e:
     warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
             name, e, components)
@@ -147,6 +169,7 @@ class _Dirent(object):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     self.type = type_
     self.name = name
+    self._uuid = None
     self.meta = Meta(self)
     if metatext is not None:
       if isinstance(metatext, str):
@@ -168,6 +191,13 @@ class _Dirent(object):
     ''' Allows collecting _Dirents in a set.
     '''
     return id(self)
+
+  @prop
+  def uuid(self):
+    u = self._uuid
+    if u is None:
+      u = self._uuid = uuid4()
+    return u
 
   def pathto(self, R=None):
     ''' Return the path to this element if known.
