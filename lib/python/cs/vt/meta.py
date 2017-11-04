@@ -10,6 +10,7 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
+import time
 from cs.logutils import exception, error, warning, debug
 from cs.pfx import Pfx
 from cs.serialise import get_bss, get_bsdata
@@ -244,6 +245,7 @@ def xattrs_from_bytes(bs, offset=0):
       xattrs[name] = data
   return xattrs
 
+# This is a direct dict subclass for memory efficiency.
 class Meta(dict):
   ''' Inode metadata: times, permissions, ownership etc.
 
@@ -253,6 +255,7 @@ class Meta(dict):
       'g': group owner
       'a': ACL
       'iref': inode number (hard links)
+      'c': st_ctime, last change to inode/metadata
       'm': modification time, a float
       'n': number of hardlinks
       'su': setuid
@@ -265,6 +268,7 @@ class Meta(dict):
     self.E = E
     self._acl = None
     self._xattrs = {}
+    self._ctime = 0
     self._lock = RLock()
 
   def __str__(self):
@@ -274,7 +278,7 @@ class Meta(dict):
     ''' Return the encoding of this Meta as text.
     '''
     self._normalise()
-    if all(k in ('u', 'g', 'a', 'iref', 'm', 'n', 'su', 'sg') for k in self.keys()):
+    if all(k in ('u', 'g', 'a', 'iref', 'c', 'm', 'n', 'su', 'sg') for k in self.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join( ':'.join( (k, str(self[k])) )
                           for k in sorted(self.keys())
@@ -309,6 +313,45 @@ class Meta(dict):
     elif 'x' in self:
       del self['x']
 
+  def __getitem__(self, k):
+    if k == 'a':
+      _acl = self._acl
+      if _acl is None:
+        raise KeyError(k)
+      return encodeACL(_acl)
+    if k == 'c':
+      return self._ctime
+    return dict.__getitem__(self, k)
+
+  def __setitem__(self, k, v):
+    if k == 'a':
+      if isinstance(v, str):
+        self._acl = decodeACL(v)
+      else:
+        warning("%s: non-str 'a': %r", self, v)
+    elif k == 'c':
+      v = float(v)
+      self._ctime = v
+    elif k in ('m',):
+      v = float(v)
+      dict.__setattr__(self, k, v)
+    elif k == 'n':
+      v = int(v)
+      dict.__setattr__(self, k, v)
+    elif k == 'x':
+      for xk, xv in v.items():
+        self.setxattr(xk, xv)
+    else:
+      dict.__setattr__(self, k, v)
+    self._ctime = time.time()
+
+  def __delitem__(self, k):
+    if k == 'a':
+      self._acl = None
+    else:
+      dict.__delitem__(self, k)
+    self._ctime = time.time()
+
   @classmethod
   def from_text(cls, metatext, E=None):
     ''' Construct a new Meta from `metatext`.
@@ -337,30 +380,9 @@ class Meta(dict):
           error("ignoring bad metatext field (no colon): %r", metafield)
           continue
         else:
-          kvs.append( (k, v) )
-    self.update_from_items(kvs)
-
-  def update_from_items(self, items):
-    for k, v in items:
-      if k == 'a':
-        if isinstance(v, str):
-          self._acl = decodeACL(v)
-        else:
-          warning("%s: non-str 'a': %r", self, v)
-      elif k in ('m',):
-        try:
-          v = float(v)
-        except ValueError:
-          warning("%s: non-float 'm': %r", self, v)
-          v = 0.0
-        self[k] = v
-      elif k == 'n':
-        v = int(v)
-      elif k == 'x':
-        for xk, xv in v.items():
-          self.setxattr(xk, xv)
-      else:
-        self[k] = v
+          kvs.append((k, v))
+    for k, v in kvs:
+      self[k] = v
 
   @property
   def user(self):
