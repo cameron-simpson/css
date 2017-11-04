@@ -51,7 +51,7 @@ You can also collect multiple Results in completion order using the report() fun
 
 from functools import partial
 import sys
-from threading import Lock
+from threading import Lock, Thread
 from cs.logutils import exception, warning, debug
 from cs.obj import O
 from cs.seq import seq
@@ -65,7 +65,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.obj', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.seq', 'cs.py3'],
 }
 
 class AsynchState(object):
@@ -198,15 +198,15 @@ class Result(O):
     with self._lock:
       self._complete(None, exc_info)
 
-  def raise_(self, exception=None):
-    ''' Convenience wrapper for self.exc_info to store an exception result `exception`.
-        If exception is omitted or None, use sys.exc_info().
+  def raise_(self, exc=None):
+    ''' Convenience wrapper for self.exc_info to store an exception result `exc`.
+        If `exc` is omitted or None, use sys.exc_info().
     '''
-    if exception is None:
+    if exc is None:
       self.exc_info = sys.exc_info()
     else:
       try:
-        raise exception
+        raise exc
       except:
         self.exc_info = sys.exc_info()
 
@@ -221,6 +221,19 @@ class Result(O):
       self.exc_info = sys.exc_info()
     else:
       self.result = r
+
+  def bg(self, func, *a, **kw):
+    ''' Submit a function to compute the result in a separate Thread, returning the Thread.
+        The Result must be in "pending" state, and transitions to "running".
+    '''
+    with self._lock:
+      state = self.state
+      if state != AsynchState.pending:
+        raise RuntimeError("<%s>.state is not AsynchState.pending, rejecting background function call of %s" % (self, func))
+      T = Thread(name="<%s>.bg(func=%s,...)" % (self, func), target=self.call, args=[func] + list(a), kwargs=kw)
+      self.state = AsynchState.running
+    T.start()
+    return T
 
   def _complete(self, result, exc_info):
     ''' Set the result.
