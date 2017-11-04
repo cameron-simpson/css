@@ -252,7 +252,8 @@ class _Dirent(object):
       block = None
     else:
       block = self.block
-    return DirentComponents(type_, name, meta, block).encode()
+    uu = self.uuid
+    return DirentComponents(type_, name, meta, uu, block).encode()
 
   def textencode(self):
     ''' Serialise the dirent as text.
