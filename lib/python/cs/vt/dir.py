@@ -722,6 +722,54 @@ class Dir(_Dirent):
 
     return E
 
+  def new_name(self, prefix, n=1):
+    ''' Allocate a new unused name with the supplied `prefix`.
+    '''
+    while True:
+      name2 = '.'.join(prefix, str(n))
+      if name2 not in self:
+        return name2
+      n += 1
+
+  def absorb(self, D2):
+    ''' Absorb `D2` into this Dir.
+        Note: this literally attaches nodes from `D2` into this
+        Dir's tree where possible.
+    '''
+    for name in D2:
+      E2 = D2[name]
+      if name in self:
+        # conflict
+        # TODO: support S_IFWHT whiteout entries
+        E1 = self[name]
+        if E1.uuid == E2.uuid:
+          # same file
+          assert E1.type == E2.type
+          if E2.meta.ctime > E1.meta.ctime:
+            E1.meta.update(E2.meta.items())
+          if E1.block != E2.block:
+            if E2.mtime > E1.mtime:
+              # TODO: E1.flush _after_ backend update? or before?
+              E1.block = E2.block
+            E1.meta.mtime = E2.mtime
+        else:
+          # distinct objects, resolve l
+          if E1.isdir and E2.isdir:
+            # merge subtrees
+            E1.absorb(E2)
+          elif E1.isfile and E2.isfile and E1.block == E2.block:
+            # file with same content, fold
+            # TODO: use Block.compare_content if different blocks
+            if E2.meta.ctime > E1.meta.ctime:
+              E1.meta.update(E2.meta.items())
+          else:
+            # add other object under a different name
+            self[self.new_name(name)] = E2
+      else:
+        # new item
+        # NB: we don't recurse into new Dirs, not needed
+        self[name] = E2
+
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.
   '''
