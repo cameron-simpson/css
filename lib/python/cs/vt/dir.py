@@ -244,6 +244,7 @@ class _Dirent(object):
 
   def encode(self):
     ''' Serialise this dirent.
+        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta][uuid]block
     '''
     type_ = self.type
     name = self.name
@@ -257,7 +258,6 @@ class _Dirent(object):
 
   def textencode(self):
     ''' Serialise the dirent as text.
-        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
     return totext(self.encode())
 
