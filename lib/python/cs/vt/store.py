@@ -96,6 +96,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
       self.readonly = False
       self.writeonly = False
+      self._archives = {}
 
   def __str__(self):
     params = [
@@ -187,6 +188,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       if h not in self:
         yield h
 
+  ##########################################################################
+  # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
     pass
@@ -218,6 +221,22 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   @abstractmethod
   def flush_bg(self):
     pass
+
+  ##########################################################################
+  # Archive support.
+  def add_archive(self, name, archive):
+    ''' Add an `archive` by `name`.
+    '''
+    archives = self._archives
+    with self._lock:
+      if name in archives:
+        raise KeyError("archive named %r already exists" % (name,))
+      archives[name] = archive
+
+  def get_archive(self, name):
+    ''' Fetch the named archive or None.
+    '''
+    return self._archives.get(name)
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
