@@ -12,6 +12,7 @@ from cs.lex import get_qstr
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.threads import locked
+from .cache import FileCacheStore
 from .store import ChainStore, DataDirStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
@@ -157,6 +158,8 @@ class ConfigFile(ConfigWatcher):
           raise ValueError("missing type")
         if stype == 'datadir':
           S = Store_from_datadir_clause(store_name, clause_name, clause)
+        elif stype == 'filecache':
+          S = Store_from_filecache_clause(store_name, clause_name, clause)
         elif stype == 'tcp':
           S = Store_from_tcp_clause(store_name, clause_name, clause)
         else:
@@ -190,6 +193,30 @@ def Store_from_datadir_clause(store_name, clause_name, clause):
   if datapath is not None:
     datapath = longpath(datapath)
   return DataDirStore(store_name, path, datapath, None, None)
+
+def Store_from_filecache_clause(store_name, clause_name, clause):
+  ''' Construct a FileCacheStorer from a "filecache" clause.
+  '''
+  path = clause.get('path')
+  if path is None:
+    path = clause_name
+    debug("path from clausename: %r", path)
+  path = longpath(path)
+  debug("longpath(path) ==> %r", path)
+  if not isabspath(path):
+    if path.startswith('./'):
+      path = abspath(path)
+      debug("abspath ==> %r", path)
+    else:
+      statedir = clause.get('statedir')
+      debug("statedir=%r", statedir)
+      if statedir is None:
+        raise ValueError('relative path %r but no statedir' % (path,))
+      statedir = longpath(statedir)
+      debug("longpath(statedir) ==> %r", statedir)
+      path = joinpath(statedir, path)
+      debug("path ==> %r", path)
+  return FileCacheStore(store_name, None, path)
 
 def Store_from_tcp_clause(store_name, clause_name, clause):
   ''' Construct a TCPStoreClient from a "tcp" clause.
