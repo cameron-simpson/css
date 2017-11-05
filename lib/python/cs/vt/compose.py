@@ -8,10 +8,12 @@ from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath, shortpath
-from cs.lex import get_qstr
+from cs.lex import get_qstr, skipwhite
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.threads import locked
+from cs.units import multiparse as multiparse_units, \
+    BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
 from .cache import FileCacheStore
 from .store import ChainStore, DataDirStore
 from .stream import StreamStore
@@ -198,6 +200,17 @@ def Store_from_filecache_clause(store_name, clause_name, clause):
   ''' Construct a FileCacheStorer from a "filecache" clause.
   '''
   path = clause.get('path')
+  max_cachefiles = clause.get('max_files')
+  if max_cachefiles is not None:
+    max_cachefiles = int(max_cachefiles)
+  max_cachefile_size = clause.get('max_file_size')
+  if max_cachefile_size is not None:
+    s = max_cachefile_size
+    max_cachefile_size, offset = multiparse_units(
+        s, (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE))
+    offset = skipwhite(s, offset)
+    if offset < len(s):
+      raise ValueError("max_file_size: unparsed text: %r" % (s[offset:],))
   if path is None:
     path = clause_name
     debug("path from clausename: %r", path)
@@ -216,7 +229,10 @@ def Store_from_filecache_clause(store_name, clause_name, clause):
       debug("longpath(statedir) ==> %r", statedir)
       path = joinpath(statedir, path)
       debug("path ==> %r", path)
-  return FileCacheStore(store_name, None, path)
+  return FileCacheStore(store_name, None, path,
+    max_cachefile_size=max_cachefile_size,
+    max_cachefiles=max_cachefiles,
+    )
 
 def Store_from_tcp_clause(store_name, clause_name, clause):
   ''' Construct a TCPStoreClient from a "tcp" clause.
