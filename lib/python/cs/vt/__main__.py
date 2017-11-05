@@ -179,7 +179,9 @@ def cmd_op(args, verbose, config, dflt_vt_store, no_cache):
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
     if not no_cache:
-      S = FileCacheStore("main", S)
+      cacheS = config.Store('cache')
+      cacheS.backend = S
+      S = cacheS
     # start the status ticker
     if False and sys.stdout.isatty():
       X("wrap in a ProgressStore")
