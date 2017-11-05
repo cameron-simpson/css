@@ -124,6 +124,10 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
 
 def parse(s, scale, offset=0):
   ''' Parse an integer followed by an optional scale and return computed value.
+      `s`: the string to parse
+      `scale`: a scale array of (factor, unit_name)
+      `offset`: starting position for parse
+      Returns the parsed value and the new offset.
   '''
   offset = skipwhite(s, offset)
   if not s:
@@ -145,6 +149,20 @@ def parse(s, scale, offset=0):
           raise ValueError("unrecognised unit: %r" % (vunit0,))
         value *= factor
   return value, offset
+
+def multiparse(s, scales, offset=0):
+  ''' Parse an integer followed by an optional scale and return computed value.
+      `s`: the string to parse
+      `scales`: an iterable of scale arrays of (factor, unit_name)
+      `offset`: starting position for parse
+      Returns the parsed value and the new offset.
+  '''
+  for scale in scales:
+    try:
+      return parse(s, scale, offset)
+    except ValueError as e:
+      exc = e
+  raise exc
 
 if __name__ == '__main__':
   print(transcribe(2050, BINARY_BYTES_SCALE))
