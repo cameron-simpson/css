@@ -219,6 +219,8 @@ class FileDataMappingProxy(object):
         # straight from memory cache
         return data
     # not in memory or file cache: fetch from backend, queue store into cache
+    if not self.backend:
+      raise KeyError('no backend: h=%s' % (h,))
     data = self.backend[h]
     with self._lock:
       self.cached[h] = data
