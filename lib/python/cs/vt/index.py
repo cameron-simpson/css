@@ -44,7 +44,7 @@ def choose(basepath, preferred_indexclass=None):
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
-  def __init__(self, basepath, decode, lock=None):
+  def __init__(self, basepath, hashclass, decode, lock=None):
     ''' Initialise an _Index instance.
         `basepath`: the base path to the index; the index itself
           is at `basepath`.SUFFIX
@@ -54,11 +54,12 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     MultiOpenMixin.__init__(self, lock=lock)
     self.basepath = basepath
+    self.hashclass = hashclass
     self.decode = decode
 
   @classmethod
   def pathof(cls, basepath):
-    return '.'.join(basepath, cls.SUFFIX)
+    return '.'.join((basepath, cls.SUFFIX))
 
   @property
   def path(self):
@@ -71,6 +72,10 @@ class LMDBIndex(_Index):
   NAME = 'lmdb'
   SUFFIX = 'lmdb'
 
+  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+    self._lmdb = None
+
   @classmethod
   def is_supported(cls):
     try:
@@ -79,16 +84,9 @@ class LMDBIndex(_Index):
       return False
     return True
 
-  def __init__(self, lmdbpath, hashclass, lock=None):
-    _Index.__init__(self, lock=lock)
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._lmdb_path = lmdbpath
-    self._lmdb = None
-
   def startup(self):
     import lmdb
-    self._lmdb = lmdb.Environment(self._lmdb_path, subdir=True, readonly=False, metasync=False, sync=False)
+    self._lmdb = lmdb.Environment(self.path, subdir=True, readonly=False, metasync=False, sync=False)
 
   def shutdown(self):
     self.flush()
@@ -129,12 +127,16 @@ class LMDBIndex(_Index):
     with self._lmdb.begin(write=True) as txn:
       txn.put(hashcode, entry, overwrite=True)
 
-class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
+class GDBMIndex(_Index):
   ''' GDBM index for a DataDir.
   '''
 
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
+
+  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+    self._gdbm = None
 
   @classmethod
   def is_supported(cls):
@@ -144,15 +146,9 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
       return False
     return True
 
-  def __init__(self, gdbmpath, hashclass, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._gdbm_path = gdbmpath
-    self._gdbm = None
-
   def startup(self):
     import dbm.gnu
-    self._gdbm = dbm.gnu.open(self._gdbm_path, 'cf')
+    self._gdbm = dbm.gnu.open(self.path, 'cf')
     self._gdbm_lock = Lock()
     self._written = False
 
@@ -212,6 +208,10 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
+  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+    self._kyoto = None
+
   @classmethod
   def is_supported(cls):
     try:
@@ -219,11 +219,6 @@ class KyotoIndex(_Index):
     except ImportError:
       return False
     return True
-
-  def __init__(self, basepath, hashclass, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._kyoto = None
 
   def startup(self):
     from kyotocabinet import DB
