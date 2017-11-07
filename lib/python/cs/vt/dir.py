@@ -112,11 +112,12 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid b
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    if self.uuid is None:
+    uu = self.uuid
+    if uu is None:
       uubs = b''
     else:
       flags |= F_HASUUID
-      uubs = self.uuid.bytes
+      uubs = uu.bytes
     return (
         put_bs(self.type)
         + put_bs(flags)
@@ -130,8 +131,12 @@ def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
   '''
   offset0 = offset
-  components, offset = DirentComponents.from_bytes(data, offset)
-  type_, name, metatext, block, uu = components
+  dc, offset = DirentComponents.from_bytes(data, offset)
+  type_ = dc.type
+  name = dc.name
+  metatext = dc.metatext
+  uu = dc.uuid
+  block = dc.block
   try:
     if type_ == D_DIR_T:
       E = Dir(name, metatext=metatext, parent=None, block=block)
@@ -146,8 +151,8 @@ def decode_Dirent(data, offset):
     E._uuid = uu
   except ValueError as e:
     warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
-            name, e, components)
-    E = InvalidDirent(components, data[offset0:offset])
+            name, e, dc)
+    E = InvalidDirent(dc, data[offset0:offset])
   return E, offset
 
 def decode_Dirents(dirdata, offset=0):
@@ -313,6 +318,7 @@ class InvalidDirent(_Dirent):
     self.type = components.type
     self.name = components.name
     self.metatext = components.metatext
+    self._uuid = components.uuid
     self.block = components.block
     self._meta = None
 
