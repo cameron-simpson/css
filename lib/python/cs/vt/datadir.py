@@ -30,6 +30,7 @@ from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .index import choose as choose_indexclass
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -132,7 +133,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   '''
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
-  INDEX_FILENAME_FORMAT = 'index-{hashname}.{suffix}'
+  INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
 
   def __init__(self, statedirpath, datadirpath, hashclass, indexclass=None, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -169,7 +170,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
     if indexclass is None:
-      indexclass = self.choose_indexclass()
+      indexclass = self._indexclass()
     self.indexclass = indexclass
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
@@ -198,31 +199,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self._n = None
     self._load_state()
 
-  def choose_indexclass(self, preferred_indexclass=None):
-    global INDEX_CLASSES
-    global INDEXCLASS_BY_NAME
-    if preferred_indexclass is not None:
-      if isinstance(preferred_indexclass, str):
-        indexname = preferred_indexclass
-        try:
-          preferred_indexclass = INDEXCLASS_BY_NAME[indexname]
-        except KeyError:
-          warning("ignoring unknown indexclass name %r", indexname)
-          preferred_indexclass = None
-    indexclasses = list(INDEX_CLASSES)
-    if preferred_indexclass is not None and preferred_indexclass.is_supported():
-      indexclasses.insert( (preferred_indexclass.INDEXNAME, preferred_indexclass) )
-    for indexname, indexclass in indexclasses:
-      if not indexclass.is_supported():
-        continue
-      indexpath = self.localpathto(self.index_localpath(self.hashclass, indexclass))
-      if existspath(indexpath):
-        return indexclass
-    for indexname, indexclass in indexclasses:
-      if not indexclass.is_supported():
-        continue
-      return indexclass
-    raise ValueError("no supported index classes available")
+  def _indexclass(self, preferred_indexclass=None):
+    return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
@@ -358,10 +336,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def statefilepath(self):
     return self.localpathto(self.state_localpath(self.hashclass))
 
-  def index_localpath(self, hashclass, indexclass):
-    return self.INDEX_FILENAME_FORMAT.format(
-        hashname=hashclass.HASHNAME,
-        suffix=indexclass.SUFFIX)
+  @property
+  def indexbase(self):
+    return self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashclass.HASHNAME)
 
   @property
   def indexpath(self):
