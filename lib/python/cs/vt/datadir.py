@@ -59,16 +59,7 @@ def encode_index_entry(n, offset):
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
   '''
-  n, offset = get_bs(entry)
-  file_offset, offset = get_bs(entry, offset)
-  if offset != len(entry):
-    raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(entry),))
-  return n, file_offset
-
-def encode_index_entry(n, offset):
-  ''' Encode (n, offset) to binary form for use as an index entry.
-  '''
-  return put_bs(n) + put_bs(offset)
+  return IndexEntry.from_bytes(entry)
 
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
