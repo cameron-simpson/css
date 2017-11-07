@@ -5,6 +5,7 @@
 #
 
 from binascii import hexlify
+from collections import namedtuple
 from collections.abc import Mapping
 import csv
 import errno
@@ -32,6 +33,28 @@ from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
+
+class IndexEntry(namedtuple('IndexEntry', 'n offset')):
+
+  @staticmethod
+  def from_bytes(data):
+    ''' Parse a binary index entry, return (n, offset).
+    '''
+    n, offset = get_bs(data)
+    file_offset, offset = get_bs(data, offset)
+    if offset != len(data):
+      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+    return IndexEntry(n, file_offset)
+
+  def encode(self):
+    ''' Encode (n, offset) to binary form for use as an index entry.
+    '''
+    return put_bs(self.n) + put_bs(self.offset)
+
+def encode_index_entry(n, offset):
+  ''' Encode an IndexEntry to binary form for use as an index entry.
+  '''
+  return IndexEntry(n, offset).encode()
 
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
