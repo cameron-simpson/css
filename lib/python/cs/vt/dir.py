@@ -313,11 +313,13 @@ class InvalidDirent(_Dirent):
   def __init__(self, components, chunk):
     ''' An invalid Dirent. Record the original data chunk for regurgitation later.
     '''
+    _Dirent.__init__(
+        self,
+        components.type,
+        components.name,
+        metatext=components.metatext)
     self.components = components
     self.chunk = chunk
-    self.type = components.type
-    self.name = components.name
-    self.metatext = components.metatext
     self._uuid = components.uuid
     self.block = components.block
     self._meta = None
@@ -345,9 +347,9 @@ class InvalidDirent(_Dirent):
 class SymlinkDirent(_Dirent):
 
   def __init__(self, name, metatext, block=None):
+    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
     if block is not None:
       raise ValueError("SymlinkDirent: block must be None, received: %s", block)
-    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
     if self.meta.pathref is None:
       raise ValueError("SymlinkDirent: meta.pathref required")
 
@@ -366,9 +368,9 @@ class HardlinkDirent(_Dirent):
   '''
 
   def __init__(self, name, metatext, block=None):
+    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
     if block is not None:
       raise ValueError("HardlinkDirent: block must be None, received: %s", block)
-    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
     if not hasattr(self.meta, 'inum'):
       raise ValueError("HardlinkDirent: meta.inum required (no iref in metatext=%r)" % (metatext,))
 
@@ -393,10 +395,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
   '''
 
   def __init__(self, name, metatext=None, block=None):
+    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+    MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
-    MultiOpenMixin.__init__(self)
-    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block
     self._check()
@@ -533,13 +535,13 @@ class Dir(_Dirent):
         `parent`: parent Dir
         `block`: pre-existing Block with initial Dir content
     '''
+    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     if block is None:
       self._block = None
       self._entries = {}
     else:
       self._block = block
       self._entries = None
-    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self._unhandled_dirent_chunks = None
     self.parent = parent
     self.changed = False
