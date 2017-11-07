@@ -12,7 +12,7 @@ import errno
 import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
-from threading import Lock, RLock, Thread
+from threading import RLock, Thread
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -215,7 +215,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def spec(self):
     ''' Return a datadir_spec for this DataDirMapping.
     '''
-    return ':'.join( (self.indexclass.INDEXNAME,
+    return ':'.join( (self.indexclass.NAME,
                       self.hashclass.HASHNAME,
                       str(self.statedirpath),
                       str(self.datadirpath)) )
@@ -229,7 +229,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexpath, self.hashclass, lock=self._lock)
+    self.index = self.indexclass(self.indexbase, self.hashclass, IndexEntry.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
