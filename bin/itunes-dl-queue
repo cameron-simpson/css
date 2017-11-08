@@ -51,12 +51,12 @@ op=$1
 shift
 
 case "$op" in
-  add)  if [ $# = 0 ]
+  add)  if [ $# -gt 0 ]
         then
           echo "$cmd: $op: extra arguments: $*" >&2
           badopts=1
         else
-          set -x \
+          set-x \
           reattach-to-user-namespace \
           osascript -e '
               tell application "iTunes"
@@ -92,7 +92,7 @@ case "$op" in
               [ $ok ] && break
               sleep 17
             done
-            set -x \
+            set-x \
             reattach-to-user-namespace \
             osascript -e "
                 activate \"iTunes\"
