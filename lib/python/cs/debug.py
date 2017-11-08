@@ -1,20 +1,60 @@
 #!/usr/bin/python
 #
 # Assorted debugging facilities.
-#       - Cameron Simpson <cs@zip.com.au> 20apr2013
+#       - Cameron Simpson <cs@cskk.id.au> 20apr2013
 #
 
+r'''
+Assorted debugging facilities.
+
+* Lock, RLock, Thread: wrappers for threading facilties; simply import from here instead of there
+
+* thread_dump, stack_dump: dump thread and stack state
+
+* @DEBUG: decorator to wrap functions in timing and value debuggers
+
+* @trace: decorator to report call and return from functions
+
+* @trace_caller: decorator to report caller of function
+
+* TracingObject: subclass of cs.obj.Proxy that reports attribute use
+'''
+
 from __future__ import print_function
+from cmd import Cmd
+import inspect
+import logging
+import os
+from subprocess import Popen, PIPE
+import sys
+import threading
+import time
+import traceback
+import cs.logutils
+from cs.logutils import debug, error, warning, D, ifdebug
+from cs.obj import O, Proxy
+from cs.pfx import Pfx
+from cs.py.stack import caller
+from cs.py3 import Queue, Queue_Empty, exec_code
+from cs.seq import seq
+from cs.x import X
 
 DISTINFO = {
-    'description': "assorted debugging facilities",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+    ],
+    'install_requires': [
+        'cs.logutils',
+        'cs.obj',
+        'cs.pfx',
+        'cs.py.stack',
+        'cs.py3',
+        'cs.seq',
+        'cs.x',
+    ],
 }
 
 from cmd import Cmd
@@ -126,7 +166,7 @@ def DEBUG(f):
   if not ifdebug():
     return f
   def inner(*a, **kw):
-    from cs.asynchron import Result
+    from cs.result import Result
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
@@ -210,6 +250,8 @@ class DebuggingLock(DebugWrapper):
     return False
 
   def acquire(self, *a):
+    ''' Acquire the lock.
+    '''
     # quietly support Python 3 arguments after blocking parameter
     blocking = True
     if a:
@@ -239,6 +281,8 @@ class DebuggingLock(DebugWrapper):
     return taken
 
   def release(self):
+    ''' Release the lock.
+    '''
     filename, lineno = inspect.stack()[0][1:3]
     debug("%s:%d: release()", filename, lineno)
     self.held = None
@@ -256,6 +300,7 @@ class DebuggingLock(DebugWrapper):
     sofar = 0
     slowness = 0
     while True:
+      # block until lock acquired
       try:
         Q.get(True, 1)
       except Queue_Empty:
@@ -343,7 +388,7 @@ def trace(func):
     else:
       X("CALL %s(): RETURNS %r", funccite(func), retval)
       return retval
-  subfunc.__name__ = "trace/subfunc/"+func.__name__
+  subfunc.__name__ = "trace/subfunc/" + func.__name__
   return subfunc
 
 def trace_caller(func):
@@ -351,11 +396,12 @@ def trace_caller(func):
   '''
   def subfunc(*a, **kw):
     frame = caller()
-    X("CALL %s FROM %s()<%s:%d>",
-         funccite(func),
-         frame.funcname, frame.filename, frame.lineno)
+    D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
+      func.__name__,
+      func.__code__.co_filename, func.__code__.co_firstlineno,
+      frame.funcname, frame.filename, frame.lineno)
     return func(*a, **kw)
-  subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
+  subfunc.__name__ = "trace_caller/subfunc/" + func.__name__
   return subfunc
 
 class TracingObject(Proxy):
@@ -432,6 +478,8 @@ class DebugShell(Cmd):
     self.vars = var_dict
 
   def default(self, line):
+    ''' Default command action.
+    '''
     if line == 'EOF':
       return True
     try:
@@ -439,10 +487,11 @@ class DebugShell(Cmd):
     except Exception as e:
       X("Exception: %s", e)
     self.stdout.flush()
-    self.stderr.flush()
     return False
 
 def debug_object_shell(o, prompt=None):
+  ''' Interactive prompt for inspecting variables.
+  '''
   if prompt is None:
     prompt = str(o) + '> '
   v = o.__dict__
@@ -466,15 +515,3 @@ def selftest(module_name, defaultTest=None, argv=None):
   signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
   import unittest
   return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
-
-if __name__ == '__main__':
-  setup_logging()
-  @DEBUG
-  def testfunc(x):
-    debug("into testfunc: x=%r", x)
-    sleep(2)
-    debug("leaving testfunc: returning x=%r", x)
-    return x
-  print("TESTFUNC", testfunc(9))
-  thread_dump()
-  ##DebugShell({'x': 1, 'y':2}).cmdloop('Debug> ')

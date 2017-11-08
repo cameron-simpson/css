@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Grab a clause from a Windows-style .ini file, or edit it.
-#	- Cameron Simpson <cs@zip.com.au> 14jul2001
+#	- Cameron Simpson <cs@cskk.id.au> 14jul2001
 #
 
 cmd=$0

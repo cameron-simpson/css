@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.later.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from functools import partial
@@ -10,8 +10,8 @@ import time
 import unittest
 from cs.logutils import D, setup_logging
 from cs.timeutils import sleep
-from cs.asynchron import report
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY, FUNC_SELECTOR
+from cs.result import report
 
 class TestLater(unittest.TestCase):
 

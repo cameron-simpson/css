@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse standard WWW server log.
-#	- Cameron Simpson <cs@zip.com.au> 27oct96
+#	- Cameron Simpson <cs@cskk.id.au> 27oct96
 #
 
 use strict qw(vars);

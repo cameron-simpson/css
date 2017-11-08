@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Thread convenience facilities.
-#       - Cameron Simpson <cs@zip.com.au> 18nov2007
+#       - Cameron Simpson <cs@cskk.id.au> 18nov2007
 #
 
 from __future__ import with_statement
@@ -442,6 +442,19 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
       pass
     return p
   return prop(getprop)
+
+class LockableMixin(object):
+  ''' Trite mixin to control access to an object via its ._lock attribute.
+      Exposes the ._lock as the property .lock.
+      Presents a context manager interface for obtaining an object's lock.
+  '''
+  def __enter__(self):
+    self._lock.acquire()
+  def __exit(self, exc_type, exc_value, traceback):
+    self._lock.release()
+  @property
+  def lock(self):
+    return self._lock
 
 def via(cmanager, func, *a, **kw):
   ''' Return a callable that calls the supplied `func` inside a

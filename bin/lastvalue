@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Stash or report the last value of some parameter.
-#	- Cameron Simpson <cs@zip.com.au> 02dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
 : ${LOGDIR:=$HOME/var/log}

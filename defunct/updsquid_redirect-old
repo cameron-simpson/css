@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Rewrite the squid_redirect script case statements used to match ads.
-#	- Cameron Simpson <cs@zip.com.au> 06nov98
+#	- Cameron Simpson <cs@cskk.id.au> 06nov98
 #
 # Notify some people of pattern updates.	- cameron, 31mar99
 # STUBURL envvar for image.			- cameron, 02apr99
@@ -10,7 +10,7 @@
 script=$HOME/bin/squid_redirect
 patterns=$HOME/rc/noads
 zappedad=http://web/ad-zap.gif
-them='alan@fromorbit.com jar@rmb.com.au cs@zip.com.au'
+them='alan@fromorbit.com jar@rmb.com.au cs@cskk.id.au'
 
 [ $# = 0 ] || { script=$1; shift; }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Various utility int subtypes.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Put a timestamp of the start of every input line.
-#   - Cameron Simpson <cs@zip.com.au> 08apr2017
+#   - Cameron Simpson <cs@cskk.id.au> 08apr2017
 #
 
 while read -r line

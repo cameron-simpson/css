@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # For each target, move aside and issue an async rm.
-#	- Cameron Simpson <cs@zip.com.au> 19jul1998
+#	- Cameron Simpson <cs@cskk.id.au> 19jul1998
 #
 
 rmopts=

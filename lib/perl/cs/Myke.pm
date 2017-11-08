@@ -2,7 +2,7 @@
 #
 # Myke - my make program
 #
-#	- Cameron Simpson <cs@zip.com.au> 02nov97
+#	- Cameron Simpson <cs@cskk.id.au> 02nov97
 #
 
 use strict qw(vars);

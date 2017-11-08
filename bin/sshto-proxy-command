@@ -4,7 +4,7 @@
 # ProxyCommand to use to tunnel to where it will be used.
 # For example, the path foo!bah!zot will emit something like:
 #  zot ssh foo ssh bah nc %h %p
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

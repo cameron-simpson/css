@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Shorten a path (the current directory by default) using various criteria.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 # prefix ==> ~ or ~user
 # do not shorten VCS top
@@ -14,7 +14,7 @@ from os.path import basename, dirname, join as joinpath
 import pwd
 import stat
 import sys
-from cs.logutils import setup_logging, warning, error, X
+from cs.logutils import setup_logging, warning, error
 from cs.obj import O
 
 USAGE = "Usage: %s [path]"

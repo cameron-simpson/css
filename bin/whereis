@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Look up whereis.com.au.	- Cameron Simpson <cs@zip.com.au> 29oct2004
+# Look up whereis.com.au.	- Cameron Simpson <cs@cskk.id.au> 29oct2004
 #
 
 cmd=`basename "$0"`

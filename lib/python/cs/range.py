@@ -2,7 +2,7 @@
 #
 # A Range in an object resembling a set but optimised for contiguous
 # ranges of int members.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 # TODO: add __getitem__, __getslice__, __delitem__, __delslice__ methods.
 #

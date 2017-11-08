@@ -1,8 +1,40 @@
 #!/usr/bin/python
 #
 # Pfx: a framework for easy to use dynamic message prefixes.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
+
+r'''
+Dynamic message prefixes providing execution context.
+
+The primary facility here is Pfx,
+a context manager which maintains a per thread stack of context prefixes.
+Usage is like this::
+
+  from cs.pfx import Pfx
+  ...
+  def parser(filename):
+    with Pfx("parse(%r)", filename):
+      with open(filename) as f:
+        for lineno, line in enumerate(f, 1):
+          with Pfx("%d", lineno) as P:
+            if line_is_invalid(line):
+              raise ValueError("problem!")
+            P.info("line = %r", line)
+
+This produces log messages like::
+
+  datafile: 1: line = 'foo\n'
+
+and exception messages like::
+
+  datafile: 17: problem!
+
+which lets one put just the relevant complaint in exception and log
+messages and get useful calling context on the output.
+This does make for wordier logs and exceptions
+but used with a little discretion produces far more debugable results.
+'''
 
 from __future__ import print_function
 from contextlib import contextmanager
@@ -12,14 +44,34 @@ import threading
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
+DISTINFO = {
+    'description': "Easy context prefixes for messages.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.py3',
+        'cs.x',
+    ],
+}
+
 cmd = None
 
-def pfx_iter(tag, iter):
-  ''' Wrapper for iterators to prefix exceptions with `tag`.
+def pfx_iter(tag, iterable):
+  ''' Wrapper for iterables to prefix exceptions with `tag`.
   '''
   with Pfx(tag):
-    for i in iter:
-      yield i
+    I = iter(iterable)
+  while True:
+    with Pfx(tag):
+      try:
+        i = next(I)
+      except StopIteration:
+        break
+    yield i
 
 def pfx(func):
   ''' Decorator for functions that should run inside:
@@ -68,7 +120,12 @@ class _PfxThreadState(threading.local):
     global cmd
     stack = self.stack
     if not stack:
-      return Pfx(cmd if cmd else sys.argv.get(0, "NO_SYS_ARGV_0"))
+      if not cmd:
+        try:
+          cmd = sys.argv[0]
+        except IndexError:
+          cmd = "NO_SYS_ARGV_0"
+      return Pfx(cmd)
     return stack[-1]
 
   @property
@@ -99,13 +156,21 @@ class _PfxThreadState(threading.local):
     return self.stack.pop()
 
 class Pfx(object):
-  ''' A context manager to maintain a per-thread stack of message prefices.
+  ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
   # instantiate the thread-local state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
+    ''' Initialise a new Pfx instance.
+        `mark`: message prefix string
+        `args`: if not empty, apply to the prefix string with `%`
+        `absolute`: optional keyword argument, default False. If
+          true, this message forms the base of the message prefixes;
+          existing prefixes will be suppressed.
+        `loggers`: which loggers should receive log messages.
+    '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
     if kwargs:
@@ -138,12 +203,12 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-              prefix, text.__class__, text, sys.exc_info())
+            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            ##  prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix \
-                 + ': ' \
-                 + ustr(text, errors='replace').replace('\n', '\n' + prefix)
+              + ': ' \
+              + ustr(text, errors='replace').replace('\n', '\n' + prefix)
         for attr in 'args', 'message', 'msg', 'reason':
           try:
             value = getattr(exc_value, attr)
@@ -191,10 +256,10 @@ class Pfx(object):
       self._umark = u
     return u
 
-  def logto(self, newLoggers):
+  def logto(self, new_loggers):
     ''' Define the Loggers anew.
     '''
-    self._loggers = newLoggers
+    self._loggers = new_loggers
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
@@ -253,14 +318,14 @@ def prefix():
   return Pfx._state.prefix
 
 @contextmanager
-def PrePfx(pfx, *args):
+def PrePfx(tag, *args):
   ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
   '''
   if args:
-    pfx = pfx % args
+    tag = tag % args
   state = Pfx._state
   old_ur_prefix = state._ur_prefix
-  state._ur_prefix = pfx
+  state._ur_prefix = tag
   yield None
   state._ur_prefix = old_ur_prefix
 

@@ -2,7 +2,7 @@
 #
 # View an M$ Word document. No idea why people imagine this is a useful
 # format to send text around in, but there you go.
-#	- Cameron Simpson <cs@zip.com.au> 26mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 26mar2000
 #
 
 catdoc ${1+"$@"} | pageif undblspc

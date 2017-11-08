@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # Web page utility.
-#       - Cameron Simpson <cs@zip.com.au> 07jul2010
+#       - Cameron Simpson <cs@cskk.id.au> 07jul2010
 #
 
 from __future__ import with_statement, print_function

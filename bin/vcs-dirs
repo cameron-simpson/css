@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Search the named directories for VCS repositories; when found report terse summary for each.
-#   - Cameron Simpson <cs@zip.com.au> 11may2016
+#   - Cameron Simpson <cs@cskk.id.au> 11may2016
 #
 
 from __future__ import print_function

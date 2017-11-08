@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Progress counting.
-#   - Cameron Simpson <cs@zip.com.au> 15feb2015
+#   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
 
 from collections import namedtuple

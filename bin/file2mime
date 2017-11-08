@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Infer MIME type from file(1) output.
-#	- Cameron Simpson <cs@zip.com.au> 14nov2002
+#	- Cameron Simpson <cs@cskk.id.au> 14nov2002
 #
 
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
@@ -40,6 +40,7 @@ case "$type" in
     *': '*"compress'd data 16 bits")	mtype=application/x-compress ;;
     *': '*'Zip archive data'*)		mtype=application/zip ;;
     *': '*'ZIP archive')		mtype=application/zip ;;
+    *': '*'7-zip archive'*)		mtype=application/x-7z-compressed ;;
     *': '*'tar archive'*)		mtype=application/x-tar ;;
     *': '*'RAR archive data'*)		mtype=application/x-rar ;;
     *': '*'ASCII cpio archive'*)	mtype=application/x-cpio-c ;;

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
 # Do stuff with the timer idset.
-#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2003
 #
 exec idset -i timer ${1+"$@"}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Assorted shell related things.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -178,7 +178,7 @@ sh(1), cs::Glob(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

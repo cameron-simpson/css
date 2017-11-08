@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Run a command forever, optionally until failure.
-#       - Cameron Simpson <cs@zip.com.au> 27apr2007
+#       - Cameron Simpson <cs@cskk.id.au> 27apr2007
 #
 
 : ${VARRUN:=$HOME/var/run}

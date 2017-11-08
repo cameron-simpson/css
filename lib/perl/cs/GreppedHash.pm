@@ -7,7 +7,7 @@
 # to insure the grepness of new entries. This will be called from
 # the STORE method if the key didn't exist in the grepped array
 # beforehand.
-#	- Cameron Simpson <cs@zip.com.au> 08dec97
+#	- Cameron Simpson <cs@cskk.id.au> 08dec97
 #
 
 use strict qw(vars);

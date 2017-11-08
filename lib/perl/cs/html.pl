@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# HTML/SGML-related stuff.	- Cameron Simpson, <cs@zip.com.au>
+# HTML/SGML-related stuff.	- Cameron Simpson, <cs@cskk.id.au>
 #
 
 package html;

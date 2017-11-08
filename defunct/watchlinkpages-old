@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Watch a set of link post pages (eg freshmeat) and report new links.
-#	- Cameron Simpson <cs@zip.com.au> 29jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 29jul2000
 #
 
 cmd=`basename "$0"`

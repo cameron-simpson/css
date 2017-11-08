@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Patch /etc/hosts (by default) with 127.0.0.n addresses with names from standard input.
-#   - Cameron Simpson <cs@zip.com.au> 10apr2016
+#   - Cameron Simpson <cs@cskk.id.au> 10apr2016
 #
 
 set -ue

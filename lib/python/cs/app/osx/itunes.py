@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience iTunes related functions.
-#       - Cameron Simpson <cs@zip.com.au>05jan2013
+#       - Cameron Simpson <cs@cskk.id.au>05jan2013
 #
 
 import datetime

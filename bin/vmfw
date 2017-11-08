@@ -2,7 +2,7 @@
 #
 # Expects to be called from inside vm with input of the form
 #	itemnum author topic
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${TMPDIR:=/tmp}

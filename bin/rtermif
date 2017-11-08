@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Open fresh shell on target machine in new window.
-#	- Cameron Simpson <cs@zip.com.au> 23oct2001
+#	- Cameron Simpson <cs@cskk.id.au> 23oct2001
 #
 
 [ $# = 0 ] || { echo "Usage: $0"; exit 2; }

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for timing.
-#       - Cameron Simpson <cs@zip.com.au> 01feb2010
+#       - Cameron Simpson <cs@cskk.id.au> 01feb2010
 #
 
 from __future__ import print_function
