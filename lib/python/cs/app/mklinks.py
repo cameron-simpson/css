@@ -2,7 +2,7 @@
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
-#       - Cameron Simpson <cs@zip.com.au> 21may2006
+#       - Cameron Simpson <cs@cskk.id.au> 21may2006
 #
 
 import sys
@@ -11,13 +11,13 @@ import os.path
 import filecmp
 from stat import S_ISREG
 from collections import namedtuple
-import filecmp
 from tempfile import NamedTemporaryFile
 if sys.hexversion >= 0x02050000:
   from hashlib import md5
 else:
   from md5 import md5
-from cs.logutils import setup_logging, Pfx, error, warn, info, debug
+from cs.logutils import setup_logging, error
+from cs.pfx import Pfx
 from cs.py3 import StringTypes
 
 # amount of file to read and checksum before trying whole file compare

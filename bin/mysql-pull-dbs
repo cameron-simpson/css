@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Pull complete databases from one mysql server to another.
-#	- Cameron Simpson <cs@zip.com.au> 29dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 29dec2005
 #
 
 cmd=`basename "$0"`

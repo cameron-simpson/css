@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Mangle HTML to put URLs inline with the links for easy grabbing.
-#	- Cameron Simpson <cs@zip.com.au> 17may2002
+#	- Cameron Simpson <cs@cskk.id.au> 17may2002
 #
 
 cmd=$0
@@ -36,7 +36,8 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -n "$cols" ] || cols=`ttysize|awk '{print$1}'`
-[ -n "$cols" ] && cols="-cols $cols"
+w3cols=
+[ -n "$cols" ] && w3cols="-cols $cols"
 
 if [ $# = 0 ]
 then  detab
@@ -56,5 +57,5 @@ fi \
   then perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)">[^<]*</a>; $& [$1];gi'
   else cat
   fi \
-| w3m $cols -dump -T text/html \
+| set-x w3m $w3cols -dump -T text/html \
 | LC_ALL=C sed 's/[ 	][ 	]*$//'

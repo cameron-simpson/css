@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Textual representation and parsing of Nodes and attribute values.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from contextlib import closing
@@ -16,7 +16,8 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, error, info, warning
+from cs.logutils import error, info, warning
+from cs.pfx import Pfx
 import cs.sh
 from .node import Node, nodekey
 from .export import import_csv_wide

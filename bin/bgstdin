@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Background command but keep attached to stdin.
-#	- Cameron Simpson <cs@zip.com.au> 12sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 12sep2000
 #
 
 : ${LOGDIR:=$HOME/var/log}

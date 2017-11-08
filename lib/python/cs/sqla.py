@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience stuff for SQLAlchemy.
-#       - Cameron Simpson <cs@zip.com.au> 02mar2013
+#       - Cameron Simpson <cs@cskk.id.au> 02mar2013
 #
 
 from __future__ import print_function
@@ -12,7 +12,8 @@ from getopt import GetoptError
 import shlex
 from sqlalchemy import MetaData, create_engine
 from threading import RLock
-from cs.logutils import setup_logging, D, Pfx, error
+from cs.logutils import setup_logging, D, error
+from cs.pfx import Pfx
 from cs.seq import the
 from cs.threads import locked_property
 from cs.obj import O

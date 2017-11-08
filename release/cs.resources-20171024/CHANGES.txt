@@ -1,0 +1,16 @@
+  lib/python/cs/resources.py: cs.resources: tidy up "repeated" import
+  lib/python/cs/resources.py: merge default ==> beyonwiz
+  lib/python/cs/resources.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/resources.py: cs.resources: bugfix MultiOpenMixin finalise logic - ._infalise not reinitialised when object reopened
+  lib/python/cs/resources.py: Automated merge with file:///Users/cameron/hg/css
+  lib/python/cs/resources.py: merge default ==> venti
+  lib/python/cs/resources.py: cs.resources: bugfix MultiOpenMixin: call startup and shutdown outside the lock, which is often shared with the mixer class
+  lib/python/cs/resources.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/resources.py: cs.*: import XP from cs.pfx instead of cs.logutils
+  lib/python/cs/resources.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/resources.py: cs.*: more cs.pfx import fixes
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: return value of final .close is that of .shutdown; record who made the final close and report it in the exception from use-after-close
+  lib/python/cs/resources.py: cs.resources: MultiOpenClose.close: fix recording of the frame of the final caller, fill out docstring
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin.close: sanity check close before initial open, report final closer on underflow closes
+  lib/python/cs/resources.py: my email address has changed - update Python code
+  lib/python/cs/resources.py: cs.resources: new class RunState for tracking or controlling a running task; some linting

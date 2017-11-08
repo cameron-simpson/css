@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # FVWM hooks, to be used by modules.
-#	- Cameron Simpson <cs@zip.com.au> 15oct94
+#	- Cameron Simpson <cs@cskk.id.au> 15oct94
 #
 
 use strict qw(vars);

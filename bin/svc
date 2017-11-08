@@ -1,19 +1,20 @@
 #!/bin/sh
 #
 # Convenience command to start disparate services based on name.
-# The configuration is in $HOME/rc/svc.
-# For further convenience I define the following shell aliases:
+# The configuration is in $HOME/.svcrc.
+# For further convenience I define the following shell aliases and functions:
 #
 #   alias disable='svc disable'
-#   alias connected='flag -q | grep "_CONNECTED\$"'
-#   alias disabled='flag -q | grep "_DISABLE\$"'
 #   alias enable='svc enable'
-#   alias restart='svc restart'
 #   alias start='svc start'
 #   alias stop='svc stop'
+#   alias restart='svc restart'
+#   fq(){         flag -q | grep -i "${1-.}"; }
+#   connected(){  fq '_CONNECTED$'; }
+#   disabled(){   fq '_DISABLE$'; }
 #
 # This makes managing my personal service processes far more convenient.
-#   - Cameron Simpson <cs@zip.com.au> 07may2016
+#   - Cameron Simpson <cs@cskk.id.au> 07may2016
 #
 
 set -ue

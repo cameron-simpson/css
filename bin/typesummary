@@ -3,7 +3,7 @@
 # Report file types, counts and sizes.
 # Expects input from "find .... -print" or if stdin is a tty
 # runs "find . -type f -print" to get the list.
-#	- Cameron Simpson <cs@zip.com.au> 25mar2003
+#	- Cameron Simpson <cs@cskk.id.au> 25mar2003
 # 
 
 if (-t STDIN)

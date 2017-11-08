@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # HTML transcription, pulled and adapted from cs.nodedb.httpd.
-#       - Cameron Simpson <cs@zip.com.au> 15jan2012
+#       - Cameron Simpson <cs@cskk.id.au> 15jan2012
 #
 
 import sys

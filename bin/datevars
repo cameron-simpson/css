@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Emit shell assignments to set date related variables.
-#	- Cameron Simpson <cs@zip.com.au> 13aug99
+#	- Cameron Simpson <cs@cskk.id.au> 13aug99
 #
 
 use strict qw(vars);

@@ -2,7 +2,7 @@
 #
 # I find the supplied python traceback facilities quite awkward.
 # These functions provide convenient facilities.
-#       - Cameron Simpson <cs@zip.com.au> 14apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 14apr2014
 #
 
 DISTINFO = {
@@ -39,12 +39,14 @@ def caller():
   # -3: the calling function of the invoker
   return frames()[-3]
 
-def stack_dump(fp=None, indent=0):
-  ''' Recite current stack to `fp`, default sys.stderr.
+def stack_dump(fp=None, indent=0, Fs=None):
+  ''' Recite current or supplied stack to `fp`, default sys.stderr.
   '''
   if fp is None:
     fp = sys.stderr
-  for F in frames():
+  if Fs is None:
+    Fs = frames()
+  for F in Fs:
     if indent > 0:
       fp.write(' ' * indent)
     fp.write(str(F))

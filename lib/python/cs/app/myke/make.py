@@ -12,16 +12,19 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
+from cs.result import Result, report as report_LFs, AsynchState
 from cs.excutils import logexc
 from cs.inttypes import Flags
-from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
-from cs.queues import MultiOpenMixin
-from cs.asynchron import Result, report as report_LFs, \
-        ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
-from cs.logutils import Pfx, info, error, debug, D, X, XP
+from cs.logutils import debug, info, warning, error, D
 from cs.obj import O
+import cs.pfx
+from cs.pfx import Pfx, XP
+from cs.py.func import prop
+from cs.queues import MultiOpenMixin
+from cs.threads import Lock, RLock, Channel, locked, locked_property
+from cs.x import X
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
@@ -47,7 +50,7 @@ class Maker(MultiOpenMixin):
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
     if name is None:
-      name = cs.logutils.cmd
+      name = cs.pfx.cmd
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
@@ -99,13 +102,13 @@ class Maker(MultiOpenMixin):
       time.sleep(5)
       self.report()
 
-  @property
+  @prop
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
     return self._namespaces + [ SPECIAL_MACROS ]
 
-  @property
+  @prop
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
         It is not possible to add more makefiles after accessing this property.
@@ -113,10 +116,10 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get( (cs.logutils.cmd+'rc').upper() )
+      makerc = os.environ.get( (cs.pfx.cmd+'rc').upper() )
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
-      makefile = os.path.basename(cs.logutils.cmd).title() + 'file'
+      makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
       _makefiles.append(makefile)
       self._makefiles = _makefiles
     if type(_makefiles) is not tuple:
@@ -141,17 +144,17 @@ class Maker(MultiOpenMixin):
     if self.debug.parse:
       info(msg, *a, **kw)
 
-  def making(self, target):
+  def target_active(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as active", target.name)
     with self._active_lock:
       self.active.add(target)
 
-  def made(self, target, status):
+  def target_inactive(self, target):
     ''' Remove this target from the set of "in progress" targets.
     '''
-    self.debug_make("note target \"%s\" as inactive (status=%s)", target.name, status)
+    self.debug_make("note target %r as inactive (%s)", target.name, target.state)
     with self._active_lock:
       self.active.remove(target)
 
@@ -175,8 +178,14 @@ class Maker(MultiOpenMixin):
   def after(self, LFs, func, *a, **kw):
     ''' Submit a function to be run after the supplied LateFunctions `LFs`, return a Result instance for collection.
     '''
+    if not isinstance(LFs, list):
+      LFs = list(LFs)
     self.debug_make("after %s call %s(*%r, **%r)" % (LFs, func, a, kw))
-    return self._makeQ.after(LFs, None, func, *a, **kw)
+    R = Result("Maker.after(%s):%s"
+               % (",".join(str(LF) for LF in LFs),
+                  func))
+    self._makeQ.after(LFs, R, func, *a, **kw)
+    return R
 
   def make(self, targets):
     ''' Synchronous call to make targets in series.
@@ -241,7 +250,7 @@ class Maker(MultiOpenMixin):
           self.setDebug('make', True)
         elif opt == '-D':
           for flag in [ w.strip().lower() for w in value.split(',') ]:
-            if len(w) == 0:
+            if len(flag) == 0:
               # silently skip empty flag items
               continue
             if flag.startswith('-'):
@@ -272,7 +281,7 @@ class Maker(MultiOpenMixin):
     return args, badopts
 
   def loadMakefiles(self, makefiles, parent_context=None):
-    ''' Load the specified Makefiles.
+    ''' Load the specified Makefiles; return success.
         Each top level Makefile named gets its own namespace prepended
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
@@ -280,6 +289,7 @@ class Maker(MultiOpenMixin):
         Also, the default_target property is set to the first
         encountered target if not yet set.
     '''
+    ok = True
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
@@ -287,7 +297,10 @@ class Maker(MultiOpenMixin):
       self._namespaces.insert(0, ns)
       for O in parseMakefile(self, makefile, parent_context):
         with Pfx(O.context):
-          if isinstance(O, Target):
+          if isinstance(O, Exception):
+            error("exception: %s", O)
+            ok = False
+          elif isinstance(O, Target):
             # record this Target in the Maker
             T = O
             self.debug_parse("add target %s", T)
@@ -308,6 +321,7 @@ class Maker(MultiOpenMixin):
                   )
       if first_target is not None:
         self.default_target = first_target
+    return ok
 
 class TargetMap(O):
   ''' A mapping interface to the known targets.
@@ -372,18 +386,18 @@ class Target(Result):
           `prereqs`: macro expression to produce prereqs.
           `postprereqs`: macro expression to produce post-inference prereqs.
           `actions`: a list of actions to build this Target
-        The same actions list is shared amongst all Targets defined
-        by a common clause in the Mykefile, and extends during the
-        Mykefile parse _after_ defining those Targets. So we do not modify it the class;
-        instead we extend .pending_actions when .require() is called the first time,
-        just as we for a :make directive.
+          The same actions list is shared amongst all Targets defined
+          by a common clause in the Mykefile, and extends during the
+          Mykefile parse _after_ defining those Targets. So we do not
+          modify it the class; instead we extend .pending_actions
+          when .require() is called the first time, just as we do for a
+          :make directive.
     '''
 
-    Result.__init__(self, lock=RLock())
+    Result.__init__(self, name=name, lock=RLock())
     self._O_omit.extend(['actions', 'maker', 'namespaces'])
     self.maker = maker
     self.context = context
-    self.name = name
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
@@ -402,41 +416,39 @@ class Target(Result):
     #  
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.madeness())
+    return "{}[{}]".format(self.name, self.state)
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
     return self.maker.debug_make(msg, *a)
 
+  @locked
   def succeed(self):
     ''' Mark target as successfully made.
     '''
     self.mdebug("OK")
+    if self.ready:
+      if not self.result:
+        raise RuntimeError("%s.succeed: already completed FAILED" % (self.name,))
+      return
     self.failed = False
     self.result = True
 
-  def fail(self):
+  @locked
+  def fail(self, msg=None):
     ''' Mark Target as failed.
     '''
-    self.mdebug("FAILED")
+    if msg is None:
+      msg = "FAILED"
+    self.mdebug(msg)
+    if self.ready:
+      if self.result:
+        raise RuntimeError("%s.fail: already completed OK" % (self.name,))
+      return
     self.failed = True
     self.result = False
 
-  def madeness(self):
-    ''' Report the status of this target as text.
-    '''
-    state = self.state
-    if state == ASYNCH_PENDING:
-      return "unconsidered"
-    if state == ASYNCH_RUNNING:
-      return "making"
-    if state == ASYNCH_CANCELLED:
-      return "cancelled"
-    if state != ASYNCH_READY:
-      raise RuntimeError("%s.madeness: unexpected state %s" % (self, state))
-    return "made" if self.result else "FAILED"
-
-  @property
+  @prop
   def namespaces(self):
     ''' The namespaces for this Target: the special per-Target macros,
         the Maker's namespaces, the Maker's macros and the special macros.
@@ -454,7 +466,7 @@ class Target(Result):
              ]
            )
 
-  @property
+  @prop
   def prereqs(self):
     ''' Return the prerequisite target names.
     '''
@@ -464,7 +476,7 @@ class Target(Result):
       self._prereqs = prereqs_mexpr(self.context, self.namespaces).split()
     return self._prereqs
 
-  @property
+  @prop
   def new_prereqs(self):
     ''' Return the new prerequisite target names.
     '''
@@ -513,33 +525,51 @@ class Target(Result):
   def require(self):
     ''' Require this Target to be made.
     '''
-    with self._lock:
-      if self.pending:
-        self.state = ASYNCH_RUNNING
-        self.was_missing = self.mtime is None
-        self.pending_actions = list(self.actions)
-        Ts = []
-        for Pname in self.prereqs:
-          T = self.maker[Pname]
-          Ts.append(T)
-          T.require()
-          # fire fail action immediately
-          T.notify(lambda T: self.fail() if not T.result else None)
-        # queue the first unit of work
-        self.maker.after(Ts, self._make_after_prereqs, Ts)
+    with Pfx("%r.require()", self.name):
+      with self._lock:
+        if self.state == AsynchState.pending:
+          # commence make of this Target
+          self.maker.target_active(self)
+          self.notify(self.maker.target_inactive)
+          self.state = AsynchState.running
+          self.was_missing = self.mtime is None
+          self.pending_actions = list(self.actions)
+          Ts = []
+          for Pname in self.prereqs:
+            T = self.maker[Pname]
+            Ts.append(T)
+            T.require()
+            # fire fail action immediately
+            def f(T):
+              if T.result:
+                pass
+              else:
+                self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+            T.notify(f)
+          # queue the first unit of work
+          if Ts:
+            self.maker.after(Ts, self._make_after_prereqs, Ts)
+          else:
+            self._make_after_prereqs(Ts)
 
   @logexc
   def _make_after_prereqs(self, Ts):
     ''' Invoked after the initial prerequisites have been run.
         Compute out_of_date etc, then run _make_next.
     '''
-    with Pfx("%s: after prereqs", self.name):
+    with Pfx("%s: after prereqs (Ts=%s)", self.name, ",".join(str(T) for T in Ts)):
       self.out_of_date = False
+      # it is possible we may have been marked as failed already
+      # because that has immediate effect
+      if self.ready:
+        return
       for T in Ts:
         if not T.ready:
           raise RuntimeError("not ready")
         self._apply_prereq(T)
-      if not self.failed and (self.was_missing or self.out_of_date):
+      if self.failed:
+        return
+      if self.was_missing or self.out_of_date:
         # proceed to normal make process
         self.Rs = []
         return self._make_next()
@@ -572,15 +602,20 @@ class Target(Result):
         If we complete without blocking, put True or False onto self.made.
         Otherwise queue a background function to block and resume.
     '''
-    with Pfx(self.name):
+    with Pfx("_make_next(%r)", self.name):
       if not self.was_missing and not self.out_of_date:
         raise RuntimeError("not missing or out of date!")
       # evaluate the result of Actions or Targets we have just waited for
       for R in self.Rs:
-        if not R.result:
-          self.fail()
-        elif isinstance(R, Target):
-          self._apply_prereq(R)
+        with Pfx("checking %s", R):
+          if isinstance(R, Target):
+            self._apply_prereq(R)
+          elif R.result:
+            pass
+          else:
+            self.fail()
+          if self.ready:
+            break
       if self.failed:
         # failure, cease make
         return
@@ -595,7 +630,7 @@ class Target(Result):
         self.mdebug("no actions remaining")
 
       if Rs:
-        self.mdebug("tasks still to do, requeuing")
+        self.mdebug("tasks still to do, requeuing: Rs=%s", ",".join(str(_) for _ in Rs))
         self.maker.after(Rs, self._make_next)
       else:
         # all done, record success
@@ -616,7 +651,7 @@ class Action(O):
 
   __repr__ = __str__
 
-  @property
+  @prop
   def prline(self):
     return self.line.rstrip().replace('\n', '\\n')
 
@@ -625,7 +660,7 @@ class Action(O):
         Return a Result which returns the success or failure
         of the action.
     '''
-    R = Result()
+    R = Result(name="%s.action(%s)" % (target, self))
     ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
     return R
 
@@ -639,6 +674,7 @@ class Action(O):
         M = target.maker
         mdebug = M.debug_make
         v = self.variant
+
         if v == 'shell':
           debug("shell command")
           shcmd = self.mexpr(self.context, target.namespaces)
@@ -656,6 +692,7 @@ class Action(O):
           mdebug("targets = %s", subtargets)
           subTs = [ M[subtarget] for subtarget in subtargets ]
           def _act_after_make():
+            # analyse success of targets, update R
             ok = True
             mdebug = M.debug_make
             for T in subTs:
@@ -664,12 +701,13 @@ class Action(O):
               else:
                 ok = False
                 mdebug("submake \"%s\" FAIL", T)
-            return ok
+            R.put(ok)
           for T in subTs:
             mdebug("submake \"%s\"", T)
             T.require()
-          target.maker.after(subTs, R, _act_after_make)
+          M.after(subTs, _act_after_make)
           return
+
         raise NotImplementedError("unsupported variant: %s" % (self.variant,))
       except Exception as e:
         error("action failed: %s", e)

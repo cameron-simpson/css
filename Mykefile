@@ -59,6 +59,11 @@ _help:
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
 
+_tags:  tags
+
+tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
+        ctags -R -o tags cs/
+
 _updcss:
         ./bin-cs/updcss
 
@@ -107,6 +112,7 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 _home:
+        @echo 'update $(HOME)/bin ...' \
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         pfx bin $(rsync) -a --delete \\
@@ -116,7 +122,8 @@ _home:
                 --exclude=squid_redirect \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/.
-        $(MAKE) _bin_$((bin_suffixes))
+        :make _bin_$((bin_suffixes))
+        @echo 'update $(HOME)/lib ...' \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
                 --include=/js \\
@@ -132,16 +139,26 @@ _home:
                 --exclude=/* \\
                 --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
-        @echo "home updated"
 
-bin_suffixes = cs darwin lrn
+bin_suffixes = cs darwin
 
 _bin_$((bin_suffixes)):
-    sfx=$(@S[_]) \
+    @sfx=$(@S[_]) \
     base=bin-$$sfx \
     target=$(HOME)/$$base \
-    skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
-    pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/"
+    if [ -d "$$target/" ] \
+    then \
+      if [ -d "$$base/" ] \
+      then \
+        echo "update $$target ..." \
+        skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
+        pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/" \
+      else \
+        echo "WARNING: no $$base" >&2 \
+      fi \
+    else \
+      echo "WARNING: no $$target" >&2 \
+    fi
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
@@ -152,14 +169,14 @@ _deploy:
 
 _publish _pub:
         :make _publish_bitbucket
-        :make _publish_ezos
+        #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
         syncezos
 
 _publish_bitbucket:
-        hg push --new-branch $(hg_bitbucket)
+        hg push --new-branch -r tip $(hg_bitbucket)
         @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release

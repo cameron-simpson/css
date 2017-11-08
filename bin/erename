@@ -1,7 +1,7 @@
-#!/usr/bin/env py3
+#!/usr/bin/env python3
 #
 # Bring up the named files in an editor for renaming.
-#   - Cameron Simpson <cs@zip.com.au> 22may2016
+#   - Cameron Simpson <cs@cskk.id.au> 22may2016
 #
 
 from __future__ import print_function
@@ -21,9 +21,9 @@ def main(argv):
   if argv:
     names = argv
   else:
-    names = [ name for name in os.listdir('.')
-             if name and not name.startswith('.')
-           ]
+    names = sorted( [ name for name in os.listdir('.')
+                      if name and not name.startswith('.')
+                    ] )
     if not names:
       error("%s: no suitable names in the current directory", cmd)
       badopts = True

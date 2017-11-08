@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Queue my mail for delivery.	- Cameron Simpson <cs@zip.com.au>
+# Queue my mail for delivery.	- Cameron Simpson <cs@cskk.id.au>
 # Recoded in perl. - cameron, 07oct94
 # Added requeue facility. - cameron, 10oct94
 #

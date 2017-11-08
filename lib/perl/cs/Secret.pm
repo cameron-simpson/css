@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manipulate my "secrets" db.
-#	- Cameron Simpson <cs@zip.com.au> 09nov1999
+#	- Cameron Simpson <cs@cskk.id.au> 09nov1999
 #
 
 use strict qw(vars);

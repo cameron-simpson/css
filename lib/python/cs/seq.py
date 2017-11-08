@@ -1,8 +1,27 @@
 #!/usr/bin/python -tt
 #
 # Stuff to do with counters, sequences and iterables.
-#       - Cameron Simpson <cs@zip.com.au> 20jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 20jul2008
 #
+
+r'''
+Stuff to do with counters, sequences and iterables.
+
+Presents:
+
+* Seq, a class for thread safe sequential integer generation.
+
+* seq(), a function to return such a number from a default global Seq instance.
+
+* the(), first(), last(), get0(): return the only, first, last or optional-first element of an iterable respectively.
+
+* TrackingCounter, a counting object with facilities for users to wait for it to reach arbitrary values.
+'''
+
+import heapq
+import itertools
+from threading import Lock, Condition
+from cs.logutils import warning
 
 DISTINFO = {
     'description': "Stuff to do with counters, sequences and iterables.",
@@ -12,15 +31,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.logutils', 'cs.py.stack', 'cs.py3'],
+    'install_requires': ['cs.logutils'],
 }
-
-import heapq
-import itertools
-from threading import Lock, Condition
-from cs.logutils import warning, debug, D
-from cs.py.stack import caller
-from cs.py3 import exec_code
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -97,26 +109,15 @@ def get0(iterable, default=None):
   else:
     return i
 
-def NamedTupleClassFactory(*fields):
-  ''' Construct classes for named tuples a bit like the named tuples
-      coming in Python 2.6/3.0.
-      NamedTupleClassFactory('a','b','c') returns a subclass of "list"
-      whose instances have properties .a, .b and .c as references to
-      elements 0, 1 and 2 respectively.
+def tee(iterable, *Qs):
+  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
+      `Qs`: the queues, objects accepting a .put method.
+      Note: the item is .put onto every queue before being yielded from this generator.
   '''
-  class NamedTuple(list):
-    for i in range(len(fields)):
-      f=fields[i]
-      exec_code('def getx(self): return self[%d]' % i)
-      exec_code('def setx(self,value): self[%d]=value' % i)
-      exec_code('%s=property(getx,setx)' % f)
-  return NamedTuple
-
-def NamedTuple(fields,iter=()):
-  ''' Return a named tuple with the specified fields.
-      Useful for one-off tuples/lists.
-  '''
-  return NamedTupleClassFactory(*fields)(iter)
+  for item in iterable:
+    for Q in Qs:
+      Q.put(item)
+    yield item
 
 def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
@@ -196,7 +197,12 @@ def onetomany(func):
   return gather
 
 def isordered(s, reverse=False, strict=False):
+  ''' Test whether an iterable is ordered.
+      Note that the iterable is iterated, so this is a destructive
+      test for nonsequences.
+  '''
   first = True
+  prev = None
   for i, item in enumerate(s):
     if not first:
       if reverse:
@@ -204,11 +210,10 @@ def isordered(s, reverse=False, strict=False):
       else:
         ordered = item > prev if strict else item >= prev
       if not ordered:
-        raise AssertionError(
-                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
-                % (reverse, strict, i-1, i, prev, item))
+        return False
     prev = item
     first = False
+  return True
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
@@ -261,8 +266,6 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
-    if tag:
-      D("INC(%s): %s", tag[:10], caller())
     with self._lock:
       self.value += 1
       if tag is not None:
@@ -275,8 +278,6 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
-    if tag:
-      D("DEC(%s): %s:", tag[:10], caller())
     with self._lock:
       self.value -= 1
       if tag is not None:
@@ -285,14 +286,8 @@ class TrackingCounter(object):
         self._tag_down[tag] += 1
         if self._tag_up.get(tag, 0) < self._tag_down[tag]:
           warning("%s.dec: more .decs than .incs for tag %r", self, tag)
-          ##raise RuntimeError
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
-      elif self.value == 0:
-        D("ZERO HERE")
-        ##from time import sleep
-        ##sleep(3)
-        ##raise RuntimeError("ZERO HERE!")
       self._notify()
 
   def check(self):
@@ -300,7 +295,7 @@ class TrackingCounter(object):
       ups = self._tag_up[tag]
       downs = self._tag_down.get(tag, 0)
       if ups != downs:
-        D("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
+        warning("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
 
   def wait(self, value):
     ''' Wait for the counter to reach the specified `value`.

@@ -25,7 +25,6 @@ set -ue
 : ${BUGSYSTEMS:=`bugsystems`}
 
 trace=
-[ -t 2 ] && trace=set-x
 
 readstdin=1
 when=
@@ -308,5 +307,5 @@ exit $xit
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au> 09jul2004
+# Cameron Simpson <cs@cskk.id.au> 09jul2004
 #

@@ -2,7 +2,7 @@
 #
 # Manage named screens for a host.
 # Allocate (or reuse) a named screen session, returning its number.
-#	- Cameron Simpson <cs@zip.com.au> 02apr2003
+#	- Cameron Simpson <cs@cskk.id.au> 02apr2003
 #
 
 exec idset -i "screen-$HOST" ${1+"$@"}

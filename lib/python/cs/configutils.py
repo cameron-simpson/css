@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Utility functions and classes for configuration files.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {
@@ -20,10 +20,12 @@ import os.path
 import sys
 from collections import Mapping
 from threading import RLock
-from cs.py3 import ConfigParser, StringTypes
 from cs.fileutils import file_property
+from cs.logutils import info, D
+from cs.pfx import Pfx
+from cs.py3 import ConfigParser, StringTypes
 from cs.threads import locked, locked_property
-from cs.logutils import Pfx, info, D, X
+from cs.x import X
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
@@ -47,21 +49,21 @@ class ConfigWatcher(Mapping):
     self._lock = RLock()
     if not os.path.isabs(config_path):
       config_path = os.path.abspath(config_path)
-    self._config_path = config_path
+    self._config__filename = config_path
     self._config_lock = self._lock
     self._watchers = {}
 
   def __str__(self):
-    return "ConfigWatcher(%r)" % (self._config_path,)
+    return "ConfigWatcher(%r)" % (self._config__filename,)
 
   @file_property
-  def config(self, path):
+  def config(self, filename):
     self._mapping = None
-    return load_config(path)
+    return load_config(filename)
 
   @property
   def path(self):
-    return self._config_path
+    return self._config__filename
 
   def as_dict(self):
     ''' Construct and return a dictionary containing an entry for each section

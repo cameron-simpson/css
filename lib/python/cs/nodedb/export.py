@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Export and import NodeDB data.
-#       - Cameron Simpson <cs@zip.com.au> 07may2011
+#       - Cameron Simpson <cs@cskk.id.au> 07may2011
 #
 
 import os
@@ -9,7 +9,7 @@ import sys
 import tempfile
 import csv
 import cs.sh
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 
 def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_nodes=False):
   ''' Generator to yield node data, unescaped, suitable for use as CSV export data

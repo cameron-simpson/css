@@ -1,13 +1,29 @@
 #!/usr/bin/python
 #
 # Facilities for terminals.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
+r'''
+Functions related to terminals.
+
+``ttysize(fd)``
+  return a namedtuple (rows, columns) with the current terminal size;
+  UNIX only (uses the stty command)
+``statusline(text,...)``
+  update the terminal status line with ``text``
+``statusline_bs(text,...)``
+  return a byte string to update the terminal status line with ``text``
+'''
+
 from __future__ import print_function
+from collections import namedtuple
+import os
+import re
+from subprocess import Popen, PIPE
+import sys
 
 DISTINFO = {
-    'description': "functions related to terminals",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Environment :: Console",
@@ -16,13 +32,9 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Terminals",
-        ],
+    ],
     'install_requires': [],
 }
-
-import re
-from subprocess import Popen, PIPE
-from collections import namedtuple
 
 WinSize = namedtuple('WinSize', 'rows columns')
 
@@ -42,5 +54,71 @@ def ttysize(fd):
   if m:
     rows, columns = int(m.group(1)), int(m.group(2))
   else:
-    rows, columns = None, None
-  return WinSize( rows, columns )
+    m = re.compile(r' (\d+) rows; (\d+) columns').search(stty)
+    if m:
+      rows, columns = int(m.group(1)), int(m.group(2))
+    else:
+      rows, columns = None, None
+  return WinSize(rows, columns)
+
+_ti_setup = False
+
+def setupterm(*args):
+  ''' Run curses.setupterm, needed to be able to use the status line.
+      Uses a global flag to avoid doing this twice.
+  '''
+  global _ti_setup
+  if _ti_setup:
+    return True
+  termstr = None
+  fd = None
+  if args:
+    args = list(args)
+    termstr = args.pop(0)
+    if args:
+      fd = args.pop(0)
+      if args:
+        raise ValueError("extra arguments after termstr and fd: %r" % (args,))
+  if termstr is None:
+    termstr = os.environ['TERM']
+  if fd is None:
+    fd = sys.stdout.fileno()
+  import curses
+  curses.setupterm(termstr, fd)
+  _ti_setup = True
+
+def statusline_bs(text, reverse=False, xpos=None, ypos=None):
+  ''' Return a byte string to update the status line.
+  '''
+  from curses import tigetstr, tparm, tigetflag
+  setupterm()
+  if tigetflag('hs'):
+    seq = (
+        tigetstr('tsl'),
+        tigetstr('dsl'),
+        tigetstr('rev') if reverse else b'',
+        text.encode(),
+        tigetstr('fsl')
+    )
+  else:
+    # save cursor position, position, reverse, restore position
+    if xpos is None:
+      xpos = 0
+    if ypos is None:
+      ypos = 0
+    seq = (
+        tigetstr('sc'),   # save cursor position
+        tparm(tigetstr("cup"), xpos, ypos),
+        tigetstr('rev') if reverse else b'',
+        text.encode(),
+        tigetstr('el'),
+        tigetstr('rc')
+    )
+  return b''.join(seq)
+
+def statusline(text, fd=None, reverse=False, xpos=None, ypos=None):
+  ''' Update the status line.
+  '''
+  if fd is None:
+    fd = sys.stdout.fileno()
+  os.write(fd, statusline_bs(text, reverse=reverse, xpos=xpos, ypos=ypos))

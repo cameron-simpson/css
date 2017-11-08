@@ -10,7 +10,7 @@
 # Config file format:
 #	users,... vhost-ip /directory
 # The first matching line applies. The special user "*" matches any user.
-#	- Cameron Simpson <cs@zip.com.au> 31mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 31mar2005
 # 
 
 logfile=/tmp/vsftpd.log

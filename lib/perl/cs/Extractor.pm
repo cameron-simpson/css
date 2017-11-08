@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # General extraction code.
-#	- Cameron Simpson <cs@zip.com.au> 30may1997
+#	- Cameron Simpson <cs@cskk.id.au> 30may1997
 #
 
 use strict qw(vars);

@@ -3,7 +3,7 @@
 # Run a regular fetchmail. Pulled from rigfetchmail.
 # Why not "fetchmail --daemon"? Because I want to tune options between
 # runs, from outside.
-#	- Cameron Simpson <cs@zip.com.au> 31dec2003
+#	- Cameron Simpson <cs@cskk.id.au> 31dec2003
 #
 
 : ${LOGDIR:=$HOME/var/log}

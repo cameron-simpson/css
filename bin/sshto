@@ -3,7 +3,7 @@
 # Bang style ssh for hopping through firewalls etc.
 # Sshes from host to host to reach destination.
 # Assorted other minor features.
-#       - Cameron Simpson <cs@zip.com.au> 28may2004
+#       - Cameron Simpson <cs@cskk.id.au> 28may2004
 #
 
 set -ue
@@ -208,54 +208,6 @@ expand_hostpath()
   printf '%s\n' "$_xphp_out"
 }
 
-# Take a here!there!... path emit the last host and, if needed, the
-# ProxyCommand to use to tunnel to where it will be used.
-# For example, the path foo!bah!zot will emit something like:
-#  zot ssh foo ssh bah nc %h %p
-#
-split_target()
-{
-  set -- `printf "%s\n" "$1" | tr '!' ' '`
-  _st_pcmd=
-  if [ $# -gt 1 ]
-  then
-    while [ $# -gt 1 ]
-    do
-      _st_target=$1
-      if [ -n "$ruser" ]
-      then
-        case "$_st_target" in
-          # explicitly omit $ruser at an interim step
-          @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
-          *@*)  ;;
-          *)    _st_target=$ruser@$_st_target ;;
-        esac
-      fi
-      if [ -z "$_st_pcmd" ]
-      then  _st_pcmd="ssh $lsshopts"    # first ssh gets the local ssh opts
-      else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
-      fi
-      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $_st_target"
-      if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css"; fi
-      if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $_st_target"; fi
-      if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace"; fi
-      shift
-    done
-    _st_pcmd="$_st_pcmd nc %h %p"
-  fi
-  _st_target=$1
-  if [ -n "$ruser" ]
-  then
-    case "$_st_target" in
-      # explicitly omit $ruser at an interim step
-      @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
-      *@*)  ;;
-      *)    _st_target=$ruser@$_st_target ;;
-    esac
-  fi
-  printf "%s %s\n" "$_st_target" "$_st_pcmd"
-}
-
 hostpath=`expand_hostpath "$host"`
 [ -n "$hostpath" ] || { echo "$cmd: empty hostpath from \$host=$host" >&2; exit 1; }
 [ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
@@ -286,7 +238,7 @@ then
     esac
   done
 else
-  set -- `split_target "$hostpath"`
+  set -- $( sshto-proxy-command "$hostpath" )
   host=$1
   shift
   if [ $# -gt 0 ]

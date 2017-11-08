@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Return or note file location based on md5 checksum.
-#	- Cameron Simpson <cs@zip.com.au> 19may2005
+#	- Cameron Simpson <cs@cskk.id.au> 19may2005
 #
 
 : ${FILELOC_CACHE:=$HOME/var/cache/fileloc}

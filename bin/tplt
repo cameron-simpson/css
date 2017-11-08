@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Emit a template for the named file on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 08apr1997
+#	- Cameron Simpson <cs@cskk.id.au> 08apr1997
 #
 
 cmd=$0

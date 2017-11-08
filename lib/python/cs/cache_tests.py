@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.cache.
-#       - Cameron Simpson <cs@zip.com.au> 04aug2014
+#       - Cameron Simpson <cs@cskk.id.au> 04aug2014
 #
 
 from __future__ import print_function
@@ -13,7 +13,6 @@ from threading import Lock
 import time
 import unittest
 from .cache import LRU_Cache
-from .logutils import D, X
 
 def check(o):
   return o._selfcheck()

@@ -2,9 +2,8 @@
 
 import sys
 from collections import deque
-from threading import Lock, RLock
+from threading import RLock
 from cs.threads import locked
-from cs.logutils import X
 
 _caches = []
 def overallHitRatio():
@@ -127,7 +126,7 @@ class LRU_Cache(object):
     cache_seq = self._cache_seq
     for qseq, qkey in stash:
       try:
-        seq = cache_seq[key]
+        seq = cache_seq[qkey]
       except KeyError:
         continue
       if qseq == seq:
@@ -207,8 +206,8 @@ def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
     raise ValueError("maxsize must be None if cache is not None: maxsize=%r, cache=%r"
                      % (maxsize, cache))
 
-  def caching_func(*a, **kw):
-    key = (tuple(a), tuple(kw.keys()), tuple(kw.values()))
+  def caching_func(func, *a, **kw):
+    key = (func, tuple(a), tuple(kw.keys()), tuple(kw.values()))
     try:
       value = cache[key]
     except KeyError:
@@ -299,12 +298,8 @@ class Cache:
     return row
 
   def store(self, value, key=None):
-    if key is not None:
-      assert type(key) in (tuple, int, long), "store" + \
-          repr(key) + "=" + repr(value)
-    else:
+    if key is None:
       key = value[self.key()]
-
     self.__cache[key] = (self.__seq, value)
     if value is not None:
       for xref in self.__xrefs:
@@ -312,7 +307,7 @@ class Cache:
 
   def __setitem__(self, key, value):
     self.__backend[key] = value
-    self.store(key, value)
+    self.store(value, key)
 
   def __delitem__(self, key):
     del self.__backend[key]

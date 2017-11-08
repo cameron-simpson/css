@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Put a timestamp of the start of every input line.
+#   - Cameron Simpson <cs@cskk.id.au> 08apr2017
+#
+
+while read -r line
+do  now=$(date)
+    printf '%s: %s\n' "$now" "$line"
+done

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Strip my LD_LIBRARY_PATH, rely on the system one.
-#	- Cameron Simpson <cs@zip.com.au> 20nov99
+#	- Cameron Simpson <cs@cskk.id.au> 20nov99
 #
 
 [ $# = 0 ] && set -- "$SHELL"

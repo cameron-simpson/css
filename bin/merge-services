@@ -1,0 +1,18 @@
+#!/usr/bin/env python
+#
+# Read services data in the format of services(5) and write a merged services
+#   - Cameron Simpson <cs@cskk.id.au> 23jan2017
+#
+
+import sys
+from cs.ip import merge_services, ETC_SERVICES
+from cs.logutils import Pfx, error, warning, X
+
+with open(ETC_SERVICES) as fp:
+  portmap, namemap = merge_services(fp)
+
+for key in portmap.keys():
+  PI, prelines = portmap[key]
+  for line in prelines:
+    print(line)
+  print(PI.line())

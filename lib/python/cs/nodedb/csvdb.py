@@ -1,24 +1,27 @@
 #!/usr/bin/python
 #
 # CSV file backend.
-#       - Cameron Simpson <cs@zip.com.au> 02may2010
+#       - Cameron Simpson <cs@cskk.id.au> 02may2010
 #
 
 import csv
+import datetime
 import io
 import os
 import os.path
-import sys
-import datetime
-import time
 from shutil import copyfile
+import sys
 from threading import Thread, Lock
+import time
+from cs.csvutils import csv_writerow
 from cs.debug import trace
-from cs.csvutils import csv_writerow, SharedCSVFile
 from cs.fileutils import FileState, rewrite_cmgr
-from cs.logutils import Pfx, error, warning, info, debug, D, X
-from cs.threads import locked
+from cs.logutils import error, warning, info, debug, D
+from cs.pfx import Pfx, PfxThread, XP
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
+from cs.sharedfile import SharedCSVFile
+from cs.threads import locked
+from cs.x import X
 from . import NodeDB
 from .backend import Backend, Update, ResetUpdate, ExtendUpdate
 
@@ -35,14 +38,8 @@ def resolve_csv_row(row, lastrow):
       attr = lastrow[2]
     return t, name, attr, value
 
-def write_csv_header(fp):
-  ''' Write CSV header row. Used for exported CSV data.
-  '''
-  csvw = csv.writer(fp)
-  csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
-
 def write_csv_file(fp, nodedata):
-  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the vertical" CSV style.
+  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the "vertical" CSV style.
       `fp` may also be a string in which case the named file
       is truncated and rewritten.
       `attrmap` maps attribute names to sequences of preserialised values as
@@ -72,17 +69,40 @@ class Backend_CSVFile(Backend):
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
     self.pathname = csvpath
-    self.rewrite_inplace = rewrite_inplace
-    self.keep_backups = False
     self._lastrow = (None, None, None, None)
+    self.csv = None
 
   def init_nodedb(self):
     ''' Open the CSV file and wait for the first update pass to complete.
     '''
-    self._open_csv()
-    self.csv.ready()
+    assert self.csv is None
+    with Pfx("%s.init_nodedb", self):
+      self.csv = SharedCSVFile(self.pathname, read_only=self.readonly)
+      # initial scan of the database
+      for row in self.csv:
+        self._import_foreign_row(row)
+      self._monitor = PfxThread(name="monitor", target=self._monitor_foreign_updates)
+      self._monitor.start()
 
-  def import_foreign_row(self, row0):
+  def close(self):
+    ''' Final shutdown: stop monitor thread, detach from CSV file.
+    '''
+    with Pfx("%s.close", self):
+      self._close_csv()
+      self._monitor.join()
+
+  @locked
+  def _close_csv(self):
+    self.csv.close()
+    self.csv = None
+
+  def _monitor_foreign_updates(self):
+    for row in self.csv.tail():
+      self._import_foreign_row(row)
+      if self.csv.closed:
+        break
+
+  def _import_foreign_row(self, row0):
     ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
         Each row is expected to be post-resolve_csv_row().
         Honour the incremental notation for data:
@@ -104,32 +124,15 @@ class Backend_CSVFile(Backend):
     for update in Update.from_csv_row( (t, name, attr, value) ):
       nodedb._update_local(update)
 
-  @locked
-  def _open_csv(self):
-    ''' Attach to the shared CSV file.
-    '''
-    self.csv = SharedCSVFile(self.pathname,
-                             importer=self.import_foreign_row,
-                             readonly=self.readonly)
-
-  @locked
-  def _close_csv(self):
-    self.csv.close()
-    self.csv = None
-
-  def close(self):
-    ''' Final shutdown: stop monitor thread, detach from CSV file.
-    '''
-    self._close_csv()
-
   def _update(self, update):
     ''' Update the backing store from an update csvrow.
     '''
     if self.readonly:
       warning("%s: readonly, discarding: %s", self.pathname, update)
       return
-    for row in update.to_csv():
-      self.csv.put(row)
+    with self.csv.writer() as w:
+      for row in update.to_csv():
+        w.writerow(row)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
@@ -138,7 +141,7 @@ class Backend_CSVFile(Backend):
       error("%s: readonly: rewrite not done", self)
       return
     with rewrite_cmgr(self.pathname, backup_ext='', do_rename=True) as outfp:
-      write_csv_file(fp, self.nodedb.nodedata())
+      write_csv_file(outfp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
   import time

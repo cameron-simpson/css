@@ -1,14 +1,15 @@
 #!/usr/bin/python
 #
 # A backend made from a mapping.
-#       - Cameron Simpson <cs@zip.com.au> 25may2012
+#       - Cameron Simpson <cs@cskk.id.au> 25may2012
 #
 
 import sys
 from cs.py3 import iteritems as map_iteritems, \
                    iterkeys as map_iterkeys, \
                    itervalues as map_itervalues
-from cs.logutils import Pfx, error, warning , info, D
+from cs.logutils import error, warning , info, D
+from cs.pfx import Pfx
 from . import Node
 from .backend import Backend
 

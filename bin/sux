@@ -3,7 +3,7 @@
 # Run a command via su, quoted to preserve the argument list.
 # Unfortunate conflict with "sux", the "su with X11 $DISPLAY".
 # Which I don't use! Yay!
-#       - Cameron Simpson <cs@zip.com.au> 03soct2011
+#       - Cameron Simpson <cs@cskk.id.au> 03soct2011
 #
 
 set -ue

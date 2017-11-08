@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Locate and update the local tags file.
+# Recite "set tags=/path/to/tagsfile".
+#   - Cameron Simpson <cs@cskk.id.au> 28feb2017
+#
+
+exec 0</dev/null 3>&1 2>/dev/tty 1>&2
+if tags=$(findup tags)
+then
+  echo "set tags=$tags" >&3
+else
+  echo 'set tags=NO-TAGS' >&3
+  exit 0
+fi
+exec 3>&-
+lock -P "$tags" ctags-update -o "$tags" -- "$@" &

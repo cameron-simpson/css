@@ -2,7 +2,7 @@
 #
 # Editor wrapper for the It's All Text! firefox extension.
 # Updated for MacOSX/iTerm environment here and in the "e" and "term" scripts.
-#       - Cameron Simpson <cs@zip.com.au> 08jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 08jul2008
 #
 
 : ${LOGDIR:=$HOME/var/log}

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Construct an unbound.conf(5) file then dispatch unbound(8) via svcd.
-#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 26jul2012
 #
 
 set -ue
@@ -57,7 +57,7 @@ fi
 # if not once, wrap in svcd
 [ $once ] || \
 { set $trace \
-        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
+        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-gateway -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
   then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" "$@"

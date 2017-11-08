@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.connect.
-#       - Cameron Simpson <cs@zip.com.au> 06oct2012
+#       - Cameron Simpson <cs@cskk.id.au> 06oct2012
 #
 
 import sys

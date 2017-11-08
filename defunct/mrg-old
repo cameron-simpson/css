@@ -4,7 +4,7 @@
 # A bit like move, but won't tread on existing files and will unlink
 # source if identical target is already there.
 # Makes the target directory if missing.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::Misc;

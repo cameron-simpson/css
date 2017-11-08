@@ -3,7 +3,7 @@
 # Attach to a Source (presumed non-seekable) and cache its contents as
 # requested.
 # Return a Seekable() Source.
-#	- Cameron Simpson <cs@zip.com.au> 31mar97 (2nd cut)
+#	- Cameron Simpson <cs@cskk.id.au> 31mar97 (2nd cut)
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.nodedb.tokab.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function

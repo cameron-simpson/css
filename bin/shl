@@ -4,7 +4,7 @@
 # Notably, this lets me use:
 #  LESSOPEN='|shl %s'
 # with "less -R".
-#   - Cameron Simpson <cs@zip.com.au> 06jul2016
+#   - Cameron Simpson <cs@cskk.id.au> 06jul2016
 #
 
 set -ue
@@ -48,9 +48,34 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+which source-highlight >/dev/null || {
+  echo "$cmd: no source highlight, using cat" >&2
+  exec cat "$filename"
+}
+
 # match_lang ext
 match_lang() {
   source-highlight --lang-list | awk -v "ext=$1" '$1 == ext { print($1); }'
+}
+
+# match_outlang colors
+match_outlang() {
+  _mo_colors=$1
+  case "$_mo_colors" in
+    ''|-1)
+      ;;
+    ?*)
+      _mo_outlangs=$( source-highlight  --outlang-list | sed 's/ .*//' | tr '\012' ' ')
+      _mo_outlang=esc${_mo_colors}
+      case " $_mo_outlangs " in
+        *" ${_mo_outlang} "*)
+          echo "$_mo_outlang"
+          return 0
+          ;;
+      esac
+      ;;
+  esac
+  return 1
 }
 
 case "$filename" in
@@ -76,12 +101,13 @@ then
 fi
 
 colors=$( tput colors ) || colors=
+outlang=$( match_outlang "$colors" ) || outlang=esc
 
 set -- source-highlight \
-        "--outlang-def=esc${colors}.outlang" \
-        "--style-file=esc${colors}.style"
-[ -z "$src_lang" ] || set -- "$@" -s "$src_lang"
+        "--outlang-def=${outlang}.outlang" \
+        "--style-file=${outlang}.style"
+[ -n "$src_lang" ] || src_lang=txt
+set -- "$@" -s "$src_lang"
 set -- "$@" -i "$filename" -o STDOUT
 
-set -x
 exec "$@"

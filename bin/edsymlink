@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Edit the named symlinks.
-#	- Cameron Simpson <cs@zip.com.au>, 01sep94
+#	- Cameron Simpson <cs@cskk.id.au>, 01sep94
 #
 
 ($cmd=$0) =~ s:.*/::;

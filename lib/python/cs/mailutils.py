@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience functions and classes to work with email.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import absolute_import
@@ -32,10 +32,12 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, exception, debug, D, X
-from cs.threads import locked_property
-from cs.seq import seq
+from cs.logutils import info, warning, exception, debug, D
+from cs.pfx import Pfx
 from cs.py3 import StringTypes
+from cs.seq import seq
+from cs.threads import locked_property
+from cs.x import X
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
