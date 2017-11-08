@@ -27,12 +27,14 @@ As such it is a callable, so to collect the result you just call the LateFunctio
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
+import logging
 import sys
 import threading
 import time
 import traceback
 from cs.debug import ifdebug, Lock, Thread
 from cs.excutils import logexc, logexc_gen
+import cs.logutils
 from cs.logutils import error, warning, debug, exception, D, OBSOLETE
 from cs.pfx import Pfx, PrePfx, XP
 from cs.py.func import funcname
@@ -354,12 +356,12 @@ class _Pipeline(MultiOpenMixin):
       count -= 1
       pq_name = ":".join(
           ( name,
-              "%s/%s" % (
-                  (funcname(func_iter) if func_iter else "None"),
-                  (funcname(func_final) if func_final else "None"),
-              ),
-              str(count),
-              str(seq()),
+            "%s/%s" % (
+                (funcname(func_iter) if func_iter else "None"),
+                (funcname(func_final) if func_final else "None"),
+            ),
+            str(count),
+            str(seq()),
           )
       )
       PQ = _PipelinePushQueue(pq_name, self, func_iter, RHQ, func_final=func_final).open()
@@ -476,18 +478,17 @@ class Later(MultiOpenMixin):
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
     ''' Initialise the Later instance.
-        If `capacity` is an int, it is used to size a Semaphore to constrain
-        the number of dispatched functions which may be in play at a time.
-        If `capacity` is not an int it is presumed to be a suitable
-        Semaphore-like object.
-        `inboundCapacity` can be specified to limit the number of undispatched
-        functions that may be queued up; the default is 0 (no limit).
-        Calls to submit functions when the inbound limit is reached block
-        until some functions are dispatched.
-        The `name` parameter may be used to supply an identifying name
-        for this instance.
-        `retry_delay`: time delay for requeued functions. Default
-            from DEFAULT_RETRY_DELAY.
+        `capacity`: resource contraint on this Later; if an int, it is used
+          to size a Semaphore to constrain the number of dispatched functions
+          which may be in play at a time; if not an int it is presumed to be a
+          suitable Semaphore-like object, perhaps shared with other subsystems.
+        `name`: optional identifying name for this instance.
+        `inboundCapacity`: if >0, used as a limit on the number of
+          undispatched functions that may be queued up; the default is 0 (no
+          limit).  Calls to submit functions when the inbound limit is reached
+          block until some functions are dispatched.
+        `retry_delay`: time delay for requeued functions.
+          Default: DEFAULT_RETRY_DELAY.
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
@@ -498,7 +499,7 @@ class Later(MultiOpenMixin):
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
     debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
-    if type(capacity) is int:
+    if isinstance(capacity, int):
       capacity = AdjustableSemaphore(capacity)
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
@@ -542,7 +543,7 @@ class Later(MultiOpenMixin):
       try:
         MultiOpenMixin.close(self, *a, **kw)
       except RuntimeError as e:
-        XP("LATER NOT IDLE: %r", self)
+        XP("LATER NOT IDLE: %r: %s", self, e)
         raise
 
   def __repr__(self):
@@ -676,8 +677,6 @@ class Later(MultiOpenMixin):
         logger named `logger` (default the module name, cs.later) at the
         specified log level `log_level` (default logging.INFO).
     '''
-    import logging
-    import cs.logutils
     if logger is None:
       logger = self.__module__
     if log_level is None:
@@ -741,24 +740,24 @@ class Later(MultiOpenMixin):
 
   @MultiOpenMixin.is_opened
   def bg(self, func, *a, **kw):
-    ''' Queue a function to run right now, ignoring the Later's capacity and
-        priority system. This is really just an easy way to utilise the Later's
-        thread pool and get back a handy LateFunction for result collection.
-        It can be useful for transient control functions that
-        themselves queue things through the Later queuing system
-        but do not want to consume capacity themselves, thus avoiding
-        deadlock at the cost of transient overthreading.
+    ''' Queue a function to run right now, ignoring the Later's capacity and priority system.
+        This is really just an easy way to utilise the Later's thread pool
+        and get back a handy LateFunction for result collection.
+        It can be useful for transient control functions that themselves
+        queue things through the Later queuing system but do not want to
+        consume capacity themselves, thus avoiding deadlock at the cost of
+        transient overthreading.
     '''
     if not self.submittable:
       raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
-    funcname = None
+    name = None
     if isinstance(func, str):
-      funcname = func
+      name = func
       a = list(a)
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = LateFunction(self, func, funcname)
+    LF = LateFunction(self, func, name)
     self._track("bg: dispatch", LF, None, self.running)
     LF._dispatch()
     return LF
@@ -795,7 +794,7 @@ class Later(MultiOpenMixin):
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
       priority = self._priority
-    elif type(priority) is int:
+    elif isinstance(priority, int):
       priority = (priority,)
     if pfx is not None:
       func = pfx.partial(func)
@@ -896,7 +895,7 @@ class Later(MultiOpenMixin):
     '''
     def then():
       LF1 = self.defer(callable1)
-      return self.defer(func, *[a + [LF1.result]])
+      return self.defer(func, *[a + [LF1.result]], **kw)
     return then()
 
   @MultiOpenMixin.is_opened
@@ -1141,7 +1140,7 @@ class LatePool(object):
     '''
     submit_params = dict(self.parameters)
     submit_params.update(params)
-    LF = self.L.submit(func, **submit_params)
+    LF = self.later.submit(func, **submit_params)
     self.add(LF)
     return LF
 
