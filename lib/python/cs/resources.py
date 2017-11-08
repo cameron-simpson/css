@@ -52,7 +52,7 @@ class MultiOpenMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
         `lock`: if set and not None, an RLock to use; otherwise one will be allocated
-          `subopens`: if true (default false) then .open will return
+        `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
     '''
