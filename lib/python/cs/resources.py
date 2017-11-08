@@ -22,7 +22,7 @@ import traceback
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
-from cs.obj import O
+from cs.obj import O, Proxy
 from cs.py.stack import caller, stack_dump
 
 class ClosedError(Exception):
@@ -46,7 +46,7 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False, lock=None):
+  def __init__(self, finalise_later=False, lock=None, subopens=False):
     ''' Initialise the MultiOpenMixin state.
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
@@ -55,7 +55,12 @@ class MultiOpenMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
         `lock`: if set and not None, an RLock to use; otherwise one will be allocated
+          `subopens`: if true (default false) then .open will return
+          a proxy object with its own .closed attribute set by the
+          proxy's .close.
     '''
+    if subopens:
+      raise RuntimeError("subopens not implemented")
     if lock is None:
       lock = RLock()
     self.opened = False
@@ -152,7 +157,7 @@ class MultiOpenMixin(O):
 
   @staticmethod
   def is_opened(func):
-    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise when if the object is not yet open.
+    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise if the object is not yet open.
     '''
     def is_opened_wrapper(self, *a, **kw):
       if self.closed:
@@ -162,6 +167,18 @@ class MultiOpenMixin(O):
       return func(self, *a, **kw)
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
+
+class _SubOpen(Proxy):
+
+  def __init__(self, proxied):
+    self.closed = False
+    self.master = master
+
+  def close(self):
+    if self.closed:
+      raise RuntimeError("already closed")
+    self.master.close()
+    self.closed = True
 
 class MultiOpen(MultiOpenMixin):
   ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
