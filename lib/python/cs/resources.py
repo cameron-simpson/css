@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from threading import Condition, RLock, Lock
 import time
 from cs.logutils import error
-from cs.obj import O
+from cs.obj import O, Proxy
 from cs.py.stack import caller
 
 DISTINFO = {
