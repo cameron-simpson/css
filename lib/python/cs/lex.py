@@ -265,8 +265,7 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
@@ -278,8 +277,7 @@ def skipwhite(s, offset):
   return offset
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
@@ -291,9 +289,7 @@ def get_hexadecimal(s, offset=0):
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -318,10 +314,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
-  ''' Scan the string `s` for a dotted identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      with optional trailing dot and another dotted identifier,
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) with optional trailing dot and another dotted identifier, starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.

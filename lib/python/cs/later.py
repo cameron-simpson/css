@@ -65,10 +65,11 @@ DISTINFO = {
 }
 
 # function signature designators, used with Later.pipeline()
-FUNC_ONE_TO_MANY = 0
-FUNC_ONE_TO_ONE = 1
-FUNC_SELECTOR = 2
-FUNC_MANY_TO_MANY = 3
+FUNC_ONE_TO_MANY = 0   # one to many: functor returns iterable
+FUNC_ONE_TO_ONE = 1    # one to one: functor returns value
+FUNC_SELECTOR = 2      # many to many, yielding item or nothing
+FUNC_MANY_TO_MANY = 3  # functor accepts all items at once
+FUNC_PIPELINE = 4      # functor is actually a pipeline, put items to it and collect asynchronously
 
 DEFAULT_RETRY_DELAY = 0.1
 
@@ -287,61 +288,125 @@ class LateFunction(_PendingFunction):
               warning(line)
     self._complete(result, exc_info)
 
-class _PipelinePushQueue(PushQueue):
-  ''' A _PipelinePushQueue subclasses cs.queues.PushQueue, adding some item tracking.
+class _PipelineStage(PushQueue):
+  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates computation via a Later; it also adds some activity tracking.
+      This represents a single stage in a Later pipeline of functions.
       We raise the pipeline's _busy counter for every item in play,
       and also raise it while the finalisation function has not run.
       This lets us inspect a pipeline for business, which we use in the
       cs.app.pilfer termination process.
   '''
 
-  def __init__(self, name, pipeline, func_iter, outQ, func_final=None, retry_interval=None):
-    ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
+  def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
+    ''' Initialise the _PipelineStage, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
+        `name`: namefor this pipeline stage as for PushQueue.
+        `pipeline`: parent pipeline for this pipeline stage
+        `functor`: callable used to process items
+        `outQ`: output queue
+        `retry_interval`: how often to retry (UNUSED? TODO: reimplement)
     '''
     if retry_interval is None:
       retry_interval = DEFAULT_RETRY_DELAY
+    PushQueue.__init__(self, name, functor, outQ)
     self.pipeline = pipeline
     self.retry_interval = retry_interval
 
-    # wrap func_iter to raise _busy while processing item
-    @logexc_gen
-    def func_push(item):
-      self.pipeline._busy.inc()
-      try:
-        for item2 in retry(self.retry_interval, func_iter, item):
-          yield item2
-      except Exception:
-        self.pipeline._busy.dec()
-        raise
-      self.pipeline._busy.dec()
-    func_push.__name__ = "busy(%s)" % (func_iter.__name__,)
+  def defer(self, functor, *a, **kw):
+    return self.pipeline.later.defer(functor, *a, **kw)
 
-    # if there is a func_final, raise _busy until func_final completed
-    if func_final is not None:
-      self.pipeline._busy.inc()
-      func_final0 = func_final
-      @logexc
-      def func_final():
-        try:
-          result = retry(self.retry_interval, func_final0)
-        except Exception:
-          self.pipeline._busy.dec()
-          raise
-        self.pipeline._busy.dec()
-        return result
-      func_final.__name__ = "pipeline_dec_busy(%s)" % (func_final0.__name__,)
+  def defer_iterable(self, I, outQ):
+    return self.pipeline.later.defer_iterable(I, outQ)
 
-    PushQueue.__init__(self, name, self.pipeline.later, func_push, outQ, func_final=func_final)
+class _PipelineStageOneToOne(_PipelineStage):
 
-  def __str__(self):
-    return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
+  def put(self, item):
+    # queue computable then send result to outQ
+    self.outQ.open()
+    LF = self.defer(self.functor, item)
+    def notify(LF):
+      # collect result: queue or report exception
+      item2, exc_info = LF.join()
+      if exc_info:
+        # report exception
+        error("%s.put(%r): %r", self.name, item, exc_info)
+      else:
+        self.outQ.put(item2)
+      self.outQ.close()
+    LF.notify(notify)
+
+class _PipelineStageOneToMany(_PipelineStage):
+
+  def put(self, item):
+    self.outQ.open()
+    # compute the iteratable
+    LF = self.defer(self.functor, item)
+    def notify(LF):
+      I, exc_info = LF.join()
+      if exc_info:
+        # report exception
+        error("%s.put(%r): %r", self.name, item, exc_info)
+        self.outQ.close()
+      else:
+        self.defer_iterable(I, self.outQ)
+    LF.notify(notify)
+
+class _PipelineStageManyToMany(_PipelineStage):
+
+  def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
+    _PipelineStage.__init__(self, name, pipeline, functor, outQ, retry_interval=retry_interval)
+    self.gathered = []
+
+  def put(self, item):
+    self.gathered.append(item)
+
+  def shutdown(self):
+    # queue function with all items, get iteratable
+    self.outQ.open()
+    gathered = self.gathered
+    self.gathered = None
+    LF = self.defer(self.functor, gathered)
+    def notify(LF):
+      I, exc_info = LF.join()
+      if exc_info:
+        # report exception
+        error("%s.put(%r): %r", self.name, item, exc_info)
+        self.outQ.close()
+      else:
+        self.defer_iterable(I, self.outQ)
+      _PipelineStage.shutdown(self)
+    LF.notify(notify)
+
+class _PipelineStagePipeline(_PipelineStage):
+  ''' A _PipelineStage which feeds an asynchronous pipeline.
+  '''
+
+  def __init__(self, name, pipeline, subpipeline, outQ, retry_interval=None):
+    _PipelineStage.__init__(self, name, pipeline, None, outQ, retry_interval=retry_interval)
+    self.subpipeline = subpipeline
+    outQ.open()
+    def copy_out(sub_outQ, outQ):
+      for item in sub_outQ:
+        outQ.put(item)
+      outQ.close()
+    self.copier = Thread(name="%s.copy_out" % (self,),
+                         target=copy_out,
+                         args=(subpipeline.outQ, outQ)).start()
+
+  def put(self, item):
+    self.subpipeline.put(item)
+
+  def shutdown(self):
+    self.subpipeline.close()
+    self.copier.join()
+    _PipelineStage.shutdown(self)
 
 class _Pipeline(MultiOpenMixin):
   ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
   '''
 
-  def __init__(self, name, L, filter_funcs, outQ):
-    ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
+  def __init__(self, name, L, actions, outQ):
+    ''' Initialise the _Pipeline from `name`, Later instance `L`, list of filter functions `actions` and output queue `outQ`.
+        Each action is either a 2-tuple of (sig, functor) or an object with a .sig attribute and a .functor method returning a callable.
     '''
     MultiOpenMixin.__init__(self)
     self.name = name
@@ -350,21 +415,36 @@ class _Pipeline(MultiOpenMixin):
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
     RHQ = outQ
-    count = len(filter_funcs)
-    while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
-      count -= 1
-      pq_name = ":".join(
-          ( name,
-            "%s/%s" % (
-                (funcname(func_iter) if func_iter else "None"),
-                (funcname(func_final) if func_final else "None"),
-            ),
-            str(count),
-            str(seq()),
-          )
-      )
-      PQ = _PipelinePushQueue(pq_name, self, func_iter, RHQ, func_final=func_final).open()
+    for index, action in reversed(list(enumerate(actions))):
+      try:
+        func_sig, functor = action
+      except TypeError:
+        X("_Pipeline: action=%r", action)
+        func_sig = action.sig
+        functor = action.functor(self.later)
+      pq_name = ":".join( (name,
+                           str(index),
+                           str(func_sig),
+                           funcname(functor),
+                          )
+                        )
+      if func_sig == FUNC_ONE_TO_MANY:
+        PQ = _PipelineStageOneToMany(pq_name, self, functor, RHQ)
+      elif func_sig == FUNC_ONE_TO_ONE:
+        PQ = _PipelineStageOneToOne(pq_name, self, functor, RHQ)
+      elif func_sig == FUNC_SELECTOR:
+        def selector(item):
+          if functor(item):
+            yield item
+        PQ = _PipelineStageOneToMany(pq_name, self, selector, RHQ)
+      elif func_sig == FUNC_MANY_TO_MANY:
+        PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
+      elif func_sig == FUNC_PIPELINE:
+        X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
+        PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
+      else:
+        raise RuntimeError("unimplemented func_sig=%r, functor=%s" % (func_sig, functor))
+      PQ.open()
       self.queues.insert(0, PQ)
       RHQ = PQ
 
@@ -403,64 +483,6 @@ class _Pipeline(MultiOpenMixin):
     ''' Wait for completion of the output queue.
     '''
     self.outQ.join()
-
-  def _pipeline_func(self, o):
-    ''' Accept a pipeline element. Return (func_iter, func_final).
-        A pipeline element is either a single function, in which case it is
-        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
-        or a tuple of (func_sig, func).
-
-        The returned func_iter and func_final take the following
-        values according to the supplied func_sig:
-
-          func_sig              func_iter, func_final
-
-          FUNC_ONE_TO_MANY      func, None
-                                Example: a directory listing.
-
-          FUNC_SELECTOR         func is presumed to be a Boolean test, and
-                                func_iter is a generator that yields its
-                                argument if the test succeeds.
-                                func_final is None.
-                                Example: a test for inclusion.
-
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a
-                                list and yield nothing. func_final applies
-                                func to the list and yields the results.
-                                Example: a sort.
-    '''
-    if callable(o):
-      func = o
-      func_sig = FUNC_ONE_TO_MANY
-    else:
-      # expect a tuple
-      func_sig, func = o
-    func_final = None
-    if func_sig == FUNC_ONE_TO_ONE:
-      def func_iter(item):
-        yield retry(DEFAULT_RETRY_DELAY, func, item)
-      func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
-    elif func_sig == FUNC_ONE_TO_MANY:
-      func_iter = func
-    elif func_sig == FUNC_SELECTOR:
-      def func_iter(item):
-        if retry(DEFAULT_RETRY_DELAY, func, item):
-          yield item
-      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
-    elif func_sig == FUNC_MANY_TO_MANY:
-      gathered = []
-      def func_iter(item):
-        gathered.append(item)
-        if False:
-          yield
-      func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
-      def func_final():
-        for item in retry(DEFAULT_RETRY_DELAY, func, gathered):
-          yield item
-      func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
-    else:
-      raise ValueError("unsupported function signature %r" % (func_sig,))
-    return func_iter, func_final
 
 class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
@@ -857,7 +879,6 @@ class Later(MultiOpenMixin):
     for LF in self.complete(until_idle=until_idle):
       pass
 
-  ##@trace_caller
   @MultiOpenMixin.is_opened
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
@@ -960,11 +981,14 @@ class Later(MultiOpenMixin):
 
   @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
-        to return results via the queue `outQ`.
+    ''' Submit an iterable `I` for asynchronous stepwise iteration to return results via the queue `outQ`. Return a Result for final synchronisation.
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
-        When the iteration is complete, call outQ.close().
+        When the iteration is complete, call outQ.close() and complete the Result.
+        If iteration ran to completion then the Result's .result
+        will be the number of iterations, otherwise if an iteration
+        raised an exception the the Result's .exc_info will contain
+        the exception information.
         `test_ready`: if not None, a callable to test if iteration
             is presently permitted; iteration will be deferred until
             the callable returns a true value
@@ -975,6 +999,8 @@ class Later(MultiOpenMixin):
 
   def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
+    R = Result()
+    iterationss = [0]
 
     @logexc
     def iterate_once():
@@ -988,10 +1014,13 @@ class Later(MultiOpenMixin):
         item = iterate()
       except StopIteration:
         outQ.close()
+        R.result = iterationss[0]
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
+        R.exc_info = exc_info()
       else:
+        iterationss[0] += 1
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
@@ -1002,16 +1031,17 @@ class Later(MultiOpenMixin):
     iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
                                                    getattr(I, '__name__', repr(I)))
     self._defer(iterate_once)
+    return R
 
   @MultiOpenMixin.is_opened
-  def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
+  def pipeline(self, actions, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
           input, output
         where `input`` is a closeable queue on which more data items can be put
         and `output` is an iterable from which result can be collected.
 
-        `filter_funcs`: an iterable of filter functions accepting the
+        `actions`: an iterable of filter functions accepting
           single items from the iterable `inputs`, returning an
           iterable output.
         `inputs`: the initial iterable inputs; this may be None.
@@ -1039,17 +1069,17 @@ class Later(MultiOpenMixin):
     '''
     if not self.submittable:
       raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
-    return self._pipeline(filter_funcs, inputs, outQ=outQ, name=name)
+    return self._pipeline(actions, inputs, outQ=outQ, name=name)
 
-  def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
-    filter_funcs = list(filter_funcs)
-    if not filter_funcs:
-      raise ValueError("no filter_funcs")
+  def _pipeline(self, actions, inputs=None, outQ=None, name=None):
+    filter_funcs = list(actions)
+    if not actions:
+      raise ValueError("no actions")
     if outQ is None:
       outQ = IterableQueue(name="pipelineIQ")
     if name is None:
       name = "pipelinePQ"
-    pipeline = _Pipeline(name, self, filter_funcs, outQ)
+    pipeline = _Pipeline(name, self, actions, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
       self._defer_iterable( inputs, inQ )
