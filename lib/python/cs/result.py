@@ -328,6 +328,22 @@ class Result(O):
     if notifier is not None:
       notifier(self)
 
+  def with_result(self, submitter, prefix=None):
+    ''' On completion without an exception, call `submitter(self.result)` or report exception.
+    '''
+    def notifier(R):
+      exc_info = R.exc_info
+      if exc_info is None:
+        return submitter(R.result)
+      else:
+        # report error
+        if prefix:
+          with Pfx(prefix):
+            error("exception: %r", exc_info)
+        else:
+          error("exception: %r", exc_info)
+    self.notify(notifier)
+
 def report(LFs):
   ''' Generator which yields completed Results.
       This is a generator that yields Results as they complete, useful
@@ -403,7 +419,7 @@ class OnDemandFunction(_PendingFunction):
       if state == AsynchState.pending:
         self.state = AsynchState.running
       else:
-        raise RuntimeError("state should be AsynchState.pending but is %s" % (self.state))
+        raise RuntimeError("state should be AsynchState.pending but is %s" % (self.state,))
     result, exc_info = None, None
     try:
       result = self.func()

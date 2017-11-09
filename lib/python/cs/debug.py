@@ -57,6 +57,26 @@ DISTINFO = {
     ],
 }
 
+from cmd import Cmd
+import inspect
+import logging
+import os
+from subprocess import Popen, PIPE
+import sys
+import threading
+import time
+import traceback
+import cs.logutils
+from cs.logutils import debug, error, warning, setup_logging, D, ifdebug
+from cs.obj import O, Proxy
+from cs.pfx import Pfx
+from cs.py.func import funccite
+from cs.py.stack import caller
+from cs.py3 import Queue, Queue_Empty, exec_code
+from cs.seq import seq
+from cs.timeutils import sleep
+from cs.x import X
+
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
       then return a DebuggingLock, otherwise a threading.Lock.
@@ -358,7 +378,6 @@ class DebuggingThread(threading.Thread, DebugWrapper):
 def trace(func):
   ''' Decorator to report the call and return of a function.
   '''
-  from cs.py.func import funccite
   def subfunc(*a, **kw):
     X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
     try:

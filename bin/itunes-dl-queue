@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# Script to aid scheduled itunes downloads.
+# It still astonishes me that iTunes lacks any kind of download
+# scheduling, yet may people have times that are far better for
+# downloading, such as special ISP off peak times with larger data
+# quotas or simply period of known low network utilisation.
+# - Cameron Simpson <cs@cskk.id.au> 08nov2017
+#
+
+set -ue
+
+: ${VARLOG:=$HOME/var/log}
+
+flagnames=${ITUNES_DL_FLAGS:-'ROUTE_DEFAULT ISP_OFF_PEAK ROUTE'}
+queuefile=$VARLOG/itunes-dl-queue.log
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd -F flags,... [op [args...]]
+  -F flags,...
+    Specify flags which must be satisfied before the run operation commences.
+  $cmd [add]
+    Add the current iTunes selection to the download queue.
+  $cmd run [queuefile]
+    Tail the queue file (default: $queuefile) and tell iTunes to download the items."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -F) flagnames=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+case "$flagnames" in
+  *,*)  flagnames=$( printf '%s\n' "$flagnames" | tr  , ' ' ) ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# -gt 0 ] || set -- add
+
+op=$1
+shift
+
+case "$op" in
+  add)  if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments: $*" >&2
+          badopts=1
+        else
+          set-x \
+          reattach-to-user-namespace \
+          osascript -e '
+              tell application "iTunes"
+                selection
+              end tell
+            ' \
+          | tr , '\012' \
+          | while read item
+            do
+              echo "$item" >>"$queuefile"
+            done
+          exit
+        fi
+        ;;
+  run)  tail -f "$queuefile" \
+        | while read -r item
+          do
+            # wait for the flags to align
+            while :
+            do
+              ok=1
+              for flagname in $flagnames
+              do
+                case "$flagname" in
+                  \!*)  flagname=$( expr "x$flagname" : 'x.\(.*\)' )
+                        flag "$flagname" && ok=
+                        ;;
+                  *)    flag "$flagname" || ok=
+                        ;;
+                esac
+                [ $ok ] || break
+              done
+              [ $ok ] && break
+              sleep 17
+            done
+            set-x \
+            reattach-to-user-namespace \
+            osascript -e "
+                activate \"iTunes\"
+                tell application \"iTunes\"
+                  download $item
+                end tell"
+            exit 1
+          done
+        exit
+        ;;
+  *)    echo "$cmd: $op: unrecognised op" >&2
+        badopts=1
+        ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exit 0
