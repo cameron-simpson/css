@@ -207,38 +207,29 @@ class Channel(object):
       self.closed = True
 
 class PushQueue(MultiOpenMixin):
-  ''' A puttable object which looks like a Queue.
+  ''' A puttable object which looks like an iterable Queue.
       Calling .put(item) calls `func_push` supplied at initialisation
-      to trigger a function on data arrival, which returns an iterable
+      to trigger a function on data arrival, whose processing is mediated 
       queued via a Later for delivery to the output queue.
   '''
 
-  def __init__(self, name, L, func_push, outQ, func_final=None):
-    ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
+  def __init__(self, name, functor, outQ):
+    ''' Initialise the PushQueue with the Later `L`, the callable `functor`
         and the output queue `outQ`.
-	`func_push` is a one-to-many function which accepts a single
-	  item of input and returns an iterable of outputs; it may
-	  be a generator.
-          This iterable is submitted to `L` via defer_iterable to call
-          `outQ.put` with each output.
-        `outQ` accepts results from the callable via its .put() method.
-        `func_final`, if specified and not None, is called after completion of
-          all calls to `func_push`.
-        Submit `func_push(item)` via L.defer_iterable() to
-          allow a progressive feed to `outQ`.
-        Otherwise, submit `func_push` with `item` via L.defer().
+        `functor` is a one-to-many function which accepts a single
+          item of input and returns an iterable of outputs; it may be a
+          generator. These outputs are passed to outQ.put individually as
+          received.  
+        `outQ` is a MultiOpenMixin which accepts via its .put() method.
     '''
     if name is None:
-      name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push)
+      name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
     O.__init__(self)
     MultiOpenMixin.__init__(self)
-    self.later = L
-    self.func_push = func_push
+    self.functor = functor
     self.outQ = outQ
-    self.func_final = func_final
-    self.LFs = []
 
   def __str__(self):
     return "PushQueue:%s" % (self.name,)
@@ -246,26 +237,17 @@ class PushQueue(MultiOpenMixin):
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
 
+  @not_closed
   def put(self, item):
     ''' Receive a new item.
-	If self.is_iterable then presume that self.func_push returns
-	an iterator and submit self.func_push(item) to defer_iterable.
+        If self.is_iterable then presume that self.func_push returns
+        an iterator and submit self.func_push(item) to defer_iterable.
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
-    if self.closed:
-      warning("%s.put(%s) when all closed" % (self, item))
-    L = self.later
-    try:
-      items = self.func_push(item)
-      ##items = list(items)
-    except Exception as e:
-      exception("%s.func_push(item=%r): %s", self, item, e)
-      items = ()
-    # defer_iterable will close the queue
-    outQ = self.outQ
-    outQ.open()
-    L._defer_iterable(items, outQ)
+    with outQ:
+      for computed in functor(item):
+        outQ.put(computed)
 
   def startup(self):
     pass
@@ -274,22 +256,7 @@ class PushQueue(MultiOpenMixin):
     ''' shutdown() is called by MultiOpenMixin._close() to close
         the outQ for real.
     '''
-    debug("%s.shutdown()", self)
-    LFs = self.LFs
-    self.LFs = []
-    if self.func_final:
-      # run func_final to completion before closing outQ
-      LFclose = self.later._after( LFs, None, self._run_func_final )
-      LFs = (LFclose,)
-    # schedule final close of output queue
-    self.later._after( LFs, None, self.outQ.close )
-
-  def _run_func_final(self):
-    debug("%s._run_func_final()", self)
-    outQ = self.outQ
-    items = self.func_final()
-    for item in items:
-      outQ.put(item)
+    self.outQ.close()
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.

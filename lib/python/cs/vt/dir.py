@@ -11,10 +11,12 @@ import stat
 import sys
 from threading import RLock
 import time
+from uuid import UUID, uuid4
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, info, warning
 from cs.pfx import Pfx, XP
 from cs.lex import texthexify
+from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked
@@ -48,8 +50,9 @@ def D_type2str(type_):
 F_HASMETA = 0x01
 F_HASNAME = 0x02
 F_NOBLOCK = 0x04
+F_HASUUID = 0x08
 
-class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
+class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid block')):
 
   @classmethod
   def from_bytes(cls, data, offset=0):
@@ -67,15 +70,25 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       metatext, offset = get_bss(data, offset)
     else:
       metatext = None
+    uu = None
+    if flags & F_HASUUID:
+      uubs = data[:16]
+      offset += 16
+      if offset > len(data):
+        raise ValueError(
+            "needed 16 bytes for UUID, only got %d bytes (%r)"
+            % (len(uubs), uubs))
+      uu = UUID(bytes=uubs)
     if flags & F_NOBLOCK:
       block = None
     else:
       block, offset = decodeBlock(data, offset)
-    return cls(type_, name, metatext, block), offset
+    E = cls(type_, name, metatext, uu, block)
+    return E, offset
 
   def encode(self):
     ''' Serialise the components.
-        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)][uuid]blockref
     '''
     flags = 0
     name = self.name
@@ -99,18 +112,31 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    return put_bs(self.type) \
-         + put_bs(flags) \
-         + namedata \
-         + metadata \
-         + blockref
+    uu = self.uuid
+    if uu is None:
+      uubs = b''
+    else:
+      flags |= F_HASUUID
+      uubs = uu.bytes
+    return (
+        put_bs(self.type)
+        + put_bs(flags)
+        + namedata
+        + metadata
+        + uubs
+        + blockref
+    )
 
 def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
   '''
   offset0 = offset
-  components, offset = DirentComponents.from_bytes(data, offset)
-  type_, name, metatext, block = components
+  dc, offset = DirentComponents.from_bytes(data, offset)
+  type_ = dc.type
+  name = dc.name
+  metatext = dc.metatext
+  uu = dc.uuid
+  block = dc.block
   try:
     if type_ == D_DIR_T:
       E = Dir(name, metatext=metatext, parent=None, block=block)
@@ -122,10 +148,11 @@ def decode_Dirent(data, offset):
       E = HardlinkDirent(name, metatext=metatext)
     else:
       E = _Dirent(type_, name, metatext=metatext, block=block)
+    E._uuid = uu
   except ValueError as e:
     warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
-            name, e, components)
-    E = InvalidDirent(components, data[offset0:offset])
+            name, e, dc)
+    E = InvalidDirent(dc, data[offset0:offset])
   return E, offset
 
 def decode_Dirents(dirdata, offset=0):
@@ -147,6 +174,7 @@ class _Dirent(object):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     self.type = type_
     self.name = name
+    self._uuid = None
     self.meta = Meta(self)
     if metatext is not None:
       if isinstance(metatext, str):
@@ -168,6 +196,13 @@ class _Dirent(object):
     ''' Allows collecting _Dirents in a set.
     '''
     return id(self)
+
+  @prop
+  def uuid(self):
+    u = self._uuid
+    if u is None:
+      u = self._uuid = uuid4()
+    return u
 
   def pathto(self, R=None):
     ''' Return the path to this element if known.
@@ -214,6 +249,7 @@ class _Dirent(object):
 
   def encode(self):
     ''' Serialise this dirent.
+        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta][uuid]block
     '''
     type_ = self.type
     name = self.name
@@ -222,11 +258,11 @@ class _Dirent(object):
       block = None
     else:
       block = self.block
-    return DirentComponents(type_, name, meta, block).encode()
+    uu = self.uuid
+    return DirentComponents(type_, name, meta, uu, block).encode()
 
   def textencode(self):
     ''' Serialise the dirent as text.
-        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
     return totext(self.encode())
 
@@ -277,11 +313,14 @@ class InvalidDirent(_Dirent):
   def __init__(self, components, chunk):
     ''' An invalid Dirent. Record the original data chunk for regurgitation later.
     '''
+    _Dirent.__init__(
+        self,
+        components.type,
+        components.name,
+        metatext=components.metatext)
     self.components = components
     self.chunk = chunk
-    self.type = components.type
-    self.name = components.name
-    self.metatext = components.metatext
+    self._uuid = components.uuid
     self.block = components.block
     self._meta = None
 
@@ -308,9 +347,9 @@ class InvalidDirent(_Dirent):
 class SymlinkDirent(_Dirent):
 
   def __init__(self, name, metatext, block=None):
+    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
     if block is not None:
       raise ValueError("SymlinkDirent: block must be None, received: %s", block)
-    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
     if self.meta.pathref is None:
       raise ValueError("SymlinkDirent: meta.pathref required")
 
@@ -329,9 +368,9 @@ class HardlinkDirent(_Dirent):
   '''
 
   def __init__(self, name, metatext, block=None):
+    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
     if block is not None:
       raise ValueError("HardlinkDirent: block must be None, received: %s", block)
-    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
     if not hasattr(self.meta, 'inum'):
       raise ValueError("HardlinkDirent: meta.inum required (no iref in metatext=%r)" % (metatext,))
 
@@ -356,10 +395,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
   '''
 
   def __init__(self, name, metatext=None, block=None):
+    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+    MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
-    MultiOpenMixin.__init__(self)
-    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block
     self._check()
@@ -496,13 +535,13 @@ class Dir(_Dirent):
         `parent`: parent Dir
         `block`: pre-existing Block with initial Dir content
     '''
+    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     if block is None:
       self._block = None
       self._entries = {}
     else:
       self._block = block
       self._entries = None
-    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self._unhandled_dirent_chunks = None
     self.parent = parent
     self.changed = False
@@ -691,6 +730,54 @@ class Dir(_Dirent):
       E = subE
 
     return E
+
+  def new_name(self, prefix, n=1):
+    ''' Allocate a new unused name with the supplied `prefix`.
+    '''
+    while True:
+      name2 = '.'.join(prefix, str(n))
+      if name2 not in self:
+        return name2
+      n += 1
+
+  def absorb(self, D2):
+    ''' Absorb `D2` into this Dir.
+        Note: this literally attaches nodes from `D2` into this
+        Dir's tree where possible.
+    '''
+    for name in D2:
+      E2 = D2[name]
+      if name in self:
+        # conflict
+        # TODO: support S_IFWHT whiteout entries
+        E1 = self[name]
+        if E1.uuid == E2.uuid:
+          # same file
+          assert E1.type == E2.type
+          if E2.meta.ctime > E1.meta.ctime:
+            E1.meta.update(E2.meta.items())
+          if E1.block != E2.block:
+            if E2.mtime > E1.mtime:
+              # TODO: E1.flush _after_ backend update? or before?
+              E1.block = E2.block
+            E1.meta.mtime = E2.mtime
+        else:
+          # distinct objects, resolve l
+          if E1.isdir and E2.isdir:
+            # merge subtrees
+            E1.absorb(E2)
+          elif E1.isfile and E2.isfile and E1.block == E2.block:
+            # file with same content, fold
+            # TODO: use Block.compare_content if different blocks
+            if E2.meta.ctime > E1.meta.ctime:
+              E1.meta.update(E2.meta.items())
+          else:
+            # add other object under a different name
+            self[self.new_name(name)] = E2
+      else:
+        # new item
+        # NB: we don't recurse into new Dirs, not needed
+        self[name] = E2
 
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.

@@ -92,11 +92,13 @@ class TCPStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
-  def __init__(self, bind_addr, addif=False):
+  def __init__(self, name, bind_addr, addif=False):
+    if name is None:
+      name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
     self.sock = socket()
     self.sock.connect(bind_addr)
     StreamStore.__init__(self,
-                         "client-TCPStore(%s)" % (bind_addr,),
+                         name,
                          OpenSocket(self.sock, False),
                          OpenSocket(self.sock, True),
                          addif=addif,

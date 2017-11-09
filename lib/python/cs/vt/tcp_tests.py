@@ -37,7 +37,7 @@ def make_tcp_store():
       break
   ##X("BIND ADDRESS = %r", bind_addr)
   remote_S.open()
-  S = TCPStoreClient(bind_addr)
+  S = TCPStoreClient(None, bind_addr)
   return S, remote_S
 
 class TestTCPStore(TestStore, unittest.TestCase):

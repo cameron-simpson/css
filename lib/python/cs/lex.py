@@ -11,6 +11,8 @@ Generally the get_* functions accept a source string and an offset (often option
 
 * get_chars(s, offset, gochars): collect adjacent characters from `gochars`
 
+* get_decimal(s, offset): collect decimal characters (0-9, string.digits)
+
 * get_delimited(s, offset, delim): collect text up to the first ocurrence of the character `delim`.
 
 * get_envvar(s, offset=0, environ=None, default=None, specials=None): parse an environment variable reference such as $foo
@@ -265,24 +267,28 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
 
-def skipwhite(s, offset):
+def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_decimal(s, offset=0):
+  ''' Scan the string `s` for decimal characters starting at `offset`.
+      Return dec_string, new_offset.
+  '''
+  return get_chars(s, offset, digits)
 
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
@@ -291,9 +297,7 @@ def get_hexadecimal(s, offset=0):
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -318,10 +322,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
-  ''' Scan the string `s` for a dotted identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      with optional trailing dot and another dotted identifier,
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) with optional trailing dot and another dotted identifier, starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.

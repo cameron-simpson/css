@@ -23,11 +23,25 @@ class FileCacheStore(BasicStoreSync):
       asynchronous updates to the backing Store.
   '''
 
-  def __init__(self, name, backend, dirpath=None, **kw):
+  def __init__(
+    self,
+    name, backend, dirpath,
+    max_cachefile_size=None, max_cachefiles=None,
+    **kw):
+    ''' Initialise the FileCacheStore.
+        `name`: the Store name
+        `backend`: the backing Store; this may be None, and the
+          property .backend may be switched to another Store at any
+          time
+        `dirpath`: directory to hold the cache files
+    '''
     BasicStoreSync.__init__(self, name, **kw)
     self._attrs.update(backend=backend)
-    self.backend = backend
-    self.cache = FileDataMappingProxy(backend, dirpath=dirpath)
+    self._backend = backend
+    self.cache = FileDataMappingProxy(
+        backend, dirpath=dirpath,
+        max_cachefile_size=max_cachefile_size,
+        max_cachefiles=max_cachefiles)
     self._attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
@@ -36,12 +50,30 @@ class FileCacheStore(BasicStoreSync):
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
 
+  @property
+  def backend(self):
+    return self._backend
+
+  @backend.setter
+  def backend(self, new_backend):
+    ''' Switch backends.
+    '''
+    old_backend = self._backend
+    if old_backend is not new_backend:
+      if old_backend:
+        old_backend.close()
+      self._backend = new_backend
+      if new_backend:
+        new_backend.open()
+
   def startup(self):
-    self.backend.open()
+    if self.backend:
+      self.backend.open()
 
   def shutdown(self):
     self.cache.close()
-    self.backend.close()
+    if self.backend:
+      self.backend.close()
 
   def flush(self):
     pass
@@ -187,6 +219,8 @@ class FileDataMappingProxy(object):
         # straight from memory cache
         return data
     # not in memory or file cache: fetch from backend, queue store into cache
+    if not self.backend:
+      raise KeyError('no backend: h=%s' % (h,))
     data = self.backend[h]
     with self._lock:
       self.cached[h] = data

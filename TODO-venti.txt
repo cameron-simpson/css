@@ -1,5 +1,20 @@
+PlatonicStore:
+  potentially lossy DataDir like mapping to existing files (eg a media tree)
+  keep mapping of hashcode => (path, offset, size)
+  keep mapping of paths => (mtime, size) to monitor changes
+  update should rescan whole file, toss old hashcode mapping for that file
+Dirent:
+  metadata st_ctime - useful for reconciliation/update
+  S_IFWHT whiteout entries
+FS:
+  file system layer on top of Dir etc
+  split out from vtfuse
+  inodes derives from uuids
+  vtfuse: no .. in top dir?
+store specs: support readlist, savelist, read-by-not-save i.e. proxy-for
+index of hashcode to remote store refs, to support multistore cooperation and proxying
 stream protocol: error flag, json flag (implies JSON additional payload)
-stream protocol: new channel
+stream protocol: new channel ==> recursive substream
 √ datafile: use os.open(O_APPEND) and raw fds, separate fd for read
 flat file cache - keep multiple caches, set of hashes per file,
   upper limit, drop oldest file once set empty and >8 files

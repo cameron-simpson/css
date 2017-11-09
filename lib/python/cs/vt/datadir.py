@@ -5,13 +5,14 @@
 #
 
 from binascii import hexlify
+from collections import namedtuple
 from collections.abc import Mapping
 import csv
 import errno
 import os
 from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
 import sys
-from threading import Lock, RLock, Thread
+from threading import RLock, Thread
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -29,23 +30,37 @@ from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .index import choose as choose_indexclass
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
+class IndexEntry(namedtuple('IndexEntry', 'n offset')):
+
+  @staticmethod
+  def from_bytes(data):
+    ''' Parse a binary index entry, return (n, offset).
+    '''
+    n, offset = get_bs(data)
+    file_offset, offset = get_bs(data, offset)
+    if offset != len(data):
+      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+    return IndexEntry(n, file_offset)
+
+  def encode(self):
+    ''' Encode (n, offset) to binary form for use as an index entry.
+    '''
+    return put_bs(self.n) + put_bs(self.offset)
+
+def encode_index_entry(n, offset):
+  ''' Encode an IndexEntry to binary form for use as an index entry.
+  '''
+  return IndexEntry(n, offset).encode()
+
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
   '''
-  n, offset = get_bs(entry)
-  file_offset, offset = get_bs(entry, offset)
-  if offset != len(entry):
-    raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(entry),))
-  return n, file_offset
-
-def encode_index_entry(n, offset):
-  ''' Encode (n, offset) to binary form for use as an index entry.
-  '''
-  return put_bs(n) + put_bs(offset)
+  return IndexEntry.from_bytes(entry)
 
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
@@ -118,7 +133,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   '''
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
-  INDEX_FILENAME_FORMAT = 'index-{hashname}.{suffix}'
+  INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
 
   def __init__(self, statedirpath, datadirpath, hashclass, indexclass=None, rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -155,7 +170,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
     if indexclass is None:
-      indexclass = self.choose_indexclass()
+      indexclass = self._indexclass()
     self.indexclass = indexclass
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
@@ -184,31 +199,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self._n = None
     self._load_state()
 
-  def choose_indexclass(self, preferred_indexclass=None):
-    global INDEX_CLASSES
-    global INDEXCLASS_BY_NAME
-    if preferred_indexclass is not None:
-      if isinstance(preferred_indexclass, str):
-        indexname = preferred_indexclass
-        try:
-          preferred_indexclass = INDEXCLASS_BY_NAME[indexname]
-        except KeyError:
-          warning("ignoring unknown indexclass name %r", indexname)
-          preferred_indexclass = None
-    indexclasses = list(INDEX_CLASSES)
-    if preferred_indexclass is not None and preferred_indexclass.is_supported():
-      indexclasses.insert( (preferred_indexclass.INDEXNAME, preferred_indexclass) )
-    for indexname, indexclass in indexclasses:
-      if not indexclass.is_supported():
-        continue
-      indexpath = self.localpathto(self.index_localpath(self.hashclass, indexclass))
-      if existspath(indexpath):
-        return indexclass
-    for indexname, indexclass in indexclasses:
-      if not indexclass.is_supported():
-        continue
-      return indexclass
-    raise ValueError("no supported index classes available")
+  def _indexclass(self, preferred_indexclass=None):
+    return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
@@ -223,7 +215,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def spec(self):
     ''' Return a datadir_spec for this DataDirMapping.
     '''
-    return ':'.join( (self.indexclass.INDEXNAME,
+    return ':'.join( (self.indexclass.NAME,
                       self.hashclass.HASHNAME,
                       str(self.statedirpath),
                       str(self.datadirpath)) )
@@ -237,7 +229,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexpath, self.hashclass, lock=self._lock)
+    self.index = self.indexclass(self.indexbase, self.hashclass, IndexEntry.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
@@ -344,10 +336,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def statefilepath(self):
     return self.localpathto(self.state_localpath(self.hashclass))
 
-  def index_localpath(self, hashclass, indexclass):
-    return self.INDEX_FILENAME_FORMAT.format(
-        hashname=hashclass.HASHNAME,
-        suffix=indexclass.SUFFIX)
+  @property
+  def indexbase(self):
+    return self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashclass.HASHNAME)
 
   @property
   def indexpath(self):
@@ -580,249 +571,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     except Exception as e:
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
-
-class LMDBIndex(HashCodeUtilsMixin, MultiOpenMixin):
-  ''' LMDB index for a DataDir.
-  '''
-
-  INDEXNAME = 'lmdb'
-  SUFFIX = 'lmdb'
-
-  @classmethod
-  def is_supported(cls):
-    try:
-      import lmdb
-    except ImportError:
-      return False
-    return True
-
-  def __init__(self, lmdbpath, hashclass, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._lmdb_path = lmdbpath
-    self._lmdb = None
-
-  def startup(self):
-    import lmdb
-    self._lmdb = lmdb.Environment(self._lmdb_path, subdir=True, readonly=False, metasync=False, sync=False)
-
-  def shutdown(self):
-    self.flush()
-    self._lmdb.close()
-
-  def flush(self):
-    # no force=True param?
-    self._lmdb.sync()
-
-  def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
-    with self._lmdb.begin() as txn:
-      cursor = txn.cursor()
-      for hashcode in cursor.iternext(keys=True, values=False):
-        yield mkhash(hashcode)
-
-  def _get(self, hashcode):
-    with self._lmdb.begin() as txn:
-      return txn.get(hashcode)
-
-  def __contains__(self, hashcode):
-    return self._get(hashcode) is not None
-
-  def __getitem__(self, hashcode):
-    entry = self._get(hashcode)
-    if entry is None:
-      raise KeyError(hashcode)
-    return decode_index_entry(entry)
-
-  def get(self, hashcode, default=None):
-    entry = self._get(hashcode)
-    if entry is None:
-      return default
-    return decode_index_entry(entry)
-
-  def __setitem__(self, hashcode, value):
-    entry = encode_index_entry(*value)
-    with self._lmdb.begin(write=True) as txn:
-      txn.put(hashcode, entry, overwrite=True)
-
-class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
-  ''' GDBM index for a DataDir.
-  '''
-
-  INDEXNAME = 'gdbm'
-  SUFFIX = 'gdbm'
-
-  @classmethod
-  def is_supported(cls):
-    try:
-      import dbm.gnu
-    except ImportError:
-      return False
-    return True
-
-  def __init__(self, gdbmpath, hashclass, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._gdbm_path = gdbmpath
-    self._gdbm = None
-
-  def startup(self):
-    import dbm.gnu
-    self._gdbm = dbm.gnu.open(self._gdbm_path, 'cf')
-    self._gdbm_lock = Lock()
-    self._written = False
-
-  def shutdown(self):
-    self.flush()
-    with self._gdbm_lock:
-      self._gdbm.close()
-      self._gdbm = None
-      del self._gdbm_lock
-
-  def flush(self):
-    if self._written:
-      with self._gdbm_lock:
-        if self._written:
-          self._gdbm.sync()
-          self._written = False
-
-  def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
-    with self._gdbm_lock:
-      hashcode = self._gdbm.firstkey()
-    while hashcode is not None:
-      yield mkhash(hashcode)
-      self.flush()
-      with self._gdbm_lock:
-        hashcode = self._gdbm.nextkey(hashcode)
-
-  def __contains__(self, hashcode):
-    with self._gdbm_lock:
-      return hashcode in self._gdbm
-
-  def __getitem__(self, hashcode):
-    with self._gdbm_lock:
-      entry = self._gdbm[hashcode]
-    return decode_index_entry(entry)
-
-  def get(self, hashcode, default=None):
-    with self._gdbm_lock:
-      entry = self._gdbm.get(hashcode, None)
-    if entry is None:
-      return default
-    return decode_index_entry(entry)
-
-  def __setitem__(self, hashcode, value):
-    entry = encode_index_entry(*value)
-    with self._gdbm_lock:
-      self._gdbm[hashcode] = entry
-      self._written = True
-
-class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
-  ''' Kyoto Cabinet index for a DataDir.
-      Notably this uses a B+ tree for the index and thus one can
-      traverse from one key forwards and backwards, which supports
-      the coming Store synchronisation processes.
-  '''
-
-  INDEXNAME = 'kyoto'
-  SUFFIX = 'kct'
-
-  @classmethod
-  def is_supported(cls):
-    try:
-      import kyotocabinet
-    except ImportError:
-      return False
-    return True
-
-  def __init__(self, kyotopath, hashclass, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.hashclass = hashclass
-    self._kyoto_path = kyotopath
-    self._kyoto = None
-
-  def startup(self):
-    from kyotocabinet import DB
-    self._kyoto = DB()
-    self._kyoto.open(self._kyoto_path, DB.OWRITER | DB.OCREATE)
-
-  def shutdown(self):
-    self._kyoto.close()
-    self._kyoto = None
-
-  def flush(self):
-    try:
-      self._kyoto.synchronize(hard=False)
-    except TypeError:
-      self._kyoto.synchronize()
-
-  def __len__(self):
-    return self._kyoto.count()
-
-  def __contains__(self, hashcode):
-    return self._kyoto.check(hashcode) >= 0
-
-  def get(self, hashcode):
-    record = self._kyoto.get(hashcode)
-    if record is None:
-      return None
-    return decode_index_entry(record)
-
-  def __getitem__(self, hashcode):
-    entry = self.get(hashcode)
-    if entry is None:
-      raise IndexError(str(hashcode))
-    return entry
-
-  def __setitem__(self, hashcode, value):
-    self._kyoto[hashcode] = encode_index_entry(*value)
-
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
-    ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
-        `start_hashcode`: the first hashcode; if missing or None, iteration
-                    starts with the first key in the index
-        `reverse`: iterate backward if true, otherwise forward
-    '''
-    hashclass = self.hashclass
-    cursor = self._kyoto.cursor()
-    if reverse:
-      if cursor.jump_back(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
-        while cursor.step_back():
-          yield hashclass.from_hashbytes(cursor.get_key())
-    else:
-      if cursor.jump(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
-        while cursor.step():
-          yield hashclass.from_hashbytes(cursor.get_key())
-    cursor.disable()
-
-def register_index(indexclass, indexname=None, priority=False):
-  ''' Register a new `indexclass`, making it known.
-      `indexclass`: the index class
-      `indexname`: the index class name, default from indexclass.INDEXNAME
-      `priority`: if true, prepend the class to the INDEX_CLASSES list otherwise append
-  '''
-  global INDEX_CLASSES
-  global INDEXCLASS_BY_NAME
-  if indexname is None:
-    indexname = indexclass.INDEXNAME
-  if indexname in INDEXCLASS_BY_NAME:
-    raise ValueError(
-            'cannot register index class %s: indexname %r already registered to %s'
-            % (indexclass, indexname, INDEXCLASS_BY_NAME[indexname]))
-  INDEXCLASS_BY_NAME[indexname] = indexclass
-  if priority:
-    INDEX_CLASSES.insert(0, (indexclass.INDEXNAME, indexclass))
-  else:
-    INDEX_CLASSES.append((indexclass.INDEXNAME, indexclass))
-
-INDEX_CLASSES = []
-INDEXCLASS_BY_NAME = {}
-for indexclass in LMDBIndex, KyotoIndex, GDBMIndex:
-  if indexclass.is_supported():
-    register_index(indexclass)
 
 if __name__ == '__main__':
   from .datadir_tests import selftest
