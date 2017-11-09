@@ -178,7 +178,9 @@ def cmd_op(args, verbose, config, dflt_vt_store, no_cache):
     except Exception as e:
       exception("can't open store \"%s\": %s", dflt_vt_store, e)
       raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    if not no_cache:
+    if no_cache:
+      cacheS = None
+    else:
       cacheS = config.Store('cache')
       cacheS.backend = S
       S = cacheS
@@ -202,6 +204,8 @@ def cmd_op(args, verbose, config, dflt_vt_store, no_cache):
       run_ticker = False
     with S:
       xit = op_func(args, verbose=verbose)
+    if cacheS:
+      cacheS.backend = None
     if run_ticker:
       run_ticker = False
     return xit
