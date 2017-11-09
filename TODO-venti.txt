@@ -1,3 +1,4 @@
+default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
 PlatonicStore:
   potentially lossy DataDir like mapping to existing files (eg a media tree)
   keep mapping of hashcode => (path, offset, size)
