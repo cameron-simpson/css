@@ -6,6 +6,11 @@ PlatonicStore:
 Dirent:
   metadata st_ctime - useful for reconciliation/update
   S_IFWHT whiteout entries
+FS:
+  file system layer on top of Dir etc
+  split out from vtfuse
+  inodes derives from uuids
+  vtfuse: no .. in top dir?
 store specs: support readlist, savelist, read-by-not-save i.e. proxy-for
 index of hashcode to remote store refs, to support multistore cooperation and proxying
 stream protocol: error flag, json flag (implies JSON additional payload)
