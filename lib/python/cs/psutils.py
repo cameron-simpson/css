@@ -14,6 +14,7 @@ Assorted process management functions.
 * run: run a command and optionally trace its dispatch.
 * pipefrom: dispatch a command with standard output connected to a pipe
 * pipeto: dispatch a command with standard input connected to a pipe
+* groupargv: break up argv lists to fit within the maximum argument limit
 '''
 
 from __future__ import print_function
@@ -125,10 +126,10 @@ def run(argv, logger=None, pids=None, **kw):
       logger.info("RUN COMMAND: %r", pargv)
     P = subprocess.Popen(argv, **kw)
     if pids is not None:
-        pids.add(P.pid)
+      pids.add(P.pid)
     returncode = P.wait()
     if pids is not None:
-        pids.remove(P.pid)
+      pids.remove(P.pid)
     if returncode != 0:
       if logger:
         logger.error("NONZERO EXIT STATUS: %s: %r", returncode, pargv)
@@ -210,7 +211,9 @@ def groupargv(pre_argv, argv, post_argv=(), maxargv=None):
     nbytes = len(arg) + 1
     if available - nbytes < 0:
       if not per:
-        raise ValueError("cannot fit argument into argv: available=%d, len(arg)=%d: %r" % (available, len(arg), arg))
+        raise ValueError(
+            "cannot fit argument into argv: available=%d, len(arg)=%d: %r"
+            % (available, len(arg), arg))
       argvs.append(pre_argv + per + post_argv)
       available = maxargv - pre_nbytes - post_nbytes
       per = [arg]
