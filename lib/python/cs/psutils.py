@@ -38,6 +38,9 @@ DISTINFO = {
     ],
 }
 
+# maximum number of bytes usable in the argv list for the exec*() functions
+MAX_ARGV = 262144
+
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`.
       If `pid` is a string, treat as a process id file and read the
@@ -180,3 +183,40 @@ def pipeto(argv, trace=False, **kw):
   P = subprocess.Popen(argv, stdin=subprocess.PIPE)
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
+
+def groupargv(pre_argv, argv, post_argv=(), maxargv=None):
+  ''' Distribute the array `argv` over multiple arrays to fit within `MAX_ARGV`. Return a list of argv lists.
+      `pre_argv`: the sequence of leading arguments
+      `argv`: the sequence of arguments to distribute
+      `post_argv`: optional, the sequence of trailing arguments
+      `maxargv`: optional, the maximum length of each distributed
+        argument list, default: MAX_ARGV
+      The sequences may contain bytes or strings; only the length
+      of the elements plus one (for each NUL terminator) is tallied,
+      so the strings will need to be ASCII only for accuracy. If
+      the caller's strings are not just ASCII they should be decoded
+      to bytes in advance.
+  '''
+  if maxargv is None:
+    maxargv = MAX_ARGV
+  pre_argv = list(pre_argv)
+  post_argv = list(post_argv)
+  pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
+  post_nbytes = sum([len(arg) + 1 for arg in post_argv])
+  argvs = []
+  available = maxargv - pre_nbytes - post_nbytes
+  per = []
+  for arg in argv:
+    nbytes = len(arg) + 1
+    if available - nbytes < 0:
+      if not per:
+        raise ValueError("cannot fit argument into argv: available=%d, len(arg)=%d: %r" % (available, len(arg), arg))
+      argvs.append(pre_argv + per + post_argv)
+      available = maxargv - pre_nbytes - post_nbytes
+      per = [arg]
+    else:
+      per.append(arg)
+      available -= nbytes
+  if per:
+    argvs.append(pre_argv + per + post_argv)
+  return argvs
