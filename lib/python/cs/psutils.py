@@ -185,27 +185,43 @@ def pipeto(argv, trace=False, **kw):
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
-def groupargv(pre_argv, argv, post_argv=(), maxargv=None):
+def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   ''' Distribute the array `argv` over multiple arrays to fit within `MAX_ARGV`. Return a list of argv lists.
       `pre_argv`: the sequence of leading arguments
       `argv`: the sequence of arguments to distribute
       `post_argv`: optional, the sequence of trailing arguments
-      `maxargv`: optional, the maximum length of each distributed
+      `max_argv`: optional, the maximum length of each distributed
         argument list, default: MAX_ARGV
-      The sequences may contain bytes or strings; only the length
-      of the elements plus one (for each NUL terminator) is tallied,
-      so the strings will need to be ASCII only for accuracy. If
-      the caller's strings are not just ASCII they should be decoded
-      to bytes in advance.
+      `encode`: default False; if truthy, encode the argv sequences
+        into bytes for accurate tallying. If `encode` is a Boolean,
+        encode the elements with their .encode() method; if `encode`
+        is a str, encode the elements with their .encode() method
+        with `encode` as the encoding name; otherwise presume that
+        `encode` is a callable for encoding the element.
+        The returned argv arrays will contain the encoded element values.
   '''
-  if maxargv is None:
-    maxargv = MAX_ARGV
-  pre_argv = list(pre_argv)
-  post_argv = list(post_argv)
+  if max_argv is None:
+    max_argv = MAX_ARGV
+  if encode:
+    if isinstance(encode, bool):
+      pre_argv = [ arg.encode() for arg in pre_argv ]
+      argv = [ arg.encode() for arg in argv ]
+      post_argv = [ arg.encode() for arg in post_argv ]
+    elif isinstance(encode, str):
+      pre_argv = [ arg.encode(encode) for arg in pre_argv ]
+      argv = [ arg.encode(encode) for arg in argv ]
+      post_argv = [ arg.encode(encode) for arg in post_argv ]
+    else:
+      pre_argv = [ encode(arg) for arg in pre_argv ]
+      argv = [ encode(arg) for arg in argv ]
+      post_argv = [ encode(arg) for arg in post_argv ]
+  else:
+    pre_argv = list(pre_argv)
+    post_argv = list(post_argv)
   pre_nbytes = sum([len(arg) + 1 for arg in pre_argv])
   post_nbytes = sum([len(arg) + 1 for arg in post_argv])
   argvs = []
-  available = maxargv - pre_nbytes - post_nbytes
+  available = max_argv - pre_nbytes - post_nbytes
   per = []
   for arg in argv:
     nbytes = len(arg) + 1
@@ -215,7 +231,7 @@ def groupargv(pre_argv, argv, post_argv=(), maxargv=None):
             "cannot fit argument into argv: available=%d, len(arg)=%d: %r"
             % (available, len(arg), arg))
       argvs.append(pre_argv + per + post_argv)
-      available = maxargv - pre_nbytes - post_nbytes
+      available = max_argv - pre_nbytes - post_nbytes
       per = [arg]
     else:
       per.append(arg)
@@ -223,3 +239,7 @@ def groupargv(pre_argv, argv, post_argv=(), maxargv=None):
   if per:
     argvs.append(pre_argv + per + post_argv)
   return argvs
+
+if __name__ == '__main__':
+  for max_argv in 64, 20, 16, 8:
+    print(max_argv, repr(groupargv(['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'], max_argv=max_argv, encode=True)))
