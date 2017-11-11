@@ -51,6 +51,7 @@ def main(argv):
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
       -C        Do not put a cache in front of the store.
+                Default: use the filecache specified by ~/.vtrc[cache].
       -S store  Specify the store to use:
                   [clause]        Specification from .vtrc.
                   /path/to/dir    GDBMStore
