@@ -52,16 +52,6 @@ class IndexEntry(namedtuple('IndexEntry', 'n offset')):
     '''
     return put_bs(self.n) + put_bs(self.offset)
 
-def encode_index_entry(n, offset):
-  ''' Encode an IndexEntry to binary form for use as an index entry.
-  '''
-  return IndexEntry(n, offset).encode()
-
-def decode_index_entry(entry):
-  ''' Parse a binary index entry, return (n, offset).
-  '''
-  return IndexEntry.from_bytes(entry)
-
 class _DataDirFile(SimpleNamespace):
   ''' General state information about a DataFile in use by a DataDir.
       Attributes:
