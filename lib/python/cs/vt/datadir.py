@@ -128,7 +128,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
 
-  def __init__(self, statedirpath, datadirpath, hashclass, indexclass=None, rollover=None, create_statedir=None, create_datadir=None):
+  def __init__(self,
+      statedirpath, datadirpath, hashclass, indexclass=None,
+      rollover=None, create_statedir=None, create_datadir=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -290,7 +292,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       if added:
         self._save_state()
       # now scan datafiles for new data
-      for filenum in filemap.keys():
+      for filenum in filemap:
         if self._monitor_halt:
           break
         if not isinstance(filenum, int):
@@ -335,10 +337,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   @property
   def indexbase(self):
     return self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashclass.HASHNAME)
-
-  @property
-  def indexpath(self):
-    return self.localpathto(self.index_localpath(self.hashclass, self.indexclass))
 
   def _queue_index(self, hashcode, n, offset, offset2):
     with self._lock:
@@ -419,7 +417,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         for k in sorted(extras.keys()):
           csvw.writerow( (k, extras[k]) )
         filemap = self._filemap
-        for n in sorted(n for n in filemap.keys() if isinstance(n, int)):
+        for n in sorted(n for n in filemap if isinstance(n, int)):
           F = filemap[n]
           csvw.writerow( (F.filenum, F.filename, F.size) )
     ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
@@ -434,7 +432,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       raise KeyError('already in filemap: %r' % (filename,))
     with self._lock:
       if filenum is None:
-        filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
+        filenum = max([0] + list(k for k in filemap if isinstance(k, int))) + 1
       elif filenum in filemap:
         raise KeyError('already in filemap: %r' % (filenum,))
       F = _DataDirFile(datadir=self, filenum=filenum, filename=filename,
