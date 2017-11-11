@@ -35,7 +35,7 @@ from .index import choose as choose_indexclass
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
-class IndexEntry(namedtuple('IndexEntry', 'n offset')):
+class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
 
   @staticmethod
   def from_bytes(data):
@@ -45,7 +45,7 @@ class IndexEntry(namedtuple('IndexEntry', 'n offset')):
     file_offset, offset = get_bs(data, offset)
     if offset != len(data):
       raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
-    return IndexEntry(n, file_offset)
+    return DataDirIndexEntry(n, file_offset)
 
   def encode(self):
     ''' Encode (n, offset) to binary form for use as an index entry.
@@ -219,7 +219,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexbase, self.hashclass, IndexEntry.from_bytes, lock=self._lock)
+    self.index = self.indexclass(self.indexbase, self.hashclass, DataDirIndexEntry.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
@@ -348,7 +348,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       filemap = self._filemap
       for hashcode, n, offset, offset2 in self._indexQ:
         with self._lock:
-          index[hashcode] = n, offset
+          index[hashcode] = DataDirIndexEntry(n, offset)
           try:
             del unindexed[hashcode]
           except KeyError:
