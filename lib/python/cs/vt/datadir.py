@@ -29,8 +29,8 @@ from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
-from .index import choose as choose_indexclass
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
+from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -92,8 +92,11 @@ def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
     for partnum, specpart in enumerate(specpath, 1):
       with Pfx("%d:%r", partnum, specpart):
         if indexclass is None:
-          if specpart in INDEXCLASS_BY_NAME:
-            indexclass = INDEXCLASS_BY_NAME[specpart]
+          try:
+            indexclass = indexclass_by_name(specpart)
+          except KeyError:
+            pass
+          else:
             continue
         if hashclass is None:
           if specpart in HASHCLASS_BY_NAME:
@@ -150,10 +153,11 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
       # the "default" data dir may be created if the statedir exists
-      if ( create_datadir is None
-       and existspath(statedirpath)
-       and not existspath(datadirpath)
-         ):
+      if (
+          create_datadir is None
+          and existspath(statedirpath)
+          and not existspath(datadirpath)
+      ):
         create_datadir = True
     self.datadirpath = datadirpath
     if hashclass is None:
@@ -275,9 +279,11 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             continue
           raise
         for filename in listing:
-          if ( not filename.startswith('.')
-           and filename.endswith(DATAFILE_DOT_EXT)
-           and filename not in filemap):
+          if (
+              not filename.startswith('.')
+              and filename.endswith(DATAFILE_DOT_EXT)
+              and filename not in filemap
+          ):
             info("MONITOR: add new filename %r", filename)
             self._add_datafile(filename, no_save=True)
             added = True
