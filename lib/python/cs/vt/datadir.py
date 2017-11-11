@@ -29,7 +29,7 @@ from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
-from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 
 # 1GiB rollover
@@ -83,7 +83,6 @@ def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
         [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
       and return a DataDir.
   '''
-  global INDEXCLASS_BY_NAME, DEFAULT_INDEXCLASS
   global HASHCLASS_BY_NAME, DEFAULT_HASHCLASS
   indexdirpath = None
   datadirpath = None
