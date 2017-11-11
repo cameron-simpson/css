@@ -14,6 +14,12 @@ from .hash import HashCodeUtilsMixin
 _CLASSES = []
 _BY_NAME = {}
 
+def class_names():
+  return _BY_NAME.keys()
+
+def class_by_name(indexname):
+  return _BY_NAME[indexname]
+
 def choose(basepath, preferred_indexclass=None):
   ''' Choose an indexclass from a `basepath` with optional preferred indexclass.
   '''
