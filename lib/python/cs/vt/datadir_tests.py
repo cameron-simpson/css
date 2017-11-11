@@ -79,7 +79,7 @@ class TestDataDir(unittest.TestCase):
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
     '''
-    for count in range(RUN_SIZE):
+    for _ in range(RUN_SIZE):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
       entry = DataDirIndexEntry(rand_n, rand_offset)
