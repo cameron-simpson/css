@@ -232,10 +232,9 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
             % (available, len(arg), arg))
       argvs.append(pre_argv + per + post_argv)
       available = max_argv - pre_nbytes - post_nbytes
-      per = [arg]
-    else:
-      per.append(arg)
-      available -= nbytes
+      per = []
+    per.append(arg)
+    available -= nbytes
   if per:
     argvs.append(pre_argv + per + post_argv)
   return argvs
