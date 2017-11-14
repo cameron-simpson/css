@@ -419,6 +419,7 @@ class _Pipeline(MultiOpenMixin):
       try:
         func_sig, functor = action
       except TypeError:
+        from cs.x import X
         X("_Pipeline: action=%r", action)
         func_sig = action.sig
         functor = action.functor(self.later)
@@ -440,6 +441,7 @@ class _Pipeline(MultiOpenMixin):
       elif func_sig == FUNC_MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_PIPELINE:
+        from cs.x import X
         X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
