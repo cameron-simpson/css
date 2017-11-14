@@ -12,7 +12,7 @@ set -ue
 
 : ${VARLOG:=$HOME/var/log}
 
-flagnames=${ITUNES_DL_FLAGS:-'ROUTE_DEFAULT ISP_OFF_PEAK ROUTE'}
+flagnames=${ITUNES_DL_FLAGS:-'ROUTE_DEFAULT ISP_OFF_PEAK'}
 queuefile=$VARLOG/itunes-dl-queue.log
 
 cmd=$( basename "$0" )

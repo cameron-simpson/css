@@ -8,10 +8,13 @@ from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
 from cs.configutils import ConfigWatcher
 from cs.fileutils import longpath, shortpath
-from cs.lex import get_qstr
+from cs.lex import get_qstr, skipwhite
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.threads import locked
+from cs.units import multiparse as multiparse_units, \
+    BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
+from .cache import FileCacheStore
 from .store import ChainStore, DataDirStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
@@ -148,45 +151,96 @@ class ConfigFile(ConfigWatcher):
     debug("ConfigFile.Store(clause_name=%r)...", clause_name)
     S = self._stores.get(clause_name)
     if S is None:
-      store_name = "%s[%s]" % (shortpath(self._config__filename), clause_name)
+      # not previously accessed, construct S
+      store_name = "%s[%s]" % (shortpath(self.path), clause_name)
       with Pfx(store_name):
         clause = self[clause_name]
         stype = clause.get('type')
         if stype is None:
           raise ValueError("missing type")
-        if stype == "datadir":
-          path = clause.get('path')
-          if path is None:
-            path = clause_name
-            debug("path from clausename: %r", path)
-          path = longpath(path)
-          debug("longpath(path) ==> %r", path)
-          if not isabspath(path):
-            if path.startswith('./'):
-              path = abspath(path)
-              debug("abspath ==> %r", path)
-            else:
-              statedir = clause.get('statedir')
-              debug("statedir=%r", statedir)
-              if statedir is None:
-                raise ValueError('relative path %r but no statedir' % (path,))
-              statedir = longpath(statedir)
-              debug("longpath(statedir) ==> %r", statedir)
-              path = joinpath(statedir, path)
-              debug("path ==> %r", path)
-          datapath = clause.get('data')
-          if datapath is not None:
-            datapath = longpath(datapath)
-          S = DataDirStore(store_name, path, datapath, None, None)
-        elif stype == "tcp":
-          hostpart = clause.get("host")
-          if not hostpart:
-            raise ValueError('no "host"')
-          portpart = clause.get("port")
-          if not portpart:
-            raise ValueError('no "port"')
-          S = TCPStoreClient((hostpart, int(portpart)))
+        if stype == 'datadir':
+          S = Store_from_datadir_clause(store_name, clause_name, clause)
+        elif stype == 'filecache':
+          S = Store_from_filecache_clause(store_name, clause_name, clause)
+        elif stype == 'tcp':
+          S = Store_from_tcp_clause(store_name, clause_name, clause)
         else:
           raise ValueError("unsupported type %r", stype)
         self._stores[clause_name] = S
     return S
+
+def Store_from_datadir_clause(store_name, clause_name, clause):
+  ''' Construct a DataDirStore from a "datadir" clause.
+  '''
+  path = clause.get('path')
+  if path is None:
+    path = clause_name
+    debug("path from clausename: %r", path)
+  path = longpath(path)
+  debug("longpath(path) ==> %r", path)
+  if not isabspath(path):
+    if path.startswith('./'):
+      path = abspath(path)
+      debug("abspath ==> %r", path)
+    else:
+      statedir = clause.get('statedir')
+      debug("statedir=%r", statedir)
+      if statedir is None:
+        raise ValueError('relative path %r but no statedir' % (path,))
+      statedir = longpath(statedir)
+      debug("longpath(statedir) ==> %r", statedir)
+      path = joinpath(statedir, path)
+      debug("path ==> %r", path)
+  datapath = clause.get('data')
+  if datapath is not None:
+    datapath = longpath(datapath)
+  return DataDirStore(store_name, path, datapath, None, None)
+
+def Store_from_filecache_clause(store_name, clause_name, clause):
+  ''' Construct a FileCacheStorer from a "filecache" clause.
+  '''
+  path = clause.get('path')
+  max_cachefiles = clause.get('max_files')
+  if max_cachefiles is not None:
+    max_cachefiles = int(max_cachefiles)
+  max_cachefile_size = clause.get('max_file_size')
+  if max_cachefile_size is not None:
+    s = max_cachefile_size
+    max_cachefile_size, offset = multiparse_units(
+        s, (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE))
+    offset = skipwhite(s, offset)
+    if offset < len(s):
+      raise ValueError("max_file_size: unparsed text: %r" % (s[offset:],))
+  if path is None:
+    path = clause_name
+    debug("path from clausename: %r", path)
+  path = longpath(path)
+  debug("longpath(path) ==> %r", path)
+  if not isabspath(path):
+    if path.startswith('./'):
+      path = abspath(path)
+      debug("abspath ==> %r", path)
+    else:
+      statedir = clause.get('statedir')
+      debug("statedir=%r", statedir)
+      if statedir is None:
+        raise ValueError('relative path %r but no statedir' % (path,))
+      statedir = longpath(statedir)
+      debug("longpath(statedir) ==> %r", statedir)
+      path = joinpath(statedir, path)
+      debug("path ==> %r", path)
+  return FileCacheStore(store_name, None, path,
+    max_cachefile_size=max_cachefile_size,
+    max_cachefiles=max_cachefiles,
+    )
+
+def Store_from_tcp_clause(store_name, clause_name, clause):
+  ''' Construct a TCPStoreClient from a "tcp" clause.
+  '''
+  hostpart = clause.get("host")
+  if not hostpart:
+    raise ValueError('no "host"')
+  portpart = clause.get("port")
+  if not portpart:
+    raise ValueError('no "port"')
+  return TCPStoreClient(store_name, (hostpart, int(portpart)))

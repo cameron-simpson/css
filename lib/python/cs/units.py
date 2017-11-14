@@ -13,6 +13,9 @@ Presupplied scales:
   TIME_SCALE          Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
 '''
 
+from string import ascii_letters
+from cs.lex import get_chars, get_decimal, skipwhite
+
 TIME_SCALE = (
     ( 60, 's' ),
     ( 60, 'm' ),
@@ -100,13 +103,13 @@ def combine(components, scale):
     total += count * factors[unit]
   return total
 
-def transcribe(n, scale, max=None, skip_zero=False, sep=''):
+def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   ''' Transcribe a nonnegative integer `n` against `scale`.
       `n`: a nonnegative integer
       `scale`: a sequence of (factor, unit) where factor is the
         size factor to the follow scale and `unit` is the designator
         of the unit
-      `max`: the maximum number of components to transcribe
+      `max_parts`: the maximum number of components to transcribe
       `skip_zero`: omit components of value 0
   '''
   components = human(n, scale)
@@ -115,11 +118,57 @@ def transcribe(n, scale, max=None, skip_zero=False, sep=''):
     if skip_zero and count == 0:
       continue
     text.append( str(count) + unit )
-    if max is not None and len(text) == max:
+    if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
+
+def parse(s, scale, offset=0):
+  ''' Parse an integer followed by an optional scale and return computed value.
+      `s`: the string to parse
+      `scale`: a scale array of (factor, unit_name)
+      `offset`: starting position for parse
+      Returns the parsed value and the new offset.
+  '''
+  offset = skipwhite(s, offset)
+  if not s:
+    raise ValueError("missing count")
+  value_s, offset2 = get_decimal(s, offset)
+  if not value_s:
+    raise ValueError("expected decimal value")
+  value = int(value_s)
+  offset = skipwhite(s, offset2)
+  if offset < len(s):
+    vunit, offset = get_chars(s, offset, ascii_letters)
+    if vunit:
+      vunit0 = vunit
+      vunit = vunit.lower()
+      for factor, unit in scale:
+        if unit.lower() == vunit:
+          break
+        if not factor:
+          raise ValueError("unrecognised unit: %r" % (vunit0,))
+        value *= factor
+  return value, offset
+
+def multiparse(s, scales, offset=0):
+  ''' Parse an integer followed by an optional scale and return computed value.
+      `s`: the string to parse
+      `scales`: an iterable of scale arrays of (factor, unit_name)
+      `offset`: starting position for parse
+      Returns the parsed value and the new offset.
+  '''
+  for scale in scales:
+    try:
+      return parse(s, scale, offset)
+    except ValueError as e:
+      exc = e
+  raise exc
 
 if __name__ == '__main__':
   print(transcribe(2050, BINARY_BYTES_SCALE))
   print(transcribe(2050, DECIMAL_BYTES_SCALE))
   print(transcribe(2050, TIME_SCALE))
+  print(parse('1 KB', DECIMAL_BYTES_SCALE), 1000)
+  print(parse('1 KiB', BINARY_BYTES_SCALE), 1024)
+  print(parse('1 K', DECIMAL_SCALE), 1000)
+  ##print(parse('1.1 K', DECIMAL_SCALE), 1000)
