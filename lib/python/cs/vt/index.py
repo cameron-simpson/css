@@ -8,6 +8,7 @@
 from os.path import exists as existspath
 from threading import Lock
 from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from .hash import HashCodeUtilsMixin
 
@@ -154,7 +155,8 @@ class GDBMIndex(_Index):
 
   def startup(self):
     import dbm.gnu
-    self._gdbm = dbm.gnu.open(self.path, 'cf')
+    with Pfx(self.path):
+      self._gdbm = dbm.gnu.open(self.path, 'cf')
     self._gdbm_lock = Lock()
     self._written = False
 
