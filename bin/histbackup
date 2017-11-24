@@ -152,7 +152,7 @@ usage="Usage:
 badopts=
 
 # have "cp -ral"? otherwise rely on my linktree script
-if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l`" = x3 ]
+if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
 then
   mklinktree(){
     [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
