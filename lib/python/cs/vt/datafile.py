@@ -69,7 +69,7 @@ def scan_chunks(fp, do_decompress=False):
   '''
   offset = fp.tell()
   while True:
-    flags, data, offset2 = read_chunk(fp)
+    flags, data, offset2 = read_chunk(fp, do_decompress=do_decompress)
     yield offset, flags, data, offset2
     offset = offset2
 
@@ -119,7 +119,7 @@ class DataFile(MultiOpenMixin):
     del self._rfd
 
   def fetch(self, offset):
-    flags, data, offset2 = self._fetch(offset, do_decompress=True)
+    flags, data, _ = self._fetch(offset, do_decompress=True)
     if flags:
       raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
@@ -141,11 +141,12 @@ class DataFile(MultiOpenMixin):
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
-    data2 = compress(data)
     flags = 0
-    if len(data2) < len(data):
-      data = data2
-      flags |= F_COMPRESSED
+    if not no_compress:
+      data2 = compress(data)
+      if len(data2) < len(data):
+        data = data2
+        flags |= F_COMPRESSED
     bs = put_bs(flags) + put_bsdata(data)
     wfd = self._wfd
     with self._wlock:
