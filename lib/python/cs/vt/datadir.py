@@ -381,28 +381,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     D = self._open_datafile(n)
     return n, D
 
-  def _open_datafile(self, n):
-    ''' Return the DataFile with index `n`.
-    '''
-    cache = self._cache
-    D = cache.get(n)
-    if D is None:
-      with self._lock:
-        # first, look again now that we have the _lock
-        D = cache.get(n)
-        if D is None:
-          # still not in the cache, open the DataFile and put into the cache
-          F = self._filemap[n]
-          readwrite = (n == self._n_current_save_datafile)
-          D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
-          D.open()
-    return D
-
-  def fetch(self, entry):
-    ''' Return the data chunk stored in DataFile `n` at `offset`.
-    '''
-    return self._open_datafile(entry.n).fetch(entry.offset)
-
   def _queue_index(self, hashcode, entry, post_offset):
     with self._lock:
       self._unindexed[hashcode] = entry
@@ -560,6 +538,29 @@ class DataDir(_FilesDir):
       pass
     F = self._add_datafile(filename)
     return F
+
+  def _open_datafile(self, n):
+    ''' Return the DataFile with index `n`.
+    '''
+    cache = self._cache
+    D = cache.get(n)
+    if D is None:
+      with self._lock:
+        # first, look again now that we have the _lock
+        D = cache.get(n)
+        if D is None:
+          # still not in the cache, open the DataFile and put into the cache
+          F = self._filemap[n]
+          readwrite = (n == self._n_current_save_datafile)
+          D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
+          D.open()
+    return D
+
+  def fetch(self, entry):
+    ''' Return the data chunk stored in DataFile `n` at `offset`.
+    '''
+    D = self._open_datafile(entry.n)
+    return D.fetch(entry.offset)
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
