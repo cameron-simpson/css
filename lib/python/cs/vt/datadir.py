@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
-from os.path import join as joinpath, samefile, exists as existspath, isdir as isdirpath
+from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath
 import sys
 from threading import RLock, Thread
 import time
@@ -20,7 +20,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
-from cs.fileutils import makelockfile, shortpath, longpath
+from cs.fileutils import makelockfile, shortpath, longpath, read_from
 from cs.logutils import info, warning, error, exception
 from cs.pfx import Pfx
 from cs.queues import IterableQueue
@@ -30,9 +30,11 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
+from .blockify import blocked_chunks_of
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
+from .parsers import scanner_from_filename
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -79,21 +81,23 @@ class FileState(SimpleNamespace):
       `indexed_to`: the maximum amount of data scanned and indexed so far
   '''
 
-  def __init__(self, datadir, filename, indexed_to=0, scanned_to=None) -> None:
+  def __init__(self, datadir, filenum, filename, indexed_to=0, scanned_to=None) -> None:
     if scanned_to is None:
       scanned_to = indexed_to
     self.datadir = datadir
+    self.filenum = filenum
     self.filename = filename
     self.indexed_to = indexed_to
     self.scanned_to = scanned_to
 
   @classmethod
-  def from_csvrow(cls, datadir, filename, indexed_to, *etc):
+  def from_csvrow(cls, datadir, filenum, filename, indexed_to, *etc):
     if etc:
       raise ValueError("%s.from_csvrow: extra arguments after indexed_to: %r" % (cls, etc))
     return cls(
-        datadir=datadir,
-        filename=filename,
+        datadir,
+        filenum,
+        filename,
         indexed_to=indexed_to)
 
   def csvrow(self):
@@ -123,7 +127,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       DataDir, where the data are kept in a subdirectory of UUID-named
       files, supporting easy merging and updating.
 
-      PlatonicDir, where the data are present in a normal file tree,
+      PlatonicDataDir, where the data are present in a normal file tree,
       such as a preexisting media server directory or the like.
   '''
 
@@ -317,8 +321,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 else:
                   # filenum, filename, indexed_to
                   _, filename, indexed_to, *etc = row
-                  filestate = FileState.from_csvrow(self, filename, indexed_to, *etc)
-                  self._add_datafilestate(filestate, filenum=filenum)
+                  filestate = FileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
+                  filestate.filenum = filenum
+                  self._add_datafilestate(filestate)
     # presume data in state dir if not specified
     if self.datadirpath is None:
       self.datadirpath = self.statedirpath
@@ -348,21 +353,22 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Add the specified data file named `filename` to the filemap, returning the filenum.
         `filename`: the filename relative to the data directory
     '''
-    F = FileState(self, filename=filename, indexed_to=0)
+    F = FileState(self, None, filename, indexed_to=0)
     return self._add_datafilestate(F)
 
-  def _add_datafilestate(self, F, filenum=None):
+  def _add_datafilestate(self, F):
     ''' Add the supplied data file state `F` to the filemap, returning the filenum.
-        `datafilestate`: the datafilestate
-        `filenum`: optional numeric index, default None
     '''
+    info("%s._add_datafilestate(F=%s)", self, F)
+    filenum = F.filenum
     filemap = self._filemap
     filename = F.filename
     if filename in filemap:
-      raise KeyError('already in filemap: %r' % (filename,))
+      raise KeyError('FileState:%s: already in filemap: %r' % (F, filename,))
     with self._lock:
       if filenum is None:
         filenum = max([0] + list(k for k in filemap if isinstance(k, int))) + 1
+        F.filenum = filenum
       elif filenum in filemap:
         raise KeyError('filenum %d already in filemap: %s' % (filenum, filemap[filenum]))
       filemap[filenum] = F
@@ -465,15 +471,15 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
   ''' A block record for a DataDir.
   '''
 
-  @staticmethod
-  def from_bytes(data:bytes):
+  @classmethod
+  def from_bytes(cls, data:bytes):
     ''' Parse a binary index entry, return (n, offset).
     '''
     n, offset = get_bs(data)
     file_offset, offset = get_bs(data, offset)
     if offset != len(data):
       raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
-    return DataDirIndexEntry(n, file_offset)
+    return cls(n, file_offset)
 
   def encode(self) -> bytes:
     ''' Encode (n, offset) to binary form for use as an index entry.
@@ -491,9 +497,6 @@ class DataDir(_FilesDir):
       a NAS presented via NFS, or a Store replicated by an external
       file-level service such as Dropbox or plain old rsync.
   '''
-
-  STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
-  INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
 
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
@@ -573,7 +576,7 @@ class DataDir(_FilesDir):
     indexQ = self._indexQ
     while not self._monitor_halt:
       # scan for new datafiles
-      added = False
+      need_save = False
       with Pfx("listdir(%r)", self.datadirpath):
         try:
           listing = list(os.listdir(self.datadirpath))
@@ -591,8 +594,8 @@ class DataDir(_FilesDir):
           ):
             info("MONITOR: add new filename %r", filename)
             self._add_datafile(filename)
-            added = True
-      if added:
+            need_save = True
+      if need_save:
         self._save_state()
       # now scan datafiles for new data
       for filenum in filter(lambda n: isinstance(n, int), filemap.keys()):
@@ -615,17 +618,18 @@ class DataDir(_FilesDir):
             warning("stat: %s", e)
             continue
           if new_size > F.scanned_to:
-            advanced = False
+            need_save = False
             for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
               hashcode = self.hashclass.from_chunk(data)
               indexQ.put( (hashcode, DataDirIndexEntry(filenum, offset), post_offset) )
               F.scanned_to = post_offset
-              advanced = True
+              need_save = True
               if self._monitor_halt:
                 break
             # update state after completion of a scan
-            if advanced:
+            if need_save:
               self._save_state()
+              need_save = False
       time.sleep(1)
 
   def add(self, data):
@@ -647,6 +651,184 @@ class DataDir(_FilesDir):
       if rollover is not None and post_offset >= rollover:
         self._n_current_save_datafile = None
     return hashcode
+
+class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
+  ''' A block record for a PlatonicDir.
+  '''
+
+  @classmethod
+  def from_bytes(cls, data:bytes):
+    ''' Parse a binary index entry, return (n, offset).
+    '''
+    n, offset = get_bs(data)
+    file_offset, offset = get_bs(data, offset)
+    length, offset = get_bs(data, offset)
+    if offset != len(data):
+      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+    return cls(n, file_offset, length)
+
+  def encode(self) -> bytes:
+    ''' Encode (n, offset) to binary form for use as an index entry.
+    '''
+    return put_bs(self.n) + put_bs(self.offset) + put_bs(self.length)
+
+class PlatonicFile(MultiOpenMixin):
+
+  def __init__(self, path):
+    MultiOpenMixin.__init__(self)
+    self.path = path
+
+  def startup(self):
+    self._fp = open(self.path, 'rb')
+
+  def shutdown(self):
+    self._fp.close()
+    del self._fp
+
+  def fetch(self, offset, length):
+    fp = self._fp
+    with self._lock:
+      fp.seek(offset)
+      data = fp.read(length)
+    if len(data) != length:
+      raise RuntimeError(
+          "%r: asked for %d bytes from offset %d, but got %d"
+          % (self.path, length, offset, len(data)))
+    return data
+
+class PlatonicDir(_FilesDir):
+  ''' Presentation of a block map based on a raw directory tree of files such a preexisting media server.
+      A PlatonicDir may be used as the Mapping for a MappingStore.
+      NB: _not_ thread safe; callers must arrange that.
+      A PlatonicDir is read-only. Data blocks are fetched directly
+      from the files in the backing directory tree.
+  '''
+
+  def __init__(self,
+      statedirpath, datadirpath, hashclass, indexclass=None,
+      create_statedir=None, exclude_dir=None, exclude_file=None):
+    ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
+        `statedirpath`: a directory containing state information
+            about the DataFiles; this is the index-state.csv file and
+            the associated index dbm-ish files.
+        `datadirpath`: the directory containing the DataFiles.
+            If this is shared by other clients then it should be
+            different from the `statedirpath`.
+            If None, default to "statedirpath/data", which might be
+            a symlink to a shared area such as a NAS.
+        `hashclass`: the hash class used to index chunk contents.
+        `indexclass`: the IndexClass providing the index to chunks
+            in the DataFiles. If not specified, a supported index
+            class with an existing index file will be chosen, otherwise
+            the most favoured indexclass available will be chosen.
+        `create_statedir`: os.mkdir the state directory if missing
+        `exclude_dir`: optional function to test a directory path for
+          exclusion from monitoring; default is to exclude directories
+          whose basename commences with a dot.
+        `exclude_file`: optional function to test a file path for
+          exclusion from monitoring; default is to exclude directories
+          whose basename commences with a dot.
+        The directory and file paths tested are relative to the
+        data directory path.
+    '''
+    _FilesDir.__init__(
+        self,
+        statedirpath, datadirpath, hashclass,
+        indexclass=None)
+
+  @staticmethod
+  def _default_exclude_path(path):
+    ''' Default function to exclude a path from the file tree traversal.
+    '''
+    base = basename(path)
+    return not base or base.startswith('.')
+
+  def _open_datafile(self, n):
+    ''' Return the DataFile with index `n`.
+    '''
+    cache = self._cache
+    D = cache.get(n)
+    if D is None:
+      with self._lock:
+        # first, look again now that we have the _lock
+        D = cache.get(n)
+        if D is None:
+          # still not in the cache, open the DataFile and put into the cache
+          F = self._filemap[n]
+          D = cache[n] = PlatonicFile(self.datapathto(F.filename))
+          D.open()
+    return D
+
+  def fetch(self, entry):
+    ''' Return the data chunk stored in DataFile `n` at `offset`.
+    '''
+    D = self._open_datafile(entry.n)
+    return D.fetch(entry.offset, entry.length)
+
+  def _monitor_datafiles(self):
+    ''' Thread body to poll the ideal tree for new or changed files.
+    '''
+    raise RuntimeError
+    filemap = self._filemap
+    indexQ = self._indexQ
+    while not self._monitor_halt:
+      # scan for new datafiles
+      need_save = False
+      datadirpath = self.datadirpath
+      with Pfx("walk(%r)", datadirpath):
+        for dirpath, dirnames, filenames in os.walk(datadirpath):
+          if not self._monitor_halt:
+            break
+          with Pfx(dirpath):
+            rdirpath = relpath(dirpath, datadirpath)
+            dirnames[:] = filter(lambda name: not self.exclude_dirpath(joinpath(rdirpath, name)), dirnames)
+            for filename in filenames:
+              if not self._monitor_halt:
+                break
+              rfilepath = joinpath(rdirpath, filename)
+              with Pfx(rfilepath):
+                if self.exclude_file(rfilepath):
+                  continue
+                try:
+                  F = filemap[rfilepath]
+                except KeyError:
+                  self._add_datafile(rfilepath)
+                  need_save = True
+                filenum = F.filenum
+                try:
+                  new_size = F.stat_size()
+                except OSError as e:
+                  warning("stat: %s", e)
+                  continue
+                if new_size > F.scanned_to:
+                  info("monitor: scan %r from %d", rfilepath, F.scanned_to)
+                  for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
+                    hashcode = self.hashclass.from_chunk(data)
+                    indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                    F.scanned_to = post_offset
+                    need_save = True
+                    if self._monitor_halt:
+                      break
+                  # update state after completion of a scan
+                  if need_save:
+                    self._save_state()
+                    need_save = False
+      if need_save:
+        self._save_state()
+        need_save = False
+      time.sleep(11)
+
+  @staticmethod
+  def scan(filepath, offset=0):
+    ''' Scan the specified `filepath` from `offset`, yielding data chunks.
+    '''
+    scanner = scanner_from_filename(filepath)
+    with open(filepath, 'rb') as fp:
+      fp.seek(offset)
+      for data in blocked_chunks_of(read_from(fp), scanner):
+        post_offset = offset + len(data)
+        yield offset, 0, data, post_offset
+        offset = post_offset
 
 if __name__ == '__main__':
   from .datadir_tests import selftest
