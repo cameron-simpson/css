@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
+from cs.excutils import logexc
 from cs.fileutils import makelockfile, shortpath, longpath, read_from
 from cs.logutils import info, warning, error, exception
 from cs.pfx import Pfx
@@ -731,10 +732,16 @@ class PlatonicDir(_FilesDir):
         The directory and file paths tested are relative to the
         data directory path.
     '''
+    if exclude_dir is None:
+      exclude_dir = self._default_exclude_path
+    if exclude_file is None:
+      exclude_file = self._default_exclude_path
     _FilesDir.__init__(
         self,
         statedirpath, datadirpath, hashclass,
         indexclass=None)
+    self.exclude_dir = exclude_dir
+    self.exclude_file = exclude_file
 
   @staticmethod
   def _default_exclude_path(path):
@@ -765,10 +772,10 @@ class PlatonicDir(_FilesDir):
     D = self._open_datafile(entry.n)
     return D.fetch(entry.offset, entry.length)
 
+  @logexc
   def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
-    raise RuntimeError
     filemap = self._filemap
     indexQ = self._indexQ
     while not self._monitor_halt:
@@ -776,14 +783,16 @@ class PlatonicDir(_FilesDir):
       need_save = False
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
+        info("WALK ...")
         for dirpath, dirnames, filenames in os.walk(datadirpath):
-          if not self._monitor_halt:
+          if self._monitor_halt:
             break
           with Pfx(dirpath):
+            info("SCAN")
             rdirpath = relpath(dirpath, datadirpath)
-            dirnames[:] = filter(lambda name: not self.exclude_dirpath(joinpath(rdirpath, name)), dirnames)
+            dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
             for filename in filenames:
-              if not self._monitor_halt:
+              if self._monitor_halt:
                 break
               rfilepath = joinpath(rdirpath, filename)
               with Pfx(rfilepath):
@@ -792,9 +801,11 @@ class PlatonicDir(_FilesDir):
                 try:
                   F = filemap[rfilepath]
                 except KeyError:
-                  self._add_datafile(rfilepath)
+                  filenum = self._add_datafile(rfilepath)
+                  F = filemap[filenum]
                   need_save = True
-                filenum = F.filenum
+                else:
+                  filenum = F.filenum
                 try:
                   new_size = F.stat_size()
                 except OSError as e:
