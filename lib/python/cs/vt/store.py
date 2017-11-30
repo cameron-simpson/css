@@ -26,7 +26,7 @@ from cs.result import report
 from cs.seq import Seq
 from cs.x import X
 from . import defaults
-from .datadir import DataDir
+from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
@@ -598,6 +598,25 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
     X("DataDirStore.shutdown: _datadir.close...")
+
+class PlatonicStore(MappingStore):
+  ''' A MappingStore using a PlatonicDir as its backend.
+  '''
+
+  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, **kw):
+    datadir = PlatonicDir(statedirpath, datadirpath, hashclass, indexclass)
+    MappingStore.__init__(self, name, datadir, **kw)
+    self._datadir = datadir
+
+  def startup(self, **kw):
+    X("PlatonicStore.startup: _datadir.open...")
+    self._datadir.open()
+    super().startup(**kw)
+
+  def shutdown(self):
+    super().shutdown()
+    self._datadir.close()
+    X("PlatonicStore.shutdown: _datadir.close...")
 
 class _ProgressStoreTemplateMapping(object):
 
