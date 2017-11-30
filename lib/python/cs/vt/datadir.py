@@ -241,7 +241,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexbase, self.hashclass, DataDirIndexEntry.from_bytes, lock=self._lock)
+    self.index = self.indexclass(self.indexbasepath, self.hashclass, DataDirIndexEntry.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
@@ -280,9 +280,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     del self.lockpath
 
   def localpathto(self, rpath):
+    ''' Return the path to `rpath`, which is relative to the statedirpath.
+    '''
     return joinpath(self.statedirpath, rpath)
 
   def datapathto(self, rpath):
+    ''' Return the path to `rpath`, which is relative to the datadirpath.
+    '''
     return joinpath(self.datadirpath, rpath)
 
   def state_localpath(self, hashclass):
@@ -294,7 +298,15 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   @property
   def indexbase(self):
+    ''' Basename of the index.
+    '''
     return self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashclass.HASHNAME)
+
+  @property
+  def indexbasepath(self):
+    ''' Pathname of the index.
+    '''
+    return self.localpathto(self.indexbase)
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
