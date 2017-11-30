@@ -13,6 +13,7 @@ import csv
 import errno
 import os
 from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath
+import stat
 import sys
 from threading import RLock, Thread
 import time
@@ -110,10 +111,17 @@ class FileState(SimpleNamespace):
   def pathname(self):
     return self.datadir.datapathto(self.filename)
 
-  def stat_size(self):
+  def stat_size(self, follow_symlinks=False):
     ''' Stat the datafile, return its size.
     '''
-    return os.stat(self.pathname).st_size
+    path = self.pathname
+    if follow_symlinks:
+      S = os.stat(path)
+    else:
+      S = os.lstat(path)
+    if not stat.S_ISREG(S.st_mode):
+      return None
+    return S.st_size
 
   def scan(self, offset=0, **kw):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (offset, flags, data, post_offset).
@@ -707,7 +715,8 @@ class PlatonicDir(_FilesDir):
 
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
-      create_statedir=None, exclude_dir=None, exclude_file=None):
+      create_statedir=None, exclude_dir=None, exclude_file=None,
+      follow_symlinks=False):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -729,6 +738,7 @@ class PlatonicDir(_FilesDir):
         `exclude_file`: optional function to test a file path for
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
+        `follow_symlinks`: follow symbolic links, default False.
         The directory and file paths tested are relative to the
         data directory path.
     '''
@@ -742,6 +752,7 @@ class PlatonicDir(_FilesDir):
         indexclass=None)
     self.exclude_dir = exclude_dir
     self.exclude_file = exclude_file
+    self.follow_symlinks = follow_symlinks
 
   @staticmethod
   def _default_exclude_path(path):
@@ -807,9 +818,18 @@ class PlatonicDir(_FilesDir):
                 else:
                   filenum = F.filenum
                 try:
-                  new_size = F.stat_size()
+                  new_size = F.stat_size(self.follow_symlinks)
                 except OSError as e:
-                  warning("stat: %s", e)
+                  if e.errno == errno.ENOENT:
+                    warning("forgetting missing file")
+                    self._del_datafilestate(F)
+                    need_save = True
+                  else:
+                    warning("stat: %s", e)
+                  continue
+                if new_size is None:
+                  # skip non files
+                  info("SKIP non-file")
                   continue
                 if new_size > F.scanned_to:
                   info("monitor: scan %r from %d", rfilepath, F.scanned_to)
