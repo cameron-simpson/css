@@ -261,7 +261,10 @@ def Store_from_platonic_clause(store_name, clause_name, clause):
   datapath = clause.get('data')
   if datapath is not None:
     datapath = longpath(datapath)
-  return PlatonicStore(store_name, path, datapath, None, None)
+  follow_symlinks = clause.get('follow_symlinks')
+  if follow_symlinks is None:
+    follow_symlinks = False
+  return PlatonicStore(store_name, path, datapath, hashclass=None, indexclass=None, follow_symlinks=follow_symlinks)
 
 def Store_from_tcp_clause(store_name, clause_name, clause):
   ''' Construct a TCPStoreClient from a "tcp" clause.

@@ -603,8 +603,13 @@ class PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
   '''
 
-  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, **kw):
-    datadir = PlatonicDir(statedirpath, datadirpath, hashclass, indexclass)
+  def __init__(self, name, statedirpath,
+    datadirpath=None, hashclass=None, indexclass=None,
+    follow_symlinks=False, **kw
+  ):
+    datadir = PlatonicDir(
+        statedirpath, datadirpath, hashclass, indexclass,
+        follow_symlinks=follow_symlinks)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
