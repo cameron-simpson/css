@@ -15,7 +15,7 @@ from cs.threads import locked
 from cs.units import multiparse as multiparse_units, \
     BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
 from .cache import FileCacheStore
-from .store import ChainStore, DataDirStore
+from .store import ChainStore, DataDirStore, PlatonicStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
 
@@ -162,10 +162,12 @@ class ConfigFile(ConfigWatcher):
           S = Store_from_datadir_clause(store_name, clause_name, clause)
         elif stype == 'filecache':
           S = Store_from_filecache_clause(store_name, clause_name, clause)
+        if stype == 'platonic':
+          S = Store_from_platonic_clause(store_name, clause_name, clause)
         elif stype == 'tcp':
           S = Store_from_tcp_clause(store_name, clause_name, clause)
         else:
-          raise ValueError("unsupported type %r", stype)
+          raise ValueError("unsupported type %r" % (stype,))
         self._stores[clause_name] = S
     return S
 
@@ -233,6 +235,33 @@ def Store_from_filecache_clause(store_name, clause_name, clause):
     max_cachefile_size=max_cachefile_size,
     max_cachefiles=max_cachefiles,
     )
+
+def Store_from_platonic_clause(store_name, clause_name, clause):
+  ''' Construct a DataDirStore from a "datadir" clause.
+  '''
+  path = clause.get('path')
+  if path is None:
+    path = clause_name
+    debug("path from clausename: %r", path)
+  path = longpath(path)
+  debug("longpath(path) ==> %r", path)
+  if not isabspath(path):
+    if path.startswith('./'):
+      path = abspath(path)
+      debug("abspath ==> %r", path)
+    else:
+      statedir = clause.get('statedir')
+      debug("statedir=%r", statedir)
+      if statedir is None:
+        raise ValueError('relative path %r but no statedir' % (path,))
+      statedir = longpath(statedir)
+      debug("longpath(statedir) ==> %r", statedir)
+      path = joinpath(statedir, path)
+      debug("path ==> %r", path)
+  datapath = clause.get('data')
+  if datapath is not None:
+    datapath = longpath(datapath)
+  return PlatonicStore(store_name, path, datapath, None, None)
 
 def Store_from_tcp_clause(store_name, clause_name, clause):
   ''' Construct a TCPStoreClient from a "tcp" clause.
