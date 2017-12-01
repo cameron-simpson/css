@@ -469,7 +469,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           oldF = F
           need_sync = True
         if need_sync:
-          TTY.write('F')
+          TTY.write(b'F')
           index.flush()
           self._save_state()
           need_sync = False
