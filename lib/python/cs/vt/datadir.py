@@ -15,7 +15,7 @@ import os
 from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath
 import stat
 import sys
-from threading import RLock, Thread
+from threading import RLock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -24,7 +24,7 @@ from cs.csvutils import csv_reader
 from cs.excutils import logexc
 from cs.fileutils import makelockfile, shortpath, longpath, read_from
 from cs.logutils import info, warning, error, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
