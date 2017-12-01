@@ -351,26 +351,27 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     if self.datadirpath is None:
       self.datadirpath = self.statedirpath
 
-  @locked
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
     statefilepath = self.statefilepath
     X("SAVE STATE ==> %r", statefilepath)
     with Pfx("_save_state(%r)", statefilepath):
-      with open(statefilepath, 'w') as fp:
-        csvw = csv.writer(fp)
-        csvw.writerow( ('datadir', shortpath(self.datadirpath)) )
-        if self._n_current_save_datafile is not None:
-          csvw.writerow( ('current', self._n_current_save_datafile) )
-        extras = self._extra_state
-        for k in sorted(extras.keys()):
-          csvw.writerow( (k, extras[k]) )
-        filemap = self._filemap
-        for n in sorted(filter(lambda n: isinstance(n, int), filemap.keys())):
-          F = filemap[n]
-          csvw.writerow( [n, F.filename] + F.csvrow() )
-    ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+      with self._lock:
+        with open(statefilepath, 'w') as fp:
+          csvw = csv.writer(fp)
+          csvw.writerow( ('datadir', shortpath(self.datadirpath)) )
+          if self._n_current_save_datafile is not None:
+            csvw.writerow( ('current', self._n_current_save_datafile) )
+          extras = self._extra_state
+          for k in sorted(extras.keys()):
+            csvw.writerow( (k, extras[k]) )
+          filemap = self._filemap
+          for n in sorted(filter(lambda n: isinstance(n, int), filemap.keys())):
+            F = filemap[n]
+            if F is not None:
+              csvw.writerow( [n, F.filename] + F.csvrow() )
+      ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
 
   def _add_datafile(self, filename):
     ''' Add the specified data file named `filename` to the filemap, returning the filenum.
