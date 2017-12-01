@@ -43,6 +43,9 @@ TTY = open('/dev/tty', 'ab', 0)
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
+# flush the index after this many updates in the index updater worker thread
+INDEX_FLUSH_RATE = 131072
+
 def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
   ''' Accept `spec` of the form:
         [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
@@ -435,8 +438,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     '''
     with Pfx("_index_updater"):
       index = self.index
+      flush_rate = INDEX_FLUSH_RATE
       unindexed = self._unindexed
       filemap = self._filemap
+      oldF = None
+      nsaves = 0
+      need_sync = False
       for hashcode, entry, post_offset in self._indexQ:
         TTY.write(b'I')
         with self._lock:
@@ -447,8 +454,29 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             # this can happen when the same key is indexed twice
             # entirely plausible if a new datafile is added to the datadir
             pass
-          F = filemap[entry.n]
-          F.indexed_to = max(F.indexed_to, post_offset)
+        nsaves += 1
+        if nsaves >= flush_rate:
+          need_sync = True
+        F = filemap[entry.n]
+        if post_offset <= F.indexed_to:
+          error("%r: indexed_to already %s but post_offset=%s",
+              F.filename, F.indexed_to, post_offset)
+        F.indexed_to = max(F.indexed_to, post_offset)
+        if oldF is None or F is not oldF:
+          XP("switch to %r", F.filename)
+          if oldF is not None:
+            XP("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
+          oldF = F
+          need_sync = True
+        if need_sync:
+          TTY.write('F')
+          index.flush()
+          self._save_state()
+          need_sync = False
+          nsaves = 0
+        TTY.write(b'i')
+      index.flush()
+      self._save_state()
 
   @locked
   def flush(self):
