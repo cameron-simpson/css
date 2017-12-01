@@ -391,6 +391,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       raise KeyError('FileState:%s: already in filemap: %r' % (F, filename,))
     with self._lock:
       if filenum is None:
+        # TODO: keep the max floating around and make this O(1)
         filenum = max([0] + list(k for k in filemap if isinstance(k, int))) + 1
         F.filenum = filenum
       elif filenum in filemap:
@@ -428,6 +429,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       self._unindexed[hashcode] = entry
     self._indexQ.put( (hashcode, entry, post_offset) )
 
+  @logexc
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from .indexQ and store it.
     '''
