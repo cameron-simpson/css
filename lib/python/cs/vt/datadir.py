@@ -44,7 +44,7 @@ TTY = open('/dev/tty', 'ab', 0)
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 # flush the index after this many updates in the index updater worker thread
-INDEX_FLUSH_RATE = 131072
+INDEX_FLUSH_RATE = 1024
 
 def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
   ''' Accept `spec` of the form:
