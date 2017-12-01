@@ -399,6 +399,18 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       filemap[filename] = F
     return filenum
 
+  def _del_datafilestate(self, F):
+    ''' Delete references to the specified FileState, leaving a None placeholder behind.
+    '''
+    filename = F.filename
+    filenum = F.filenum
+    filemap = self.filemap
+    with self._lock:
+      assert filemap[filename] is F
+      filemap[filename] = None
+      assert filemap[filenum] is F
+      filemap[filenum] = None
+
   @locked
   def _get_current_save_datafile(self):
     ''' Return the number and DataFile of the current datafile,
