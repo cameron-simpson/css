@@ -38,6 +38,8 @@ from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
 
+TTY = open('/dev/tty', 'ab', 0)
+
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
@@ -421,6 +423,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       unindexed = self._unindexed
       filemap = self._filemap
       for hashcode, entry, post_offset in self._indexQ:
+        TTY.write(b'I')
         with self._lock:
           index[hashcode] = entry
           try:
@@ -852,6 +855,7 @@ class PlatonicDir(_FilesDir):
                     need_save = True
                     if self._monitor_halt:
                       break
+                  XP("%r: scanned_to=%d", F.filename, F.scanned_to)
                   # update state after completion of a scan
                   if need_save:
                     self._save_state()
