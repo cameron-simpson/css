@@ -29,9 +29,9 @@ PyMODINIT_FUNC PyInit__scan(void)
 static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     unsigned long   hash_value;
     unsigned char   *buf;
-    size_t          buflen;
+    int             buflen;
 
-    if (!PyArg_ParseTuple(args, "Iy#", &hash_value, &buf, &buflen)) {
+    if (!PyArg_ParseTuple(args, "ky#", &hash_value, &buf, &buflen)) {
         return NULL;
     }
 
@@ -39,36 +39,42 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     int             noffsets = 0;
 
     if (buflen > 0) {
-        Py_BEGIN_ALLOW_THREADS
         offsets = malloc(buflen * sizeof(unsigned long));
-        if (offsets != NULL) {
-            unsigned long   offset = 0;
-            unsigned char   *cp = buf;
-            for (; buflen; cp++, buflen--, offset++) {
-                unsigned char b = *cp;
-                hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                               )
-                             | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                               )
-                             );
-                if (hash_value % 4093 == 4091) {
-                    offsets[noffsets++] = offset;
-                }
-            }
-        }
-        Py_END_ALLOW_THREADS
         if (offsets == NULL) {
             return PyErr_NoMemory();
         }
+        /*Py_BEGIN_ALLOW_THREADS*/
+        unsigned long   offset = 0;
+        unsigned char   *cp = buf;
+        for (; buflen; cp++, buflen--, offset++) {
+            unsigned char b = *cp;
+            hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                           )
+                         | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                           )
+                         );
+            if (hash_value % 4093 == 4091) {
+                offsets[noffsets++] = offset;
+            }
+        }
+        /*Py_END_ALLOW_THREADS*/
     }
 
     /* compose a Python list containing the offsets */
     PyObject        *offset_list = PyList_New(noffsets);
+    if (offset_list == NULL) {
+        if (offsets != NULL) {
+            free(offsets);
+        }
+        return NULL;
+    }
     for (int offset_ndx=0; offset_ndx < noffsets; offset_ndx++) {
         PyObject *py_offset = PyLong_FromUnsignedLong(offsets[offset_ndx]);
         if (py_offset == NULL) {
             Py_DECREF(offset_list);
-            free(offsets);
+            if (offsets != NULL) {
+                free(offsets);
+            }
             return NULL;
         }
         PyList_SET_ITEM(offset_list, offset_ndx, py_offset);
