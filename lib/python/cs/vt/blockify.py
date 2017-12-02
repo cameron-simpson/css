@@ -8,28 +8,55 @@
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import debug, warning, exception, D
+from cs.logutils import debug, warning, error, exception, D
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.x import X
 from .block import Block, IndirectBlock
 
+# import the C buffer scanner, building it if necessary
+# fall back to the pure python one if we fail
 try:
   from ._scan import scanbuf
 except ImportError:
   def do_setup():
     from distutils.core import setup, Extension
     from os.path import dirname, join as joinpath
-    setup(
+    return setup(
       ext_modules=[Extension("cs.vt._scan", [joinpath(dirname(__file__), '_scan.c')])],
     )
+  # delay, seemingly needed to make the C version look "new"
+  import time
+  time.sleep(2)
   oargv = sys.argv
   sys.argv = [oargv[0], 'build_ext', '--inplace']
-  do_setup()
-  sys.argv = oargv
-  X("sys.modules = %r", sorted(sys.modules.keys()))
-  from ._scan import scanbuf
+  try:
+    X("do_setup => %r", do_setup())
+  except SystemExit as e:
+    error("SETUP FAILS: %s:%s", type(e), e)
+    scanbuf =  None
+  else:
+    try:
+      from ._scan import scanbuf
+    except ImportError as e:
+      error("import fails after setup: %s", e)
+      scanbuf = None
+  finally:
+    sys.argv = oargv
+if scanbuf is None:
+  warning("using pure Python scanbuf")
+  def scanbuf(hash_value, chunk):
+    offsets = []
+    for offset, b in enumerate(chunk):
+      hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                     )
+                   | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                     )
+                   )
+      if hash_value % 4093 == 4091:
+        offsets.append(offset)
+    return hash_value, offsets
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
@@ -290,7 +317,9 @@ def blocked_chunks_of(chunks, scanner,
       if not in_chunks:
         # no more data
         break
-      chunk = memoryview(in_chunks.pop(0))
+      chunk = in_chunks.pop(0)
+      hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+      chunk = memoryview(chunk)
       chunk_end_offset = offset + len(chunk)
       # process current chunk
       advance_by = 0    # how much data to add to the pending buffer
