@@ -15,6 +15,22 @@ from cs.seq import tee
 from cs.x import X
 from .block import Block, IndirectBlock
 
+try:
+  from ._scan import scanbuf
+except ImportError:
+  def do_setup():
+    from distutils.core import setup, Extension
+    from os.path import dirname, join as joinpath
+    setup(
+      ext_modules=[Extension("cs.vt._scan", [joinpath(dirname(__file__), '_scan.c')])],
+    )
+  oargv = sys.argv
+  sys.argv = [oargv[0], 'build_ext', '--inplace']
+  do_setup()
+  sys.argv = oargv
+  X("sys.modules = %r", sorted(sys.modules.keys()))
+  from ._scan import scanbuf
+
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
 MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
