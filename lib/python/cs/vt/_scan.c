@@ -43,7 +43,7 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
         if (offsets == NULL) {
             return PyErr_NoMemory();
         }
-        /*Py_BEGIN_ALLOW_THREADS*/
+        Py_BEGIN_ALLOW_THREADS
         unsigned long   offset = 0;
         unsigned char   *cp = buf;
         for (; buflen; cp++, buflen--, offset++) {
@@ -57,7 +57,7 @@ static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
                 offsets[noffsets++] = offset;
             }
         }
-        /*Py_END_ALLOW_THREADS*/
+        Py_END_ALLOW_THREADS
     }
 
     /* compose a Python list containing the offsets */
