@@ -126,7 +126,9 @@ def main(argv):
 
   if verbose:
     loginfo.level = logging.INFO
-    loginfo.upd.nl_level = logging.INFO
+    upd = loginfo.upd
+    if upd is not None:
+      upd.nl_level = logging.INFO
 
   config = ConfigFile(dflt_configpath)
 
