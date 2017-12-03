@@ -110,11 +110,12 @@ class LMDBIndex(_Index):
   def _embiggen_lmdb(self, new_map_size=None):
     if new_map_size is None:
       new_map_size= self.map_size * 2
-    self._lmdb.sync()
-    self._lmdb.close()
+    old_lmdb = self._lmdb
     self.map_size = new_map_size
     info("change LMDB map_size to %d", self.map_size)
     self._open_lmdb()
+    old_lmdb.sync()
+    old_lmdb.close()
 
   def shutdown(self):
     self.flush()
@@ -153,16 +154,15 @@ class LMDBIndex(_Index):
   def __setitem__(self, hashcode, value):
     import lmdb
     entry = value.encode()
-    try:
-      with self._lmdb.begin(write=True) as txn:
-        txn.put(hashcode, entry, overwrite=True)
-    except lmdb.MapFullError as e:
-      warning("%s", e)
-    else:
-      return
-    self._embiggen_lmdb()
-    with self._lmdb.begin(write=True) as txn:
-      txn.put(hashcode, entry, overwrite=True)
+    while True:
+      try:
+        with self._lmdb.begin(write=True) as txn:
+          txn.put(hashcode, entry, overwrite=True)
+      except lmdb.MapFullError as e:
+        warning("%s", e)
+      else:
+        return
+      self._embiggen_lmdb()
 
 class GDBMIndex(_Index):
   ''' GDBM index for a DataDir.
