@@ -23,7 +23,7 @@ from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
 from cs.excutils import logexc
 from cs.fileutils import makelockfile, shortpath, longpath, read_from
-from cs.logutils import info, warning, error, exception
+from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -866,7 +866,6 @@ class PlatonicDir(_FilesDir):
           if self._monitor_halt:
             break
           with Pfx(dirpath):
-            info("SCAN")
             rdirpath = relpath(dirpath, datadirpath)
             dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
             for filename in filenames:
@@ -896,7 +895,7 @@ class PlatonicDir(_FilesDir):
                   continue
                 if new_size is None:
                   # skip non files
-                  info("SKIP non-file")
+                  debug("SKIP non-file")
                   continue
                 if new_size > F.scanned_to:
                   info("monitor: scan %r from %d", rfilepath, F.scanned_to)
