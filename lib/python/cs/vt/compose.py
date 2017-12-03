@@ -162,7 +162,7 @@ class ConfigFile(ConfigWatcher):
           S = Store_from_datadir_clause(store_name, clause_name, clause)
         elif stype == 'filecache':
           S = Store_from_filecache_clause(store_name, clause_name, clause)
-        if stype == 'platonic':
+        elif stype == 'platonic':
           S = Store_from_platonic_clause(store_name, clause_name, clause)
         elif stype == 'tcp':
           S = Store_from_tcp_clause(store_name, clause_name, clause)
