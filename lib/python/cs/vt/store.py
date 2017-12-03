@@ -439,14 +439,18 @@ class ChainStore(BasicStoreSync):
     if parallel is None:
       parallel = self.parallel
     LFs = []
+    SbyLF = {}
     for S in self.stores:
       with Pfx(S):
         LF = getattr(S, method_name)(*args)
-        LFs.append( (S, LF) )
+        LFs.append(LF)
+        SbyLF[LF] = S
         if not parallel:
           # yield early, allowing caller to prevent further calls
           yield LF()
-    for S, LF in reportLFs(LFs):
+    X("LFs=%r", LFs)
+    for LF in reportLFs(LFs):
+      S = SbyLF[LF]
       with Pfx(S):
         result = LF()
         if self.parallel:
