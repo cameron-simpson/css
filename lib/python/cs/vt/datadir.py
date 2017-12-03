@@ -350,6 +350,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 else:
                   # filenum, filename, indexed_to
                   _, filename, indexed_to, *etc = row
+                  try:
+                    indexed_to = int(indexed_to)
+                  except ValueError as e:
+                    error("discrading record: invalid indexed_to (column 3), expected int: %s: %r",
+                          e, indexed_to)
+                    continue
                   filestate = FileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
                   filestate.filenum = filenum
                   self._add_datafilestate(filestate)
