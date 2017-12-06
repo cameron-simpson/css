@@ -32,7 +32,7 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
-from .blockify import blocked_chunks_of
+from .blockify import blocked_chunks_of, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
@@ -45,9 +45,6 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 1024
-
-# read size for file scans
-SCAN_READ_SIZE = 1024 * 1024
 
 def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
   ''' Accept `spec` of the form:
@@ -920,11 +917,11 @@ class PlatonicDir(_FilesDir):
   def scan(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
-    global SCAN_READ_SIZE
+    global DEFAULT_SCAN_SIZE
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
-      for data in blocked_chunks_of(read_from(fp, SCAN_READ_SIZE), scanner):
+      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE), scanner):
         post_offset = offset + len(data)
         yield offset, 0, data, post_offset
         offset = post_offset
