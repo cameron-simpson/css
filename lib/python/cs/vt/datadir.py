@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
-from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath
+from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
 import stat
 import sys
 from threading import RLock
@@ -25,6 +25,7 @@ from cs.excutils import logexc
 from cs.fileutils import makelockfile, shortpath, longpath, read_from
 from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP, PfxThread as Thread
+from cs.py.func import prop
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import imerge
@@ -332,18 +333,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 except ValueError:
                   _, col2 = row
                   with Pfx("%s=%r", col1, col2):
-                    if col1 == 'datadir':
-                      datadirpath = longpath(col2)
-                      if self.datadirpath is None:
-                        self.datadirpath = datadirpath
-                      elif not samefile(datadirpath, self.datadirpath):
-                        warning("not the same directory as supplied self.datadirpath=%r, will be updated",
-                                self.datadirpath)
-                    elif col1 == 'current':
-                      self._n_current_save_datafile = int(col2)
-                    else:
-                      warning("unrecognised parameter (preserved)")
-                      extras[col1] = col2
+                    self.set_state(col1, col2)
                 else:
                   # filenum, filename, indexed_to
                   _, filename, indexed_to, *etc = row
@@ -356,9 +346,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                   filestate = FileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
                   filestate.filenum = filenum
                   self._add_datafilestate(filestate)
-    # presume data in state dir if not specified
-    if self.datadirpath is None:
-      self.datadirpath = self.statedirpath
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
@@ -370,8 +357,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         with open(statefilepath, 'w') as fp:
           csvw = csv.writer(fp)
           csvw.writerow( ('datadir', shortpath(self.datadirpath)) )
-          if self._n_current_save_datafile is not None:
-            csvw.writerow( ('current', self._n_current_save_datafile) )
+          if self.current_save_filenum is not None:
+            csvw.writerow( ('current', self.current_save_filenum) )
           extras = self._extra_state
           for k in sorted(extras.keys()):
             csvw.writerow( (k, extras[k]) )
@@ -381,6 +368,39 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             if F is not None:
               csvw.writerow( [n, F.filename] + F.csvrow() )
       ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+
+  def set_state(self, key, value):
+    if not key.islower():
+      raise ValueError("invalid state key, short be lower case: %r" % (key,))
+    if value is None:
+      if key in self._state:
+        del self._extra_state[key]
+    else:
+      self._extra_state[key] = value
+
+  @prop
+  def datadirpath(self):
+    path = longpath(self._extra_state.get('datadir', 'data'))
+    if not isabspath(path):
+      path = joinpath(self.statedirpath, path)
+    return path
+
+  @datadirpath.setter
+  def datadirpath(self, newpath):
+    if isabspath(newpath):
+      newpath = relpath(newpath, self.statedirpath)
+    self.set_state('datadir', shortpath(newpath))
+
+  @prop
+  def current_save_filenum(self):
+    n = self._extra_state.get('current')
+    if n is not None:
+      n = int(n)
+    return n
+
+  @current_save_filenum.setter
+  def current_save_filenum(self, new_filenum):
+    self.set_state('current', new_filenum)
 
   def _add_datafile(self, filename):
     ''' Add the specified data file named `filename` to the filemap, returning the filenum.
@@ -426,10 +446,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Return the number and DataFile of the current datafile,
         opening one if necessary.
     '''
-    n = self._n_current_save_datafile
+    n = self.current_save_filenum
     if n is None:
       n = self._new_datafile()
-      self._n_current_save_datafile = n
+      self.current_save_filenum = n
     D = self._open_datafile(n)
     return n, D
 
@@ -627,7 +647,7 @@ class DataDir(_FilesDir):
         if D is None:
           # still not in the cache, open the DataFile and put into the cache
           F = self._filemap[n]
-          readwrite = (n == self._n_current_save_datafile)
+          readwrite = (n == self.current_save_filenum)
           D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
           D.open()
     return D
@@ -675,7 +695,7 @@ class DataDir(_FilesDir):
         if self._monitor_halt:
           break
         # don't monitor the current datafile: our own actions will update it
-        n = self._n_current_save_datafile
+        n = self.current_save_filenum
         if n is not None and filenum == n:
           # ignore the current save file
           continue
@@ -722,7 +742,7 @@ class DataDir(_FilesDir):
     rollover = self.rollover
     with self._lock:
       if rollover is not None and post_offset >= rollover:
-        self._n_current_save_datafile = None
+        self.current_save_filenum = None
     return hashcode
 
 class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
