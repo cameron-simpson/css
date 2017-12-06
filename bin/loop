@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Trite script to run a command forever with an optional sleep in between runs.
+#   - Cameron Simpson <cs@cskk.id.au> 06dec2017
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $0 [delay] command [args...]
+  delay Time between runs in seconds. Values from 0 to 999 accepted."
+
+delay=1
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    [0-9] | [1-9][0-9] | [1-9][0-9][0-9] )
+      delay=$1
+      shift
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+while :
+do
+  "$@" || :
+  case "$delay" in
+    0)  ;;
+    *)  sleep "$delay" ;;
+  esac
+done
