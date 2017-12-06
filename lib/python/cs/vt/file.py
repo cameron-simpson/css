@@ -272,7 +272,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
     return self._high_level_blocks_from_front_back(
-                  self.front_file, back_block, self.front_range,
+                  self.front_file, self.backing_block, self.front_range,
                   start, end, scanner=scanner)
 
   @staticmethod
