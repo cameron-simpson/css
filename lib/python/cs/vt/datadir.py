@@ -172,17 +172,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
+    MultiOpenMixin.__init__(self, lock=RLock())
     self.statedirpath = statedirpath
-    if datadirpath is None:
-      datadirpath = joinpath(statedirpath, 'data')
-      # the "default" data dir may be created if the statedir exists
-      if (
-          create_datadir is None
-          and existspath(statedirpath)
-          and not existspath(datadirpath)
-      ):
-        create_datadir = True
-    self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
@@ -204,17 +195,26 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
+    self._filemap = {}
+    self._extra_state = {}
+    self._load_state()
+    if datadirpath is not None:
+      self.datadirpath = datadirpath
+    else:
+      datadirpath = self.datadirpath
+    # the "default" data dir may be created if the statedir exists
+    if (
+        create_datadir is None
+        and existspath(statedirpath)
+        and not existspath(datadirpath)
+    ):
+      create_datadir = True
     if not isdirpath(datadirpath):
       if create_datadir:
         with Pfx("mkdir(%r)", datadirpath):
           os.mkdir(datadirpath)
       else:
         raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
-    MultiOpenMixin.__init__(self, lock=RLock())
-    self._filemap = {}
-    self._extra_state = {}
-    self._n_current_save_datafile = None
-    self._load_state()
 
   def _indexclass(self, preferred_indexclass=None):
     return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
