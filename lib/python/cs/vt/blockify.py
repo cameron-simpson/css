@@ -59,9 +59,17 @@ if scanbuf is None:
         offsets.append(offset)
     return hash_value, offsets
 
+scanbuf0 = scanbuf
+def scanbuf(h, data):
+  X("scan %d bytes", len(data))
+  return scanbuf0(h, data)
+
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
 MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
+
+# default read size for file scans
+DEFAULT_SCAN_SIZE = 1024 * 1024
 
 def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
