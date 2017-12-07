@@ -5,19 +5,71 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+from heapq import heapify, heappushpop, heappop
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import debug, warning, exception, D
+from cs.logutils import debug, warning, error, exception, D
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.x import X
 from .block import Block, IndirectBlock
 
+# import the C buffer scanner, building it if necessary
+# fall back to the pure python one if we fail
+try:
+  from ._scan import scanbuf
+except ImportError:
+  def do_setup():
+    from distutils.core import setup, Extension
+    from os.path import dirname, join as joinpath
+    return setup(
+      ext_modules=[Extension("cs.vt._scan", [joinpath(dirname(__file__), '_scan.c')])],
+    )
+  # delay, seemingly needed to make the C version look "new"
+  import time
+  time.sleep(2)
+  oargv = sys.argv
+  sys.argv = [oargv[0], 'build_ext', '--inplace']
+  try:
+    X("do_setup => %r", do_setup())
+  except SystemExit as e:
+    error("SETUP FAILS: %s:%s", type(e), e)
+    scanbuf =  None
+  else:
+    try:
+      from ._scan import scanbuf
+    except ImportError as e:
+      error("import fails after setup: %s", e)
+      scanbuf = None
+  finally:
+    sys.argv = oargv
+if scanbuf is None:
+  warning("using pure Python scanbuf")
+  def scanbuf(hash_value, chunk):
+    offsets = []
+    for offset, b in enumerate(chunk):
+      hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                     )
+                   | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                     )
+                   )
+      if hash_value % 4093 == 4091:
+        offsets.append(offset)
+    return hash_value, offsets
+
+scanbuf0 = scanbuf
+def scanbuf(h, data):
+  X("scan %d bytes", len(data))
+  return scanbuf0(h, data)
+
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
 MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
+
+# default read size for file scans
+DEFAULT_SCAN_SIZE = 1024 * 1024
 
 def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
@@ -214,8 +266,6 @@ def blocked_chunks_of(chunks, scanner,
         # end of offsets and chunks
         parseQ.close()
       PfxThread(target=run_parser).run()
-    ##X("blocked_chunks_of: min_block=%d, min_autoblock=%d, max_block=%d",
-    ##    min_block, min_autoblock, max_block)
     def get_parse():
       ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
           Sets parseQ to None if the end of the iterable is reached.
@@ -232,30 +282,21 @@ def blocked_chunks_of(chunks, scanner,
           in_chunks.append(parsed)
     last_offset = None
     first_possible_point = None
-    next_rolling_point = None
     max_possible_point = None
-    max_rolling_point = None
     def recompute_offsets():
       ''' Recompute relevant offsets from the block parameters.
           The first_possible_point is last_offset+min_block,
             the earliest point at which we will accept a block boundary.
-          The next_rolling_point is the offset at which we should
-            start looking for automatic boundaries with the rolling
-            hash algorithm. Without an upstream scanner this is the same
-            as first_possible_point, but if there is a scanner then it
-            is further to give more opportunity for a scanner boundary
-            to be used in preference to an automatic boundary.
           The max_possible_point is last_offset+max_block,
             the latest point at which we will accept a block boundary;
             we will choose this if no next_offset or hash offset
             is found earlier.
       '''
-      nonlocal last_offset, first_possible_point, next_rolling_point, max_possible_point
+      nonlocal last_offset, first_possible_point, max_possible_point
       first_possible_point = last_offset + min_block
-      next_rolling_point   = last_offset + min_autoblock
       max_possible_point   = last_offset + max_block
-      ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, next_rolling_point=%d, max_possible_point=%d",
-      ##  last_offset, first_possible_point, next_rolling_point, max_possible_point)
+      ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, max_possible_point=%d",
+      ##  last_offset, first_possible_point, max_possible_point)
     # prepare initial state
     next_offset = 0
     last_offset = 0
@@ -274,7 +315,11 @@ def blocked_chunks_of(chunks, scanner,
       if not in_chunks:
         # no more data
         break
-      chunk = memoryview(in_chunks.pop(0))
+      chunk = in_chunks.pop(0)
+      hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+      chunk_scan_offsets = [ offset + cso for cso in chunk_scan_offsets ]
+      heapify(chunk_scan_offsets)
+      chunk = memoryview(chunk)
       chunk_end_offset = offset + len(chunk)
       # process current chunk
       advance_by = 0    # how much data to add to the pending buffer
@@ -311,7 +356,6 @@ def blocked_chunks_of(chunks, scanner,
                 histogram[out_chunk_size] += 1
             last_offset = pending.offset
             ##X("RELEASED: "+release)
-            hash_value = 0
             recompute_offsets()
             release = False   # becomes true if we should flush after taking data
           if not chunk:
@@ -325,7 +369,6 @@ def blocked_chunks_of(chunks, scanner,
                       'last_offset': last_offset,
                       'next_offset': next_offset,
                       'first_point': first_possible_point,
-                      'next_rolling': next_rolling_point,
                       'max_point': max_possible_point,
                       'chunk_end': chunk_end_offset,
                     } )
@@ -334,7 +377,6 @@ def blocked_chunks_of(chunks, scanner,
         if first_possible_point > offset:
           advance_by = min(first_possible_point - offset, len(chunk))
           why = "first_possible_point > offset"
-          hash_value = 0
           continue
         # advance next_offset to something useful > offset
         while next_offset is not None and next_offset <= offset:
@@ -346,62 +388,14 @@ def blocked_chunks_of(chunks, scanner,
               warning("next offset %d < current next_offset:%d",
                       next_offset2, next_offset)
             else:
-              next_offset = next_offset2
-              max_rolling_point = next_offset - min_autoblock
+              next_offset = heappushpop(chunk_scan_offsets, next_offset2)
               ##X("NEXT_OFFSET = %d", next_offset)
+          elif chunk_scan_offsets:
+            # nothing from parser, but still offsets in the scan
+            next_offset = heappop(chunk_scan_offsets)
           else:
             ##X("END OF OFFSETS")
             next_offset = None
-        # if we're beyond the max_rolling_point (next_offset-min_autoblock)
-        # then just take data until the next_offset
-        if next_offset is not None and offset >= max_rolling_point:
-          ##X("next_offset=%d, next_rolling_point=%d, chunk_end_offset=%d",
-          ##  next_offset, next_rolling_point, chunk_end_offset)
-          advance_by = min(next_offset, chunk_end_offset) - offset
-          why = "offset >= next_rolling_point"
-          # flush if we actually got to the next_offset
-          if next_offset <= chunk_end_offset:
-            ##X("USE PARSER OFFSET next_offset=%d", next_offset)
-            release = "next_offset <= chunk_end_offset"
-            if histogram is not None:
-              histogram['offsets_from_scanner'] += 1
-          continue
-        ##X("SCANNING: last_offset=%d, offset=%d, next_offset=%s, next_rolling_point=%d",
-        ##    last_offset, offset, next_offset, next_rolling_point)
-        # how far to scan with the rolling hash, being from here to
-        # next_offset minus a min_block buffer, capped by the length of
-        # the current chunk
-        scan_to = min(max_possible_point, chunk_end_offset)
-        if next_offset is not None:
-          scan_to = min(scan_to, max_rolling_point)
-        if scan_to > offset:
-          scan_len = scan_to - offset
-          ##X("SCAN %d bytes...", scan_len)
-          for upto, b in enumerate(chunk[:scan_len]):
-            hash_value = ( ( ( hash_value & 0x001fffff ) << 7
-                           )
-                         | ( ( b & 0x7f )^( (b & 0x80)>>7 )
-                           )
-                         )
-            if hash_value % 4093 == 4091:
-              # found an edge with the rolling hash
-              ##left = upto-3
-              ##if left < 0: left=0
-              ##right = upto+1
-              ##release = "rolling hash hit at %s of %s" % (bytes(chunk[left:right]),bytes(chunk[left:]))
-              ##release = "rolling hash hit at %s" % (bytes(chunk[left:right]),)
-              release = "rolling hash hit"
-              advance_by = upto + 1
-              why = "rolling hash hit"
-              if histogram is not None:
-                histogram['offsets_from_hash_scan'] += 1
-                histogram['bytes_hash_scanned'] += upto + 1
-              break
-          if advance_by is None:
-            advance_by = scan_len
-            why = "scanned to %d with no hit" % (scan_to,)
-            ##X("SCAN: no match, advance by %d bytes", advance_by)
-          continue
         # nothing to skip, nothing to hash scan
         # ==> take everything up to next_offset
         # (and reset the hash)

@@ -12,10 +12,9 @@ import sys
 import tempfile
 import unittest
 from cs.randutils import rand0, randblock
-from .datadir import DataDir, DataDir_from_spec, \
-                      encode_index_entry, decode_index_entry
-from .datadir import INDEXCLASS_BY_NAME
+from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
 from .hash import HASHCLASS_BY_NAME
+from .index import class_names as indexclass_names, class_by_name as indexclass_by_name
 
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
@@ -27,10 +26,10 @@ def mktmpdir(flavour=None):
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
-           tempfile.mkdtemp(
-             prefix="datadir-test"
-             suffix=".dir",
-             dir='.'))
+      tempfile.mkdtemp(
+          prefix="datadir-test",
+          suffix=".dir",
+          dir='.'))
 
 class TestDataDir(unittest.TestCase):
 
@@ -80,12 +79,18 @@ class TestDataDir(unittest.TestCase):
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
     '''
-    for count in range(RUN_SIZE):
+    for _ in range(RUN_SIZE):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
-      n, offset = decode_index_entry(encode_index_entry(rand_n, rand_offset))
-      self.assertEqual(rand_n, n)
-      self.assertEqual(rand_offset, offset)
+      entry = DataDirIndexEntry(rand_n, rand_offset)
+      self.assertEqual(entry.n, rand_n)
+      self.assertEqual(entry.offset, rand_offset)
+      encoded = entry.encode()
+      self.assertIsInstance(encoded, bytes)
+      entry2 = DataDirIndexEntry.from_bytes(encoded)
+      self.assertEqual(entry, entry2)
+      self.assertEqual(entry2.n, rand_n)
+      self.assertEqual(entry2.offset, rand_offset)
 
   def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
@@ -157,8 +162,8 @@ def selftest(argv):
   suite = unittest.TestSuite()
   for hashname in sorted(HASHCLASS_BY_NAME.keys()):
     hashclass = HASHCLASS_BY_NAME[hashname]
-    for indexname in sorted(INDEXCLASS_BY_NAME.keys()):
-      indexclass = INDEXCLASS_BY_NAME[indexname]
+    for indexname in sorted(indexclass_names()):
+      indexclass = indexclass_by_name(indexname)
       suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
   runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)

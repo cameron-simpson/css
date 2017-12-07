@@ -7,12 +7,19 @@
 
 from os.path import exists as existspath
 from threading import Lock
-from cs.logutils import warning
+from cs.logutils import warning, info
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from .hash import HashCodeUtilsMixin
 
 _CLASSES = []
 _BY_NAME = {}
+
+def class_names():
+  return _BY_NAME.keys()
+
+def class_by_name(indexname):
+  return _BY_NAME[indexname]
 
 def choose(basepath, preferred_indexclass=None):
   ''' Choose an indexclass from a `basepath` with optional preferred indexclass.
@@ -71,6 +78,7 @@ class LMDBIndex(_Index):
 
   NAME = 'lmdb'
   SUFFIX = 'lmdb'
+  MAP_SIZE = 1024 * 1024 * 1024
 
   def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
     _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
@@ -85,8 +93,29 @@ class LMDBIndex(_Index):
     return True
 
   def startup(self):
+    self.map_size = 10240   ## self.MAP_SIZE
+    self._open_lmdb()
+
+  def _open_lmdb(self):
     import lmdb
-    self._lmdb = lmdb.Environment(self.path, subdir=True, readonly=False, metasync=False, sync=False)
+    self._lmdb = lmdb.Environment(
+        self.path,
+        subdir=True, readonly=False,
+        metasync=False, sync=False,
+        writemap=True, map_async=True,
+        map_size = self.map_size,
+    )
+    info("%s: %r", self, self._lmdb.info())
+
+  def _embiggen_lmdb(self, new_map_size=None):
+    if new_map_size is None:
+      new_map_size= self.map_size * 2
+    old_lmdb = self._lmdb
+    self.map_size = new_map_size
+    info("change LMDB map_size to %d", self.map_size)
+    self._open_lmdb()
+    old_lmdb.sync()
+    old_lmdb.close()
 
   def shutdown(self):
     self.flush()
@@ -123,9 +152,17 @@ class LMDBIndex(_Index):
     return self.decode(entry)
 
   def __setitem__(self, hashcode, value):
+    import lmdb
     entry = value.encode()
-    with self._lmdb.begin(write=True) as txn:
-      txn.put(hashcode, entry, overwrite=True)
+    while True:
+      try:
+        with self._lmdb.begin(write=True) as txn:
+          txn.put(hashcode, entry, overwrite=True)
+      except lmdb.MapFullError as e:
+        warning("%s", e)
+      else:
+        return
+      self._embiggen_lmdb()
 
 class GDBMIndex(_Index):
   ''' GDBM index for a DataDir.
@@ -148,7 +185,8 @@ class GDBMIndex(_Index):
 
   def startup(self):
     import dbm.gnu
-    self._gdbm = dbm.gnu.open(self.path, 'cf')
+    with Pfx(self.path):
+      self._gdbm = dbm.gnu.open(self.path, 'cf')
     self._gdbm_lock = Lock()
     self._written = False
 

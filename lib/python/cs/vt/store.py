@@ -26,7 +26,7 @@ from cs.result import report
 from cs.seq import Seq
 from cs.x import X
 from . import defaults
-from .datadir import DataDir
+from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
@@ -439,14 +439,18 @@ class ChainStore(BasicStoreSync):
     if parallel is None:
       parallel = self.parallel
     LFs = []
+    SbyLF = {}
     for S in self.stores:
       with Pfx(S):
         LF = getattr(S, method_name)(*args)
-        LFs.append( (S, LF) )
+        LFs.append(LF)
+        SbyLF[LF] = S
         if not parallel:
           # yield early, allowing caller to prevent further calls
           yield LF()
-    for S, LF in reportLFs(LFs):
+    X("LFs=%r", LFs)
+    for LF in reportLFs(LFs):
+      S = SbyLF[LF]
       with Pfx(S):
         result = LF()
         if self.parallel:
@@ -598,6 +602,30 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
     X("DataDirStore.shutdown: _datadir.close...")
+
+class PlatonicStore(MappingStore):
+  ''' A MappingStore using a PlatonicDir as its backend.
+  '''
+
+  def __init__(self, name, statedirpath,
+    datadirpath=None, hashclass=None, indexclass=None,
+    follow_symlinks=False, **kw
+  ):
+    datadir = PlatonicDir(
+        statedirpath, datadirpath, hashclass, indexclass,
+        follow_symlinks=follow_symlinks)
+    MappingStore.__init__(self, name, datadir, **kw)
+    self._datadir = datadir
+
+  def startup(self, **kw):
+    X("PlatonicStore.startup: _datadir.open...")
+    self._datadir.open()
+    super().startup(**kw)
+
+  def shutdown(self):
+    super().shutdown()
+    self._datadir.close()
+    X("PlatonicStore.shutdown: _datadir.close...")
 
 class _ProgressStoreTemplateMapping(object):
 

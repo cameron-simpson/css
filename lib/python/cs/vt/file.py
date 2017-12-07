@@ -15,7 +15,7 @@ from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults
 from .block import Block
-from .blockify import top_block_for, blockify
+from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
 
 class BlockFile(RawIOBase,ReadMixin):
   ''' A read-only file interface to a Block based on io.RawIOBase.
@@ -272,7 +272,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
     return self._high_level_blocks_from_front_back(
-                  self.front_file, back_block, self.front_range,
+                  self.front_file, self.backing_block, self.front_range,
                   start, end, scanner=scanner)
 
   @staticmethod
@@ -300,11 +300,13 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
           for B in back_block.top_blocks(span.start, span.end):
             yield B
 
-def filedata(fp, rsize=8192, start=None, end=None):
+def filedata(fp, rsize=None, start=None, end=None):
   ''' A generator to yield chunks of data from a file.
       These chunks don't need to be preferred-edge aligned;
       blockify() does that.
   '''
+  if rsize is None:
+    rsize = DEFAULT_SCAN_SIZE
   if start is None:
     pos = fp.tell()
   else:
@@ -321,7 +323,7 @@ def filedata(fp, rsize=8192, start=None, end=None):
     pos += len(data)
     yield data
 
-def file_top_block(fp, rsize=8192, start=None, end=None):
+def file_top_block(fp, rsize=None, start=None, end=None):
   ''' Return a top Block for the data from an open file.
   '''
   return top_block_for(blockify(filedata(fp, rsize=rsize, start=start, end=end)))

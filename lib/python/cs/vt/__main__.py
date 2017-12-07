@@ -51,6 +51,7 @@ def main(argv):
   usage = '''Usage: %s [options...] [profile] operation [args...]
     Options:
       -C        Do not put a cache in front of the store.
+                Default: use the filecache specified by ~/.vtrc[cache].
       -S store  Specify the store to use:
                   [clause]        Specification from .vtrc.
                   /path/to/dir    GDBMStore
@@ -125,7 +126,9 @@ def main(argv):
 
   if verbose:
     loginfo.level = logging.INFO
-    loginfo.upd.nl_level = logging.INFO
+    upd = loginfo.upd
+    if upd is not None:
+      upd.nl_level = logging.INFO
 
   config = ConfigFile(dflt_configpath)
 
