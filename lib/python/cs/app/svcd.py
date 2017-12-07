@@ -243,9 +243,12 @@ def main(argv=None, environ=None):
     sig_func = None
   else:
     def sig_func():
-      argv = ['sh', '-c', sig_shcmd]
+      argv = ['sh', ( '-xc' if trace else '-c' ), sig_shcmd]
       if test_uid != uid:
-        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+        su_shcmd = 'exec ' + quotecmd(argv)
+        if trace:
+          su_shcmd = 'set -x; ' + su_shcmd
+        argv = ['su', test_username, '-c', su_shcmd]
       P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()

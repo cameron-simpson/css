@@ -1,0 +1,3 @@
+  lib/python/cs/psutils.py: cs.psutils: new function groupargv for breaking up argv lists to fit within the maximum argument limit; constant MAX_ARGV for the default limit
+  lib/python/cs/psutils.py: cs.psutils: update module docstring, clean a little lint
+  lib/python/cs/psutils.py: cs.psutils: groupargv: support encoding string arrays into bytes for tally and return purposes
