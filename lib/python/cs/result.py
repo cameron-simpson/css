@@ -52,8 +52,9 @@ You can also collect multiple Results in completion order using the report() fun
 from functools import partial
 import sys
 from threading import Lock, Thread
-from cs.logutils import exception, warning, debug
+from cs.logutils import exception, error, warning, debug
 from cs.obj import O
+from cs.pfx import Pfx
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
 
@@ -65,7 +66,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.pfx', 'cs.seq', 'cs.py3'],
 }
 
 class AsynchState(object):
@@ -343,6 +344,13 @@ class Result(O):
         else:
           error("exception: %r", exc_info)
     self.notify(notifier)
+
+def bg(func, *a, **kw):
+  ''' Dispatch a Thread to run `func`, return a Result to collect its value.
+  '''
+  R = Result()
+  R.bg(func, *a, **kw)
+  return R
 
 def report(LFs):
   ''' Generator which yields completed Results.
