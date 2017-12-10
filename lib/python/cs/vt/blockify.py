@@ -62,7 +62,9 @@ if scanbuf is None:
 scanbuf0 = scanbuf
 def scanbuf(h, data):
   X("scan %d bytes", len(data))
-  return scanbuf0(h, data)
+  h2, offsets = scanbuf0(h, data)
+  ##X("scan => %r", offsets)
+  return h2, offsets
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
@@ -145,6 +147,20 @@ def blocks_of(chunks, scanner, min_block=None, max_block=None):
   '''
   for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block, max_block=max_block):
     yield Block(data=chunk)
+
+def spliced_blocks(B, new_blocks):
+  ''' Splice an iterable of (offset, Block) into the data of the Block `B`.
+      Yield high level blocks.
+  '''
+  upto = 0      # data span yielded so far
+  for offset, newB in new_blocks:
+    if offset > upto:
+      yield from B.top_blocks(upto, offset)
+      upto = offset
+    yield newB
+    upto += len(newB)
+  if upto < len(B):
+    yield from B.top_blocks(upto, len(B))
 
 class _PendingBuffer(object):
   ''' Class to manage the unbound chunks accrued by blocked_chunks_of below.
