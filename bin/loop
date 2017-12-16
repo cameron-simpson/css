@@ -6,11 +6,12 @@
 
 set -ue
 
+delay=1
+
 cmd=$0
 usage="Usage: $0 [delay] command [args...]
-  delay Time between runs in seconds. Values from 0 to 999 accepted."
-
-delay=1
+  delay Time between runs in seconds. Values from 0 to 999 accepted.
+        Default: $delay"
 
 badopts=
 
