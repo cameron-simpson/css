@@ -15,10 +15,8 @@
 from __future__ import with_statement
 from abc import ABC, abstractmethod
 import sys
-from cs.result import report as reportLFs
-from cs.fileutils import shortpath
 from cs.later import Later
-from cs.logutils import info, debug, warning, error
+from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
@@ -109,10 +107,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   # Basic support for putting Stores in sets.
   def __hash__(self):
-      return id(self)
+    return id(self)
 
   def __eq__(self, other):
-      return self is other
+    return self is other
 
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
@@ -366,7 +364,7 @@ class ProxyStore(BasicStoreSync):
 
       Save stores. All data added to the Proxy is added to these Stores.
 
-      Read Stores. Requested data may be ontained from these Stores.
+      Read Stores. Requested data may be obtained from these Stores.
 
       A typical setup utilising a working ProxyStore might look like this:
 
@@ -398,9 +396,9 @@ class ProxyStore(BasicStoreSync):
           would be higher latency upstream Stores.
     '''
     BasicStoreSync.__init__(self, name)
-    save = frozenset(save)
-    read = frozenset(read)
-    read2 = frozenset(read2)
+    self.save = frozenset(save)
+    self.read = frozenset(read)
+    self.read2 = frozenset(read2)
     self._attrs.update(save=save, read=read)
     if read2:
       self._attrs.update(read2=read2)
@@ -510,13 +508,16 @@ class PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
   '''
 
-  def __init__(self, name, statedirpath,
-    datadirpath=None, hashclass=None, indexclass=None,
-    follow_symlinks=False, **kw
+  def __init__(
+      self, name, statedirpath,
+      datadirpath=None, hashclass=None, indexclass=None,
+      follow_symlinks=False, meta_store=None,
+      **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
-        follow_symlinks=follow_symlinks)
+        follow_symlinks=follow_symlinks,
+        meta_store=meta_store)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
