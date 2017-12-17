@@ -14,8 +14,9 @@ from cs.pfx import Pfx
 from cs.threads import locked
 from cs.units import multiparse as multiparse_units, \
     BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
+from .archive import Archive
 from .cache import FileCacheStore
-from .store import ChainStore, DataDirStore, PlatonicStore
+from .store import DataDirStore, PlatonicStore, ProxyStore
 from .stream import StreamStore
 from .tcp import TCPStoreClient
 
@@ -27,24 +28,30 @@ def Store(store_spec, config=None):
                         first, seek data in all from left to right.
   '''
   with Pfx(repr(store_spec)):
+    stores = list(parse_store_specs(store_spec, config=config))
+    if not stores:
+      raise ValueError("empty Store specification: %r" % (store_spec,))
+    if len(stores) == 1:
+      return stores[0]
+    # multiple stores: save to the front store, read first from the
+    # front store then from the rest
+    return ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
+
+def parse_store_specs(s, offset=0, config=None):
+  with Pfx("parse_store_spec(%r)", s):
     stores = []
-    offset = 0
-    while offset < len(store_spec):
-      with Pfx(offset + 1):
-        S, offset = parse_store_spec(store_spec, offset, config=config)
+    while offset < len(s):
+      with Pfx("offset %d", offset):
+        S, offset = parse_store_spec(s, offset, config=config)
         stores.append(S)
-        if offset < len(store_spec):
-          sep = store_spec[offset]
+      if offset < len(s):
+        with Pfx("offset %d", offset):
+          sep = s[offset]
           offset += 1
           if sep == ':':
             continue
-          raise ValueError("unexpected separator %r at offset %d, expected ':'"
-                           % (sep, offset - 1))
-    if not stores:
-      raise ValueError("no stores in %r" % (store_spec,))
-    if len(stores) == 1:
-      return stores[0]
-    return ChainStore(store_spec, stores)
+          raise ValueError("expected colon ':', found unexpected separator: %r" % (sep,))
+    return stores
 
 def parse_store_spec(s, offset, config=None):
   ''' Parse a single Store specification from a string.
@@ -64,6 +71,7 @@ def parse_store_spec(s, offset, config=None):
         tcp:[host]:port Connect to a daemon implementing the streaming protocol.
 
         TODO:
+          type(param=value,...)
           ssh://host/[store-designator-as-above]
           unix:/path/to/socket
                         Connect to a daemon implementing the streaming protocol.
@@ -117,7 +125,7 @@ def parse_store_spec(s, offset, config=None):
       # collect port
       portpart = s[offset:]
       offset = len(s)
-      S = TCPStoreClient((hostpart, int(portpart)))
+      S = TCPStoreClient("tcp:%s:%s" % (hostpart, portpart), (hostpart, int(portpart)))
     else:
       raise ValueError("unrecognised Store spec")
   return S, offset
@@ -159,21 +167,24 @@ class ConfigFile(ConfigWatcher):
         if stype is None:
           raise ValueError("missing type")
         if stype == 'datadir':
-          S = Store_from_datadir_clause(store_name, clause_name, clause)
+          S = Store_from_datadir_clause(store_name, self, clause_name)
         elif stype == 'filecache':
-          S = Store_from_filecache_clause(store_name, clause_name, clause)
+          S = Store_from_filecache_clause(store_name, self, clause_name)
         elif stype == 'platonic':
-          S = Store_from_platonic_clause(store_name, clause_name, clause)
+          S = Store_from_platonic_clause(store_name, self, clause_name)
+        elif stype == 'proxy':
+          S = Store_from_proxy_clause(store_name, self, clause_name)
         elif stype == 'tcp':
-          S = Store_from_tcp_clause(store_name, clause_name, clause)
+          S = Store_from_tcp_clause(store_name, self, clause_name)
         else:
           raise ValueError("unsupported type %r" % (stype,))
         self._stores[clause_name] = S
     return S
 
-def Store_from_datadir_clause(store_name, clause_name, clause):
+def Store_from_datadir_clause(store_name, config, clause_name):
   ''' Construct a DataDirStore from a "datadir" clause.
   '''
+  clause = config[clause_name]
   path = clause.get('path')
   if path is None:
     path = clause_name
@@ -198,9 +209,10 @@ def Store_from_datadir_clause(store_name, clause_name, clause):
     datapath = longpath(datapath)
   return DataDirStore(store_name, path, datapath, None, None)
 
-def Store_from_filecache_clause(store_name, clause_name, clause):
+def Store_from_filecache_clause(store_name, config, clause_name):
   ''' Construct a FileCacheStorer from a "filecache" clause.
   '''
+  clause = config[clause_name]
   path = clause.get('path')
   max_cachefiles = clause.get('max_files')
   if max_cachefiles is not None:
@@ -231,14 +243,16 @@ def Store_from_filecache_clause(store_name, clause_name, clause):
       debug("longpath(statedir) ==> %r", statedir)
       path = joinpath(statedir, path)
       debug("path ==> %r", path)
-  return FileCacheStore(store_name, None, path,
-    max_cachefile_size=max_cachefile_size,
-    max_cachefiles=max_cachefiles,
-    )
+  return FileCacheStore(
+      store_name, None, path,
+      max_cachefile_size=max_cachefile_size,
+      max_cachefiles=max_cachefiles,
+  )
 
-def Store_from_platonic_clause(store_name, clause_name, clause):
+def Store_from_platonic_clause(store_name, config, clause_name):
   ''' Construct a DataDirStore from a "datadir" clause.
   '''
+  clause = config[clause_name]
   path = clause.get('path')
   if path is None:
     path = clause_name
@@ -264,11 +278,52 @@ def Store_from_platonic_clause(store_name, clause_name, clause):
   follow_symlinks = clause.get('follow_symlinks')
   if follow_symlinks is None:
     follow_symlinks = False
-  return PlatonicStore(store_name, path, datapath, hashclass=None, indexclass=None, follow_symlinks=follow_symlinks)
+  meta_spec = clause.get('meta')
+  if meta_spec is None:
+    meta_store = None
+  else:
+    meta_store = Store(meta_spec, config)
+  archive_path = clause.get('archive')
+  if archive_path is None:
+    archive = None
+  else:
+    archive = Archive(longpath(archive_path))
+  return PlatonicStore(
+      store_name, path, datapath,
+      hashclass=None, indexclass=None,
+      follow_symlinks=follow_symlinks,
+      meta_store=meta_store, archive=archive
+  )
 
-def Store_from_tcp_clause(store_name, clause_name, clause):
+def Store_from_proxy_clause(store_name, config, clause_name):
+  ''' Construct a ProxyStore.
+  '''
+  clause = config[clause_name]
+  save = clause.get('save')
+  if save is None:
+    save_stores = []
+    readonly = True
+  else:
+    save_stores = list(parse_store_specs(save))
+    readonly = len(save_stores) == 0
+  read = clause.get('read')
+  if read is None:
+    read_stores = []
+  else:
+    read_stores = list(parse_store_specs(read))
+  read2 = clause.get('read2')
+  if read2 is None:
+    read2_stores = []
+  else:
+    read2_stores = list(parse_store_specs(read2))
+  S = ProxyStore(store_name, save_stores, read_stores, read2_stores)
+  S.readonly = readonly
+  return S
+
+def Store_from_tcp_clause(store_name, config, clause_name):
   ''' Construct a TCPStoreClient from a "tcp" clause.
   '''
+  clause = config[clause_name]
   hostpart = clause.get("host")
   if not hostpart:
     raise ValueError('no "host"')
