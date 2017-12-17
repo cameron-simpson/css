@@ -511,13 +511,13 @@ class PlatonicStore(MappingStore):
   def __init__(
       self, name, statedirpath,
       datadirpath=None, hashclass=None, indexclass=None,
-      follow_symlinks=False, meta_store=None,
+      follow_symlinks=False, archive=None, meta_store=None,
       **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
         follow_symlinks=follow_symlinks,
-        meta_store=meta_store)
+        archive=archive, meta_store=meta_store)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
