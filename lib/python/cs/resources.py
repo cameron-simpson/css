@@ -254,6 +254,28 @@ class Pool(O):
 
 class RunState(object):
   ''' A class to track a running task whose cancellation may be requested.
+      Its purpose is twofold, to provide easily queriable state
+      around tasks which can start and stop, and to provide control
+      methods to pronounce that a task has started, should stop
+      (cancel) and has stopped (end).
+
+      A RunState can be used a a context manager, with the enter
+      and exit methods calling .start and .end respectively.
+
+      Monitor or daemon processes can poll the RunState to see when
+      they should terminate, and may also manage the overall state
+      easily using a context manager. Example:
+
+        def monitor(self):
+          with self.runstate:
+            while not self.runstate.cancelled:
+              ... main loop body here ...
+
+      A RunState has three main methods:
+
+      .start(): set .running and clear .cancelled
+      .cancel(): set .cancelled
+      .end(): clear .running
 
       A RunState has the following properties:
 
@@ -277,9 +299,6 @@ class RunState(object):
         instance to be called whenever .running becomes false.
       notify_cancel: a set of callables called with the RunState
         instance to be called whenever .cancel is called.
-
-      A RunState can be used a a context manager, with the enter
-      and exit methods calling start and .end respectively.
   '''
 
   def __init__(self):
@@ -347,18 +366,18 @@ class RunState(object):
 
   @property
   def stopping(self):
-    ''' Is the process stopping?
+    ''' Is the process stopping? Running is true and cancelled is true.
     '''
     return self.running and self.cancelled
 
   @property
   def stopped(self):
-    ''' Is the process stopped.
+    ''' Was the process stopped? Running is false and cancelled is true.
     '''
     return self.cancelled and not self.running
 
   def cancel(self):
-    ''' Set the cancelled flag, the process should notice and stop.
+    ''' Set the cancelled flag; the process should notice and stop.
     '''
     self.cancelled = True
     for notify in self.notify_cancel:
