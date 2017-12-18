@@ -188,7 +188,7 @@ class _SubOpen(Proxy):
 
   def __init__(self, proxied):
     self.closed = False
-    self.master = master
+    self.master = proxied
 
   def close(self):
     if self.closed:
