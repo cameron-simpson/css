@@ -138,7 +138,6 @@ case "$op" in
     ;;
 
   setvar)
-    set -x
     varname=$1
     shift
     value64=$( printf '%s' "$*" | /usr/bin/base64 )
