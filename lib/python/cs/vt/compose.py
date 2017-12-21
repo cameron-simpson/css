@@ -130,15 +130,6 @@ def parse_store_spec(s, offset, config=None):
       raise ValueError("unrecognised Store spec")
   return S, offset
 
-def get_colon(s, offset):
-  ''' Fetch text to the next colon. Return text and new offset.
-      Returns None if there is no colon.
-  '''
-  cpos = s.find(':', offset)
-  if cpos < 0:
-    return None, offset
-  return s[offset:cpos], cpos + 1
-
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to command.
   '''
