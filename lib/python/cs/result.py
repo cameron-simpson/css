@@ -96,7 +96,7 @@ class Result(O):
 
   def __init__(self, name=None, final=None, lock=None, result=None):
     ''' Base initialiser for Result objects and subclasses.
-        `name`: optional paramater to name this object.
+        `name`: optional parameter naming this object.
         `final`: a function to run after completion of the asynchron,
                  regardless of the completion mode (result, exception,
                  cancellation).
