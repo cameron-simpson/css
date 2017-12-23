@@ -20,7 +20,7 @@ from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
-from cs.result import report
+from cs.result import Result, report
 from cs.seq import Seq
 from cs.x import X
 from . import defaults
@@ -177,6 +177,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
+
+  def bg(self, func, *a, **kw):
+    ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
+    '''
+    R = Result(name="%s:%s")
+    def bg2():
+      with self:
+        return func(*a, **kw)
+    R.bg(func, *a, **kw)
+    return R
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
