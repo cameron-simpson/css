@@ -28,7 +28,6 @@ from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.py.func import prop
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
-from cs.result import bg
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
@@ -988,7 +987,7 @@ class PlatonicDir(_FilesDir):
                   info("monitor: scan %r from %d", rfilepath, F.scanned_to)
                   if meta_store is not None:
                     blockQ = IterableQueue(64)
-                    R = bg(splice_blocks, E.block, blockQ)
+                    R = meta_store.bg(splice_blocks, E.block, blockQ)
                   for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
                     hashcode = self.hashclass.from_chunk(data)
                     indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
