@@ -1001,8 +1001,11 @@ class PlatonicDir(_FilesDir):
                   XP("%r: scanned_to=%d", F.filename, F.scanned_to)
                   XP("... updating Block ...")
                   if meta_store is not None:
+                    blockQ.close()
+                    XP("... updating Block ...")
                     newB = R()
                     E.block = newB
+                    need_save = True
                   # update state after completion of a scan
                   if need_save:
                     self._save_state()
