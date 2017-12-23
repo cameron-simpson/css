@@ -135,6 +135,7 @@ class FileState(SimpleNamespace):
 
   def scan(self, offset=0, **kw):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (offset, flags, data, post_offset).
+        We use the DataDir's .scan method because it knows the format of the file.
     '''
     yield from self.datadir.scan(self.pathname, offset=offset, **kw)
 
@@ -747,6 +748,12 @@ class DataDir(_FilesDir):
       if rollover is not None and post_offset >= rollover:
         self.current_save_filenum = None
     return hashcode
+
+  @staticmethod
+  def scan(filepath, offset=0):
+    ''' Scan the specified `filepath` from `offset`, yielding data chunks.
+    '''
+    return scan_datafile(filepath, offset)
 
 class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
   ''' A block record for a PlatonicDir.
