@@ -33,7 +33,7 @@ from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
-from .compose import Store, ConfigFile
+from .compose import Store, Config
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir, DirFTP
@@ -153,7 +153,7 @@ class VTCmd:
       if upd is not None:
         upd.nl_level = logging.INFO
 
-    self.config = ConfigFile(self.configpath)
+    self.config = Config.from_ini(self.configpath)
 
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
@@ -220,7 +220,7 @@ class VTCmd:
       if self.no_cache:
         cacheS = None
       else:
-        cacheS = self.config.Store('cache')
+        cacheS = self.config['cache']
         cacheS.backend = S
         S = cacheS
       # start the status ticker
