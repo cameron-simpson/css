@@ -40,6 +40,8 @@ class _Hash(bytes):
   ''' All hashes are bytes subclasses.
   '''
 
+  __slots__ = ()
+
   def __str__(self):
     return hexify(self)
 
@@ -93,6 +95,7 @@ class _Hash(bytes):
     return self.__class__.from_chunk
 
 class Hash_SHA1(_Hash):
+  __slots__ = ()
   HASHFUNC = sha1
   HASHNAME = 'sha1'
   HASHLEN = 20
