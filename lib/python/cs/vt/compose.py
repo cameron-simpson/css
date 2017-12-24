@@ -34,20 +34,27 @@ def Store(store_spec, config=None):
     config = Config({})
   with Pfx(repr(store_spec)):
     X("compose.Store(store_spec=%r)...", store_spec)
-    store_specs = list(parse_store_specs(store_spec))
-    if not store_specs:
-      raise ValueError("empty Store specification: %r" % (store_specs,))
-    stores = [
-        Store_from_type_and_params(store_text, store_type, params, config)
-        for store_text, store_type, params
-        in store_specs
-    ]
+    stores = Stores_from_spec(store_spec, config)
     X("stores = %r", stores)
+    if len(stores) == 0:
+      raise ValueError("empty Store specification: %r" % (store_spec,))
     if len(stores) == 1:
       return stores[0]
     # multiple stores: save to the front store, read first from the
     # front store then from the rest
     return ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
+
+def Stores_from_spec(store_spec, config):
+  store_specs = list(parse_store_specs(store_spec))
+  if not store_specs:
+    raise ValueError("empty Store specification: %r" % (store_specs,))
+  stores = [
+      Store_from_type_and_params(store_text, store_type, params, config)
+      for store_text, store_type, params
+      in store_specs
+  ]
+  X("stores = %r", stores)
+  return stores
 
 def parse_store_specs(s, offset=0):
   ''' Parse the string `s` for a list of Store specifications.
@@ -291,7 +298,7 @@ def Store_from_type_and_params(store_name, store_type, params, config=None, clau
     elif store_type == 'platonic':
       S = Store_from_platonic_clause(store_name, config, clause_name, **params)
     elif store_type == 'proxy':
-      S = Store_from_proxy_clause(store_name, **params)
+      S = Store_from_proxy_clause(store_name, config, **params)
     elif store_type == 'tcp':
       if 'host' not in params:
         params['host'] = clause_name
@@ -448,6 +455,7 @@ def Store_from_platonic_clause(
 
 def Store_from_proxy_clause(
     store_name,
+    config,
     *,
     type=None,
     save=None,
@@ -463,20 +471,20 @@ def Store_from_proxy_clause(
     readonly = True
   else:
     if isinstance(save, str):
-      save_stores = list(parse_store_specs(save))
+      save_stores = Stores_from_spec(save, config)
     else:
       save_stores = save
     readonly = len(save_stores) == 0
   if read is None:
     read_stores = []
   elif isinstance(read, str):
-    read_stores = list(parse_store_specs(read))
+    read_stores = Stores_from_spec(read, config)
   else:
     read_stores = read
   if read2 is None:
     read2_stores = []
   elif isinstance(read2, str):
-    read2_stores = list(parse_store_specs(read2))
+    read2_stores = Stores_from_spec(read2, config)
   else:
     read2_stores = read2
   S = ProxyStore(store_name, save_stores, read_stores, read2_stores)
