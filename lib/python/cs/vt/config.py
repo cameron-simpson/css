@@ -58,7 +58,6 @@ class Config:
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
     '''
-    X("%s.__getitem__[clause_name=%r]...", type(self).__name__, clause_name)
     with self._lock:
       R = self._stores_by_name.get(clause_name)
       if R is not None:
@@ -81,6 +80,14 @@ class Config:
       R.result = S
     return S
 
+  def get_default(self, param):
+    ''' Fetch a default parameter from the [GLOBALS] clause.
+    '''
+    G = self.map.get('GLOBAL')
+    if not G:
+      return None
+    return G.get(param)
+
   def Store_from_spec(self, store_spec):
     ''' Factory function to return an appropriate BasicStore* subclass
         based on its argument:
@@ -95,9 +102,7 @@ class Config:
         separate Stores unassembled.
     '''
     with Pfx(repr(store_spec)):
-      X("compose.Store(store_spec=%r)...", store_spec)
       stores = self.Stores_from_spec(store_spec)
-      X("stores = %r", stores)
       if len(stores) == 0:
         raise ValueError("empty Store specification: %r" % (store_spec,))
       if len(stores) == 1:
@@ -117,7 +122,6 @@ class Config:
         for store_text, store_type, params
         in store_specs
     ]
-    X("stores = %r", stores)
     return stores
 
   def new_Store(self, store_name, store_type, params, clause_name=None):
@@ -153,7 +157,9 @@ class Config:
   ):
     ''' Construct a Store from a reference to a configuration clause.
     '''
-    if type is not None:
+    if type is None:
+      type = 'config'
+    else:
       assert type == 'config'
     if clause_name is None:
       raise ValueError("clause_name may not be None")
@@ -165,13 +171,15 @@ class Config:
       *,
       type=None,
       path=None,
-      statedir=None,
+      basedir=None,
       data=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
     if type is not None:
       assert type == 'datadir'
+    if basedir is None:
+      basedir = self.get_default('basedir')
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -182,12 +190,12 @@ class Config:
         path = abspath(path)
         debug("abspath ==> %r", path)
       else:
-        debug("statedir=%r", statedir)
-        if statedir is None:
-          raise ValueError('relative path %r but no statedir' % (path,))
-        statedir = longpath(statedir)
-        debug("longpath(statedir) ==> %r", statedir)
-        path = joinpath(statedir, path)
+        debug("basedir=%r", basedir)
+        if basedir is None:
+          raise ValueError('relative path %r but no basedir' % (path,))
+        basedir = longpath(basedir)
+        debug("longpath(basedir) ==> %r", basedir)
+        path = joinpath(basedir, path)
         debug("path ==> %r", path)
     if data is not None:
       data = longpath(data)
@@ -201,12 +209,14 @@ class Config:
       path=None,
       max_files=None,
       max_file_size=None,
-      statedir=None,
+      basedir=None,
   ):
     ''' Construct a FileCacheStorer from a "filecache" clause.
     '''
     if type is not None:
       assert type == 'filecache'
+    if basedir is None:
+      basedir = self.get_default('basedir')
     if max_files is not None:
       max_files = int(max_files)
     if max_file_size is not None:
@@ -226,12 +236,11 @@ class Config:
         path = abspath(path)
         debug("abspath ==> %r", path)
       else:
-        debug("statedir=%r", statedir)
-        if statedir is None:
-          raise ValueError('relative path %r but no statedir' % (path,))
-        statedir = longpath(statedir)
-        debug("longpath(statedir) ==> %r", statedir)
-        path = joinpath(statedir, path)
+        if basedir is None:
+          raise ValueError('relative path %r but no basedir' % (path,))
+        basedir = longpath(basedir)
+        debug("longpath(basedir) ==> %r", basedir)
+        path = joinpath(basedir, path)
         debug("path ==> %r", path)
     return FileCacheStore(
         store_name, None, path,
@@ -245,7 +254,7 @@ class Config:
       *,
       type=None,
       path=None,
-      statedir=None,
+      basedir=None,
       data=None,
       follow_symlinks=False,
       meta=None,
@@ -255,6 +264,8 @@ class Config:
     '''
     if type is not None:
       assert type == 'platonic'
+    if basedir is None:
+      basedir = self.get_default('basedir')
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
@@ -265,12 +276,11 @@ class Config:
         path = abspath(path)
         debug("abspath ==> %r", path)
       else:
-        debug("statedir=%r", statedir)
-        if statedir is None:
-          raise ValueError('relative path %r but no statedir' % (path,))
-        statedir = longpath(statedir)
-        debug("longpath(statedir) ==> %r", statedir)
-        path = joinpath(statedir, path)
+        if basedir is None:
+          raise ValueError('relative path %r but no basedir' % (path,))
+        basedir = longpath(basedir)
+        debug("longpath(basedir) ==> %r", basedir)
+        path = joinpath(basedir, path)
         debug("path ==> %r", path)
     if data is not None:
       data = longpath(data)
