@@ -55,7 +55,7 @@ from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, debug
-from cs.pfx import Pfx, PfxThread as Thread, XP
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.sh import quotecmd
 
@@ -453,7 +453,6 @@ class SvcD(FlaggedMixin, object):
         while True:
           # check for termination state
           if self.flag_stop:
-            XP("flag_stop(%s): was true, set to False and break", self.flagname_stop)
             self.flag_stop = False
             break
           # check for process exit
@@ -468,8 +467,6 @@ class SvcD(FlaggedMixin, object):
               if self.test():
                 # test passes, start service
                 self.spawn()
-              else:
-                XP("self.test() failed")
               next_test_time = now() + self.test_rate
           else:
             # running - see if it should stop
