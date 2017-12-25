@@ -151,7 +151,7 @@ class VTCmd:
       if upd is not None:
         upd.nl_level = logging.INFO
 
-    self.config = Config(store_spec)
+    self.config = Config()
 
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
