@@ -42,8 +42,6 @@ from .index import choose as choose_indexclass, class_by_name as indexclass_by_n
 from .parsers import scanner_from_filename
 from .paths import decode_Dirent_text
 
-TTY = open('/dev/tty', 'ab', 0)
-
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
@@ -498,12 +496,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           oldF = F
           need_sync = True
         if need_sync:
-          TTY.write(b'F')
           index.flush()
           self._save_state()
           need_sync = False
           nsaves = 0
-        TTY.write(b'i')
       index.flush()
       self._save_state()
 
