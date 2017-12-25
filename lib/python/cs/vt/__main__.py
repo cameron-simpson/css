@@ -19,7 +19,6 @@ from signal import signal, SIGINT, SIGHUP, SIGQUIT
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.env import envsub
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
@@ -33,7 +32,7 @@ from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
-from .compose import Store, Config
+from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress
 from .dir import Dir, DirFTP
@@ -117,8 +116,7 @@ class VTCmd:
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
     cs.x.X_logger = logging.getLogger()
 
-    self.configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-    store_spec = os.environ.get('VT_STORE')
+    store_spec = None
     dflt_log = os.environ.get('VT_LOGFILE')
     no_cache = False
 
@@ -153,7 +151,7 @@ class VTCmd:
       if upd is not None:
         upd.nl_level = logging.INFO
 
-    self.config = Config.from_ini(self.configpath)
+    self.config = Config(store_spec)
 
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
