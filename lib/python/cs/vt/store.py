@@ -15,14 +15,12 @@
 from __future__ import with_statement
 from abc import ABC, abstractmethod
 import sys
-from cs.result import report as reportLFs
-from cs.fileutils import shortpath
 from cs.later import Later
-from cs.logutils import info, debug, warning, error
+from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
-from cs.result import report
+from cs.result import Result, report
 from cs.seq import Seq
 from cs.x import X
 from . import defaults
@@ -109,10 +107,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   # Basic support for putting Stores in sets.
   def __hash__(self):
-      return id(self)
+    return id(self)
 
   def __eq__(self, other):
-      return self is other
+    return self is other
 
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
@@ -179,6 +177,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
+
+  def bg(self, func, *a, **kw):
+    ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
+    '''
+    R = Result(name="%s:%s")
+    def bg2():
+      with self:
+        return func(*a, **kw)
+    R.bg(func, *a, **kw)
+    return R
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -359,103 +367,6 @@ class MappingStore(BasicStoreSync):
       return HashCodeUtilsMixin.hashcodes_from(self, start_hashcode=start_hashcode, reverse=reverse)
     return hashcodes_method(start_hashcode=start_hashcode, reverse=reverse)
 
-class ChainStore(BasicStoreSync):
-  ''' A wrapper for a sequence of Stores.
-  '''
-
-  def __init__(self, name, stores, save_all=False, parallel=False):
-    ''' Initialise a ChainStore.
-        `name`: ChainStore name.
-        `stores`: sequence of Stores
-        `save_all`: add new data to all Stores, not just the first one
-        `parallel`: run requests to the Stores in parallel instead of in sequence
-    '''
-    if not stores:
-      raise ValueError("stores may not be empty: %r" %(stores,))
-    BasicStoreSync.__init__(self, name)
-    self._attrs.update(
-        stores='[' + ','.join(str(S) for S in stores) + ']',
-        parallel=parallel,
-        save_all=save_all,
-    )
-    self.stores = stores
-    self.save_all = save_all
-    self.parallel = parallel
-
-  def startup(self):
-    for S in self.stores:
-      S.open()
-
-  def shutdown(self):
-    for S in self.stores:
-      S.close()
-
-  def add(self, data):
-    ''' Add a block to the first subStore, or to all if self.save_all.
-    '''
-    first = True
-    for result in self._multicall('add_bg', (data,),
-                                  parallel=self.parallel and not self.save_all):
-      if result is None:
-        raise RuntimeError("None returned from .add")
-      if first:
-        hashcode = result
-        if not self.save_all:
-          break
-        first = False
-      elif result != hashcode:
-        warning("different hashcodes returns from .add: %s vs %s", hashcode, result)
-    return hashcode
-
-  def get(self, h):
-    ''' Fetch a block from the first Store which has it.
-    '''
-    for result in self._multicall('get_bg', (h,), parallel=False):
-      if result is not None:
-        return result
-
-  def contains(self, h):
-    ''' Is the hashcode `h` in any of the subStores?
-    '''
-    for result in self._multicall('contains_bg', (h,)):
-      if result:
-        return True
-    return False
-
-  def flush(self):
-    ''' Flush all the subStores.
-    '''
-    for result in self._multicall('flush_bg', ()):
-      pass
-
-  def _multicall(self, method_name, args, parallel=None):
-    ''' Generator yielding results of subcalls.
-        `method_name`: name of method on subStore, should return a Result
-        `args`: positional arguments for the method call
-        `parallel`: controls whether the subStores' methods are
-          called and waited for sequentially or in parallel; if
-          unspecified or None defaults to `self.parallel`
-    '''
-    if parallel is None:
-      parallel = self.parallel
-    LFs = []
-    SbyLF = {}
-    for S in self.stores:
-      with Pfx(S):
-        LF = getattr(S, method_name)(*args)
-        LFs.append(LF)
-        SbyLF[LF] = S
-        if not parallel:
-          # yield early, allowing caller to prevent further calls
-          yield LF()
-    X("LFs=%r", LFs)
-    for LF in reportLFs(LFs):
-      S = SbyLF[LF]
-      with Pfx(S):
-        result = LF()
-        if self.parallel:
-          yield result
-
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
 
@@ -463,7 +374,7 @@ class ProxyStore(BasicStoreSync):
 
       Save stores. All data added to the Proxy is added to these Stores.
 
-      Read Stores. Requested data may be ontained from these Stores.
+      Read Stores. Requested data may be obtained from these Stores.
 
       A typical setup utilising a working ProxyStore might look like this:
 
@@ -495,9 +406,9 @@ class ProxyStore(BasicStoreSync):
           would be higher latency upstream Stores.
     '''
     BasicStoreSync.__init__(self, name)
-    save = frozenset(save)
-    read = frozenset(read)
-    read2 = frozenset(read2)
+    self.save = frozenset(save)
+    self.read = frozenset(read)
+    self.read2 = frozenset(read2)
     self._attrs.update(save=save, read=read)
     if read2:
       self._attrs.update(read2=read2)
@@ -607,13 +518,16 @@ class PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
   '''
 
-  def __init__(self, name, statedirpath,
-    datadirpath=None, hashclass=None, indexclass=None,
-    follow_symlinks=False, **kw
+  def __init__(
+      self, name, statedirpath,
+      datadirpath=None, hashclass=None, indexclass=None,
+      follow_symlinks=False, archive=None, meta_store=None,
+      **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
-        follow_symlinks=follow_symlinks)
+        follow_symlinks=follow_symlinks,
+        archive=archive, meta_store=meta_store)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 

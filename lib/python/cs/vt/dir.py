@@ -728,7 +728,6 @@ class Dir(_Dirent):
           else:
             raise ValueError("%s[name=%s] is not a directory" % (subE, name))
       E = subE
-
     return E
 
   def new_name(self, prefix, n=1):

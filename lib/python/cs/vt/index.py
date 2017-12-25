@@ -159,7 +159,7 @@ class LMDBIndex(_Index):
         with self._lmdb.begin(write=True) as txn:
           txn.put(hashcode, entry, overwrite=True)
       except lmdb.MapFullError as e:
-        warning("%s", e)
+        info("%s", e)
       else:
         return
       self._embiggen_lmdb()

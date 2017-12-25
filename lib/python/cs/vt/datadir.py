@@ -33,11 +33,14 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
-from .blockify import blocked_chunks_of, DEFAULT_SCAN_SIZE
+from .block import Block
+from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
+from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
+from .paths import decode_Dirent_text
 
 TTY = open('/dev/tty', 'ab', 0)
 
@@ -131,6 +134,7 @@ class FileState(SimpleNamespace):
 
   def scan(self, offset=0, **kw):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (offset, flags, data, post_offset).
+        We use the DataDir's .scan method because it knows the format of the file.
     '''
     yield from self.datadir.scan(self.pathname, offset=offset, **kw)
 
@@ -323,7 +327,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     with Pfx('_load_state(%r)', shortpath(statefilepath)):
       if existspath(statefilepath):
         with open(statefilepath, 'r') as fp:
-          extras = self._extra_state
           for lineno, row in enumerate(csv_reader(fp), 1):
             with Pfx("%d", lineno):
               col1 = row[0]
@@ -350,6 +353,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
+    # update the topdir state before any save
     statefilepath = self.statefilepath
     X("SAVE STATE ==> %r", statefilepath)
     with Pfx("_save_state(%r)", statefilepath):
@@ -471,7 +475,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       nsaves = 0
       need_sync = False
       for hashcode, entry, post_offset in self._indexQ:
-        TTY.write(b'I')
         with self._lock:
           index[hashcode] = entry
           try:
@@ -488,8 +491,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           error("%r: indexed_to already %s but post_offset=%s",
               F.filename, F.indexed_to, post_offset)
         F.indexed_to = max(F.indexed_to, post_offset)
-        if oldF is None or F is not oldF:
-          XP("switch to %r", F.filename)
+        if F is not oldF:
+          XP("switch to %r: %r", F.filename, F.pathname)
           if oldF is not None:
             XP("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
           oldF = F
@@ -745,6 +748,12 @@ class DataDir(_FilesDir):
         self.current_save_filenum = None
     return hashcode
 
+  @staticmethod
+  def scan(filepath, offset=0):
+    ''' Scan the specified `filepath` from `offset`, yielding data chunks.
+    '''
+    return scan_datafile(filepath, offset)
+
 class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
   ''' A block record for a PlatonicDir.
   '''
@@ -800,7 +809,7 @@ class PlatonicDir(_FilesDir):
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
       create_statedir=None, exclude_dir=None, exclude_file=None,
-      follow_symlinks=False):
+      follow_symlinks=False, archive=None, meta_store=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -823,6 +832,9 @@ class PlatonicDir(_FilesDir):
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
         `follow_symlinks`: follow symbolic links, default False.
+        `meta_store`: an optional Store used to maintain a Dir
+          representing the ideal directory
+        `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
         The directory and file paths tested are relative to the
         data directory path.
     '''
@@ -837,6 +849,40 @@ class PlatonicDir(_FilesDir):
     self.exclude_dir = exclude_dir
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
+    self.meta_store = meta_store
+    if archive is not None:
+      if isinstance(archive, str):
+        archive = Archive(archive)
+    self.archive = archive
+
+  def _save_state(self):
+    ''' Rewrite STATE_FILENAME.
+    '''
+    # update the topdir state before any save
+    self.topdir = self.topdir
+    if self.archive:
+      self.archive.save(self.topdir)
+    return _FilesDir._save_state(self)
+
+  @prop
+  def topdir(self):
+    top_dirref = self._extra_state.get('top_dirref')
+    if top_dirref is None:
+      D = None
+    else:
+      try:
+        D = decode_Dirent_text(top_dirref)
+      except ValueError as e:
+        warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
+        D = None
+    if D is None:
+      info("%r: create empty topdir Dir", self.datadirpath)
+      D = self.topdir = Dir('.')
+    return D
+
+  @topdir.setter
+  def topdir(self, D):
+    self.set_state('top_dirref', D.textencode())
 
   @staticmethod
   def _default_exclude_path(path):
@@ -868,11 +914,21 @@ class PlatonicDir(_FilesDir):
     return D.fetch(entry.offset, entry.length)
 
   @logexc
-  def _monitor_datafiles(self):
+  def _monitor_datafiles(self, use_meta_store=True):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
+    meta_store = self.meta_store
+    if use_meta_store:
+      if meta_store is not None:
+        # activate the meta_store
+        with meta_store:
+          return self._monitor_datafiles(use_meta_store=False)
     filemap = self._filemap
     indexQ = self._indexQ
+    if meta_store is not None:
+      topdir = self.topdir
+      def splice_blocks(B, Q):
+        return top_block_for(spliced_blocks(B, Q))
     while not self._monitor_halt:
       # scan for new datafiles
       need_save = False
@@ -885,6 +941,12 @@ class PlatonicDir(_FilesDir):
           with Pfx(dirpath):
             rdirpath = relpath(dirpath, datadirpath)
             dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
+            if meta_store is not None:
+              D = topdir.makedirs(rdirpath, force=True)
+              # prune removed names
+              for name in D.keys():
+                if name not in dirnames and name not in filenames:
+                  del D[name]
             for filename in filenames:
               if self._monitor_halt:
                 break
@@ -914,16 +976,37 @@ class PlatonicDir(_FilesDir):
                   # skip non files
                   debug("SKIP non-file")
                   continue
+                if meta_store is not None:
+                  try:
+                    E = D[filename]
+                  except KeyError:
+                    E = FileDirent(filename)
+                  else:
+                    if not E.isfile:
+                      E = D[E] = FileDirent(filename)
                 if new_size > F.scanned_to:
                   info("monitor: scan %r from %d", rfilepath, F.scanned_to)
+                  if meta_store is not None:
+                    blockQ = IterableQueue(64)
+                    R = meta_store.bg(splice_blocks, E.block, blockQ)
                   for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
                     hashcode = self.hashclass.from_chunk(data)
                     indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                    if meta_store is not None:
+                      B = Block(data=data, hashcode=hashcode)
+                      blockQ.put( (offset, B) )
                     F.scanned_to = post_offset
                     need_save = True
                     if self._monitor_halt:
                       break
                   XP("%r: scanned_to=%d", F.filename, F.scanned_to)
+                  if meta_store is not None:
+                    blockQ.close()
+                    XP("... updating Block ...")
+                    newB = R()
+                    XP("newB=%s", newB)
+                    E.block = newB
+                    need_save = True
                   # update state after completion of a scan
                   if need_save:
                     self._save_state()

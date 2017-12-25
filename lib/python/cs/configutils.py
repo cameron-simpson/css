@@ -137,11 +137,7 @@ class ConfigSectionWatcher(Mapping):
     return "%s[%s]" % (self.path, self.section)
 
   def __repr__(self):
-    d = {}
-    for k in self.keys():
-      v = self[k]
-      d[k] = self[k]
-    return repr(d)
+    return repr(self.as_dict())
 
   @property
   def path(self):

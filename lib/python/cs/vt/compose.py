@@ -1,67 +1,54 @@
 #!/usr/bin/python
 #
-# The generic Store factory.
+# The generic Store factory and parser for Store specifications.
 #   - Cameron Simpson <cs@cskk.id.au> 20dec2016
 #
 
-from os.path import isabs as isabspath, abspath, join as joinpath
 from subprocess import Popen, PIPE
-from cs.configutils import ConfigWatcher
-from cs.fileutils import longpath, shortpath
-from cs.lex import get_qstr, skipwhite
-from cs.logutils import debug
+from cs.lex import skipwhite, get_identifier, get_qstr
 from cs.pfx import Pfx
-from cs.threads import locked
 from cs.units import multiparse as multiparse_units, \
     BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
-from .cache import FileCacheStore
-from .store import ChainStore, DataDirStore, PlatonicStore
+from cs.x import X
 from .stream import StreamStore
-from .tcp import TCPStoreClient
 
-def Store(store_spec, config=None):
-  ''' Factory function to return an appropriate BasicStore* subclass
-      based on its argument:
-
-        store:...       A sequence of stores. Save new data to the
-                        first, seek data in all from left to right.
+def parse_store_specs(s, offset=0):
+  ''' Parse the string `s` for a list of Store specifications.
   '''
-  with Pfx(repr(store_spec)):
-    stores = []
-    offset = 0
-    while offset < len(store_spec):
-      with Pfx(offset + 1):
-        S, offset = parse_store_spec(store_spec, offset, config=config)
-        stores.append(S)
-        if offset < len(store_spec):
-          sep = store_spec[offset]
+  with Pfx("parse_store_specs(%r)", s):
+    store_specs = []
+    while offset < len(s):
+      with Pfx("offset %d", offset):
+        store_text, store_type, params, offset = get_store_spec(s, offset)
+        store_specs.append( (store_text, store_type, params) )
+      if offset < len(s):
+        with Pfx("offset %d", offset):
+          sep = s[offset]
           offset += 1
           if sep == ':':
             continue
-          raise ValueError("unexpected separator %r at offset %d, expected ':'"
-                           % (sep, offset - 1))
-    if not stores:
-      raise ValueError("no stores in %r" % (store_spec,))
-    if len(stores) == 1:
-      return stores[0]
-    return ChainStore(store_spec, stores)
+          raise ValueError("expected colon ':', found unexpected separator: %r" % (sep,))
+    return store_specs
 
-def parse_store_spec(s, offset, config=None):
-  ''' Parse a single Store specification from a string.
-      Return the Store and the new offset.
+def get_store_spec(s, offset):
+  ''' Get a single Store specification from a string. Return the text, store type, params and the new offset.
 
-        "text"          Quoted store spec, needed to bound some of
+        "text"          Quoted store spec, needed to enclose some of
                         the following syntaxes if they do not consume the
                         whole string.
 
-        [config-clause] A Store as specified by the named config-clause.
+        [clause_name]   The name of a clause to be obtained from a Config.
 
         /path/to/store  A DataDirStore directory.
         ./subdir/to/store A relative path to a DataDirStore directory.
 
         |command        A subprocess implementing the streaming protocol.
 
-        tcp:[host]:port Connect to a daemon implementing the streaming protocol.
+        store_type(param=value,...)
+                        A general Store specification.
+        store_type:params...
+                        An inline Store specification. Supported inline types:
+                          tcp:[host]:port
 
         TODO:
           ssh://host/[store-designator-as-above]
@@ -76,60 +63,122 @@ def parse_store_spec(s, offset, config=None):
   if offset >= len(s):
     raise ValueError("empty string")
   if s.startswith('"', offset):
-    qs, offset = get_qstr(s, offset)
-    S, offset2 = parse_store_spec(qs, 0, config=config)
+    # "store_spec"
+    qs, offset = get_qstr(s, offset, q='"')
+    _, store_type, params, offset2 = get_store_spec(qs, 0)
     if offset2 < len(qs):
       raise ValueError("unparsed text inside quotes: %r", qs[offset2:])
   elif s.startswith('[', offset):
+    # [clause_name]
+    store_type = 'config'
+    offset = skipwhite(s, offset + 1)
+    clause_name, offset = get_qstr_or_identifier(s, offset)
+    X("clause_name=%r, offset=%d", clause_name, offset)
+    offset = skipwhite(s, offset)
+    if offset >= len(s) or s[offset] != ']':
+      raise ValueError("offset %d: missing closing ']'" % (offset,))
     offset += 1
-    endpos = s.find(']', offset)
-    if endpos < 0:
-      raise ValueError("missing closing ']'")
-    clause_name = s[offset:endpos]
-    offset = endpos + 1
-    if config is None:
-      raise ValueError("no config supplied, rejecting %r" % (s[offset0:],))
-    S = config.Store(clause_name)
-    if S is None:
-      raise ValueError("no config clause [%s]" % (clause_name,))
-  else:
+    params = {'clause_name': clause_name}
+  elif s.startswith('/', offset) or s.startswith('./', offset):
     # /path/to/datadir
-    if s.startswith('/', offset) or s.startswith('./', offset):
-      dirpath = s[offset:]
-      S = DataDirStore(dirpath, dirpath)
-      offset = len(s)
+    store_type = 'datadir'
+    params = {'path': s[offset:] }
+    offset = len(s)
+  elif s.startswith('|', offset):
     # |shell command
-    elif s.startswith('|', offset):
-      shcmd = s[offset + 1:].strip()
-      S = CommandStore(shcmd)
-      offset = len(s)
-    # TCP connection
-    elif s.startswith('tcp:', offset):
-      offset += 4
-      # collect host part
-      cpos = s.find(':', offset)
-      if cpos < 0:
-        raise ValueError("no host part terminating colon")
-      hostpart = s[offset:cpos]
-      offset = cpos + 1
-      if not hostpart:
-        hostpart = 'localhost'
-      # collect port
-      portpart = s[offset:]
-      offset = len(s)
-      S = TCPStoreClient((hostpart, int(portpart)))
-    else:
-      raise ValueError("unrecognised Store spec")
-  return S, offset
+    store_type = 'shell'
+    params = {'shcmd': s[offset + 1:].strip()}
+    offset = len(s)
+  else:
+    store_type, offset = get_identifier(s, offset)
+    if not store_type:
+      raise ValueError(
+          "expected identifier at offset %d, found: %r"
+          % (offset, s[offset:]))
+    with Pfx(store_type):
+      if s.startswith('(', offset):
+        params, offset = get_params(s, offset + 1, ')')
+      elif s.startswith(':', offset):
+        offset += 1
+        params = {}
+        if store_type == 'tcp':
+          hostpart, offset = get_token(s, offset)
+          if not isinstance(hostpart, str):
+            raise ValueError(
+                "expected hostpart to be a string, got: %r" % (hostpart,))
+          params['host'] = hostpart
+          if not s.startswith(':', offset):
+            raise ValueError(
+                "missing port at offset %d, found: %r"
+                % (offset, s[offset:]))
+          offset += 1
+          portpart, offset = get_token(s, offset)
+          params['port'] = portpart
+        else:
+          raise ValueError("unrecognised Store type for inline form")
+      else:
+        raise ValueError("no parameters")
+  return s[offset0:offset], store_type, params, offset
 
-def get_colon(s, offset):
-  ''' Fetch text to the next colon. Return text and new offset.
-      Returns None if there is no colon.
+def get_params(s, offset, endchar):
+  ''' Parse "param=value,...)". Return params dict and new offset.
   '''
-  cpos = s.find(':', offset)
-  if cpos < 0:
-    return None, offset
-  return s[offset:cpos], cpos + 1
+  params = {}
+  first = True
+  while True:
+    ch = s[offset:offset + 1]
+    if not ch:
+      raise ValueError("hit end of string, expected param or %r" % (endchar,))
+    if ch == endchar:
+      offset += 1
+      return params, offset
+    if not first and ch == ',':
+      offset += 1
+    param, offset = get_qstr_or_identifier(s, offset)
+    if not param:
+      raise ValueError("rejecting empty parameter name")
+    offset = skipwhite(s, offset)
+    ch = s[offset:offset + 1]
+    if not ch:
+      raise ValueError("hit end of string after param %r, expected '='" % (param,))
+    if ch != '=':
+      raise ValueError("expected '=', found %r" % (ch,))
+    offset = skipwhite(s, offset + 1)
+    ch = s[offset:offset + 1]
+    if not ch:
+      raise ValueError("hit end of string after param %r=, expected token" % (param,))
+    if ch == endchar or ch == ',':
+      raise ValueError("expected token, found %r" % (ch,))
+    value, offset = get_token(s, offset)
+    params[param] = value
+    first = False
+
+def get_qstr_or_identifier(s, offset):
+  ''' Parse q quoted string or an identifier.
+  '''
+  if s.startswith('"', offset):
+    return get_qstr(s, offset, q='"')
+  return get_identifier(s, offset)
+
+def get_token(s, offset):
+  ''' Parse an integer value, an identifier or a quoted string.
+  '''
+  if offset == len(s):
+    raise ValueError("unexpected end of string, expected token")
+  if s[offset].isdigit():
+    token, offset = get_integer(s, offset)
+  else:
+    token, offset = get_qstr_or_identifier(s, offset)
+  return token, offset
+
+def get_integer(s, offset):
+  ''' Parse an integer followed by an optional scale and return computed value.
+  '''
+  return multiparse_units(
+      s,
+      (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE),
+      offset
+  )
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to command.
@@ -137,142 +186,3 @@ def CommandStore(shcmd, addif=False):
   name = "StreamStore(%r)" % ("|" + shcmd, )
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
-
-class ConfigFile(ConfigWatcher):
-  ''' Live tracker of a vt configuration file.
-  '''
-
-  def __init__(self, config_path):
-    ConfigWatcher.__init__(self, config_path)
-    self._stores = {}
-
-  @locked
-  def Store(self, clause_name):
-    debug("ConfigFile.Store(clause_name=%r)...", clause_name)
-    S = self._stores.get(clause_name)
-    if S is None:
-      # not previously accessed, construct S
-      store_name = "%s[%s]" % (shortpath(self.path), clause_name)
-      with Pfx(store_name):
-        clause = self[clause_name]
-        stype = clause.get('type')
-        if stype is None:
-          raise ValueError("missing type")
-        if stype == 'datadir':
-          S = Store_from_datadir_clause(store_name, clause_name, clause)
-        elif stype == 'filecache':
-          S = Store_from_filecache_clause(store_name, clause_name, clause)
-        elif stype == 'platonic':
-          S = Store_from_platonic_clause(store_name, clause_name, clause)
-        elif stype == 'tcp':
-          S = Store_from_tcp_clause(store_name, clause_name, clause)
-        else:
-          raise ValueError("unsupported type %r" % (stype,))
-        self._stores[clause_name] = S
-    return S
-
-def Store_from_datadir_clause(store_name, clause_name, clause):
-  ''' Construct a DataDirStore from a "datadir" clause.
-  '''
-  path = clause.get('path')
-  if path is None:
-    path = clause_name
-    debug("path from clausename: %r", path)
-  path = longpath(path)
-  debug("longpath(path) ==> %r", path)
-  if not isabspath(path):
-    if path.startswith('./'):
-      path = abspath(path)
-      debug("abspath ==> %r", path)
-    else:
-      statedir = clause.get('statedir')
-      debug("statedir=%r", statedir)
-      if statedir is None:
-        raise ValueError('relative path %r but no statedir' % (path,))
-      statedir = longpath(statedir)
-      debug("longpath(statedir) ==> %r", statedir)
-      path = joinpath(statedir, path)
-      debug("path ==> %r", path)
-  datapath = clause.get('data')
-  if datapath is not None:
-    datapath = longpath(datapath)
-  return DataDirStore(store_name, path, datapath, None, None)
-
-def Store_from_filecache_clause(store_name, clause_name, clause):
-  ''' Construct a FileCacheStorer from a "filecache" clause.
-  '''
-  path = clause.get('path')
-  max_cachefiles = clause.get('max_files')
-  if max_cachefiles is not None:
-    max_cachefiles = int(max_cachefiles)
-  max_cachefile_size = clause.get('max_file_size')
-  if max_cachefile_size is not None:
-    s = max_cachefile_size
-    max_cachefile_size, offset = multiparse_units(
-        s, (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE))
-    offset = skipwhite(s, offset)
-    if offset < len(s):
-      raise ValueError("max_file_size: unparsed text: %r" % (s[offset:],))
-  if path is None:
-    path = clause_name
-    debug("path from clausename: %r", path)
-  path = longpath(path)
-  debug("longpath(path) ==> %r", path)
-  if not isabspath(path):
-    if path.startswith('./'):
-      path = abspath(path)
-      debug("abspath ==> %r", path)
-    else:
-      statedir = clause.get('statedir')
-      debug("statedir=%r", statedir)
-      if statedir is None:
-        raise ValueError('relative path %r but no statedir' % (path,))
-      statedir = longpath(statedir)
-      debug("longpath(statedir) ==> %r", statedir)
-      path = joinpath(statedir, path)
-      debug("path ==> %r", path)
-  return FileCacheStore(store_name, None, path,
-    max_cachefile_size=max_cachefile_size,
-    max_cachefiles=max_cachefiles,
-    )
-
-def Store_from_platonic_clause(store_name, clause_name, clause):
-  ''' Construct a DataDirStore from a "datadir" clause.
-  '''
-  path = clause.get('path')
-  if path is None:
-    path = clause_name
-    debug("path from clausename: %r", path)
-  path = longpath(path)
-  debug("longpath(path) ==> %r", path)
-  if not isabspath(path):
-    if path.startswith('./'):
-      path = abspath(path)
-      debug("abspath ==> %r", path)
-    else:
-      statedir = clause.get('statedir')
-      debug("statedir=%r", statedir)
-      if statedir is None:
-        raise ValueError('relative path %r but no statedir' % (path,))
-      statedir = longpath(statedir)
-      debug("longpath(statedir) ==> %r", statedir)
-      path = joinpath(statedir, path)
-      debug("path ==> %r", path)
-  datapath = clause.get('data')
-  if datapath is not None:
-    datapath = longpath(datapath)
-  follow_symlinks = clause.get('follow_symlinks')
-  if follow_symlinks is None:
-    follow_symlinks = False
-  return PlatonicStore(store_name, path, datapath, hashclass=None, indexclass=None, follow_symlinks=follow_symlinks)
-
-def Store_from_tcp_clause(store_name, clause_name, clause):
-  ''' Construct a TCPStoreClient from a "tcp" clause.
-  '''
-  hostpart = clause.get("host")
-  if not hostpart:
-    raise ValueError('no "host"')
-  portpart = clause.get("port")
-  if not portpart:
-    raise ValueError('no "port"')
-  return TCPStoreClient(store_name, (hostpart, int(portpart)))

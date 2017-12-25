@@ -17,7 +17,8 @@ from cs.logutils import D
 from cs.randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
-                      blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+                      blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE, \
+                      DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
 
@@ -93,7 +94,7 @@ class TestAll(unittest.TestCase):
           if os.path.exists(testfile):
             X("%s: replace input data with chunks from %s", scanner, testfile)
             rfp = open(testfile, 'rb')
-            input_chunks = read_from(rfp)
+            input_chunks = read_from(rfp, DEFAULT_SCAN_SIZE)
             input_desc = testfile
           else:
             X("%s: no %s in %s", scanner, testfile, os.getcwd())
