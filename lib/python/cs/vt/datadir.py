@@ -491,8 +491,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           error("%r: indexed_to already %s but post_offset=%s",
               F.filename, F.indexed_to, post_offset)
         F.indexed_to = max(F.indexed_to, post_offset)
-        if oldF is None or F is not oldF:
-          XP("switch to %r", F.filename)
+        if F is not oldF:
+          XP("switch to %r: %r", F.filename, F.pathname)
           if oldF is not None:
             XP("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
           oldF = F
@@ -876,6 +876,7 @@ class PlatonicDir(_FilesDir):
         warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
         D = None
     if D is None:
+      info("%r: create empty topdir Dir", self.datadirpath)
       D = self.topdir = Dir('.')
     return D
 
@@ -999,11 +1000,11 @@ class PlatonicDir(_FilesDir):
                     if self._monitor_halt:
                       break
                   XP("%r: scanned_to=%d", F.filename, F.scanned_to)
-                  XP("... updating Block ...")
                   if meta_store is not None:
                     blockQ.close()
                     XP("... updating Block ...")
                     newB = R()
+                    XP("newB=%s", newB)
                     E.block = newB
                     need_save = True
                   # update state after completion of a scan
