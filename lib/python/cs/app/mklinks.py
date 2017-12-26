@@ -12,9 +12,9 @@ import filecmp
 from stat import S_ISREG
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
-if sys.hexversion >= 0x02050000:
+try:
   from hashlib import md5
-else:
+except Import Error:
   from md5 import md5
 from cs.logutils import setup_logging, error
 from cs.pfx import Pfx
