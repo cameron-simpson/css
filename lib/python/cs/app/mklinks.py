@@ -89,10 +89,6 @@ class FileInfo(object):
         self._checksum = csum
     return csum
 
-  @prop
-  def sortkey(self):
-    return self.mtime, self.size, self.stat_key, self.path
-
   def same_dev(self, other):
     ''' Test whether two FileInfos are on the same filesystem.
     '''
@@ -171,14 +167,17 @@ class Linker(object):
 
   def merge(self):
     for size in reversed(sorted(self.sizemap.keys())):
-      FIs = sorted(self.sizemap[size].values(), key=lambda FI: FI.sortkey, reverse=True)
+      FIs = sorted(
+          self.sizemap[size].values(),
+          key=lambda FI: (FI.size, FI.mtime, FI.path),
+          reverse=True)
       for i, FI in enumerate(FIs):
         # skip FileInfos with no paths
         if not FI.paths:
           continue
         for FI2 in FIs[i + 1:]:
           assert FI.size == FI2.size
-          assert FI.mtime <= FI2.mtime
+          assert FI.mtime >= FI2.mtime
           assert not FI.same_file(FI2)
           if not FI.same_dev(FI2):
             # different filesystems, cannot link
@@ -188,7 +187,7 @@ class Linker(object):
             continue
           # FI2 is the younger, keep it
           info("link %r => %r", FI2.path, FI.paths)
-          FI2.assimilate(FI)
+          FI.assimilate(FI2)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
