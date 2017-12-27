@@ -43,7 +43,7 @@ from cs.timeutils import TimeoutError
 from cs.x import X
 
 DEFAULT_POLL_INTERVAL = 1.0
-DEFAULT_READSIZE = 8192
+DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
 
 try:
