@@ -104,7 +104,7 @@ class FileInfo(object):
     '''
     ok = True
     path = self.path
-    with Pfx("%r: assimilate", path):
+    with Pfx(path):
       if self is other or self.same_file(other):
         return
       assert self.same_dev(other)
@@ -113,7 +113,7 @@ class FileInfo(object):
           if opath in self.paths:
             warning("already assimilated")
             continue
-          info("link paths")
+          info("link")
           odir = dirname(opath)
           with NamedTemporaryFile(dir=odir) as tfp:
             with Pfx("unlink(%s)", tfp.name):
