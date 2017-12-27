@@ -7,7 +7,20 @@
 # 27dec2017: recode again: prefer younger files over older file, cleaner logic.
 #
 
-from collections import defaultdict, namedtuple
+r'''
+mklinks: tool for finding and hardlinking identical files
+
+Mklinks walks supplied paths looking for files with the same content,
+based on a cryptographic checksum of their content. It hardlinks
+all such files found, keeping the newest version.
+
+Unlike some rather naive tools out there, mklinks only compares
+files with other files of the same size, and is hardlink aware - a
+partially hardlinked tree is processed efficiently and correctly.
+'''
+
+from __future__ import print_function
+from collections import defaultdict
 from hashlib import sha1 as hashfunc
 import os
 from os.path import basename, dirname, isdir, isfile, join as joinpath
@@ -18,7 +31,27 @@ from cs.fileutils import read_from
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.x import X
+
+DISTINFO = {
+    'description': "Tool for finding and hardlinking identical files.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.fileutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'mklinks = cs.app.mklinks:main'
+        ],
+    },
+}
 
 USAGE = "Usage: %s paths..."
 
@@ -33,6 +66,7 @@ def main(argv=None):
   paths = argv[1:]
   if not paths:
     warning("missing paths")
+    print(usage, file=sys.stderr)
     return 2
   linker = Linker()
   # scan the supplied paths
