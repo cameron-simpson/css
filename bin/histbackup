@@ -101,6 +101,7 @@ usehbfiles=1
 obackup_options=
 symlink_unchanged=1
 rsopts=
+copytimes=
 rsdelete=--delete
 thisbackup=
 reverse=
@@ -123,6 +124,11 @@ usage="Usage:
                 later than this option is required.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
+  --copy-times  Copy file timestamps from the source tree to the
+                new link tree before the rsync pass. Useful for
+                media libraries which may be touched to aid browsing
+                order but dangerous for files where the content
+                might change without a change in file size.
   --no-delete   Don't pass --delete to rsync.
   --date datestring A date string for use as the backup target.
                 The default is the current date or date-time.
@@ -191,6 +197,17 @@ while [ $# -gt 0 ]
 do
   case $1 in
 
+    # =item --copy-times
+    #
+    # Copy file timestamps from the source tree to the
+    # new link tree before the rsync pass.
+    # This can be useful for trees such as media libraries which may be
+    # touched to aid browing order, but dangerous for files where the content
+    # might change without a change in file size.
+    #
+    --copy-times)
+      copytimes=1
+      ;;
     # =item --no-delete
     #
     # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
@@ -590,6 +607,10 @@ then
       if [ $linkonly ]
       then  echo "$dest/$thisbackup" >&3
       else  $vecho "updating $thisbackup from $src ..."
+            if [ $copytimes ]
+            then
+              $trace cpt "$src" "$dest/$thisbackup" || ok=
+            fi
       fi
     fi
 else
