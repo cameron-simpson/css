@@ -7,7 +7,7 @@
 set -ue
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d dstdir] hostslists..."
+usage="Usage: $cmd [-d dstdir] hostlists..."
 
 : ${OPTCSS:=/opt/css}
 
@@ -19,5 +19,5 @@ dstdir=$OPTCSS
 
 for hostlist
 do
-  mrsync -iOJ -aH --delete --delete-excluded '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
+  mrsync -iO -aH --delete --delete-excluded '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
 done
