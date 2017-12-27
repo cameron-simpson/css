@@ -171,7 +171,7 @@ class Linker(object):
 
   def merge(self):
     for size in reversed(sorted(self.sizemap.keys())):
-      FIs = sorted(self.sizemap[size].values(), key=lambda FI: FI.sortkey)
+      FIs = sorted(self.sizemap[size].values(), key=lambda FI: FI.sortkey, reverse=True)
       for i, FI in enumerate(FIs):
         # skip FileInfos with no paths
         if not FI.paths:
