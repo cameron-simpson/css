@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Send a Wake On LAN (WOL) packet.
+# -Cameron Simpson <cs@cskk.id.au>
+#
+exec python -m cs.wol ${1+"$@"}
