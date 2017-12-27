@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Copy times from one tree to another.
 #   - Cameron Simpson <cs@cskk.id.au> 27dec2017
