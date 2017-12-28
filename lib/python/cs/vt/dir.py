@@ -300,7 +300,7 @@ class _Dirent(object):
 
   def complete(self, S2, recurse=False):
     ''' Complete this Dirent from alternative Store `S2`.
-        TODO: paralellise like _Block.complete.
+        TODO: parallelise like _Block.complete.
     '''
     self.block.complete(S2)
     if self.isdir:

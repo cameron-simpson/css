@@ -930,29 +930,30 @@ class PlatonicDir(_FilesDir):
       need_save = False
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
-        info("WALK ...")
         for dirpath, dirnames, filenames in os.walk(datadirpath):
           if self._monitor_halt:
             break
-          with Pfx(dirpath):
-            rdirpath = relpath(dirpath, datadirpath)
+          rdirpath = relpath(dirpath, datadirpath)
+          with Pfx(rdirpath):
             dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
             if meta_store is not None:
               D = topdir.makedirs(rdirpath, force=True)
               # prune removed names
               for name in D.keys():
                 if name not in dirnames and name not in filenames:
+                  info("del %r", name)
                   del D[name]
             for filename in filenames:
               if self._monitor_halt:
                 break
               rfilepath = joinpath(rdirpath, filename)
-              with Pfx(rfilepath):
+              with Pfx(filename):
                 if self.exclude_file(rfilepath):
                   continue
                 try:
                   F = filemap[rfilepath]
                 except KeyError:
+                  info("ADD")
                   filenum = self._add_datafile(rfilepath)
                   F = filemap[filenum]
                   need_save = True
@@ -976,12 +977,15 @@ class PlatonicDir(_FilesDir):
                   try:
                     E = D[filename]
                   except KeyError:
+                    info("new FileDirent")
                     E = FileDirent(filename)
+                    D[filename] = E
                   else:
                     if not E.isfile:
+                      info("new FileDirent replacing previous nonfile")
                       E = D[E] = FileDirent(filename)
                 if new_size > F.scanned_to:
-                  info("monitor: scan %r from %d", rfilepath, F.scanned_to)
+                  info("scan from %d", F.scanned_to)
                   if meta_store is not None:
                     blockQ = IterableQueue(64)
                     R = meta_store.bg(splice_blocks, E.block, blockQ)
@@ -995,13 +999,12 @@ class PlatonicDir(_FilesDir):
                     need_save = True
                     if self._monitor_halt:
                       break
-                  XP("%r: scanned_to=%d", F.filename, F.scanned_to)
+                  info("scanned to %d", F.scanned_to)
                   if meta_store is not None:
                     blockQ.close()
-                    XP("... updating Block ...")
                     newB = R()
-                    XP("newB=%s", newB)
                     E.block = newB
+                    D.changed = True
                     need_save = True
                   # update state after completion of a scan
                   if need_save:
