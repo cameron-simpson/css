@@ -1,3 +1,4 @@
+take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
 cs.resources: finish subopen proxy support
 PyPI: remove cs.asynchron once dependent packages updated
 cs.logutils.status: fold into cs.statusline, merge features
