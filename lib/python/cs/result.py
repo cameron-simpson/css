@@ -218,7 +218,7 @@ class Result(O):
     '''
     try:
       r = func(*a, **kw)
-    except Exception:
+    except BaseException:
       self.exc_info = sys.exc_info()
     else:
       self.result = r
