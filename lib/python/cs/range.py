@@ -505,12 +505,12 @@ class Range(object):
     if len(_spans) == 0:
       raise KeyError("pop() from empty Range")
     span = _spans[-1]
-    start, end = _spans[-1]
+    start, end = span
     end -= 1
     if end > start:
       span[1] = end
     else:
-      del spans[-1]
+      del _spans[-1]
     return end
 
   def symmetric_difference(self, other):
