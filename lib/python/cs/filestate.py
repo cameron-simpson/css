@@ -14,6 +14,17 @@ from collections import namedtuple
 import errno
 import os
 
+DISTINFO = {
+    'description': "Trivial FileState class used to watch for file changes.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': [],
+}
+
 _FileState = namedtuple('FileState', 'stat mtime size dev ino')
 _FileState.__eq__ = lambda self, other: self[1:] == other[1:]
 
