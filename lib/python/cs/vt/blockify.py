@@ -372,6 +372,7 @@ def blocked_chunks_of(chunks, scanner,
         else:
           take_to = next_offset
           why = "next_offset very close"
+          release = True
         advance_by = take_to - offset
 
     # yield any left over data
