@@ -37,7 +37,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': [
+    'install_requires': [
         'cs.deco',
         'cs.env',
         'cs.filestate',
