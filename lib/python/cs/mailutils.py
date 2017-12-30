@@ -37,7 +37,7 @@ DISTINFO = {
         'cs.fileutils',
         'cs.logutils',
         'cs.pfx',
-        'cs.py3'
+        'cs.py3',
         'cs.seq',
         'cs.threads',
     ],
