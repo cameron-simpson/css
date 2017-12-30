@@ -5,6 +5,7 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
+from contextlib import contextmanager
 from os.path import exists as existspath
 from threading import Lock
 from cs.logutils import warning, info
@@ -83,6 +84,15 @@ class LMDBIndex(_Index):
   def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
     _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
     self._lmdb = None
+    self._resize_needed = False
+    # Locking around transaction control logic.
+    self._txn_lock = Lock()
+    # Lock preventing activity which cannot occur while a transaction is
+    # current. This is primarily for database reopens, as when the
+    # LMDB map_size is raised.
+    self._txn_idle = Lock()     # available if no transactions are in progress
+    self._txn_blocked = Lock()  # available if new transactions may commence
+    self._txn_count = 0
 
   @classmethod
   def is_supported(cls):
@@ -110,12 +120,42 @@ class LMDBIndex(_Index):
   def _embiggen_lmdb(self, new_map_size=None):
     if new_map_size is None:
       new_map_size= self.map_size * 2
-    old_lmdb = self._lmdb
     self.map_size = new_map_size
     info("change LMDB map_size to %d", self.map_size)
+    # reopen the database
+    self._lmdb.sync()
+    self._lmdb.close()
     self._open_lmdb()
-    old_lmdb.sync()
-    old_lmdb.close()
+
+  @contextmanager
+  def _txn(self, write=False):
+    ''' Context manager wrapper for an LMDB transaction which tracks active transactions.
+    '''
+    with self._txn_blocked:
+      with self._txn_lock:
+        resize_needed = self._resize_needed
+        if resize_needed:
+          self._resize_needed = False
+      if resize_needed:
+        # wait for existing transactions to finish
+        with self._txn_idle:
+          self._embiggen_lmdb()
+      with self._txn_lock:
+        count = self._txn_count
+        count += 1
+        self._txn_count = count
+        if count == 1:
+          # mark transactions as in progress
+          self._txn_idle.acquire()
+    yield self._lmdb.begin(write=write)
+    # logic mutex
+    with self._txn_lock:
+      count = self._txn_count
+      count -= 1
+      self._txn_count = count
+      if count == 0:
+        # mark all transactions as complete
+        self._txn_idle.release()
 
   def shutdown(self):
     self.flush()
@@ -127,13 +167,13 @@ class LMDBIndex(_Index):
 
   def __iter__(self):
     mkhash = self.hashclass.from_hashbytes
-    with self._lmdb.begin() as txn:
+    with self._txn() as txn:
       cursor = txn.cursor()
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
   def _get(self, hashcode):
-    with self._lmdb.begin() as txn:
+    with self._txn() as txn:
       return txn.get(hashcode)
 
   def __contains__(self, hashcode):
@@ -156,7 +196,7 @@ class LMDBIndex(_Index):
     entry = value.encode()
     while True:
       try:
-        with self._lmdb.begin(write=True) as txn:
+        with self._txn(write=True) as txn:
           txn.put(hashcode, entry, overwrite=True)
       except lmdb.MapFullError as e:
         info("%s", e)

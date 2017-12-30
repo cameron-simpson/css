@@ -181,11 +181,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   def bg(self, func, *a, **kw):
     ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
     '''
-    R = Result(name="%s:%s")
-    def bg2():
+    X("Store.bg(func=%s)", func)
+    R = Result(name="%s:%s" % (self, func))
+    def func2():
       with self:
         return func(*a, **kw)
-    R.bg(func, *a, **kw)
+    R.bg(func2)
     return R
 
   def missing(self, hashes):

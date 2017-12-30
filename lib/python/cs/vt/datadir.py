@@ -375,7 +375,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     if not key.islower():
       raise ValueError("invalid state key, short be lower case: %r" % (key,))
     if value is None:
-      if key in self._state:
+      if key in self._extra_state:
         del self._extra_state[key]
     else:
       self._extra_state[key] = value
