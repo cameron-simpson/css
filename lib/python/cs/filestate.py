@@ -32,7 +32,7 @@ def FileState(path, do_lstat=False, missing_ok=False):
     try:
       S = os.lstat(path) if do_lstat else os.stat(path)
     except OSError as e:
-      if e.errno == errno.ENOENT:
+      if e.errno == errno.ENOENT and missing_ok:
         return None
       raise
   return _FileState(S, S.st_mtime, S.st_size, S.st_dev, S.st_ino)
