@@ -505,7 +505,7 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     if len(x_status) > 0:
       M['X-Status'] = x_status
     with LogExceptions():
-      text = M.as_string(True)
+      text = M.as_string(True).replace('\nFrom ', '\n>From ')
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
     info("    OK >> %s" % (shortpath(folderpath)))
