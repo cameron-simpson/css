@@ -233,11 +233,14 @@ def blocked_chunks_of(chunks, scanner,
         # end of offsets and chunks
         parseQ.close()
       PfxThread(target=run_parser).run()
+    # inbound chunks and offsets
+    in_chunks = []  # unprocessed chunks
+    in_offsets = [] # inbound parse offsets
     def get_parse():
       ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
           Sets parseQ to None if the end of the iterable is reached.
       '''
-      nonlocal parseQ
+      nonlocal parseQ, in_offsets, in_chunks
       try:
         parsed = next(parseQ)
       except StopIteration:
@@ -270,9 +273,6 @@ def blocked_chunks_of(chunks, scanner,
     recompute_offsets()
     hash_value = 0
     offset = 0
-    # inbound chunks and offsets
-    in_chunks = []
-    in_offsets = []
     # unblocked outbound data
     pending = _PendingBuffer(max_block)
     # Read data chunks and locate desired boundaries.
@@ -314,6 +314,7 @@ def blocked_chunks_of(chunks, scanner,
             last_offset = pending.offset
             recompute_offsets()
           if release:
+            release = False   # becomes true if we should flush after taking data
             # yield the current pending data
             for out_chunk in pending.flush():
               yield out_chunk
@@ -324,7 +325,6 @@ def blocked_chunks_of(chunks, scanner,
             last_offset = pending.offset
             ##X("RELEASED: "+release)
             recompute_offsets()
-            release = False   # becomes true if we should flush after taking data
           if not chunk:
             # consumed the end of the chunk, need a new one
             break
