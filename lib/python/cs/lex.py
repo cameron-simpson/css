@@ -84,8 +84,7 @@ ord_space = ord(' ')
 def unctrl(s, tabsize=8):
   s2 = ''
   sofar = 0
-  for i in range(len(s)):
-    ch = s[i]
+  for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
       pass
@@ -162,16 +161,12 @@ def phpquote(s):
   '''
   return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
-def dict2js(d):
-  import cs.json
-  return cs.json.json(d)
-
 # characters that may appear in text sections of a texthexify result
 # Notable exclusions:
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
-#  { } - used for JSON data and 
+#  { } - used for JSON data and some other markup
 #  / - path separator
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
@@ -365,7 +360,7 @@ SLOSH_CHARMAP = {
 }
 
 def slosh_mapper(c, charmap=SLOSH_CHARMAP):
-  ''' Return a string to replace \`c`, or None.
+  ''' Return a string to replace backslash-`c`, or None.
   '''
   return charmap.get(c)
 
@@ -404,7 +399,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     special_starts = set()
     special_seqs = []
     for special in specials.keys():
-      if len(special) == 0:
+      if not special:
         raise ValueError(
             'empty strings may not be used as keys for specials: %r' % (specials,))
       special_starts.add(special[0])
@@ -498,9 +493,10 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if ( c == slosh
-           or (delim is not None and c == delim)
-           or (specials is not None and c in special_starts)
+      if (
+          c == slosh
+          or (delim is not None and c == delim)
+          or (specials is not None and c in special_starts)
       ):
         break
       offset += 1
