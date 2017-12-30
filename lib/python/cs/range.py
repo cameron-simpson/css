@@ -8,6 +8,11 @@
 #
 
 from __future__ import print_function
+import sys
+from bisect import bisect_left
+from collections import namedtuple
+from cs.logutils import ifdebug
+from cs.seq import first
 
 DISTINFO = {
     'description': "a Range class implementing compact integer ranges with a set-like API, and associated functions",
@@ -16,17 +21,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.logutils'],
+    ],
+    'install_requires': ['cs.logutils', 'cs.seq'],
 }
-
-import sys
-from bisect import bisect_left
-from collections import namedtuple
-from cs.logutils import ifdebug
-from cs.pfx import XP
-from cs.seq import first
-from cs.x import X
 
 def overlap(span1, span2):
   ''' Return a list [start, end] denoting the overlap of two spans.
@@ -118,7 +115,7 @@ class Range(object):
     ##return "[%s]" % (",".join(spans))
 
   def __eq__(self, other):
-    if type(other) is Range:
+    if isinstance(other, Range):
       return self._spans == other._spans
     return list(self) == list(other)
 
@@ -241,9 +238,9 @@ class Range(object):
     _spans = self._spans
     i = bisect_left(_spans, Span(start, start))
     # check preceeding span
-    assert(i == 0 or _spans[i-1].end <= start)
+    assert i == 0 or _spans[i-1].end <= start
     # check current span
-    assert(i == len(_spans) or _spans[i].start >= start)
+    assert i == len(_spans) or _spans[i].start >= start
     raise RuntimeError("INCOMPLETE")
 
   def slices(self, start=None, end=None):
@@ -332,7 +329,7 @@ class Range(object):
     while i < len(_spans) and _spans[i].start <= end:
       span = _spans[i]
       # check that the spans overlap
-      assert(span.start <= end and span.end >= start)
+      assert span.start <= end and span.end >= start
       new_start = min(new_start, span.start)
       new_end = max(new_end, span.end)
       i += 1
@@ -464,16 +461,16 @@ class Range(object):
 
   def intersection(self, other):
     R2 = Range()
-    if type(other) is Range:
-      spans = other._spans
+    if isinstance(other, Range):
+      ospans = other._spans
     else:
-      spans = Range.range(other)
+      ospans = Range(other)._spans
     _spans = self._spans
-    for ostart, oend in spans:
+    for ostart, oend in ospans:
       ndx = bisect_left(_spans, [ostart, oend])
       while ndx < len(_spans):
         _span = _spans[ndx]
-        start, end = Range.overlap(_span, [start, oend])
+        start, end = Range.overlap(_span, [ostart, oend])
         if start < end:
           R2.update(start, end)
         ostart = _span[1]
@@ -502,7 +499,7 @@ class Range(object):
         Raise KeyError if the Range is empty.
     '''
     _spans = self._spans
-    if len(_spans) == 0:
+    if not _spans:
       raise KeyError("pop() from empty Range")
     span = _spans[-1]
     start, end = span
@@ -516,7 +513,7 @@ class Range(object):
   def symmetric_difference(self, other):
     ''' Return a new Range with elements in self or other but not both.
     '''
-    if type(other) is not Range:
+    if not isinstance(other, Range):
       other = Range(other)
     R1 = self.difference(other)
     R2 = other.difference(self)
