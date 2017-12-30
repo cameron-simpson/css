@@ -63,7 +63,6 @@ from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
-from cs.x import X
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
