@@ -106,6 +106,12 @@ class LMDBIndex(_Index):
     self.map_size = 10240   ## self.MAP_SIZE
     self._open_lmdb()
 
+  def shutdown(self):
+    with self._txn_idle:
+      self.flush()
+      self._lmdb.close()
+      self._lmdb = None
+
   def _open_lmdb(self):
     import lmdb
     self._lmdb = lmdb.Environment(
@@ -156,10 +162,6 @@ class LMDBIndex(_Index):
       if count == 0:
         # mark all transactions as complete
         self._txn_idle.release()
-
-  def shutdown(self):
-    self.flush()
-    self._lmdb.close()
 
   def flush(self):
     # no force=True param?
