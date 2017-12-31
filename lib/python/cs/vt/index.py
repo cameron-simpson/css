@@ -153,15 +153,17 @@ class LMDBIndex(_Index):
         if count == 1:
           # mark transactions as in progress
           self._txn_idle.acquire()
-    yield self._lmdb.begin(write=write)
-    # logic mutex
-    with self._txn_lock:
-      count = self._txn_count
-      count -= 1
-      self._txn_count = count
-      if count == 0:
-        # mark all transactions as complete
-        self._txn_idle.release()
+    try:
+      yield self._lmdb.begin(write=write)
+    finally:
+      # logic mutex
+      with self._txn_lock:
+        count = self._txn_count
+        count -= 1
+        self._txn_count = count
+        if count == 0:
+          # mark all transactions as complete
+          self._txn_idle.release()
 
   def flush(self):
     # no force=True param?
