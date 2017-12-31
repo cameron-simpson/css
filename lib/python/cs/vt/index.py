@@ -204,9 +204,9 @@ class LMDBIndex(_Index):
           txn.put(hashcode, entry, overwrite=True)
       except lmdb.MapFullError as e:
         info("%s", e)
+        self._resize_needed = True
       else:
         return
-      self._embiggen_lmdb()
 
 class GDBMIndex(_Index):
   ''' GDBM index for a DataDir.
