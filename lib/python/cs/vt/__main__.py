@@ -6,7 +6,6 @@
 
 from __future__ import with_statement
 import errno
-from binascii import hexlify
 from datetime import datetime
 from getopt import getopt, GetoptError
 import logging
@@ -36,6 +35,7 @@ from .cache import FileCacheStore
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec
 from .datafile import DataFile, F_COMPRESSED, decompress, scan_chunks
+from .debug import dump_chunk
 from .dir import Dir, DirFTP
 from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
@@ -357,25 +357,8 @@ class VTCmd:
           try:
             for offset, flags, data, offset2 in scan_chunks(fp, do_decompress=True):
               hashcode = hashclass(data)
-              leadin = '%9d %5d %16.16s' % (offset, len(data), hashcode)
-              leadin2 = ' ' * len(leadin)
-              data_width = max_width - len(leadin)
-              slice_size = (data_width - 1) // 3
-              assert slice_size > 0
-              doff = 0
-              while doff < len(data):
-                doff2 = doff + slice_size
-                chunk = data[doff:doff2]
-                hex_text = hexlify(chunk).decode('utf-8')
-                txt_text = ''.join(
-                    c if c.isprintable() else '.'
-                    for c in chunk.decode('iso8859-1')
-                )
-                print(leadin, txt_text, hex_text)
-                if one_line:
-                  break
-                leadin = leadin2
-                doff = doff2
+              leadin = '%9d %16.16s' % (offset, hashcode)
+              dump_chunk(data, leadin, max_width, one_line)
           except EOFError:
             pass
       else:
