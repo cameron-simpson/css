@@ -5,17 +5,18 @@
 #
 
 from __future__ import with_statement
-import sys
+import errno
+from binascii import hexlify
+from datetime import datetime
+from getopt import getopt, GetoptError
+import logging
 import os
 from os.path import basename, splitext, \
     exists as existspath, join as joinpath, \
     isabs as isabspath, isdir as isdirpath, isfile as isfilepath
-import errno
-from getopt import getopt, GetoptError
-from datetime import datetime
-import logging
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
+import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
@@ -25,7 +26,7 @@ from cs.logutils import exception, error, warning, info, debug, \
                         setup_logging, loginfo, logTo
 from cs.pfx import Pfx
 from cs.resources import RunState
-from cs.tty import statusline
+from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
 from . import fromtext, defaults
@@ -34,7 +35,7 @@ from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec
-from .datafile import DataFile, F_COMPRESSED, decompress
+from .datafile import DataFile, F_COMPRESSED, decompress, scan_chunks
 from .dir import Dir, DirFTP
 from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
@@ -67,7 +68,7 @@ class VTCmd:
     datadir [indextype:[hashname:]]/dirpath index
     datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
     datadir [indextype:[hashname:]]/dirpath push other-datadir
-    dump filerefs
+    dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
     ftp archive.vt
     import [-oW] path {-|archive.vt}
@@ -205,7 +206,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown operation \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("scan", "datadir", "init"):
+      if op in ("datadir", "init", "dump", "scan"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -338,12 +339,47 @@ class VTCmd:
     return xit
 
   def cmd_dump(self, args):
-    ''' Do a Block dump of the filerefs.
+    ''' Dump various file types.
     '''
     if not args:
       raise GetoptError("missing filerefs")
+    hashclass = DEFAULT_HASHCLASS
+    long_format = True
+    one_line = True
+    rows, columns = ttysize(1)
+    if columns is None:
+      columns = 80
+    max_width = columns - 1
     for path in args:
-      dump(path)
+      if path.endswith('.vtd'):
+        print(path)
+        with open(path, 'rb') as fp:
+          try:
+            for offset, flags, data, offset2 in scan_chunks(fp, do_decompress=True):
+              hashcode = hashclass(data)
+              leadin = '%9d %5d %16.16s' % (offset, len(data), hashcode)
+              leadin2 = ' ' * len(leadin)
+              data_width = max_width - len(leadin)
+              slice_size = (data_width - 1) // 3
+              assert slice_size > 0
+              doff = 0
+              while doff < len(data):
+                doff2 = doff + slice_size
+                chunk = data[doff:doff2]
+                hex_text = hexlify(chunk).decode('utf-8')
+                txt_text = ''.join(
+                    c if c.isprintable() else '.'
+                    for c in chunk.decode('iso8859-1')
+                )
+                print(leadin, txt_text, hex_text)
+                if one_line:
+                  break
+                leadin = leadin2
+                doff = doff2
+          except EOFError:
+            pass
+      else:
+        warning("unsupported file type: %r", path)
     return 0
 
   def cmd_fsck(self, args):
