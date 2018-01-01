@@ -33,12 +33,13 @@ from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, dump_block, decodeBlock
 from .cache import FileCacheStore
 from .config import Config, Store
-from .datadir import DataDir, DataDir_from_spec
+from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
 from .datafile import DataFile, F_COMPRESSED, decompress, scan_chunks
 from .debug import dump_chunk
 from .dir import Dir, DirFTP
-from .hash import DEFAULT_HASHCLASS
 from .fsck import fsck_Block, fsck_dir
+from .hash import DEFAULT_HASHCLASS
+from .index import LMDBIndex
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .smuggling import import_dir, import_file
@@ -361,6 +362,12 @@ class VTCmd:
               dump_chunk(data, leadin, max_width, one_line)
           except EOFError:
             pass
+      elif path.endswith('.lmdb'):
+        print(path)
+        lmdb = LMDBIndex(path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes)
+        with lmdb:
+          for hashcode, entry in lmdb.items():
+            print(hashcode, entry)
       else:
         warning("unsupported file type: %r", path)
     return 0
