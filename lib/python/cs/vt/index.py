@@ -191,10 +191,10 @@ class LMDBIndex(_Index):
     return self._get(hashcode) is not None
 
   def __getitem__(self, hashcode):
-    entry = self._get(hashcode)
-    if entry is None:
+    record = self._get(hashcode)
+    if record is None:
       raise KeyError(hashcode)
-    return self.decode(entry)
+    return self.decode(record)
 
   def get(self, hashcode, default=None):
     entry = self._get(hashcode)
@@ -202,13 +202,14 @@ class LMDBIndex(_Index):
       return default
     return self.decode(entry)
 
-  def __setitem__(self, hashcode, value):
+  def __setitem__(self, hashcode, entry):
     import lmdb
-    entry = value.encode()
+    record = entry.encode()
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, entry, overwrite=True)
+          txn.put(hashcode, record, overwrite=True)
+          txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
         self._resize_needed = True
