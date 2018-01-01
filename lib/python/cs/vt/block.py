@@ -448,7 +448,9 @@ class HashCodeBlock(_Block):
 def Block(hashcode=None, data=None, span=None):
   ''' Factory function for a Block.
   '''
-  if data is not None:
+  if data is None:
+    B = HashCodeBlock(hashcode=hashcode)
+  else:
     if span is None:
       span = len(data)
     elif span != len(data):
@@ -458,8 +460,6 @@ def Block(hashcode=None, data=None, span=None):
       B = HashCodeBlock(data=data, hashcode=hashcode)
     else:
       B = LiteralBlock(data=data)
-  else:
-    B = HashCodeBlock(hashcode=hashcode)
   B.span = span
   B.indirect = False
   return B

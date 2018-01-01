@@ -106,6 +106,12 @@ class LMDBIndex(_Index):
     self.map_size = 10240   ## self.MAP_SIZE
     self._open_lmdb()
 
+  def shutdown(self):
+    with self._txn_idle:
+      self.flush()
+      self._lmdb.close()
+      self._lmdb = None
+
   def _open_lmdb(self):
     import lmdb
     self._lmdb = lmdb.Environment(
@@ -147,19 +153,17 @@ class LMDBIndex(_Index):
         if count == 1:
           # mark transactions as in progress
           self._txn_idle.acquire()
-    yield self._lmdb.begin(write=write)
-    # logic mutex
-    with self._txn_lock:
-      count = self._txn_count
-      count -= 1
-      self._txn_count = count
-      if count == 0:
-        # mark all transactions as complete
-        self._txn_idle.release()
-
-  def shutdown(self):
-    self.flush()
-    self._lmdb.close()
+    try:
+      yield self._lmdb.begin(write=write)
+    finally:
+      # logic mutex
+      with self._txn_lock:
+        count = self._txn_count
+        count -= 1
+        self._txn_count = count
+        if count == 0:
+          # mark all transactions as complete
+          self._txn_idle.release()
 
   def flush(self):
     # no force=True param?
@@ -172,6 +176,13 @@ class LMDBIndex(_Index):
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
+  def items(self):
+    mkhash = self.hashclass.from_hashbytes
+    with self._txn() as txn:
+      cursor = txn.cursor()
+      for hashcode, record in cursor.iternext(keys=True, values=True):
+        yield mkhash(hashcode), self.decode(record)
+
   def _get(self, hashcode):
     with self._txn() as txn:
       return txn.get(hashcode)
@@ -180,10 +191,10 @@ class LMDBIndex(_Index):
     return self._get(hashcode) is not None
 
   def __getitem__(self, hashcode):
-    entry = self._get(hashcode)
-    if entry is None:
+    record = self._get(hashcode)
+    if record is None:
       raise KeyError(hashcode)
-    return self.decode(entry)
+    return self.decode(record)
 
   def get(self, hashcode, default=None):
     entry = self._get(hashcode)
@@ -191,18 +202,19 @@ class LMDBIndex(_Index):
       return default
     return self.decode(entry)
 
-  def __setitem__(self, hashcode, value):
+  def __setitem__(self, hashcode, entry):
     import lmdb
-    entry = value.encode()
+    record = entry.encode()
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, entry, overwrite=True)
+          txn.put(hashcode, record, overwrite=True)
+          txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
+        self._resize_needed = True
       else:
         return
-      self._embiggen_lmdb()
 
 class GDBMIndex(_Index):
   ''' GDBM index for a DataDir.
