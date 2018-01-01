@@ -851,6 +851,16 @@ class PlatonicDir(_FilesDir):
         archive = Archive(archive)
     self.archive = archive
 
+  def startup(self):
+    super().startup()
+    if self.meta_store is not None:
+      self.meta_store.open()
+
+  def shutdown(self):
+    if self.meta_store is not None:
+      self.meta_store.close()
+    super().shutdown()
+
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
