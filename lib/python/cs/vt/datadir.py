@@ -910,15 +910,10 @@ class PlatonicDir(_FilesDir):
     return D.fetch(entry.offset, entry.length)
 
   @logexc
-  def _monitor_datafiles(self, use_meta_store=True):
+  def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
     meta_store = self.meta_store
-    if use_meta_store:
-      if meta_store is not None:
-        # activate the meta_store
-        with meta_store:
-          return self._monitor_datafiles(use_meta_store=False)
     filemap = self._filemap
     indexQ = self._indexQ
     if meta_store is not None:
@@ -993,7 +988,7 @@ class PlatonicDir(_FilesDir):
                     hashcode = self.hashclass.from_chunk(data)
                     indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
                     if meta_store is not None:
-                      B = Block(data=data, hashcode=hashcode)
+                      B = Block(data=data, hashcode=hashcode, added=True)
                       blockQ.put( (offset, B) )
                     F.scanned_to = post_offset
                     need_save = True
