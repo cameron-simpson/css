@@ -14,12 +14,30 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': [ 'cs.configutils', 'cs.env', 'cs.excutils', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'install_requires': [
+        'cs.app.maildb',
+        'cs.configutils',
+        'cs.deco',
+        'cs.env',
+        'cs.excutils',
+        'cs.filestate',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mailutils',
+        'cs.obj',
+        'cs.pfx',
+        'cs.py.modules',
+        'cs.py3',
+        'cs.rfc2047',
+        'cs.seq',
+        'cs.threads',
+    ],
     'entry_points': {
-      'console_scripts': [
-          'mailfiler = cs.app.mailfiler:main',
-          ],
-        },
+        'console_scripts': [
+            'mailfiler = cs.app.mailfiler:main',
+        ],
+    },
 }
 
 from collections import namedtuple
@@ -56,13 +74,13 @@ from cs.logutils import setup_logging, with_log, \
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
 from cs.obj import O
-from cs.seq import first
-from cs.threads import locked, locked_property
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
+from cs.seq import first
+from cs.threads import locked, locked_property
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
@@ -1150,7 +1168,6 @@ def get_targets(s, offset):
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
-    offset0 = offset
     T, offset = get_target(s, offset)
     targets.append(T)
     if offset < len(s):
