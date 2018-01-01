@@ -176,6 +176,13 @@ class LMDBIndex(_Index):
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
+  def items(self):
+    mkhash = self.hashclass.from_hashbytes
+    with self._txn() as txn:
+      cursor = txn.cursor()
+      for hashcode, record in cursor.iternext(keys=True, values=True):
+        yield mkhash(hashcode), self.decode(record)
+
   def _get(self, hashcode):
     with self._txn() as txn:
       return txn.get(hashcode)
