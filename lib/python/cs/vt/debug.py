@@ -2,6 +2,7 @@
 
 from binascii import hexlify
 from cs.lex import hexify, texthexify
+from cs.tty import ttysize
 from cs.x import X
 from .block import BlockType
 from .dir import InvalidDirent
