@@ -284,9 +284,11 @@ class Flags(MutableMapping, FlaggedMixin):
     def mutex():
       if lock:
         lock.acquire()
-      yield
-      if lock:
-        lock.release()
+      try:
+        yield
+      finally:
+        if lock:
+          lock.release()
     self._mutex = mutex
     if debug is None:
       debug = False

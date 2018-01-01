@@ -552,8 +552,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       `poll_interval`: polling frequency when timeout is not 0.
   '''
   lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
-  yield lockpath
-  os.remove(lockpath)
+  try:
+    yield lockpath
+  finally:
+    os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
@@ -976,9 +978,11 @@ def tee(fp, fp2):
   old_flush = getattr(fp, 'flush')
   fp.write = _write
   fp.flush = _flush
-  yield
-  fp.write = old_write
-  fp.flush = old_flush
+  try:
+    yield
+  finally:
+    fp.write = old_write
+    fp.flush = old_flush
 
 class NullFile(object):
   ''' Writable file that discards its input.

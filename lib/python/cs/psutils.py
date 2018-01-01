@@ -108,8 +108,10 @@ def PidFileManager(path, pid=None):
   ''' Context manager for a pid file.
   '''
   write_pidfile(path, pid)
-  yield
-  remove_pidfile(path)
+  try:
+    yield
+  finally:
+    remove_pidfile(path)
 
 def run(argv, logger=None, pids=None, **kw):
   ''' Run a command. Optionally trace invocation. Return result of subprocess.call.

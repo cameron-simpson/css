@@ -326,8 +326,10 @@ def PrePfx(tag, *args):
   state = Pfx._state
   old_ur_prefix = state._ur_prefix
   state._ur_prefix = tag
-  yield None
-  state._ur_prefix = old_ur_prefix
+  try:
+    yield None
+  finally:
+    state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.

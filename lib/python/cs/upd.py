@@ -153,5 +153,7 @@ class Upd(object):
   def _withoutContext(self):
     with self._lock:
       old = self.out('')
-      yield
-      self.out(old)
+      try:
+        yield
+      finally:
+        self.out(old)
