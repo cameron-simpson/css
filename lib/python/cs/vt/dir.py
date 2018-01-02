@@ -184,10 +184,11 @@ class _Dirent(object):
     self.parent = parent
 
   def __str__(self):
-    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
+    return "%s:%d:%r:type=%s:%s" % (self.__class__.__name__, id(self), self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
-    return "%s(%s, %s, %s)" % (self.__class__.__name__,
+    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
+                               id(self),
                                D_type2str(self.type),
                                self.name,
                                self.meta)
