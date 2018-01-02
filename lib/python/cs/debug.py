@@ -95,6 +95,31 @@ def RLock():
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
 
+class TimingOutLock(object):
+  ''' A Lock replacement which times out, used for locating deadlock points.
+  '''
+  def __init__(self, deadlock_timeout=20.0):
+    self._lock = threading.Lock()
+    self._deadlock_timeout = deadlock_timeout
+  def acquire(self,blocking=True,timeout=-1,name=None):
+    if timeout < 0:
+      timeout = self._deadlock_timeout
+    else:
+      timeout = min(timeout, self._deadlock_timeout)
+    if not self._lock.acquire(blocking=blocking,timeout=timeout):
+      raise RuntimeError("TIMEOUT acquiring lock held by %s:%r" % (self.owner, self.owner_name))
+    self.owner = caller()
+    self.owner_name = name
+    return True
+  def release(self):
+    return self._lock.release()
+  def __enter__(self):
+    self.acquire()
+    self.owner = caller()
+    return True
+  def __exit__(self,*a):
+    return self._lock.__exit__(*a)
+
 class TraceSuite(object):
   ''' Context manager to trace start and end of a code suite.
   '''
