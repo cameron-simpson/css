@@ -779,6 +779,9 @@ class PlatonicFile(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     self.path = path
 
+  def __str__(self):
+    return "PlatonicFile(%s)" % (shortpath(self.path,))
+
   def startup(self):
     self._fp = open(self.path, 'rb')
 
