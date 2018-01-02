@@ -858,43 +858,39 @@ class PlatonicDir(_FilesDir):
     self.archive = archive
 
   def startup(self):
-    super().startup()
     if self.meta_store is not None:
       self.meta_store.open()
+      top_dirref = self._extra_state.get('top_dirref')
+      if top_dirref is None:
+        D = None
+      else:
+        try:
+          D = decode_Dirent_text(top_dirref)
+        except ValueError as e:
+          warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
+          D = None
+      if D is None:
+        info("%r: create empty topdir Dir", self.datadirpath)
+        D = Dir('.')
+      self.topdir = D
+    super().startup()
 
   def shutdown(self):
+    super().shutdown()
     if self.meta_store is not None:
       self.meta_store.close()
-    super().shutdown()
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
     # update the topdir state before any save
-    self.topdir = self.topdir
-    if self.archive:
-      self.archive.save(self.topdir)
+    X("************************* PLATONIC SAVE STATE *****************")
+    if self.meta_store is not None:
+      with self.meta_store:
+        self.set_state('top_dirref', self.topdir.textencode())
+        if self.archive:
+          self.archive.save(self.topdir)
     return _FilesDir._save_state(self)
-
-  @prop
-  def topdir(self):
-    top_dirref = self._extra_state.get('top_dirref')
-    if top_dirref is None:
-      D = None
-    else:
-      try:
-        D = decode_Dirent_text(top_dirref)
-      except ValueError as e:
-        warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
-        D = None
-    if D is None:
-      info("%r: create empty topdir Dir", self.datadirpath)
-      D = self.topdir = Dir('.')
-    return D
-
-  @topdir.setter
-  def topdir(self, D):
-    self.set_state('top_dirref', D.textencode())
 
   @staticmethod
   def _default_exclude_path(path):
