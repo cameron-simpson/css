@@ -116,7 +116,7 @@ class VTCmd:
     badopts = False
 
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
-    cs.x.X_logger = logging.getLogger()
+    ####cs.x.X_logger = logging.getLogger()
 
     store_spec = None
     dflt_log = os.environ.get('VT_LOGFILE')
