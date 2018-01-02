@@ -467,7 +467,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from .indexQ and store it.
     '''
-    with Pfx("_index_updater"):
+    with Pfx("%s._index_updater", self):
       index = self.index
       flush_rate = INDEX_FLUSH_RATE
       unindexed = self._unindexed
@@ -737,9 +737,7 @@ class DataDir(_FilesDir):
       n, D = self._get_current_save_datafile()
       with D:
         offset, post_offset = D.add(data)
-        ##X("DataDir.add: added data: %d bytes => %d consumed", len(data), post_offset-offset)
     hashcode = self.hashclass.from_chunk(data)
-    ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, DataDirIndexEntry(n, offset), post_offset)
     rollover = self.rollover
     with self._lock:
@@ -884,7 +882,6 @@ class PlatonicDir(_FilesDir):
     ''' Rewrite STATE_FILENAME.
     '''
     # update the topdir state before any save
-    X("************************* PLATONIC SAVE STATE *****************")
     if self.meta_store is not None:
       with self.meta_store:
         self.set_state('top_dirref', self.topdir.textencode())
@@ -930,8 +927,6 @@ class PlatonicDir(_FilesDir):
     indexQ = self._indexQ
     if meta_store is not None:
       topdir = self.topdir
-      def splice_blocks(B, Q):
-        return top_block_for(spliced_blocks(B, Q))
     while not self._monitor_halt:
       # scan for new datafiles
       need_save = False
@@ -951,72 +946,75 @@ class PlatonicDir(_FilesDir):
                   info("del %r", name)
                   del D[name]
             for filename in filenames:
-              if self._monitor_halt:
-                break
-              rfilepath = joinpath(rdirpath, filename)
               with Pfx(filename):
-                if self.exclude_file(rfilepath):
-                  continue
-                try:
-                  F = filemap[rfilepath]
-                except KeyError:
-                  info("ADD")
-                  filenum = self._add_datafile(rfilepath)
-                  F = filemap[filenum]
-                  need_save = True
-                else:
-                  filenum = F.filenum
-                try:
-                  new_size = F.stat_size(self.follow_symlinks)
-                except OSError as e:
-                  if e.errno == errno.ENOENT:
-                    warning("forgetting missing file")
-                    self._del_datafilestate(F)
-                    need_save = True
-                  else:
-                    warning("stat: %s", e)
-                  continue
-                if new_size is None:
-                  # skip non files
-                  debug("SKIP non-file")
-                  continue
-                if meta_store is not None:
+                if self._monitor_halt:
+                  break
+                rfilepath = joinpath(rdirpath, filename)
+                with Pfx(filename):
+                  if self.exclude_file(rfilepath):
+                    continue
                   try:
-                    E = D[filename]
+                    F = filemap[rfilepath]
                   except KeyError:
-                    info("new FileDirent")
-                    E = FileDirent(filename)
-                    D[filename] = E
+                    info("ADD")
+                    filenum = self._add_datafile(rfilepath)
+                    F = filemap[filenum]
+                    need_save = True
                   else:
-                    if not E.isfile:
-                      info("new FileDirent replacing previous nonfile")
-                      E = D[E] = FileDirent(filename)
-                if new_size > F.scanned_to:
-                  info("scan from %d", F.scanned_to)
+                    filenum = F.filenum
+                  try:
+                    new_size = F.stat_size(self.follow_symlinks)
+                  except OSError as e:
+                    if e.errno == errno.ENOENT:
+                      warning("forgetting missing file")
+                      self._del_datafilestate(F)
+                      need_save = True
+                    else:
+                      warning("stat: %s", e)
+                    continue
+                  if new_size is None:
+                    # skip non files
+                    debug("SKIP non-file")
+                    continue
                   if meta_store is not None:
-                    blockQ = IterableQueue(64)
-                    R = meta_store.bg(splice_blocks, E.block, blockQ)
-                  for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
-                    hashcode = self.hashclass.from_chunk(data)
-                    indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                    try:
+                      E = D[filename]
+                    except KeyError:
+                      info("new FileDirent")
+                      E = FileDirent(filename)
+                      D[filename] = E
+                    else:
+                      if not E.isfile:
+                        info("new FileDirent replacing previous nonfile")
+                        E = D[E] = FileDirent(filename)
+                  if new_size > F.scanned_to:
+                    info("scan from %d", F.scanned_to)
                     if meta_store is not None:
-                      B = Block(data=data, hashcode=hashcode, added=True)
-                      blockQ.put( (offset, B) )
-                    F.scanned_to = post_offset
-                    need_save = True
-                    if self._monitor_halt:
-                      break
-                  info("scanned to %d", F.scanned_to)
-                  if meta_store is not None:
-                    blockQ.close()
-                    newB = R()
-                    E.block = newB
-                    D.changed = True
-                    need_save = True
-                  # update state after completion of a scan
-                  if need_save:
-                    self._save_state()
-                    need_save = False
+                      blockQ = IterableQueue()
+                      R = meta_store.bg(
+                          lambda B, Q: top_block_for(spliced_blocks(B, Q)),
+                          E.block, blockQ)
+                    for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
+                      hashcode = self.hashclass.from_chunk(data)
+                      indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                      if meta_store is not None:
+                        B = Block(data=data, hashcode=hashcode, added=True)
+                        blockQ.put( (offset, B) )
+                      F.scanned_to = post_offset
+                      need_save = True
+                      if self._monitor_halt:
+                        break
+                    info("scanned to %d", F.scanned_to)
+                    if meta_store is not None:
+                      blockQ.close()
+                      top_block = R()
+                      E.block = top_block
+                      D.changed = True
+                      need_save = True
+                    # update state after completion of a scan
+                    if need_save:
+                      self._save_state()
+                      need_save = False
       if need_save:
         self._save_state()
         need_save = False
