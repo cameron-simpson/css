@@ -260,7 +260,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # drop the location onto the _indexQ for persistent storage in
     # the index asynchronously.
     self._unindexed = {}
-    self._indexQ = IterableQueue()
+    self._indexQ = IterableQueue(64)
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
     T.start()
