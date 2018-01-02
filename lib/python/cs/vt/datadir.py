@@ -222,6 +222,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def _indexclass(self, preferred_indexclass=None):
     return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
 
+  def __str__(self):
+    return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
+
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
              % (self.__class__.__name__,
