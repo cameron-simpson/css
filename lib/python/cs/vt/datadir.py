@@ -939,12 +939,13 @@ class PlatonicDir(_FilesDir):
           with Pfx(rdirpath):
             dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
             if meta_store is not None:
-              D = topdir.makedirs(rdirpath, force=True)
-              # prune removed names
-              for name in D.keys():
-                if name not in dirnames and name not in filenames:
-                  info("del %r", name)
-                  del D[name]
+              with meta_store:
+                D = topdir.makedirs(rdirpath, force=True)
+                # prune removed names
+                for name in D.keys():
+                  if name not in dirnames and name not in filenames:
+                    info("del %r", name)
+                    del D[name]
             for filename in filenames:
               with Pfx(filename):
                 if self._monitor_halt:
