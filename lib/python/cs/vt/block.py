@@ -429,7 +429,10 @@ class HashCodeBlock(_Block):
     self.hashcode = hashcode
 
   def __repr__(self):
-    return "%s:len=%d:hashcode=%s" % (self.__class__.__name__, len(self), self.hashcode)
+    return (
+        "%s:len=%d:hashcode=%s"
+        % (self.__class__.__name__, len(self), self.hashcode)
+    )
 
   def stored_data(self):
     ''' The direct data of this Block.
