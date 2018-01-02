@@ -211,7 +211,7 @@ class Config:
       max_file_size=None,
       basedir=None,
   ):
-    ''' Construct a FileCacheStorer from a "filecache" clause.
+    ''' Construct a FileCacheStore from a "filecache" clause.
     '''
     if type is not None:
       assert type == 'filecache'
@@ -260,7 +260,7 @@ class Config:
       meta=None,
       archive=None,
   ):
-    ''' Construct a DataDirStore from a "datadir" clause.
+    ''' Construct a PlatonicStore from a "datadir" clause.
     '''
     if type is not None:
       assert type == 'platonic'
