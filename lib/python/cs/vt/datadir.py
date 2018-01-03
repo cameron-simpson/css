@@ -190,8 +190,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self.rollover = rollover
     if create_statedir is None:
       create_statedir = False
-    if create_datadir is None:
-      create_datadir = False
     if not isdirpath(statedirpath):
       if create_statedir:
         with Pfx("mkdir(%r)", statedirpath):
@@ -206,12 +204,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     else:
       datadirpath = self.datadirpath
     # the "default" data dir may be created if the statedir exists
-    if (
-        create_datadir is None
-        and existspath(statedirpath)
-        and not existspath(datadirpath)
-    ):
-      create_datadir = True
+    if create_datadir is None:
+      create_datadir = existspath(statedirpath) and not existspath(datadirpath)
     if not isdirpath(datadirpath):
       if create_datadir:
         with Pfx("mkdir(%r)", datadirpath):
