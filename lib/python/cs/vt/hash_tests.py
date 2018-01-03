@@ -14,7 +14,6 @@ import unittest
 from itertools import accumulate
 import cs.logutils
 cs.logutils.X_via_tty = True
-from cs.logutils import X
 from cs.randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
