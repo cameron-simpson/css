@@ -441,14 +441,16 @@ class ProxyStore(BasicStoreSync):
         LF = getattr(S, method_name)(*args)
         LFs.append(LF)
     for LF in report(LFs):
-      # locate the correspnding store for context
-      for i, iLF in LFs:
+      # locate the corresponding store for context
+      S = None
+      for i, iLF in enumerate(LFs):
         if iLF is LF:
           S = stores[i]
-          with Pfx(S):
-            yield S, LF()
-          continue
-      raise RuntimeError("LF %r not one of the original LFs: %r" % (LF, LFs))
+          break
+      if S is None:
+        raise RuntimeError("LF %r not one of the original LFs: %r" % (LF, LFs))
+      with Pfx(S):
+        yield S, LF()
 
   def add(self, data):
     ''' Add a data chunk to the save Stores.
