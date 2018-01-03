@@ -73,7 +73,6 @@ class VTCmd:
     fsck block blockref...
     ftp archive.vt
     import [-oW] path {-|archive.vt}
-    listen {-|host:port}
     ls [-R] dirrefs...
     mount [-a] [-o {append_only,readonly}] [-r] archive.vt [mountpoint [subpath]]
       -a  All dates. Implies readonly.
@@ -83,9 +82,10 @@ class VTCmd:
             readonly    Read only; data may not be modified.
       -r  Readonly, the same as "-o readonly".
     pack paths...
-    scan datafile
     pull other-store objects...
     report
+    scan datafile
+    serve {-|host:port}
     unpack dirrefs...
   '''
 
@@ -529,15 +529,15 @@ class VTCmd:
         os.system("ls -la %s" % (statedirpath,))
     return 0
 
-  def cmd_listen(self, args):
-    ''' Start a daemon listening on a TCP port or on stdin/stdout.
+  def cmd_serve(self, args):
+    ''' Start a service daemon listening on a TCP port or on stdin/stdout.
     '''
     if len(args) != 1:
       raise GetoptError("expected a port")
     arg = args[0]
     if arg == '-':
       from .stream import StreamStore
-      RS = StreamStore("listen -", sys.stdin, sys.stdout,
+      RS = StreamStore("serve -", sys.stdin, sys.stdout,
                        local_store=defaults.S)
       RS.join()
     else:
@@ -554,7 +554,7 @@ class VTCmd:
           with self.runstate:
             srv.join()
       else:
-        raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
+        raise GetoptError("invalid serve argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
     return 0
 
   def cmd_ls(self, args):
