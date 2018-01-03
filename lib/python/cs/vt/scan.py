@@ -61,10 +61,11 @@ if scanbuf is None:
         offsets.append(offset)
     return hash_value, offsets
 
-# debugging wrapper
-scanbuf0 = scanbuf
-def scanbuf(h, data):
-  X("scan %d bytes", len(data))
-  h2, offsets = scanbuf0(h, data)
-  ##X("scan => %r", offsets)
-  return h2, offsets
+if False:
+  # debugging wrapper
+  scanbuf0 = scanbuf
+  def scanbuf(h, data):
+    X("scan %d bytes", len(data))
+    h2, offsets = scanbuf0(h, data)
+    ##X("scan => %r", offsets)
+    return h2, offsets

@@ -403,25 +403,36 @@ class _Block(object):
 
 class HashCodeBlock(_Block):
 
-  def __init__(self, hashcode=None, data=None):
+  def __init__(self, hashcode=None, data=None, added=False):
     ''' Initialise a BT_HASHCODE Block or IndirectBlock.
         A HashCodeBlock always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
         NB: The data are not kept in memory; fetched on demand.
+        `added`: if true, do not add the data to the current Store
     '''
     _Block.__init__(self, BlockType.BT_HASHCODE)
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
     if data is not None:
-      h = defaults.S.add(data)
-      if hashcode is None:
-        hashcode = h
-      elif h != hashcode:
-        raise ValueError("supplied hashcode %r != saved hash for data (%r : %r)" % (hashcode, h, data))
+      if added:
+        # Block already Stored, just require presupplied hashcode
+        if hashcode is None:
+          raise ValueError("added=%s but no hashcode supplied" % (added,))
+      else:
+        h = defaults.S.add(data)
+        if hashcode is None:
+          hashcode = h
+        elif h != hashcode:
+          raise ValueError(
+              "supplied hashcode %r != saved hash for data (%r : %r)"
+              % (hashcode, h, data))
     self.hashcode = hashcode
 
   def __repr__(self):
-    return "%s:len=%d:hashcode=%s" % (self.__class__.__name__, len(self), self.hashcode)
+    return (
+        "%s:len=%d:hashcode=%s"
+        % (self.__class__.__name__, len(self), self.hashcode)
+    )
 
   def stored_data(self):
     ''' The direct data of this Block.
@@ -445,7 +456,7 @@ class HashCodeBlock(_Block):
     '''
     return self.stored_data()
 
-def Block(hashcode=None, data=None, span=None):
+def Block(hashcode=None, data=None, span=None, added=False):
   ''' Factory function for a Block.
   '''
   if data is None:
@@ -457,7 +468,7 @@ def Block(hashcode=None, data=None, span=None):
       raise ValueError("span(%d) does not match data (%d bytes)"
                        % (span, len(data)))
     if len(data) > 32:
-      B = HashCodeBlock(data=data, hashcode=hashcode)
+      B = HashCodeBlock(data=data, hashcode=hashcode, added=added)
     else:
       B = LiteralBlock(data=data)
   B.span = span

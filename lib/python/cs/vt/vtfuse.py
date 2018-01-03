@@ -185,7 +185,7 @@ class FileHandle(O):
     ''' Close the file, mark its parent directory as changed.
     '''
     self.Eopen.close()
-    self.E.parent.change()
+    self.E.parent.changed = True
 
 class Inode(NS):
   ''' An Inode associates an inode number and a Dirent.
@@ -971,7 +971,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EROFS)
     fhndx = self._vt_core.open(E, flags, ctx)
     if for_write or for_append:
-      E.change()
+      E.changed = True
     return fhndx
 
   @handler

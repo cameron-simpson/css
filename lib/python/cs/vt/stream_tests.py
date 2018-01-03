@@ -7,7 +7,7 @@
 import os
 import sys
 import unittest
-from cs.logutils import X
+from cs.x import X
 from .hash import DEFAULT_HASHCLASS
 from .hash_tests import HashUtilDict, _TestHashCodeUtils
 from .store import MappingStore

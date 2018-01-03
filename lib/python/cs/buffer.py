@@ -233,7 +233,7 @@ class CornuCopyBuffer(object):
     ''' Advance position by `skip_to`. Return the new offset.
         `skipto`: the distance to advance
         `copy_skip`: callable to receive skipped data.
-        `short_ok`: default False; f true then skipto may return before
+        `short_ok`: default False; if true then skipto may return before
           `new_offset` if there are insufficient `input_data`.
         Return values:
         `buf`: the new state of `buf`

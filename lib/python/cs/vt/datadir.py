@@ -46,7 +46,7 @@ from .paths import decode_Dirent_text
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
 # flush the index after this many updates in the index updater worker thread
-INDEX_FLUSH_RATE = 1024
+INDEX_FLUSH_RATE = 16384
 
 def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
   ''' Accept `spec` of the form:
@@ -190,8 +190,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self.rollover = rollover
     if create_statedir is None:
       create_statedir = False
-    if create_datadir is None:
-      create_datadir = False
     if not isdirpath(statedirpath):
       if create_statedir:
         with Pfx("mkdir(%r)", statedirpath):
@@ -206,12 +204,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     else:
       datadirpath = self.datadirpath
     # the "default" data dir may be created if the statedir exists
-    if (
-        create_datadir is None
-        and existspath(statedirpath)
-        and not existspath(datadirpath)
-    ):
-      create_datadir = True
+    if create_datadir is None:
+      create_datadir = existspath(statedirpath) and not existspath(datadirpath)
     if not isdirpath(datadirpath):
       if create_datadir:
         with Pfx("mkdir(%r)", datadirpath):
@@ -221,6 +215,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   def _indexclass(self, preferred_indexclass=None):
     return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
+
+  def __str__(self):
+    return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
   def __repr__(self):
     return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
@@ -257,7 +254,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     # drop the location onto the _indexQ for persistent storage in
     # the index asynchronously.
     self._unindexed = {}
-    self._indexQ = IterableQueue()
+    self._indexQ = IterableQueue(64)
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
     T.start()
@@ -464,7 +461,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from .indexQ and store it.
     '''
-    with Pfx("_index_updater"):
+    with Pfx("%s._index_updater", self):
       index = self.index
       flush_rate = INDEX_FLUSH_RATE
       unindexed = self._unindexed
@@ -613,8 +610,7 @@ class DataDir(_FilesDir):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
-    _FilesDir.__init__(
-        self,
+    super().__init__(
         statedirpath, datadirpath, hashclass,
         indexclass=None,
         rollover=None,
@@ -734,9 +730,7 @@ class DataDir(_FilesDir):
       n, D = self._get_current_save_datafile()
       with D:
         offset, post_offset = D.add(data)
-        ##X("DataDir.add: added data: %d bytes => %d consumed", len(data), post_offset-offset)
     hashcode = self.hashclass.from_chunk(data)
-    ##X("DataDir.add: hashcode=%s", hashcode)
     self._queue_index(hashcode, DataDirIndexEntry(n, offset), post_offset)
     rollover = self.rollover
     with self._lock:
@@ -776,6 +770,9 @@ class PlatonicFile(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     self.path = path
 
+  def __str__(self):
+    return "PlatonicFile(%s)" % (shortpath(self.path,))
+
   def startup(self):
     self._fp = open(self.path, 'rb')
 
@@ -803,9 +800,11 @@ class PlatonicDir(_FilesDir):
   '''
 
   def __init__(self,
-      statedirpath, datadirpath, hashclass, indexclass=None,
-      create_statedir=None, exclude_dir=None, exclude_file=None,
-      follow_symlinks=False, archive=None, meta_store=None):
+      statedirpath, datadirpath, hashclass,
+      create_datadir=False,
+      exclude_dir=None, exclude_file=None,
+      follow_symlinks=False, archive=None, meta_store=None,
+      **kw):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -816,11 +815,6 @@ class PlatonicDir(_FilesDir):
             If None, default to "statedirpath/data", which might be
             a symlink to a shared area such as a NAS.
         `hashclass`: the hash class used to index chunk contents.
-        `indexclass`: the IndexClass providing the index to chunks
-            in the DataFiles. If not specified, a supported index
-            class with an existing index file will be chosen, otherwise
-            the most favoured indexclass available will be chosen.
-        `create_statedir`: os.mkdir the state directory if missing
         `exclude_dir`: optional function to test a directory path for
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
@@ -831,17 +825,15 @@ class PlatonicDir(_FilesDir):
         `meta_store`: an optional Store used to maintain a Dir
           representing the ideal directory
         `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
+        Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
     '''
+    super().__init__(statedirpath, datadirpath, hashclass, create_datadir=False, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
       exclude_file = self._default_exclude_path
-    _FilesDir.__init__(
-        self,
-        statedirpath, datadirpath, hashclass,
-        indexclass=None)
     self.exclude_dir = exclude_dir
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
@@ -851,34 +843,39 @@ class PlatonicDir(_FilesDir):
         archive = Archive(archive)
     self.archive = archive
 
+  def startup(self):
+    if self.meta_store is not None:
+      self.meta_store.open()
+      top_dirref = self._extra_state.get('top_dirref')
+      if top_dirref is None:
+        D = None
+      else:
+        try:
+          D = decode_Dirent_text(top_dirref)
+        except ValueError as e:
+          warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
+          D = None
+      if D is None:
+        info("%r: create empty topdir Dir", self.datadirpath)
+        D = Dir('.')
+      self.topdir = D
+    super().startup()
+
+  def shutdown(self):
+    super().shutdown()
+    if self.meta_store is not None:
+      self.meta_store.close()
+
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
     # update the topdir state before any save
-    self.topdir = self.topdir
-    if self.archive:
-      self.archive.save(self.topdir)
+    if self.meta_store is not None:
+      with self.meta_store:
+        self.set_state('top_dirref', self.topdir.textencode())
+        if self.archive:
+          self.archive.save(self.topdir)
     return _FilesDir._save_state(self)
-
-  @prop
-  def topdir(self):
-    top_dirref = self._extra_state.get('top_dirref')
-    if top_dirref is None:
-      D = None
-    else:
-      try:
-        D = decode_Dirent_text(top_dirref)
-      except ValueError as e:
-        warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
-        D = None
-    if D is None:
-      info("%r: create empty topdir Dir", self.datadirpath)
-      D = self.topdir = Dir('.')
-    return D
-
-  @topdir.setter
-  def topdir(self, D):
-    self.set_state('top_dirref', D.textencode())
 
   @staticmethod
   def _default_exclude_path(path):
@@ -910,21 +907,14 @@ class PlatonicDir(_FilesDir):
     return D.fetch(entry.offset, entry.length)
 
   @logexc
-  def _monitor_datafiles(self, use_meta_store=True):
+  def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
     meta_store = self.meta_store
-    if use_meta_store:
-      if meta_store is not None:
-        # activate the meta_store
-        with meta_store:
-          return self._monitor_datafiles(use_meta_store=False)
     filemap = self._filemap
     indexQ = self._indexQ
     if meta_store is not None:
       topdir = self.topdir
-      def splice_blocks(B, Q):
-        return top_block_for(spliced_blocks(B, Q))
     while not self._monitor_halt:
       # scan for new datafiles
       need_save = False
@@ -937,79 +927,83 @@ class PlatonicDir(_FilesDir):
           with Pfx(rdirpath):
             dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
             if meta_store is not None:
-              D = topdir.makedirs(rdirpath, force=True)
-              # prune removed names
-              for name in D.keys():
-                if name not in dirnames and name not in filenames:
-                  info("del %r", name)
-                  del D[name]
+              with meta_store:
+                D = topdir.makedirs(rdirpath, force=True)
+                # prune removed names
+                for name in D.keys():
+                  if name not in dirnames and name not in filenames:
+                    info("del %r", name)
+                    del D[name]
             for filename in filenames:
-              if self._monitor_halt:
-                break
-              rfilepath = joinpath(rdirpath, filename)
               with Pfx(filename):
-                if self.exclude_file(rfilepath):
-                  continue
-                try:
-                  F = filemap[rfilepath]
-                except KeyError:
-                  info("ADD")
-                  filenum = self._add_datafile(rfilepath)
-                  F = filemap[filenum]
-                  need_save = True
-                else:
-                  filenum = F.filenum
-                try:
-                  new_size = F.stat_size(self.follow_symlinks)
-                except OSError as e:
-                  if e.errno == errno.ENOENT:
-                    warning("forgetting missing file")
-                    self._del_datafilestate(F)
-                    need_save = True
-                  else:
-                    warning("stat: %s", e)
-                  continue
-                if new_size is None:
-                  # skip non files
-                  debug("SKIP non-file")
-                  continue
-                if meta_store is not None:
+                if self._monitor_halt:
+                  break
+                rfilepath = joinpath(rdirpath, filename)
+                with Pfx(filename):
+                  if self.exclude_file(rfilepath):
+                    continue
                   try:
-                    E = D[filename]
+                    F = filemap[rfilepath]
                   except KeyError:
-                    info("new FileDirent")
-                    E = FileDirent(filename)
-                    D[filename] = E
+                    info("ADD")
+                    filenum = self._add_datafile(rfilepath)
+                    F = filemap[filenum]
+                    need_save = True
                   else:
-                    if not E.isfile:
-                      info("new FileDirent replacing previous nonfile")
-                      E = D[E] = FileDirent(filename)
-                if new_size > F.scanned_to:
-                  info("scan from %d", F.scanned_to)
+                    filenum = F.filenum
+                  try:
+                    new_size = F.stat_size(self.follow_symlinks)
+                  except OSError as e:
+                    if e.errno == errno.ENOENT:
+                      warning("forgetting missing file")
+                      self._del_datafilestate(F)
+                      need_save = True
+                    else:
+                      warning("stat: %s", e)
+                    continue
+                  if new_size is None:
+                    # skip non files
+                    debug("SKIP non-file")
+                    continue
                   if meta_store is not None:
-                    blockQ = IterableQueue(64)
-                    R = meta_store.bg(splice_blocks, E.block, blockQ)
-                  for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
-                    hashcode = self.hashclass.from_chunk(data)
-                    indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                    try:
+                      E = D[filename]
+                    except KeyError:
+                      info("new FileDirent")
+                      E = FileDirent(filename)
+                      D[filename] = E
+                    else:
+                      if not E.isfile:
+                        info("new FileDirent replacing previous nonfile")
+                        E = D[E] = FileDirent(filename)
+                  if new_size > F.scanned_to:
+                    info("scan from %d", F.scanned_to)
                     if meta_store is not None:
-                      B = Block(data=data, hashcode=hashcode)
-                      blockQ.put( (offset, B) )
-                    F.scanned_to = post_offset
-                    need_save = True
-                    if self._monitor_halt:
-                      break
-                  info("scanned to %d", F.scanned_to)
-                  if meta_store is not None:
-                    blockQ.close()
-                    newB = R()
-                    E.block = newB
-                    D.changed = True
-                    need_save = True
-                  # update state after completion of a scan
-                  if need_save:
-                    self._save_state()
-                    need_save = False
+                      blockQ = IterableQueue()
+                      R = meta_store.bg(
+                          lambda B, Q: top_block_for(spliced_blocks(B, Q)),
+                          E.block, blockQ)
+                    for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
+                      hashcode = self.hashclass.from_chunk(data)
+                      indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
+                      if meta_store is not None:
+                        B = Block(data=data, hashcode=hashcode, added=True)
+                        blockQ.put( (offset, B) )
+                      F.scanned_to = post_offset
+                      need_save = True
+                      if self._monitor_halt:
+                        break
+                    info("scanned to %d", F.scanned_to)
+                    if meta_store is not None:
+                      blockQ.close()
+                      top_block = R()
+                      E.block = top_block
+                      D.changed = True
+                      need_save = True
+                    # update state after completion of a scan
+                    if need_save:
+                      self._save_state()
+                      need_save = False
       if need_save:
         self._save_state()
         need_save = False

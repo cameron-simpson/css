@@ -40,6 +40,9 @@ class Archive(object):
     self.path = arpath
     self._entries__filename = arpath
 
+  def __str__(self):
+    return "Archive(%s)" % (self.path,)
+
   @prop
   def last(self):
     ''' Return the last (unixtime, Dirent) from the file, or (None, None).

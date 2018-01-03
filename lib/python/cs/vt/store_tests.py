@@ -18,20 +18,25 @@ from cs.x import X
 import cs.x
 cs.x.X_via_tty = True
 from . import _TestAdditionsMixin
-from .datadir import GDBMIndex, KyotoIndex
-from .store import MappingStore, DataDirStore, ProgressStore
+from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HashUtilDict, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .hash_tests import _TestHashCodeUtils
+from .store import MappingStore, DataDirStore, ProgressStore
 
 def multitest(method):
   ''' Decorator to permute a test method for multplie Store types and hash classes.
   '''
   def testMethod(self):
-    for test_store, factory, kwargs, *args in (
+    setups = [
         ('MappingStore', MappingStore, {'mapping': {}}),
-        ('DataDirStore', DataDirStore,
-                         {'indexclass': GDBMIndex, 'rollover': 200000}),
-      ):
+    ]
+    for index_name in get_index_names():
+      setups.append(
+          ('DataDirStore', DataDirStore,
+            {'indexclass': get_index_by_name(index_name),
+             'rollover': 200000})
+      )
+    for test_store, factory, kwargs, *args in setups:
       for hashclass_name in sorted(HASHCLASS_BY_NAME.keys()):
         hashclass = HASHCLASS_BY_NAME[hashclass_name]
         with self.subTest(test_store=test_store, hashclass=hashclass_name):

@@ -184,10 +184,11 @@ class _Dirent(object):
     self.parent = parent
 
   def __str__(self):
-    return "%s:%r:type=%s:%s" % (self.__class__.__name__, self.name, self.type, self.meta.textencode())
+    return "%s:%d:%r:type=%s:%s" % (self.__class__.__name__, id(self), self.name, self.type, self.meta.textencode())
 
   def __repr__(self):
-    return "%s(%s, %s, %s)" % (self.__class__.__name__,
+    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
+                               id(self),
                                D_type2str(self.type),
                                self.name,
                                self.meta)
@@ -285,15 +286,6 @@ class _Dirent(object):
     if when is None:
       when = time.time()
     self.mtime = when
-
-  @locked
-  def change(self):
-    ''' Mark this dirent as changed; propagate to parent Dir if present.
-    '''
-    E = self
-    while E is not None:
-      E.changed = True
-      E = E.parent
 
   def stat(self):
     return self.meta.stat()
@@ -544,8 +536,37 @@ class Dir(_Dirent):
       self._entries = None
     self._unhandled_dirent_chunks = None
     self.parent = parent
-    self.changed = False
+    self._changed = False
     self._lock = RLock()
+
+  def __str__(self):
+    return "Dir:%d:%r" % (id(self), self.path)
+
+  @prop
+  def changed(self):
+    return self._changed
+
+  @changed.setter
+  @locked
+  def changed(self, status):
+    ''' Mark this dirent as changed; propagate to parent Dir if present.
+    '''
+    if not status:
+      raise ValueError("cannot clear .changed")
+    E = self
+    while E is not None:
+      X("%s.changed=True", self)
+      E._changed = True
+      E = E.parent
+
+  @prop
+  def path(self):
+    parts = [self.name]
+    D = self
+    while D.parent is not None:
+      D = D.parent
+      parts.append(D.name)
+    return os.sep.join(reversed(parts))
 
   @property
   @locked
@@ -584,7 +605,7 @@ class Dir(_Dirent):
                       )
       # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
-      self.changed = False
+      self._changed = False
     else:
       B = self._block
     return B
@@ -639,7 +660,7 @@ class Dir(_Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
     self.touch()
-    self.change()
+    self.changed = True
     E.name = name
     Eparent = E.parent
     if Eparent is None:
@@ -657,7 +678,7 @@ class Dir(_Dirent):
     del self.entries[name]
     E.parent = None
     self.touch()
-    self.change()
+    self.changed = True
 
   def add(self, E):
     ''' Add a Dirent to this Dir.
