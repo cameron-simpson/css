@@ -13,6 +13,7 @@ from cs.logutils import setup_logging, info, debug, warning
 from cs.pfx import Pfx, XP
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
+from cs.threads import locked
 from cs.x import X
 from .store import BasicStoreAsync
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
@@ -32,11 +33,13 @@ class StreamStore(BasicStoreAsync):
       or simply to implement the server side.
   '''
 
-  def __init__(self, name, send_fp, recv_fp, local_store=None, addif=False, **kw):
+  def __init__(self, name, send_fp, recv_fp, connect=None, local_store=None, addif=False, **kw):
     ''' Initialise the Stream Store.
         `name`: the Store name.
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.
+        `connect`: if not None, a function to return `send_fp` and `recv_fp`.
+          If specified, the `send_fp` and `recv_fp` parameters must be None.
         `local_store`: optional local Store for serving requests from the peer.
         `addif`: optional mode causing .add to probe the peer for
             the data chunk's hash and to only submit a T_ADD request
@@ -49,13 +52,18 @@ class StreamStore(BasicStoreAsync):
       if local_store.hashclass is not self.hashclass:
         raise ValueError("local_store.hashclass %s is not self.hashclass %s"
                          % (local_store.hashclass, self.hashclass))
-    self._conn = PacketConnection(send_fp, recv_fp, self._handle_request,
-                                  name='PacketConnection:'+self.name)
+    if connect is None:
+      # set up protocol on existing stream
+      # to reconnect facility
+      self._conn = self._packet_connection(send_fp, recv_fp)
+    else:
+      # defer protocol setup until needed
+      self.connect = connect
     self.local_store = local_store
     self.mode_addif = addif
 
   def startup(self):
-    BasicStoreAsync.startup(self)
+    super().startup()
     local_store = self.local_store
     if local_store is not None:
       local_store.open()
@@ -68,7 +76,22 @@ class StreamStore(BasicStoreAsync):
       local_store = self.local_store
       if local_store is not None:
         local_store.close()
-      BasicStoreAsync.shutdown(self)
+      super().shutdown()
+
+  @locked
+  def __getattr__(self, attr):
+    if attr == '_conn':
+      send_fp, recv_fp = self.connect()
+      conn = self._conn = self._packet_connection(send_fp, recv_fp)
+      return conn
+    raise AttributeError(attr)
+
+  def _packet_connection(self, send_fp, recv_fp):
+    ''' Wrap a pair of binary streams in a PacketConnection.
+    '''
+    return PacketConnection(
+      send_fp, recv_fp, self._handle_request,
+      name='PacketConnection:'+self.name)
 
   def join(self):
     ''' Wait for the PacketConnection to shut down.
