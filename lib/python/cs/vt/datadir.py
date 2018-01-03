@@ -610,8 +610,7 @@ class DataDir(_FilesDir):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
-    _FilesDir.__init__(
-        self,
+    super().__init__(
         statedirpath, datadirpath, hashclass,
         indexclass=None,
         rollover=None,
@@ -801,9 +800,11 @@ class PlatonicDir(_FilesDir):
   '''
 
   def __init__(self,
-      statedirpath, datadirpath, hashclass, indexclass=None,
-      create_statedir=None, exclude_dir=None, exclude_file=None,
-      follow_symlinks=False, archive=None, meta_store=None):
+      statedirpath, datadirpath, hashclass,
+      create_datadir=False,
+      exclude_dir=None, exclude_file=None,
+      follow_symlinks=False, archive=None, meta_store=None,
+      **kw):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -814,11 +815,6 @@ class PlatonicDir(_FilesDir):
             If None, default to "statedirpath/data", which might be
             a symlink to a shared area such as a NAS.
         `hashclass`: the hash class used to index chunk contents.
-        `indexclass`: the IndexClass providing the index to chunks
-            in the DataFiles. If not specified, a supported index
-            class with an existing index file will be chosen, otherwise
-            the most favoured indexclass available will be chosen.
-        `create_statedir`: os.mkdir the state directory if missing
         `exclude_dir`: optional function to test a directory path for
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
@@ -829,17 +825,15 @@ class PlatonicDir(_FilesDir):
         `meta_store`: an optional Store used to maintain a Dir
           representing the ideal directory
         `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
+        Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
     '''
+    super().__init__(statedirpath, datadirpath, hashclass, create_datadir=False, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
       exclude_file = self._default_exclude_path
-    _FilesDir.__init__(
-        self,
-        statedirpath, datadirpath, hashclass,
-        indexclass=None)
     self.exclude_dir = exclude_dir
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
