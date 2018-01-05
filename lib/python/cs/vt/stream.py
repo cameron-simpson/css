@@ -54,10 +54,12 @@ class StreamStore(BasicStoreAsync):
                          % (local_store.hashclass, self.hashclass))
     if connect is None:
       # set up protocol on existing stream
-      # to reconnect facility
+      # no reconnect facility
       self._conn = self._packet_connection(send_fp, recv_fp)
     else:
       # defer protocol setup until needed
+      if send_fp is not None or recv_fp is not None:
+        raise ValueError("connect is not None and one of send_fp or recv_fp is not None")
       self.connect = connect
     self.local_store = local_store
     self.mode_addif = addif
