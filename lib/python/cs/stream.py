@@ -223,6 +223,12 @@ class PacketConnection(object):
     self._send_request(channel, tag, rq_type, flags, payload)
     return R
 
+  @not_closed
+  def do(self, *a, **kw):
+    ''' Synchronous request. Calls the Result returned from the request.
+    '''
+    return self.request(*a, **kw)()
+
   def _send_request(self, channel, tag, rq_type, flags, payload):
     ''' Issue a request.
     '''
@@ -328,7 +334,7 @@ class PacketConnection(object):
                   # return (True, flags, decoded-response)
                   if decode_response is None:
                     # return payload bytes unchanged
-                    R.result = payload
+                    R.result = (True, flags, payload)
                   else:
                     # decode payload
                     try:
