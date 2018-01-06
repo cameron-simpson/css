@@ -46,7 +46,9 @@ class PacketConnection(object):
       name = str(seq())
     self.name = name
     self._recv_fp = BytesFile(recv_fp)
+    self.notify_recv_eof = set()
     self._send_fp = BytesFile(send_fp)
+    self.notify_send_eof = set()
     self.request_handler = request_handler
     # tags of requests in play against the local system
     self._channel_request_tags = {0: set()}
@@ -313,22 +315,28 @@ class PacketConnection(object):
                 if not ok:
                   R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r"
                                       % (ok, flags, payload)))
-                else:
+                if ok:
+                  # successful reply
+                  # return (True, decoded-response)
                   try:
                     result = decode_response(flags, payload)
                   except Exception as e:
                     R.exc_info = sys.exc_info()
                   else:
-                    R.result = result
+                    R.result = (True, result)
+                else:
+                  # unsuccessful: return (False, other-flags, payload-bytes)
+                  R.result = (False, flags, payload)
+        # end of received packets: cancel any outstanding requests
         self._pending_cancel()
+        # alert any listeners of receive EOF
+        for notify in self.notify_recv_eof:
+          notify(self)
         with Pfx("_recv_fp.close"):
           try:
             self._recv_fp.close()
           except OSError as e:
             warning("%s.close: %s", self._recv_fp, e)
-          except Exception as e:
-            error("(_RECV) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
-            raise
         self._recv_fp = None
         self.shutdown()
 

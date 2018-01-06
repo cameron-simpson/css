@@ -12,11 +12,11 @@ import random
 import socket
 from threading import Thread
 import unittest
-from cs.logutils import X
 from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
 from cs.socketutils import bind_next_port, OpenSocket
+from cs.x import X
 from .stream import PacketConnection
 
 class _TestStream(object):
@@ -50,7 +50,9 @@ class _TestStream(object):
     # throw the same packet up and back repeatedly
     for _ in range(16):
       R = self.local_conn.request(1, 0x55, bytes((2,3)), self._decode_response, 0)
-      flags, payload = R()
+      ok, response = R()
+      self.assertTrue(ok, "response status not ok")
+      flags, payload = response
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes((3,2)))
 
@@ -66,7 +68,9 @@ class _TestStream(object):
     random.shuffle(rqs)
     for rq in rqs:
       R, flags, data = rq
-      flags, payload = R()
+      ok, response = R()
+      self.assertTrue(ok, "response status not ok")
+      flags, payload = response
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
