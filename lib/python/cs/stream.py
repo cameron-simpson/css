@@ -33,9 +33,9 @@ class PacketConnection(object):
         `recv_fp`: inbound binary stream
         `send_fp`: outbound binary stream
         `request_handler`: if supplied and not None, should be a
-            callable accepting (request_type, flags, payload)
+            callable accepting (request_type, ok, flags, payload)
         The request_handler may return one of 4 values on success:
-          None  Respond will be 0 flags and an empty payload.
+          None  Response will be 0 flags and an empty payload.
           int   Flags only. Response will be the flags and an empty payload.
           bytes Payload only. Response will be 0 flags and the payload.
           (int, bytes) Specify flags and payload for response.
@@ -196,11 +196,22 @@ class PacketConnection(object):
     self._queue_packet(P)
 
   @not_closed
-  def request(self, rq_type, flags, payload, decode_response, channel=0):
+  def request(self, rq_type, flags, payload, decode_response=None, channel=0):
     ''' Compose and dispatch a new request.
         Allocates a new tag, a Result to deliver the response, and
         records the response decode function for use when the
         response arrives.
+        `rq_type`: request type code, an int
+        `flags`: flags to accompany the request, an int
+        `payload`: a bytes-like object to accompany the request
+        `decode_response`: optional callable accepting (response_flags,
+          response_payload_bytes) and returning the decoded response payload
+          value; if unspecified, the response payload bytes are used
+        The Result will yield an (ok, flags, payload) tuple, where:
+        `ok`: where the request was successful
+        `flags`: the response flags
+        `payload`: the response payload, decoded by decode_response
+          if specified
     '''
     if rq_type < 0:
       raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
@@ -312,18 +323,20 @@ class PacketConnection(object):
                 ok = (flags & 0x01) != 0
                 flags >>= 1
                 payload = packet.payload
-                if not ok:
-                  R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r"
-                                      % (ok, flags, payload)))
                 if ok:
                   # successful reply
-                  # return (True, decoded-response)
-                  try:
-                    result = decode_response(flags, payload)
-                  except Exception as e:
-                    R.exc_info = sys.exc_info()
+                  # return (True, flags, decoded-response)
+                  if decode_response is None:
+                    # return payload bytes unchanged
+                    R.result = payload
                   else:
-                    R.result = (True, result)
+                    # decode payload
+                    try:
+                      result = decode_response(flags, payload)
+                    except Exception as e:
+                      R.exc_info = sys.exc_info()
+                    else:
+                      R.result = (True, flags, result)
                 else:
                   # unsuccessful: return (False, other-flags, payload-bytes)
                   R.result = (False, flags, payload)

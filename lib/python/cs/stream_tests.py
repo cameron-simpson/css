@@ -37,7 +37,7 @@ class _TestStream(object):
 
   @staticmethod
   def _decode_response(flags, payload):
-    return flags, payload
+    return payload
 
   @staticmethod
   def _request_handler(rq_type, flags, payload):
@@ -50,9 +50,8 @@ class _TestStream(object):
     # throw the same packet up and back repeatedly
     for _ in range(16):
       R = self.local_conn.request(1, 0x55, bytes((2,3)), self._decode_response, 0)
-      ok, response = R()
+      ok, flags, payload = R()
       self.assertTrue(ok, "response status not ok")
-      flags, payload = response
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes((3,2)))
 
@@ -68,9 +67,8 @@ class _TestStream(object):
     random.shuffle(rqs)
     for rq in rqs:
       R, flags, data = rq
-      ok, response = R()
+      ok, flags, payload = R()
       self.assertTrue(ok, "response status not ok")
-      flags, payload = response
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
