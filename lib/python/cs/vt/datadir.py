@@ -27,7 +27,7 @@ from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.py.func import prop
 from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
@@ -136,7 +136,7 @@ class FileState(SimpleNamespace):
     '''
     yield from self.datadir.scan(self.pathname, offset=offset, **kw)
 
-class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
+class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, Mapping):
   ''' Base class for locally stored data in files.
 
       There are two main subclasses of this at present:
@@ -176,6 +176,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         `create_datadir`: os.mkdir the data directory if missing
     '''
     MultiOpenMixin.__init__(self, lock=RLock())
+    RunStateMixin.__init__(self)
     self.statedirpath = statedirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
@@ -240,6 +241,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   __str__ = spec
 
   def startup(self):
+    self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(maxsize=4,
                             on_remove=lambda k, datafile: datafile.close())
@@ -258,14 +260,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
     T.start()
-    self._monitor_halt = False
     T = self._monitor_Thread = Thread(name="%s-datafile-monitor" % (self,),
                                       target=self._monitor_datafiles)
     T.start()
 
   def shutdown(self):
+    self.runstate.cancel()
     # shut down the monitor Thread
-    self._monitor_halt = True
     self._monitor_Thread.join()
     # drain index update queue
     self._indexQ.close()
@@ -662,7 +663,7 @@ class DataDir(_FilesDir):
     '''
     filemap = self._filemap
     indexQ = self._indexQ
-    while not self._monitor_halt:
+    while not self.cancelled:
       # scan for new datafiles
       need_save = False
       with Pfx("listdir(%r)", self.datadirpath):
@@ -687,7 +688,7 @@ class DataDir(_FilesDir):
         self._save_state()
       # now scan datafiles for new data
       for filenum in filter(lambda n: isinstance(n, int), filemap.keys()):
-        if self._monitor_halt:
+        if self.cancelled:
           break
         # don't monitor the current datafile: our own actions will update it
         n = self.current_save_filenum
@@ -712,7 +713,7 @@ class DataDir(_FilesDir):
               indexQ.put( (hashcode, DataDirIndexEntry(filenum, offset), post_offset) )
               F.scanned_to = post_offset
               need_save = True
-              if self._monitor_halt:
+              if self.cancelled:
                 break
             # update state after completion of a scan
             if need_save:
@@ -915,13 +916,13 @@ class PlatonicDir(_FilesDir):
     indexQ = self._indexQ
     if meta_store is not None:
       topdir = self.topdir
-    while not self._monitor_halt:
+    while not self.cancelled:
       # scan for new datafiles
       need_save = False
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
         for dirpath, dirnames, filenames in os.walk(datadirpath):
-          if self._monitor_halt:
+          if self.cancelled:
             break
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
@@ -936,7 +937,7 @@ class PlatonicDir(_FilesDir):
                     del D[name]
             for filename in filenames:
               with Pfx(filename):
-                if self._monitor_halt:
+                if self.cancelled:
                   break
                 rfilepath = joinpath(rdirpath, filename)
                 with Pfx(filename):
@@ -991,7 +992,8 @@ class PlatonicDir(_FilesDir):
                         blockQ.put( (offset, B) )
                       F.scanned_to = post_offset
                       need_save = True
-                      if self._monitor_halt:
+                      if self.cancelled:
+                        X("CANCELLED DURING SCAN")
                         break
                     info("scanned to %d", F.scanned_to)
                     if meta_store is not None:
