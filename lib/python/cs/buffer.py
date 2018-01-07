@@ -122,7 +122,7 @@ class CornuCopyBuffer(object):
         except StopIteration as e:
           if short_ok:
             break
-          raise ValueError("insufficient chunks, wanted %d but only found %d"
+          raise EOFError("insufficient chunks, wanted %d but only found %d"
                            % (min_size, length)) from e
         if next_chunk:
           # nonempty chunk, stash it
@@ -271,7 +271,7 @@ class CornuCopyBuffer(object):
           except StopIteration as e:
             if short_ok:
               break
-            raise ValueError("insufficient chunks: skipto:%d but only reached %d"
+            raise EOFError("insufficient chunks: skipto:%d but only reached %d"
                              % (new_offset, offset)) from e
           bufskip = min(len(buf), toskip)
           if bufskip > 0:
