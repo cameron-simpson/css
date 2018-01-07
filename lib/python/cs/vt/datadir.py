@@ -187,7 +187,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     else:
       if flag_prefix is None:
         raise ValueError("flags provided but no flag_prefix")
-    X("FILESDIR: flags=%s, prefix=%r", flags, flag_prefix)
     FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
     self.statedirpath = statedirpath
     if hashclass is None:
@@ -671,8 +670,7 @@ class DataDir(_FilesDir):
     filemap = self._filemap
     indexQ = self._indexQ
     while not self.cancelled:
-      if self.flag_scan_disabled:
-        X("SCAN DISABLED for %s", self)
+      if self.flag_scan_disable:
         time.sleep(1)
         continue
       # scan for new datafiles
@@ -699,7 +697,7 @@ class DataDir(_FilesDir):
         self._save_state()
       # now scan known datafiles for new data
       for filenum in filter(lambda n: isinstance(n, int), filemap.keys()):
-        if self.cancelled or self.flag_scan_disabled:
+        if self.cancelled or self.flag_scan_disable:
           break
         # don't monitor the current datafile: our own actions will update it
         n = self.current_save_filenum
@@ -930,8 +928,7 @@ class PlatonicDir(_FilesDir):
     if meta_store is not None:
       topdir = self.topdir
     while not self.cancelled:
-      if self.flag_scan_disabled:
-        X("SCAN DISABLED for %s", self)
+      if self.flag_scan_disable:
         time.sleep(1)
         continue
       # scan for new datafiles
@@ -939,7 +936,7 @@ class PlatonicDir(_FilesDir):
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
         for dirpath, dirnames, filenames in os.walk(datadirpath):
-          if self.cancelled or self.flag_scan_disabled:
+          if self.cancelled or self.flag_scan_disable:
             break
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
@@ -954,7 +951,7 @@ class PlatonicDir(_FilesDir):
                     del D[name]
             for filename in filenames:
               with Pfx(filename):
-                if self.cancelled or self.flag_scan_disabled:
+                if self.cancelled or self.flag_scan_disable:
                   break
                 rfilepath = joinpath(rdirpath, filename)
                 with Pfx(filename):
@@ -1009,8 +1006,7 @@ class PlatonicDir(_FilesDir):
                         blockQ.put( (offset, B) )
                       F.scanned_to = post_offset
                       need_save = True
-                      if self.cancelled or self.flag_scan_disabled:
-                        X("CANCELLED DURING SCAN")
+                      if self.cancelled or self.flag_scan_disable:
                         break
                     info("scanned to %d", F.scanned_to)
                     if meta_store is not None:
