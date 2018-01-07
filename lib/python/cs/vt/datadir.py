@@ -34,6 +34,7 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
+from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
@@ -849,6 +850,8 @@ class PlatonicDir(_FilesDir):
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
+    if meta_store is not None and archive is None:
+      archive = joinpath(statedirpath, 'data.vt')
     if archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
