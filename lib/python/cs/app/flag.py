@@ -34,7 +34,7 @@ with flag names prefixed by the object's .name attribute uppercased and with an 
       FlaggedMixin.__init__(self)
       ...
     def disable(self):
-      self.flag_disabled = True
+      self.flag_disable = True
     def restart(self):
       self.flag_restart = True
     def _restart(self):
@@ -44,9 +44,9 @@ with flag names prefixed by the object's .name attribute uppercased and with an 
 so that an object set up as::
 
   svcd - SvcD("portfwd")
-  print(svcd.flag_disabled)
+  print(svcd.flag_disable)
 
-accesses the flag named "PORTFWD_DISABLED".
+accesses the flag named "PORTFWD_DISABLE".
 '''
 
 from __future__ import print_function
@@ -318,6 +318,9 @@ class Flags(MutableMapping, FlaggedMixin):
     self.debug = debug
     self._old_flags = {}
 
+  def __repr__(self):
+    return "%s(dir=%r)" % (self.__class__.__name__, self.dirpath)
+
   def init(self):
     ''' Ensure the flag directory exists.
     '''
@@ -414,21 +417,16 @@ class Flags(MutableMapping, FlaggedMixin):
         `omitted_value`: value to be assigned to any unmentioned flags, default False.
           Set this to None to leave unmentioned flags alone.
     '''
-    from cs.x import X
-    X("prefix=%r, update=%r, omitted=%r", prefix, updates, omitted_value)
     all_names = set( name for name in self if name.startswith(prefix) )
-    X("all_names=%r", all_names)
     named = set()
     for flagname, flagvalue in updates:
       if not flagname.startswith(prefix):
         raise ValueError("update flag %r does not start with prefix %r" % (flagname, prefix))
-      X("%s -> %s", flagname, flagvalue)
       self[flagname] = flagvalue
       named.add(flagname)
     if omitted_value is not None:
       for flagname in all_names:
         if flagname not in named:
-          X("%s -> %s", flagname, omitted_value)
           self[flagname] = omitted_value
 
 class PolledFlags(dict):
