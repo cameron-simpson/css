@@ -24,7 +24,7 @@ It presents as a modifiable mapping whose keys are the flag names::
   flags = Flags()
   flags['UNTOPPOST'] = True
 
-The is also a FlaggedMixin class providing convenient methods and attributes
+There is also a FlaggedMixin class providing convenient methods and attributes
 for maintaining a collection of flags associated with some object
 with flag names prefixed by the object's .name attribute uppercased and with an underscore appended::
 
@@ -132,6 +132,8 @@ FLAGSET_USAGE = '''Usage: %s prefix [{set|clear}[-all]] [names...]
   If no names are supplied, read the names from standard input.'''
 
 def main_flagset(argv=None, stdin=None):
+  ''' Main program for "flagset" command.
+  '''
   if argv is None:
     argv = sys.argv
   else:
@@ -175,7 +177,7 @@ def main_flagset(argv=None, stdin=None):
       updates = []
       if argv:
         for flagname in argv:
-          updates.append((flagname,value))
+          updates.append( (flagname, value) )
       else:
         for lineno, line in enumerate(stdin, 1):
           with Pfx("%s:%d" % (stdin, lineno)):
@@ -203,6 +205,15 @@ def lowername(s):
   return s.replace('_', '-').lower()
 
 def truthy(value):
+  ''' Decide whether a value is considered true.
+      Strings are converted to:
+        '0': False
+        '1': True
+        'true': True (case insensitive)
+        'false': False (case insensitive)
+        Other values are unchanged.
+      Other types are converted with bool().
+  '''
   if isinstance(value, str):
     if value == '0':
       value = False
@@ -222,9 +233,12 @@ class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
   '''
 
-  def __init__(self, flags=None, debug=None):
+  def __init__(self, flags=None, debug=None, prefix=None):
     ''' Initialise the mixin.
         `flags`: optional parameter; if None defaults to a new default Flags().
+        `prefix`: optional prefix; if not proveded the prefix is
+          derived from the objects .name attribute, or is empty if
+          there is no .name
     '''
     if flags is None:
       flags = Flags(debug=debug)
@@ -232,6 +246,7 @@ class FlaggedMixin(object):
       if debug is not None:
         flags.debug = debug
     self.flags = flags
+    self.__flag_prefix = prefix
 
   def __flagname(self, suffix):
     ''' Compute a flag name from `suffix`.
@@ -239,9 +254,10 @@ class FlaggedMixin(object):
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
     '''
-    try:
-      name = self.name
-    except AttributeError:
+    name = self.__flag_prefixname
+    if name is None:
+      name = getattr(self, 'name', None)
+    if name is None:
       flagname = suffix
     else:
       flagname = name + '_' + suffix
@@ -282,11 +298,15 @@ class Flags(MutableMapping, FlaggedMixin):
     MutableMapping.__init__(self)
     @contextmanager
     def mutex():
+      ''' Mutex context manager.
+      '''
       if lock:
         lock.acquire()
-      yield
-      if lock:
-        lock.release()
+      try:
+        yield
+      finally:
+        if lock:
+          lock.release()
     self._mutex = mutex
     if debug is None:
       debug = False
@@ -355,12 +375,12 @@ class Flags(MutableMapping, FlaggedMixin):
     self._track(k, value)
     return value
 
-  def __setitem__(self, k, truthy):
+  def __setitem__(self, k, value):
     ''' Set the flag value.
         If true, write "1\n" to the flag file.
         If false, remove the flag file.
     '''
-    if truthy:
+    if truthy(value):
       value = True
       with self._mutex():
         if not self[k]:
