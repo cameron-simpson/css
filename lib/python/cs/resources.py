@@ -388,3 +388,24 @@ class RunState(object):
     ''' Property returning most recent run time (end_time-start_time).
     '''
     return max(0, self.end_time - self.start_time)
+
+class RunStateMixin(object):
+  ''' Mixin to provide convenient access to a RunState.
+      Provides: .runstate, .cancelled, .running, .stopping, .stopped.
+  '''
+  def __init__(self, runstate=None):
+    if runstate is None:
+      runstate = RunState()
+    self.runstate = runstate
+  @property
+  def cancelled(self):
+    return self.runstate.cancelled
+  @property
+  def running(self):
+    return self.runstate.running
+  @property
+  def stopping(self):
+    return self.runstate.stopping
+  @property
+  def stopped(self):
+    return self.runstate.stopped
