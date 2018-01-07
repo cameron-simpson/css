@@ -290,10 +290,8 @@ class Config:
       meta_store = None
     elif isinstance(meta, str):
       meta_store = Store(meta, self)
-    if archive is None:
-      archive = None
-    elif isinstance(archive, str):
-      archive = Archive(longpath(archive))
+    if isinstance(archive, str):
+      archive = longpath(archive)
     return PlatonicStore(
         store_name, path,
         datadirpath=data,
