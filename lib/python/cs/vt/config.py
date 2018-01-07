@@ -295,7 +295,8 @@ class Config:
     elif isinstance(archive, str):
       archive = Archive(longpath(archive))
     return PlatonicStore(
-        store_name, path, data,
+        store_name, path,
+        datadirpath=data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
         meta_store=meta_store, archive=archive,
