@@ -298,7 +298,8 @@ class Config:
         store_name, path, data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
-        meta_store=meta_store, archive=archive
+        meta_store=meta_store, archive=archive,
+        flag_prefix='VT_' + clause_name
     )
 
   def proxy_Store(
