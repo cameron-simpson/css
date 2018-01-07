@@ -254,7 +254,7 @@ class FlaggedMixin(object):
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
     '''
-    name = self.__flag_prefixname
+    name = self.__flag_prefix
     if name is None:
       name = getattr(self, 'name', None)
     if name is None:
