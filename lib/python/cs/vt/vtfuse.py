@@ -45,7 +45,7 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-def mount(mnt, E, S, archive=None, subpath=None, readonly=False, append_only=False):
+def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -55,6 +55,8 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=False, append_only=Fal
       `readonly`: forbid data modification operations
       `append_only`: files may not be truncated or overwritten
   '''
+  if readonly is None:
+    readonly = S.readonly
   log = getLogger(LOGGER_NAME)
   log.propagate = False
   log_handler = LogFileHandler(LOGGER_FILENAME)
