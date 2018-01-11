@@ -253,7 +253,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexbasepath, self.hashclass, DataDirIndexEntry.from_bytes, lock=self._lock)
+    self.index = self.indexclass(self.indexbasepath, self.hashclass, self.index_entry_class.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
