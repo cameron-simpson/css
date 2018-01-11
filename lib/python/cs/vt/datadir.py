@@ -392,7 +392,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   @datadirpath.setter
   def datadirpath(self, newpath):
-    if isabspath(newpath):
+    if isabspath(newpath) and newpath.startswith(self.statedirpath + '/'):
       newpath = relpath(newpath, self.statedirpath)
     self.set_state('datadir', shortpath(newpath))
 
