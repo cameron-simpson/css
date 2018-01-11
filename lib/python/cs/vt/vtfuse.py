@@ -57,6 +57,13 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=Fals
   '''
   if readonly is None:
     readonly = S.readonly
+  else:
+    if not readonly and S.readonly:
+      warning("Store %s is readonly, using readonly option for mount (was %r)", S, readonly)
+      readonly = True
+  # forget the archive if readonly
+  if readonly:
+    A = None
   log = getLogger(LOGGER_NAME)
   log.propagate = False
   log_handler = LogFileHandler(LOGGER_FILENAME)
@@ -408,7 +415,7 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=False, append_only=False):
+  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=None, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -419,6 +426,8 @@ class _StoreFS_core(object):
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
+    if readonly is None:
+      readonly = S.readonly
     self.E = E
     self.S = S
     if oserror is None:
@@ -652,7 +661,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=False, append_only=False):
+  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -661,6 +670,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
         `readonly`: forbid data modification
         `append_only`: forbid truncation or oervwrite of file data
     '''
+    if readonly is None:
+      readonly = S.readonly
     self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
