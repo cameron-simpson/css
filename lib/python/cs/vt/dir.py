@@ -584,6 +584,13 @@ class Dir(_Dirent):
     return emap
 
   @property
+  def size(self):
+    ''' The length of a Dir is the number of entries it contains.
+        This property is used mostly for stat calls and 
+    '''
+    return len(self.entries)
+
+  @property
   @locked
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
