@@ -459,6 +459,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return n, D
 
   def _queue_index(self, hashcode, entry, post_offset):
+    if not isinstance(entry, self.index_entry_class):
+      raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
     with self._lock:
       self._unindexed[hashcode] = entry
     self._indexQ.put( (hashcode, entry, post_offset) )
@@ -469,6 +471,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     with Pfx("%s._index_updater", self):
       index = self.index
+      entry_class = self.index_entry_class
       flush_rate = INDEX_FLUSH_RATE
       unindexed = self._unindexed
       filemap = self._filemap
@@ -476,6 +479,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       nsaves = 0
       need_sync = False
       for hashcode, entry, post_offset in self._indexQ:
+        if not isinstance(entry, entry_class):
+          raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
         with self._lock:
           index[hashcode] = entry
           try:
@@ -573,7 +578,9 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
     n, offset = get_bs(data)
     file_offset, offset = get_bs(data, offset)
     if offset != len(data):
-      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+      raise ValueError(
+          "unparsed data from index entry; full entry = %s; n=%d, file_offset=%d, unparsed=%r"
+          % (hexlify(data), n, file_offset, data[offset:]))
     return cls(n, file_offset)
 
   def encode(self) -> bytes:
@@ -592,6 +599,8 @@ class DataDir(_FilesDir):
       a NAS presented via NFS, or a Store replicated by an external
       file-level service such as Dropbox or plain old rsync.
   '''
+
+  index_entry_class = DataDirIndexEntry
 
   def __init__(self,
       statedirpath, datadirpath, hashclass, *,
@@ -808,6 +817,8 @@ class PlatonicDir(_FilesDir):
       A PlatonicDir is read-only. Data blocks are fetched directly
       from the files in the backing directory tree.
   '''
+
+  index_entry_class = PlatonicDirIndexEntry
 
   def __init__(self,
       statedirpath, datadirpath, hashclass,
