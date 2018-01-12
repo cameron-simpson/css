@@ -19,6 +19,7 @@ from threading import RLock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
+from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
 from cs.excutils import logexc
@@ -27,12 +28,13 @@ from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.py.func import prop
 from cs.queues import IterableQueue
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import MAX_FILE_SIZE
+from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
@@ -136,7 +138,7 @@ class FileState(SimpleNamespace):
     '''
     yield from self.datadir.scan(self.pathname, offset=offset, **kw)
 
-class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
+class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin, Mapping):
   ''' Base class for locally stored data in files.
 
       There are two main subclasses of this at present:
@@ -153,7 +155,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
-      rollover=None, create_statedir=None, create_datadir=None):
+      create_statedir=None, create_datadir=None,
+      flags=None, flag_prefix=None):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -169,13 +172,22 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             class with an existing index file will be chosen, otherwise
             the most favoured indexclass available will be chosen.
         `hashclass`: the hash class used to index chunk contents.
-        `rollover`: data file roll over size; if a data file grows
-            beyond this a new datafile is commenced for new blocks.
-            Default: DEFAULT_ROLLOVER
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
+        `flags`: optional Flags object for control; if specified
+            then `flag_prefix` is also required
+        `flag_prefix`: prefix for control flag names
     '''
     MultiOpenMixin.__init__(self, lock=RLock())
+    RunStateMixin.__init__(self)
+    if flags is None:
+      if flag_prefix is None:
+        flags = DummyFlags()
+        flag_prefix = 'DUMMY'
+    else:
+      if flag_prefix is None:
+        raise ValueError("flags provided but no flag_prefix")
+    FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
     self.statedirpath = statedirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
@@ -183,11 +195,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     if indexclass is None:
       indexclass = self._indexclass()
     self.indexclass = indexclass
-    if rollover is None:
-      rollover = DEFAULT_ROLLOVER
-    elif rollover < 1024:
-      raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
-    self.rollover = rollover
     if create_statedir is None:
       create_statedir = False
     if not isdirpath(statedirpath):
@@ -220,13 +227,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
   def __repr__(self):
-    return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
+    return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s)'
              % (self.__class__.__name__,
                 self.statedirpath,
                 self.datadirpath,
                 self.hashclass.HASHNAME,
-                self.indexclass,
-                self.rollover)
+                self.indexclass)
            )
 
   def spec(self):
@@ -240,13 +246,14 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   __str__ = spec
 
   def startup(self):
+    self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(maxsize=4,
                             on_remove=lambda k, datafile: datafile.close())
     # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
     # open dbm index
-    self.index = self.indexclass(self.indexbasepath, self.hashclass, DataDirIndexEntry.from_bytes, lock=self._lock)
+    self.index = self.indexclass(self.indexbasepath, self.hashclass, self.index_entry_class.from_bytes, lock=self._lock)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
@@ -258,14 +265,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
     T.start()
-    self._monitor_halt = False
     T = self._monitor_Thread = Thread(name="%s-datafile-monitor" % (self,),
                                       target=self._monitor_datafiles)
     T.start()
 
   def shutdown(self):
+    self.runstate.cancel()
     # shut down the monitor Thread
-    self._monitor_halt = True
     self._monitor_Thread.join()
     # drain index update queue
     self._indexQ.close()
@@ -386,7 +392,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   @datadirpath.setter
   def datadirpath(self, newpath):
-    if isabspath(newpath):
+    if isabspath(newpath) and newpath.startswith(self.statedirpath + '/'):
       newpath = relpath(newpath, self.statedirpath)
     self.set_state('datadir', shortpath(newpath))
 
@@ -453,6 +459,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     return n, D
 
   def _queue_index(self, hashcode, entry, post_offset):
+    if not isinstance(entry, self.index_entry_class):
+      raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
     with self._lock:
       self._unindexed[hashcode] = entry
     self._indexQ.put( (hashcode, entry, post_offset) )
@@ -463,6 +471,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     '''
     with Pfx("%s._index_updater", self):
       index = self.index
+      entry_class = self.index_entry_class
       flush_rate = INDEX_FLUSH_RATE
       unindexed = self._unindexed
       filemap = self._filemap
@@ -470,6 +479,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       nsaves = 0
       need_sync = False
       for hashcode, entry, post_offset in self._indexQ:
+        if not isinstance(entry, entry_class):
+          raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
         with self._lock:
           index[hashcode] = entry
           try:
@@ -548,7 +559,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         with self._lock:
           entry = index[hashcode]
       except KeyError:
-        info("%s[%s]: hash not in index", self, hashcode)
+        ##info("%s[%s]: hash not in index", self, hashcode)
         raise
     try:
       return self.fetch(entry)
@@ -567,7 +578,9 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
     n, offset = get_bs(data)
     file_offset, offset = get_bs(data, offset)
     if offset != len(data):
-      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+      raise ValueError(
+          "unparsed data from index entry; full entry = %s; n=%d, file_offset=%d, unparsed=%r"
+          % (hexlify(data), n, file_offset, data[offset:]))
     return cls(n, file_offset)
 
   def encode(self) -> bytes:
@@ -587,9 +600,12 @@ class DataDir(_FilesDir):
       file-level service such as Dropbox or plain old rsync.
   '''
 
+  index_entry_class = DataDirIndexEntry
+
   def __init__(self,
-      statedirpath, datadirpath, hashclass, indexclass=None,
-      rollover=None, create_statedir=None, create_datadir=None):
+      statedirpath, datadirpath, hashclass, *,
+      rollover=None,
+      **kw):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -610,12 +626,12 @@ class DataDir(_FilesDir):
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
     '''
-    super().__init__(
-        statedirpath, datadirpath, hashclass,
-        indexclass=None,
-        rollover=None,
-        create_statedir=None,
-        create_datadir=None)
+    super().__init__(statedirpath, datadirpath, hashclass, **kw)
+    if rollover is None:
+      rollover = DEFAULT_ROLLOVER
+    elif rollover < 1024:
+      raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    self.rollover = rollover
 
   def _new_datafile(self):
     ''' Create a new datafile and return its record.
@@ -662,7 +678,10 @@ class DataDir(_FilesDir):
     '''
     filemap = self._filemap
     indexQ = self._indexQ
-    while not self._monitor_halt:
+    while not self.cancelled:
+      if self.flag_scan_disable:
+        time.sleep(1)
+        continue
       # scan for new datafiles
       need_save = False
       with Pfx("listdir(%r)", self.datadirpath):
@@ -685,9 +704,9 @@ class DataDir(_FilesDir):
             need_save = True
       if need_save:
         self._save_state()
-      # now scan datafiles for new data
+      # now scan known datafiles for new data
       for filenum in filter(lambda n: isinstance(n, int), filemap.keys()):
-        if self._monitor_halt:
+        if self.cancelled or self.flag_scan_disable:
           break
         # don't monitor the current datafile: our own actions will update it
         n = self.current_save_filenum
@@ -712,7 +731,7 @@ class DataDir(_FilesDir):
               indexQ.put( (hashcode, DataDirIndexEntry(filenum, offset), post_offset) )
               F.scanned_to = post_offset
               need_save = True
-              if self._monitor_halt:
+              if self.cancelled:
                 break
             # update state after completion of a scan
             if need_save:
@@ -799,6 +818,8 @@ class PlatonicDir(_FilesDir):
       from the files in the backing directory tree.
   '''
 
+  index_entry_class = PlatonicDirIndexEntry
+
   def __init__(self,
       statedirpath, datadirpath, hashclass,
       create_datadir=False,
@@ -838,6 +859,8 @@ class PlatonicDir(_FilesDir):
     self.exclude_file = exclude_file
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
+    if meta_store is not None and archive is None:
+      archive = joinpath(statedirpath, 'data.vt')
     if archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
@@ -915,13 +938,16 @@ class PlatonicDir(_FilesDir):
     indexQ = self._indexQ
     if meta_store is not None:
       topdir = self.topdir
-    while not self._monitor_halt:
+    while not self.cancelled:
+      if self.flag_scan_disable:
+        time.sleep(1)
+        continue
       # scan for new datafiles
       need_save = False
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
         for dirpath, dirnames, filenames in os.walk(datadirpath):
-          if self._monitor_halt:
+          if self.cancelled or self.flag_scan_disable:
             break
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
@@ -936,7 +962,7 @@ class PlatonicDir(_FilesDir):
                     del D[name]
             for filename in filenames:
               with Pfx(filename):
-                if self._monitor_halt:
+                if self.cancelled or self.flag_scan_disable:
                   break
                 rfilepath = joinpath(rdirpath, filename)
                 with Pfx(filename):
@@ -991,7 +1017,7 @@ class PlatonicDir(_FilesDir):
                         blockQ.put( (offset, B) )
                       F.scanned_to = post_offset
                       need_save = True
-                      if self._monitor_halt:
+                      if self.cancelled or self.flag_scan_disable:
                         break
                     info("scanned to %d", F.scanned_to)
                     if meta_store is not None:

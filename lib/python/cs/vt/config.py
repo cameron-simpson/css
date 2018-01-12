@@ -290,15 +290,15 @@ class Config:
       meta_store = None
     elif isinstance(meta, str):
       meta_store = Store(meta, self)
-    if archive is None:
-      archive = None
-    elif isinstance(archive, str):
-      archive = Archive(longpath(archive))
+    if isinstance(archive, str):
+      archive = longpath(archive)
     return PlatonicStore(
-        store_name, path, data,
+        store_name, path,
+        datadirpath=data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
-        meta_store=meta_store, archive=archive
+        meta_store=meta_store, archive=archive,
+        flag_prefix='VT_' + clause_name
     )
 
   def proxy_Store(

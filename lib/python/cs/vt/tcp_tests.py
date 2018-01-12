@@ -11,7 +11,7 @@ import time
 import sys
 import unittest
 from cs.debug import thread_dump, debug_object_shell
-from cs.logutils import X
+from cs.x import X
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore
@@ -46,6 +46,7 @@ class TestTCPStore(TestStore, unittest.TestCase):
     self.S, self.remote_S = make_tcp_store()
 
   def setUp(self):
+    self._init_Store()
     TestStore.setUp(self)
     self.remote_S.open()
 
@@ -68,6 +69,8 @@ class TestHashCodeUtilsTCPStore(_TestHashCodeUtils, unittest.TestCase):
     _TestHashCodeUtils.tearDown(self)
     ##debug_object_shell(self, prompt='%s.tearDown> ' % (self._testMethodName,))
 
+def selftest(argv):
+  unittest.main(__name__, None, argv)
+
 if __name__ == '__main__':
-  from cs.debug import selftest
-  selftest('__main__')
+  selftest(sys.argv)

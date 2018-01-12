@@ -45,7 +45,7 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
-def mount(mnt, E, S, archive=None, subpath=None, readonly=False, append_only=False):
+def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -55,6 +55,15 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=False, append_only=Fal
       `readonly`: forbid data modification operations
       `append_only`: files may not be truncated or overwritten
   '''
+  if readonly is None:
+    readonly = S.readonly
+  else:
+    if not readonly and S.readonly:
+      warning("Store %s is readonly, using readonly option for mount (was %r)", S, readonly)
+      readonly = True
+  # forget the archive if readonly
+  if readonly:
+    A = None
   log = getLogger(LOGGER_NAME)
   log.propagate = False
   log_handler = LogFileHandler(LOGGER_FILENAME)
@@ -406,7 +415,7 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=False, append_only=False):
+  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=None, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -417,6 +426,8 @@ class _StoreFS_core(object):
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
+    if readonly is None:
+      readonly = S.readonly
     self.E = E
     self.S = S
     if oserror is None:
@@ -650,7 +661,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=False, append_only=False):
+  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -659,6 +670,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
         `readonly`: forbid data modification
         `append_only`: forbid truncation or oervwrite of file data
     '''
+    if readonly is None:
+      readonly = S.readonly
     self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
@@ -1008,18 +1021,21 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def readdir(self, fhndx, off):
     # TODO: if rootdir, generate '..' for parent of mount
-    OD = self._vt_core._fh(fhndx)
+    FH = self._vt_core._fh(fhndx)
     def entries():
       o = off
-      D = OD.D
-      names = OD.names
+      D = FH.D
+      S = self._vt_core.S
+      names = FH.names
       while True:
         if o == 0:
           name = '.'
-          E = D[name]
+          with S:
+            E = D[name]
         elif o == 1:
           name = '..'
-          E = D[name]
+          with S:
+            E = D[name]
         else:
           o2 = o - 2
           if o2 >= len(names):
@@ -1029,10 +1045,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
             # already special cased
             E = None
           else:
-            E = D.get(name)
+            with S:
+              E = D.get(name)
         if E is not None:
           # yield name, attributes and next offset
-          yield self._vt_bytes(name), self._vt_EntryAttributes(E), o + 1
+          with S:
+            EA = self._vt_EntryAttributes(E)
+          yield self._vt_bytes(name), EA, o + 1
         o += 1
     return entries()
 

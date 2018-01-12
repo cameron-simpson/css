@@ -10,6 +10,7 @@ import sys
 from threading import Thread
 from .stream import StreamStore
 from cs.excutils import logexc
+from cs.logutils import info
 from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
 from cs.socketutils import OpenSocket
@@ -95,18 +96,28 @@ class TCPStoreClient(StreamStore):
   def __init__(self, name, bind_addr, addif=False):
     if name is None:
       name = "%s(bind_addr=%r)" % (self.__class__.__name__, bind_addr)
-    self.sock = socket()
-    self.sock.connect(bind_addr)
-    StreamStore.__init__(self,
-                         name,
-                         OpenSocket(self.sock, False),
-                         OpenSocket(self.sock, True),
-                         addif=addif,
-                        )
+    self.sock_bind_addr = bind_addr
+    self.sock = None
+    StreamStore.__init__(
+        self, name, None, None,
+        addif=addif, connect=self._tcp_connect
+    )
 
   def shutdown(self):
     StreamStore.shutdown(self)
-    self.sock.close()
+    if self.sock:
+      self.sock.close()
+
+  def _tcp_connect(self):
+    info("TCP CONNECT to %r", self.sock_bind_addr)
+    assert not self.sock
+    self.sock = socket()
+    try:
+      self.sock.connect(self.sock_bind_addr)
+    except OSError:
+      self.sock.close()
+      raise
+    return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
 if __name__ == '__main__':
   from .tcp_tests import selftest

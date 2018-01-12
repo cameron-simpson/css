@@ -583,7 +583,7 @@ class VTCmd:
     badopts = False
     all_dates = False
     append_only = False
-    readonly = False
+    readonly = None
     opts, args = getopt(args, 'ao:r')
     for opt, val in opts:
       with Pfx(opt):
@@ -659,9 +659,6 @@ class VTCmd:
           if not E.isdir:
             error("expected directory, not file: %s", E)
             return 1
-      # forget the archive if readonly
-      if readonly:
-        A = None
       # import vtfuse before doing anything with side effects
       from .vtfuse import mount, umount
       with Pfx(mountpoint):

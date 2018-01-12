@@ -413,6 +413,7 @@ class ProxyStore(BasicStoreSync):
     self._attrs.update(save=save, read=read)
     if read2:
       self._attrs.update(read2=read2)
+    self.readonly = len(self.save) == 0
 
   def startup(self):
     for S in self.save | self.read | self.read2:
@@ -503,7 +504,7 @@ class DataDirStore(MappingStore):
   '''
 
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
+    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
@@ -517,22 +518,44 @@ class DataDirStore(MappingStore):
     self._datadir.close()
     X("DataDirStore.shutdown: _datadir.close...")
 
-class PlatonicStore(MappingStore):
+def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
+  ''' Factory function for platonic Stores.
+      This is needed because if a meta_store is specified then it
+      must be included as a block source in addition to the core
+      platonic Store.
+  '''
+  X("name=%r, statedirpath=%r, a=%r", name, statedirpath, a)
+  if meta_store is None:
+    return _PlatonicStore(name, statedirpath, *a, **kw)
+  return ProxyStore(
+      name,
+      save=(),
+      read=(
+          _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw),
+          meta_store
+      )
+  )
+
+class _PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
   '''
 
   def __init__(
       self, name, statedirpath,
+      *,
       datadirpath=None, hashclass=None, indexclass=None,
       follow_symlinks=False, archive=None, meta_store=None,
+      flag_prefix=None,
       **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
         follow_symlinks=follow_symlinks,
-        archive=archive, meta_store=meta_store)
+        archive=archive, meta_store=meta_store,
+        flag_prefix=flag_prefix)
     MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
+    self.readonly = True
 
   def startup(self, **kw):
     X("PlatonicStore.startup: _datadir.open...")
