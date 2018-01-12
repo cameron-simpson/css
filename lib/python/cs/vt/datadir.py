@@ -559,7 +559,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         with self._lock:
           entry = index[hashcode]
       except KeyError:
-        info("%s[%s]: hash not in index", self, hashcode)
+        ##info("%s[%s]: hash not in index", self, hashcode)
         raise
     try:
       return self.fetch(entry)
