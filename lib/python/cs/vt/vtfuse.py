@@ -1021,18 +1021,21 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def readdir(self, fhndx, off):
     # TODO: if rootdir, generate '..' for parent of mount
-    OD = self._vt_core._fh(fhndx)
+    FH = self._vt_core._fh(fhndx)
     def entries():
       o = off
-      D = OD.D
-      names = OD.names
+      D = FH.D
+      S = self._vt_core.S
+      names = FH.names
       while True:
         if o == 0:
           name = '.'
-          E = D[name]
+          with S:
+            E = D[name]
         elif o == 1:
           name = '..'
-          E = D[name]
+          with S:
+            E = D[name]
         else:
           o2 = o - 2
           if o2 >= len(names):
@@ -1042,10 +1045,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
             # already special cased
             E = None
           else:
-            E = D.get(name)
+            with S:
+              E = D.get(name)
         if E is not None:
           # yield name, attributes and next offset
-          yield self._vt_bytes(name), self._vt_EntryAttributes(E), o + 1
+          with S:
+            EA = self._vt_EntryAttributes(E)
+          yield self._vt_bytes(name), EA, o + 1
         o += 1
     return entries()
 
