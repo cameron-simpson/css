@@ -555,9 +555,28 @@ class Dir(_Dirent):
       raise ValueError("cannot clear .changed")
     E = self
     while E is not None:
-      X("%s.changed=True", self)
       E._changed = True
+      E._notify_change()
       E = E.parent
+
+  @locked
+  def on_change(self, notifier):
+    ''' Record `notifier` to fire when .changed is set.
+    '''
+    # This is so that unmonitored Dirs have no additional cost.
+    notifiers = getattr(self, 'notify_change', None)
+    if notifiers is None:
+      self.notify_change = notifiers = set()
+    notifiers.add(notifier)
+
+  def _notify_change(self):
+    ''' Call each recorded notifier with this Dir.
+    '''
+    notifiers = getattr(self, 'notify_change', None)
+    if notifiers is None:
+      return
+    for notifier in notifiers:
+      notifier(self)
 
   @prop
   def path(self):
