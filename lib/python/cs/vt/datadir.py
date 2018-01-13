@@ -869,18 +869,12 @@ class PlatonicDir(_FilesDir):
   def startup(self):
     if self.meta_store is not None:
       self.meta_store.open()
-      top_dirref = self._extra_state.get('top_dirref')
-      if top_dirref is None:
-        D = None
-      else:
-        try:
-          D = decode_Dirent_text(top_dirref)
-        except ValueError as e:
-          warning("ignoring invalid topdir: %e: %r" % (e, top_dirref))
-          D = None
+      archive = self.archive
+      when, D = archive.last
       if D is None:
-        info("%r: create empty topdir Dir", self.datadirpath)
+        info("%r: no entries in %s, create empty topdir Dir", self.datadirpath, archive)
         D = Dir('.')
+        archive.save(D)
       self.topdir = D
     super().startup()
 
@@ -895,9 +889,7 @@ class PlatonicDir(_FilesDir):
     # update the topdir state before any save
     if self.meta_store is not None:
       with self.meta_store:
-        self.set_state('top_dirref', self.topdir.textencode())
-        if self.archive:
-          self.archive.save(self.topdir)
+        self.archive.save(self.topdir)
     return _FilesDir._save_state(self)
 
   @staticmethod
