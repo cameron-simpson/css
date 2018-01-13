@@ -58,7 +58,6 @@ class _Archive(object):
 
   def __init__(self, arpath):
     self.path = arpath
-    self._entries__filename = arpath
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
