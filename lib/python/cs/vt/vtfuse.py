@@ -409,7 +409,7 @@ class Inodes(object):
 class _StoreFS_core(object):
   ''' The core functionality supporting FUSE operations.
       The StoreFS_LLFUSE class subclasses the appropriate FUSE
-      module and present shims that call the logic here.
+      module and presents shims that call the logic here.
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
       or the like.
@@ -433,10 +433,6 @@ class _StoreFS_core(object):
     if oserror is None:
       oserror = OSError
     self.oserror = oserror
-    if readonly:
-      if archive is not None:
-        warning("readonly: setting archive=None, was %s", archive)
-        archive = None
     self.archive = archive
     if archive is None:
       self._last_sync_state = None
@@ -496,7 +492,7 @@ class _StoreFS_core(object):
       # update the inode table state
       E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
       archive = self.archive
-      if archive is not None:
+      if not self.readonly and archive is not None:
         with self._lock:
           updated = False
           new_state = archive.strfor_Dirent(E)

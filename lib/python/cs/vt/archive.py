@@ -13,6 +13,7 @@
 
 from __future__ import print_function
 import os
+from os.path import realpath
 import stat
 import time
 from datetime import datetime
@@ -32,25 +33,48 @@ from .paths import decode_Dirent_text, resolve, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
-class Archive(object):
+# shared mapping of archive paths to Archive instances
+_ARCHIVES = {}
+
+def Archive(path, mapping=None):
+  ''' Return an Archive for the named file.
+      Maintains a mapping of issues Archives in order to reuse that
+      same Archive for a given path.
+  '''
+  global _ARCHIVES
+  if not path.endswith('.vt'):
+    warning("unusual Archive path: %r", path)
+  if mapping is None:
+    mapping = _ARCHIVES
+  path = realpath(path)
+  A = mapping.get(path)
+  if A is None:
+    mapping[path] = A = _Archive(path)
+  return A
+
+class _Archive(object):
   ''' Manager for an archive.vt file.
   '''
 
   def __init__(self, arpath):
     self.path = arpath
-    self._entries__filename = arpath
+    self._last = None
 
   def __str__(self):
-    return "Archive(%s)" % (self.path,)
+    return "Archive(%s)" % (shortpath(self.path),)
 
   @prop
   def last(self):
     ''' Return the last (unixtime, Dirent) from the file, or (None, None).
     '''
-    entry = None, None
-    for entry in self:
-      pass
-    return entry
+    last_entry = self._last
+    if last_entry is None:
+      for entry in self:
+        last_entry = entry
+      if last_entry is None:
+        return None, None
+      self._last = last_entry
+    return last_entry
 
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
@@ -76,10 +100,14 @@ class Archive(object):
   def save(self, E, when=None):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
     '''
+    if when is None:
+      when = time.time()
     path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        return self.write(fp, E, when=when, etc=E.name)
+        written = self.write(fp, E, when=when, etc=E.name)
+    self._last = when, E
+    return written
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
@@ -88,7 +116,7 @@ class Archive(object):
           isodatetime unixtime totext(dirent) dirent.name
        Note: does not flush the file.
     '''
-    encoded = Archive.strfor_Dirent(E)
+    encoded = _Archive.strfor_Dirent(E)
     if when is None:
       when = time.time()
     # produce a local time with knowledge of its timezone offset
@@ -130,7 +158,7 @@ class Archive(object):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in Archive._parselines(fp, first_lineno=first_lineno):
+    for when, E in _Archive._parselines(fp, first_lineno=first_lineno):
       return when, E
     return None, None
 
