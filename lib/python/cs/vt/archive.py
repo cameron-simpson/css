@@ -58,6 +58,7 @@ class _Archive(object):
 
   def __init__(self, arpath):
     self.path = arpath
+    self._last = None
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
@@ -66,10 +67,14 @@ class _Archive(object):
   def last(self):
     ''' Return the last (unixtime, Dirent) from the file, or (None, None).
     '''
-    entry = None, None
-    for entry in self:
-      pass
-    return entry
+    last_entry = self._last
+    if last_entry is None:
+      for entry in self:
+        last_entry = entry
+      if last_entry is None:
+        return None, None
+      self._last = last_entry
+    return last_entry
 
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
@@ -95,10 +100,14 @@ class _Archive(object):
   def save(self, E, when=None):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
     '''
+    if when is None:
+      when = time.time()
     path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        return self.write(fp, E, when=when, etc=E.name)
+        written = self.write(fp, E, when=when, etc=E.name)
+    self._last = when, E
+    return written
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
