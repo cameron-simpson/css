@@ -577,7 +577,7 @@ class VTCmd:
     return 0
 
   def cmd_mount(self, args):
-    ''' Mount the specified special as on the specified mountpoint directory.
+    ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
     '''
     badopts = False
