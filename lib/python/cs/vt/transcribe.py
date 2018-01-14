@@ -8,6 +8,7 @@
 '''
 
 from abc import ABC, abstractmethod
+from io import StringIO
 from cs.lex import get_identifier
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -16,14 +17,26 @@ class Transcriber(ABC):
   ''' Abstract base class for objects which can be used with the Transcribe class.
   '''
 
+  __slots__ = ()
+
+  @classmethod
+  def register_transcriber(klass, prefix, T=None):
+    ''' Register this class as `prefix`.
+    '''
+    global _TRANSCRIBE
+    if T is None:
+      T = _TRANSCRIBE
+    T.register(prefix, klass)
+
   @abstractmethod
   def transcribe_inner(self, fp):
     ''' Write the textual form of this object to the file `fp`.
     '''
     raise NotImplementedError()
 
+  @staticmethod
   @abstractmethod
-  def parse_inner(self, s, offset, stopchar):
+  def parse_inner(s, offset, stopchar):
     ''' Read the textual form of an object from `s` at offset `offset`. Return the object and new offset.
         `s`: the source text
         `offset`: the parse position within `s`
@@ -43,7 +56,11 @@ class Transcribe:
     '''
     if prefix in self.prefix_map:
       raise ValueError("prefix %r already taken" % (prefix,))
-    if not isinstance(baseclass, Transcriber):
+    if ( not isinstance(baseclass, Transcriber)
+     and ( not hasattr(baseclass, 'transcribe_inner')
+        or not hasattr(baseclass, 'parse_inner')
+         )
+    ):
       raise ValueError("baseclass %s not a subclass of Transcriber" % (baseclass,))
     self.prefix_map[prefix] = baseclass
 
@@ -56,9 +73,18 @@ class Transcribe:
         raise ValueError("unregistered prefix")
       if not isinstance(o, baseclass):
         raise ValueError("type(o)=%s, not an instanceof(%r)" % (type(o), baseclass))
-      print(prefix, '{', file=fp, sep='')
+      print(prefix, '{', file=fp, sep='', end='')
       o.transcribe_inner(fp)
-      print('}', file=fp, sep='')
+      print('}', file=fp, sep='', end='')
+
+  def transcribe_s(self, prefix, o):
+    ''' Convenience function to transcribe object `o` with `prefix`, returns a string.
+    '''
+    fp = StringIO()
+    self.transcribe(fp, prefix, o)
+    s = fp.getvalue()
+    fp.close()
+    return s
 
   def parse(self, s, offset=0):
     ''' Parse an object transcription from the string `s` at the offset `offset`. Return the object and the new offset.
@@ -85,10 +111,26 @@ class Transcribe:
 
 _TRANSCRIBE = Transcribe()
 
-def register(prefix, baseclass, T=None):
-  ''' Register a `prefix` and its `baseclass`.
+def transcribe(fp, prefix, o, T=None):
+  ''' Transcribe the object `o` to file `fp`.
   '''
   global _TRANSCRIBE
   if T is None:
     T = _TRANSCRIBE
-  T.register(prefix, baseclass)
+  return T.transcribe(fp, prefix, o)
+
+def transcribe_s(prefix, o, T=None):
+  ''' Transcribe the object `o` to file `fp`.
+  '''
+  global _TRANSCRIBE
+  if T is None:
+    T = _TRANSCRIBE
+  return T.transcribe_s(prefix, o)
+
+def parse(s, offset=0, T=None):
+  ''' Parse an object from the string `s`. return the object and the offset
+  '''
+  global _TRANSCRIBE
+  if T is None:
+    T = _TRANSCRIBE
+  return T.parse(s, offset)
