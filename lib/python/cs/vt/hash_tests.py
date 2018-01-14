@@ -31,7 +31,7 @@ class TestHashing(unittest.TestCase):
       H = Hash_SHA1.from_chunk(rs)
       self.assertEqual( sha1(rs).digest(), bytes(H) )
       self.assertTrue( isinstance(H, Transcriber))
-      Hs = transcribe_s('H', H)
+      Hs = str(H)
       H2, offset = parse(Hs)
       self.assertTrue( offset == len(Hs) )
       self.assertEqual(H, H2)
