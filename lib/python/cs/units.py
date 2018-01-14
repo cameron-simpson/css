@@ -122,6 +122,13 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
       break
   return sep.join(text)
 
+def transcribe_bytes_geek(n, max_parts=1, **kw):
+  return transcribe(n, BINARY_BYTES_SCALE, max_parts=max_parts, **kw)
+def transcribe_bytes_human(n, max_parts=1, **kw):
+  return transcribe(n, DECIMAL_BYTES_SCALE, max_parts=max_parts, **kw)
+def transcribe_time(n, max_parts=3, **kw):
+  return transcribe(n, TIME_SCALE, max_parts=max_parts, **kw)
+
 def parse(s, scale, offset=0):
   ''' Parse an integer followed by an optional scale and return computed value.
       `s`: the string to parse
