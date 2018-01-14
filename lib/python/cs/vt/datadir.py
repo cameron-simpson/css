@@ -32,6 +32,7 @@ from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
+from cs.units import transcribe_bytes_geek
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
@@ -1002,6 +1003,8 @@ class PlatonicDir(_FilesDir):
                       R = meta_store.bg(
                           lambda B, Q: top_block_for(spliced_blocks(B, Q)),
                           E.block, blockQ)
+                    scan_from = F.scanned_to
+                    scan_start = time.time()
                     for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
                       hashcode = self.hashclass.from_chunk(data)
                       indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
@@ -1012,7 +1015,16 @@ class PlatonicDir(_FilesDir):
                       need_save = True
                       if self.cancelled or self.flag_scan_disable:
                         break
-                    info("scanned to %d", F.scanned_to)
+                    elapsed = time.time() - scan_start
+                    scanned = F.scanned_to - scan_from
+                    if elapsed > 0:
+                      scan_rate = scanned / elapsed
+                    else:
+                      scan_rate = None
+                    if scan_rate is None:
+                      info("scanned to %d: %s", F.scanned_to, transcribe_bytes_geek(scanned))
+                    else:
+                      info("scanned to %d: %s at %s/s", F.scanned_to, transcribe_bytes_geek(scanned), transcribe_bytes_geek(scan_rate))
                     if meta_store is not None:
                       blockQ.close()
                       top_block = R()
