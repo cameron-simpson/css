@@ -948,7 +948,8 @@ class PlatonicDir(_FilesDir):
               with meta_store:
                 D = topdir.makedirs(rdirpath, force=True)
                 # prune removed names
-                for name in D.keys():
+                names = list(D.keys())
+                for name in names:
                   if name not in dirnames and name not in filenames:
                     info("del %r", name)
                     del D[name]
