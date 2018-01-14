@@ -17,6 +17,7 @@ cs.logutils.X_via_tty = True
 from cs.randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
+from .transcribe import Transcriber, transcribe_s, parse
 
 class TestHashing(unittest.TestCase):
 
@@ -29,6 +30,11 @@ class TestHashing(unittest.TestCase):
       rs = bytes( random.randint(0, 255) for _ in range(100) )
       H = Hash_SHA1.from_chunk(rs)
       self.assertEqual( sha1(rs).digest(), bytes(H) )
+      self.assertTrue( isinstance(H, Transcriber))
+      Hs = transcribe_s('H', H)
+      H2, offset = parse(Hs)
+      self.assertTrue( offset == len(Hs) )
+      self.assertEqual(H, H2)
       # bytes(hash_num + hash_bytes)
       Hencode = H.encode()
       H2, offset = decode(Hencode)

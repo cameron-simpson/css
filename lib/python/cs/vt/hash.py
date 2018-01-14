@@ -5,13 +5,15 @@ else:
   from sha import new as sha1
 if sys.hexversion < 0x02060000:
   bytes = str
+from binascii import unhexlify
 from bisect import bisect_left, bisect_right
-from cs.lex import hexify
+from cs.lex import hexify, get_identifier
 from cs.logutils import D
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
 from cs.x import X
 from .pushpull import missing_hashcodes
+from .transcribe import Transcriber
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
@@ -36,7 +38,7 @@ def hash_of_byteses(bss):
     H.update(bs)
   return Hash_SHA1.from_chunk(H.digest())
 
-class _Hash(bytes):
+class _Hash(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
   '''
 
@@ -93,6 +95,33 @@ class _Hash(bytes):
     ''' Convenient hook to this Hash's class' .from_chunk method.
     '''
     return self.__class__.from_chunk
+
+  def transcribe_inner(self, fp):
+    fp.write(self.HASHNAME)
+    fp.write(':')
+    fp.write(hexify(self))
+
+  @staticmethod
+  def parse_inner(s, offset, stopchar):
+    ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
+    '''
+    hashname, offset = get_identifier(s, offset)
+    if not hashname:
+      raise ValueError("missing hashname at offset %d" % (offset,))
+    hashclass = HASHCLASS_BY_NAME[hashname]
+    if offset >= len(s) or s[offset] != ':':
+      raise ValueError("missing colon at offset %d" % (offset,))
+    offset += 1
+    hexlen = hashclass.HASHLEN * 2
+    hashtext = s[offset:offset + hexlen]
+    if len(hashtext) != hexlen:
+      raise ValueError("expected %d hex digits, found only %d" % (hexlen, len(hashtext)))
+    offset += hexlen
+    bs = unhexlify(hashtext)
+    H = hashclass.from_hashbytes(bs)
+    return H, offset
+
+_Hash.register_transcriber('H')
 
 class Hash_SHA1(_Hash):
   __slots__ = ()
