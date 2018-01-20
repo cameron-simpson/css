@@ -15,6 +15,8 @@ from cs.logutils import exception, error, warning, debug
 from cs.pfx import Pfx
 from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
+from .transcribe import Transcriber, register as register_transcriber, \
+                        transcribe_mapping, parse_mapping
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -119,9 +121,11 @@ def permbits_to_allow_deny(bits):
 def rwx(mode):
   ''' Transcribe 3 bits of a UNIX mode in 'rwx' form.
   '''
-  return ( 'r' if mode&4 else '-' ) \
-       + ( 'w' if mode&2 else '-' ) \
-       + ( 'x' if mode&1 else '-' )
+  return (
+      ( 'r' if mode&4 else '-' )
+      + ( 'w' if mode&2 else '-' )
+      + ( 'x' if mode&1 else '-' )
+  )
 
 class AC(object):
   __slots__ = ('prefix', 'allow', 'deny')
@@ -197,9 +201,9 @@ class AC_Other(AC):
     AC.__init__(self, '*', allow, deny)
 
 _AC_prefix_map = {
-  'o': AC_Owner,
-  'g': AC_Group,
-  '*': AC_Other,
+    'o': AC_Owner,
+    'g': AC_Group,
+    '*': AC_Other,
 }
 
 def decodeAC(ac_text):
@@ -246,7 +250,7 @@ def xattrs_from_bytes(bs, offset=0):
   return xattrs
 
 # This is a direct dict subclass for memory efficiency.
-class Meta(dict):
+class Meta(dict, Transcriber):
   ''' Inode metadata: times, permissions, ownership etc.
 
       This is a dictionary with the following keys:
@@ -263,6 +267,9 @@ class Meta(dict):
       'pathref': pathname component for symlinks (and, later, hard links)
       'x': xattrs
   '''
+
+  transcribe_prefix = 'M'
+
   def __init__(self, E):
     dict.__init__(self)
     self.E = E
@@ -292,6 +299,14 @@ class Meta(dict):
         exception("json.dumps: %s: d=%r", e, d)
         raise
     return encoded
+
+  def transcribe_inner(self, T, fp):
+    return transcribe_mapping(dict(self), fp, T=T)
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar):
+    m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
+    return cls(m), offset
 
   def _normalise(self):
     ''' Update some entries from their unpacked forms.
@@ -777,3 +792,5 @@ class Meta(dict):
   @mime_type.deleter
   def mime_type(self):
     self.delxattr('user.mime_type')
+
+register_transcriber(Meta)
