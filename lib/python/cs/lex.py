@@ -285,11 +285,23 @@ def get_decimal(s, offset=0):
   '''
   return get_chars(s, offset, digits)
 
+def get_decimal_value(s, offset=0):
+  value_s, offset = get_decimal(s, offset)
+  if not value_s:
+    raise ValueError("expected decimal value")
+  return int(value_s), offset
+
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
       Return hex_string, new_offset.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
+
+def get_hexadecimal_value(s, offset=0):
+  value_s, offset = get_hexadecimal(s, offset)
+  if not value_s:
+    raise ValueError("expected hexadecimal value")
+  return int('0x' + value_s), offset
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
