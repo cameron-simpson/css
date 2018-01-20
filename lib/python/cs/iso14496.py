@@ -250,7 +250,6 @@ class Box(object):
       cls = pick_box_class(box_header.type)
     B = cls(box_header)
     B.offset = offset0
-    X("Box.from_buffer: found %s at %d", bytes(B.box_type), offset0)
     bfr.report_offset(offset0)
     # further parse some or all of the data
     B.parse_data(bfr)
