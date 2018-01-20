@@ -152,11 +152,14 @@ class Transcribe:
         `m`: the mapping to transcribe.
         `fp`: optional file, default sys.stdout
         The keys of the mapping must be identifiers.
+        Values which are None are skipped.
     '''
     first = True
     for k, v in m.items():
       if not is_identifier(k):
         raise ValueError("not an identifier key: %r" % (k,))
+      if v is None:
+        continue
       if not first:
         fp.write(',')
       fp.write(k)
