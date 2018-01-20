@@ -247,10 +247,12 @@ class Pool(O):
         o = self.pool.pop()
       except IndexError:
         o = self.new_object()
-    yield o
-    with self._lock:
-      if self.max_size == 0 or len(self.pool) < self.max_size:
-        self.pool.append(o)
+    try:
+      yield o
+    finally:
+      with self._lock:
+        if self.max_size == 0 or len(self.pool) < self.max_size:
+          self.pool.append(o)
 
 class RunState(object):
   ''' A class to track a running task whose cancellation may be requested.

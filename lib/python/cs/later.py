@@ -693,8 +693,10 @@ class Later(MultiOpenMixin):
   @contextmanager
   def more_capacity(self, increment=1):
     self.capacity.adjust_delta(increment)
-    yield
-    self.capacity.adjust_delta(-increment)
+    try:
+      yield
+    finally:
+      self.capacity.adjust_delta(-increment)
 
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
@@ -1104,8 +1106,10 @@ class Later(MultiOpenMixin):
     '''
     oldpri = self._priority
     self._priority = pri
-    yield
-    self._priority = oldpri
+    try:
+      yield
+    finally:
+      self._priority = oldpri
 
   def pool(self, *a, **kw):
     ''' Return a LatePool to manage some tasks run with this Later.

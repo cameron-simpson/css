@@ -34,6 +34,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug
 from cs.obj import O, Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -50,32 +51,13 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
         'cs.x',
     ],
 }
-
-from cmd import Cmd
-import inspect
-import logging
-import os
-from subprocess import Popen, PIPE
-import sys
-import threading
-import time
-import traceback
-import cs.logutils
-from cs.logutils import debug, error, warning, setup_logging, D, ifdebug
-from cs.obj import O, Proxy
-from cs.pfx import Pfx
-from cs.py.func import funccite
-from cs.py.stack import caller
-from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.seq import seq
-from cs.timeutils import sleep
-from cs.x import X
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -129,7 +111,7 @@ class TraceSuite(object):
     self.msg = msg
   def __enter__(self):
     X("TraceSuite ENTER %s", self.msg)
-  def __exit__(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, exc_tb):
     X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
 def Thread(*a, **kw):
@@ -143,7 +125,6 @@ def thread_dump(Ts=None, fp=None):
       `Ts`: the Threads to dump; if unspecified use threading.enumerate().
       `fp`: the file to which to write; if unspecified use sys.stderr.
   '''
-  import traceback
   if Ts is None:
     Ts = threading.enumerate()
   if fp is None:
@@ -390,7 +371,7 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
     _debug_threads.add(self)
-    return threading.Thread.__init__(self, *a, **kw)
+    threading.Thread.__init__(self, *a, **kw)
 
   @DEBUG
   def join(self, timeout=None):
