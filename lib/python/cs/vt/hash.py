@@ -13,7 +13,7 @@ from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
 from cs.x import X
 from .pushpull import missing_hashcodes
-from .transcribe import Transcriber, transcribe_s
+from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
@@ -123,7 +123,7 @@ class _Hash(bytes, Transcriber):
     H = hashclass.from_hashbytes(bs)
     return H, offset
 
-_Hash.register_transcriber()
+register_transcriber(_Hash)
 
 class Hash_SHA1(_Hash):
   __slots__ = ()
