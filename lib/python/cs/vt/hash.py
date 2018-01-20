@@ -44,8 +44,10 @@ class _Hash(bytes, Transcriber):
 
   __slots__ = ()
 
+  transcribe_prefix = 'H'
+
   def __str__(self):
-    return transcribe_s('H', self)
+    return transcribe_s(self)
 
   def __repr__(self):
     return ':'.join( (self.HASHNAME, hexify(self)) )
@@ -121,7 +123,7 @@ class _Hash(bytes, Transcriber):
     H = hashclass.from_hashbytes(bs)
     return H, offset
 
-_Hash.register_transcriber('H')
+_Hash.register_transcriber()
 
 class Hash_SHA1(_Hash):
   __slots__ = ()
