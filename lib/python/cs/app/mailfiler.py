@@ -1709,7 +1709,7 @@ class WatchedMaildir(O):
     self.rules_path = rules_path
     if rules_path is None:
       # default to looking for .mailfiler inside the Maildir
-      rules_path = os.path.join(self.mdir.dir, '.mailfiler')
+      rules_path = os.path.join(self.mdir.path, '.mailfiler')
     self._rules = None
     self._rules_paths = [ rules_path ]
     self._rules_lock = Lock()
@@ -1733,7 +1733,7 @@ class WatchedMaildir(O):
 
   @property
   def path(self):
-    return self.mdir.dir
+    return self.mdir.path
 
   def keys(self, flush=False):
     return self.mdir.keys(flush=flush)
