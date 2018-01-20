@@ -23,7 +23,7 @@ from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
 from cs.logutils import info, warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
@@ -76,26 +76,22 @@ class _Archive(object):
       self._last = last_entry
     return last_entry
 
+  @pfxgen
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
     '''
     path = self.path
-    # The funny control structure is because we're using Pfx in a generator.
-    # It needs to be set up and torn down between yields.
     with Pfx(path):
       try:
         fp = open(path)
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-    entries = self.parse(fp)
-    while True:
-      with Pfx(path):
-        when, E = next(entries)
+      entries = self.parse(fp)
+      for when, E in entries:
         if when is None and E is None:
           break
-      # note: yield _outside_ Pfx
-      yield when, E
+        yield when, E
 
   def save(self, E, when=None):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
@@ -134,6 +130,7 @@ class _Archive(object):
     return encoded
 
   @staticmethod
+  @pfxgen
   def parse(fp, first_lineno=1):
     ''' Parse lines from an open archive file, yield (when, E).
     '''
@@ -150,8 +147,7 @@ class _Archive(object):
         when = float(unixtime)
         E = decode_Dirent_text(dent)
         info("when=%s, E=%s", when, E)
-      # note: yield _outside_ Pfx
-      yield when, E
+        yield when, E
 
   @staticmethod
   def read(fp, first_lineno=1):
