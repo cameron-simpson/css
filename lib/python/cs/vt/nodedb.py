@@ -24,5 +24,5 @@ def dirent_fromtext(value):
 def dirent_tobytes(D):
   return D.encode()
 
-def dirent_frombytes(value):
-  return decode_Dirent(value, justone=True)
+def dirent_frombytes(bs):
+  return _Dirent.from_bytes(bs, justone=True)
