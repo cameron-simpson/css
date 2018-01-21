@@ -178,8 +178,9 @@ class Transcribe:
     '''
     ##X("parse %r ...", s[offset:])
     # strings
-    if s.startswith("'", offset) or s.startswith('"', offset):
-      return get_qstr(s, offset=offset, q=s[offset])
+    value, offset2 = self.parse_qs(s, offset, optional=True)
+    if value is not None:
+      return value, offset2
     # decimal values
     if s[offset:offset+1].isdigit():
       return get_decimal_value(s, offset)
@@ -201,6 +202,14 @@ class Transcribe:
         raise ValueError("missing closing '}' at offset %d" % (offset,))
       offset += 1
       return o, offset
+
+  @staticmethod
+  def parse_qs(s, offset, optional=False):
+    if s.startswith("'", offset) or s.startswith('"', offset):
+      return get_qstr(s, offset=offset, q=s[offset])
+    if optional:
+      return None
+    raise ValueError("offset %d: expected quoted string" % (offset,))
 
   def parse_mapping(self, s, offset=0, stopchar=None):
     ''' Parse a mapping from the string `s`. Return the mapping and the new offset.
