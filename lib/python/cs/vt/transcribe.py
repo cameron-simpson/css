@@ -302,7 +302,7 @@ def parse_mapping(s, offset=0, stopchar=None, T=None):
   global _TRANSCRIBE
   if T is None:
     T = _TRANSCRIBE
-  return T.parse(s, offset)
+  return T.parse_mapping(s, offset, stopchar)
 
 if __name__ == '__main__':
   from .transcribe_tests import selftest
