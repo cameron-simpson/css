@@ -133,7 +133,7 @@ class Transcribe:
           raise ValueError("type(o)=%s, not an instanceof(%r)" % (type(o), baseclass))
       fp.write(prefix)
       fp.write('{')
-      o.transcribe_inner(fp)
+      o.transcribe_inner(self, fp)
       fp.write('}')
 
   def transcribe_s(self, o, prefix=None):
@@ -189,7 +189,7 @@ class Transcribe:
       baseclass = self.prefix_map.get(prefix)
       if baseclass is None:
         raise ValueError("prefix not registered: %r" % (prefix,))
-      o, offset = baseclass.parse_inner(s, offset, '}')
+      o, offset = baseclass.parse_inner(self, s, offset, '}')
       if offset > len(s):
         raise ValueError("parse_inner returns offset beyond text")
       if offset >= len(s) or s[offset] != '}':
