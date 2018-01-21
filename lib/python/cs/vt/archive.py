@@ -8,7 +8,7 @@
       isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
-    encoding of a Dirent.
+    transcription of a Dirent.
 '''
 
 from __future__ import print_function
@@ -29,7 +29,8 @@ from cs.x import X
 from .blockify import blockify, top_block_for
 from .dir import FileDirent, DirFTP
 from .file import filedata
-from .paths import decode_Dirent_text, resolve, walk
+from .paths import resolve, walk
+from .transcribe import transcribe, parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -94,25 +95,23 @@ class _Archive(object):
         yield when, E
 
   def save(self, E, when=None):
-    ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
+    ''' Save the supplied Dirent `E` with timestamp `when` (default now).
     '''
     if when is None:
       when = time.time()
     path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        written = self.write(fp, E, when=when, etc=E.name)
+        self.write(fp, E, when=when, etc=E.name)
     self._last = when, E
-    return written
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
-    ''' Write a Dirent to an open archive file; return the textual form of `E` used.
+    ''' Write a Dirent to an open archive file.
         Archive lines have the form:
-          isodatetime unixtime totext(dirent) dirent.name
+          isodatetime unixtime transcribe(dirent) dirent.name
        Note: does not flush the file.
     '''
-    encoded = _Archive.strfor_Dirent(E)
     if when is None:
       when = time.time()
     # produce a local time with knowledge of its timezone offset
@@ -122,12 +121,11 @@ class _Archive(object):
     fp.write(' ')
     fp.write(str(when))
     fp.write(' ')
-    fp.write(encoded)
+    transcribe(E, fp)
     if etc is not None:
       fp.write(' ')
       fp.write(unctrl(etc))
     fp.write('\n')
-    return encoded
 
   @staticmethod
   @pfxgen
@@ -145,7 +143,9 @@ class _Archive(object):
         fields = line.split(None, 3)
         isodate, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E = decode_Dirent_text(dent)
+        E, offset = parse(dent)
+        if offset != len(dent):
+          warning("unparsed dirent text: %r", dent[offset:])
         info("when=%s, E=%s", when, E)
         yield when, E
 
