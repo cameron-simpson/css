@@ -12,7 +12,7 @@ from cs.threads import locked_property
 from cs.x import X
 from . import defaults, totext
 from .hash import decode as hash_decode
-from .transcribe import Transcriber, register_transcriber
+from .transcribe import Transcriber, register as register_transcriber
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
 F_BLOCK_TYPED = 0x02        # block type provided, otherwise BT_HASHCODE
@@ -614,7 +614,7 @@ class _SubBlock(_Block):
       A SubBlock may not be empty and may not cover the whole of its superblock.
   '''
 
-  trancribe_prefix = 'SubB'
+  transcribe_prefix = 'SubB'
 
   def __init__(self, SuperB, suboffset, span):
     _Block.__init__(self, BlockType.BT_SUBBLOCK)
