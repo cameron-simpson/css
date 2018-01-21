@@ -204,19 +204,38 @@ class Transcribe:
       return o, offset
 
   @staticmethod
-  def parse_qs(s, offset, optional=False):
+  def parse_qs(s, offset=0, optional=False):
+    ''' Parse a quoted string.
+        `s`: the source string
+        `offset`: optional string offset, default 0
+        `optional`: if true (default False), return None if there
+          is no quoted string at offset instead of raising a ValueError
+    '''
     if s.startswith("'", offset) or s.startswith('"', offset):
       return get_qstr(s, offset=offset, q=s[offset])
     if optional:
       return None, offset
     raise ValueError("offset %d: expected quoted string" % (offset,))
 
-  def parse_mapping(self, s, offset=0, stopchar=None):
+  def parse_mapping(
+      self,
+      s, offset=0, stopchar=None,
+      required=None, optional=None
+  ):
     ''' Parse a mapping from the string `s`. Return the mapping and the new offset.
         `s`: the source string
         `offset`: optional string offset, default 0
         `stopchar`: ending character, not to be consumed
+        `required`: if specified, validate that the mapping contains
+          all the keys in this list
+        `optional`: if specified, validate that the mapping contains
+          no keys which are not required or optional
+        If `required` or `optional` is specified the return takes the form:
+          offset, required_values..., optional_values...
+        where missing optional values are presented as None.
     '''
+    if optional is not None and required is None:
+      raise ValueError("required is None but optional is specified: %r" % (optional,))
     d = OrderedDict()
     while offset < len(s) and (stopchar is None or s[offset] != stopchar):
       k, offset = get_identifier(s, offset)
@@ -235,7 +254,21 @@ class Transcribe:
       if c != ',':
         raise ValueError("offset %d: expected ','" % (offset,))
       offset += 1
-    return d, offset
+    if required is None and optional is None:
+      return d, offset
+    for k in required:
+      if k not in d:
+        raise ValueError("missing required field %r" % (k,))
+    if optional is not None:
+      for k in d.keys():
+        if k not in required and k not in optional:
+          raise ValueError("unexpected field %r" % (k,))
+    ret = [offset]
+    for k in required:
+      ret.append(d[k])
+    for k in optional:
+      ret.append(d.get(k))
+    return ret
 
 _TRANSCRIBE = Transcribe()
 
