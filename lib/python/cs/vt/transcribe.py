@@ -59,9 +59,9 @@ class UUIDTranscriber:
 
   @staticmethod
   def parse_inner(s, offset, stopchar):
-    end_offset = s.find('}', offset)
+    end_offset = s.find(stopchar, offset)
     if end_offset < offset:
-      raise ValueError("offset %d: closing '}' not found" % (offset,))
+      raise ValueError("offset %d: closing %r not found" % (offset, stopchar))
     uu = UUID(s[offset:end_offset])
     return uu, end_offset
 
