@@ -98,13 +98,13 @@ class _Hash(bytes, Transcriber):
     '''
     return self.__class__.from_chunk
 
-  def transcribe_inner(self, fp):
+  def transcribe_inner(self, T, fp):
     fp.write(self.HASHNAME)
     fp.write(':')
     fp.write(hexify(self))
 
   @staticmethod
-  def parse_inner(s, offset, stopchar):
+  def parse_inner(T, s, offset, stopchar):
     ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
     '''
     hashname, offset = get_identifier(s, offset)
