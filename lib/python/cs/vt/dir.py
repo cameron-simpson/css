@@ -85,10 +85,6 @@ class _Dirent(Transcriber):
     self.meta = meta
     self.parent = parent
 
-  def __str__(self):
-    return transcribe_s(self)
-    ##return "%s:%d:%r:type=%s:%s" % (self.__class__.__name__, id(self), self.name, self.type, self.meta.textencode())
-
   def __repr__(self):
     return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
                                id(self),
@@ -556,10 +552,6 @@ class Dir(_Dirent):
     self.parent = parent
     self._changed = False
     self._lock = RLock()
-    X("NEW %s: %s", type(self), self)
-
-  ##def __str__(self):
-  ##  return "Dir:%d:%r" % (id(self), self.path)
 
   @prop
   def changed(self):
