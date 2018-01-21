@@ -213,20 +213,28 @@ class _Dirent(Transcriber):
     return id(self)
 
   def transcribe_inner(self, T, fp):
-    attrs = OrderedDict()
     if self.name:
-      attrs['name'] = self.name
+      T.transcribe(self.name, fp)
+      fp.write(':')
+    attrs = OrderedDict()
     attrs['type'] = self.type
     if self.uuid:
       attrs['uuid'] = self.uuid
     attrs['meta'] = self.meta
     attrs['data'] = self.block
-    transcribe_mapping(attrs, fp, T=T)
+    T.transcribe_mapping(attrs, fp)
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar):
     ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
     '''
+    name, offset2 = T.parse_qs(s, offset, optional=True)
+    if name is None:
+      name = ''
+    else:
+      if s[offset2] != ':':
+        raise ValueError("offset %d: missing colon after name" % (offset2,))
+      offset = offset2 + 1
     m, offset = parse_mapping(s, offset=offset, stopchar=stopchar)
     type_ = m.pop('type')
     name = m.pop('name')
