@@ -12,7 +12,7 @@ from cs.threads import locked_property
 from cs.x import X
 from . import defaults, totext
 from .hash import decode as hash_decode
-from .transcribe import Transcriber, transcribe_s
+from .transcribe import Transcriber, register_transcriber
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
 F_BLOCK_TYPED = 0x02        # block type provided, otherwise BT_HASHCODE
@@ -470,6 +470,8 @@ class HashCodeBlock(_Block):
     B.indirect = indirect
     return B, offset
 
+register_transcriber(HashCodeBlock)
+
 def Block(hashcode=None, data=None, span=None, added=False):
   ''' Factory function for a Block.
   '''
@@ -569,6 +571,8 @@ class RLEBlock(_Block):
       raise ValueError("unexpected fields: %r" % (m,))
     return cls(span, octet), offset
 
+register_transcriber(RLEBlock)
+
 class LiteralBlock(_Block):
   ''' A LiteralBlock is for data too short to bother hashing and Storing.
   '''
@@ -595,6 +599,8 @@ class LiteralBlock(_Block):
       raise ValueError("stopchar %r not found" % (stopchar,))
     data = untexthexify(s[offset:endpos])
     return cls(data), endpos
+
+register_transcriber(LiteralBlock)
 
 def SubBlock(B, suboffset, span):
   ''' Factory for SubBlocks: returns origin Block if suboffset==0 and span==len(B).
@@ -660,6 +666,8 @@ class _SubBlock(_Block):
     if m:
       raise ValueError("unexpected fields: %r" % (m,))
     return cls(block, offset, span)
+
+register_transcriber(_SubBlock)
 
 def chunksOf(B, start, stop=None):
   ''' Generator that yields the chunks from the subblocks that span
