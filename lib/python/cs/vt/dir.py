@@ -235,13 +235,10 @@ class _Dirent(Transcriber):
       if s[offset2] != ':':
         raise ValueError("offset %d: missing colon after name" % (offset2,))
       offset = offset2 + 1
-    m, offset = parse_mapping(s, offset=offset, stopchar=stopchar)
-    type_ = m.pop('type')
-    name = m.pop('name')
-    uuid = m.pop('uuid', None)
-    block = m.pop('block', None)
-    if m:
-      raise ValueError("unhandled entries: %r", m)
+    offset, type_, uuid, block = T.parse_mapping(
+        s, offset, stopchar,
+        required=('type',),
+        optional=('uuid', 'block'))
     return cls.from_components(type_, name, uuid, block)
 
   @prop
