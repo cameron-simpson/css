@@ -198,15 +198,6 @@ class _Dirent(Transcriber):
         + blockref
     )
 
-  def as_dict(self):
-    return {
-        'type': self.type,
-        'name': self.name,
-        'meta': self.meta,
-        'uuid': self._uuid,
-        'block': self.block,
-    }
-
   def __hash__(self):
     ''' Allows collecting _Dirents in a set.
     '''
@@ -218,8 +209,8 @@ class _Dirent(Transcriber):
       fp.write(':')
     attrs = OrderedDict()
     attrs['type'] = self.type
-    if self.uuid:
-      attrs['uuid'] = self.uuid
+    if self._uuid:
+      attrs['uuid'] = self._uuid
     attrs['meta'] = self.meta
     attrs['data'] = self.block
     T.transcribe_mapping(attrs, fp)
