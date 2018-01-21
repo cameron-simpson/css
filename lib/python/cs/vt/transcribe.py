@@ -28,6 +28,9 @@ class Transcriber(ABC):
 
   __slots__ = ()
 
+  def __str__(self):
+    return transcribe_s(self)
+
   @abstractmethod
   def transcribe_inner(self, T, fp):
     ''' Write the inner textual form of this object to the file `fp`.
@@ -131,6 +134,7 @@ class Transcribe:
       if baseclass is not None:
         if not isinstance(o, baseclass):
           raise ValueError("type(o)=%s, not an instanceof(%r)" % (type(o), baseclass))
+      ##X("transcribe %r ...", o)
       fp.write(prefix)
       fp.write('{')
       o.transcribe_inner(self, fp)
@@ -172,6 +176,7 @@ class Transcribe:
         `s`: the source string
         `offset`: optional string offset, default 0
     '''
+    ##X("parse %r ...", s[offset:])
     # strings
     if s.startswith("'", offset) or s.startswith('"', offset):
       return get_qstr(s, offset=offset, q=s[offset])
