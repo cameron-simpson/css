@@ -208,7 +208,7 @@ class Transcribe:
     if s.startswith("'", offset) or s.startswith('"', offset):
       return get_qstr(s, offset=offset, q=s[offset])
     if optional:
-      return None
+      return None, offset
     raise ValueError("offset %d: expected quoted string" % (offset,))
 
   def parse_mapping(self, s, offset=0, stopchar=None):
