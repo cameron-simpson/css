@@ -61,24 +61,27 @@ class _Dirent(Transcriber):
 
   transcribe_prefix = 'E'
 
-  def __init__(self, type_, name, meta=None, parent=None):
+  def __init__(self, type_, name, meta=None, uuid=None, parent=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     self.type = type_
     self.name = name
-    self._uuid = None
-    if meta is not None:
-      if isinstance(meta, Meta):
-        if meta.E is not None and meta.E is not self:
-          warning("meta.E is %r, replacing with self %r", meta.E, self)
-        meta.E = self
+    self._uuid = uuid
+    if isinstance(meta, Meta):
+      if meta.E is not None and meta.E is not self:
+        warning("meta.E is %r, replacing with self %r", meta.E, self)
+      meta.E = self
+    else:
+      M = Meta(self)
+      if meta is None:
+        pass
+      elif isinstance(meta, str):
+        M.update_from_text(meta)
       else:
-        M = Meta(self)
-        if isinstance(meta, str):
-          self.meta.update_from_text(meta)
-        meta = M
+        raise ValueError("unsupported meta value: %r" % (meta,))
+      meta = M
     self.meta = meta
     self.parent = parent
 
