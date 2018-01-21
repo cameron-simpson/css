@@ -4,6 +4,7 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
+from cs.lex import texthexify, untexthexify
 from cs.logutils import D, error, debug
 from cs.pfx import Pfx
 from cs.serialise import get_bs, put_bs
@@ -11,6 +12,7 @@ from cs.threads import locked_property
 from cs.x import X
 from . import defaults, totext
 from .hash import decode as hash_decode
+from .transcribe import Transcriber, transcribe_s
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
 F_BLOCK_TYPED = 0x02        # block type provided, otherwise BT_HASHCODE
@@ -163,14 +165,11 @@ def encodeBlock(B):
 def isBlock(o):
   return isinstance(o, _Block)
 
-class _Block(object):
+class _Block(Transcriber):
 
   def __init__(self, block_type):
     self.type = block_type
     self._lock = RLock()
-
-  def __str__(self):
-    return self.textencode()
 
   def __eq__(self, oblock):
     if self is oblock:
@@ -403,6 +402,8 @@ class _Block(object):
 
 class HashCodeBlock(_Block):
 
+  transcribe_prefix = 'B'
+
   def __init__(self, hashcode=None, data=None, added=False):
     ''' Initialise a BT_HASHCODE Block or IndirectBlock.
         A HashCodeBlock always stores its hashcode directly.
@@ -428,12 +429,6 @@ class HashCodeBlock(_Block):
               % (hashcode, h, data))
     self.hashcode = hashcode
 
-  def __repr__(self):
-    return (
-        "%s:len=%d:hashcode=%s"
-        % (self.__class__.__name__, len(self), self.hashcode)
-    )
-
   def stored_data(self):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
@@ -455,6 +450,25 @@ class HashCodeBlock(_Block):
     ''' The direct data of this Block.
     '''
     return self.stored_data()
+
+  def transcribe_inner(self, T, fp):
+    m = {'span':self.span, 'hash':self.hashcode}
+    if self.indirect:
+      m['indirect'] = True
+    return T.transcribe_mapping(m, fp)
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar):
+    m, offset = T.parse_mapping(s, offset, stopchar)
+    span = m.pop('span')
+    hashcode = m.pop('hash')
+    indirect = m.pop('indirect', False)
+    if m:
+      raise ValueError("unexpected fields: %r" % (m,))
+    B = cls(hashcode=hashcode)
+    B.span = span
+    B.indirect = indirect
+    return B, offset
 
 def Block(hashcode=None, data=None, span=None, added=False):
   ''' Factory function for a Block.
@@ -520,6 +534,8 @@ class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes all of a specific value, typically NUL.
   '''
 
+  transcribe_prefix = 'RLE'
+
   def __init__(self, span, octet):
     _Block.__init__(self, BlockType.BT_RLE)
     if span < 0:
@@ -534,9 +550,6 @@ class RLEBlock(_Block):
     self.octet = octet
     self.indirect = False
 
-  def __repr__(self):
-    return "%s:len=%d:0x%02x" % (self.__class__.__name__, len(self), self.octet)
-
   @property
   def data(self):
     return self.octet * self.span
@@ -544,9 +557,23 @@ class RLEBlock(_Block):
   def encode(self):
     return self._encode(0, self.span, BlockType.BT_RLE, 0, ( self.octet, ))
 
+  def transcribe_inner(self, T, fp):
+    return T.transcribe_mapping({'span':self.span,'octet':self.octet})
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar):
+    m = T.parse_mapping(s, offset, stopchar)
+    span = m.pop('span')
+    octet = m.pop('octet')
+    if m:
+      raise ValueError("unexpected fields: %r" % (m,))
+    return cls(span, octet), offset
+
 class LiteralBlock(_Block):
   ''' A LiteralBlock is for data too short to bother hashing and Storing.
   '''
+
+  transcribe_prefix = 'LB'
 
   def __init__(self, data):
     _Block.__init__(self, BlockType.BT_LITERAL)
@@ -554,12 +581,20 @@ class LiteralBlock(_Block):
     self.indirect = False
     self.span = len(data)
 
-  def __repr__(self):
-    return "%s:%s" % (self.__class__.__name__, self)
-
   def encode(self):
     return self._encode(0, self.span, BlockType.BT_LITERAL, 0,
                         ( self.data, ))
+
+  def transcribe_inner(self, T, fp):
+    fp.write(texthexify(self.data))
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar):
+    endpos = s.find(stopchar, offset)
+    if endpos < offset:
+      raise ValueError("stopchar %r not found" % (stopchar,))
+    data = untexthexify(s[offset:endpos])
+    return cls(data), endpos
 
 def SubBlock(B, suboffset, span):
   ''' Factory for SubBlocks: returns origin Block if suboffset==0 and span==len(B).
@@ -572,6 +607,8 @@ class _SubBlock(_Block):
   ''' A SubBlock is a view into another block.
       A SubBlock may not be empty and may not cover the whole of its superblock.
   '''
+
+  trancribe_prefix = 'SubB'
 
   def __init__(self, SuperB, suboffset, span):
     _Block.__init__(self, BlockType.BT_SUBBLOCK)
@@ -606,6 +643,23 @@ class _SubBlock(_Block):
     if index < 0 or index >= self.span:
       raise IndexError("index %d outside span %d" % (index, self.span))
     return self._superblock[self._offset+index]
+
+  def transcribe_inner(self, T, fp):
+    return T.transcribe_mapping({
+        'block': self._superblock,
+        'offset': self._offset,
+        'span': self.span
+    }, fp)
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar):
+    m = T.parse_mapping(s, offset, stopchar)
+    block = m.pop('block')
+    offset = m.pop('offset')
+    span = m.pop('span')
+    if m:
+      raise ValueError("unexpected fields: %r" % (m,))
+    return cls(block, offset, span)
 
 def chunksOf(B, start, stop=None):
   ''' Generator that yields the chunks from the subblocks that span
