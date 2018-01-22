@@ -570,7 +570,7 @@ class RLEBlock(_Block):
     return T.transcribe_mapping({'span':self.span,'octet':self.octet})
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
     m = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span')
     octet = m.pop('octet')
@@ -600,7 +600,7 @@ class LiteralBlock(_Block):
     fp.write(texthexify(self.data))
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
     endpos = s.find(stopchar, offset)
     if endpos < offset:
       raise ValueError("stopchar %r not found" % (stopchar,))
@@ -665,7 +665,7 @@ class _SubBlock(_Block):
     }, fp)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
     m = T.parse_mapping(s, offset, stopchar)
     block = m.pop('block')
     offset = m.pop('offset')
