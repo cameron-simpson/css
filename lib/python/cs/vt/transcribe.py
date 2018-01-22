@@ -164,18 +164,19 @@ class Transcribe:
         The keys of the mapping must be identifiers.
         Values which are None are skipped.
     '''
-    first = True
-    for k, v in m.items():
-      if not is_identifier(k):
-        raise ValueError("not an identifier key: %r" % (k,))
-      if v is None:
-        continue
-      if not first:
-        fp.write(',')
-      fp.write(k)
-      fp.write(':')
-      self.transcribe(v, None, fp)
-      first = False
+    with Pfx("transcribe_mapping(%r)", m):
+      first = True
+      for k, v in m.items():
+        if not is_identifier(k):
+          raise ValueError("not an identifier key: %r" % (k,))
+        if v is None:
+          continue
+        if not first:
+          fp.write(',')
+        fp.write(k)
+        fp.write(':')
+        self.transcribe(v, None, fp)
+        first = False
 
   def parse(self, s, offset=0):
     ''' Parse an object from the string `s`. Return the object and the new offset.
