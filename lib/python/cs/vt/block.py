@@ -7,6 +7,7 @@ from threading import RLock
 from cs.lex import texthexify, untexthexify
 from cs.logutils import D, error, debug
 from cs.pfx import Pfx
+from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.x import X
@@ -402,8 +403,6 @@ class _Block(Transcriber):
 
 class HashCodeBlock(_Block):
 
-  transcribe_prefix = 'B'
-
   def __init__(self, hashcode=None, data=None, added=False):
     ''' Initialise a BT_HASHCODE Block or IndirectBlock.
         A HashCodeBlock always stores its hashcode directly.
@@ -451,18 +450,26 @@ class HashCodeBlock(_Block):
     '''
     return self.stored_data()
 
+  @prop
+  def transcribe_prefix(self):
+    return 'IB' if self.indirect else 'B'
+
   def transcribe_inner(self, T, fp):
     m = {'span':self.span, 'hash':self.hashcode}
-    if self.indirect:
-      m['indirect'] = True
     return T.transcribe_mapping(m, fp)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
     m, offset = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span')
     hashcode = m.pop('hash')
-    indirect = m.pop('indirect', False)
+    if prefix == 'B':
+      indirect = False
+    elif prefix == 'IB':
+      indirect = True
+    else:
+      warning("unexpected prefix %r, setting indirect=False", prefix)
+      indirect = False
     if m:
       raise ValueError("unexpected fields: %r" % (m,))
     B = cls(hashcode=hashcode)
@@ -470,7 +477,7 @@ class HashCodeBlock(_Block):
     B.indirect = indirect
     return B, offset
 
-register_transcriber(HashCodeBlock)
+register_transcriber(HashCodeBlock, ('B', 'IB'))
 
 def Block(hashcode=None, data=None, span=None, added=False):
   ''' Factory function for a Block.
