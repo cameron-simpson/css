@@ -121,7 +121,7 @@ class _Archive(object):
     fp.write(' ')
     fp.write(str(when))
     fp.write(' ')
-    transcribe(E, fp)
+    transcribe(E, fp=fp)
     if etc is not None:
       fp.write(' ')
       fp.write(unctrl(etc))
