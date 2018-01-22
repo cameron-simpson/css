@@ -42,12 +42,13 @@ class Transcriber(ABC):
 
   @staticmethod
   @abstractmethod
-  def parse_inner(T, s, offset, stopchar):
+  def parse_inner(T, s, offset, stopchar, prefix):
     ''' Read the inner textual form of an object from `s` at offset `offset`. Return the object and new offset.
         `T`: the Transcribe context
         `s`: the source text
         `offset`: the parse position within `s`
         `stopchar`: the end of object marker, usually '}'
+        `prefix`: the active prefix
     '''
     raise NotImplementedError()
 
@@ -58,7 +59,7 @@ class UUIDTranscriber:
     fp.write(str(uu))
 
   @staticmethod
-  def parse_inner(s, offset, stopchar):
+  def parse_inner(s, offset, stopchar, prefix):
     end_offset = s.find(stopchar, offset)
     if end_offset < offset:
       raise ValueError("offset %d: closing %r not found" % (offset, stopchar))
@@ -82,23 +83,27 @@ class Transcribe:
     }
     self.register(UUIDTranscriber, 'U')
 
-  def register(self, baseclass, prefix):
+  def register(self, baseclass, prefixes):
     ''' Register a class and its default prefix.
         `baseclass`: the class to register, which should be a Transcriber.
-        `prefix`: the default prefix leading "prefix{....}" transcriptions.
+        `prefixes`: an iterable of string prefixes leading
+          "prefix{....}" transcriptions; the first prefix is the
+          default. This may also be a single string.
     '''
-    assert isinstance(prefix, str)
-    if prefix in self.prefix_map:
-      raise ValueError("prefix %r already taken" % (prefix,))
-    if ( not isinstance(baseclass, Transcriber)
-         and ( not hasattr(baseclass, 'transcribe_inner')
-               or not hasattr(baseclass, 'parse_inner')
-             )
-       ):
-      raise ValueError("baseclass %s not a subclass of Transcriber" % (baseclass,))
-    self.prefix_map[prefix] = baseclass
-    if baseclass not in self.class_map:
-      self.class_map[baseclass] = prefix
+    if isinstance(prefixes, str):
+      prefixes = (prefixes,)
+    for prefix in prefixes:
+      if prefix in self.prefix_map:
+        raise ValueError("prefix %r already taken" % (prefix,))
+      if ( not isinstance(baseclass, Transcriber)
+           and ( not hasattr(baseclass, 'transcribe_inner')
+                 or not hasattr(baseclass, 'parse_inner')
+               )
+         ):
+        raise ValueError("baseclass %s not a subclass of Transcriber" % (baseclass,))
+      self.prefix_map[prefix] = baseclass
+      if baseclass not in self.class_map:
+        self.class_map[baseclass] = prefix
 
   def register_class(self, cls, transcribe_s, parse):
     ''' Register transcribers for a class `cls`.
@@ -196,7 +201,7 @@ class Transcribe:
       baseclass = self.prefix_map.get(prefix)
       if baseclass is None:
         raise ValueError("prefix not registered: %r" % (prefix,))
-      o, offset = baseclass.parse_inner(self, s, offset, '}')
+      o, offset = baseclass.parse_inner(self, s, offset, '}', prefix)
       if offset > len(s):
         raise ValueError("parse_inner returns offset beyond text")
       if offset >= len(s) or s[offset] != '}':
