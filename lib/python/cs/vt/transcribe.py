@@ -77,6 +77,7 @@ class Transcribe:
     self.class_transcribers = {
         int: str,
         str: repr,
+        bool: lambda v: '1' if v else '0',
         UUID: lambda u: 'U{' + str(u) + '}',
     }
     self.register(UUIDTranscriber, 'U')
