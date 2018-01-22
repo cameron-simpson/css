@@ -104,7 +104,7 @@ class _Hash(bytes, Transcriber):
     fp.write(hexify(self))
 
   @staticmethod
-  def parse_inner(T, s, offset, stopchar):
+  def parse_inner(T, s, offset, stopchar, prefix):
     ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
     '''
     hashname, offset = get_identifier(s, offset)
