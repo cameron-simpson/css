@@ -35,6 +35,7 @@ gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (_Dirent).
 
+D_INVALID_T = -1
 D_FILE_T = 0
 D_DIR_T = 1
 D_SYM_T = 2
@@ -58,8 +59,6 @@ F_HASUUID = 0x08
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
-
-  transcribe_prefix = 'E'
 
   def __init__(self, type_, name, meta=None, uuid=None, parent=None):
     if not isinstance(type_, int):
@@ -128,31 +127,21 @@ class _Dirent(Transcriber):
       warning("%r: invalid Dirent components, marking Dirent as invalid: %s",
               name, e)
       E = InvalidDirent(
-          data[offset0:offset],
-          type_=type_, name=name, meta=metatext, uuid=uu, block=block)
+          type_, name,
+          chunk=data[offset0:offset],
+          meta=metatext, uuid=uu, block=block)
     return E, offset
 
   @staticmethod
-  def from_components(type_, name, meta=None, uuid=None, block=None, parent=None):
+  def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
     '''
-    if type_ == D_DIR_T:
-      E = Dir(name, meta=meta, block=block)
-    elif type_ == D_FILE_T:
-      E = FileDirent(name, meta=meta, block=block)
-    elif type_ == D_SYM_T:
-      if block is not None:
-        raise ValueError("symlink: block should be None, got %r" % (block,))
-      E = SymlinkDirent(name, meta=meta)
-    elif type_ == D_HARD_T:
-      if block is not None:
-        raise ValueError("hardlink: block should be None, got %r" % (block,))
-      E = HardlinkDirent(name, meta=meta)
-    else:
-      E = _Dirent(type_, name, meta=meta, block=block)
-    E._uuid = uuid
-    E.parent = parent
-    return E
+    if type_ == D_DIR_T:    cls = Dir
+    elif type_ == D_FILE_T: cls = FileDirent
+    elif type_ == D_SYM_T:  cls = SymlinkDirent
+    elif type_ == D_HARD_T: cls = HardlinkDirent
+    else:                   cls = InvalidDirent
+    return cls(name, **kw)
 
   def encode(self):
     ''' Serialise to binary format.
@@ -174,10 +163,7 @@ class _Dirent(Transcriber):
         metadata = put_bss(meta.textencode())
     else:
       metadata = b''
-    if self.issym or self.ishardlink:
-      block = None
-    else:
-      block = self.block
+    block = self.block
     if block is None:
       flags |= F_NOBLOCK
       blockref = b''
@@ -203,21 +189,21 @@ class _Dirent(Transcriber):
     '''
     return id(self)
 
-  def transcribe_inner(self, T, fp):
+  def transcribe_inner(self, T, fp, attrs):
     if self.name:
-      T.transcribe(self.name, fp)
+      T.transcribe(self.name, fp=fp)
       fp.write(':')
-    attrs = OrderedDict()
-    attrs['type'] = self.type
     if self._uuid:
       attrs['uuid'] = self._uuid
-    attrs['meta'] = self.meta
-    attrs['data'] = self.block
+    if self.meta:
+      attrs['meta'] = self.meta
+    if self.block:
+      attrs['block'] = self.block
     T.transcribe_mapping(attrs, fp)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
-    ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
+    ''' Parse [name:]attrs from `s` at offset `offset`. Return _Dirent instance and new offset.
     '''
     name, offset2 = T.parse_qs(s, offset, optional=True)
     if name is None:
@@ -226,11 +212,14 @@ class _Dirent(Transcriber):
       if s[offset2] != ':':
         raise ValueError("offset %d: missing colon after name" % (offset2,))
       offset = offset2 + 1
-    offset, type_, uuid, block = T.parse_mapping(
-        s, offset, stopchar,
-        required=('type',),
-        optional=('uuid', 'block'))
-    return cls.from_components(type_, name, uuid, block)
+    attrs, offset = T.parse_mapping(s, offset, stopchar)
+    type_ = {
+        'F': D_FILE_T,
+        'D': D_DIR_T,
+        'SymLink': D_SYM_T,
+        'HardLink': D_HARD_T,
+    }.get(prefix)
+    return cls.from_components(type_, name, **attrs), offset
 
   @prop
   def uuid(self):
@@ -320,19 +309,29 @@ class _Dirent(Transcriber):
         if name != '.' and name != '..':
           entry.complete(S2, True)
 
-register_transcriber(_Dirent)
+register_transcriber(_Dirent, (
+    'INVALIDDirent',
+    'SymLink',
+    'HardLink',
+    'D',
+    'F',
+))
 
 class InvalidDirent(_Dirent):
 
-  def __init__(self, chunk, type_, name, meta=None, **kw):
+  transcribe_prefix = 'INVALIDDirent'
+
+  def __init__(self, name, *, chunk=None, **kw):
     ''' An invalid Dirent. Record the original data chunk for regurgitation later.
     '''
     _Dirent.__init__(
         self,
-        type_,
+        D_INVALID_T,
         name,
-        meta,
+        block=None,
+        chunk=None,
         **kw)
+    self.block = block
     self.chunk = chunk
 
   def __str__(self):
@@ -343,18 +342,30 @@ class InvalidDirent(_Dirent):
     '''
     return self.chunk
 
+  def transcribe_inner(self, T, fp):
+    attrs = OrderedDict()
+    attrs['block'] = self.block # data block if any
+    attrs['chunk'] = self.chunk # original encoded data
+    return super().transcribe_inner(T, fp, attrs)
+
 class SymlinkDirent(_Dirent):
 
-  def __init__(self, name, meta, block=None):
-    _Dirent.__init__(self, D_SYM_T, name, meta=meta)
+  transcribe_prefix = 'SymLink'
+
+  def __init__(self, name, *, block=None, **kw):
+    super().__init__(D_SYM_T, name, **kw)
     if block is not None:
-      raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s", block)
+    self.block = None
     if self.meta.pathref is None:
-      raise ValueError("SymlinkDirent: meta.pathref required")
+      raise ValueError("meta.pathref required")
 
   @property
   def pathref(self):
     return self.meta.pathref
+
+  def transcribe_inner(self, T, fp):
+    return super().transcribe_inner(T, fp, {})
 
 class HardlinkDirent(_Dirent):
   ''' A hard link.
@@ -366,12 +377,15 @@ class HardlinkDirent(_Dirent):
       in a HardlinkDirent it is a proxy for the local .meta.inum.
   '''
 
+  transcribe_prefix = 'HardLink'
+
   def __init__(self, name, meta, block=None):
     _Dirent.__init__(self, D_HARD_T, name, meta=meta)
     if block is not None:
-      raise ValueError("HardlinkDirent: block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s", block)
+    self.block = None
     if not hasattr(self.meta, 'inum'):
-      raise ValueError("HardlinkDirent: meta.inum required (no iref in meta=%r)" % (meta,))
+      raise ValueError("meta.inum required (no iref in meta=%r)" % (meta,))
 
   @property
   def inum(self):
@@ -384,6 +398,9 @@ class HardlinkDirent(_Dirent):
   def to_inum(cls, inum, name):
     return cls(name, {'iref': str(inum)})
 
+  def transcribe_inner(self, T, fp):
+    return super().transcribe_inner(T, fp, {})
+
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
@@ -393,8 +410,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
       maintain their own offsets in their file handle objects.
   '''
 
-  def __init__(self, name, meta=None, block=None):
-    _Dirent.__init__(self, D_FILE_T, name, meta=meta)
+  transcribe_prefix = 'F'
+
+  def __init__(self, name, block=None, **kw):
+    _Dirent.__init__(self, D_FILE_T, name, **kw)
     MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
@@ -520,6 +539,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
+  def transcribe_inner(self, T, fp):
+    return _Dirent.transcribe_inner(self, T, fp, {})
+
 class Dir(_Dirent):
   ''' A directory.
 
@@ -531,13 +553,13 @@ class Dir(_Dirent):
 
   transcribe_prefix = 'D'
 
-  def __init__(self, name, meta=None, parent=None, block=None):
+  def __init__(self, name, block=None, **kw):
     ''' Initialise this directory.
         `meta`: meta information
         `parent`: parent Dir
         `block`: pre-existing Block with initial Dir content
     '''
-    _Dirent.__init__(self, D_DIR_T, name, meta=meta)
+    super().__init__(D_DIR_T, name, **kw)
     if block is None:
       self._block = None
       self._entries = {}
@@ -545,7 +567,6 @@ class Dir(_Dirent):
       self._block = block
       self._entries = None
     self._unhandled_dirent_chunks = None
-    self.parent = parent
     self._changed = False
     self._lock = RLock()
 
@@ -834,6 +855,9 @@ class Dir(_Dirent):
         # new item
         # NB: we don't recurse into new Dirs, not needed
         self[name] = E2
+
+  def transcribe_inner(self, T, fp):
+    return _Dirent.transcribe_inner(self, T, fp, {})
 
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.
