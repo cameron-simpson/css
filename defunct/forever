@@ -20,7 +20,7 @@ usage="Usage:
 
 doshcmd=
 shcmd=
-delay=0
+delay=1
 failok=1
 max=0
 dotrace=
