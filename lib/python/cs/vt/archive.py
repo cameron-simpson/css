@@ -30,7 +30,7 @@ from .blockify import blockify, top_block_for
 from .dir import FileDirent, DirFTP
 from .file import filedata
 from .paths import resolve, walk
-from .transcribe import transcribe, parse
+from .transcribe import transcribe_s, parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -60,6 +60,7 @@ class _Archive(object):
   def __init__(self, arpath):
     self.path = arpath
     self._last = None
+    self._last_s = None
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
@@ -94,20 +95,39 @@ class _Archive(object):
           break
         yield when, E
 
-  def save(self, E, when=None):
-    ''' Save the supplied Dirent `E` with timestamp `when` (default now).
+  def save(self, E, when=None, previous=None, force=False):
+    ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
     '''
+    if isinstance(E, str):
+      etc = E
+    else:
+      etc = E.name
+    if not force:
+      if previous is None:
+        previous = self._last_s
+      if previous is not None:
+        # do not save if the previous transcription is unchanged
+        if isinstance(E, str):
+          Es = E
+        else:
+          Es = transcribe_s(E)
+        if Es == previous:
+          return Es
+        # use the transcription directly
+        E = Es
     if when is None:
       when = time.time()
     path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        self.write(fp, E, when=when, etc=E.name)
+        s = self.write(fp, E, when=when, etc=etc)
     self._last = when, E
+    self._last_s = s
+    return s
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
-    ''' Write a Dirent to an open archive file.
+    ''' Write a Dirent to an open archive file. Return the Dirent transcription.
         Archive lines have the form:
           isodatetime unixtime transcribe(dirent) dirent.name
        Note: does not flush the file.
@@ -117,15 +137,24 @@ class _Archive(object):
     # produce a local time with knowledge of its timezone offset
     dt = datetime.fromtimestamp(when).astimezone()
     assert dt.tzinfo is not None
-    fp.write(dt.isoformat())
+    # precompute strings to avoid corrupting the archive file
+    iso_s = dt.isoformat()
+    when_s = str(when)
+    if isinstance(E, str):
+      Es = E
+    else:
+      Es = transcribe_s(E)
+    etc_s = None if etc is None else unctrl(etc)
+    fp.write(iso_s)
     fp.write(' ')
-    fp.write(str(when))
+    fp.write(when_s)
     fp.write(' ')
-    transcribe(E, fp=fp)
+    fp.write(Es)
     if etc is not None:
       fp.write(' ')
-      fp.write(unctrl(etc))
+      fp.write(etc_s)
     fp.write('\n')
+    return Es
 
   @staticmethod
   @pfxgen
@@ -141,7 +170,7 @@ class _Archive(object):
           continue
         # allow optional trailing text, which will be the E.name part normally
         fields = line.split(None, 3)
-        isodate, unixtime, dent = fields[:3]
+        _, unixtime, dent = fields[:3]
         when = float(unixtime)
         E, offset = parse(dent)
         if offset != len(dent):
@@ -154,7 +183,7 @@ class _Archive(object):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in _Archive._parselines(fp, first_lineno=first_lineno):
+    for when, E in _Archive.parse(fp, first_lineno=first_lineno):
       return when, E
     return None, None
 
@@ -294,8 +323,8 @@ def _blockify_file(fp, E):
   data = None
   for B in E.block.leaves:
     data = fp.read(len(B))
-    if len(data) == 0:
-      # EOF
+    if not data:
+      # EOF from file, we're done
       return
     if len(data) != len(B):
       break
@@ -371,10 +400,10 @@ def copy_out_file(E, ospath, modes=None, log=None):
   B = E.block
   M = E.meta
   if ( modes.trust_size_mtime
-   and st is not None
-   and ( M.mtime is not None and M.mtime == st.st_mtime
-         and B.span == st.st_size
-       )
+       and st is not None
+       and ( M.mtime is not None and M.mtime == st.st_mtime
+             and B.span == st.st_size
+           )
      ):
     log("skip  %s (same size/mtime)", ospath)
     return
@@ -399,7 +428,7 @@ class ArchiveFTP(DirFTP):
     self.archive = Archive(arpath)
     if prompt is None:
       prompt = shortpath(arpath)
-    when, rootD = self.archive.last
+    _, rootD = self.archive.last
     self.rootD = rootD
     super().__init__(rootD, prompt=prompt)
 
