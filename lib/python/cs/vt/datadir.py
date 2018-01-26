@@ -418,7 +418,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def _add_datafilestate(self, F):
     ''' Add the supplied data file state `F` to the filemap, returning the filenum.
     '''
-    info("%s._add_datafilestate(F=%s)", self, F)
+    ##info("%s._add_datafilestate(F=%s)", self, F)
     filenum = F.filenum
     filemap = self._filemap
     filename = F.filename
