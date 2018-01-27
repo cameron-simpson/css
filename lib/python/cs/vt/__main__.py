@@ -623,6 +623,7 @@ class VTCmd:
         badopts = True
       else:
         mountpoint = spfx
+    mount_base = basename(mountpoint)
     if args:
       subpath = args.pop(0)
     else:
@@ -638,7 +639,7 @@ class VTCmd:
     with Pfx(special):
       A = Archive(special)
       if all_dates:
-        E = Dir(basename(mountpoint))
+        E = Dir(mount_base)
         for when, subD in A:
           E[datetime.fromtimestamp(when).isoformat()] = subD
       else:
@@ -652,13 +653,16 @@ class VTCmd:
           return 1
         # no "last entry" (==> first use) - make an empty directory
         if E is None:
-          E = Dir(basename(mountpoint))
+          E = Dir(mount_base)
           X("cmd_mount: new E=%s", E)
         else:
           ##dump_Dirent(E, recurse=True)
           if not E.isdir:
             error("expected directory, not file: %s", E)
             return 1
+          if E.name== '.':
+            info("rename %s from %r to %r", E, E.name, mount_base)
+            E.name = mount_base
       # import vtfuse before doing anything with side effects
       from .vtfuse import mount, umount
       with Pfx(mountpoint):
