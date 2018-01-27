@@ -623,7 +623,6 @@ class VTCmd:
         badopts = True
       else:
         mountpoint = spfx
-    mount_base = basename(mountpoint)
     if args:
       subpath = args.pop(0)
     else:
@@ -637,6 +636,7 @@ class VTCmd:
       readonly = True
     xit = 0
     with Pfx(special):
+      mount_base = basename(mountpoint)
       A = Archive(special)
       if all_dates:
         E = Dir(mount_base)
