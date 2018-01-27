@@ -149,13 +149,6 @@ class FileDataMappingProxy(object):
     self._worker = Thread(target=self._work)
     self._worker.start()
 
-  def _add_cachefile(self):
-    cachefile = RWFileBlockCache(dirpath=self.dirpath)
-    self.cachefiles.insert(0, cachefile)
-    if len(self.cachefiles) > self.max_cachefiles:
-      old_cachefile = self.cachefiles.pop()
-      old_cachefile.close()
-
   def close(self):
     ''' Shut down the cache.
         Stop the worker, close the file cache.
@@ -164,6 +157,13 @@ class FileDataMappingProxy(object):
     self._worker.join()
     for cachefile in self.cachefiles:
       cachefile.close()
+
+  def _add_cachefile(self):
+    cachefile = RWFileBlockCache(dirpath=self.dirpath)
+    self.cachefiles.insert(0, cachefile)
+    if len(self.cachefiles) > self.max_cachefiles:
+      old_cachefile = self.cachefiles.pop()
+      old_cachefile.close()
 
   def _getref(self, h):
     ''' Fetch a cache reference from self.saved, return None if missing.
