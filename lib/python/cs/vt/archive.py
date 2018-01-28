@@ -8,7 +8,7 @@
       isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
-    encoding of a Dirent.
+    transcription of a Dirent.
 '''
 
 from __future__ import print_function
@@ -23,13 +23,14 @@ from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
 from cs.logutils import info, warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
 from .dir import FileDirent, DirFTP
 from .file import filedata
-from .paths import decode_Dirent_text, resolve, walk
+from .paths import resolve, walk
+from .transcribe import transcribe_s, parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -59,6 +60,7 @@ class _Archive(object):
   def __init__(self, arpath):
     self.path = arpath
     self._last = None
+    self._last_s = None
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
@@ -76,64 +78,86 @@ class _Archive(object):
       self._last = last_entry
     return last_entry
 
+  @pfxgen
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
     '''
     path = self.path
-    # The funny control structure is because we're using Pfx in a generator.
-    # It needs to be set up and torn down between yields.
     with Pfx(path):
       try:
         fp = open(path)
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-    entries = self.parse(fp)
-    while True:
-      with Pfx(path):
-        when, E = next(entries)
+      entries = self.parse(fp)
+      for when, E in entries:
         if when is None and E is None:
           break
-      # note: yield _outside_ Pfx
-      yield when, E
+        yield when, E
 
-  def save(self, E, when=None):
-    ''' Save the supplied Dirent `E` with timestamp `when` (default now); returns the text form of `E`.
+  def save(self, E, when=None, previous=None, force=False):
+    ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
     '''
+    if isinstance(E, str):
+      etc = E
+    else:
+      etc = E.name
+    if not force:
+      if previous is None:
+        previous = self._last_s
+      if previous is not None:
+        # do not save if the previous transcription is unchanged
+        if isinstance(E, str):
+          Es = E
+        else:
+          Es = transcribe_s(E)
+        if Es == previous:
+          return Es
+        # use the transcription directly
+        E = Es
     if when is None:
       when = time.time()
     path = self.path
     with lockfile(path):
       with open(path, "a") as fp:
-        written = self.write(fp, E, when=when, etc=E.name)
+        s = self.write(fp, E, when=when, etc=etc)
     self._last = when, E
-    return written
+    self._last_s = s
+    return s
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
-    ''' Write a Dirent to an open archive file; return the textual form of `E` used.
+    ''' Write a Dirent to an open archive file. Return the Dirent transcription.
         Archive lines have the form:
-          isodatetime unixtime totext(dirent) dirent.name
+          isodatetime unixtime transcribe(dirent) dirent.name
        Note: does not flush the file.
     '''
-    encoded = _Archive.strfor_Dirent(E)
     if when is None:
       when = time.time()
     # produce a local time with knowledge of its timezone offset
     dt = datetime.fromtimestamp(when).astimezone()
     assert dt.tzinfo is not None
-    fp.write(dt.isoformat())
+    # precompute strings to avoid corrupting the archive file
+    iso_s = dt.isoformat()
+    when_s = str(when)
+    if isinstance(E, str):
+      Es = E
+    else:
+      Es = transcribe_s(E)
+    etc_s = None if etc is None else unctrl(etc)
+    fp.write(iso_s)
     fp.write(' ')
-    fp.write(str(when))
+    fp.write(when_s)
     fp.write(' ')
-    fp.write(encoded)
+    fp.write(Es)
     if etc is not None:
       fp.write(' ')
-      fp.write(unctrl(etc))
+      fp.write(etc_s)
     fp.write('\n')
-    return encoded
+    return Es
 
   @staticmethod
+  @pfxgen
   def parse(fp, first_lineno=1):
     ''' Parse lines from an open archive file, yield (when, E).
     '''
@@ -146,19 +170,20 @@ class _Archive(object):
           continue
         # allow optional trailing text, which will be the E.name part normally
         fields = line.split(None, 3)
-        isodate, unixtime, dent = fields[:3]
+        _, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E = decode_Dirent_text(dent)
+        E, offset = parse(dent)
+        if offset != len(dent):
+          warning("unparsed dirent text: %r", dent[offset:])
         info("when=%s, E=%s", when, E)
-      # note: yield _outside_ Pfx
-      yield when, E
+        yield when, E
 
   @staticmethod
   def read(fp, first_lineno=1):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in _Archive._parselines(fp, first_lineno=first_lineno):
+    for when, E in _Archive.parse(fp, first_lineno=first_lineno):
       return when, E
     return None, None
 
@@ -298,8 +323,8 @@ def _blockify_file(fp, E):
   data = None
   for B in E.block.leaves:
     data = fp.read(len(B))
-    if len(data) == 0:
-      # EOF
+    if not data:
+      # EOF from file, we're done
       return
     if len(data) != len(B):
       break
@@ -375,10 +400,10 @@ def copy_out_file(E, ospath, modes=None, log=None):
   B = E.block
   M = E.meta
   if ( modes.trust_size_mtime
-   and st is not None
-   and ( M.mtime is not None and M.mtime == st.st_mtime
-         and B.span == st.st_size
-       )
+       and st is not None
+       and ( M.mtime is not None and M.mtime == st.st_mtime
+             and B.span == st.st_size
+           )
      ):
     log("skip  %s (same size/mtime)", ospath)
     return
@@ -403,7 +428,7 @@ class ArchiveFTP(DirFTP):
     self.archive = Archive(arpath)
     if prompt is None:
       prompt = shortpath(arpath)
-    when, rootD = self.archive.last
+    _, rootD = self.archive.last
     self.rootD = rootD
     super().__init__(rootD, prompt=prompt)
 

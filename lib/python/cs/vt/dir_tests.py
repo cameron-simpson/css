@@ -8,7 +8,7 @@ from random import shuffle
 import sys
 import unittest
 from cs.randutils import randbool
-from .dir import FileDirent, Dir, decode_Dirent
+from .dir import FileDirent, Dir, _Dirent
 from .paths import decode_Dirent_text
 from .store import MappingStore
 
@@ -23,7 +23,8 @@ class TestAll(unittest.TestCase):
 
   def _round_trip_Dirent(self, D):
     encoded = D.encode()
-    D2, offset = decode_Dirent(encoded, 0)
+    D2, offset = _Dirent.from_bytes(encoded)
+    self.assertEqual(offset, len(encoded))
     self.assertEqual(D, D2)
     text_encoded = D.textencode()
     D2 = decode_Dirent_text(text_encoded)

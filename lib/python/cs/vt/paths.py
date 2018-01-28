@@ -13,9 +13,9 @@ def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Dirent, such as from
       Dirent.textencode(), and return the corresponding Dirent.
   '''
-  from .dir import decode_Dirent
+  from .dir import _Dirent
   data = fromtext(text)
-  E, offset = decode_Dirent(data, 0)
+  E, offset = _Dirent.from_bytes(data)
   if offset < len(data):
     raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
                      % (text, E, data[offset:]))

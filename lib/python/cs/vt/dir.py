@@ -1,7 +1,7 @@
 import os
 import os.path
 from cmd import Cmd
-from collections import namedtuple
+from collections import OrderedDict
 import errno
 from getopt import GetoptError
 import grp
@@ -13,25 +13,29 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.cmdutils import docmd
-from cs.logutils import debug, error, info, warning
-from cs.pfx import Pfx, XP
+from cs.logutils import debug, error, warning
+from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked
 from cs.x import X
-from . import totext, fromtext, SEP
+from . import totext, SEP
 from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
+from .transcribe import Transcriber, transcribe_s, transcribe_mapping, \
+                        parse_mapping, \
+                        register as register_transcriber
 
 uid_nobody = -1
 gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (_Dirent).
 
+D_INVALID_T = -1
 D_FILE_T = 0
 D_DIR_T = 1
 D_SYM_T = 2
@@ -52,13 +56,47 @@ F_HASNAME = 0x02
 F_NOBLOCK = 0x04
 F_HASUUID = 0x08
 
-class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid block')):
+class _Dirent(Transcriber):
+  ''' Incomplete base class for Dirent objects.
+  '''
+
+  def __init__(self, type_, name, meta=None, uuid=None, parent=None):
+    if not isinstance(type_, int):
+      raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
+    if name is not None and not isinstance(name, str):
+      raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
+    self.type = type_
+    self.name = name
+    self._uuid = uuid
+    if isinstance(meta, Meta):
+      if meta.E is not None and meta.E is not self:
+        warning("meta.E is %r, replacing with self %r", meta.E, self)
+      meta.E = self
+    else:
+      M = Meta(self)
+      if meta is None:
+        pass
+      elif isinstance(meta, str):
+        M.update_from_text(meta)
+      else:
+        raise ValueError("unsupported meta value: %r" % (meta,))
+      meta = M
+    self.meta = meta
+    self.parent = parent
+
+  def __repr__(self):
+    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
+                               id(self),
+                               D_type2str(self.type),
+                               self.name,
+                               self.meta)
 
   @classmethod
   def from_bytes(cls, data, offset=0):
-    ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
+    ''' Unserialise a serialised Dirent, return (Dirent, offset).
         Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
     '''
+    offset0 = offset
     type_, offset = get_bs(data, offset)
     flags, offset = get_bs(data, offset)
     if flags & F_HASNAME:
@@ -83,11 +121,30 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid b
       block = None
     else:
       block, offset = decodeBlock(data, offset)
-    E = cls(type_, name, metatext, uu, block)
+    try:
+      E = cls.from_components(type_, name, meta=metatext, uuid=uu, block=block)
+    except ValueError as e:
+      warning("%r: invalid Dirent components, marking Dirent as invalid: %s",
+              name, e)
+      E = InvalidDirent(
+          type_, name,
+          chunk=data[offset0:offset],
+          meta=metatext, uuid=uu, block=block)
     return E, offset
 
+  @staticmethod
+  def from_components(type_, name, **kw):
+    ''' Factory returning a _Dirent instance.
+    '''
+    if type_ == D_DIR_T:    cls = Dir
+    elif type_ == D_FILE_T: cls = FileDirent
+    elif type_ == D_SYM_T:  cls = SymlinkDirent
+    elif type_ == D_HARD_T: cls = HardlinkDirent
+    else:                   cls = InvalidDirent
+    return cls(name, **kw)
+
   def encode(self):
-    ''' Serialise the components.
+    ''' Serialise to binary format.
         Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)][uuid]blockref
     '''
     flags = 0
@@ -97,7 +154,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid b
       namedata = put_bsdata(name.encode())
     else:
       namedata = b''
-    meta = self.metatext
+    meta = self.meta
     if meta:
       flags |= F_HASMETA
       if isinstance(meta, str):
@@ -112,7 +169,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid b
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    uu = self.uuid
+    uu = self._uuid
     if uu is None:
       uubs = b''
     else:
@@ -127,76 +184,42 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext uuid b
         + blockref
     )
 
-def decode_Dirent(data, offset):
-  ''' Unserialise a Dirent, return (Dirent, offset).
-  '''
-  offset0 = offset
-  dc, offset = DirentComponents.from_bytes(data, offset)
-  type_ = dc.type
-  name = dc.name
-  metatext = dc.metatext
-  uu = dc.uuid
-  block = dc.block
-  try:
-    if type_ == D_DIR_T:
-      E = Dir(name, metatext=metatext, parent=None, block=block)
-    elif type_ == D_FILE_T:
-      E = FileDirent(name, metatext=metatext, block=block)
-    elif type_ == D_SYM_T:
-      E = SymlinkDirent(name, metatext=metatext)
-    elif type_ == D_HARD_T:
-      E = HardlinkDirent(name, metatext=metatext)
-    else:
-      E = _Dirent(type_, name, metatext=metatext, block=block)
-    E._uuid = uu
-  except ValueError as e:
-    warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
-            name, e, dc)
-    E = InvalidDirent(dc, data[offset0:offset])
-  return E, offset
-
-def decode_Dirents(dirdata, offset=0):
-  ''' Decode and yield all the Dirents from the supplied bytes `dirdata`.
-      Return invalid Dirent data chunks and valid Dirents.
-  '''
-  while offset < len(dirdata):
-    E, offset = decode_Dirent(dirdata, offset)
-    yield E
-
-class _Dirent(object):
-  ''' Incomplete base class for Dirent objects.
-  '''
-
-  def __init__(self, type_, name, metatext=None, parent=None):
-    if not isinstance(type_, int):
-      raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
-    if name is not None and not isinstance(name, str):
-      raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
-    self.type = type_
-    self.name = name
-    self._uuid = None
-    self.meta = Meta(self)
-    if metatext is not None:
-      if isinstance(metatext, str):
-        self.meta.update_from_text(metatext)
-      else:
-        self.meta.update_from_items(metatext.items())
-    self.parent = parent
-
-  def __str__(self):
-    return "%s:%d:%r:type=%s:%s" % (self.__class__.__name__, id(self), self.name, self.type, self.meta.textencode())
-
-  def __repr__(self):
-    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
-                               id(self),
-                               D_type2str(self.type),
-                               self.name,
-                               self.meta)
-
   def __hash__(self):
     ''' Allows collecting _Dirents in a set.
     '''
     return id(self)
+
+  def transcribe_inner(self, T, fp, attrs):
+    if self.name:
+      T.transcribe(self.name, fp=fp)
+      fp.write(':')
+    if self._uuid:
+      attrs['uuid'] = self._uuid
+    if self.meta:
+      attrs['meta'] = self.meta
+    if self.block:
+      attrs['block'] = self.block
+    T.transcribe_mapping(attrs, fp)
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
+    ''' Parse [name:]attrs from `s` at offset `offset`. Return _Dirent instance and new offset.
+    '''
+    name, offset2 = T.parse_qs(s, offset, optional=True)
+    if name is None:
+      name = ''
+    else:
+      if s[offset2] != ':':
+        raise ValueError("offset %d: missing colon after name" % (offset2,))
+      offset = offset2 + 1
+    attrs, offset = T.parse_mapping(s, offset, stopchar)
+    type_ = {
+        'F': D_FILE_T,
+        'D': D_DIR_T,
+        'SymLink': D_SYM_T,
+        'HardLink': D_HARD_T,
+    }.get(prefix)
+    return cls.from_components(type_, name, **attrs), offset
 
   @prop
   def uuid(self):
@@ -248,20 +271,6 @@ class _Dirent(object):
     '''
     return self.type == D_HARD_T
 
-  def encode(self):
-    ''' Serialise this dirent.
-        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta][uuid]block
-    '''
-    type_ = self.type
-    name = self.name
-    meta = self.meta
-    if self.issym or self.ishardlink:
-      block = None
-    else:
-      block = self.block
-    uu = self.uuid
-    return DirentComponents(type_, name, meta, uu, block).encode()
-
   def textencode(self):
     ''' Serialise the dirent as text.
     '''
@@ -300,21 +309,30 @@ class _Dirent(object):
         if name != '.' and name != '..':
           entry.complete(S2, True)
 
+register_transcriber(_Dirent, (
+    'INVALIDDirent',
+    'SymLink',
+    'HardLink',
+    'D',
+    'F',
+))
+
 class InvalidDirent(_Dirent):
 
-  def __init__(self, components, chunk):
+  transcribe_prefix = 'INVALIDDirent'
+
+  def __init__(self, name, *, chunk=None, **kw):
     ''' An invalid Dirent. Record the original data chunk for regurgitation later.
     '''
     _Dirent.__init__(
         self,
-        components.type,
-        components.name,
-        metatext=components.metatext)
-    self.components = components
+        D_INVALID_T,
+        name,
+        block=None,
+        chunk=None,
+        **kw)
+    self.block = block
     self.chunk = chunk
-    self._uuid = components.uuid
-    self.block = components.block
-    self._meta = None
 
   def __str__(self):
     return '<InvalidDirent:%s:%s>' % (self.components, texthexify(self.chunk))
@@ -324,30 +342,30 @@ class InvalidDirent(_Dirent):
     '''
     return self.chunk
 
-  @property
-  def meta(self):
-    M = self._meta
-    if M is None:
-      M = self.metatext
-      if M is None:
-        M = Meta(self)
-      elif isinstance(M, str):
-        M = Meta.from_text(M, self)
-      self._meta = M
-    return M
+  def transcribe_inner(self, T, fp):
+    attrs = OrderedDict()
+    attrs['block'] = self.block # data block if any
+    attrs['chunk'] = self.chunk # original encoded data
+    return super().transcribe_inner(T, fp, attrs)
 
 class SymlinkDirent(_Dirent):
 
-  def __init__(self, name, metatext, block=None):
-    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
+  transcribe_prefix = 'SymLink'
+
+  def __init__(self, name, *, block=None, **kw):
+    super().__init__(D_SYM_T, name, **kw)
     if block is not None:
-      raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s", block)
+    self.block = None
     if self.meta.pathref is None:
-      raise ValueError("SymlinkDirent: meta.pathref required")
+      raise ValueError("meta.pathref required")
 
   @property
   def pathref(self):
     return self.meta.pathref
+
+  def transcribe_inner(self, T, fp):
+    return super().transcribe_inner(T, fp, {})
 
 class HardlinkDirent(_Dirent):
   ''' A hard link.
@@ -359,12 +377,15 @@ class HardlinkDirent(_Dirent):
       in a HardlinkDirent it is a proxy for the local .meta.inum.
   '''
 
-  def __init__(self, name, metatext, block=None):
-    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
+  transcribe_prefix = 'HardLink'
+
+  def __init__(self, name, meta, block=None):
+    _Dirent.__init__(self, D_HARD_T, name, meta=meta)
     if block is not None:
-      raise ValueError("HardlinkDirent: block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s", block)
+    self.block = None
     if not hasattr(self.meta, 'inum'):
-      raise ValueError("HardlinkDirent: meta.inum required (no iref in metatext=%r)" % (metatext,))
+      raise ValueError("meta.inum required (no iref in meta=%r)" % (meta,))
 
   @property
   def inum(self):
@@ -377,6 +398,9 @@ class HardlinkDirent(_Dirent):
   def to_inum(cls, inum, name):
     return cls(name, {'iref': str(inum)})
 
+  def transcribe_inner(self, T, fp):
+    return super().transcribe_inner(T, fp, {})
+
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
@@ -386,12 +410,15 @@ class FileDirent(_Dirent, MultiOpenMixin):
       maintain their own offsets in their file handle objects.
   '''
 
-  def __init__(self, name, metatext=None, block=None):
-    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+  transcribe_prefix = 'F'
+
+  def __init__(self, name, block=None, **kw):
+    _Dirent.__init__(self, D_FILE_T, name, **kw)
     MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
     self._open_file = None
+    self._lock = RLock()
     self._block = block
     self._check()
 
@@ -512,6 +539,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
+  def transcribe_inner(self, T, fp):
+    return _Dirent.transcribe_inner(self, T, fp, {})
+
 class Dir(_Dirent):
   ''' A directory.
 
@@ -521,13 +551,15 @@ class Dir(_Dirent):
                 setting the flag on every file.write etc.
   '''
 
-  def __init__(self, name, metatext=None, parent=None, block=None):
+  transcribe_prefix = 'D'
+
+  def __init__(self, name, block=None, **kw):
     ''' Initialise this directory.
-        `metatext`: meta information
+        `meta`: meta information
         `parent`: parent Dir
         `block`: pre-existing Block with initial Dir content
     '''
-    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
+    super().__init__(D_DIR_T, name, **kw)
     if block is None:
       self._block = None
       self._entries = {}
@@ -535,12 +567,8 @@ class Dir(_Dirent):
       self._block = block
       self._entries = None
     self._unhandled_dirent_chunks = None
-    self.parent = parent
     self._changed = False
     self._lock = RLock()
-
-  def __str__(self):
-    return "Dir:%d:%r" % (id(self), self.path)
 
   @prop
   def changed(self):
@@ -596,7 +624,10 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      for E in decode_Dirents(self._block.all_data()):
+      offset = 0
+      data = self._block.all_data()
+      while offset < len(data):
+        E, offset = _Dirent.from_bytes(data, offset)
         E.parent = self
         emap[E.name] = E
       self._entries = emap
@@ -605,7 +636,7 @@ class Dir(_Dirent):
   @property
   def size(self):
     ''' The length of a Dir is the number of entries it contains.
-        This property is used mostly for stat calls and 
+        This property is used mostly for stat calls.
     '''
     return len(self.entries)
 
@@ -616,7 +647,7 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      X("Dir(%r): recompute block (_block=%s,changed=%s) ...",self.name, self._block, self.changed)
+      X("Dir(%r): recompute block (_block=%s,changed=%s) ...", self.name, self._block, self.changed)
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
@@ -824,6 +855,9 @@ class Dir(_Dirent):
         # new item
         # NB: we don't recurse into new Dirs, not needed
         self[name] = E2
+
+  def transcribe_inner(self, T, fp):
+    return _Dirent.transcribe_inner(self, T, fp, {})
 
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.

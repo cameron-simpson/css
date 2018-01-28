@@ -129,12 +129,14 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
         We dispatch the sync in the background within a lock.
         `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
+    old_file = self._file
+    old_syncer = self._syncer
+    # only do work if there are new data in the file or pending syncs
+    if not old_syncer and not old_file.front_range:
+      return
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
-      old_file = self._file
-      # only do work if there are new data in the file
-      if not old_file.front_range:
-        return
       def update_store():
+        # wait for previous sync to complete, if any
         if old_syncer:
           old_syncer.join()
         old_block = old_file.back_file.block
@@ -152,8 +154,6 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
           # if we're still current, update the front settings
           if self._file is new_file:
             self._reset(B)
-        if old_syncer:
-          old_syncer.join()
         S.close()
       S = defaults.S
       T = PfxThread(name="%s.flush(): update_store" % (self,),
@@ -161,7 +161,6 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       # push the current state as the backing file
       # and initiate a sync to the Store
       old_file.read_only = True
-      old_syncer = self._syncer
       new_file = BackedFile(old_file)
       self._syncer = T
       self._file = new_file

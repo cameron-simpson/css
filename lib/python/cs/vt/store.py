@@ -22,7 +22,6 @@ from cs.progress import Progress
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report
 from cs.seq import Seq
-from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
@@ -105,6 +104,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
         ','.join([repr(self.name)] + params)
     )
 
+  __repr__ = __str__
+
   # Basic support for putting Stores in sets.
   def __hash__(self):
     return id(self)
@@ -181,7 +182,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   def bg(self, func, *a, **kw):
     ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
     '''
-    X("Store.bg(func=%s)", func)
     R = Result(name="%s:%s" % (self, func))
     def func2():
       with self:
@@ -201,35 +201,35 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def add_bg(self, data):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def get(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def get_bg(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def contains(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def contains_bg(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def flush(self):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def flush_bg(self):
-    pass
+    raise NotImplemented
 
   ##########################################################################
   # Archive support.
@@ -457,6 +457,9 @@ class ProxyStore(BasicStoreSync):
     ''' Add a data chunk to the save Stores.
     '''
     if not self.save:
+      hashcode = self.hash(data)
+      if hashcode in self:
+        return hashcode
       raise RuntimeError("add but no save Stores")
     hashcode = None
     for S, result in self._multicall(self.save, 'add_bg', (data,)):
@@ -509,14 +512,12 @@ class DataDirStore(MappingStore):
     self._datadir = datadir
 
   def startup(self, **kw):
-    X("DataDirStore.startup: _datadir.open...")
     self._datadir.open()
     super().startup(**kw)
 
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
-    X("DataDirStore.shutdown: _datadir.close...")
 
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
@@ -524,7 +525,6 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
       must be included as a block source in addition to the core
       platonic Store.
   '''
-  X("name=%r, statedirpath=%r, a=%r", name, statedirpath, a)
   if meta_store is None:
     return _PlatonicStore(name, statedirpath, *a, **kw)
   return ProxyStore(
@@ -558,14 +558,12 @@ class _PlatonicStore(MappingStore):
     self.readonly = True
 
   def startup(self, **kw):
-    X("PlatonicStore.startup: _datadir.open...")
     self._datadir.open()
     super().startup(**kw)
 
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
-    X("PlatonicStore.shutdown: _datadir.close...")
 
 class _ProgressStoreTemplateMapping(object):
 

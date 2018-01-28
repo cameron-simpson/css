@@ -27,7 +27,7 @@ from cs.threads import locked
 from cs.x import X
 from . import defaults
 from .debug import dump_Dirent
-from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
+from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, _Dirent
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 from .store import MissingHashcodeError
@@ -269,7 +269,7 @@ class Inodes(object):
       allocated.add(start, end)
       hardlinked.add(start, end)
     # load the Dir containing the hardlinked Dirents
-    hardlinked_dir, offset1 = decode_Dirent(idata, offset1)
+    hardlinked_dir, offset1 = _Dirent.from_bytes(idata, offset1)
     if offset1 < len(idata):
       warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
     return hardlinked_dir, hardlinked

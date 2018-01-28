@@ -27,7 +27,7 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 SEP = '/'
 
-class _ventiDefaults(threading.local):
+class _Defaults(threading.local):
   ''' Per-thread default store stack.
       A Store's __enter__/__exit__ methods push/pop that store
       from the default.
@@ -48,7 +48,7 @@ class _ventiDefaults(threading.local):
     ##X("POP STORE %s => %s", defaults.S, oldS)
     defaults.S = oldS
 
-defaults = _ventiDefaults()
+defaults = _Defaults()
 
 def fromtext(s):
   ''' Return raw byte array from text/hexadecimal string.
