@@ -85,15 +85,16 @@ class _Archive(object):
     path = self.path
     with Pfx(path):
       try:
-        fp = open(path)
+        with open(path) as fp:
+          entries = self.parse(fp)
+          for when, E in entries:
+            if when is None and E is None:
+              break
+            yield when, E
       except OSError as e:
-        if e.errno != errno.ENOENT:
-          raise
-      entries = self.parse(fp)
-      for when, E in entries:
-        if when is None and E is None:
-          break
-        yield when, E
+        if e.errno == errno.ENOENT:
+          return
+        raise
 
   def save(self, E, when=None, previous=None, force=False):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
