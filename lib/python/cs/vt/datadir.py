@@ -937,12 +937,29 @@ class PlatonicDir(_FilesDir):
       need_save = False
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
-        for dirpath, dirnames, filenames in os.walk(datadirpath):
+        seen = set()
+        for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
           if self.cancelled or self.flag_scan_disable:
             break
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
-            dirnames[:] = filter(lambda name: not self.exclude_dir(joinpath(rdirpath, name)), dirnames)
+            pruned_dirnames = []
+            for dname in dirnames:
+              if self.exclude_dir(joinpath(rdirpath, dname)):
+                continue
+              subdirpath = joinpath(dirpath, dname)
+              try:
+                S = os.stat(subdirpath)
+              except OSError as e:
+                warning("stat(%r): %s, skipping", subdirpath, e)
+                continue
+              ino = S.st_dev, S.st_ino
+              if ino in seen:
+                warning("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
+                continue
+              seen.add(ino)
+              pruned_dirnames.append(dname)
+            dirnames[:] = pruned_dirnames
             if meta_store is not None:
               with meta_store:
                 D = topdir.makedirs(rdirpath, force=True)

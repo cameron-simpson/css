@@ -44,6 +44,7 @@ from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
+from .transcribe import parse
 
 def main(argv):
   return VTCmd().main(argv)
@@ -74,7 +75,7 @@ class VTCmd:
     ftp archive.vt
     import [-oW] path {-|archive.vt}
     ls [-R] dirrefs...
-    mount [-a] [-o {append_only,readonly}] [-r] archive.vt [mountpoint [subpath]]
+    mount [-a] [-o {append_only,readonly}] [-r] {Dir|archive.vt} [mountpoint [subpath]]
       -a  All dates. Implies readonly.
       -o options
           Mount options:
@@ -605,15 +606,36 @@ class VTCmd:
           readonly = True
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
+    # special is either a D{dir} or an archive pathname
+    A = None            # becomes not None for a pathname
+    specialD = None     # becomes not None for a D{dir}
     try:
       special = args.pop(0)
     except IndexError:
       error("missing special")
       badopts = True
     else:
-      if not isfilepath(special):
-        error("not a file: %r", special)
-        badopts = True
+      with Pfx("special %r", special):
+        if special.startswith('D{') and special.endswith('}'):
+          # D{dir}
+          try:
+            D, offset = parse(special)
+          except ValueError as e:
+            error("does not seem to be a Dir transcription: %s", e)
+          else:
+            if offset != len(special):
+              error("unparsed text: %r", special[offset:])
+            elif not isinstance(D, Dir):
+              error("does not seem to be a Dir transcription, looks like a %s", type(D))
+            else:
+              specialD = D
+          if specialD is None:
+            badopts = True
+        else:
+          # pathname to archive file
+          if not isfilepath(special):
+            error("not a file: %r", special)
+            badopts = True
     if args:
       mountpoint = args.pop(0)
     else:
@@ -635,34 +657,39 @@ class VTCmd:
     if all_dates:
       readonly = True
     xit = 0
+    mount_base = basename(mountpoint)
     with Pfx(special):
-      mount_base = basename(mountpoint)
-      A = Archive(special)
-      if all_dates:
-        E = Dir(mount_base)
-        for when, subD in A:
-          E[datetime.fromtimestamp(when).isoformat()] = subD
+      if specialD is not None:
+        # D{dir}
+        E = specialD
       else:
-        try:
-          when, E = A.last
-        except OSError as e:
-          error("can't access special: %s", e)
-          return 1
-        except ValueError as e:
-          error("invalid contents: %s", e)
-          return 1
-        # no "last entry" (==> first use) - make an empty directory
-        if E is None:
+        # pathname
+        A = Archive(special)
+        if all_dates:
           E = Dir(mount_base)
-          X("cmd_mount: new E=%s", E)
+          for when, subD in A:
+            E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
-          ##dump_Dirent(E, recurse=True)
-          if not E.isdir:
-            error("expected directory, not file: %s", E)
+          try:
+            when, E = A.last
+          except OSError as e:
+            error("can't access special: %s", e)
             return 1
-          if E.name== '.':
-            info("rename %s from %r to %r", E, E.name, mount_base)
-            E.name = mount_base
+          except ValueError as e:
+            error("invalid contents: %s", e)
+            return 1
+          # no "last entry" (==> first use) - make an empty directory
+          if E is None:
+            E = Dir(mount_base)
+            X("cmd_mount: new E=%s", E)
+          else:
+            ##dump_Dirent(E, recurse=True)
+            if not E.isdir:
+              error("expected directory, not file: %s", E)
+              return 1
+      if E.name== '.':
+        info("rename %s from %r to %r", E, E.name, mount_base)
+        E.name = mount_base
       # import vtfuse before doing anything with side effects
       from .vtfuse import mount, umount
       with Pfx(mountpoint):
