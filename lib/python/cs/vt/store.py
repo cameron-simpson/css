@@ -459,6 +459,9 @@ class ProxyStore(BasicStoreSync):
     ''' Add a data chunk to the save Stores.
     '''
     if not self.save:
+      hashcode = self.hash(data)
+      if hashcode in self:
+        return hashcode
       raise RuntimeError("add but no save Stores")
     hashcode = None
     for S, result in self._multicall(self.save, 'add_bg', (data,)):
