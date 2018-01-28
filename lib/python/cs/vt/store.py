@@ -22,7 +22,6 @@ from cs.progress import Progress
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report
 from cs.seq import Seq
-from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
@@ -183,7 +182,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   def bg(self, func, *a, **kw):
     ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
     '''
-    X("Store.bg(func=%s)", func)
     R = Result(name="%s:%s" % (self, func))
     def func2():
       with self:
@@ -514,14 +512,12 @@ class DataDirStore(MappingStore):
     self._datadir = datadir
 
   def startup(self, **kw):
-    X("DataDirStore.startup: _datadir.open...")
     self._datadir.open()
     super().startup(**kw)
 
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
-    X("DataDirStore.shutdown: _datadir.close...")
 
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
@@ -529,7 +525,6 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
       must be included as a block source in addition to the core
       platonic Store.
   '''
-  X("name=%r, statedirpath=%r, a=%r", name, statedirpath, a)
   if meta_store is None:
     return _PlatonicStore(name, statedirpath, *a, **kw)
   return ProxyStore(
@@ -563,14 +558,12 @@ class _PlatonicStore(MappingStore):
     self.readonly = True
 
   def startup(self, **kw):
-    X("PlatonicStore.startup: _datadir.open...")
     self._datadir.open()
     super().startup(**kw)
 
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
-    X("PlatonicStore.shutdown: _datadir.close...")
 
 class _ProgressStoreTemplateMapping(object):
 
