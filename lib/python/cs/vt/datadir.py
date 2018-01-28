@@ -221,9 +221,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       else:
         raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
 
-  def _indexclass(self, preferred_indexclass=None):
-    return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
-
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
@@ -236,6 +233,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                 self.indexclass)
            )
 
+  def _indexclass(self, preferred_indexclass=None):
+    return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
+
   def spec(self):
     ''' Return a datadir_spec for this DataDirMapping.
     '''
@@ -243,8 +243,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                       self.hashclass.HASHNAME,
                       str(self.statedirpath),
                       str(self.datadirpath)) )
-
-  __str__ = spec
 
   def startup(self):
     self.runstate.start()
@@ -965,7 +963,6 @@ class PlatonicDir(_FilesDir):
                   try:
                     F = filemap[rfilepath]
                   except KeyError:
-                    info("ADD")
                     filenum = self._add_datafile(rfilepath)
                     F = filemap[filenum]
                     need_save = True
