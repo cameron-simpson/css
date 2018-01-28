@@ -132,7 +132,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     old_file = self._file
     old_syncer = self._syncer
     # only do work if there are new data in the file or pending syncs
-    if not old_syncher and not old_file.front_range:
+    if not old_syncer and not old_file.front_range:
       return
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       def update_store():
