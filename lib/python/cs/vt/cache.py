@@ -35,7 +35,7 @@ class FileCacheStore(BasicStoreSync):
           time
         `dirpath`: directory to hold the cache files
     '''
-    BasicStoreSync.__init__(self, name, **kw)
+    super().__init__(name, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
     self.cache = FileDataMappingProxy(
@@ -63,10 +63,12 @@ class FileCacheStore(BasicStoreSync):
       if old_backend:
         old_backend.close()
       self._backend = new_backend
+      self._attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
 
   def startup(self):
+    super().startup()
     if self.backend:
       self.backend.open()
 
@@ -74,6 +76,7 @@ class FileCacheStore(BasicStoreSync):
     self.cache.close()
     if self.backend:
       self.backend.close()
+    super().shutdown()
 
   def flush(self):
     pass
