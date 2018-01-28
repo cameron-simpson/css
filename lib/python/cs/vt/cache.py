@@ -159,6 +159,8 @@ class FileDataMappingProxy(object):
     '''
     self._workQ.close()
     self._worker.join()
+    if self.cached:
+      error("blocks still in memory cache: %r", self.cached)
     for cachefile in self.cachefiles:
       cachefile.close()
 
