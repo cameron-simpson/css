@@ -225,12 +225,13 @@ class FileDataMappingProxy(object):
         # straight from memory cache
         return data
     # not in memory or file cache: fetch from backend, queue store into cache
-    if not self.backend:
+    backend = self.backend
+    if not backend:
       raise KeyError('no backend: h=%s' % (h,))
-    data = self.backend[h]
+    data = backend[h]
     with self._lock:
       self.cached[h] = data
-    self._workQ.put( (h, data) )
+    self._workQ.put( (h, data, False) )
     return data
 
   def __setitem__(self, h, data):
@@ -246,10 +247,10 @@ class FileDataMappingProxy(object):
       # save in memory cache
       self.cached[h] = data
     # queue for file cache and backend
-    self._workQ.put( (h, data) )
+    self._workQ.put( (h, data, True) )
 
   def _work(self):
-    for h, data in self._workQ:
+    for h, data, in_backend in self._workQ:
       with self._lock:
         if self._getref(h):
           # already in file cache, therefore already sent to backend
@@ -267,7 +268,8 @@ class FileDataMappingProxy(object):
         if offset + len(data) >= self.max_cachefile_size:
           self._add_cachefile()
       # store into the backend
-      self.backend[h] = data
+      if not in_backend:
+        self.backend[h] = data
 
 if __name__ == '__main__':
   from .cache_tests import selftest
