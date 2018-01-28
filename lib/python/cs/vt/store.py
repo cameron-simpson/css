@@ -203,35 +203,35 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def add_bg(self, data):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def get(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def get_bg(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def contains(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def contains_bg(self, h):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def flush(self):
-    pass
+    raise NotImplemented
 
   @abstractmethod
   def flush_bg(self):
-    pass
+    raise NotImplemented
 
   ##########################################################################
   # Archive support.
