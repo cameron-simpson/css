@@ -8,11 +8,7 @@ from .block import BlockType
 from .dir import InvalidDirent
 
 def dump_Block(block, indent=''):
-  X("%s%s %s %d bytes",
-    indent,
-    hexify(block.hashcode),
-    "indirect" if block.indirect else "direct",
-    len(block))
+  X("%s%s", indent, block)
   if block.indirect:
     indent += '  '
     subblocks = block.subblocks()
@@ -22,24 +18,7 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False, not_dir=False):
-  if isinstance(E, InvalidDirent):
-    details = '<INVALID:%s:%s>' % (E.components, texthexify(E.chunk))
-  elif E.issym:
-    details = '-> ' + repr(E.pathref)
-  elif E.ishardlink:
-    details = 'inode ' + str(E.inum)
-  elif E.block.type == BlockType.BT_LITERAL:
-    details = "literal(%r)" % (E.block.data,)
-  else:
-    details = hexify(E.block.hashcode)
-  if E.isfile:
-    details += " %s  size=%d meta=%s block=%s" % (indent, len(E.block), E.meta.textencode(), E.block)
-  X("%s%s %r %s",
-    indent,
-    'd' if E.isdir else '-',
-    E.name,
-    details,
-  )
+  X("%s%s", indent, E)
   if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):
