@@ -63,6 +63,7 @@ class FileCacheStore(BasicStoreSync):
       if old_backend:
         old_backend.close()
       self._backend = new_backend
+      self.cache.backend = new_backend
       self._attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
