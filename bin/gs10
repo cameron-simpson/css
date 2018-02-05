@@ -4,9 +4,10 @@
 #	- Cameron Simpson <cs@cskk.id.au> 12aug2001
 #
 
-cmd=`basename "$0"`
+set -ue
 
-[ -n "$S10PORT" ] || { S10PORT=/dev/ttyS1; export S10PORT; }
-[ -n "$S10SPEED" ] || { S10SPEED=115200; export S10PORT; }
+: ${S10PORT:=/dev/ttyS1}
+: ${S10SPEED:=115200}
 
-exec set-x s10sh -d "$S10PORT" -s "$S10SPEED" -g -L ${1+"$@"}
+set -x
+exec s10sh -d "$S10PORT" -s "$S10SPEED" -g -L ${1+"$@"}
