@@ -24,23 +24,27 @@ do
     [a-z]*:*)
       type=$( expr "x$lintfile" : 'x\([a-z][^:]*\):.*' )
       tail=$( expr "x$lintfile" : 'x[a-z][^:]*:\(.*\)' )
-      if [ -f "$tail" ]
-      then  lintfile=$tail
-      else  type=
-      fi
+      [ -f "$tail" ] && lintfile=$tail
       ;;
   esac
   if [ -z "$type" ]
   then
     case "$lintfile" in
       *.json | *.go | *.php | *.py )
-        type=$( expr "x$lintfile" : 'x.*\.([a-z][a-z]0-9]*\)' )
+        type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
+        ;;
+      *.pl | *.pm )
+        type=pl
+        ;;
+      *.py)
+        type=py
         ;;
     esac
   fi
   if [ -z "$type" ] && magic=$( file "$lintfile" )
   then
     case "$magic" in
+      *'perl script'*)          type=pl ;;
       *'python script'*)        type=py ;;
       *'POSIX shell script'*)   type=sh ;;
     esac
