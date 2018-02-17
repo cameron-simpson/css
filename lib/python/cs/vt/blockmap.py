@@ -18,6 +18,7 @@ import sys
 from tempfile import TemporaryFile
 from threading import Thread
 from cs.resources import RunStateMixin
+from cs.x import X
 from . import defaults
 
 # the record format uses 4 byte integer offsets
@@ -154,16 +155,14 @@ class BlockMap(RunStateMixin):
   def close(self):
     ''' Release the resources associated with the BlockMap.
     '''
-    def on_end():
-      maps = self.maps
-      for i in range(len(maps)-1):
-        submap = maps[i]
-        if submap is not None:
-          submap.close()
-          maps[i] = None
-    self.runstate.notify_end.add(on_end)
     self.cancel()
     self.join()
+    maps = self.maps
+    for i in range(len(maps)-1):
+      submap = maps[i]
+      if submap is not None:
+        submap.close()
+        maps[i] = None
 
   def _load_maps(self):
     ''' Walk the block tree assembling the mapping.
@@ -254,6 +253,21 @@ class BlockMap(RunStateMixin):
     if span < 0:
       raise ValueError("span(%d) should be >= 0" % (span,))
     if span == 0:
+      return
+    mapped_to = self.mapped_to
+    if mapped_to < offset + span:
+      X("PARTIALLY MAPPED: mapped_to=%d, offset=%d, span=%d", mapped_to, offset, span)
+      # a portion of the span is outside the mapped range
+      mapped_span = mapped_to - offset
+      if mapped_span > 0:
+        # a leading portion is inside the mapped range
+        yield from self.chunks(offset, mapped_span)
+        span -= mapped_span
+        offset += mapped_span
+      # fetch the unmapped data by traversing the Block tree
+      X("get block.chunks: offst=%d, span=%d, offset+span=%d",
+        offset, span, offset+span)
+      yield from self.block.chunks(offset, offset + span)
       return
     S = self.S
     hashclass = S.hashclass
