@@ -5,7 +5,7 @@ import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import D, error, debug
+from cs.logutils import D, error, warning, debug
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
@@ -295,7 +295,6 @@ class _Block(Transcriber):
     elif self.span > 0:
       yield self
 
-  @property
   def chunks(self, start=None, end=None):
     ''' Generator yielding data from the direct blocks.
     '''
@@ -321,7 +320,7 @@ class _Block(Transcriber):
         substart = max(0, start - offset)
         subend = min(sublen, end - offset)
         if substart < subend:
-          yield from B.slices(substart, subend):
+          yield from B.slices(substart, subend)
         offset += sublen
         if offset >= end:
           break
@@ -384,7 +383,7 @@ class _Block(Transcriber):
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
     '''
-    return b''.join(self.chunks)
+    return b''.join(self.chunks())
 
   def textencode(self):
     return totext(self.encode())
