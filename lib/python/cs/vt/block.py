@@ -321,8 +321,7 @@ class _Block(Transcriber):
         substart = max(0, start - offset)
         subend = min(sublen, end - offset)
         if substart < subend:
-          for subslice in B.slices(substart, subend):
-            yield subslice
+          yield from B.slices(substart, subend):
         offset += sublen
         if offset >= end:
           break
