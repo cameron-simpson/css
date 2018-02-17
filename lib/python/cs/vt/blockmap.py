@@ -145,7 +145,6 @@ class BlockMap(RunStateMixin):
     ''' Wait for the worker to complete.
     '''
     self._worker.join()
-    self.self_check()
 
   def __del__(self):
     ''' Release resources on object deletion.
@@ -254,7 +253,6 @@ class BlockMap(RunStateMixin):
       raise ValueError("offset(%d) should be >= 0" % (offset,))
     if span < 0:
       raise ValueError("span(%d) should be >= 0" % (span,))
-    self.self_check()
     if span == 0:
       return
     S = self.S
@@ -304,7 +302,6 @@ class BlockMap(RunStateMixin):
   def data(self, offset, span):
     ''' Return the data from [offset:offset+span] as a single bytes object.
     '''
-    self.self_check()
     return b''.join(self.chunks(offset, span))
 
   def __getitem__(self, index):
