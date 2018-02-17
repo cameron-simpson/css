@@ -89,7 +89,9 @@ class TestAll(unittest.TestCase):
         IB = IndirectBlock(subblocks=subblocks)
         self._verify_block(IB, recurse=True)
         IBspan = IB.span
-        self.assertEqual(IBspan, total_length)
+        self.assertEqual(
+          IBspan, total_length,
+          "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
         IBH = IB.hashcode
         IBdata = IB.all_data()
         self.assertEqual(len(IBdata), total_length)
