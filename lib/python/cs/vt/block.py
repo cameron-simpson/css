@@ -296,11 +296,11 @@ class _Block(Transcriber):
       yield self
 
   @property
-  def chunks(self):
-    ''' Yield the data from the direct blocks.
+  def chunks(self, start=None, end=None):
+    ''' Generator yielding data from the direct blocks.
     '''
-    for leaf in self.leaves:
-      yield leaf.data
+    for leaf, start, end in self.slices(start=start, end=end):
+      yield leaf[start:end]
 
   def slices(self, start=None, end=None):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
