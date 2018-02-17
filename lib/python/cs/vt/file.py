@@ -9,7 +9,8 @@ from os import SEEK_SET
 import sys
 from threading import RLock
 from cs.fileutils import BackedFile, ReadMixin
-from cs.pfx import Pfx, PfxThread, XP
+from cs.logutils import warning
+from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
 from cs.threads import locked, LockableMixin
 from cs.x import X
@@ -17,7 +18,10 @@ from . import defaults
 from .block import Block
 from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
 
-class BlockFile(RawIOBase,ReadMixin):
+# arbitrary threshold to generate blockmaps
+AUTO_BLOCKMAP_THRESHOLD = 1024 * 1024
+
+class BlockFile(RawIOBase, ReadMixin):
   ''' A read-only file interface to a Block based on io.RawIOBase.
   '''
 
@@ -213,6 +217,12 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
 
   def write(self, data):
     return self._file.write(data)
+
+  def _auto_blockmap(self):
+    backing_block = self._backing_block
+    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
+      warning("getting BlockMap for %s", backing_block)
+      backing_block.get_blockmap()
 
   @locked
   def read(self, size=-1, offset=None):
