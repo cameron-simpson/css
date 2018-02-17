@@ -5,7 +5,7 @@ import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
 from cs.lex import texthexify, untexthexify
-from cs.logutils import D, error, warning, debug
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
@@ -22,7 +22,7 @@ F_BLOCK_TYPE_FLAGS = 0x04   # type-specific flags follow type
 
 @uniqueEnum
 class BlockType(IntEnum):
-  BT_HASHCODE = 0           # default type: hashref 
+  BT_HASHCODE = 0           # default type: hashref
   BT_RLE = 1                # run length encoding: span octet
   BT_LITERAL = 2            # span raw-data
   BT_SUBBLOCK = 3           # a SubBlock of another Block
@@ -115,6 +115,8 @@ def decodeBlock(bs, offset=0, length=None):
       # gather type flags
       if has_type_flags:
         type_flags, offset = get_bs(bs, offset)
+        if type_flags:
+          warning("nonzero type_flags: 0x%02x", type_flags)
       else:
         type_flags = 0x00
       # instantiate type specific block ref
@@ -198,9 +200,9 @@ class _Block(Transcriber):
     # indirect: walk both blocks comparing leaves
     leaves1 = self.leaves
     leaves2 = oblock.leaves
-    offset = 0  # amount already compared
-    offset1 = 0 # offset of start of leaf1
-    offset2 = 0 # offset of start of leaf2
+    offset = 0      # amount already compared
+    offset1 = 0     # offset of start of leaf1
+    offset2 = 0     # offset of start of leaf2
     leaf2 = None
     for leaf1 in leaves1:
       end1 = offset1 + len(leaf1)
@@ -231,8 +233,8 @@ class _Block(Transcriber):
         # we can defer fetching the data until now
         data1 = leaf1.data
         data2 = leaf2.data
-        if ( data1[offset-offset1:offset-offset1+cmplen]
-             != data2[offset-offset2:offset-offset2+cmplen] 
+        if ( data1[offset - offset1:offset - offset1 + cmplen]
+             != data2[offset - offset2:offset - offset2 + cmplen]
            ):
           return False
         end2 = offset2 + len(data2)
@@ -329,7 +331,7 @@ class _Block(Transcriber):
     if end is None:
       end = len(self)
     elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
@@ -373,7 +375,7 @@ class _Block(Transcriber):
     if end is None:
       end = len(self)
     elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
     if self.indirect:
       offset = 0        # the absolute index of the left edge of subblock B
       for B in self.subblocks:
@@ -488,7 +490,7 @@ class HashCodeBlock(_Block):
     return 'IB' if self.indirect else 'B'
 
   def transcribe_inner(self, T, fp):
-    m = {'span':self.span, 'hash':self.hashcode}
+    m = {'span': self.span, 'hash': self.hashcode}
     return T.transcribe_mapping(m, fp)
 
   @classmethod
@@ -593,7 +595,7 @@ class RLEBlock(_Block):
     return self._encode(0, self.span, BlockType.BT_RLE, 0, ( self.octet, ))
 
   def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping({'span':self.span,'octet':self.octet})
+    return T.transcribe_mapping({'span': self.span, 'octet': self.octet})
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
@@ -740,14 +742,14 @@ def verify_block(B, recurse=False, S=None):
         yield B, "hashcode(%s) does not match hashfunc of data(%s)" \
                  % (hashcode, data_hashcode)
   if B.indirect:
-    for subB in B.subblocks:
-      verify_block(subB, recurse=True, S=S)
+    if recurse:
+      for subB in B.subblocks:
+        verify_block(subB, recurse=True, S=S)
   else:
     # direct block: verify data length
     data = B.data
     if B.span != len(data):
-      yield B, "span(%d) != len(data:%d)" \
-               (B.span, len(data))
+      yield B, "span(%d) != len(data:%d)" % (B.span, len(data))
 
 if __name__ == '__main__':
   from .block_tests import selftest
