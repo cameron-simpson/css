@@ -196,9 +196,9 @@ class BlockMap(RunStateMixin):
               prevmap = newmap
               offset0 = offset
               maps.append(newmap)
-              self.mapped_to = offset
               submap_fp.close()
               submap_fp = None
+              self.mapped_to = offset
           submap_index += 1
         if submap_fp is None:
           submap_fp = TemporaryFile('wb')
@@ -217,6 +217,7 @@ class BlockMap(RunStateMixin):
           newmap.prevmap = prevmap
         prevmap = newmap
         submap_fp.close()
+        self.mapped_to = offset
       final_submap_index = offset // mapsize
       while submap_index < final_submap_index:
         maps.append(None)
@@ -299,7 +300,6 @@ class BlockMap(RunStateMixin):
       else:
         i -= 1
     assert submap[i] <= offset
-    chunks_yielded = []
     with S:
       while span > 0:
         leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
@@ -307,11 +307,10 @@ class BlockMap(RunStateMixin):
         start = offset - leaf_offset
         end = start + min(span, leaf_span - start)
         leaf = S[hashclass(leaf_hashcode)]
-        chunk = leaf[start:end]
-        chunks_yielded.append(chunk)
-        yield chunk
-        offset += len(chunk)
-        span -= len(chunk)
+        yield leaf, start, end
+        yielded_length = end - start
+        offset += yielded_length
+        span -= yielded_length
         if span > 0:
           i += 1
           if i == len(submap):
