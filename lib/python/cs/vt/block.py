@@ -672,52 +672,6 @@ class _SubBlock(_Block):
 
 register_transcriber(_SubBlock)
 
-def chunksOf(B, start, stop=None):
-  ''' Generator that yields the chunks from the subblocks that span
-      the supplied range.
-  '''
-  if stop is None:
-    stop = sys.maxint
-  elif stop <= start:
-    return
-  rangelen = stop - start
-
-  # skip subblocks preceeding the range
-  Bs = iter(B.subblocks())
-  while True:
-    try:
-      B = Bs.next()
-    except StopIteration:
-      return
-    Blen = len(B)
-    if Blen <= start:
-      # too early - skip this block
-      start -= Blen
-      continue
-    break
-  # post: B is a subblock spanning the start of the range
-  assert start < Blen
-
-  while rangelen > 0:
-    if B.indirect:
-      # pull chunks from the indirect block
-      for chunk in B.chunks(start, start+rangelen):
-        yield chunk
-        rangelen -= len(chunk)
-    else:
-      # grab the relevant chunk of this direct block
-      chunk = B[start:start+rangelen]
-      yield chunk
-      rangelen -= len(chunk)
-    if rangelen <= 0:
-      break
-    try:
-      B = Bs.next()
-    except StopIteration:
-      return
-    # we always start from the start of the next block
-    start = 0
-
 def dump_block(B, fp=None, indent='', verbose=False):
   if fp is None:
     fp = sys.stderr
