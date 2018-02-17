@@ -9,9 +9,10 @@ from cs.logutils import D, error, warning, debug
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.x import X
 from . import defaults, totext
+from .blockmap import BlockMap
 from .hash import decode as hash_decode
 from .transcribe import Transcriber, register as register_transcriber
 
@@ -295,13 +296,29 @@ class _Block(Transcriber):
     elif self.span > 0:
       yield self
 
-  def chunks(self, start=None, end=None):
+  @locked
+  def get_blockmap(self, force=False):
+    ''' Get the blockmap for this block, creating it if necessary.
+        `force`: if True, create a new blockmap anyway; default: False
+    '''
+    if force:
+      blockmap = None
+    else:
+      try:
+        blockmap = self.blockmap
+      except AttributeError:
+        blockmap = None
+    if blockmap is None:
+      self.blockmap = blockmap = BlockMap(self)
+    return blockmap
+
+  def chunks(self, start=None, end=None, no_blockmap=False):
     ''' Generator yielding data from the direct blocks.
     '''
-    for leaf, start, end in self.slices(start=start, end=end):
+    for leaf, start, end in self.slices(start=start, end=end, no_blockmap=no_blockmap):
       yield leaf[start:end]
 
-  def slices(self, start=None, end=None):
+  def slices(self, start=None, end=None, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
@@ -314,6 +331,17 @@ class _Block(Transcriber):
     elif end < start:
       raise ValueError("end must be >= start(%r), received: %r" % (start,end))
     if self.indirect:
+      if not no_blockmap:
+        # use the blockmap to access the data if present
+        try:
+          blockmap = self.blockmap
+        except AttributeError:
+          pass
+        else:
+          X("SLICES FROM BLOCKMAP")
+          yield from blockmap.slices(start, end - start)
+          return
+      X("TREE no_blockmap=%s ...", no_blockmap)
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
