@@ -37,6 +37,12 @@ class BlockFile(RawIOBase, ReadMixin):
     '''
     return len(self.block)
 
+  def _auto_blockmap(self):
+    backing_block = self.block
+    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
+      warning("getting BlockMap for %s", backing_block)
+      backing_block.get_blockmap()
+
   def seek(self, offset, whence=0):
     ''' Set the current file offset.
     '''
@@ -58,6 +64,7 @@ class BlockFile(RawIOBase, ReadMixin):
         flavour of RawIOBase, which should only make one underlying
         read system call.
     '''
+    self._auto_blockmap()
     if n == -1:
       data = self.readall()
     else:
@@ -71,6 +78,7 @@ class BlockFile(RawIOBase, ReadMixin):
   def readinto(self, b):
     ''' Read data into the bytearray `b`.
     '''
+    self._auto_blockmap()
     nread = 0
     for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
       Blen = end - start
@@ -228,6 +236,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
   def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
+    self._auto_blockmap()
     f = self._file
     if offset is not None:
       with self._lock:
@@ -258,6 +267,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
   def readall(self):
     ''' Concatenate all the data from the current offset to the end of the file.
     '''
+    self._auto_blockmap()
     f = self._file
     offset = self.tell()
     bss = []
