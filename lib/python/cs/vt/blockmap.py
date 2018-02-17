@@ -247,6 +247,13 @@ class BlockMap(RunStateMixin):
   def chunks(self, offset, span):
     ''' Generator yielding data from [offset:offset+span] from the relevant leaves.
     '''
+    for leaf, start, end in self.slices(offset, span):
+      assert start < end
+      yield leaf[start:end]
+
+  def slices(self, offset, span):
+    ''' Generator yielding (leaf, start, end) from [offset:offset+span].
+    '''
     if offset < 0:
       raise ValueError("offset(%d) should be >= 0" % (offset,))
     if span < 0:
@@ -260,13 +267,13 @@ class BlockMap(RunStateMixin):
       mapped_span = mapped_to - offset
       if mapped_span > 0:
         # a leading portion is inside the mapped range
-        yield from self.chunks(offset, mapped_span)
+        yield from self.slices(offset, mapped_span)
         span -= mapped_span
         offset += mapped_span
       # fetch the unmapped data by traversing the Block tree
       X("get block.chunks: offst=%d, span=%d, offset+span=%d",
         offset, span, offset+span)
-      yield from self.block.chunks(offset, offset + span)
+      yield from self.block.slices(offset, offset + span, no_blockmap=True)
       return
     S = self.S
     hashclass = S.hashclass
