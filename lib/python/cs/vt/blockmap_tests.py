@@ -56,12 +56,13 @@ class TestAll(unittest.TestCase):
     ''' Exercise the BlockMap in various configurations.
     '''
     with self.S:
-      for mapsize in 999999, 10000007, 13131313, None:
-        for depth in 0, 1, 2, 3:
-          for width in 1, 2, 7, 17:
+      for depth in 0, 1, 2, 3:
+        for width in 1, 2, 7, 17:
+          X("gen depth=%d, width=%d ...", depth, width)
+          top_block, flat_data = self._gen_data(depth, width)
+          for mapsize in 999999, 10000007, 13131313, None:
             with self.subTest(mapsize=mapsize, depth=depth, width=width):
-              X("gen mapsize=%s, depth=%d, width=%d ...", mapsize, depth, width)
-              top_block, flat_data = self._gen_data(depth, width)
+              X("test mapsize=%s", mapsize)
               bmap = BlockMap(top_block, mapsize=mapsize)
               bmap.join()
               X("full data cmp...")
