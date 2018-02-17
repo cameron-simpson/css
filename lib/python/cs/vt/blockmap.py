@@ -69,7 +69,6 @@ class MappedFD:
     ''' Release the map and its file descriptor.
     '''
     self.mmap.close()
-    os.close(self.fd)
 
   def __len__(self):
     return self.record_count
