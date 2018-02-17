@@ -415,7 +415,7 @@ def copy_out_file(E, ospath, modes=None, log=None):
     log("rewrite %s", ospath)
     with open(ospath, "wb") as fp:
       wrote = 0
-      for chunk in B.chunks:
+      for chunk in B.chunks():
         fp.write(chunk)
         wrote += len(chunk)
     if Blen != wrote:
