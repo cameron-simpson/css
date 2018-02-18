@@ -3,6 +3,9 @@
 # File interfaces.      - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Classes to present blocks as file-like objects with write support.
+'''
+
 from __future__ import print_function, absolute_import
 from io import RawIOBase
 from os import SEEK_SET
@@ -13,7 +16,6 @@ from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
 from cs.threads import locked, LockableMixin
-from cs.x import X
 from . import defaults
 from .block import Block
 from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
@@ -28,6 +30,7 @@ class BlockFile(RawIOBase, ReadMixin):
   def __init__(self, block):
     ''' Initialise with Block `block`.
     '''
+    RawIOBase.__init__(self)
     self.isdir = False
     self.block = block
     self._offset = 0
@@ -87,7 +90,7 @@ class BlockFile(RawIOBase, ReadMixin):
     self._offset += nread
     return nread
 
-class File(MultiOpenMixin,LockableMixin,ReadMixin):
+class File(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
@@ -100,7 +103,7 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     if backing_block is None:
       backing_block = Block(data=b'')
     self.filename = None
-    self._syncer = None # syncing Thread, close waits for it
+    self._syncer = None     # syncing Thread, close waits for it
     self._reset(backing_block)
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
@@ -114,6 +117,8 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
     self._file = BackedFile(BlockFile(new_backing_block))
 
   def startup(self):
+    ''' Startup actions.
+    '''
     pass
 
   def shutdown(self):
@@ -148,6 +153,8 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       return
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       def update_store():
+        ''' Commit unsynched file contents to the Store.
+        '''
         # wait for previous sync to complete, if any
         if old_syncer:
           old_syncer.join()
@@ -157,10 +164,10 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
         # front file data, which are now saved to the Store.
         with S:
           B = top_block_for(
-                self._high_level_blocks_from_front_back(
-                    old_file.front_file, old_block,
-                    old_file.front_range,
-                    scanner=scanner))
+              self._high_level_blocks_from_front_back(
+                  old_file.front_file, old_block,
+                  old_file.front_range,
+                  scanner=scanner))
         old_file.close()
         with self._lock:
           # if we're still current, update the front settings
@@ -218,12 +225,18 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
       front_range.add_span(front_range.end, length)
 
   def tell(self):
+    ''' Return the file read/write position.
+    '''
     return self._file.tell()
 
   def seek(self, offset, whence=SEEK_SET):
+    ''' Adjust the file read/write position.
+    '''
     return self._file.seek(offset, whence=whence)
 
   def write(self, data):
+    ''' Write `data` to the File.
+    '''
     return self._file.write(data)
 
   def _auto_blockmap(self):
@@ -288,16 +301,18 @@ class File(MultiOpenMixin,LockableMixin,ReadMixin):
 
   @locked
   def high_level_blocks(self, start=None, end=None, scanner=None):
-    ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
+    ''' Return an iterator of new high level Blocks covering the specified data span.
+        The default is the entire current file data.
     '''
     return self._high_level_blocks_from_front_back(
-                  self.front_file, self.backing_block, self.front_range,
-                  start, end, scanner=scanner)
+        self.front_file, self.backing_block, self.front_range,
+        start, end, scanner=scanner)
 
   @staticmethod
   def _high_level_blocks_from_front_back(
-        front_file, back_block, front_range,
-        start=None, end=None, scanner=None):
+      front_file, back_block, front_range,
+      start=None, end=None, scanner=None
+  ):
     ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
     '''
     with Pfx("File.high_level_blocks(%s..%s)", start, end):
