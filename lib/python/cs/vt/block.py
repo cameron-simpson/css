@@ -526,7 +526,7 @@ def Block(hashcode=None, data=None, span=None, added=False, indirect=False):
     if len(data) > 32:
       B = HashCodeBlock(data=data, hashcode=hashcode, span=span, added=added)
     else:
-      B = LiteralBlock(data=data, span=span, indirect=indirect)
+      B = LiteralBlock(data=data, indirect=indirect)
   return B
 
 def IndirectBlock(subblocks=None, hashcode=None, span=None):
