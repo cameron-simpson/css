@@ -867,7 +867,7 @@ class BackedFile(ReadMixin):
           assert self._offset <= end
       else:
         for bs in rn(size, rsize=rsize):
-          self._offset += bs_len
+          self._offset += len(bs)
           yield bs
           assert self._offset <= end
       if self._offset < span.end:
@@ -892,6 +892,7 @@ class BackedFile(ReadMixin):
 
 class BackedFile_TestMethods(object):
   ''' Mixin for testing subclasses of BackedFile.
+      Tests self.backed_fp.
   '''
 
   def _eq(self, a, b, opdesc):
