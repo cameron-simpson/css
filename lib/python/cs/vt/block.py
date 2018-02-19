@@ -595,7 +595,7 @@ class RLEBlock(_Block):
     return self._encode(0, self.span, BlockType.BT_RLE, 0, ( self.octet, ))
 
   def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping({'span': self.span, 'octet': self.octet})
+    return T.transcribe_mapping({'span': self.span, 'octet': self.octet}, fp)
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
