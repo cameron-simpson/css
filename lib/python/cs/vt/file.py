@@ -115,6 +115,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
   def _reset(self, new_backing_block):
     self._backing_block = new_backing_block
     self._file = BackedFile(BlockFile(new_backing_block))
+    self._file.flush = self.flush
 
   def startup(self):
     ''' Startup actions.
@@ -183,6 +184,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       new_file = BackedFile(old_file)
       self._syncer = T
       self._file = new_file
+      self._file.flush = self.flush
       S.open()
       T.start()
 
