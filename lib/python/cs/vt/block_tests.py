@@ -7,13 +7,10 @@
 import sys
 from random import choice
 import unittest
-from cs.logutils import D
 from cs.pfx import Pfx
-from cs.py3 import bytes
 from cs.randutils import rand0, randblock
-from cs.x import X
 from . import totext
-from .block import Block, HashCodeBlock, IndirectBlock, RLEBlock, \
+from .block import Block, IndirectBlock, RLEBlock, \
                 LiteralBlock, SubBlock, \
                 verify_block, \
                 BlockType, \
@@ -31,8 +28,9 @@ class TestAll(unittest.TestCase):
 
   def _make_random_Block(self, block_type=None, size=None):
     if block_type is None:
-      block_type = choice( (BlockType.BT_HASHCODE, BlockType.BT_RLE, \
-                            BlockType.BT_LITERAL, BlockType.BT_SUBBLOCK) )
+      block_type = choice(
+          (BlockType.BT_HASHCODE, BlockType.BT_RLE,
+           BlockType.BT_LITERAL, BlockType.BT_SUBBLOCK) )
     if size is None:
       size = rand0(16385)
     with Pfx("_make_random_Block(block_type=%s,size=%d)", block_type, size):
@@ -97,8 +95,8 @@ class TestAll(unittest.TestCase):
         self._verify_block(IB, recurse=True)
         IBspan = IB.span
         self.assertEqual(
-          IBspan, total_length,
-          "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
+            IBspan, total_length,
+            "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
         IBH = IB.hashcode
         IBdata = IB.all_data()
         self.assertEqual(len(IBdata), total_length)
@@ -120,7 +118,9 @@ class TestAll(unittest.TestCase):
           B = self._make_random_Block(block_type=block_type)
           Bserial = encodeBlock(B)
           B2, offset = decodeBlock(Bserial, 0)
-          self.assertEqual(offset, len(Bserial), "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial)))
+          self.assertEqual(
+              offset, len(Bserial),
+              "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial)))
           self._verify_block(B2)
           self.assertEqual(B.type, B2.type, "block types differ")
           self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
@@ -141,6 +141,8 @@ class TestAll(unittest.TestCase):
             ##X("no type specific tests for Block type %r" % (block_type,))
 
 def selftest(argv):
+  ''' Run the unit tests.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
