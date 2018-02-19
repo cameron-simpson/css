@@ -50,9 +50,16 @@ class TestAll(unittest.TestCase):
         B = LiteralBlock(data=rs)
       elif block_type == BlockType.BT_SUBBLOCK:
         B2 = self._make_random_Block()
-        suboffset = rand0(B2.span+1)
-        subsize = rand0(B2.span - suboffset + 1)
-        B = SubBlock(B2, suboffset, subsize)
+        if len(B2) == 0:
+          suboffset = 0
+          subspan = 0
+        else:
+          suboffset = rand0(B2.span)
+          subspan = rand0(B2.span - suboffset)
+        B = SubBlock(B2, suboffset, subspan)
+        # SubBlock returns an empty literal for an empty subblock
+        if subspan == 0:
+          block_type = BlockType.BT_LITERAL
       else:
         raise ValueError("unknow block type")
       if B.type != block_type:
@@ -77,7 +84,7 @@ class TestAll(unittest.TestCase):
   def test10IndirectBlock(self):
     S = self.S
     with S:
-      for _ in range(8):
+      for _ in range(64):
         fullblock = bytes(())
         subblocks = []
         total_length = 0
