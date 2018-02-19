@@ -691,13 +691,10 @@ class _SubBlock(_Block):
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
-    m = T.parse_mapping(s, offset, stopchar)
-    block = m.pop('block')
-    offset = m.pop('offset')
-    span = m.pop('span')
-    if m:
-      raise ValueError("unexpected fields: %r" % (m,))
-    return cls(block, offset, span)
+    offset, block, suboffset, subspan = T.parse_mapping(
+        s, offset, stopchar,
+        required=('block', 'offset', 'span'))
+    return cls(block, suboffset, subspan), offset
 
 register_transcriber(_SubBlock)
 
