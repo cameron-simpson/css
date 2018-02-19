@@ -638,7 +638,11 @@ register_transcriber(LiteralBlock)
 def SubBlock(B, suboffset, span, **kw):
   ''' Factory for SubBlocks: returns origin Block if suboffset==0 and span==len(B).
   '''
+  if span == 0:
+    warning("SubBlock(%s): span==0, returning empty LiteralBlock", B)
+    return LiteralBlock(b'')
   if suboffset == 0 and span == len(B):
+    warning("SubBlock(%s): covers full Block, returning original", B)
     return B
   return _SubBlock(B, suboffset, span, **kw)
 
