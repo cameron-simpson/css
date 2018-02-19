@@ -10,7 +10,6 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked, locked_property
-from cs.x import X
 from . import defaults, totext
 from .blockmap import BlockMap
 from .hash import decode as hash_decode
@@ -340,10 +339,8 @@ class _Block(Transcriber):
         except AttributeError:
           pass
         else:
-          X("SLICES FROM BLOCKMAP")
           yield from blockmap.slices(start, end - start)
           return
-      X("TREE no_blockmap=%s ...", no_blockmap)
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
@@ -703,28 +700,6 @@ class _SubBlock(_Block):
     return cls(block, offset, span)
 
 register_transcriber(_SubBlock)
-
-def dump_block(B, fp=None, indent='', verbose=False):
-  if fp is None:
-    fp = sys.stderr
-  data = B.data
-  if B.indirect:
-    subblocks = B.subblocks
-    print("%sIB.datalen=%d, span=%d, %d subblocks, hash=%s"
-          % (indent, len(data), B.span, len(subblocks), B.hashcode),
-          file=fp)
-    indent += '  '
-    for subB in subblocks:
-      dump_block(subB, fp=fp, indent=indent)
-  else:
-    if verbose:
-      print("%sB.datalen=%d, span=%d, hash=%s %r"
-            % (indent, len(data), B.span, B.hashcode, B.data),
-            file=fp)
-    else:
-      print("%sB.datalen=%d, span=%d, hash=%s"
-            % (indent, len(data), B.span, B.hashcode),
-            file=fp)
 
 def verify_block(B, recurse=False, S=None):
   ''' Perform integrity checks on the Block `B`, yield error messages.
