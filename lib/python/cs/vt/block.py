@@ -639,13 +639,21 @@ register_transcriber(LiteralBlock)
 def SubBlock(B, suboffset, span, **kw):
   ''' Factory for SubBlocks: returns origin Block if suboffset==0 and span==len(B).
   '''
-  if span == 0:
-    warning("SubBlock(%s): span==0, returning empty LiteralBlock", B)
-    return LiteralBlock(b'')
-  if suboffset == 0 and span == len(B):
-    warning("SubBlock(%s): covers full Block, returning original", B)
-    return B
-  return _SubBlock(B, suboffset, span, **kw)
+  with Pfx("SubBlock(%s)", B):
+    # check offset and span here because we trust them later
+    if suboffset < 0 or suboffset > len(B):
+      raise ValueError("suboffset(%d) out of range", suboffset)
+    if span < 0 or suboffset + span > len(B):
+      raise ValueError("span(%d) out of range", span)
+    if span == 0:
+      warning("span==0, returning empty LiteralBlock")
+      return LiteralBlock(b'')
+    if suboffset == 0 and span == len(B):
+      warning("covers full Block, returning original")
+      return B
+    if isinstance(B, _SubBlock):
+      return _SubBlock(B._superblock, suboffset + B._offset, span)
+    return _SubBlock(B, suboffset, span, **kw)
 
 class _SubBlock(_Block):
   ''' A SubBlock is a view into another block.
