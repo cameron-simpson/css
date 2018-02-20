@@ -30,12 +30,12 @@ import cs.x
 from cs.x import X
 from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
-from .block import Block, IndirectBlock, dump_block, decodeBlock
+from .block import Block, IndirectBlock, decodeBlock
 from .cache import FileCacheStore
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
 from .datafile import DataFile, F_COMPRESSED, decompress, scan_chunks
-from .debug import dump_chunk
+from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
@@ -875,7 +875,7 @@ def dump(path, fp=None):
   E, subname = dirent_resolve(path)
   if subname:
     E = E[subname]
-  dump_block(E.block, fp)
+  dump_Block(E.block, fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
