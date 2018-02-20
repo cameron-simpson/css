@@ -316,8 +316,8 @@ class _Block(Transcriber):
   def chunks(self, start=None, end=None, no_blockmap=False):
     ''' Generator yielding data from the direct blocks.
     '''
-    for leaf, start, end in self.slices(start=start, end=end, no_blockmap=no_blockmap):
-      yield leaf[start:end]
+    for leaf, leaf_start, leaf_end in self.slices(start=start, end=end, no_blockmap=no_blockmap):
+      yield leaf[leaf_start:leaf_end]
 
   def slices(self, start=None, end=None, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
@@ -404,7 +404,9 @@ class _Block(Transcriber):
       else:
         # should be a new partial block
         if B.indirect:
-          raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, Bstart, Bend))
+          raise RuntimeError(
+              "got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf"
+              % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
 
   def all_data(self):
@@ -578,7 +580,9 @@ class RLEBlock(_Block):
     if isinstance(octet, int):
       octet = bytes((octet,))
     elif not isinstance(octet, bytes):
-     raise TypeError("octet should be an int or a bytes instance but is %s: %r" % (type(octet), octet))
+     raise TypeError(
+         "octet should be an int or a bytes instance but is %s: %r"
+         % (type(octet), octet))
     if len(octet) != 1:
       raise ValueError("len(octet):%d != 1" % (len(octet),))
     _Block.__init__(self, BlockType.BT_RLE, span=span, **kw)
@@ -656,8 +660,9 @@ class _SubBlock(_Block):
       if suboffset < 0 or suboffset >= len(SuperB):
         raise ValueError('suboffset out of range 0-%d: %d' % (len(SuperB)-1, suboffset))
       if span < 0 or suboffset+span > len(SuperB):
-        raise ValueError('span must be nonnegative and less than %d (suboffset=%d, len(superblock)=%d): %d'
-                         % (len(SuperB)-suboffset, suboffset, len(SuperB), span))
+        raise ValueError(
+            'span must be nonnegative and less than %d (suboffset=%d, len(superblock)=%d): %d'
+            % (len(SuperB)-suboffset, suboffset, len(SuperB), span))
       if suboffset == 0 and span == len(SuperB):
         raise RuntimeError('tried to make a SubBlock spanning all of of SuperB')
       _Block.__init__(self, BlockType.BT_SUBBLOCK, span, **kw)
