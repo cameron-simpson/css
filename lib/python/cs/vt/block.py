@@ -310,6 +310,7 @@ class _Block(Transcriber):
       except AttributeError:
         blockmap = None
     if blockmap is None:
+      warning("making blockmap for %s", self)
       self.blockmap = blockmap = BlockMap(self)
     return blockmap
 

@@ -43,7 +43,6 @@ class BlockFile(RawIOBase, ReadMixin):
   def _auto_blockmap(self):
     backing_block = self.block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      warning("getting BlockMap for %s", backing_block)
       backing_block.get_blockmap()
 
   def seek(self, offset, whence=0):
@@ -244,7 +243,6 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
   def _auto_blockmap(self):
     backing_block = self._backing_block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      warning("getting BlockMap for %s", backing_block)
       backing_block.get_blockmap()
 
   @locked
