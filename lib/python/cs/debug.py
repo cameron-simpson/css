@@ -80,8 +80,8 @@ def RLock():
 class TimingOutLock(object):
   ''' A Lock replacement which times out, used for locating deadlock points.
   '''
-  def __init__(self, deadlock_timeout=20.0):
-    self._lock = threading.Lock()
+  def __init__(self, deadlock_timeout=20.0, recursive=False):
+    self._lock = threading.RLock() if recursive else threading.Lock()
     self._deadlock_timeout = deadlock_timeout
   def acquire(self,blocking=True,timeout=-1,name=None):
     if timeout < 0:
