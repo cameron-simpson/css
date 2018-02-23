@@ -11,8 +11,8 @@ import sys
 from random import randint
 import unittest
 from cs.randutils import randblock
-from cs.x import X
 import cs.x
+from cs.x import X
 from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
 from .store import MappingStore
