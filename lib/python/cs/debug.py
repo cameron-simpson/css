@@ -88,7 +88,8 @@ class TimingOutLock(object):
       timeout = self._deadlock_timeout
     else:
       timeout = min(timeout, self._deadlock_timeout)
-    if not self._lock.acquire(blocking=blocking,timeout=timeout):
+    ok = self._lock.acquire(timeout=timeout) if blocking else self._lock.acquire(blocking=blocking)
+    if not ok:
       raise RuntimeError("TIMEOUT acquiring lock held by %s:%r" % (self.owner, self.owner_name))
     self.owner = caller()
     self.owner_name = name
