@@ -1022,7 +1022,8 @@ def file_data(fp, nbytes, rsize=None):
       break
     yield data
     copied += len(data)
-    nbytes -= len(data)
+    if nbytes is not None:
+      nbytes -= len(data)
 
 def copy_data(fpin, fpout, nbytes, rsize=None):
   ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
