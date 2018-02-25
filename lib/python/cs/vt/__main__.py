@@ -5,8 +5,9 @@
 #
 
 from __future__ import with_statement
-import errno
+from collections import defaultdict
 from datetime import datetime
+import errno
 from getopt import getopt, GetoptError
 import logging
 import os
@@ -19,6 +20,7 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
+from cs.fileutils import file_data
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
@@ -31,6 +33,7 @@ from cs.x import X
 from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, decodeBlock
+from .blockify import blocked_chunks_of
 from .cache import FileCacheStore
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
@@ -40,6 +43,7 @@ from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
+from .parsers import scanner_from_filename
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .smuggling import import_dir, import_file
@@ -87,6 +91,7 @@ class VTCmd:
     report
     scan datafile
     serve {-|host:port}
+    test blockify file
     unpack dirrefs...
   '''
 
@@ -208,7 +213,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown operation \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("datadir", "init", "dump", "scan"):
+      if op in ("datadir", "init", "dump", "scan", "test"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -780,6 +785,30 @@ class VTCmd:
               data = decompress(data)
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
     return 0
+
+  def cmd_test(self, args):
+    if not args:
+      raise GetoptError("missing test subcommand")
+    subcmd = args.pop(0)
+    with Pfx(subcmd):
+      if subcmd == 'blockify':
+        if not args:
+          raise GetoptError("missing filename")
+        filename = args.pop(0)
+        with Pfx(filename):
+          if args:
+            raise GetoptError("extra arguments after filename: %r" % (args,))
+          scanner = scanner_from_filename(filename)
+          size_counts = defaultdict(int)
+          with open(filename, 'rb') as fp:
+            for chunk in blocked_chunks_of(file_data(fp, None), scanner):
+              print(len(chunk), str(chunk[:16]))
+              size_counts[len(chunk)] += 1
+          for size, count in sorted(size_counts.items()):
+            print(size, count)
+        return 0
+      else:
+        raise GetoptError("unrecognised subcommand")
 
   def cmd_unpack(self, args):
     ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
