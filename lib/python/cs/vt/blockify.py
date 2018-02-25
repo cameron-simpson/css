@@ -18,7 +18,6 @@ from .block import Block, IndirectBlock
 from .scan import scanbuf
 
 MIN_BLOCKSIZE = 80          # less than this seems silly
-MIN_AUTOBLOCKSIZE = 1024    # provides more scope for upstream block boundaries
 MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
 
 # default read size for file scans
@@ -156,7 +155,7 @@ class _PendingBuffer(object):
       self.pending_room -= len(chunk)
 
 def blocked_chunks_of(chunks, scanner,
-        min_block=None, max_block=None, min_autoblock=None,
+        min_block=None, max_block=None,
         histogram=None):
   ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `scanner`
@@ -168,9 +167,6 @@ def blocked_chunks_of(chunks, scanner,
         to create a Block, default MIN_BLOCKSIZE
       `max_block`: the largest amount of data that will be used to
         create a Block, default MAX_BLOCKSIZE
-      `min_autoblock`: the smallest amount of data that will be
-        used for the rolling hash fallback if `scanner` is not None,
-        default MIN_AUTOBLOCK
       `histogram`: if not None, a defaultdict(int) to collate counts.
         Integer indices count block sizes and string indices are used
         for 'bytes_total' and 'bytes_hash_scanned'.
@@ -183,11 +179,6 @@ def blocked_chunks_of(chunks, scanner,
       min_block = MIN_BLOCKSIZE
     elif min_block < 8:
       raise ValueError("rejecting min_block < 8: %s" % (min_block,))
-    if min_autoblock is None:
-      min_autoblock = MIN_AUTOBLOCKSIZE
-    elif min_autoblock < min_block:
-      raise ValueError("rejecting min_autoblock:%d < min_block:%d"
-                       % (min_autoblock, min_block,))
     if max_block is None:
       max_block = MAX_BLOCKSIZE
     elif max_block >= 1024*1024:
@@ -209,7 +200,6 @@ def blocked_chunks_of(chunks, scanner,
     if scanner is None:
       # No scanner, consume the chunks directly.
       parseQ = chunk_iter
-      min_autoblock = min_block   # start the rolling hash earlier
     else:
       # Consume the chunks and offsets via a queue.
       # The scanner puts offsets onto the queue.
