@@ -17,6 +17,7 @@ from cs.x import X
 from .block import Block, IndirectBlock
 from .scan import scanbuf
 
+# constraints on the chunk sizes yields from blocked_chunks_of
 MIN_BLOCKSIZE = 80          # less than this seems silly
 MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
 
@@ -197,6 +198,7 @@ def blocked_chunks_of(chunks, scanner,
     # to the parseQ when chunks are obtained by the scanner. The
     # Thread runs the scanner and copies its output offsets to the
     # parseQ.
+    # The tee() arranges that chunks arrive before any offsets within them.
     if scanner is None:
       # No scanner, consume the chunks directly.
       parseQ = chunk_iter
@@ -258,9 +260,9 @@ def blocked_chunks_of(chunks, scanner,
       ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, max_possible_point=%d",
       ##  last_offset, first_possible_point, max_possible_point)
     # prepare initial state
-    next_offset = 0
-    last_offset = 0
-    recompute_offsets()
+    next_offset = 0         # next potential release boundary
+    last_offset = 0         # latest released boundary
+    recompute_offsets()     # compute first_possible_point and max_possible_point
     hash_value = 0
     offset = 0
     # unblocked outbound data
