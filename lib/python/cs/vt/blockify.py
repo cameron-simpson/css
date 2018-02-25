@@ -5,7 +5,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-from heapq import heapify, heappushpop, heappop
+from heapq import heapify, heappush, heappushpop, heappop
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
@@ -137,7 +137,6 @@ class _PendingBuffer(object):
       chunk = b''.join(self.pending)
       self._reset()
       self.offset += len(chunk)
-      ##X("_PendingBuffer.flush: yield %d bytes", len(chunk))
       yield chunk
 
   def append(self, chunk):
@@ -226,22 +225,48 @@ def blocked_chunks_of(chunks, scanner,
         parseQ.close()
       PfxThread(target=run_parser).run()
     # inbound chunks and offsets
-    in_chunks = []  # unprocessed chunks
-    in_offsets = [] # inbound parse offsets
-    def get_parse():
-      ''' Fetch the next item from `parseQ` and add to the inbound chunks or offsets.
+    in_offsets = []     # heap of unprocessed edge offsets
+    # prime `available_chunk` with the first data chunk, ready for get_next_chunk
+    try:
+      available_chunk = next(parseQ)
+    except StopIteration:
+      # no data! just return
+      return
+    def get_next_chunk():
+      ''' Fetch and return the next data chunk from the `parseQ`.
+          Return None at end of input.
+          Also gather all the following offsets from the queue before return.
+          Because this inherently means collecting the chunk beyond
+          these offsets, we keep that in `available_chunk` for the
+          next call.
           Sets parseQ to None if the end of the iterable is reached.
       '''
-      nonlocal parseQ, in_offsets, in_chunks
-      try:
-        parsed = next(parseQ)
-      except StopIteration:
-        parseQ = None
-      else:
-        if isinstance(parsed, int):
-          in_offsets.append(parsed)
+      nonlocal parseQ, in_offsets, hash_value, available_chunk
+      if parseQ is None:
+        assert available_chunk is None
+        return None
+      next_chunk = available_chunk
+      available_chunk = None
+      assert not(isinstance(next_chunk, int))
+      # scan the new chunk and load potential edges into the offset heap
+      hash_value, chunk_scan_offsets = scanbuf(hash_value, next_chunk)
+      for cso in chunk_scan_offsets:
+        heappush(in_offsets, offset + cso)
+      # gather items from the parseQ until the following chunk
+      # or end of input
+      while True:
+        try:
+          item = next(parseQ)
+        except StopIteration:
+          parseQ = None
+          break
         else:
-          in_chunks.append(parsed)
+          if isinstance(item, int):
+            heappush(in_offsets, item)
+          else:
+            available_chunk = item
+            break
+      return next_chunk
     last_offset = None
     first_possible_point = None
     max_possible_point = None
@@ -260,24 +285,24 @@ def blocked_chunks_of(chunks, scanner,
       ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, max_possible_point=%d",
       ##  last_offset, first_possible_point, max_possible_point)
     # prepare initial state
-    next_offset = 0         # next potential release boundary
     last_offset = 0         # latest released boundary
     recompute_offsets()     # compute first_possible_point and max_possible_point
     hash_value = 0
     offset = 0
+    chunk0 = None
     # unblocked outbound data
     pending = _PendingBuffer(max_block)
     # Read data chunks and locate desired boundaries.
-    while parseQ is not None or in_chunks:
-      while parseQ is not None and not in_chunks:
-        get_parse()
-      if not in_chunks:
-        # no more data
-        break
-      chunk = in_chunks.pop(0)
-      hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
-      chunk_scan_offsets = [ offset + cso for cso in chunk_scan_offsets ]
-      heapify(chunk_scan_offsets)
+    while True:
+      chunk = get_next_chunk()
+      if chunk is None:
+        return
+      # verify current chunk start offset against end of previous chunk
+      if chunk0 is not None:
+        if offset != offset0 + len(chunk0):
+          raise RuntimeError("offset0=%d, len(chunk0)=%d: sum(%d) != current offset %d" % (offset0, len(chunk0), offset0+len(chunk0), offset))
+      chunk0 = chunk
+      offset0 = offset
       chunk = memoryview(chunk)
       chunk_end_offset = offset + len(chunk)
       # process current chunk
@@ -291,7 +316,6 @@ def blocked_chunks_of(chunks, scanner,
           assert advance_by is not None
           assert advance_by >= 0
           assert advance_by <= len(chunk)
-          ##X("ADVANCE_BY %d: %s", advance_by, why)
           # save the advance bytes and yield any overflow
           for out_chunk in pending.append(chunk[:advance_by]):
             yield out_chunk
@@ -303,6 +327,7 @@ def blocked_chunks_of(chunks, scanner,
           offset += advance_by
           chunk = chunk[advance_by:]
           if last_offset != pending.offset:
+            # if the flush discarded a full buffer we need to adjust our boundaries
             last_offset = pending.offset
             recompute_offsets()
           if release:
@@ -315,58 +340,29 @@ def blocked_chunks_of(chunks, scanner,
                 histogram['bytes_total'] += out_chunk_size
                 histogram[out_chunk_size] += 1
             last_offset = pending.offset
-            ##X("RELEASED: "+release)
             recompute_offsets()
           if not chunk:
             # consumed the end of the chunk, need a new one
             break
         advance_by = None
-        why = None
-        if False:
-          Xoffsets( { 'pending': pending.offset,
-                      'offset': offset,
-                      'last_offset': last_offset,
-                      'next_offset': next_offset,
-                      'first_point': first_possible_point,
-                      'max_point': max_possible_point,
-                      'chunk_end': chunk_end_offset,
-                    } )
-        # see if we can skip some data completely
-        # we don't care where the next_offset is if offset < first_possible_point
-        if first_possible_point > offset:
-          advance_by = min(first_possible_point - offset, len(chunk))
-          why = "first_possible_point > offset"
-          continue
-        # advance next_offset to something useful > offset
-        while next_offset is not None and next_offset <= offset:
-          while parseQ is not None and not in_offsets:
-            get_parse()
+        # fetch the next available edge, None if nothing available or suitable
+        while True:
           if in_offsets:
-            next_offset2 = in_offsets.pop(0)
-            if next_offset2 < next_offset:
-              warning("next offset %d < current next_offset:%d",
-                      next_offset2, next_offset)
-            else:
-              next_offset = heappushpop(chunk_scan_offsets, next_offset2)
-              ##X("NEXT_OFFSET = %d", next_offset)
-          elif chunk_scan_offsets:
-            # nothing from parser, but still offsets in the scan
-            next_offset = heappop(chunk_scan_offsets)
+            next_offset = heappop(in_offsets)
+            if next_offset >= first_possible_point:
+              break
           else:
-            ##X("END OF OFFSETS")
             next_offset = None
-        # nothing to skip, nothing to hash scan
-        # ==> take everything up to next_offset
-        # (and reset the hash)
+            break
         if next_offset is None or next_offset > chunk_end_offset:
+          # no suitable edge: consume the chunk and advance
           take_to = chunk_end_offset
-          why = "chunk_end_offset very close"
         else:
+          # edge before end of chunk: use it
           take_to = next_offset
-          why = "next_offset very close"
           release = True
         advance_by = take_to - offset
-
+        assert advance_by > 0
     # yield any left over data
     for out_chunk in pending.flush():
       yield out_chunk
