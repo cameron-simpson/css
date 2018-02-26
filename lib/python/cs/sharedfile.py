@@ -93,8 +93,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
     else:
       break
   os.close(lockfd)
-  yield lockpath
-  os.remove(lockpath)
+  try:
+    yield lockpath
+  finally:
+    os.remove(lockpath)
 
 class SharedAppendFile(object):
   ''' A base class to share a modifiable file between multiple users.
@@ -303,11 +305,13 @@ class SharedAppendFile(object):
     with self._readlock:
       with self.open() as _:
         tmpfp = mkstemp(dir=dirname(self.pathname), text=self.binary)
-        yield tmpfp
-        if not self.write_only:
-          self._read_offset = tmpfp.tell()
-        tmpfp.close()
-        os.rename(tmpfp, self.pathname)
+        try:
+          yield tmpfp
+        finally:
+          if not self.write_only:
+            self._read_offset = tmpfp.tell()
+          tmpfp.close()
+          os.rename(tmpfp, self.pathname)
 
 class SharedAppendLines(SharedAppendFile):
   ''' A line oriented subclass of SharedAppendFile.

@@ -172,7 +172,7 @@ def main(argv):
         elif op == 'status':
           tagged = N.last_suffix()
           result = [name, tagged]
-          for pypi_flavour in 'pypi':
+          for pypi_flavour in ('pypi',):
             lvkey, last_upload = N.last_upload(pypi_flavour)
             if last_upload != tagged:
               result.append("%s:%s" % (pypi_flavour, last_upload))

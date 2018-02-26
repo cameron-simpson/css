@@ -14,12 +14,30 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': [ 'cs.configutils', 'cs.env', 'cs.excutils', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'install_requires': [
+        'cs.app.maildb',
+        'cs.configutils',
+        'cs.deco',
+        'cs.env',
+        'cs.excutils',
+        'cs.filestate',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mailutils',
+        'cs.obj',
+        'cs.pfx',
+        'cs.py.modules',
+        'cs.py3',
+        'cs.rfc2047',
+        'cs.seq',
+        'cs.threads',
+    ],
     'entry_points': {
-      'console_scripts': [
-          'mailfiler = cs.app.mailfiler:main',
-          ],
-        },
+        'console_scripts': [
+            'mailfiler = cs.app.mailfiler:main',
+        ],
+    },
 }
 
 from collections import namedtuple
@@ -56,14 +74,13 @@ from cs.logutils import setup_logging, with_log, \
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
 from cs.obj import O
-from cs.seq import first
-from cs.threads import locked, locked_property
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
-from cs.x import X
+from cs.seq import first
+from cs.threads import locked, locked_property
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
@@ -505,7 +522,7 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     if len(x_status) > 0:
       M['X-Status'] = x_status
     with LogExceptions():
-      text = M.as_string(True)
+      text = M.as_string(True).replace('\nFrom ', '\n>From ')
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
     info("    OK >> %s" % (shortpath(folderpath)))
@@ -549,13 +566,16 @@ class MessageFiler(O):
     with with_log(os.path.join(cs.env.LOGDIR(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = message_path
-      info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                 unrfc2047(M.get('subject', '_no_subject'))))
-                 .replace('\n', ' ') )
-      info("  " + self.format_message(M, "{short_from}->{short_recipients}"))
-      info("  " + M.get('message-id', '<?>'))
-      if self.message_path:
-        info("  " + shortpath(self.message_path))
+      info( (u("%s %s: %s") % (
+          time.strftime("%Y-%m-%d %H:%M:%S"),
+          self.format_message(M, "{short_from}->{short_recipients}"),
+          unrfc2047(M.get('subject', '_no_subject'))
+      )).replace('\n', ' ') )
+      msg_id = M.get('message-id', '<?>').replace('\n', ' ')
+      if message_path:
+        info("  " + shortpath(self.message_path) + " " + msg_id)
+      else:
+        info("  " + msg_id)
 
       # match the rules, gathering labels and save destinations
       try:
@@ -1148,7 +1168,6 @@ def get_targets(s, offset):
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
-    offset0 = offset
     T, offset = get_target(s, offset)
     targets.append(T)
     if offset < len(s):
@@ -1690,8 +1709,8 @@ class WatchedMaildir(O):
     self.rules_path = rules_path
     if rules_path is None:
       # default to looking for .mailfiler inside the Maildir
-      rules_path = os.path.join(self.mdir.dir, '.mailfiler')
-    self._rules = ()
+      rules_path = os.path.join(self.mdir.path, '.mailfiler')
+    self._rules = None
     self._rules_paths = [ rules_path ]
     self._rules_lock = Lock()
     self.lurking = set()
@@ -1714,7 +1733,7 @@ class WatchedMaildir(O):
 
   @property
   def path(self):
-    return self.mdir.dir
+    return self.mdir.path
 
   def keys(self, flush=False):
     return self.mdir.keys(flush=flush)

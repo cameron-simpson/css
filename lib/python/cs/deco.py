@@ -4,7 +4,25 @@
 #   - Cameron Simpson <cs@cskk.id.au> 02jul2017
 #
 
+r'''
+Some decorator functions: @decorator, @cached.
+
+* @decorator: decorator for decorators to imbue them with optional keyword arguments.
+* @cache: decorator for functions to cache their return value subject to some change detection.
+'''
+
 import time
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+    ],
+}
 
 def decorator(deco, *da, **dkw):
   ''' Wrapper for decorator functions to support optional keyword arguments.
@@ -141,7 +159,7 @@ if __name__ == '__main__':
     @cached(poll_delay=2)
     def x(self, y):
       return str(y)
-  F = Foo();
+  F = Foo()
   y = F.x(1)
   print("F.x() ==>", y)
   y = F.x(1)

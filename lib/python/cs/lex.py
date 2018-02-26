@@ -11,6 +11,8 @@ Generally the get_* functions accept a source string and an offset (often option
 
 * get_chars(s, offset, gochars): collect adjacent characters from `gochars`
 
+* get_decimal(s, offset): collect decimal characters (0-9, string.digits)
+
 * get_delimited(s, offset, delim): collect text up to the first ocurrence of the character `delim`.
 
 * get_envvar(s, offset=0, environ=None, default=None, specials=None): parse an environment variable reference such as $foo
@@ -82,8 +84,7 @@ ord_space = ord(' ')
 def unctrl(s, tabsize=8):
   s2 = ''
   sofar = 0
-  for i in range(len(s)):
-    ch = s[i]
+  for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
       pass
@@ -160,15 +161,12 @@ def phpquote(s):
   '''
   return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
-def dict2js(d):
-  import cs.json
-  return cs.json.json(d)
-
 # characters that may appear in text sections of a texthexify result
 # Notable exclusions:
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
+#  { } - used for JSON data and some other markup
 #  / - path separator
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
@@ -264,24 +262,34 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
 
-def skipwhite(s, offset):
+def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_decimal(s, offset=0):
+  ''' Scan the string `s` for decimal characters starting at `offset`.
+      Return dec_string, new_offset.
+  '''
+  return get_chars(s, offset, digits)
+
+def get_decimal_value(s, offset=0):
+  value_s, offset = get_decimal(s, offset)
+  if not value_s:
+    raise ValueError("expected decimal value")
+  return int(value_s), offset
 
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
@@ -289,10 +297,14 @@ def get_hexadecimal(s, offset=0):
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
+def get_hexadecimal_value(s, offset=0):
+  value_s, offset = get_hexadecimal(s, offset)
+  if not value_s:
+    raise ValueError("expected hexadecimal value")
+  return int('0x' + value_s), offset
+
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -317,10 +329,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
-  ''' Scan the string `s` for a dotted identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      with optional trailing dot and another dotted identifier,
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) with optional trailing dot and another dotted identifier, starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -363,7 +372,7 @@ SLOSH_CHARMAP = {
 }
 
 def slosh_mapper(c, charmap=SLOSH_CHARMAP):
-  ''' Return a string to replace \`c`, or None.
+  ''' Return a string to replace backslash-`c`, or None.
   '''
   return charmap.get(c)
 
@@ -402,7 +411,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     special_starts = set()
     special_seqs = []
     for special in specials.keys():
-      if len(special) == 0:
+      if not special:
         raise ValueError(
             'empty strings may not be used as keys for specials: %r' % (specials,))
       special_starts.add(special[0])
@@ -496,9 +505,10 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if ( c == slosh
-           or (delim is not None and c == delim)
-           or (specials is not None and c in special_starts)
+      if (
+          c == slosh
+          or (delim is not None and c == delim)
+          or (specials is not None and c in special_starts)
       ):
         break
       offset += 1

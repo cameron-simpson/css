@@ -5,10 +5,8 @@
 #
 
 from __future__ import print_function, absolute_import
-import os
-import sys
-import io
-import subprocess
+from getopt import GetoptError
+from logging import warning, exception
 from cs.pfx import Pfx
 
 def docmd(dofunc):

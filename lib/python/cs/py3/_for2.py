@@ -38,7 +38,7 @@ def ustr(s, e='utf-8', errors='strict'):
   if isinstance(s, str):
     try:
       s = s.decode(e, errors)
-    except UnicodeDecodeError, ude:
+    except UnicodeDecodeError as ude:
       from cs.logutils import warning
       warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
       s = s.decode(e, 'replace')

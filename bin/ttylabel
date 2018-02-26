@@ -11,6 +11,7 @@ usage="Usage: $cmd [-n] [--] [label...]"
 
 : ${TTYLABEL:=''}
 : ${TTYLABEL_SUPPRESS:=''}
+: ${TTYLABEL_BADGE:=''}
 
 [ -z "$TTYLABEL_SUPPRESS" ] || exit 0
 
@@ -87,5 +88,9 @@ label=`printf "%s" "$*" | tr -s ' \011\012\015\033' '    \['`
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
 [ -n "$_start_icon"  ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
+
+[ -z "${ITERM_SESSION_ID:-}" ] || {
+  iterm setvar terminal_badge "$TTYLABEL_BADGE"
+}
 
 exec necho "$ttylabel"

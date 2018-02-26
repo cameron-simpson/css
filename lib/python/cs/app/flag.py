@@ -24,7 +24,7 @@ It presents as a modifiable mapping whose keys are the flag names::
   flags = Flags()
   flags['UNTOPPOST'] = True
 
-The is also a FlaggedMixin class providing convenient methods and attributes
+There is also a FlaggedMixin class providing convenient methods and attributes
 for maintaining a collection of flags associated with some object
 with flag names prefixed by the object's .name attribute uppercased and with an underscore appended::
 
@@ -34,13 +34,19 @@ with flag names prefixed by the object's .name attribute uppercased and with an 
       FlaggedMixin.__init__(self)
       ...
     def disable(self):
-      self.flag_disabled = True
+      self.flag_disable = True
     def restart(self):
       self.flag_restart = True
     def _restart(self):
       self.flag_restart = False
       ... restart the SvcD ...
 
+so that an object set up as::
+
+  svcd - SvcD("portfwd")
+  print(svcd.flag_disable)
+
+accesses the flag named "PORTFWD_DISABLE".
 '''
 
 from __future__ import print_function
@@ -55,6 +61,7 @@ from threading import Thread
 from time import sleep
 from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
+from cs.pfx import Pfx
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -64,21 +71,29 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.env', 'cs.lex'],
+    'entry_points': {
+        'console_scripts': [
+            'flagset = cs.app.flag:main_flagset'
+        ],
+    },
 }
 
 
-USAGE = '''Usage:
+FLAG_USAGE = '''Usage:
   %s            Recite all flag values.
   %s flagname   Test value of named flag.
   %s flagname {0|1|false|true}
                 Set value of named flag.'''
 
-def main(argv):
+def main(argv=None):
   ''' Main program: inspect or modify flags.
   '''
-  argv = list(argv)
+  if argv is None:
+    argv = sys.argv
+  else:
+    argv = list(argv)
   cmd = argv.pop(0)
-  usage = USAGE % (cmd, cmd, cmd)
+  usage = FLAG_USAGE % (cmd, cmd, cmd)
   xit = 0
   flagdir = None
   F = Flags(flagdir=flagdir)
@@ -94,25 +109,83 @@ def main(argv):
         xit = 0 if F[k] else 1
       else:
         value = argv.pop(0)
-        if not argv:
-          if value == '0':
-            value = False
-          elif value == '1':
-            value = True
-          else:
-            value = value.lower()
-            if value == 'false':
-              value = False
-            elif value == 'true':
-              value = True
-            else:
-              raise GetoptError(
-                  "invalid key value, expected 0, 1, true or false, got: %s"
-                  % (value,))
-          F[k] = value
-        else:
+        if argv:
           raise GetoptError("unexpected values after key value: %s"
                             % (' '.join(argv),))
+        F[k] = truthy(value)
+  except GetoptError as e:
+    print("%s: warning: %s" % (cmd, e), file=sys.stderr)
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  return xit
+
+FLAGSET_USAGE = '''Usage: %s prefix [{set|clear}[-all]] [names...]
+  prefix    Prefix of flags involved: implies flags commencing {prefix}_
+  set       Set all flags whose suffixes are named on the input.
+  set-all   Set all flags whose suffixes are named on the input,
+            clear the remainder.
+  clear     Clear all flags whose suffixes are named on the input.
+  clear-all Clear all flags whose suffixes are named on the input,
+            set the remainder.
+  If no names are supplied, read the names from standard input.'''
+
+def main_flagset(argv=None, stdin=None):
+  ''' Main program for "flagset" command.
+  '''
+  if argv is None:
+    argv = sys.argv
+  else:
+    argv = list(argv)
+  if stdin is None:
+    stdin = sys.stdin
+  cmd = argv.pop(0)
+  usage = FLAGSET_USAGE % (cmd,)
+  xit = 0
+  flagdir = None
+  F = Flags(flagdir=flagdir)
+  badopts = False
+  try:
+    if not argv:
+      raise GetoptError("missing prefix")
+    prefix = argv.pop(0)
+    if not prefix:
+      raise GetoptError("invalid empty prefix")
+    all_names = sorted([ flagname for flagname in F if flagname.startswith(prefix) ])
+    if not argv:
+      # print current flag values
+      for flagname in all_names:
+        print(flagname, "TRUE" if F[flagname] else "FALSE")
+      return 0
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == 'set':
+        value = True
+        omitted = None
+      elif op == 'set-all':
+        value = True
+        omitted = False
+      elif op == 'clear':
+        value = False
+        omitted = None
+      elif op == 'clear-all':
+        value = False
+        omitted = True
+      else:
+        raise GetoptError("invalid operator, expected one of set, set-all, clear, clear-all")
+      updates = []
+      if argv:
+        for flagname in argv:
+          updates.append( (flagname, value) )
+      else:
+        for lineno, line in enumerate(stdin, 1):
+          with Pfx("%s:%d" % (stdin, lineno)):
+            if not line.endswith('\n'):
+              raise ValueError("missing newline")
+            flagname = line.rstrip()
+            updates.append((flagname, value))
+      F.update_prefix(prefix, updates, omitted_value=omitted)
   except GetoptError as e:
     print("%s: warning: %s" % (cmd, e), file=sys.stderr)
     badopts = True
@@ -131,13 +204,41 @@ def lowername(s):
   '''
   return s.replace('_', '-').lower()
 
+def truthy(value):
+  ''' Decide whether a value is considered true.
+      Strings are converted to:
+        '0': False
+        '1': True
+        'true': True (case insensitive)
+        'false': False (case insensitive)
+        Other values are unchanged.
+      Other types are converted with bool().
+  '''
+  if isinstance(value, str):
+    if value == '0':
+      value = False
+    elif value == '1':
+      value = True
+    else:
+      value = value.lower()
+      if value == 'false':
+        value = False
+      elif value == 'true':
+        value = True
+  else:
+    value = bool(value)
+  return value
+
 class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
   '''
 
-  def __init__(self, flags=None, debug=None):
+  def __init__(self, flags=None, debug=None, prefix=None):
     ''' Initialise the mixin.
         `flags`: optional parameter; if None defaults to a new default Flags().
+        `prefix`: optional prefix; if not proveded the prefix is
+          derived from the objects .name attribute, or is empty if
+          there is no .name
     '''
     if flags is None:
       flags = Flags(debug=debug)
@@ -145,6 +246,7 @@ class FlaggedMixin(object):
       if debug is not None:
         flags.debug = debug
     self.flags = flags
+    self.__flag_prefix = prefix
 
   def __flagname(self, suffix):
     ''' Compute a flag name from `suffix`.
@@ -152,9 +254,10 @@ class FlaggedMixin(object):
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
     '''
-    try:
-      name = self.name
-    except AttributeError:
+    name = self.__flag_prefix
+    if name is None:
+      name = getattr(self, 'name', None)
+    if name is None:
       flagname = suffix
     else:
       flagname = name + '_' + suffix
@@ -195,11 +298,15 @@ class Flags(MutableMapping, FlaggedMixin):
     MutableMapping.__init__(self)
     @contextmanager
     def mutex():
+      ''' Mutex context manager.
+      '''
       if lock:
         lock.acquire()
-      yield
-      if lock:
-        lock.release()
+      try:
+        yield
+      finally:
+        if lock:
+          lock.release()
     self._mutex = mutex
     if debug is None:
       debug = False
@@ -210,6 +317,9 @@ class Flags(MutableMapping, FlaggedMixin):
     self.dirpath = flagdir
     self.debug = debug
     self._old_flags = {}
+
+  def __repr__(self):
+    return "%s(dir=%r)" % (self.__class__.__name__, self.dirpath)
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -259,19 +369,21 @@ class Flags(MutableMapping, FlaggedMixin):
     flagpath = self._flagpath(k)
     try:
       S = os.stat(flagpath)
-    except OSError:
+    except OSError as e:
       value = False
+      if e.errno != errno.ENOENT:
+        print("os.stat(%r): %s", flagpath, e, file=sys.stderr)
     else:
       value = S.st_size > 0
     self._track(k, value)
     return value
 
-  def __setitem__(self, k, truthy):
+  def __setitem__(self, k, value):
     ''' Set the flag value.
         If true, write "1\n" to the flag file.
         If false, remove the flag file.
     '''
-    if truthy:
+    if truthy(value):
       value = True
       with self._mutex():
         if not self[k]:
@@ -283,11 +395,8 @@ class Flags(MutableMapping, FlaggedMixin):
       with self._mutex():
         if self[k]:
           flagpath = self._flagpath(k)
-          try:
-            os.remove(flagpath)
-          except OSError as e:
-            if e.errno != errno.ENOENT:
-              raise
+          with open(flagpath, 'w') as fp:
+            pass
     self._track(k, value)
 
   def __delitem__(self, k):
@@ -300,6 +409,25 @@ class Flags(MutableMapping, FlaggedMixin):
         self._old_flags[k] = value
     if value != old_value and self.debug:
       print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
+
+  def update_prefix(self, prefix, updates, omitted_value=False):
+    ''' Update all flag values commencing with `prefix`, falsifying any unmentioned flags.
+        `prefix`: common prefix for updated flags
+        `updates`: iterable of (flagname, flagvalue)
+        `omitted_value`: value to be assigned to any unmentioned flags, default False.
+          Set this to None to leave unmentioned flags alone.
+    '''
+    all_names = set( name for name in self if name.startswith(prefix) )
+    named = set()
+    for flagname, flagvalue in updates:
+      if not flagname.startswith(prefix):
+        raise ValueError("update flag %r does not start with prefix %r" % (flagname, prefix))
+      self[flagname] = flagvalue
+      named.add(flagname)
+    if omitted_value is not None:
+      for flagname in all_names:
+        if flagname not in named:
+          self[flagname] = omitted_value
 
 class PolledFlags(dict):
   ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.

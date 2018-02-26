@@ -64,22 +64,18 @@ def unrfc2047(s, warning=None):
         try:
           decoded = base64.b64decode(coded)
         except (ValueError, TypeError) as e:
-          warning("%r: %e", coded, e)
+          warning("%r: %s", coded, e)
           realtext = m.group()
       elif coding == 'Q':
         try:
           decoded = quopri.decodestring(coded.replace('_', ' '))
         except (UnicodeEncodeError, ValueError) as e:
-          warning("%r: %e", coded, e)
+          warning("%r: %s", coded, e)
           realtext = m.group()
       else:
         raise RuntimeError("unhandled RFC2047 string: %r" % (m.group(),))
       if realtext is None:
-        try:
-          realtext = decoded.decode(charset)
-        except (UnicodeDecodeError, LookupError) as e:
-          warning("decode(%r): %e", decoded, e)
-          realtext = decoded.decode('iso8859-1')
+        realtext = decoded.decode(charset, 'replace')
       chunks.append(realtext)
       sofar = end
   if sofar < len(s):

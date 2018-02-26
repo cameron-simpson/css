@@ -11,8 +11,9 @@ from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
-from cs.logutils import X, warning
+from cs.logutils import warning
 from cs.timeutils import time_func
+from cs.x import X
 
 DISTINFO = {
     'description': "RFC2616 (HTTP 1.1) facilities",

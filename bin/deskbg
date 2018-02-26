@@ -68,6 +68,9 @@ fi || exit 1
 case "$OS" in
   darwin)
     set -x
+    case "$rootbg" in
+      /*) ;; *) rootbg=$(pwd)/$rootbg ;;
+    esac
     osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$rootbg\""
     ;;
   *)

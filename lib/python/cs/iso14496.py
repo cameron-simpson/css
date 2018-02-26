@@ -239,10 +239,8 @@ class Box(object):
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
           class or Box if not present.
         `discard_data`: if false (default), keep the unparsed data portion as
-          a list of data chunk in the attribute .data_chunks; if true,
+          a list of data chunks in the attribute .data_chunks; if true,
           discard the unparsed data
-        `copy_offsets`: if not None, call `copy_offsets` with each
-          Box starting offset
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
@@ -252,7 +250,6 @@ class Box(object):
       cls = pick_box_class(box_header.type)
     B = cls(box_header)
     B.offset = offset0
-    X("Box.from_buffer: found %s at %d", bytes(B.box_type), offset0)
     bfr.report_offset(offset0)
     # further parse some or all of the data
     B.parse_data(bfr)

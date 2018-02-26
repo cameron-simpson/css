@@ -16,6 +16,7 @@ Convenience facilities related to Python functions.
 import sys
 from functools import partial
 from cs.excutils import transmute
+from cs.py3 import unicode
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -24,7 +25,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.excutils'],
+    'install_requires': ['cs.excutils', 'cs.py3'],
 }
 
 def funcname(func):
@@ -159,3 +160,18 @@ def returns_type(func, basetype):
       'check_returns_type[%s,basetype=%s]' % (citation, basetype)
   )
   return check_returns_type
+
+def yields_str(func):
+  ''' Decorator for generators which should yield strings.
+  '''
+  return yields_type(func, (str, unicode))
+
+def returns_bool(func):
+  ''' Decorator for functions which should return Booleans.
+  '''
+  return returns_type(func, bool)
+
+def returns_str(func):
+  ''' Decorator for functions which should return strings.
+  '''
+  return returns_type(func, (str, unicode))
