@@ -103,6 +103,8 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       backing_block = Block(data=b'')
     self.filename = None
     self._syncer = None     # syncing Thread, close waits for it
+    self._backing_block = None
+    self._blockmap = None
     self._reset(backing_block)
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
@@ -112,9 +114,15 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     return "File(backing_block=%s)" % (self._backing_block,)
 
   def _reset(self, new_backing_block):
-    self._backing_block = new_backing_block
-    self._file = BackedFile(BlockFile(new_backing_block))
-    self._file.flush = self.flush
+    old_backing_block = self._backing_block
+    if old_backing_block is not new_backing_block:
+      try:
+        del old_backing_block.blockmap
+      except AttributeError:
+        pass
+      self._backing_block = new_backing_block
+      self._file = BackedFile(BlockFile(new_backing_block))
+      self._file.flush = self.flush
 
   def startup(self):
     ''' Startup actions.
