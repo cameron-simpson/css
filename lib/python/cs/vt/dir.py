@@ -418,7 +418,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if block is None:
       block = Block(data=b'')
     self._open_file = None
-    self._lock = RLock()
     self._block = block
     self._check()
 
