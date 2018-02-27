@@ -253,7 +253,6 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       backing_block.get_blockmap()
 
-  @locked
   def read(self, size=-1, offset=None):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
