@@ -239,7 +239,9 @@ class _Block(Transcriber):
         end2 = offset2 + len(data2)
         offset += cmplen
         if offset > end1 or offset > end2:
-          raise RuntimeError("offset advanced beyond end of leaf1 or leaf2: offset=%d, end(leaf1)=%d, end(leaf2)= %d" % ( offset, end1, end2))
+          raise RuntimeError(
+              "offset advanced beyond end of leaf1 or leaf2: offset=%d, end(leaf1)=%d, end(leaf2)= %d"
+              % ( offset, end1, end2))
         if offset >= end2:
           # leaf2 consumed, discard
           leaf2 = None
@@ -487,6 +489,8 @@ class HashCodeBlock(_Block):
 
   @prop
   def transcribe_prefix(self):
+    ''' Transcription prefix: IB for an IndirectBlock and B for a direct Block.
+    '''
     return 'IB' if self.indirect else 'B'
 
   def transcribe_inner(self, T, fp):
@@ -581,9 +585,9 @@ class RLEBlock(_Block):
     if isinstance(octet, int):
       octet = bytes((octet,))
     elif not isinstance(octet, bytes):
-     raise TypeError(
-         "octet should be an int or a bytes instance but is %s: %r"
-         % (type(octet), octet))
+      raise TypeError(
+          "octet should be an int or a bytes instance but is %s: %r"
+          % (type(octet), octet))
     if len(octet) != 1:
       raise ValueError("len(octet):%d != 1" % (len(octet),))
     _Block.__init__(self, BlockType.BT_RLE, span=span, **kw)
@@ -591,9 +595,13 @@ class RLEBlock(_Block):
 
   @property
   def data(self):
+    ''' The data of this RLEBlock.
+    '''
     return self.octet * self.span
 
   def encode(self):
+    ''' Return the binary transcription of an RLEBlock.
+    '''
     return self._encode(0, self.span, BlockType.BT_RLE, 0, ( self.octet, ))
 
   def transcribe_inner(self, T, fp):
@@ -621,6 +629,8 @@ class LiteralBlock(_Block):
     self.data = data
 
   def encode(self):
+    ''' Return the binary transcription of a LiteralBlock.
+    '''
     return self._encode(0, self.span, BlockType.BT_LITERAL, 0,
                         ( self.data, ))
 
@@ -680,10 +690,14 @@ class _SubBlock(_Block):
 
   @property
   def data(self):
+    ''' The full data for this block.
+    '''
     # TODO: _Blocks need a subrange method that is efficient for indirect blocks
     return self._superblock.all_data()[self._offset:self._offset + self.span]
 
   def encode(self):
+    ''' Return the binary transcription of a SubBlock.
+    '''
     return self._encode(0, self.span, BlockType.BT_SUBBLOCK, 0,
                         ( put_bs(self._offset),
                           self._superblock.encode(),
