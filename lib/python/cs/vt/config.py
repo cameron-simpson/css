@@ -132,6 +132,11 @@ class Config:
     ''' Construct a store given its specification.
     '''
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
+      if 'type' in params:
+        # shuffle to avoid using builtin "type" as parameter name
+        if not isinstance(params, dict):
+          params = dict(params)
+        params['type_'] = params.pop('type')
       if store_name is None:
         store_name = str(self) + '[' + clause_name + ']'
       if store_type == 'config':
