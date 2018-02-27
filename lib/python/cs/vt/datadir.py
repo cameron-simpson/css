@@ -33,7 +33,6 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
@@ -372,6 +371,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             if F is not None:
               csvw.writerow( [n, F.filename] + F.csvrow() )
       ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+    X("SAVE DONE")
 
   def set_state(self, key, value):
     if not key.islower():
@@ -938,7 +938,9 @@ class PlatonicDir(_FilesDir):
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
         seen = set()
+        X("NEW WALK %r", datadirpath)
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
+          X("WALK: dirpath=%r", dirpath)
           if self.cancelled or self.flag_scan_disable:
             break
           rdirpath = relpath(dirpath, datadirpath)
@@ -970,6 +972,7 @@ class PlatonicDir(_FilesDir):
                     info("del %r", name)
                     del D[name]
             for filename in filenames:
+              X("WALK: dirpath=%r, filename=%r", dirpath, filename)
               with Pfx(filename):
                 if self.cancelled or self.flag_scan_disable:
                   break
@@ -980,6 +983,7 @@ class PlatonicDir(_FilesDir):
                   try:
                     F = filemap[rfilepath]
                   except KeyError:
+                    X("F: add datafile %r", rfilepath)
                     filenum = self._add_datafile(rfilepath)
                     F = filemap[filenum]
                     need_save = True
@@ -1047,11 +1051,12 @@ class PlatonicDir(_FilesDir):
                       need_save = True
                     # update state after completion of a scan
                     if need_save:
-                      self._save_state()
                       need_save = False
+                      self._save_state()
       if need_save:
-        self._save_state()
         need_save = False
+        self._save_state()
+      X("SLEEP 1 AFTER WALK")
       time.sleep(11)
 
   @staticmethod
