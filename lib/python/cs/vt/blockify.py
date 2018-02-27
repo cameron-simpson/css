@@ -296,7 +296,7 @@ def blocked_chunks_of(chunks, scanner,
     while True:
       chunk = get_next_chunk()
       if chunk is None:
-        return
+        break
       # verify current chunk start offset against end of previous chunk
       if chunk0 is not None:
         if offset != offset0 + len(chunk0):
