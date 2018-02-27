@@ -349,7 +349,7 @@ def blocked_chunks_of(chunks, scanner,
         while True:
           if in_offsets:
             next_offset = heappop(in_offsets)
-            if next_offset >= first_possible_point:
+            if next_offset > offset and next_offset >= first_possible_point:
               break
           else:
             next_offset = None
