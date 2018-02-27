@@ -18,7 +18,6 @@ import sys
 from tempfile import TemporaryFile
 from threading import Thread
 from cs.resources import RunStateMixin
-from cs.x import X
 from . import defaults
 
 # the record format uses 4 byte integer offsets
@@ -263,7 +262,6 @@ class BlockMap(RunStateMixin):
       return
     mapped_to = self.mapped_to
     if mapped_to < offset + span:
-      X("PARTIALLY MAPPED: mapped_to=%d, offset=%d, span=%d", mapped_to, offset, span)
       # a portion of the span is outside the mapped range
       mapped_span = mapped_to - offset
       if mapped_span > 0:
@@ -272,8 +270,6 @@ class BlockMap(RunStateMixin):
         span -= mapped_span
         offset += mapped_span
       # fetch the unmapped data by traversing the Block tree
-      X("get block.chunks: offst=%d, span=%d, offset+span=%d",
-        offset, span, offset+span)
       yield from self.block.slices(offset, offset + span, no_blockmap=True)
       return
     S = self.S
@@ -300,23 +296,23 @@ class BlockMap(RunStateMixin):
       else:
         i -= 1
     assert submap[i] <= offset
-    with S:
-      while span > 0:
-        leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
-        leaf_offset += submap_base
-        start = offset - leaf_offset
-        end = start + min(span, leaf_span - start)
+    while span > 0:
+      leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
+      leaf_offset += submap_base
+      start = offset - leaf_offset
+      end = start + min(span, leaf_span - start)
+      with S:
         leaf = S[hashclass(leaf_hashcode)]
-        yield leaf, start, end
-        yielded_length = end - start
-        offset += yielded_length
-        span -= yielded_length
-        if span > 0:
-          i += 1
-          if i == len(submap):
-            submap = submap.nextmap
-            submap_base = submap.base
-            i = 0
+      yield leaf, start, end
+      yielded_length = end - start
+      offset += yielded_length
+      span -= yielded_length
+      if span > 0:
+        i += 1
+        if i == len(submap):
+          submap = submap.nextmap
+          submap_base = submap.base
+          i = 0
 
   def data(self, offset, span):
     ''' Return the data from [offset:offset+span] as a single bytes object.
