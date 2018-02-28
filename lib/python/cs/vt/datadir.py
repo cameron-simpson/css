@@ -477,7 +477,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       oldF = None
       nsaves = 0
       need_sync = False
-      for hashcode, entry, post_offset in self._indexQ:
+      indexQ = self._indexQ
+      for hashcode, entry, post_offset in indexQ:
         if not isinstance(entry, entry_class):
           raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
         with self._lock:
@@ -502,11 +503,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             XP("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
           oldF = F
           need_sync = True
-        if need_sync:
+        if need_sync and indexQ.empty():
+          X("INDEX UPDATER SYNC...")
           index.flush()
           self._save_state()
           need_sync = False
           nsaves = 0
+          X("INDEX UPDATER SYNC DONE")
       index.flush()
       self._save_state()
 
