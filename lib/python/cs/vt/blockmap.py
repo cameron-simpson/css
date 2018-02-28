@@ -202,7 +202,15 @@ class BlockMap(RunStateMixin):
         if submap_fp is None:
           submap_fp = TemporaryFile('wb')
           submap_index = leaf_submap_index
-        h = leaf.hashcode
+        try:
+          h = leaf.hashcode
+        except AttributeError:
+          # make a conventional HashCodeBlock and index that
+          from .block import HashCodeBlock
+          data = leaf.data
+          if len(data) >= 65536:
+            warning("promoting %d bytes from %s to a new HashCodeBlock", len(data), leaf)
+          leaf = HashCodeBlock(data=data)
         submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
         submap_fp.write(h)
         offset += leaf.span
