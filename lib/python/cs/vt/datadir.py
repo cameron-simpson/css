@@ -943,9 +943,13 @@ class PlatonicDir(_FilesDir):
         seen = set()
         X("NEW WALK %r", datadirpath)
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
-          X("WALK: dirpath=%r", dirpath)
           if self.cancelled or self.flag_scan_disable:
             break
+          X("WALK: dirpath=%r", dirpath)
+          # update state before scan
+          if need_save:
+            need_save = False
+            self._save_state()
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
             pruned_dirnames = []
@@ -1052,10 +1056,6 @@ class PlatonicDir(_FilesDir):
                       E.block = top_block
                       D.changed = True
                       need_save = True
-                    # update state after completion of a scan
-                    if need_save:
-                      need_save = False
-                      self._save_state()
       if need_save:
         need_save = False
         self._save_state()
