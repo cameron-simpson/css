@@ -101,7 +101,7 @@ class _Dirent(Transcriber):
     flags, offset = get_bs(data, offset)
     if flags & F_HASNAME:
       namedata, offset = get_bsdata(data, offset)
-      name = namedata.decode()
+      name = bytes(namedata).decode()
     else:
       name = ""
     if flags & F_HASMETA:
