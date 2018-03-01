@@ -4,5 +4,5 @@
 #	- Cameron Simpson, 05nov1993
 #
 
-loop -E ! -- ${1+"$@"}
+loop -E ! ${1+"$@"}
 exit 0
