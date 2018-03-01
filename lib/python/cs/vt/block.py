@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-import sys
+from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
+import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify
 from cs.logutils import warning
@@ -164,7 +165,7 @@ def encodeBlock(B):
 def isBlock(o):
   return isinstance(o, _Block)
 
-class _Block(Transcriber):
+class _Block(Transcriber, ABC):
 
   def __init__(self, block_type, span, *, indirect=False):
     if not isinstance(span, int) or span < 0:
@@ -262,6 +263,14 @@ class _Block(Transcriber):
     '''
     return b''.join(encoded_Block_fields(flags, span, block_type, block_type_flags, chunks))
 
+  def __getattr__(self, attr):
+    if attr == 'subblocks':
+      if not self.indirect:
+        raise AttributeError('%r: Block is direct, no .subblocks' % (attr,))
+      self.subblocks = Bs = tuple(decodeBlocks(self.data))
+      return Bs
+    raise AttributeError(attr)
+
   def __getitem__(self, index):
     ''' Return specified direct data.
     '''
@@ -271,6 +280,13 @@ class _Block(Transcriber):
     ''' len(Block) is the length of the encompassed data.
     '''
     return self.span
+
+  def all_data(self):
+    '''
+    '''
+    if self.indirect:
+      return b''.join(leaf.data for leaf in self.leaves)
+    return self.data
 
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
@@ -282,20 +298,13 @@ class _Block(Transcriber):
       return self.data == odata
     return h == h.from_chunk(odata)
 
-  @locked_property
-  def subblocks(self):
-    if not self.indirect:
-      raise AttributeError("Block is direct, no .subblocks")
-    return tuple(decodeBlocks(self.data))
-
   @property
   def leaves(self):
     ''' Return the leaf (direct) blocks.
     '''
     if self.indirect:
       for B in self.subblocks:
-        for subB in B.leaves:
-          yield subB
+        yield from B.leaves
     elif self.span > 0:
       yield self
 
@@ -412,11 +421,6 @@ class _Block(Transcriber):
               % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
 
-  def all_data(self):
-    ''' The entire data of this Block as a single bytes object.
-    '''
-    return b''.join(self.chunks())
-
   def textencode(self):
     return totext(self.encode())
 
@@ -465,13 +469,11 @@ class HashCodeBlock(_Block):
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
 
-  def stored_data(self):
-    ''' The direct data of this Block.
-        i.e. _not_ the data implied by an indirect Block.
-    '''
-    S = defaults.S
-    hashcode = self.hashcode
-    return S[hashcode]
+  def __getattr__(self, attr):
+    if attr == 'data':
+      self.data = bs = defaults.S[self.hashcode]
+      return bs
+    return super().__getattr__(attr)
 
   def encode(self):
     flags = 0
@@ -480,12 +482,6 @@ class HashCodeBlock(_Block):
     hashcode = self.hashcode
     return self._encode(flags, self.span, BlockType.BT_HASHCODE, 0,
                         ( hashcode.encode(), ))
-
-  @property
-  def data(self):
-    ''' The direct data of this Block.
-    '''
-    return self.stored_data()
 
   @prop
   def transcribe_prefix(self):
@@ -688,8 +684,13 @@ class _SubBlock(_Block):
       self._superblock = SuperB
       self._offset = suboffset
 
-  @property
-  def data(self):
+  def __getattr__(self, attr):
+    if attr == 'data':
+      self.data = bs = self.all_data()
+      return bs
+    return super().__getattr__(attr)
+
+  def all_data(self):
     ''' The full data for this block.
     '''
     # TODO: _Blocks need a subrange method that is efficient for indirect blocks
