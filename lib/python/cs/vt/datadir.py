@@ -846,12 +846,16 @@ class PlatonicDir(_FilesDir):
           whose basename commences with a dot.
         `follow_symlinks`: follow symbolic links, default False.
         `meta_store`: an optional Store used to maintain a Dir
-          representing the ideal directory
+          representing the ideal directory; unhashed data blocks
+          encountered during scans which are promoted to HashCodeBlocks
+          are also stored here
         `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
         Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
     '''
+    if meta_store is None:
+      raise ValueError("meta_store may not be None")
     super().__init__(statedirpath, datadirpath, hashclass, create_datadir=False, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
