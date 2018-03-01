@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
-from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
+from os.path import basename, join as joinpath, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
 import stat
 import sys
 from threading import RLock
@@ -33,16 +33,16 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
-from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
+from .blockify import top_block_for, blocked_chunks_of, spliced_blocks
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
-from .paths import decode_Dirent_text
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -156,7 +156,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
       create_statedir=None, create_datadir=None,
-      flags=None, flag_prefix=None):
+      flags=None, flag_prefix=None
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -459,7 +460,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def _queue_index(self, hashcode, entry, post_offset):
     if not isinstance(entry, self.index_entry_class):
-      raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
+      raise RuntimeError("expected %s but got %s %r" % (self.index_entry_class, type(entry), entry))
     with self._lock:
       self._unindexed[hashcode] = entry
     self._indexQ.put( (hashcode, entry, post_offset) )
@@ -574,7 +575,7 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
   '''
 
   @classmethod
-  def from_bytes(cls, data:bytes):
+  def from_bytes(cls, data: bytes):
     ''' Parse a binary index entry, return (n, offset).
     '''
     n, offset = get_bs(data)
@@ -607,7 +608,8 @@ class DataDir(_FilesDir):
   def __init__(self,
       statedirpath, datadirpath, hashclass, *,
       rollover=None,
-      **kw):
+      **kw
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -770,7 +772,7 @@ class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length
   '''
 
   @classmethod
-  def from_bytes(cls, data:bytes):
+  def from_bytes(cls, data: bytes):
     ''' Parse a binary index entry, return (n, offset).
     '''
     n, offset = get_bs(data)
@@ -827,7 +829,8 @@ class PlatonicDir(_FilesDir):
       create_datadir=False,
       exclude_dir=None, exclude_file=None,
       follow_symlinks=False, archive=None, meta_store=None,
-      **kw):
+      **kw
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
