@@ -35,10 +35,13 @@ class MappedFD:
   '''
 
   def __init__(self, fp, mapsize, recsize, start_offset, end_offset, submap_index):
-    ''' Initialise the MappedFD from a file.
+    ''' Initialise a MappedFD from a file.
         `fp`: the file whose contents will be mapped
+        `mapsize`: the span covered by a submap
         `recsize`: the size of each record in the file
-
+        `start_offset`: the offset of the first leaf
+        `end_offset`: the offset of the end of the last leaf
+        `submap_index`: the index of this map
         The file's file descriptor is dup()ed and the dup used to manage the
         memory map, allowing the original file to be closed.
     '''
