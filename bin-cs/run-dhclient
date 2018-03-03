@@ -68,6 +68,7 @@ while sleep "$probe_interval"
 do
   { kill -0 "$dhpid" && echo probe | nc -w "$probe_timeout" "$probe_ip" "$probe_port" >/dev/null
   } || {
+    date
     echo "RESTARTING $* ..."
     while kill "$dhpid"
     do
