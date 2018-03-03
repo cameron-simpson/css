@@ -15,9 +15,11 @@ from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
 from struct import Struct
 import sys
+from time import time
 from tempfile import TemporaryFile
 from threading import Thread
 from cs.resources import RunStateMixin
+from cs.x import X
 from . import defaults
 
 # the record format uses 4 byte integer offsets
@@ -136,7 +138,7 @@ class BlockMap(RunStateMixin):
     self.mapsize = mapsize
     self.block = block
     self.S = defaults.S
-    self.maps = []
+    self.maps = [_MappedFDStub(0)]
     self.mapped_to = 0
     self.recsize = 4 + self.S.hashclass.HASHLEN
     self._loaded = False
@@ -156,6 +158,7 @@ class BlockMap(RunStateMixin):
   def close(self):
     ''' Release the resources associated with the BlockMap.
     '''
+    X("BlockMap.close...")
     self.cancel()
     self.join()
     maps = self.maps
@@ -168,43 +171,68 @@ class BlockMap(RunStateMixin):
   def _load_maps(self):
     ''' Walk the block tree assembling the mapping.
     '''
+    X("_load_maps...")
+    start_time = time()
+    nleaves = 0
     with self.S:
       maps = self.maps
       recsize = self.recsize
       mapsize = self.mapsize
-      submap_index = -1
+      submap_index = 0
       submap_fp = None
       offset = 0
       prevmap = None
       offset0 = offset
+      def flush_submap_fp():
+        ''' Turn the current submap_fp into a MappedFD and store it.
+            Then pad the maps with None until we're ready for the next map.
+        '''
+        nonlocal submap_fp, maps, mapsize, recsize
+        nonlocal prevmap, offset0, offset
+        nonlocal submap_index, leaf_submap_index
+        X("flush_submap_fp: len(maps)=%d (includes stub), submap_index=%d", len(maps), submap_index)
+        # construct a submap for the current map file
+        submap_fp.flush()
+        # discard the end stub
+        maps.pop()
+        assert submap_index == len(maps), \
+            "submap_index(%d) != len(maps)(%d), maps=%r" \
+            % (submap_index, len(maps), maps)
+        # append a MappedFD for the current file and close it
+        newmap = MappedFD(submap_fp, mapsize, recsize, offset0, offset, submap_index)
+        maps.append(newmap)
+        submap_fp.close()
+        submap_fp = None
+        if prevmap is not None:
+          prevmap.nextmap = newmap
+        newmap.prevmap = prevmap
+        prevmap = newmap
+        # pad the map with None until submap_index == leaf_submap_index
+        while len(maps) < leaf_submap_index:
+          maps.append(None)
+        submap_index = len(maps)
+        # add a new end stub
+        last_submap = _MappedFDStub(offset)
+        maps.append(last_submap)
+        prevmap.nextmap = last_submap
+        self.mapped_to = offset
+        # reset offset0 for the new submap
+        offset0 = offset
       for leaf in self.block.leaves:
+        if nleaves % 4096 == 0:
+          X("... mapped %d leaves in %gs", nleaves, time() - start_time)
+        nleaves += 1
+        self.self_check()
         if self.cancelled:
+          X("CANCELLED: abort submap construction")
           return
         leaf_submap_index = offset // mapsize
         leaf_submap_offset = offset % mapsize
-        while submap_index < leaf_submap_index:
-          if submap_index >= 0:
-            # save the current map
-            if submap_fp is None:
-              maps.append(None)
-            else:
-              submap_fp.flush()
-              assert submap_index == len(maps)
-              newmap = MappedFD(submap_fp, mapsize, recsize, offset0, offset, len(maps))
-              if prevmap is not None:
-                assert prevmap.nextmap is None
-                prevmap.nextmap = newmap
-                newmap.prevmap = prevmap
-              prevmap = newmap
-              offset0 = offset
-              maps.append(newmap)
-              submap_fp.close()
-              submap_fp = None
-              self.mapped_to = offset
-          submap_index += 1
+        if submap_index < leaf_submap_index:
+          flush_submap_fp()
+          assert submap_index == leaf_submap_index
         if submap_fp is None:
           submap_fp = TemporaryFile('wb')
-          submap_index = leaf_submap_index
         try:
           h = leaf.hashcode
         except AttributeError:
@@ -218,41 +246,25 @@ class BlockMap(RunStateMixin):
         submap_fp.write(h)
         offset += leaf.span
       if submap_fp is not None:
-        submap_fp.flush()
-        newmap = MappedFD(submap_fp, mapsize, recsize, offset0, offset, len(maps))
-        maps.append(newmap)
-        if prevmap is not None:
-          assert prevmap.nextmap is None
-          prevmap.nextmap = newmap
-          newmap.prevmap = prevmap
-        prevmap = newmap
-        submap_fp.close()
-        self.mapped_to = offset
-      final_submap_index = offset // mapsize
-      while submap_index < final_submap_index:
-        maps.append(None)
-        submap_index += 1
-      # dummy map on the end of the list to hold the final offset
-      newmap = _MappedFDStub(offset)
-      assert prevmap.nextmap is None
-      prevmap.nextmap = newmap
-      maps.append(newmap)
+        flush_submap_fp()
     self._loaded = True
+    end_time = time()
+    X("mapped %d leaves in %gs", nleaves, end_time - start_time)
     self.self_check()
 
   def self_check(self):
     ''' Perform some integrity tests.
     '''
-    assert self._loaded
+    ##assert self._loaded
     maps = self.maps
     for i in range(len(maps)-1):
       submap = maps[i]
       if submap is None:
         continue
       assert isinstance(submap, MappedFD), \
-          "maps[%d] is not a MappedFD: %r" % (i, type(submap))
+          "maps[%d] is not a MappedFD: %r; maps=%r" % (i, type(submap), maps)
       assert maps[i].nextmap is not None, \
-          "len(maps)=%d: maps[%d].nextmap=%s" % (len(maps), i, maps[i].nextmap)
+          "len(maps)=%d: maps[%d].nextmap=%s; maps=%r" % (len(maps), i, maps[i].nextmap, maps)
     assert isinstance(maps[-1], _MappedFDStub)
 
   def chunks(self, offset, span):
@@ -293,7 +305,6 @@ class BlockMap(RunStateMixin):
     while submap is None:
       submap_index -= 1
       submap = maps[submap_index]
-    submap_base = submap.base
     i = bisect_left(submap, submap_offset)
     assert i >= 0 and i <= len(submap)
     if i == len(submap):
@@ -307,6 +318,8 @@ class BlockMap(RunStateMixin):
       else:
         i -= 1
     assert submap[i] <= offset
+    ##X("maps=%d:%r, submap_index=%d", len(maps), maps, submap_index)
+    submap_base = submap.base
     while span > 0:
       leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
       leaf_offset += submap_base
