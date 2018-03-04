@@ -3,6 +3,7 @@
 from __future__ import print_function
 from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
+from functools import lru_cache
 import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify
@@ -435,6 +436,14 @@ class _Block(Transcriber, ABC):
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
+@lru_cache(maxsize=1024*1024, typed=True)
+def get_HashCodeBlock(hashcode, span, indirect):
+  ''' Caching constructor for HashCodeBlocks of known code.
+  '''
+  if hashcode is None or span <= 0:
+    raise ValueError("invalid hashcode(%s) or span(%s)" % (hashcode, span))
+  return HashCodeBlock(hashcode=hashcode, span=span, indirect=indirect)
+
 class HashCodeBlock(_Block):
 
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
@@ -516,7 +525,7 @@ def Block(hashcode=None, data=None, span=None, added=False, indirect=False):
   ''' Factory function for a Block.
   '''
   if data is None:
-    B = HashCodeBlock(hashcode=hashcode, span=span, indirect=indirect)
+    B = get_HashCodeBlock(hashcode, span, indirect)
   else:
     if span is None:
       span = len(data)
@@ -554,7 +563,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None):
       raise ValueError("one of subblocks or hashcode must be supplied")
     if span is None:
       raise ValueError("no span supplied with hashcode %s" % (hashcode,))
-    B = HashCodeBlock(hashcode=hashcode, span=span, indirect=True)
+    B = get_HashCodeBlock(hashcode, span, True)
   else:
     # subblocks specified
     if hashcode is not None:
