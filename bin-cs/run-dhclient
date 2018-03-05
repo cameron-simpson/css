@@ -66,7 +66,11 @@ dhpid=$!
 
 while sleep "$probe_interval"
 do
-  { kill -0 "$dhpid" && echo probe | nc -w "$probe_timeout" "$probe_ip" "$probe_port" >/dev/null
+  { kill -0 "$dhpid" && (
+      ( ( echo probe; sleep 1; sleep "$probe_timeout" ) \
+        | nc -w "$probe_timeout" "$probe_ip" "$probe_port" &
+      ) | read ssh_greeting
+    )
   } || {
     date
     echo "RESTARTING $* ..."
