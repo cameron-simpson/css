@@ -3,6 +3,8 @@
 
 set -ue
 
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+
 trace=set-x
 rrdstep=10
 rrdslots=3153600
@@ -30,19 +32,47 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+case "$OS" in
+  darwin)   method=netstat bytes_in_col=7 bytes_out_col=10 ;;
+  openbsd)  method=netstat bytes_in_col=5 bytes_out_col=6 ;;
+  linux)    method=proc_net_dev bytes_in_col=2 bytes_out_col=10 ;;
+  *)        echo "$cmd: unsupported OS: $OS" >&2
+            exit 1
+            ;;
+esac
+
 dir=$HOME/var/rrd/$HOST
 
 [ -d "$dir" ] || $trace mkdir "$dir"
 
-if [ $# = 0 ]
-then  netstat -ib
-else  for iface
-      do  netstat -ib -I "$iface"
+case "$method" in
+  netstat)
+    if [ $# = 0 ]
+    then  netstat -n -ib
+    else  for iface
+          do  netstat -n -ib -I "$iface"
+          done
+    fi
+    ;;
+  proc_net_dev)
+    if [ $# = 0 ]
+    then
+      sed '1,2d; s/: / /' /proc/net/dev
+    else
+      for iface
+      do
+        sed -n "1,2d; /^$iface:/s/: / /" /proc/net/dev
       done
-fi \
-| awk '
-    NR > 1 && !seen[$1] && $7 > 0 && $10 > 0 {
-        print $1, $7, $10
+    fi
+    ;;
+  *)echo "$cmd: unimplemented method: $method" >&2
+    exit 1
+    ;;
+esac \
+| awk -v "bytes_in_col=$bytes_in_col" \
+      -v "bytes_out_col=$bytes_out_col" \
+   'NR > 1 && !seen[$1] && $bytes_in_col > 0 && $bytes_out_col > 0 {
+        print $1, $bytes_in_col, $bytes_out_col
         seen[$1]=1
     }' \
 | \
