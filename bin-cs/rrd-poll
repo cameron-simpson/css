@@ -4,12 +4,31 @@
 set -ue
 
 trace=set-x
-
-: ${HOST:=`hostname -s`}
+rrdstep=10
+rrdslots=3153600
+create=
+host=${HOST:-`hostname -s`}
 
 cmd=$0
-usage="Usage: $cmd [-h host] [interfaces...]
+usage="Usage: $cmd [-c] [-h host] [--] [interfaces...]
+  -c        Create missing RRD tables.
   -h host   Local hostname. Default: $HOST"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) create=1 ;;
+    -h) host=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 dir=$HOME/var/rrd/$HOST
 
@@ -32,11 +51,16 @@ fi \
   while read iface bytes_in bytes_out
   do
     rrdfile=$dir/$iface.rrd
-    [ -s "$rrdfile" ] || {
+    [ -s "$rrdfile" ] \
+    || \
+    if [ $create ]
+    then
+      $trace rrdtool create "$rrdfile" --step "$rrdstep" DS:bytes_in:COUNTER:10:0:U DS:bytes_out:COUNTER:10:0:U "RRA:MAX:0.5:1:$rrdslots"
+    else
       echo "$cmd: $iface: missing RRD file: $rrdfile" >&2
       xit=1
       continue
-    }
+    fi
     $trace rrdtool update "$rrdfile" -t bytes_in:bytes_out "N:$bytes_in:$bytes_out"
   done
   exit $xit
