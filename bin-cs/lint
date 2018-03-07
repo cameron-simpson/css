@@ -18,26 +18,72 @@ xit=0
 
 for lintfile
 do
+  type=
+  magic=
   case "$lintfile" in
-    *.json)
+    [a-z]*:*)
+      type=$( expr "x$lintfile" : 'x\([a-z][^:]*\):.*' )
+      tail=$( expr "x$lintfile" : 'x[a-z][^:]*:\(.*\)' )
+      [ -f "$tail" ] && lintfile=$tail
+      ;;
+  esac
+  if [ -z "$type" ]
+  then
+    case "$lintfile" in
+      *.json | *.go | *.php | *.py )
+        type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
+        ;;
+      *.pl | *.pm )
+        type=pl
+        ;;
+      *.py)
+        type=py
+        ;;
+    esac
+  fi
+  if [ -z "$type" ] && magic=$( file "$lintfile" )
+  then
+    case "$magic" in
+      *'perl script'*)          type=pl ;;
+      *'python script'*)        type=py ;;
+      *'POSIX shell script'*)   type=sh ;;
+    esac
+  fi
+  [ -n "$type" ] || {
+    echo "$cmd: $lintfile: unknown type (magic=$magic)" >&2
+    continue
+  }
+
+  case "$type" in
+    json)
       $trace json-pprint <"$lintfile" 2>&1 >/dev/null || xit=1
       ;;
-    *.go)
+    go)
       $trace go tool vet -all -shadowstrict "$lintfile" || xit=1
       ;;
-    *.php)
+    php)
       { $trace php -l "$lintfile" \
         && $trace phpcs --standard=PSR2 --report=emacs "$lintfile"
       } || xit=1
       ;;
-    *.py)
+    py)
       { $trace python3 -m py_compile "$lintfile" \
         && $trace pyflakes "$lintfile" \
-        && $trace pep8 --ignore=E111,E114,E126,E201,E202,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
-        && $trace pylint "$lintfile"
+        && $trace pep8 --ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
+        && $trace pylint --disable=bad-whitespace,invalid-name "$lintfile"
       } || xit=1
       ;;
-    *)echo "$cmd: no lint for $lintfile"
+    py2)
+      { $trace python -m py_compile "$lintfile" \
+        && $trace pyflakes "$lintfile" \
+        && $trace pep8 --ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
+        && $trace pylint --disable=bad-whitespace,invalid-name "$lintfile"
+      } || xit=1
+      ;;
+    sh)
+      $trace shellcheck -s sh "$lintfile" || xit=1
+      ;;
+    *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
       ;;
   esac
 done

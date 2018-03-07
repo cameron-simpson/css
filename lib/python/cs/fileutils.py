@@ -5,18 +5,6 @@
 #
 
 from __future__ import with_statement, print_function, absolute_import
-
-DISTINFO = {
-    'description': "convenience functions and classes for files and filenames/pathnames",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.result', 'cs.debug', 'cs.deco', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.py3'],
-}
-
 from contextlib import contextmanager
 import datetime
 import errno
@@ -40,10 +28,31 @@ from cs.py3 import ustr, bytes
 from cs.range import Range
 from cs.threads import locked
 from cs.timeutils import TimeoutError
-from cs.x import X
+
+DISTINFO = {
+    'description': "convenience functions and classes for files and filenames/pathnames",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.env',
+        'cs.filestate',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py3',
+        'cs.range',
+        'cs.threads',
+        'cs.timeutils',
+    ],
+}
 
 DEFAULT_POLL_INTERVAL = 1.0
-DEFAULT_READSIZE = 8192
+DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
 
 try:
@@ -57,7 +66,7 @@ except ImportError:
     chunks = []
     while size > 0:
       data = os.read(fd, size)
-      if len(data) == 0:
+      if not data:
         break
       chunks.append(data)
       size -= len(data)
@@ -120,11 +129,11 @@ def compare(f1, f2, mode="rb"):
       If `f1` or `f2` is a string, open the named file using `mode`
       (default: "rb").
   '''
-  if type(f1) is str:
+  if isinstance(f1, str):
     with open(f1, mode) as f1fp:
       return compare(f1fp, f2, mode)
-  if type(f2) is str:
-    with open (f2, mode) as f2fp:
+  if isinstance(f2, str):
+    with open(f2, mode) as f2fp:
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
@@ -176,14 +185,16 @@ def rewrite(filepath, data,
       shutil.copyfile(T.name, filepath)
 
 @contextmanager
-def rewrite_cmgr(pathname,
-            mode='w',
-            backup_ext=None,
-            keep_backup=False,
-            do_rename=False,
-            do_diff=None,
-            empty_ok=False,
-            overwrite_anyway=False):
+def rewrite_cmgr(
+    pathname,
+    mode='w',
+    backup_ext=None,
+    keep_backup=False,
+    do_rename=False,
+    do_diff=None,
+    empty_ok=False,
+    overwrite_anyway=False
+):
   ''' Rewrite a file, presented as a context manager.
       `mode`: file write mode, defaulting to "w" for text.
       `backup_ext`: backup extension. None means no backup.
@@ -197,7 +208,7 @@ def rewrite_cmgr(pathname,
   if backup_ext is None:
     backuppath = None
   else:
-    if len(backup_ext) == 0:
+    if not backup_ext:
       backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
     backuppath = pathname + backup_ext
   dirpath = dirname(pathname)
@@ -426,8 +437,8 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
             changed = True
           else:
             changed = False
-	    # Instead of breaking out of the loop below on the first change
-	    # found we actually stat every file path because we want to
+            # Instead of breaking out of the loop below on the first change
+            # found we actually stat every file path because we want to
             # maximise the coverage of the stability check after the load.
             for path, old_filestate in zip(old_paths, old_filestates):
               try:
@@ -509,7 +520,6 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
         complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
       else:
         if now - complaint_last >= complaint_interval:
-          from cs.logutils import warning
           warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
                   os.getpid(), now - start, lockpath)
           complaint_last = now
@@ -542,27 +552,29 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       `poll_interval`: polling frequency when timeout is not 0.
   '''
   lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
-  yield lockpath
-  os.remove(lockpath)
+  try:
+    yield lockpath
+  finally:
+    os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
   '''
-  pfx=ustr(pfx)
-  maxn=None
-  pfxlen=len(pfx)
+  pfx = ustr(pfx)
+  maxn = None
+  pfxlen = len(pfx)
   for e in os.listdir(dirpath):
     e = ustr(e)
     if len(e) <= pfxlen or not e.startswith(pfx):
       continue
     tail = e[pfxlen:]
     if tail.isdigit():
-      n=int(tail)
+      n = int(tail)
       if maxn is None:
-        maxn=n
+        maxn = n
       elif maxn < n:
-        maxn=n
+        maxn = n
   return maxn
 
 def mkdirn(path, sep=''):
@@ -576,7 +588,7 @@ def mkdirn(path, sep=''):
               "sep contains os.sep (%r)"
               % (os.sep,))
     opath = path
-    if len(path) == 0:
+    if not path:
       path = '.' + os.sep
 
     if path.endswith(os.sep):
@@ -588,8 +600,8 @@ def mkdirn(path, sep=''):
       pfx = ''
     else:
       dirpath = dirname(path)
-      if len(dirpath) == 0:
-        dirpath='.'
+      if not dirpath:
+        dirpath = '.'
       pfx = basename(path)+sep
 
     if not isdir(dirpath):
@@ -616,7 +628,7 @@ def mkdirn(path, sep=''):
           continue
         error("mkdir(%s): %s", newpath, e)
         return None
-      if len(opath) == 0:
+      if not opath:
         newpath = basename(newpath)
       return newpath
 
@@ -624,15 +636,13 @@ def tmpdir():
   ''' Return the pathname of the default temporary directory for scratch data,
       $TMPDIR or '/tmp'.
   '''
-  tmpdir = os.environ.get('TMPDIR')
-  if tmpdir is None:
-    tmpdir = '/tmp'
-  return tmpdir
+  return os.environ.get('TMPDIR', '/tmp')
 
 def tmpdirn(tmp=None):
   ''' Make a new temporary directory with a numeric suffix.
   '''
-  if tmp is None: tmp=tmpdir()
+  if tmp is None:
+    tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
@@ -731,7 +741,7 @@ class ReadMixin(object):
         and back files and a CornuCopyBuffer which has natural
         blocks from its source iterator.
     '''
-    return file_data(self, n, rsize=None)
+    return file_data(self, n, rsize=rsize)
 
   def read(self, n):
     ''' Do a single potentially short read.
@@ -744,18 +754,15 @@ class ReadMixin(object):
     ''' Read data into a bytearray.
         Uses read_natural to obtain data in as efficient a fashion as possible.
     '''
-    X("readinto(barray=%s:len=%d)", id(barray), len(barray))
     needed = len(barray)
     boff = 0
     for bs in self.read_natural(needed):
       bs_len = len(bs)
-      X("readinfo: got %d bytes from read_natural(needed=%d)", bs_len, needed)
       assert bs_len <= needed
       boff2 = boff + bs_len
       barray[boff:boff2] = bs
       boff = boff2
       needed -= bs_len
-    X("readinto: final boff=%d", boff)
     return boff
 
 class BackedFile(ReadMixin):
@@ -779,11 +786,8 @@ class BackedFile(ReadMixin):
       back_len = len(back_file)
     except TypeError:
       back_pos = back_file.tell()
-      X("BackedFile.__len__: tell=%d", back_pos)
       back_len = back_file.seek(0, 2)
-      X("BackedFile.__len__: seek(0,2)=%d", back_len)
       back_file.seek(back_pos, 0)
-      X("BackedFile.__len__: after seek(%d,0), tell=%d", back_pos, back_file.tell())
     return max(self.front_range.end, back_len)
 
   @locked
@@ -823,9 +827,9 @@ class BackedFile(ReadMixin):
     elif whence == SEEK_CUR:
       self._offset += pos
     elif whence == SEEK_END:
-      endpos = self._back_file.seek(0, SEEK_END)
+      endpos = self.back_file.seek(0, SEEK_END)
       if self.front_range is not None:
-        endpos = max(len(self.back_file), self.front_range.end())
+        endpos = max(len(self.back_file), self.front_range.end)
       self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
@@ -834,41 +838,32 @@ class BackedFile(ReadMixin):
     ''' Return "natural" file data.
         This is used to support readinto efficiently.
     '''
-    X("file_data: n=%d", n)
     if n < 1:
       return
     start = self._offset
     end = start + n
     back_file = self.back_file
     front_file = self.front_file
-    X("front_range=%s", self.front_range)
     SLICES = list(self.front_range.slices(start, end))
-    X("front_range slices=%r", SLICES)
     for in_front, span in SLICES:
-      X("offset=%d, in_front=%s, span=%s", self._offset, in_front, span)
       assert span.start == self._offset
       assert span.end <= end
       size = span.size
       src_file = front_file if in_front else back_file
-      X("seek %d", self._offset)
       src_file.seek(self._offset)
       try:
         rn = src_file.read_natural
       except AttributeError:
         while size > 0:
-          X("read %d ...", size)
           bs = src_file.read(size)
           bs_len = len(bs)
           assert bs_len <= size
           if bs:
-            X("bs = %r...", bs[:16])
             self._offset += bs_len
             yield bs
           else:
-            X("EMPTY READ, leave loop")
             break
           size -= bs_len
-          X("offset => %d", self._offset)
           assert self._offset <= end
       else:
         for bs in rn(size, rsize=rsize):
@@ -878,8 +873,6 @@ class BackedFile(ReadMixin):
       if self._offset < span.end:
         # short data, infer EOF, exit loop
         break
-      raise RuntimeError("BANG")
-    X("EXIT file_data")
 
   @locked
   def write(self, b):
@@ -921,7 +914,7 @@ class BackedFile_TestMethods(object):
     bfp_leading_text = bfp.read_n(512)
     self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
     # test writing some data and reading it back
-    random_chunk = bytes( randint(0,255) for x in range(256) )
+    random_chunk = bytes( randint(0, 255) for x in range(256) )
     bfp.seek(512)
     bfp.write(random_chunk)
     # check that the front file has a single span of the right dimensions
@@ -985,9 +978,11 @@ def tee(fp, fp2):
   old_flush = getattr(fp, 'flush')
   fp.write = _write
   fp.flush = _flush
-  yield
-  fp.write = old_write
-  fp.flush = old_flush
+  try:
+    yield
+  finally:
+    fp.write = old_write
+    fp.flush = old_flush
 
 class NullFile(object):
   ''' Writable file that discards its input.
@@ -1045,12 +1040,11 @@ def read_data(fp, nbytes, rsize=None):
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
   bss = list(file_data(fp, nbytes, rsize))
-  if len(bss) == 0:
+  if not bss:
     return b''
-  elif len(bss) == 1:
+  if len(bss) == 1:
     return bss[0]
-  else:
-    return b''.join(bss)
+  return b''.join(bss)
 
 def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
   ''' Generator to present text or data from an open file until EOF.
@@ -1097,9 +1091,8 @@ class RWFileBlockCache(object):
           some outer system. A Lock will be allocated if omitted.
     '''
     opathname = pathname
-    X("dirpath=%r,suffix=%r", dirpath, suffix)
     if pathname is None:
-      tmpfd, pathname = mkstemp(dir=dirpath, suffix=None)
+      tmpfd, pathname = mkstemp(dir=dirpath, suffix=suffix)
     self.rfd = os.open(pathname, os.O_RDONLY)
     self.wfd = os.open(pathname, os.O_WRONLY)
     if opathname is None:

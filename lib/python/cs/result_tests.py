@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 import unittest
-from cs.result import Result, after
+from cs.result import Result, after, bg
 
 def D(msg, *a):
   if a:
@@ -65,6 +65,29 @@ class TestResult(unittest.TestCase):
     self.assertTrue(A.ready)
     self.assertTrue(R.ready)
     self.assertTrue(R2.ready)
+
+  def test02bg(self):
+    R = self.R
+    self.assertFalse(R.ready)
+    def f(n):
+      time.sleep(1)
+      return n
+    T = R.bg(f, 3)
+    self.assertTrue(type(T) == threading.Thread)
+    self.assertFalse(R.ready)
+    time.sleep(2)
+    self.assertTrue(R.ready)
+    self.assertEqual(R.result, 3)
+
+  def test02bg2(self):
+    def f(n):
+      time.sleep(1)
+      return n
+    R = bg(f, 3)
+    self.assertFalse(R.ready)
+    time.sleep(2)
+    self.assertTrue(R.ready)
+    self.assertEqual(R.result, 3)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

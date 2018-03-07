@@ -451,8 +451,10 @@ def with_log(filename, **kw):
   ''' Context manager to add a Logger to the output logs temporarily.
   '''
   logger, handler = add_logfile(filename, **kw)
-  yield logger, handler
-  logger.removeHandler(handler)
+  try:
+    yield logger, handler
+  finally:
+    logger.removeHandler(handler)
 
 class NullHandler(logging.Handler):
   ''' A Handler which discards its requests.
