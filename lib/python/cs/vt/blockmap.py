@@ -17,7 +17,8 @@ from struct import Struct
 import sys
 from time import time
 from tempfile import TemporaryFile
-from threading import Thread
+from threading import Thread, Lock
+from cs.logutils import warning
 from cs.resources import RunStateMixin
 from cs.x import X
 from . import defaults
@@ -142,6 +143,7 @@ class BlockMap(RunStateMixin):
     self.mapped_to = 0
     self.recsize = 4 + self.S.hashclass.HASHLEN
     self._loaded = False
+    self._load_lock = Lock()
     self._worker = Thread(target=self._load_maps)
     self._worker.start()
 
@@ -171,7 +173,7 @@ class BlockMap(RunStateMixin):
   def _load_maps(self):
     ''' Walk the block tree assembling the mapping.
     '''
-    X("_load_maps...")
+    X("_load_maps for %s ...", self.block)
     start_time = time()
     nleaves = 0
     with self.S:
@@ -218,33 +220,36 @@ class BlockMap(RunStateMixin):
         self.mapped_to = offset
         # reset offset0 for the new submap
         offset0 = offset
-      for leaf in self.block.leaves:
-        if nleaves % 4096 == 0:
-          X("... mapped %d leaves in %gs", nleaves, time() - start_time)
-        nleaves += 1
-        self.self_check()
-        if self.cancelled:
-          X("CANCELLED: abort submap construction")
-          return
-        leaf_submap_index = offset // mapsize
-        leaf_submap_offset = offset % mapsize
-        if submap_index < leaf_submap_index:
-          flush_submap_fp()
-          assert submap_index == leaf_submap_index
-        if submap_fp is None:
-          submap_fp = TemporaryFile('wb')
-        try:
-          h = leaf.hashcode
-        except AttributeError:
-          # make a conventional HashCodeBlock and index that
-          from .block import HashCodeBlock
-          data = leaf.data
-          if len(data) >= 65536:
-            warning("promoting %d bytes from %s to a new HashCodeBlock", len(data), leaf)
-          leaf = HashCodeBlock(data=data)
-        submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
-        submap_fp.write(h)
-        offset += leaf.span
+      with self._load_lock:
+        for leaf in self.block.leaves:
+          if nleaves % 4096 == 0 and nleaves > 0:
+            X("... mapped %d leaves in %gs", nleaves, time() - start_time)
+          nleaves += 1
+          self.self_check()
+          if self.cancelled:
+            X("CANCELLED: abort submap construction")
+            return
+          leaf_submap_index = offset // mapsize
+          leaf_submap_offset = offset % mapsize
+          if submap_index < leaf_submap_index:
+            flush_submap_fp()
+            assert submap_index == leaf_submap_index
+            self._load_lock.release()
+            self._load_lock.acquire()
+          if submap_fp is None:
+            submap_fp = TemporaryFile('wb')
+          try:
+            h = leaf.hashcode
+          except AttributeError:
+            # make a conventional HashCodeBlock and index that
+            from .block import HashCodeBlock
+            data = leaf.data
+            if len(data) >= 65536:
+              warning("promoting %d bytes from %s to a new HashCodeBlock", len(data), leaf)
+            leaf = HashCodeBlock(data=data)
+          submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
+          submap_fp.write(h)
+          offset += leaf.span
       if submap_fp is not None:
         flush_submap_fp()
     self._loaded = True
@@ -277,66 +282,74 @@ class BlockMap(RunStateMixin):
   def slices(self, offset, span):
     ''' Generator yielding (leaf, start, end) from [offset:offset+span].
     '''
+    from .block import get_HashCodeBlock
+    ##from cs.py.stack import caller
+    ##X("BlockMap.slices(offset=%d, span=%d) from %s ...", offset, span, caller())
+    ##raise RuntimeError("BANG")
     if offset < 0:
       raise ValueError("offset(%d) should be >= 0" % (offset,))
     if span < 0:
       raise ValueError("span(%d) should be >= 0" % (span,))
     if span == 0:
       return
-    mapped_to = self.mapped_to
-    if mapped_to < offset + span:
-      # a portion of the span is outside the mapped range
-      mapped_span = mapped_to - offset
-      if mapped_span > 0:
-        # a leading portion is inside the mapped range
-        yield from self.slices(offset, mapped_span)
-        span -= mapped_span
-        offset += mapped_span
-      # fetch the unmapped data by traversing the Block tree
-      yield from self.block.slices(offset, offset + span, no_blockmap=True)
-      return
-    S = self.S
-    hashclass = S.hashclass
-    maps = self.maps
-    mapsize = self.mapsize
-    submap_index = offset // mapsize
-    submap_offset = offset % mapsize
-    submap = maps[submap_index]
-    while submap is None:
-      submap_index -= 1
-      submap = maps[submap_index]
-    i = bisect_left(submap, submap_offset)
-    assert i >= 0 and i <= len(submap)
-    if i == len(submap):
-      assert i > 0
-      i -= 1
-    elif submap[i] > submap_offset:
-      if i == 0:
-        submap = submap.prevmap
-        submap_base = submap.base
-        i = len(submap) - 1
-      else:
-        i -= 1
-    assert submap[i] <= offset
-    ##X("maps=%d:%r, submap_index=%d", len(maps), maps, submap_index)
-    submap_base = submap.base
     while span > 0:
-      leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
-      leaf_offset += submap_base
-      start = offset - leaf_offset
-      end = start + min(span, leaf_span - start)
-      with S:
-        leaf = S[hashclass(leaf_hashcode)]
-      yield leaf, start, end
-      yielded_length = end - start
-      offset += yielded_length
-      span -= yielded_length
-      if span > 0:
-        i += 1
+      if self.mapped_to <= offset:
+        # outside the mapped range
+        yield from self.block.slices(offset, offset + span, no_blockmap=True)
+        return
+      # we can get the start of the span from the blockmap
+      S = self.S
+      hashclass = S.hashclass
+      maps = self.maps
+      mapsize = self.mapsize
+      submap_index = offset // mapsize
+      submap_offset = offset % mapsize
+      with self._load_lock:
+        submap = maps[submap_index]
+        while submap is None:
+          submap_index -= 1
+          submap = maps[submap_index]
+        i = bisect_left(submap, submap_offset)
+        assert i >= 0 and i <= len(submap)
         if i == len(submap):
-          submap = submap.nextmap
-          submap_base = submap.base
-          i = 0
+          assert i > 0
+          i -= 1
+        elif submap[i] > submap_offset:
+          if i == 0:
+            submap = submap.prevmap
+            submap_base = submap.base
+            i = len(submap) - 1
+          else:
+            i -= 1
+        assert submap[i] <= offset
+        ##X("maps=%d:%r, submap_index=%d", len(maps), maps, submap_index)
+        submap_base = submap.base
+      while span > 0:
+        with self._load_lock:
+          # pull slices from the mapped range
+          leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
+          assert offset >= leaf_offset and offset < leaf_offset + leaf_span
+          leaf_hashcode = hashclass.from_hashbytes(leaf_hashcode)
+          leaf_offset += submap_base
+          start = offset - leaf_offset
+          end = start + min(span, leaf_span - start)
+          leaf = get_HashCodeBlock(leaf_hashcode, leaf_span, False)
+          leaf.rq_data()
+          ## then try requesting leaf2
+        yield leaf, start, end
+        with self._load_lock:
+          yielded_length = end - start
+          offset += yielded_length
+          span -= yielded_length
+          if offset >= self.mapped_to:
+            # reached the end of the mapped range, resume main loop
+            break
+          if span > 0:
+            i += 1
+            if i == len(submap):
+              submap = submap.nextmap
+              submap_base = submap.base
+              i = 0
 
   def data(self, offset, span):
     ''' Return the data from [offset:offset+span] as a single bytes object.
