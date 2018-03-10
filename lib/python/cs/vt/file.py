@@ -16,6 +16,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
 from cs.threads import locked, LockableMixin
+from cs.x import X
 from . import defaults
 from .block import Block
 from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
@@ -253,9 +254,10 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       backing_block.get_blockmap()
 
-  def read(self, size=-1, offset=None):
+  def read(self, size=-1, offset=None, longread=False):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
+    ##X("File.read(size=%s,offset=%s)...", size, offset)
     self._auto_blockmap()
     f = self._file
     if offset is not None:
@@ -268,18 +270,23 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       raise ValueError("%s.read: size(%r) < 1 but not -1", self, size)
     start = f.tell()
     end = start + size
-    data = b''
+    chunks = []
+    ##X("File.read: front_range=%s", f.front_range)
     for inside, span in f.front_range.slices(start, end):
       if inside:
         # data from the front file; return the first chunk
         for chunk in filedata(f.front_file, start=span.start, end=span.end):
-          data = chunk
-          break
+          chunks.append(chunk)
+          if not longread:
+            break
       else:
         # data from the backing block: return the first chunk
+        ##X("File.read: backing_block span=%s", span)
         for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
-          data = B[Bstart:Bend]
-          break
+          chunks.append(B[Bstart:Bend])
+          if not longread:
+            break
+    data = b''.join(chunks)
     f.seek(start + len(data))
     return data
 
