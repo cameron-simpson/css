@@ -333,7 +333,7 @@ class BlockMap(RunStateMixin):
           leaf_offset += submap_base
           start = offset - leaf_offset
           end = start + min(span, leaf_span - start)
-          leaf = get_HashCodeBlock(leaf_hashcode, leaf_span, False)
+          leaf = get_HashCodeBlock(leaf_hashcode)
           leaf.rq_data()
           ## then try requesting leaf2
         yield leaf, start, end
