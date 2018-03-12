@@ -328,9 +328,10 @@ class BlockMap(RunStateMixin):
         with self._load_lock:
           # pull slices from the mapped range
           leaf_offset, leaf_span, leaf_hashcode = submap.get_record(i)
-          assert offset >= leaf_offset and offset < leaf_offset + leaf_span
-          leaf_hashcode = hashclass.from_hashbytes(leaf_hashcode)
           leaf_offset += submap_base
+          assert offset >= leaf_offset and offset < leaf_offset + leaf_span, \
+              "NOT offset(%d) >= leaf_offset(%d) and offset < leaf_offset + leaf_span(%d) => %d" % (offset, leaf_offset, leaf_span, leaf_offset + leaf_span)
+          leaf_hashcode = hashclass.from_hashbytes(leaf_hashcode)
           start = offset - leaf_offset
           end = start + min(span, leaf_span - start)
           leaf = get_HashCodeBlock(leaf_hashcode)
