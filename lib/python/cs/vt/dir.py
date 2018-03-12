@@ -624,7 +624,7 @@ class Dir(_Dirent):
       # compute the dictionary holding the live Dir entries
       emap = {}
       offset = 0
-      data = self._block.all_data()
+      data = self._block.data
       while offset < len(data):
         E, offset = _Dirent.from_bytes(data, offset)
         E.parent = self
