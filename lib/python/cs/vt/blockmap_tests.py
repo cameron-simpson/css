@@ -57,7 +57,7 @@ class TestAll(unittest.TestCase):
     '''
     with self.S:
       for depth in 0, 1, 2, 3:
-        for width in 1, 2, 7, 17:
+        for width in 1, 2, 7:   ## , 17:
           X("gen depth=%d, width=%d ...", depth, width)
           top_block, flat_data = self._gen_data(depth, width)
           for mapsize in 999999, 10000007, 13131313, None:
