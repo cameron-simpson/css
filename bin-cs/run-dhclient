@@ -72,12 +72,15 @@ do
       ) | read ssh_greeting
     )
   } || {
-    date
-    echo "RESTARTING $* ..."
-    while kill "$dhpid"
+    colour_echo white `date`
+    echo "RESTARTING $* .."
+    necho "kill $dhpid .."
+    while kill "$dhpid" 2>/dev/null
     do
+      necho .
       sleep 1
     done
+    echo
     sleep 2
     ( set -x; exec "$@" ) &
     dhpid=$!
