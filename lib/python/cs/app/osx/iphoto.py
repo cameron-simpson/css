@@ -322,6 +322,9 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  ''' Usage: tag criteria... [--] {+tag|-tag}...
+      Add or remove tags from selected images.
+  '''
   xit = 0
   badopts = False
   if not argv:
