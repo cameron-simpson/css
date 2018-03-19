@@ -48,7 +48,7 @@ case $colour in
   cyan)     on=`tput setaf 6 || tput setaf 6 0 0 || tput setf 3` ;;
   white)    on=`tput setaf 7 || tput setaf 7 0 0 || tput setf 7` ;;
   *)        echo "$cmd: warning: unsupported colour: $colour" >&2 ;;
-esac
+esac || on=
 exec 2>&3 3>&-
 
 # no sequence? just run the command
