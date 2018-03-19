@@ -1,8 +1,10 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Perform command with output in particular colour.
 # - Cameron Simpson <cs@cskk.id.au> 08jul2007
 #
+
+set -ue
 
 : ${WITH_COLOUR_ON:=''}
 
@@ -51,9 +53,9 @@ case $colour in
 esac || on=
 exec 2>&3 3>&-
 
-# no sequence? just run the command
+# no "on" sequence? just run the command
 [ -n "$on" ] || exec "$@"
-# no $off? restore original colour pair
+# no "off"? restore original colour pair
 [ -n "$off" ] || off=`tput op`
 
 xit=0
