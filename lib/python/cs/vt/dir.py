@@ -329,9 +329,7 @@ class InvalidDirent(_Dirent):
         D_INVALID_T,
         name,
         block=None,
-        chunk=None,
         **kw)
-    self.block = block
     self.chunk = chunk
 
   def __str__(self):
