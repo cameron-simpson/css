@@ -495,6 +495,7 @@ class _StoreFS_core(object):
       if not self.readonly and archive is not None:
         with self._lock:
           updated = False
+          E.snapshot()
           new_state = archive.strfor_Dirent(E)
           if new_state != self._last_sync_state:
             archive.save(E)
