@@ -124,10 +124,9 @@ class _Dirent(Transcriber):
     else:
       block, offset = decodeBlock(data, offset)
     if flags & F_PREVDIRENT:
-      X("decode prev_dirent_block encoding from data(len=%d) at offset %d", len(data), offset)
-      prev_dirent_block, offset = decodeBlock(data, offset)
+      prev_dirent_blockref, offset = get_bsdata(data, offset)
     else:
-      prev_dirent_block = None
+      prev_dirent_blockref = None
     try:
       E = cls.from_components(type_, name, meta=metatext, uuid=uu, block=block)
     except ValueError as e:
@@ -137,7 +136,7 @@ class _Dirent(Transcriber):
           type_, name,
           chunk=data[offset0:offset],
           meta=metatext, uuid=uu, block=block)
-    E._prev_dirent_blockref = prev_dirent_block
+    E._prev_dirent_blockref = prev_dirent_blockref
     return E, offset
 
   @staticmethod
@@ -183,15 +182,12 @@ class _Dirent(Transcriber):
     else:
       flags |= F_HASUUID
       uubs = uu.bytes
-    prevE = self.prev_dirent
-    if prevE is not None:
-      if prevE == self:
-        prevE = prevE.prev_dirent
-    if prevE is None:
-      prev_dirent_blockref = b''
+    prev_dirent_blockref = self._prev_dirent_blockref
+    if prev_dirent_blockref is None:
+      prev_dirent = b''
     else:
       flags |= F_PREVDIRENT
-      prev_dirent_blockref = encodeBlock(Block(data=prevE.encode()))
+      prev_dirent = put_bsdata(prev_dirent_blockref)
     return (
         put_bs(self.type)
         + put_bs(flags)
@@ -199,7 +195,7 @@ class _Dirent(Transcriber):
         + metadata
         + uubs
         + blockref
-        + prev_dirent_blockref
+        + prev_dirent
     )
 
   def __hash__(self):
@@ -277,9 +273,11 @@ class _Dirent(Transcriber):
         If not None, o1Gn encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
     '''
-    B = self._prev_dirent_blockref
-    if B is None:
+    prev_blockref = self._prev_dirent_blockref
+    if prev_blockref is None:
       return None
+    B, offset = decodeBlock(prev_blockref, length=len(prev_blockref))
+    assert offset == len(prev_blockref)
     data = B.data
     E, offset = _Dirent.from_bytes(data)
     if offset < len(data):
@@ -292,7 +290,8 @@ class _Dirent(Transcriber):
     '''
     E = self.prev_dirent
     if E is None or E != self:
-      self._prev_dirent_blockref = Block(data=self.encode()).encode()
+      self_bs = self.encode()
+      self._prev_dirent_blockref = Block(data=self_bs).encode()
       self._block = None
       if self.parent:
         self.parent.changed = True
