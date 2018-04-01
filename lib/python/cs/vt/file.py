@@ -333,9 +333,10 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       if start is None:
         start = 0
       if end is None:
-        end = front_range.end
+        end = max(front_range.end, len(back_block))
       ##X("_HLB: front_file=%s, back_block=%s, front_range=%s, start=%s, end=%s...",
       ##  front_file, back_block, front_range, start, end)
+      offset = start
       for in_front, span in front_range.slices(start, end):
         if in_front:
           # blockify the new data and yield the top block
@@ -344,9 +345,13 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
                                               end=span.end),
                                      scanner))
           yield B
+          offset += len(B)
         else:
           for B in back_block.top_blocks(span.start, span.end):
             yield B
+            offset += len(B)
+        if offset < end:
+          warning("only got data to offset %d", offset)
 
 def filedata(fp, rsize=None, start=None, end=None):
   ''' A generator to yield chunks of data from a file.
