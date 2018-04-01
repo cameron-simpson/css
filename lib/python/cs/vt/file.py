@@ -221,26 +221,31 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     if length < 0:
       raise ValueError("length must be >= 0, received %s" % (length,))
-    cur_len = len(self)
-    front_range = self.front_range
-    backing_block0 = self.backing_block
-    if length < cur_len:
-      # shorten file
-      if front_range.end > length:
-        front_range.discard_span(cur_len, front_range.end)
-        # the front_file should also be too big
+    if length == 0:
+      self._reset(Block(data=b''))
+    else:
+      # let any syncers complete
+      self.sync()
+      cur_len = len(self)
+      front_range = self._file.front_range
+      backing_block0 = self.backing_block
+      if length < cur_len:
+        # shorten file
+        if front_range.end > length:
+          front_range.discard_span(cur_len, front_range.end)
+          # the front_file should also be too big
+          self.front_file.truncate(length)
+        if len(backing_block0) > length:
+          # new top Block built on previous Block
+          # this might overlap some of the front_range but the only new blocks
+          # should be the partial direct block at the end of the range, and
+          # whatever new indirect blocks get made to span things
+          self.backing_block \
+              = top_block_for(backing_block0.top_blocks(0, length))
+      elif length > cur_len:
+        # extend the front_file and front_range
         self.front_file.truncate(length)
-      if len(backing_block0) > length:
-        # new top Block built on previous Block
-        # this might overlap some of the front_range but the only new blocks
-        # should be the partial direct block at the end of the range, and
-        # whatever new indirect blocks get made to span things
-        self.backing_block \
-            = top_block_for(backing_block0.top_blocks(0, length))
-    elif length > cur_len:
-      # extend the front_file and front_range
-      self.front_file.truncate(length)
-      front_range.add_span(front_range.end, length)
+        front_range.add_span(front_range.end, length)
 
   def tell(self):
     ''' Return the file read/write position.
