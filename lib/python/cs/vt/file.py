@@ -110,6 +110,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
     self.open()
+    self.flush_count = 0
 
   def __str__(self):
     return "File(backing_block=%s)" % (self._backing_block,)
@@ -155,6 +156,8 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
         We dispatch the sync in the background within a lock.
         `scanner`: optional scanner for new file data to locate preferred block boundaries.
     '''
+    flushnum = self.flush_count
+    self.flush_count += 1
     old_file = self._file
     old_syncer = self._syncer
     # only do work if there are new data in the file or pending syncs
