@@ -15,6 +15,7 @@ from cs.fileutils import BackedFile, ReadMixin
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
+from cs.result import bg
 from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults
@@ -103,7 +104,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     if backing_block is None:
       backing_block = Block(data=b'')
     self.filename = None
-    self._syncer = None     # syncing Thread, close waits for it
+    self._syncer = None     # syncing Result, close waits for it
     self._backing_block = None
     self._blockmap = None
     self._reset(backing_block)
@@ -162,6 +163,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     old_syncer = self._syncer
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
+      # no bg syncher, no modified data: file unchanged
       return
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       def update_store():
@@ -169,8 +171,11 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
         '''
         # wait for previous sync to complete, if any
         if old_syncer:
-          old_syncer.join()
-        old_block = old_file.back_file.block
+          # fetch the result Block of the preceeding sync
+          old_block = old_syncer()
+        else:
+          # otherwise use the file's current backing Block
+          old_block = old_file.back_file.block
         # Recompute the top Block from the current high level blocks.
         # As a side-effect of setting .backing_block we discard the
         # front file data, which are now saved to the Store.
@@ -186,6 +191,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
           if self._file is new_file:
             self._reset(B)
         S.close()
+        return B
       S = defaults.S
       T = PfxThread(name="%s.flush(): update_store" % (self,),
                     target=update_store)
@@ -193,20 +199,19 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       # and initiate a sync to the Store
       old_file.read_only = True
       new_file = BackedFile(old_file)
-      self._syncer = T
       self._file = new_file
       self._file.flush = self.flush
       S.open()
-      T.start()
+      self._syncer = bg(update_store)
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
         Wait for any flush to complete before returing the backing block.
     '''
     self.flush()
-    T = self._syncer
-    if T:
-      T.join()
+    R = self._syncer
+    if R:
+      R.join()
     B = self.backing_block
     return B
 
