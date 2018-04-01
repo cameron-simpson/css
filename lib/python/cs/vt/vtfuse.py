@@ -115,6 +115,16 @@ def dolog(logcall, citation, elapsed, ctx, msg, *a):
   logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
           elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
 
+class DirHandle:
+  ''' An "open" Dir: keeps a list of the names from open time
+      and a reference to the Dir so that it can validate the names
+      at readdir time.
+  '''
+  def __init__(self, fs, D):
+    self.fs = fs
+    self.D = D
+    self.names = list(D.keys())
+
 class FileHandle(O):
   ''' Filesystem state for open files.
   '''
@@ -987,19 +997,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def opendir(self, inode, ctx):
     # TODO: check for permission to read
-    class _OpenDir:
-      ''' An "open" Dir: keeps a list of the names from open time
-          and a reference to the Dir so that it can validate the names
-          at readdir time.
-      '''
-      def __init__(self, D):
-        self.D = D
-        self.names = list(D.keys())
     E = self._vt_core.i2E(inode)
     if not E.isdir:
       raise FuseOSError(errno.ENOTDIR)
-    OD = _OpenDir(E)
-    fhndx = self._vt_core._new_file_handle_index(OD)
+    fs = self._vt_core
+    OD = DirHandle(fs, E)
+    fhndx = fs._new_file_handle_index(OD)
     return fhndx
 
   @handler
