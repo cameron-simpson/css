@@ -1153,8 +1153,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
       if fields.update_gid:
         M.gid = attr.st_gid
       if fields.update_size:
-        # TODO: what calls this? do we sanity check file sizes etc?
-        warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
+        FH = FileHandle(self, E, False, True, False)
+        FH.truncate(attr.st_size)
+        FH.close()
       return self._vt_EntryAttributes(E)
 
   @handler
