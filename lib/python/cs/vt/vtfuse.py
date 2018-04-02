@@ -14,7 +14,7 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 import stat
 import subprocess
 import sys
-from threading import Thread, RLock
+from threading import Thread, RLock, Lock
 from types import SimpleNamespace as NS
 from cs.lex import texthexify, untexthexify
 from cs.logutils import debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
@@ -134,7 +134,7 @@ class FileHandle(O):
     '''
     O.__init__(self)
     if lock is None:
-      lock = fs._lock
+      lock = Lock()
     self.fs = fs
     self.log = fs.log
     self.logQ = fs.logQ
