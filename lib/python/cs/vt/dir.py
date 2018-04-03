@@ -22,7 +22,7 @@ from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import totext, SEP
-from .block import Block, decodeBlock, encodeBlock
+from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
@@ -61,7 +61,7 @@ class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta=None, uuid=None, parent=None, prev_dirent=None):
+  def __init__(self, type_, name, meta=None, uuid=None, parent=None, prevblock=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -69,7 +69,8 @@ class _Dirent(Transcriber):
     self.type = type_
     self.name = name
     self._uuid = uuid
-    self._prev_dirent_blockref = prev_dirent
+    assert prevblock is None or isinstance(prevblock, _Block), "not _Block: prevblock=%r" % (prevblock,)
+    self._prev_dirent_blockref = prevblock
     if isinstance(meta, Meta):
       if meta.E is not None and meta.E is not self:
         warning("meta.E is %r, replacing with self %r", meta.E, self)
@@ -124,7 +125,7 @@ class _Dirent(Transcriber):
     else:
       block, offset = decodeBlock(data, offset)
     if flags & F_PREVDIRENT:
-      prev_dirent_blockref, offset = get_bsdata(data, offset)
+      prev_dirent_blockref, offset = decodeBlock(data, offset)
     else:
       prev_dirent_blockref = None
     try:
@@ -184,10 +185,11 @@ class _Dirent(Transcriber):
       uubs = uu.bytes
     prev_dirent_blockref = self._prev_dirent_blockref
     if prev_dirent_blockref is None:
-      prev_dirent = b''
+      prev_dirent_bs = b''
     else:
+      assert isinstance(prev_dirent_blockref, _Block)
       flags |= F_PREVDIRENT
-      prev_dirent = put_bsdata(prev_dirent_blockref)
+      prev_dirent_bs = prev_dirent_blockref.encode()
     return (
         put_bs(self.type)
         + put_bs(flags)
@@ -195,7 +197,7 @@ class _Dirent(Transcriber):
         + metadata
         + uubs
         + blockref
-        + prev_dirent
+        + prev_dirent_bs
     )
 
   def __hash__(self):
@@ -215,10 +217,7 @@ class _Dirent(Transcriber):
       attrs['block'] = self.block
     prevE = self.prev_dirent
     if prevE is not None:
-      if prevE == self:
-        prevE = prevE.prev_dirent
-      if prevE is not None:
-        attrs['prevblock'] = Block(data=prevE.encode())
+      attrs['prevblock'] = Block(data=prevE.encode())
     T.transcribe_mapping(attrs, fp)
 
   @classmethod
@@ -276,9 +275,7 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    B, offset = decodeBlock(prev_blockref, length=len(prev_blockref))
-    assert offset == len(prev_blockref)
-    data = B.data
+    data = prev_blockref.data
     E, offset = _Dirent.from_bytes(data)
     if offset < len(data):
       warning("prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
@@ -291,7 +288,9 @@ class _Dirent(Transcriber):
     E = self.prev_dirent
     if E is None or E != self:
       self_bs = self.encode()
-      self._prev_dirent_blockref = Block(data=self_bs).encode()
+      X("snapshot: make new prev_dirent: self encodes to %r", self_bs)
+      self._prev_dirent_blockref = Block(data=self_bs)
+      X("snapshot: make new prev_dirent: new prev_dirent = %r", self._prev_dirent_blockref)
       self._block = None
       if self.parent:
         self.parent.changed = True
