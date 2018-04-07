@@ -19,7 +19,7 @@ from cs.lex import texthexify
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
-from cs.threads import locked
+from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, SEP
 from .block import Block, decodeBlock, encodeBlock, _Block
@@ -267,10 +267,10 @@ class _Dirent(Transcriber):
          and self.block == other.block
            )
 
-  @prop
+  @locked_property
   def prev_dirent(self):
     ''' Return the previous Dirent.
-        If not None, o1Gn encoding or transcription, if self !=
+        If not None, during encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
     '''
     prev_blockref = self._prev_dirent_blockref
@@ -283,18 +283,22 @@ class _Dirent(Transcriber):
         B, offset, data[offset:])
     return E
 
+  @prev_dirent.setter
+  @locked
+  def prev_dirent(self, E):
+    assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
+    self._prev_dirent = None
+    Ebs = E.encode()
+    self._prev_dirent_blockref = Block(data=Ebs)
+    self.changed = True
+    X("SET .PREVDIRENT: self=%s", self)
+
   def snapshot(self):
     ''' Update the Dirent's previous block state if missing or changed.
     '''
     E = self.prev_dirent
     if E is None or E != self:
-      self_bs = self.encode()
-      X("snapshot: make new prev_dirent: self encodes to %r", self_bs)
-      self._prev_dirent_blockref = Block(data=self_bs)
-      X("snapshot: make new prev_dirent: new prev_dirent = %r", self._prev_dirent_blockref)
-      self._block = None
-      if self.parent:
-        self.parent.changed = True
+      self.prev_dirent = self
 
   @property
   def isfile(self):
