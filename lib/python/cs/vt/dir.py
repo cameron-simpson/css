@@ -69,7 +69,8 @@ class _Dirent(Transcriber):
     self.type = type_
     self.name = name
     self._uuid = uuid
-    assert prevblock is None or isinstance(prevblock, _Block), "not _Block: prevblock=%r" % (prevblock,)
+    assert prevblock is None or isinstance(prevblock, _Block), \
+        "not _Block: prevblock=%r" % (prevblock,)
     self._prev_dirent_blockref = prevblock
     if isinstance(meta, Meta):
       if meta.E is not None and meta.E is not self:
@@ -189,7 +190,7 @@ class _Dirent(Transcriber):
     else:
       assert isinstance(prev_dirent_blockref, _Block)
       flags |= F_PREVDIRENT
-      prev_dirent_bs = prev_dirent_blockref.encode()
+      prev_dirent_bs = encodeBlock(prev_dirent_blockref)
     return (
         put_bs(self.type)
         + put_bs(flags)
