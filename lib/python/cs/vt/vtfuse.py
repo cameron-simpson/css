@@ -934,12 +934,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
       E = P
     elif name == '..':
       if E is self._vt_core.mntE:
+        # directly stat the directory above the mountpoint
         try:
           st = os.stat(dirname(self._vt_core.mnt_path))
         except OSError as e:
           raise FuseOSError(e.errno)
         EA = self._stat_EntryAttributes(st)
       else:
+        # otherwise use the parent with the FS
         E = P.parent
     elif name == PREV_DIRENT_NAME and self._vt_core.show_prev_dirent:
       E = P.prev_dirent
