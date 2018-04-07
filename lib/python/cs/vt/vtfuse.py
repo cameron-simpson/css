@@ -1055,6 +1055,22 @@ class StoreFS_LLFUSE(llfuse.Operations):
         o += 1
     return entries()
 
+  @staticmethod
+  def _stat_EntryAttributes(st):
+    EA = llfuse.EntryAttributes()
+    EA.st_ino = st.st_ino
+    EA.st_mode = st.st_mode
+    EA.st_nlink = st.st_nlink
+    EA.st_uid = st.st_uid
+    EA.st_gid = st.st_gid
+    EA.st_size = st.st_size
+    EA.st_blksize = st.st_blksize
+    EA.st_blocks = st.st_blocks
+    EA.st_atime_ns = int(st.st_atime * 1000000000)
+    EA.st_ctime_ns = int(st.st_ctime * 1000000000)
+    EA.st_mtime_ns = int(st.st_mtime * 1000000000)
+    return EA
+
   @handler
   def readlink(self, inode, ctx):
     # TODO: check for permission to read the link?
