@@ -42,7 +42,6 @@ Basic logging from anywhere::
 '''
 
 from __future__ import with_statement
-import builtins
 import codecs
 from contextlib import contextmanager
 try:
@@ -85,7 +84,12 @@ DISTINFO = {
     ],
 }
 
-builtins.X = lambda msg, *a: None
+try:
+  import builtins
+except ImportError:
+  pass
+else:
+  builtins.X = lambda msg, *a: None
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'

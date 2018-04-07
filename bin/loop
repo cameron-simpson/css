@@ -10,6 +10,7 @@ delay=1
 trace=
 invert=
 fragile=
+flag=
 shcmd=
 
 cmd=$0
