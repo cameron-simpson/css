@@ -110,12 +110,13 @@ class TCPStoreClient(StreamStore):
 
   def _tcp_connect(self):
     info("TCP CONNECT to %r", self.sock_bind_addr)
-    assert not self.sock
+    assert not self.sock, "self.sock=%s" % (self.sock,)
     self.sock = socket()
     try:
       self.sock.connect(self.sock_bind_addr)
     except OSError:
       self.sock.close()
+      self.sock = None
       raise
     return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 

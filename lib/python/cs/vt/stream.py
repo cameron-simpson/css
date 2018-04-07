@@ -9,7 +9,7 @@
 from __future__ import with_statement
 import sys
 from cs.inttypes import Enum
-from cs.logutils import setup_logging, info, debug, warning
+from cs.logutils import setup_logging, info, debug, warning, error
 from cs.pfx import Pfx, XP
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
@@ -84,9 +84,13 @@ class StreamStore(BasicStoreSync):
   @locked
   def __getattr__(self, attr):
     if attr == '_conn':
-      send_fp, recv_fp = self.connect()
-      conn = self._conn = self._packet_connection(send_fp, recv_fp)
-      return conn
+      try:
+        send_fp, recv_fp = self.connect()
+      except Exception as e:
+        raise AttributeError("%r: connect fails: %s", attr, e) from e
+      else:
+        conn = self._conn = self._packet_connection(send_fp, recv_fp)
+        return conn
     raise AttributeError(attr)
 
   def _packet_connection(self, send_fp, recv_fp):

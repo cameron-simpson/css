@@ -11,10 +11,11 @@ from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFo
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
+from os.path import abspath, dirname
 import stat
 import subprocess
 import sys
-from threading import Thread, RLock
+from threading import Thread, RLock, Lock
 from types import SimpleNamespace as NS
 from cs.lex import texthexify, untexthexify
 from cs.logutils import debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
@@ -45,6 +46,9 @@ XATTR_REPLACE  = 0x0004
 
 XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 
+PREV_DIRENT_NAME = '...'
+PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
+
 def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
@@ -70,7 +74,7 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=Fals
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
-  FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
+  FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=True)
   return FS._vt_runfuse(mnt)
 
 def umount(mnt):
@@ -115,6 +119,16 @@ def dolog(logcall, citation, elapsed, ctx, msg, *a):
   logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
           elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
 
+class DirHandle:
+  ''' An "open" Dir: keeps a list of the names from open time
+      and a reference to the Dir so that it can validate the names
+      at readdir time.
+  '''
+  def __init__(self, fs, D):
+    self.fs = fs
+    self.D = D
+    self.names = list(D.keys())
+
 class FileHandle(O):
   ''' Filesystem state for open files.
   '''
@@ -124,7 +138,7 @@ class FileHandle(O):
     '''
     O.__init__(self)
     if lock is None:
-      lock = fs._lock
+      lock = Lock()
     self.fs = fs
     self.log = fs.log
     self.logQ = fs.logQ
@@ -163,7 +177,7 @@ class FileHandle(O):
     with fp:
       with self._lock:
         fp.seek(offset)
-        data = fp.read(size)
+        data = fp.read(size, longread=True)
     return data
 
   def truncate(self, length):
@@ -415,13 +429,15 @@ class _StoreFS_core(object):
       or the like.
   '''
 
-  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=None, append_only=False):
+  def __init__(self, E, S, oserror=None, archive=None, subpath=None, readonly=None, append_only=False, show_prev_dirent=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
         `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
+        `append_only`: append only mode: files may only grow, filenames may not be changed or deleted
+        `show_prev_dirent`: show Dir revision as the '...' entry
     '''
     O.__init__(self)
     if not E.isdir:
@@ -441,6 +457,7 @@ class _StoreFS_core(object):
     self.subpath = subpath
     self.readonly = readonly
     self.append_only = append_only
+    self.show_prev_dirent = show_prev_dirent
     if subpath:
       # locate subdirectory to display at mountpoint
       mntE, mntP, tail_path = resolve(E, subpath)
@@ -495,6 +512,9 @@ class _StoreFS_core(object):
       if not self.readonly and archive is not None:
         with self._lock:
           updated = False
+          X("snapshot %s ...", E)
+          E.snapshot()
+          X("snapshot: afterwards E=%s", E)
           new_state = archive.strfor_Dirent(E)
           if new_state != self._last_sync_state:
             archive.save(E)
@@ -555,6 +575,7 @@ class _StoreFS_core(object):
   def open2(self, P, name, flags, ctx):
     ''' Open a regular file given `P` parent Dir and `name`, allocate FileHandle, return FileHandle index.
         Increments the kernel reference count.
+        Wraps self.open.
     '''
     if not P.isdir:
       error("parent (name=%r) not a directory, raising ENOTDIR", P.name)
@@ -657,7 +678,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False):
+  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False, show_prev_dirent=False):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
@@ -665,10 +686,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
         `append_only`: forbid truncation or oervwrite of file data
+        `show_prev_dirent`: show previous Dir revision as '...'
     '''
     if readonly is None:
       readonly = S.readonly
-    self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
+    self._vt_core = _StoreFS_core(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=show_prev_dirent)
     self.log = self._vt_core.log
     self.logQ = self._vt_core.logQ
     llf_opts = set(llfuse.default_options)
@@ -702,6 +724,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     S = self._vt_core.S
     with S:
       llfuse.init(self, mnt, self._vt_llf_opts)
+      # record the full path to the mount point
+      # this is used to support '..' at the top of the tree
+      self._vt_core.mnt_path = abspath(mnt)
       def mainloop():
         llfuse.main()
         llfuse.close()
@@ -904,10 +929,20 @@ class StoreFS_LLFUSE(llfuse.Operations):
       P = core.mntE
     else:
       P = core.i2E(parent_inode)
+    EA = None
     if name == '.':
       E = P
     elif name == '..':
-      E.parent
+      if E is self._vt_core.mntE:
+        try:
+          st = os.stat(dirname(self._vt_core.mnt_path))
+        except OSError as e:
+          raise FuseOSError(e.errno)
+        EA = self._stat_EntryAttributes(st)
+      else:
+        E = P.parent
+    elif name == PREV_DIRENT_NAME and self._vt_core.show_prev_dirent:
+      E = P.prev_dirent
     else:
       try:
         E = P[name]
@@ -918,7 +953,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
         EA.st_ino = 0
         EA.entry_timeout = 1.0
         return EA
-    return self._vt_EntryAttributes(E)
+    if EA is None:
+      if E is None:
+        raise FuseOSError(errno.ENOENT)
+      EA = self._vt_EntryAttributes(E)
+    return EA
 
   @handler
   def mkdir(self, parent_inode, name_b, mode, ctx):
@@ -986,23 +1025,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def opendir(self, inode, ctx):
     # TODO: check for permission to read
-    class _OpenDir:
-      ''' An "open" Dir: keeps a list of the names from open time
-          and a reference to the Dir so that it can validate the names
-          at readdir time.
-      '''
-      def __init__(self, D):
-        self.D = D
-        self.names = list(D.keys())
     E = self._vt_core.i2E(inode)
     if not E.isdir:
       raise FuseOSError(errno.ENOTDIR)
-    OD = _OpenDir(E)
-    fhndx = self._vt_core._new_file_handle_index(OD)
+    fs = self._vt_core
+    OD = DirHandle(fs, E)
+    fhndx = fs._new_file_handle_index(OD)
     return fhndx
 
   @handler
   def read(self, fhndx, off, size):
+    ##X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
     FH = self._vt_core._fh(fhndx)
     chunks = []
     while size > 0:
@@ -1021,35 +1054,75 @@ class StoreFS_LLFUSE(llfuse.Operations):
     def entries():
       o = off
       D = FH.D
+      fs = FH.fs
       S = self._vt_core.S
       names = FH.names
       while True:
-        if o == 0:
-          name = '.'
-          with S:
-            E = D[name]
-        elif o == 1:
-          name = '..'
-          with S:
-            E = D[name]
-        else:
-          o2 = o - 2
-          if o2 >= len(names):
-            break
-          name = names[o2]
-          if name == '.' or name == '..':
-            # already special cased
-            E = None
-          else:
+        try:
+          EA = None
+          if o == 0:
+            name = '.'
             with S:
-              E = D.get(name)
-        if E is not None:
-          # yield name, attributes and next offset
-          with S:
-            EA = self._vt_EntryAttributes(E)
-          yield self._vt_bytes(name), EA, o + 1
-        o += 1
+              E = D[name]
+          elif o == 1:
+            name = '..'
+            if D is self._vt_core.mntE:
+              try:
+                st = os.stat(dirname(self._vt_core.mnt_path))
+              except OSError as e:
+                warning("os.stat(%r): %s", dirname(self._vt_core.mnt_path), e)
+                raise FuseOSError(e.errno)
+              EA = self._stat_EntryAttributes(st)
+            else:
+              with S:
+                E = D[name]
+          else:
+            o2 = o - 2
+            if o2 == len(names) and fs.show_prev_dirent:
+              name = PREV_DIRENT_NAME
+              E = D.prev_dirent
+            elif o2 >= len(names):
+              break
+            else:
+              name = names[o2]
+              if name == '.' or name == '..':
+                # already special cased
+                E = None
+              elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
+                warning("%s: readdir: suppressing entry %r because fs.show_prev_dirent is true", D, PREV_DIRENT_NAME)
+                E = None
+              else:
+                with S:
+                  E = D.get(name)
+          if EA is None:
+            if E is not None:
+              # yield name, attributes and next offset
+              with S:
+                EA = self._vt_EntryAttributes(E)
+          if EA is not None:
+            yield self._vt_bytes(name), EA, o + 1
+          o += 1
+        except Exception as e:
+          exception("READDIR: %s", e)
+          raise
+
     return entries()
+
+  @staticmethod
+  def _stat_EntryAttributes(st):
+    EA = llfuse.EntryAttributes()
+    EA.st_ino = st.st_ino
+    EA.st_mode = st.st_mode
+    EA.st_nlink = st.st_nlink
+    EA.st_uid = st.st_uid
+    EA.st_gid = st.st_gid
+    EA.st_size = st.st_size
+    EA.st_blksize = st.st_blksize
+    EA.st_blocks = st.st_blocks
+    EA.st_atime_ns = int(st.st_atime * 1000000000)
+    EA.st_ctime_ns = int(st.st_ctime * 1000000000)
+    EA.st_mtime_ns = int(st.st_mtime * 1000000000)
+    return EA
 
   @handler
   def readlink(self, inode, ctx):
@@ -1152,8 +1225,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
       if fields.update_gid:
         M.gid = attr.st_gid
       if fields.update_size:
-        # TODO: what calls this? do we sanity check file sizes etc?
-        warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
+        FH = FileHandle(self, E, False, True, False)
+        FH.truncate(attr.st_size)
+        FH.close()
       return self._vt_EntryAttributes(E)
 
   @handler

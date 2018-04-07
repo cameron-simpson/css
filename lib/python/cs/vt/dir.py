@@ -19,10 +19,10 @@ from cs.lex import texthexify
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
-from cs.threads import locked
+from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, SEP
-from .block import Block, decodeBlock, encodeBlock
+from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
@@ -51,16 +51,17 @@ def D_type2str(type_):
     return "D_HARD_T"
   return str(type_)
 
-F_HASMETA = 0x01
-F_HASNAME = 0x02
-F_NOBLOCK = 0x04
-F_HASUUID = 0x08
+F_HASMETA = 0x01        # has metadata
+F_HASNAME = 0x02        # has a name
+F_NOBLOCK = 0x04        # has no Block reference
+F_HASUUID = 0x08        # has a UUID
+F_PREVDIRENT = 0x10     # has reference to serialised previous Dirent
 
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta=None, uuid=None, parent=None):
+  def __init__(self, type_, name, meta=None, uuid=None, parent=None, prevblock=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -68,6 +69,9 @@ class _Dirent(Transcriber):
     self.type = type_
     self.name = name
     self._uuid = uuid
+    assert prevblock is None or isinstance(prevblock, _Block), \
+        "not _Block: prevblock=%r" % (prevblock,)
+    self._prev_dirent_blockref = prevblock
     if isinstance(meta, Meta):
       if meta.E is not None and meta.E is not self:
         warning("meta.E is %r, replacing with self %r", meta.E, self)
@@ -94,14 +98,14 @@ class _Dirent(Transcriber):
   @classmethod
   def from_bytes(cls, data, offset=0):
     ''' Unserialise a serialised Dirent, return (Dirent, offset).
-        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
+        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta][uuid:16]blockref[blockref(pref_dirent)]
     '''
     offset0 = offset
     type_, offset = get_bs(data, offset)
     flags, offset = get_bs(data, offset)
     if flags & F_HASNAME:
       namedata, offset = get_bsdata(data, offset)
-      name = namedata.decode()
+      name = bytes(namedata).decode()
     else:
       name = ""
     if flags & F_HASMETA:
@@ -121,6 +125,10 @@ class _Dirent(Transcriber):
       block = None
     else:
       block, offset = decodeBlock(data, offset)
+    if flags & F_PREVDIRENT:
+      prev_dirent_blockref, offset = decodeBlock(data, offset)
+    else:
+      prev_dirent_blockref = None
     try:
       E = cls.from_components(type_, name, meta=metatext, uuid=uu, block=block)
     except ValueError as e:
@@ -130,6 +138,7 @@ class _Dirent(Transcriber):
           type_, name,
           chunk=data[offset0:offset],
           meta=metatext, uuid=uu, block=block)
+    E._prev_dirent_blockref = prev_dirent_blockref
     return E, offset
 
   @staticmethod
@@ -175,6 +184,13 @@ class _Dirent(Transcriber):
     else:
       flags |= F_HASUUID
       uubs = uu.bytes
+    prev_dirent_blockref = self._prev_dirent_blockref
+    if prev_dirent_blockref is None:
+      prev_dirent_bs = b''
+    else:
+      assert isinstance(prev_dirent_blockref, _Block)
+      flags |= F_PREVDIRENT
+      prev_dirent_bs = encodeBlock(prev_dirent_blockref)
     return (
         put_bs(self.type)
         + put_bs(flags)
@@ -182,6 +198,7 @@ class _Dirent(Transcriber):
         + metadata
         + uubs
         + blockref
+        + prev_dirent_bs
     )
 
   def __hash__(self):
@@ -199,6 +216,9 @@ class _Dirent(Transcriber):
       attrs['meta'] = self.meta
     if self.block:
       attrs['block'] = self.block
+    prevE = self.prev_dirent
+    if prevE is not None:
+      attrs['prevblock'] = Block(data=prevE.encode())
     T.transcribe_mapping(attrs, fp)
 
   @classmethod
@@ -246,6 +266,39 @@ class _Dirent(Transcriber):
          and self.meta == other.meta
          and self.block == other.block
            )
+
+  @locked_property
+  def prev_dirent(self):
+    ''' Return the previous Dirent.
+        If not None, during encoding or transcription, if self !=
+        prev_dirent, include it in the encoding or transcription.
+    '''
+    prev_blockref = self._prev_dirent_blockref
+    if prev_blockref is None:
+      return None
+    data = prev_blockref.data
+    E, offset = _Dirent.from_bytes(data)
+    if offset < len(data):
+      warning("prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
+        B, offset, data[offset:])
+    return E
+
+  @prev_dirent.setter
+  @locked
+  def prev_dirent(self, E):
+    assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
+    self._prev_dirent = None
+    Ebs = E.encode()
+    self._prev_dirent_blockref = Block(data=Ebs)
+    self.changed = True
+    X("SET .PREVDIRENT: self=%s", self)
+
+  def snapshot(self):
+    ''' Update the Dirent's previous block state if missing or changed.
+    '''
+    E = self.prev_dirent
+    if E is None or E != self:
+      self.prev_dirent = self
 
   @property
   def isfile(self):
@@ -329,9 +382,7 @@ class InvalidDirent(_Dirent):
         D_INVALID_T,
         name,
         block=None,
-        chunk=None,
         **kw)
-    self.block = block
     self.chunk = chunk
 
   def __str__(self):
@@ -418,7 +469,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if block is None:
       block = Block(data=b'')
     self._open_file = None
-    self._lock = RLock()
     self._block = block
     self._check()
 
@@ -625,7 +675,7 @@ class Dir(_Dirent):
       # compute the dictionary holding the live Dir entries
       emap = {}
       offset = 0
-      data = self._block.all_data()
+      data = self._block.data
       while offset < len(data):
         E, offset = _Dirent.from_bytes(data, offset)
         E.parent = self

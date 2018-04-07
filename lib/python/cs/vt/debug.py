@@ -11,7 +11,7 @@ def dump_Block(block, indent=''):
   X("%s%s", indent, block)
   if block.indirect:
     indent += '  '
-    subblocks = block.subblocks()
+    subblocks = block.subblocks
     X("%sindirect %d subblocks, span %d bytes",
       indent, len(subblocks), len(block))
     for B in subblocks:

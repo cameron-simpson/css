@@ -191,7 +191,10 @@ class FileDataMappingProxy(object):
         return True
       if self._getref(h) is not None:
         return True
-    return h in self.backend
+    backend = self.backend
+    if backend:
+      return h in backend
+    return False
 
   def keys(self):
     ''' Mapping method for .keys.
@@ -205,9 +208,11 @@ class FileDataMappingProxy(object):
       if h not in seen and self._getref(h):
         yield h
         seen.add(h)
-    for h in self.backend.keys():
-      if h not in seen:
-        yield h
+    backend = self.backend
+    if backend:
+      for h in backend.keys():
+        if h not in seen:
+          yield h
 
   def __getitem__(self, h):
     ''' Fetch the data with key `h`. Raise KeyError if missing.
@@ -269,7 +274,9 @@ class FileDataMappingProxy(object):
           self._add_cachefile()
       # store into the backend
       if not in_backend:
-        self.backend[h] = data
+        backend = self.backend
+        if backend:
+          self.backend[h] = data
 
 if __name__ == '__main__':
   from .cache_tests import selftest

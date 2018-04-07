@@ -399,6 +399,8 @@ class RunStateMixin(object):
     if runstate is None:
       runstate = RunState()
     self.runstate = runstate
+  def cancel(self):
+    return self.runstate.cancel()
   @property
   def cancelled(self):
     return self.runstate.cancelled
