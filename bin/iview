@@ -109,7 +109,7 @@ class IViewInfo(_IViewInfo):
           xit = 0
         else:
           argv = ['iview-cli', '-d', url]
-          xit = run(argv, trace=True)
+          xit = run(argv, logger=True)
           if xit != 0:
             error("nonzero exit from %r: %d", argv, xit)
             with Pfx('remove %r', output_flv):
@@ -127,7 +127,7 @@ class IViewInfo(_IViewInfo):
               warning('MP4 output exists, skipping conversion')
             else:
               argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
-              xit = run(argv, trace=True)
+              xit = run(argv, logger=True)
               if xit != 0:
                 error("nonzero exit from %r: %d", argv, xit)
                 with Pfx('remove %r', output_mp4):
@@ -249,7 +249,7 @@ def main(argv):
           warning('extra arguments: %r', argv)
           badopts = True
         else:
-          xit = run(['iview-cli', '--programme'], trace=True)
+          xit = run(['iview-cli', '--programme'], logger==True)
       elif op == 'download' or op == 'dl':
         if argv:
           matches = iview_matches(argv)
