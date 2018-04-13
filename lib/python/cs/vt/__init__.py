@@ -18,6 +18,7 @@ from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
+from cs.logutils import error
 from cs.seq import isordered
 
 # Default OS level file high water mark.
@@ -32,8 +33,14 @@ class _Defaults(threading.local):
       A Store's __enter__/__exit__ methods push/pop that store
       from the default.
   '''
+  _Ss = []  # global stack of fallback Store values
   def __getattr__(self, attr):
     if attr == 'S':
+      Ss = self._Ss
+      if Ss:
+        warning("no per-Thread Store stack, using the global stack")
+        return Ss[-1]
+      error("%s: no per-Thread defaults.S and no global stack, returning None", self)
       return None
     if attr == 'oldS':
       oldS = self.oldS = []
@@ -47,6 +54,10 @@ class _Defaults(threading.local):
     oldS = defaults.oldS.pop()
     ##X("POP STORE %s => %s", defaults.S, oldS)
     defaults.S = oldS
+  def push_Ss(self, newS):
+    self._Ss.append(newS)
+  def pop_Ss(self):
+    return self._Ss.pop()
 
 defaults = _Defaults()
 
