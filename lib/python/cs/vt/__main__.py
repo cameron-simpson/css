@@ -223,12 +223,14 @@ class VTCmd:
       except Exception as e:
         exception("can't open store %r: %s", self.store_spec, e)
         raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
+      defaults.push_Ss(S)
       if self.no_cache:
         cacheS = None
       else:
         cacheS = self.config['cache']
         cacheS.backend = S
         S = cacheS
+      defaults.push_Ss(S)
       # start the status ticker
       if False and sys.stdout.isatty():
         X("wrap in a ProgressStore")
