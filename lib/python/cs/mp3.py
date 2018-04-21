@@ -108,4 +108,5 @@ def framesof(bfr):
 
 if __name__ == '__main__':
   import cs.mp3_tests
+  import sys
   cs.mp3_tests.selftest(sys.argv)

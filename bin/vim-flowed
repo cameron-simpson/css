@@ -12,5 +12,6 @@
 
 exec vim \
     -c 'silent 1,/^$/s/  *$//' \
+    -c 'set filetype=mail' \
     -c 'set formatoptions=waqj' \
     ${1+"$@"}

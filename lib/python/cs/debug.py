@@ -34,6 +34,7 @@ import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug
 from cs.obj import O, Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -50,6 +51,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.seq',
@@ -75,6 +77,32 @@ def RLock():
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
 
+class TimingOutLock(object):
+  ''' A Lock replacement which times out, used for locating deadlock points.
+  '''
+  def __init__(self, deadlock_timeout=20.0, recursive=False):
+    self._lock = threading.RLock() if recursive else threading.Lock()
+    self._deadlock_timeout = deadlock_timeout
+  def acquire(self,blocking=True,timeout=-1,name=None):
+    if timeout < 0:
+      timeout = self._deadlock_timeout
+    else:
+      timeout = min(timeout, self._deadlock_timeout)
+    ok = self._lock.acquire(timeout=timeout) if blocking else self._lock.acquire(blocking=blocking)
+    if not ok:
+      raise RuntimeError("TIMEOUT acquiring lock held by %s:%r" % (self.owner, self.owner_name))
+    self.owner = caller()
+    self.owner_name = name
+    return True
+  def release(self):
+    return self._lock.release()
+  def __enter__(self):
+    self.acquire()
+    self.owner = caller()
+    return True
+  def __exit__(self,*a):
+    return self._lock.__exit__(*a)
+
 class TraceSuite(object):
   ''' Context manager to trace start and end of a code suite.
   '''
@@ -84,7 +112,7 @@ class TraceSuite(object):
     self.msg = msg
   def __enter__(self):
     X("TraceSuite ENTER %s", self.msg)
-  def __exit__(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, exc_tb):
     X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
 def Thread(*a, **kw):
@@ -98,7 +126,6 @@ def thread_dump(Ts=None, fp=None):
       `Ts`: the Threads to dump; if unspecified use threading.enumerate().
       `fp`: the file to which to write; if unspecified use sys.stderr.
   '''
-  import traceback
   if Ts is None:
     Ts = threading.enumerate()
   if fp is None:
@@ -345,7 +372,7 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
     _debug_threads.add(self)
-    return threading.Thread.__init__(self, *a, **kw)
+    threading.Thread.__init__(self, *a, **kw)
 
   @DEBUG
   def join(self, timeout=None):
@@ -358,7 +385,6 @@ class DebuggingThread(threading.Thread, DebugWrapper):
 def trace(func):
   ''' Decorator to report the call and return of a function.
   '''
-  from cs.py.func import funccite
   def subfunc(*a, **kw):
     X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
     try:

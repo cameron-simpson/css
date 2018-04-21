@@ -1,0 +1,1 @@
+Assorted fixes from recent module reshuffle. Other small features and cleanups. Drop a couple of unused functions.

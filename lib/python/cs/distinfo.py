@@ -270,7 +270,11 @@ class PyPI_Package(O):
     M = importlib.import_module(self.package_name)
     dinfo.update(M.DISTINFO)
 
-    doc = M.__doc__.strip()
+    doc = M.__doc__
+    if doc:
+      doc = doc.strip()
+    else:
+      doc = ''
     try:
       doc_line1, doc_tail = doc.split('\n', 1)
     except ValueError:

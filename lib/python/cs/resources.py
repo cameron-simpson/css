@@ -4,6 +4,13 @@
 #       - Cameron Simpson <cs@cskk.id.au> 11sep2014
 #
 
+from contextlib import contextmanager
+from threading import Condition, RLock, Lock
+import time
+from cs.logutils import error
+from cs.obj import O, Proxy
+from cs.py.stack import caller
+
 DISTINFO = {
     'description': "resourcing related classes and functions",
     'keywords': ["python2", "python3"],
@@ -11,21 +18,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
+    ],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.stack'],
 }
-
-from contextlib import contextmanager
-from threading import Condition, RLock, Lock, current_thread
-import time
-import traceback
-from cs.excutils import logexc
-import cs.logutils
-from cs.logutils import debug, warning, error
-from cs.obj import O
-from cs.pfx import Pfx, PfxCallInfo, XP
-from cs.py.stack import caller, stack_dump
-from cs.x import X
 
 class ClosedError(Exception):
   pass
@@ -48,7 +43,7 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False, lock=None):
+  def __init__(self, finalise_later=False, lock=None, subopens=False):
     ''' Initialise the MultiOpenMixin state.
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
@@ -57,7 +52,13 @@ class MultiOpenMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
         `lock`: if set and not None, an RLock to use; otherwise one will be allocated
+        `subopens`: if true (default false) then .open will return
+          a proxy object with its own .closed attribute set by the
+          proxy's .close.
     '''
+    if subopens:
+      raise RuntimeError("subopens not implemented")
+    O.__init__(self)
     if lock is None:
       lock = RLock()
     self.opened = False
@@ -81,11 +82,11 @@ class MultiOpenMixin(O):
     ''' Increment the open count.
         On the first .open call self.startup().
     '''
-    if True:    ## cs.logutils.D_mode:
+    if True:
       if caller_frame is None:
         caller_frame = caller()
-      Fkey = caller_frame.filename, caller_frame.lineno
-      self._opened_from[Fkey] = self._opened_from.get(Fkey, 0) + 1
+      frame_key = caller_frame.filename, caller_frame.lineno
+      self._opened_from[frame_key] = self._opened_from.get(frame_key, 0) + 1
     self.opened = True
     with self._lock:
       self._opens += 1
@@ -113,9 +114,10 @@ class MultiOpenMixin(O):
       if self._opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
         error("  final close was from %s", self._final_close_from)
-        for Fkey in sorted(self._opened_from.keys()):
-          error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
+        for frame_key in sorted(self._opened_from.keys()):
+          error("  opened from %s %d times", frame_key, self._opened_from[frame_key])
         ##from cs.debug import thread_dump
+        ##from threading import current_thread
         ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
@@ -149,9 +151,9 @@ class MultiOpenMixin(O):
   def closed(self):
     if self._opens > 0:
       return False
-    if self._opens < 0:
-      XP("_opens < 0: %r", self._opens)
-      raise RuntimeError("_OPENS UNDERFLOW")
+    ##if self._opens < 0:
+    ##  XP("_opens < 0: %r", self._opens)
+    ##  raise RuntimeError("_OPENS UNDERFLOW")
     if not self.opened:
       # never opened, so not totally closed
       return False
@@ -171,7 +173,7 @@ class MultiOpenMixin(O):
 
   @staticmethod
   def is_opened(func):
-    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise when if the object is not yet open.
+    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise if the object is not yet open.
     '''
     def is_opened_wrapper(self, *a, **kw):
       if self.closed:
@@ -181,6 +183,18 @@ class MultiOpenMixin(O):
       return func(self, *a, **kw)
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
+
+class _SubOpen(Proxy):
+
+  def __init__(self, proxied):
+    self.closed = False
+    self.master = proxied
+
+  def close(self):
+    if self.closed:
+      raise RuntimeError("already closed")
+    self.master.close()
+    self.closed = True
 
 class MultiOpen(MultiOpenMixin):
   ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
@@ -233,7 +247,174 @@ class Pool(O):
         o = self.pool.pop()
       except IndexError:
         o = self.new_object()
-    yield o
-    with self._lock:
-      if self.max_size == 0 or len(self.pool) < self.max_size:
-        self.pool.append(o)
+    try:
+      yield o
+    finally:
+      with self._lock:
+        if self.max_size == 0 or len(self.pool) < self.max_size:
+          self.pool.append(o)
+
+class RunState(object):
+  ''' A class to track a running task whose cancellation may be requested.
+      Its purpose is twofold, to provide easily queriable state
+      around tasks which can start and stop, and to provide control
+      methods to pronounce that a task has started, should stop
+      (cancel) and has stopped (end).
+
+      A RunState can be used a a context manager, with the enter
+      and exit methods calling .start and .end respectively.
+
+      Monitor or daemon processes can poll the RunState to see when
+      they should terminate, and may also manage the overall state
+      easily using a context manager. Example:
+
+        def monitor(self):
+          with self.runstate:
+            while not self.runstate.cancelled:
+              ... main loop body here ...
+
+      A RunState has three main methods:
+
+      .start(): set .running and clear .cancelled
+      .cancel(): set .cancelled
+      .end(): clear .running
+
+      A RunState has the following properties:
+
+      cancelled: true if .cancel has been called.
+
+      running: true if the task is running. Assigning a true value
+        to it also sets .start_time to now. Assigning a false value
+        to it also sets .end_time to now.
+
+      start_time: the time .running was last set to true.
+      end_time: the time .running was last set to false.
+      run_time: max(0, .end_time - .start_time)
+
+      stopped: true if the task is not running.
+
+      stopping: true if the task is running but has been cancelled.
+
+      notify_start: a set of callables called with the RunState
+        instance to be called whenever .running becomes true.
+      notify_end: a set of callables called with the RunState
+        instance to be called whenever .running becomes false.
+      notify_cancel: a set of callables called with the RunState
+        instance to be called whenever .cancel is called.
+  '''
+
+  def __init__(self):
+    # core state
+    self._running = False
+    self.cancelled = False
+    # timing state
+    self.start_time = None
+    self.end_time = None
+    self.total_time = 0
+    # callbacks
+    self.notify_start = set()
+    self.notify_cancel = set()
+    self.notify_end = set()
+
+  def __bool__(self):
+    ''' Return true if the task is running.
+    '''
+    return self.running
+  __nonzero__ = __bool__
+
+  def __enter__(self):
+    self.start()
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.end()
+
+  def start(self):
+    ''' Start: adjust state, set start_time to now.
+        Sets .cancelled to False and sets .running to True.
+    '''
+    assert not self.running
+    self.cancelled = False
+    self.running = True
+
+  def end(self):
+    ''' End: adjust state, set end_time to now.
+        Sets sets .running to False.
+    '''
+    assert self.running
+    self.running = False
+
+  @property
+  def running(self):
+    ''' Property expressing whether the task is running.
+    '''
+    return self._running
+
+  @running.setter
+  def running(self, status):
+    ''' Set the running property.
+    '''
+    if self._running:
+      if not status:
+        self.end_time = time.time()
+        self.total_time += self.run_time
+        for notify in self.notify_end:
+          notify(self)
+    elif status:
+      self.start_time = time.time()
+      for notify in self.notify_start:
+        notify(self)
+    self._running = status
+
+  @property
+  def stopping(self):
+    ''' Is the process stopping? Running is true and cancelled is true.
+    '''
+    return self.running and self.cancelled
+
+  @property
+  def stopped(self):
+    ''' Was the process stopped? Running is false and cancelled is true.
+    '''
+    return self.cancelled and not self.running
+
+  def cancel(self):
+    ''' Set the cancelled flag; the process should notice and stop.
+    '''
+    self.cancelled = True
+    for notify in self.notify_cancel:
+      notify(self)
+
+  @property
+  def run_time(self):
+    ''' Property returning most recent run time (end_time-start_time).
+        If still running, use now as the end time.
+    '''
+    if self.running:
+        end_time = time.time()
+    else:
+        end_time = self.end_time
+    return max(0, end_time - self.start_time)
+
+class RunStateMixin(object):
+  ''' Mixin to provide convenient access to a RunState.
+      Provides: .runstate, .cancelled, .running, .stopping, .stopped.
+  '''
+  def __init__(self, runstate=None):
+    if runstate is None:
+      runstate = RunState()
+    self.runstate = runstate
+  def cancel(self):
+    return self.runstate.cancel()
+  @property
+  def cancelled(self):
+    return self.runstate.cancelled
+  @property
+  def running(self):
+    return self.runstate.running
+  @property
+  def stopping(self):
+    return self.runstate.stopping
+  @property
+  def stopped(self):
+    return self.runstate.stopped
