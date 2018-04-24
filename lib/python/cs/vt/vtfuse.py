@@ -111,9 +111,10 @@ def handler(method):
       raise RuntimeError("UNCAUGHT EXCEPTION") from e
   return handle
 
-def log_traces_queued(Q):
-  for logcall, citation, elapsed, ctx, msg, *a in Q:
-    dolog(logcall, citation, elapsed, ctx, msg, *a)
+def log_traces_queued(Q, S):
+  with S:
+    for logcall, citation, elapsed, ctx, msg, *a in Q:
+      dolog(logcall, citation, elapsed, ctx, msg, *a)
 
 def dolog(logcall, citation, elapsed, ctx, msg, *a):
   logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
@@ -472,11 +473,13 @@ class _StoreFS_core(object):
     # and a thread to process them asynchronously
     self.log = getLogger(LOGGER_NAME)
     self.logQ = IterableQueue()
-    T = Thread(name="log-queue(%s)" % (self,),
-               target=log_traces_queued,
-               args=(self.logQ,))
+    T = Thread(
+        name="log-queue(%s)" % (self,),
+        target=log_traces_queued,
+        args=(self.logQ, S))
     T.daemon = True
     T.start()
+    self._log_worker = T
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
@@ -486,6 +489,11 @@ class _StoreFS_core(object):
     # preassign inode 1, llfuse seems to presume it :-(
     self.mnt_inum = 1
     self._inodes._add_Dirent(self.mnt_inum, self.mntE)
+
+  def close(self):
+    self._sync()
+    self.logQ.close()
+    self._log_worker.join()
 
   def __str__(self):
     if self.subpath:
@@ -825,7 +833,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def destroy(self):
     # TODO: call self.forget with all kreffed inums?
-    self._vt_core._sync()
+    X("%s.destroy...", self)
+    self._vt_core.close()
+    X("%s.destroy COMPLETE", self)
 
   @handler
   def flush(self, fh):
