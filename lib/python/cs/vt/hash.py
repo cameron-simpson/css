@@ -98,6 +98,12 @@ class _Hash(bytes, Transcriber):
     '''
     return self.__class__.from_chunk
 
+  @property
+  def filename(self):
+    ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
+    '''
+    return hexify(self) + '.' + self.HASHNAME
+
   def transcribe_inner(self, T, fp):
     fp.write(self.HASHNAME)
     fp.write(':')
