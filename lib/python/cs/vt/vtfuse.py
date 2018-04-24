@@ -17,6 +17,7 @@ import subprocess
 import sys
 from threading import Thread, RLock, Lock
 from types import SimpleNamespace as NS
+from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
@@ -735,9 +736,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
       self._vt_core.mnt_path = abspath(mnt)
+      @logexc
       def mainloop():
-        llfuse.main()
-        llfuse.close()
+        with S:
+          llfuse.main()
+          llfuse.close()
         S.close()
       T = PfxThread(target=mainloop)
       S.open()
