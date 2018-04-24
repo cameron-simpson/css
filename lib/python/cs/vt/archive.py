@@ -176,7 +176,7 @@ class _Archive(object):
         E, offset = parse(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
-        info("when=%s, E=%s", when, E)
+        ##info("when=%s, E=%s", when, E)
         yield when, E
 
   @staticmethod
