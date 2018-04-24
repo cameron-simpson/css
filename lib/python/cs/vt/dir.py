@@ -291,7 +291,6 @@ class _Dirent(Transcriber):
     Ebs = E.encode()
     self._prev_dirent_blockref = Block(data=Ebs)
     self.changed = True
-    X("SET .PREVDIRENT: self=%s", self)
 
   def snapshot(self):
     ''' Update the Dirent's previous block state if missing or changed.
