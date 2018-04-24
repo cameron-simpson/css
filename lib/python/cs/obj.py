@@ -16,7 +16,9 @@ Presents:
 * Proxy, a very simple minded object proxy intened to aid debugging.
 '''
 
+from __future__ import print_function
 from copy import copy as copy0
+import sys
 from cs.py3 import StringTypes
 
 DISTINFO = {
@@ -242,3 +244,52 @@ class Proxy(object):
   def __len__(self):
     _proxied = object.__getattribute__(self, '_proxied')
     return len(_proxied)
+
+class TrackedClassMixin(object):
+  ''' A mixin to track all instances of a particular class.
+
+      This is aimed at checking the global state of objects of a
+      particular type, particularly states like counters. The
+      tracking is attached to the class itself.
+
+      The class to be tracked includes this mixin as a superclass and calls:
+
+        TrackedClassMixin.__init__(class_to_track)
+
+      from its __init__ method. Note that `class_to_track` is
+      typically the class name itself, not `type(self)` which would
+      track the specific subclass. At some relevant point one can call:
+
+        self.tcm_dump(class_to_track[, file])
+
+      `class_to_track` needs a `tcm_get_state` method to return the
+      salient information, such as this from cs.resources.MultiOpenMixin:
+
+        def tcm_get_state(self):
+          return {'opened': self.opened, 'opens': self._opens}
+
+      See cs.resources.MultiOpenMixin for example use.
+  '''
+
+  def __init__(self, cls):
+    try:
+      m = cls.__map
+    except AttributeError:
+      m = cls.__map = {}
+    m[id(self)] = self
+
+  def __state(self, cls):
+    return cls.tcm_get_state(self)
+
+  @staticmethod
+  def tcm_all_state(cls):
+    m = cls.__map
+    for o in m.values():
+      yield o, cls.__state(o, cls)
+
+  @staticmethod
+  def tcm_dump(cls, f=None):
+    if f is None:
+      f = sys.stderr
+    for o, state in TrackedClassMixin.tcm_all_state(cls):
+      print(str(type(o)), id(o), repr(state), file=f)
