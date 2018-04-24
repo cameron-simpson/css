@@ -22,7 +22,7 @@ from itertools import chain
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import info, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
