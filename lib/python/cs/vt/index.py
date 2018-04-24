@@ -49,7 +49,7 @@ def choose(basepath, preferred_indexclass=None):
     if not indexclass.is_supported():
       continue
     return indexclass
-  raise ValueError("no supported index classes available")
+  raise ValueError("no supported index classes available: tried %r", indexclasses)
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
