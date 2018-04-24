@@ -53,9 +53,12 @@ class _Defaults(threading.local):
     error("%s: no per-Thread defaults.S and no global stack, returning None", self)
     return None
   def pushStore(self, newS):
+    newS.open()
     self.Ss.append(newS)
   def popStore(self):
-    return self.Ss.pop()
+    oldS = self.Ss.pop()
+    oldS.close()
+    return oldS
   def push_Ss(self, newS):
     self._Ss.append(newS)
   def pop_Ss(self):
