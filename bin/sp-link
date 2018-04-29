@@ -1,0 +1,402 @@
+#!/usr/bin/env python3
+#
+# Utility script for dealing with SP-Link data.
+# - Cameron Simpson <cs@cskk.id.au> 25apr2018
+#
+
+from __future__ import print_function
+from collections import defaultdict
+from datetime import datetime, timedelta
+from getopt import GetoptError
+from os.path import basename, splitext, join as joinpath, exists as pathexists
+from subprocess import run
+import sys
+from cs.csvutils import csv_reader
+from cs.logutils import setup_logging, error, warning
+from cs.pfx import Pfx
+from cs.py.func import prop
+from cs.x import X
+
+UNIX_EPOCH = datetime(1970,1,1)
+SP_EPOCH = datetime(2001,1,1).astimezone()
+
+GRAPH_DAYS = 6 * 24 * 3600
+
+# the SP PRO accrues data every 15 minutes
+SP_DATA_INTERVAL = 900
+
+# SP polls seem to be every 15 minutes, set heartbeat to 20 minutes in case of skew
+##RRD_HEARTBEAT = 1200
+RRD_HEARTBEAT = 1200
+
+RRD_STEP = 10           # 10s slot size
+RRD_SLOTS = 3153600     # a year in 10s slots
+
+# scale factor for per-slot rates to get per-hour rates
+# base rate is kwh/s
+RRD_Y_SCALE = 3600
+
+# hourly power consumption implied by a given power rate poll
+KW_to_KWH = 3600 / SP_DATA_INTERVAL
+
+##RRD_STEP = 900
+##RRD_SLOTS = 35040
+
+KEY_TIMESTAMP_SECONDS = 'Date/Time Stamp [Seconds From The Year 2001]'
+
+MAPPINGS = {
+  'DetailedData': {
+    'csv2rrd': {
+      'Date/Time Stamp [Seconds From The Year 2001]': None,
+      'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]': None,
+      'Inverter AC Power (Average) [kW]': 'inverterACPowerKW:GAUGE',
+      'DC Input Accumulated (Sample) [kWh]': 'dcInputCumKWH:DCOUNTER',
+      'DC Output Accumulated (Sample) [kWh]': 'dcOutputCumKWH:DCOUNTER',
+      'Battery In Accumulated (Sample) [kWh]': 'batteryInCumKWH:DCOUNTER',
+      'Battery Out Accumulated (Sample) [kWh]': 'batteryOutCumKWH:DCOUNTER',
+      'DC Voltage (Average) [V DC]': None,
+      'DC Voltage (Min) [V DC]': None,
+      'DC Voltage (Max) [V DC]': None,
+      'DC Mid Voltage (Average) [V DC]': None,
+      'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': None,
+      'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': None,
+      'Inverter DC Current (Average) [A]': None,
+      'Shunt1 Current (Average) [A]': None,
+      'Shunt 2 Current (Average) [A]': None,
+      'Load AC Power (Average) [kW]': 'ACLoadPowerKW:GAUGE',
+      'Load AC Power (Max) [kW]': None,
+      'AC Input Power (Average) [kW]': None,
+      'AC Load Voltage (Average) [V AC]': None,
+      'AC Load Frequency (Average) [Hz]': None,
+      'Transformer Temperature (Max) [Degrees C]': None,
+      'Heatsink Temperature (Max) [Degrees C]': None,
+      'Battery Temperature (Max) [Degrees C]': None,
+      'Internal Temperature (Max) [Degrees C]': None,
+      'Power Module Temperature (Max) [Degrees C]': None,
+      'State of Charge (Sample) [%]': 'batterySOCPcnt:GAUGE',
+      'AC Input kWh Accumulated (Sample) [kWh]': 'ACInputCumKWH:DCOUNTER',
+      'AC Load kWh Accumulated (Sample) [kWh]': 'ACLoadCumKWH:DCOUNTER',
+      'Shunt 1 kWh Accumulated (Sample) [kWh]': None,
+      'Shunt 2 kWh Accumulated (Sample) [kWh]': None,
+      'Analogue In 1 DC Voltage (Average) [V DC]': None,
+      'Analogue In 2 DC Voltage (Average) [V DC]': None,
+      'AC Export kWh Accumulated (Sample) [kWh]': 'ACExportCumKWH:DCOUNTER',
+      'Total AC Coupled Power (Average) [kW]': 'totACCoupledPowerKW:GAUGE',
+      'Total AC Coupled Energy (Sample) [kWh]': None,
+    },
+    'graphs': {
+      'battery_charge': [ 'DEF:batterySOCPcnt:batterySOCPcnt:MAX', 'LINE:batterySOCPcnt#000080:Battery SOC %' ],
+      'power': [
+        'DEF:ACLoadCumKWH:ACLoadCumKWH:LAST',
+          f'CDEF:acloadkw=ACLoadCumKWH,{RRD_Y_SCALE},*',
+        'DEF:pvinputkwh:dcInputCumKWH:LAST',
+          f'CDEF:pvkw=pvinputkwh,{RRD_Y_SCALE},*,0,6,LIMIT',
+        'DEF:BatInputCumKW:batteryInCumKWH:LAST',
+          f'CDEF:BatChargeKW=BatInputCumKW,{RRD_Y_SCALE},*',
+        'DEF:BatOutputCumKW:batteryOutCumKWH:LAST',
+          f'CDEF:BatDischargeKW=BatOutputCumKW,{RRD_Y_SCALE},*',
+        'DEF:ACExportCumKWH:ACExportCumKWH:LAST',
+          f'CDEF:GridExpKW=ACExportCumKWH,{RRD_Y_SCALE},*',
+        # the load should be met by the sum of:
+        # pvload=min(load, pvinput)
+        # batout=battery out
+        # acimport=load-pvload-batout
+        'CDEF:acloadafterbat=acloadkw,BatDischargeKW,-,0,MAX',
+        'CDEF:acloadfrombat=acloadkw,acloadafterbat,-',
+        'CDEF:batexport=BatDischargeKW,acloadfrombat,-',
+        'CDEF:acloadafterpv=acloadafterbat,pvkw,-,0,MAX',
+        'CDEF:acloadfrompv=acloadafterbat,acloadafterpv,-,0,MAX',
+        'CDEF:acloadfromgrid=acloadafterpv',
+        'CDEF:pvloadkw=acloadkw,pvkw,MIN',
+        'CDEF:GridImportKW=acloadkw,pvloadkw,-,BatDischargeKW,-',
+          'AREA:acloadfrompv#0000ff:Load From PV KW',
+          'AREA:acloadfrombat#ff8080:Load From PV KW:STACK',
+          'AREA:acloadfromgrid#ff0000:Grid Import KW (load - pv - battery):STACK',
+          'AREA:BatChargeKW#8080ff:Battery Charge from PV? KW (from batteryInCumKWH):STACK',
+          'AREA:batexport#ffff00:Battery Export? Battery not consumed by load:STACK',
+          'AREA:GridExpKW#00ff00:Grid Export KW (from ACExportCumKWH):STACK',
+          'LINE1:pvkw#c0c080:PV Input KW (from dcInputCumKWH)',
+          'LINE1:acloadkw#000000:Load AC Power KW',
+      ],
+    },
+  },
+}
+
+def rrdcreate(filename, csv2rrd):
+  for key, value in sorted(csv2rrd.items()):
+    if value is None:
+      continue
+    rrdkey, rrdtype = value.split(':')
+    print(rrdkey, rrdtype)
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  setup_logging(cmd)
+  usage = r'''Usage: %s op [op-args...]
+    graph csvfiles...
+    import csvfiles...
+    parse csvfiles...''' % (cmd,)
+  badopts = False
+  try:
+    if not argv:
+      raise GetoptError("missing op")
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == 'graph':
+        return cmd_graph(argv)
+      if op == 'import':
+        return cmd_import(argv)
+      if op == 'parse':
+        return cmd_parse(argv)
+      raise GetoptError("unrecognised op")
+  except GetoptError as e:
+    error("%s", e)
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  return 0
+
+def cmd_graph(argv):
+  xit = 0
+  if not argv:
+    raise GetoptError("missing csvfiles")
+  for csvfile in argv:
+    with Pfx(csvfile):
+      try:
+        dataset = DataSet(csvfile)
+      except ValueError as e:
+        warning("unhandled file: %s" % (e,))
+        continue
+      rrdfile = dataset.rrdfile
+      dataset.rrd_graph()
+  return xit
+
+def cmd_import(argv):
+  xit = 0
+  if not argv:
+    raise GetoptError("missing csvfiles")
+  for csvfile in argv:
+    with Pfx(csvfile):
+      try:
+        dataset = DataSet(csvfile)
+      except ValueError as e:
+        warning("unhandled file: %s" % (e,))
+        continue
+      rrdfile = dataset.rrdfile
+      if not pathexists(rrdfile):
+        dataset.rrd_create()
+      dataset.rrd_update()
+  return xit
+
+def cmd_parse(argv):
+  if not argv:
+    raise GetoptError("missing csvfiles")
+  for csvfile in argv:
+    with Pfx(csvfile):
+      try:
+        dataset = DataSet(csvfile)
+      except ValueError as e:
+        warning("unhandled file: %s" % (e,))
+        continue
+      data = dataset.data
+      hdrs = dataset.data_hdrs
+      print("%s: %d rows of %d columns" % (csvfile, len(data), len(hdrs)))
+      for ndx, hdr in enumerate(hdrs):
+        print(' ', ndx, hdr)
+      print(list(dataset.rrd_field_defns()))
+
+def load_csv(csvfp, no_headers=False):
+  if isinstance(csvfp, str):
+    csvfile = csvfp
+    with Pfx(csvfile):
+      with open(csvfile) as csvfp:
+        return load_csv(csvfp, no_headers=no_headers)
+  r = csv_reader(csvfp)
+  if no_headers:
+    hdrs = None
+    ts_index = None
+  else:
+    with Pfx("0"):
+      hdrs = next(r)
+    try:
+      ts_index = hdrs.index(KEY_TIMESTAMP_SECONDS)
+    except ValueError:
+      ts_index = None
+  nonzero = defaultdict(bool)
+  data = []
+  for rownum, row in enumerate(r, 1):
+    with Pfx("%d: %s", rownum, row[1]):
+      for i, v in enumerate(row):
+        hdr = hdrs[i-1]
+        with Pfx(hdr):
+          try:
+            v = int(v)
+          except ValueError:
+            try:
+              v = float(v)
+            except ValueError:
+              v = v.strip()
+              if hdr == 'Date/Time Stamp [Seconds From The Year 2001]':
+                pass
+              elif v == '':
+                v = 0.0
+              else:
+                warning("string value: %r", v)
+            else:
+              if v != 0.0:
+                nonzero[hdrs[i]] = True
+          else:
+            if v != 0:
+              nonzero[hdrs[i]] = True
+          row[i] = v
+      if hdrs:
+        row = dict(zip(hdrs, row))
+        if ts_index is not None:
+          row['unixtime'] = sp_unixtime(row[KEY_TIMESTAMP_SECONDS])
+      data.append(row)
+  for hdr, nz in sorted(nonzero.items()):
+    if not nz:
+      warning("%r: all zero or string", hdr)
+  return hdrs, data
+
+def sp_unixtime(sp_ts):
+  ''' Take an SP LINK timestamp and produce a UNIX timestamp.
+  '''
+  dt = SP_EPOCH + timedelta(seconds=sp_ts)
+  return dt.timestamp()
+
+class DataSet(object):
+
+  def __init__(self, csvfile):
+    self.csvfile = csvfile
+    self._data = None
+    base = basename(csvfile)
+    root, ext = splitext(base)
+    if ext.lower() != '.csv':
+      raise ValueError("not a CSV file: %r" % (csvfile,))
+    found = False
+    for mkey, mval in MAPPINGS.items():
+      _mkey_ = '_' + mkey + '_'
+      try:
+        self.csvfile_site, self.csvfile_dumptime = root.split(_mkey_, 1)
+      except ValueError:
+        continue
+      found = True
+      break
+    if not found:
+      raise ValueError("unrecognised CSV base: %r" % (base,))
+    self.mapping_name = mkey
+    self._mapping = MAPPINGS[mkey]
+    self.csv2rrd = self._mapping['csv2rrd']
+    self.graphs = self._mapping['graphs']
+
+  def _load_data(self):
+    ''' Read the CSV data file, sotre headers and time-sorted data.
+    '''
+    hdrs, data = load_csv(self.csvfile)
+    self._data = sorted(data, key=lambda row: row['unixtime'])
+    self._data_hdrs = hdrs
+
+  @prop
+  def data(self):
+    if self._data is None:
+      self._load_data()
+    return self._data
+
+  @prop
+  def data_hdrs(self):
+    if self._data is None:
+      self._load_data()
+    return self._data_hdrs
+
+  @prop
+  def rrdfile(self):
+    return f"{self.csvfile_site}_power.rrd"
+
+  def rrd_specs(self):
+    for row_key, rrd_spec in sorted(self.csv2rrd.items()):
+      if rrd_spec is None:
+        continue
+      rrd_field, rrd_type = rrd_spec.split(':')
+      yield row_key, rrd_field, rrd_type
+
+  def rrd_field_defns(self):
+    for row_key, rrd_field, rrd_type in self.rrd_specs():
+      yield f"DS:{rrd_field}:{rrd_type}:{RRD_HEARTBEAT}:0:U"
+    yield f"RRA:MAX:0.01:1:{RRD_SLOTS}"
+
+  def rrd_create(self):
+    start_time = self.data[0]['unixtime']
+    rrd_argv = [
+        'rrdtool', 'create', self.rrdfile,
+        '--step', str(RRD_STEP),
+        '--start', str(int(start_time-RRD_STEP*(RRD_SLOTS+1))),
+    ] + list(self.rrd_field_defns())
+    print(*rrd_argv, flush=True)
+    run(rrd_argv, check=True)
+
+  def rrd_update(self):
+    rrd_argv = ['rrdtool', 'update', self.rrdfile] + list(self.rrd_update_args())
+    print(*rrd_argv, flush=True)
+    run(rrd_argv, check=True)
+
+  def rrd_update_args(self):
+    yield "-t"
+    yield ':'.join(rrd_field for row_key, rrd_field, rrd_type in self.rrd_specs())
+    yield '--'
+    row_time_prev = None
+    for row in self.data:
+      row_time = row['unixtime']
+      if row_time_prev is not None and row_time <= row_time_prev:
+        error("SKIP out of order rows: row_time=%s, row_time_prev=%s", row_time, row_time_prev)
+        continue
+      row_time_prev = row_time
+      values = [row_time]
+      for row_key, rrd_field, rrd_type in self.rrd_specs():
+        values.append(row[row_key])
+      yield ':'.join(str(value) for value in values)
+
+  def rrd_graph(self):
+    ##start = int(self.data[0]['unixtime'])
+    end = int(self.data[-1]['unixtime'])
+    start = end - GRAPH_DAYS
+    for graph_name, graph_spec in self.graphs.items():
+      graphfile = f"{self.csvfile_site}_{self.mapping_name}_{graph_name}.png"
+      with Pfx(graphfile):
+        rrd_argv = [
+          'rrdtool', 'graph', graphfile,
+          f'--start={start}', f'--end={end}',
+          '--width=2048', '--height=512'
+        ]
+        for spec in graph_spec:
+          with Pfx(spec):
+            fields = spec.split(':')
+            spec_type = fields[0]
+            if spec_type == 'DEF':
+              # append the RRD file to the vname
+              fields[1] = f"{fields[1]}={self.rrdfile}"
+            elif spec_type == 'LINE':
+              fields[0] = fields[0] + '1'
+            spec = ':'.join(fields)
+            rrd_argv.append(spec)
+        print(*rrd_argv, flush=True)
+        run(rrd_argv, check=True)
+    if False:
+      # debugging graphs for various parameters
+      for hdr in sorted(self.data_hdrs):
+        rrdspec = self.csv2rrd[hdr]
+        if rrdspec is None:
+          continue
+        rrdfield, rrdtype = rrdspec.split(':')
+        graphfile = f"{self.csvfile_site}_{self.mapping_name}_hdr_{rrdfield}.png"
+        rrd_argv = ['rrdtool', 'graph', graphfile, f'--start={start}', f'--end={end}', '--width=2048',
+            f"DEF:{rrdfield}={self.rrdfile}:{rrdfield}:MAX", f"LINE1:{rrdfield}#000000:Field {rrdfield} - {hdr}",
+        ]
+        print(*rrd_argv, flush=True)
+        run(rrd_argv, check=True)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
