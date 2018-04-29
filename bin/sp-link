@@ -17,6 +17,38 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.x import X
 
+USAGE = r'''Usage: %s op [op-args...]
+    graph csvfiles...
+    import csvfiles...
+    parse csvfiles...'''
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  setup_logging(cmd)
+  usage = USAGE % (cmd,)
+  badopts = False
+  try:
+    if not argv:
+      raise GetoptError("missing op")
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == 'graph':
+        return cmd_graph(argv)
+      if op == 'import':
+        return cmd_import(argv)
+      if op == 'parse':
+        return cmd_parse(argv)
+      raise GetoptError("unrecognised op")
+  except GetoptError as e:
+    error("%s", e)
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  return 0
+
 UNIX_EPOCH = datetime(1970,1,1)
 SP_EPOCH = datetime(2001,1,1).astimezone()
 
@@ -121,43 +153,6 @@ MAPPINGS = {
     },
   },
 }
-
-def rrdcreate(filename, csv2rrd):
-  for key, value in sorted(csv2rrd.items()):
-    if value is None:
-      continue
-    rrdkey, rrdtype = value.split(':')
-    print(rrdkey, rrdtype)
-
-def main(argv=None):
-  if argv is None:
-    argv = sys.argv
-  cmd = argv.pop(0)
-  setup_logging(cmd)
-  usage = r'''Usage: %s op [op-args...]
-    graph csvfiles...
-    import csvfiles...
-    parse csvfiles...''' % (cmd,)
-  badopts = False
-  try:
-    if not argv:
-      raise GetoptError("missing op")
-    op = argv.pop(0)
-    with Pfx(op):
-      if op == 'graph':
-        return cmd_graph(argv)
-      if op == 'import':
-        return cmd_import(argv)
-      if op == 'parse':
-        return cmd_parse(argv)
-      raise GetoptError("unrecognised op")
-  except GetoptError as e:
-    error("%s", e)
-    badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  return 0
 
 def cmd_graph(argv):
   xit = 0
