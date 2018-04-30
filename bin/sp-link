@@ -37,6 +37,8 @@ USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
     parse csvfiles...'''
 
 def main(argv=None):
+  ''' Main programme implementing the command line.
+  '''
   if argv is None:
     argv = sys.argv
   cmd = argv.pop(0)
@@ -185,6 +187,8 @@ MAPPINGS = {
 }
 
 class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
+  ''' An embodiment of the sp-link command's options.
+  '''
 
   @prop
   def basepath(self):
@@ -215,7 +219,7 @@ class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
     if ext.lower() != '.csv':
       raise ValueError("not a CSV file: %r" % (filename,))
     found = False
-    for mkey, mval in MAPPINGS.items():
+    for mkey in MAPPINGS.keys():
       _mkey_ = '_' + mkey + '_'
       try:
         site, dumptime = root.split(_mkey_, 1)
@@ -228,6 +232,8 @@ class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
     return site, mkey, dumptime
 
 def cmd_graph(argv, cfg):
+  ''' Run the "graph" command, generating graphs of RRD files associated with CSV data.
+  '''
   xit = 0
   if not argv:
     raise GetoptError("missing csvfiles")
@@ -242,6 +248,8 @@ def cmd_graph(argv, cfg):
   return xit
 
 def cmd_import(argv, cfg):
+  ''' Run the "import" command, loading CSV data into RRD files.
+  '''
   xit = 0
   if not argv:
     raise GetoptError("missing csvfiles")
@@ -259,6 +267,8 @@ def cmd_import(argv, cfg):
   return xit
 
 def cmd_parse(argv, cfg):
+  ''' Run the "parse" command, reading CSV data files.
+  '''
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
@@ -276,6 +286,11 @@ def cmd_parse(argv, cfg):
       print(list(dataset.rrd_field_defns()))
 
 def load_csv(csvfp, no_headers=False):
+  ''' Load data from a CSV file, return header names and data rows.
+      If `no_headers` is true (default False) then the header names
+        will be None and the rows will be lists. Otherwise the header
+        names will be a list of strings and the rows will be dicts.
+  '''
   if isinstance(csvfp, str):
     csvfile = csvfp
     with Pfx(csvfile):
@@ -336,6 +351,8 @@ def sp_unixtime(sp_ts):
   return dt.timestamp()
 
 class DataSet(object):
+  ''' Data and methods for a CSV file.
+  '''
 
   def __init__(self, csvfile, cfg):
     self.csvfile = csvfile
@@ -355,17 +372,23 @@ class DataSet(object):
 
   @prop
   def data(self):
+    ''' Ths data rows of this DataSet.
+    '''
     if self._data is None:
       self._load_data()
     return self._data
 
   @prop
   def data_hdrs(self):
+    ''' The header fields of this DataSet.
+    '''
     if self._data is None:
       self._load_data()
     return self._data_hdrs
 
   def pathto(self, filebase):
+    ''' Return the pathname of a file given its basename.
+    '''
     return joinpath(self.cfg.sitepath(self.csvfile_site), filebase)
 
   @prop
@@ -376,6 +399,8 @@ class DataSet(object):
 
   @staticmethod
   def run_argv(pre_argv, argv):
+    ''' Run a command which may be too long for the OS argument limit by breaking it into several commands if necessary.
+    '''
     if argv:
       for argv_group in groupargv(pre_argv, argv):
         print(*argv_group, flush=True)
@@ -385,6 +410,8 @@ class DataSet(object):
       run(pre_argv, check=True)
 
   def rrd_specs(self):
+    ''' Yield the broken out parts of the RRD field specifications.
+    '''
     for row_key, rrd_spec in sorted(self.csv2rrd.items()):
       if rrd_spec is None:
         continue
@@ -392,11 +419,15 @@ class DataSet(object):
       yield row_key, rrd_field, rrd_type
 
   def rrd_field_defns(self):
-    for row_key, rrd_field, rrd_type in self.rrd_specs():
+    ''' Yield the RRD filed definitions for this DataSet.
+    '''
+    for _, rrd_field, rrd_type in self.rrd_specs():
       yield f"DS:{rrd_field}:{rrd_type}:{RRD_HEARTBEAT}:0:U"
     yield f"RRA:MAX:0.01:1:{RRD_SLOTS}"
 
   def rrd_create(self):
+    ''' Create the RRD file for this DataSet.
+    '''
     start_time = self.data[0]['unixtime']
     self.run_argv([
         'rrdtool', 'create', self.rrdfile,
@@ -405,6 +436,8 @@ class DataSet(object):
     ], list(self.rrd_field_defns()))
 
   def rrd_update(self):
+    ''' Update the RRD file with values from this DataSet.
+    '''
     pre_argv = [
         'rrdtool', 'update', self.rrdfile,
         '--template', ':'.join(rrd_field for row_key, rrd_field, rrd_type in self.rrd_specs()),
@@ -420,12 +453,14 @@ class DataSet(object):
         continue
       row_time_prev = row_time
       values = [row_time]
-      for row_key, rrd_field, rrd_type in self.rrd_specs():
+      for row_key, _, _ in self.rrd_specs():
         values.append(row[row_key])
       data_argv.append(':'.join(str(value) for value in values))
     self.run_argv(pre_argv, data_argv)
 
   def rrd_graph(self):
+    ''' Generate the various graphs defined for this DataSet.
+    '''
     ##start = int(self.data[0]['unixtime'])
     end = int(self.data[-1]['unixtime'])
     start = end - GRAPH_DAYS
@@ -455,7 +490,7 @@ class DataSet(object):
         rrdspec = self.csv2rrd[hdr]
         if rrdspec is None:
           continue
-        rrdfield, rrdtype = rrdspec.split(':')
+        rrdfield, _ = rrdspec.split(':')
         graphfile = f"{self.csvfile_site}_{self.mapping_name}_hdr_{rrdfield}.png"
         rrd_argv = [
             'rrdtool', 'graph', graphfile,
