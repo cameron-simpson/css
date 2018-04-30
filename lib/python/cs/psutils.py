@@ -190,7 +190,7 @@ def pipeto(argv, trace=False, **kw):
 def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
   ''' Distribute the array `argv` over multiple arrays to fit within `MAX_ARGV`. Return a list of argv lists.
       `pre_argv`: the sequence of leading arguments
-      `argv`: the sequence of arguments to distribute
+      `argv`: the sequence of arguments to distribute; this may not be empty
       `post_argv`: optional, the sequence of trailing arguments
       `max_argv`: optional, the maximum length of each distributed
         argument list, default: MAX_ARGV
@@ -202,6 +202,8 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
         `encode` is a callable for encoding the element.
         The returned argv arrays will contain the encoded element values.
   '''
+  if not argv:
+    raise ValueError("argv may not be empty")
   if max_argv is None:
     max_argv = MAX_ARGV
   if encode:
