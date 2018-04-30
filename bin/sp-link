@@ -18,7 +18,6 @@ from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
 from cs.psutils import groupargv
 from cs.py.func import prop
-from cs.x import X
 
 ENV_BASEDIR = 'SP_LINK_BASEDIR'
 ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
@@ -80,8 +79,8 @@ def main(argv=None):
     return 2
   return 0
 
-UNIX_EPOCH = datetime(1970,1,1)
-SP_EPOCH = datetime(2001,1,1).astimezone()
+UNIX_EPOCH = datetime(1970, 1, 1)
+SP_EPOCH = datetime(2001, 1, 1).astimezone()
 
 GRAPH_DAYS = 6 * 24 * 3600
 
@@ -108,81 +107,81 @@ KW_to_KWH = 3600 / SP_DATA_INTERVAL
 KEY_TIMESTAMP_SECONDS = 'Date/Time Stamp [Seconds From The Year 2001]'
 
 MAPPINGS = {
-  'DetailedData': {
-    'csv2rrd': {
-      'Date/Time Stamp [Seconds From The Year 2001]': None,
-      'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]': None,
-      'Inverter AC Power (Average) [kW]': 'inverterACPowerKW:GAUGE',
-      'DC Input Accumulated (Sample) [kWh]': 'dcInputCumKWH:DCOUNTER',
-      'DC Output Accumulated (Sample) [kWh]': 'dcOutputCumKWH:DCOUNTER',
-      'Battery In Accumulated (Sample) [kWh]': 'batteryInCumKWH:DCOUNTER',
-      'Battery Out Accumulated (Sample) [kWh]': 'batteryOutCumKWH:DCOUNTER',
-      'DC Voltage (Average) [V DC]': None,
-      'DC Voltage (Min) [V DC]': None,
-      'DC Voltage (Max) [V DC]': None,
-      'DC Mid Voltage (Average) [V DC]': None,
-      'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': None,
-      'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': None,
-      'Inverter DC Current (Average) [A]': None,
-      'Shunt1 Current (Average) [A]': None,
-      'Shunt 2 Current (Average) [A]': None,
-      'Load AC Power (Average) [kW]': 'ACLoadPowerKW:GAUGE',
-      'Load AC Power (Max) [kW]': None,
-      'AC Input Power (Average) [kW]': None,
-      'AC Load Voltage (Average) [V AC]': None,
-      'AC Load Frequency (Average) [Hz]': None,
-      'Transformer Temperature (Max) [Degrees C]': None,
-      'Heatsink Temperature (Max) [Degrees C]': None,
-      'Battery Temperature (Max) [Degrees C]': None,
-      'Internal Temperature (Max) [Degrees C]': None,
-      'Power Module Temperature (Max) [Degrees C]': None,
-      'State of Charge (Sample) [%]': 'batterySOCPcnt:GAUGE',
-      'AC Input kWh Accumulated (Sample) [kWh]': 'ACInputCumKWH:DCOUNTER',
-      'AC Load kWh Accumulated (Sample) [kWh]': 'ACLoadCumKWH:DCOUNTER',
-      'Shunt 1 kWh Accumulated (Sample) [kWh]': None,
-      'Shunt 2 kWh Accumulated (Sample) [kWh]': None,
-      'Analogue In 1 DC Voltage (Average) [V DC]': None,
-      'Analogue In 2 DC Voltage (Average) [V DC]': None,
-      'AC Export kWh Accumulated (Sample) [kWh]': 'ACExportCumKWH:DCOUNTER',
-      'Total AC Coupled Power (Average) [kW]': 'totACCoupledPowerKW:GAUGE',
-      'Total AC Coupled Energy (Sample) [kWh]': None,
+    'DetailedData': {
+        'csv2rrd': {
+            'Date/Time Stamp [Seconds From The Year 2001]': None,
+            'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]': None,
+            'Inverter AC Power (Average) [kW]': 'inverterACPowerKW:GAUGE',
+            'DC Input Accumulated (Sample) [kWh]': 'dcInputCumKWH:DCOUNTER',
+            'DC Output Accumulated (Sample) [kWh]': 'dcOutputCumKWH:DCOUNTER',
+            'Battery In Accumulated (Sample) [kWh]': 'batteryInCumKWH:DCOUNTER',
+            'Battery Out Accumulated (Sample) [kWh]': 'batteryOutCumKWH:DCOUNTER',
+            'DC Voltage (Average) [V DC]': None,
+            'DC Voltage (Min) [V DC]': None,
+            'DC Voltage (Max) [V DC]': None,
+            'DC Mid Voltage (Average) [V DC]': None,
+            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': None,
+            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': None,
+            'Inverter DC Current (Average) [A]': None,
+            'Shunt1 Current (Average) [A]': None,
+            'Shunt 2 Current (Average) [A]': None,
+            'Load AC Power (Average) [kW]': 'ACLoadPowerKW:GAUGE',
+            'Load AC Power (Max) [kW]': None,
+            'AC Input Power (Average) [kW]': None,
+            'AC Load Voltage (Average) [V AC]': None,
+            'AC Load Frequency (Average) [Hz]': None,
+            'Transformer Temperature (Max) [Degrees C]': None,
+            'Heatsink Temperature (Max) [Degrees C]': None,
+            'Battery Temperature (Max) [Degrees C]': None,
+            'Internal Temperature (Max) [Degrees C]': None,
+            'Power Module Temperature (Max) [Degrees C]': None,
+            'State of Charge (Sample) [%]': 'batterySOCPcnt:GAUGE',
+            'AC Input kWh Accumulated (Sample) [kWh]': 'ACInputCumKWH:DCOUNTER',
+            'AC Load kWh Accumulated (Sample) [kWh]': 'ACLoadCumKWH:DCOUNTER',
+            'Shunt 1 kWh Accumulated (Sample) [kWh]': None,
+            'Shunt 2 kWh Accumulated (Sample) [kWh]': None,
+            'Analogue In 1 DC Voltage (Average) [V DC]': None,
+            'Analogue In 2 DC Voltage (Average) [V DC]': None,
+            'AC Export kWh Accumulated (Sample) [kWh]': 'ACExportCumKWH:DCOUNTER',
+            'Total AC Coupled Power (Average) [kW]': 'totACCoupledPowerKW:GAUGE',
+            'Total AC Coupled Energy (Sample) [kWh]': None,
+        },
+        'graphs': {
+            'battery_charge': [ 'DEF:batterySOCPcnt:batterySOCPcnt:MAX', 'LINE:batterySOCPcnt#000080:Battery SOC %' ],
+            'power': [
+                'DEF:ACLoadCumKWH:ACLoadCumKWH:LAST',
+                f'CDEF:acloadkw=ACLoadCumKWH,{RRD_Y_SCALE},*',
+                'DEF:pvinputkwh:dcInputCumKWH:LAST',
+                f'CDEF:pvkw=pvinputkwh,{RRD_Y_SCALE},*,0,6,LIMIT',
+                'DEF:BatInputCumKW:batteryInCumKWH:LAST',
+                f'CDEF:BatChargeKW=BatInputCumKW,{RRD_Y_SCALE},*',
+                'DEF:BatOutputCumKW:batteryOutCumKWH:LAST',
+                f'CDEF:BatDischargeKW=BatOutputCumKW,{RRD_Y_SCALE},*',
+                'DEF:ACExportCumKWH:ACExportCumKWH:LAST',
+                f'CDEF:GridExpKW=ACExportCumKWH,{RRD_Y_SCALE},*',
+                # the load should be met by the sum of:
+                # pvload=min(load, pvinput)
+                # batout=battery out
+                # acimport=load-pvload-batout
+                'CDEF:acloadafterbat=acloadkw,BatDischargeKW,-,0,MAX',
+                'CDEF:acloadfrombat=acloadkw,acloadafterbat,-',
+                'CDEF:batexport=BatDischargeKW,acloadfrombat,-',
+                'CDEF:acloadafterpv=acloadafterbat,pvkw,-,0,MAX',
+                'CDEF:acloadfrompv=acloadafterbat,acloadafterpv,-,0,MAX',
+                'CDEF:acloadfromgrid=acloadafterpv',
+                'CDEF:pvloadkw=acloadkw,pvkw,MIN',
+                'CDEF:GridImportKW=acloadkw,pvloadkw,-,BatDischargeKW,-',
+                'AREA:acloadfrompv#0000ff:Load From PV KW',
+                'AREA:acloadfrombat#ff8080:Load From PV KW:STACK',
+                'AREA:acloadfromgrid#ff0000:Grid Import KW (load - pv - battery):STACK',
+                'AREA:BatChargeKW#8080ff:Battery Charge from PV? KW (from batteryInCumKWH):STACK',
+                'AREA:batexport#ffff00:Battery Export? Battery not consumed by load:STACK',
+                'AREA:GridExpKW#00ff00:Grid Export KW (from ACExportCumKWH):STACK',
+                'LINE1:pvkw#c0c080:PV Input KW (from dcInputCumKWH)',
+                'LINE1:acloadkw#000000:Load AC Power KW',
+            ],
+        },
     },
-    'graphs': {
-      'battery_charge': [ 'DEF:batterySOCPcnt:batterySOCPcnt:MAX', 'LINE:batterySOCPcnt#000080:Battery SOC %' ],
-      'power': [
-        'DEF:ACLoadCumKWH:ACLoadCumKWH:LAST',
-          f'CDEF:acloadkw=ACLoadCumKWH,{RRD_Y_SCALE},*',
-        'DEF:pvinputkwh:dcInputCumKWH:LAST',
-          f'CDEF:pvkw=pvinputkwh,{RRD_Y_SCALE},*,0,6,LIMIT',
-        'DEF:BatInputCumKW:batteryInCumKWH:LAST',
-          f'CDEF:BatChargeKW=BatInputCumKW,{RRD_Y_SCALE},*',
-        'DEF:BatOutputCumKW:batteryOutCumKWH:LAST',
-          f'CDEF:BatDischargeKW=BatOutputCumKW,{RRD_Y_SCALE},*',
-        'DEF:ACExportCumKWH:ACExportCumKWH:LAST',
-          f'CDEF:GridExpKW=ACExportCumKWH,{RRD_Y_SCALE},*',
-        # the load should be met by the sum of:
-        # pvload=min(load, pvinput)
-        # batout=battery out
-        # acimport=load-pvload-batout
-        'CDEF:acloadafterbat=acloadkw,BatDischargeKW,-,0,MAX',
-        'CDEF:acloadfrombat=acloadkw,acloadafterbat,-',
-        'CDEF:batexport=BatDischargeKW,acloadfrombat,-',
-        'CDEF:acloadafterpv=acloadafterbat,pvkw,-,0,MAX',
-        'CDEF:acloadfrompv=acloadafterbat,acloadafterpv,-,0,MAX',
-        'CDEF:acloadfromgrid=acloadafterpv',
-        'CDEF:pvloadkw=acloadkw,pvkw,MIN',
-        'CDEF:GridImportKW=acloadkw,pvloadkw,-,BatDischargeKW,-',
-          'AREA:acloadfrompv#0000ff:Load From PV KW',
-          'AREA:acloadfrombat#ff8080:Load From PV KW:STACK',
-          'AREA:acloadfromgrid#ff0000:Grid Import KW (load - pv - battery):STACK',
-          'AREA:BatChargeKW#8080ff:Battery Charge from PV? KW (from batteryInCumKWH):STACK',
-          'AREA:batexport#ffff00:Battery Export? Battery not consumed by load:STACK',
-          'AREA:GridExpKW#00ff00:Grid Export KW (from ACExportCumKWH):STACK',
-          'LINE1:pvkw#c0c080:PV Input KW (from dcInputCumKWH)',
-          'LINE1:acloadkw#000000:Load AC Power KW',
-      ],
-    },
-  },
 }
 
 class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
