@@ -5,21 +5,35 @@
 #
 
 from __future__ import print_function
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta
-from getopt import GetoptError
+from getopt import getopt, GetoptError
+import os
 from os.path import basename, splitext, join as joinpath, exists as pathexists
 from subprocess import run
 import sys
 from cs.csvutils import csv_reader
+from cs.env import envsub
 from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.x import X
 
-USAGE = r'''Usage: %s op [op-args...]
+ENV_BASEDIR = 'SP_LINK_BASEDIR'
+ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
+
+USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
+  -D basedir
+    Base directory for RRD file data, containing per-site subdirectories.
+    Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
+  -d sitedir
+    Directory for RRD file data.
+    Default: {basedir}/{site}
+  Ops:
     graph csvfiles...
+        Graph the data from the RRD files corresponding to the specified CSVs.
     import csvfiles...
+        Import data from the specified CSVs into RRD files.
     parse csvfiles...'''
 
 def main(argv=None):
@@ -28,18 +42,34 @@ def main(argv=None):
   cmd = argv.pop(0)
   setup_logging(cmd)
   usage = USAGE % (cmd,)
+  basedir = None
+  sitedir = None
   badopts = False
+  try:
+    opts, argv = getopt(argv, 'D:d:')
+  except GetoptError as e:
+    error("%s", e)
+    badopts = True
+  else:
+    for opt, value in opts:
+      if opt == '-D':
+        basedir = value
+      elif opt == '-d':
+        sitedir = value
+      else:
+        raise RuntimeError("unimplemented option: %s" % (opt,))
+  cfg = SPConfig(basedir=basedir, sitedir=sitedir)
   try:
     if not argv:
       raise GetoptError("missing op")
     op = argv.pop(0)
     with Pfx(op):
       if op == 'graph':
-        return cmd_graph(argv)
+        return cmd_graph(argv, cfg)
       if op == 'import':
-        return cmd_import(argv)
+        return cmd_import(argv, cfg)
       if op == 'parse':
-        return cmd_parse(argv)
+        return cmd_parse(argv, cfg)
       raise GetoptError("unrecognised op")
   except GetoptError as e:
     error("%s", e)
@@ -154,29 +184,71 @@ MAPPINGS = {
   },
 }
 
-def cmd_graph(argv):
+class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
+
+  @prop
+  def basepath(self):
+    ''' Base directory for RRD file data, containing per-site subdirectories.
+        Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
+    '''
+    base = self.basedir
+    if base is None:
+      base = os.environ.get(ENV_BASEDIR)
+      if base is None:
+        base = envsub(ENV_BASEDIR_DEFAULT)
+    return base
+
+  def sitepath(self, site):
+    ''' Directory to hold the per-site files such as RRD files.
+    '''
+    sitedir = self.sitedir
+    if sitedir is None:
+      sitedir = joinpath(self.basepath, site)
+    return sitedir
+
+  @staticmethod
+  def parse_csvfilename(filename):
+    ''' Extract site and dataset name from a CSV filename. Return (site, datasetname, dumptime).
+    '''
+    filebase = basename(filename)
+    root, ext = splitext(filebase)
+    if ext.lower() != '.csv':
+      raise ValueError("not a CSV file: %r" % (filename,))
+    found = False
+    for mkey, mval in MAPPINGS.items():
+      _mkey_ = '_' + mkey + '_'
+      try:
+        site, dumptime = root.split(_mkey_, 1)
+      except ValueError:
+        continue
+      found = True
+      break
+    if not found:
+      raise ValueError("unrecognised CSV base: %r" % (filebase,))
+    return site, mkey, dumptime
+
+def cmd_graph(argv, cfg):
   xit = 0
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile)
+        dataset = DataSet(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
-      rrdfile = dataset.rrdfile
       dataset.rrd_graph()
   return xit
 
-def cmd_import(argv):
+def cmd_import(argv, cfg):
   xit = 0
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile)
+        dataset = DataSet(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
@@ -186,13 +258,13 @@ def cmd_import(argv):
       dataset.rrd_update()
   return xit
 
-def cmd_parse(argv):
+def cmd_parse(argv, cfg):
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile)
+        dataset = DataSet(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
@@ -265,26 +337,12 @@ def sp_unixtime(sp_ts):
 
 class DataSet(object):
 
-  def __init__(self, csvfile):
+  def __init__(self, csvfile, cfg):
     self.csvfile = csvfile
+    self.cfg = cfg
     self._data = None
-    base = basename(csvfile)
-    root, ext = splitext(base)
-    if ext.lower() != '.csv':
-      raise ValueError("not a CSV file: %r" % (csvfile,))
-    found = False
-    for mkey, mval in MAPPINGS.items():
-      _mkey_ = '_' + mkey + '_'
-      try:
-        self.csvfile_site, self.csvfile_dumptime = root.split(_mkey_, 1)
-      except ValueError:
-        continue
-      found = True
-      break
-    if not found:
-      raise ValueError("unrecognised CSV base: %r" % (base,))
-    self.mapping_name = mkey
-    self._mapping = MAPPINGS[mkey]
+    self.csvfile_site, self.mapping_name, self.dumptime = cfg.parse_csvfilename(csvfile)
+    self._mapping = MAPPINGS[self.mapping_name]
     self.csv2rrd = self._mapping['csv2rrd']
     self.graphs = self._mapping['graphs']
 
@@ -307,9 +365,14 @@ class DataSet(object):
       self._load_data()
     return self._data_hdrs
 
+  def pathto(self, filebase):
+    return joinpath(self.cfg.sitepath(self.csvfile_site), filebase)
+
   @prop
   def rrdfile(self):
-    return f"{self.csvfile_site}_power.rrd"
+    ''' Pathname for the RRD file containing this dataset.
+    '''
+    return self.pathto(f'{self.csvfile_site}_{self.mapping_name}.rrd')
 
   def rrd_specs(self):
     for row_key, rrd_spec in sorted(self.csv2rrd.items()):
