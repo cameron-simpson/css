@@ -40,7 +40,10 @@ DISTINFO = {
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
-MAX_ARGV = 262144
+# 262144 below is from MacOS El Capitan "sysctl kern.argmax", then
+# halved because even allowing for the size of the environment this
+# can be too big. Unsure why.
+MAX_ARGV = 262144 / 2
 
 def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
   ''' Stop the process specified by `pid`.
