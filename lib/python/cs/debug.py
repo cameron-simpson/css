@@ -89,7 +89,7 @@ class TimingOutLock(object):
   def __init__(self, deadlock_timeout=20.0, recursive=False):
     self._lock = threading.RLock() if recursive else threading.Lock()
     self._deadlock_timeout = deadlock_timeout
-  def acquire(self,blocking=True,timeout=-1,name=None):
+  def acquire(self, blocking=True, timeout=-1, name=None):
     if timeout < 0:
       timeout = self._deadlock_timeout
     else:
@@ -106,7 +106,7 @@ class TimingOutLock(object):
     self.acquire()
     self.owner = caller()
     return True
-  def __exit__(self,*a):
+  def __exit__(self, *a):
     return self._lock.__exit__(*a)
 
 class TraceSuite(object):
