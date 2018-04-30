@@ -16,6 +16,7 @@ from cs.csvutils import csv_reader
 from cs.env import envsub
 from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
+from cs.psutils import groupargv
 from cs.py.func import prop
 from cs.x import X
 
@@ -374,6 +375,16 @@ class DataSet(object):
     '''
     return self.pathto(f'{self.csvfile_site}_{self.mapping_name}.rrd')
 
+  @staticmethod
+  def run_argv(pre_argv, argv):
+    if argv:
+      for argv_group in groupargv(pre_argv, argv):
+        print(*argv_group, flush=True)
+        run(argv_group, check=True)
+    else:
+      print(*pre_argv, flush=True)
+      run(pre_argv, check=True)
+
   def rrd_specs(self):
     for row_key, rrd_spec in sorted(self.csv2rrd.items()):
       if rrd_spec is None:
@@ -388,23 +399,20 @@ class DataSet(object):
 
   def rrd_create(self):
     start_time = self.data[0]['unixtime']
-    rrd_argv = [
+    self.run_argv([
         'rrdtool', 'create', self.rrdfile,
         '--step', str(RRD_STEP),
         '--start', str(int(start_time-RRD_STEP*(RRD_SLOTS+1))),
-    ] + list(self.rrd_field_defns())
-    print(*rrd_argv, flush=True)
-    run(rrd_argv, check=True)
+    ], list(self.rrd_field_defns()))
 
   def rrd_update(self):
-    rrd_argv = ['rrdtool', 'update', self.rrdfile] + list(self.rrd_update_args())
-    print(*rrd_argv, flush=True)
-    run(rrd_argv, check=True)
-
-  def rrd_update_args(self):
-    yield "-t"
-    yield ':'.join(rrd_field for row_key, rrd_field, rrd_type in self.rrd_specs())
-    yield '--'
+    pre_argv = [
+        'rrdtool', 'update', self.rrdfile,
+        '--template', ':'.join(rrd_field for row_key, rrd_field, rrd_type in self.rrd_specs()),
+        '--skip-past-updates',
+        '--'
+    ]
+    data_argv = []
     row_time_prev = None
     for row in self.data:
       row_time = row['unixtime']
@@ -415,7 +423,8 @@ class DataSet(object):
       values = [row_time]
       for row_key, rrd_field, rrd_type in self.rrd_specs():
         values.append(row[row_key])
-      yield ':'.join(str(value) for value in values)
+      data_argv.append(':'.join(str(value) for value in values))
+    self.run_argv(pre_argv, data_argv)
 
   def rrd_graph(self):
     ##start = int(self.data[0]['unixtime'])
@@ -425,9 +434,9 @@ class DataSet(object):
       graphfile = f"{self.csvfile_site}_{self.mapping_name}_{graph_name}.png"
       with Pfx(graphfile):
         rrd_argv = [
-          'rrdtool', 'graph', graphfile,
-          f'--start={start}', f'--end={end}',
-          '--width=2048', '--height=512'
+            'rrdtool', 'graph', graphfile,
+            f'--start={start}', f'--end={end}',
+            '--width=2048', '--height=512'
         ]
         for spec in graph_spec:
           with Pfx(spec):
@@ -440,8 +449,7 @@ class DataSet(object):
               fields[0] = fields[0] + '1'
             spec = ':'.join(fields)
             rrd_argv.append(spec)
-        print(*rrd_argv, flush=True)
-        run(rrd_argv, check=True)
+        self.run_argv(rrd_argv, [])
     if False:
       # debugging graphs for various parameters
       for hdr in sorted(self.data_hdrs):
@@ -450,11 +458,13 @@ class DataSet(object):
           continue
         rrdfield, rrdtype = rrdspec.split(':')
         graphfile = f"{self.csvfile_site}_{self.mapping_name}_hdr_{rrdfield}.png"
-        rrd_argv = ['rrdtool', 'graph', graphfile, f'--start={start}', f'--end={end}', '--width=2048',
-            f"DEF:{rrdfield}={self.rrdfile}:{rrdfield}:MAX", f"LINE1:{rrdfield}#000000:Field {rrdfield} - {hdr}",
+        rrd_argv = [
+            'rrdtool', 'graph', graphfile,
+            f'--start={start}', f'--end={end}', '--width=2048',
+            f"DEF:{rrdfield}={self.rrdfile}:{rrdfield}:MAX",
+            f"LINE1:{rrdfield}#000000:Field {rrdfield} - {hdr}",
         ]
-        print(*rrd_argv, flush=True)
-        run(rrd_argv, check=True)
+        self.run_argv(rrd_argv, [])
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
