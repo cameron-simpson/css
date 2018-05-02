@@ -465,7 +465,7 @@ class DataSet(object):
     end = int(self.data[-1]['unixtime'])
     start = end - GRAPH_DAYS
     for graph_name, graph_spec in self.graphs.items():
-      graphfile = f"{self.csvfile_site}_{self.mapping_name}_{graph_name}.png"
+      graphfile = self.pathto(f"{self.csvfile_site}_{self.mapping_name}_{graph_name}.png")
       with Pfx(graphfile):
         rrd_argv = [
             'rrdtool', 'graph', graphfile,
