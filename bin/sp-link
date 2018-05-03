@@ -499,12 +499,12 @@ class DataSet(object):
             spec = ':'.join(fields)
             rrd_argv.append(spec)
         self.run_argv(rrd_argv, [])
-    if False:
+    if True:
       # debugging graphs for various parameters
       for rrd_spec in self.rrd_specs():
         graphfile = f"{self.site}_{self.mapping_name}_hdr_{rrd_spec.ds_name}.png"
         rrd_argv = [
-            'rrdtool', 'graph', graphfile,
+            'rrdtool', 'graph', graphfile, '--title', ': '.join((rrd_spec.ds_name, rrd_spec.csv_hdr)),
             f'--start={start}', f'--end={end}', '--width=2048',
             ##f'--start=end-36000', '--width=2048',
             f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
