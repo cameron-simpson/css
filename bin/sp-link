@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from getopt import getopt, GetoptError
 import os
 from os.path import basename, splitext, join as joinpath, exists as pathexists
+import re
 from subprocess import run
 import sys
 from cs.csvutils import csv_reader
@@ -86,8 +87,7 @@ SP_EPOCH = datetime(2001, 1, 1).astimezone()
 
 GRAPH_DAYS = 6 * 24 * 3600
 
-# the SP PRO accrues data every 15 minutes
-SP_DATA_INTERVAL = 900
+RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
 
 # SP polls seem to be every 15 minutes, set heartbeat to 20 minutes in case of skew
 ##RRD_HEARTBEAT = 1200
@@ -113,40 +113,40 @@ MAPPINGS = {
         'csv2rrd': {
             'Date/Time Stamp [Seconds From The Year 2001]': None,
             'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]': None,
-            'Inverter AC Power (Average) [kW]': 'inverterACPowerKW:GAUGE',
+            'Inverter AC Power (Average) [kW]': 'inverterACPwrKW:GAUGE',
             'DC Input Accumulated (Sample) [kWh]': 'dcInputCumKWH:DCOUNTER',
             'DC Output Accumulated (Sample) [kWh]': 'dcOutputCumKWH:DCOUNTER',
             'Battery In Accumulated (Sample) [kWh]': 'batteryInCumKWH:DCOUNTER',
             'Battery Out Accumulated (Sample) [kWh]': 'batteryOutCumKWH:DCOUNTER',
-            'DC Voltage (Average) [V DC]': None,
-            'DC Voltage (Min) [V DC]': None,
-            'DC Voltage (Max) [V DC]': None,
-            'DC Mid Voltage (Average) [V DC]': None,
-            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': None,
-            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': None,
-            'Inverter DC Current (Average) [A]': None,
-            'Shunt1 Current (Average) [A]': None,
-            'Shunt 2 Current (Average) [A]': None,
-            'Load AC Power (Average) [kW]': 'ACLoadPowerKW:GAUGE',
-            'Load AC Power (Max) [kW]': None,
-            'AC Input Power (Average) [kW]': None,
-            'AC Load Voltage (Average) [V AC]': None,
-            'AC Load Frequency (Average) [Hz]': None,
-            'Transformer Temperature (Max) [Degrees C]': None,
-            'Heatsink Temperature (Max) [Degrees C]': None,
-            'Battery Temperature (Max) [Degrees C]': None,
-            'Internal Temperature (Max) [Degrees C]': None,
-            'Power Module Temperature (Max) [Degrees C]': None,
+            'DC Voltage (Average) [V DC]': 'dcVoltsAvgVDC:GAUGE',
+            'DC Voltage (Min) [V DC]': 'dcVoltsMinVDC:GAUGE',
+            'DC Voltage (Max) [V DC]': 'dcVoltsMaxVDC:GAUGE',
+            'DC Mid Voltage (Average) [V DC]': 'dcMidVoltsAvgVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': 'dcMidVoltsMinVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': 'dcMidVoltsMaxVDC:GAUGE',
+            'Inverter DC Current (Average) [A]': 'invDCCurrentAvgA:GAUGE',
+            'Shunt1 Current (Average) [A]': 'shunt1CurrentA:GAUGE',
+            'Shunt 2 Current (Average) [A]': 'shunt2CurrentA:GAUGE',
+            'Load AC Power (Average) [kW]': 'acLoadPwrAvgKW:GAUGE',
+            'Load AC Power (Max) [kW]': 'acLoadPwrMaxKW:GAUGE',
+            'AC Input Power (Average) [kW]': 'ACInputPwrAvgKW:GAUGE',
+            'AC Load Voltage (Average) [V AC]': 'acLoadVoltsAvgVDC:GAUGE',
+            'AC Load Frequency (Average) [Hz]': 'acLoadFreqAvgHz:GAUGE',
+            'Transformer Temperature (Max) [Degrees C]': 'transformerTempMaxC:GAUGE',
+            'Heatsink Temperature (Max) [Degrees C]': 'heatsinkTempMaxC:GAUGE',
+            'Battery Temperature (Max) [Degrees C]': 'batteryTempMaxC:GAUGE',
+            'Internal Temperature (Max) [Degrees C]': 'internalTempMaxC:GAUGE',
+            'Power Module Temperature (Max) [Degrees C]': 'powerModTempMaxC:GAUGE',
             'State of Charge (Sample) [%]': 'batterySOCPcnt:GAUGE',
-            'AC Input kWh Accumulated (Sample) [kWh]': 'ACInputCumKWH:DCOUNTER',
-            'AC Load kWh Accumulated (Sample) [kWh]': 'ACLoadCumKWH:DCOUNTER',
-            'Shunt 1 kWh Accumulated (Sample) [kWh]': None,
-            'Shunt 2 kWh Accumulated (Sample) [kWh]': None,
-            'Analogue In 1 DC Voltage (Average) [V DC]': None,
-            'Analogue In 2 DC Voltage (Average) [V DC]': None,
-            'AC Export kWh Accumulated (Sample) [kWh]': 'ACExportCumKWH:DCOUNTER',
-            'Total AC Coupled Power (Average) [kW]': 'totACCoupledPowerKW:GAUGE',
-            'Total AC Coupled Energy (Sample) [kWh]': None,
+            'AC Input kWh Accumulated (Sample) [kWh]': 'acInputCumKWH:DCOUNTER',
+            'AC Load kWh Accumulated (Sample) [kWh]': 'acLoadCumKWH:DCOUNTER',
+            'Shunt 1 kWh Accumulated (Sample) [kWh]': 'shunt1SampCumKWH:DCOUNTER',
+            'Shunt 2 kWh Accumulated (Sample) [kWh]': 'shunt2SampCumKWH:DCOUNTER',
+            'Analogue In 1 DC Voltage (Average) [V DC]': 'alogIn1VoltsAvgVDC:GAUGE',
+            'Analogue In 2 DC Voltage (Average) [V DC]': 'alogIn2VoltsAvgVDC:GAUGE',
+            'AC Export kWh Accumulated (Sample) [kWh]': 'acExportCumKWH:DCOUNTER',
+            'Total AC Coupled Power (Average) [kW]': 'totACCoupledPwrKW:GAUGE',
+            'Total AC Coupled Energy (Sample) [kWh]': 'totACCoupledEgyKWH:DCOUNTER',
         },
         'graphs': {
             'battery_charge': [ 'DEF:batterySOCPcnt:batterySOCPcnt:MAX', 'LINE:batterySOCPcnt#000080:Battery SOC %' ],
@@ -413,9 +413,14 @@ class DataSet(object):
     ''' Yield the broken out parts of the RRD field specifications.
     '''
     for row_key, rrd_spec in sorted(self.csv2rrd.items()):
-      if rrd_spec is None:
-        continue
-      rrd_field, rrd_type = rrd_spec.split(':')
+      with Pfx("%r: %r", row_key, rrd_spec):
+        if rrd_spec is None:
+          continue
+        rrd_field, rrd_type = rrd_spec.split(':')
+        if not RRD_VALID_DS_NAME.match(rrd_field):
+          raise ValueError("invalid ds-name: %r" % (rrd_field,))
+        if rrd_type not in ('GAUGE', 'DCOUNTER'):
+          raise ValueError("invalid ds-name type: %r" % (rrd_type,))
       yield row_key, rrd_field, rrd_type
 
   def rrd_field_defns(self):
