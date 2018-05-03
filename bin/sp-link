@@ -237,7 +237,7 @@ def cmd_graph(argv, cfg):
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile, cfg)
+        dataset = DataSet.from_csvfile(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
@@ -253,7 +253,7 @@ def cmd_import(argv, cfg):
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile, cfg)
+        dataset = DataSet.from_csvfile(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
@@ -271,7 +271,7 @@ def cmd_parse(argv, cfg):
   for csvfile in argv:
     with Pfx(csvfile):
       try:
-        dataset = DataSet(csvfile, cfg)
+        dataset = DataSet.from_csvfile(csvfile, cfg)
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
@@ -351,48 +351,49 @@ class DataSet(object):
   ''' Data and methods for a CSV file.
   '''
 
-  def __init__(self, csvfile, cfg):
-    self.csvfile = csvfile
+  def __init__(self, site, mapping_name, cfg):
+    X("DataSet(mapping_name=%r, cfg=%r)...", mapping_name, cfg)
+    self.site = site
+    self.mapping_name = mapping_name
     self.cfg = cfg
-    self._data = None
-    self.csvfile_site, self.mapping_name, self.dumptime = cfg.parse_csvfilename(csvfile)
+    self.data = []
     self._mapping = MAPPINGS[self.mapping_name]
     self.csv2rrd = self._mapping['csv2rrd']
+    self.data_hdrs = self.csv2rrd.keys()
     self.graphs = self._mapping['graphs']
 
-  def _load_data(self):
+  @classmethod
+  def from_csvfile(cls, csvfile, cfg):
+    ''' Construct a DataSet from a CSV file, and load the CSV data. Return the DataSet.
+    '''
+    csvfile_site, mapping_name, dumptime = cfg.parse_csvfilename(csvfile)
+    DS = cls(csvfile_site, mapping_name, cfg)
+    DS.import_csv(csvfile)
+    return DS
+
+  def import_csv(self, csvfile):
     ''' Read the CSV data file, sotre headers and time-sorted data.
     '''
-    hdrs, data = load_csv(self.csvfile)
-    self._data = sorted(data, key=lambda row: row['unixtime'])
-    self._data_hdrs = hdrs
-
-  @prop
-  def data(self):
-    ''' Ths data rows of this DataSet.
-    '''
-    if self._data is None:
-      self._load_data()
-    return self._data
-
-  @prop
-  def data_hdrs(self):
-    ''' The header fields of this DataSet.
-    '''
-    if self._data is None:
-      self._load_data()
-    return self._data_hdrs
+    with Pfx(csvfile):
+      csvfile_site, mapping_name, dumptime = self.cfg.parse_csvfilename(csvfile)
+      if mapping_name != self.mapping_name:
+        raise ValueError(
+            "CSV mapping name %r does not match %s mapping name %r"
+            % (mapping_name, type(self).__name__, self.mapping_name))
+      hdrs, data = load_csv(csvfile)
+      self.data.extend(data)
+      self.data.sort(key=lambda row: row['unixtime'])
 
   def pathto(self, filebase):
     ''' Return the pathname of a file given its basename.
     '''
-    return joinpath(self.cfg.sitepath(self.csvfile_site), filebase)
+    return joinpath(self.cfg.sitepath(self.site), filebase)
 
   @prop
   def rrdfile(self):
     ''' Pathname for the RRD file containing this dataset.
     '''
-    return self.pathto(f'{self.csvfile_site}_{self.mapping_name}.rrd')
+    return self.pathto(f'{self.site}_{self.mapping_name}.rrd')
 
   @staticmethod
   def run_argv(pre_argv, argv):
@@ -467,7 +468,7 @@ class DataSet(object):
     end = int(self.data[-1]['unixtime'])
     start = end - GRAPH_DAYS
     for graph_name, graph_spec in self.graphs.items():
-      graphfile = self.pathto(f"{self.csvfile_site}_{self.mapping_name}_{graph_name}.png")
+      graphfile = self.pathto(f"{self.site}_{self.mapping_name}_{graph_name}.png")
       with Pfx(graphfile):
         rrd_argv = [
             'rrdtool', 'graph', graphfile,
