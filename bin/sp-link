@@ -105,6 +105,12 @@ RRD_Y_SCALE = 3600
 
 KEY_TIMESTAMP_SECONDS = 'Date/Time Stamp [Seconds From The Year 2001]'
 
+# RRD ds-name information:
+# csv_hdr: the key from the CSV file, and index in the 'csv2rrd' map
+# ds_name: the RRD ds-name
+# ds_type: the RRD ds-name type
+RRD_DSName = namedtuple('RRD_DSName', 'csv_hdr ds_name ds_type')
+
 MAPPINGS = {
     'DetailedData': {
         'csv2rrd': {
@@ -419,13 +425,13 @@ class DataSet(object):
           raise ValueError("invalid ds-name: %r" % (rrd_field,))
         if rrd_type not in ('GAUGE', 'DCOUNTER'):
           raise ValueError("invalid ds-name type: %r" % (rrd_type,))
-      yield row_key, rrd_field, rrd_type
+      yield RRD_DSName(row_key, rrd_field, rrd_type)
 
   def rrd_field_defns(self):
     ''' Yield the RRD filed definitions for this DataSet.
     '''
-    for _, rrd_field, rrd_type in self.rrd_specs():
-      yield f"DS:{rrd_field}:{rrd_type}:{RRD_HEARTBEAT}:0:U"
+    for rrd_spec in self.rrd_specs():
+      yield f"DS:{rrd_spec.ds_name}:{rrd_spec.ds_type}:{RRD_HEARTBEAT}:0:U"
     yield f"RRA:MAX:0.01:1:{RRD_SLOTS}"
 
   def rrd_create(self):
@@ -443,7 +449,7 @@ class DataSet(object):
     '''
     pre_argv = [
         'rrdtool', 'update', self.rrdfile,
-        '--template', ':'.join(rrd_field for row_key, rrd_field, rrd_type in self.rrd_specs()),
+        '--template', ':'.join(rrd_spec.ds_name for rrd_spec in self.rrd_specs()),
         '--skip-past-updates',
         '--'
     ]
@@ -456,8 +462,8 @@ class DataSet(object):
         continue
       row_time_prev = row_time
       values = [row_time]
-      for row_key, _, _ in self.rrd_specs():
-        values.append(row[row_key])
+      for rrd_spec in self.rrd_specs():
+        values.append(row[rrd_spec.csv_hdr])
       data_argv.append(':'.join(str(value) for value in values))
     self.run_argv(pre_argv, data_argv)
 
@@ -475,6 +481,8 @@ class DataSet(object):
             f'--start={start}', f'--end={end}',
             '--width=2048', '--height=512'
         ]
+        for rrd_spec in self.rrd_specs():
+          rrd_argv.append(f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX')
         for spec in graph_spec:
           with Pfx(spec):
             fields = spec.split(':')
@@ -489,17 +497,14 @@ class DataSet(object):
         self.run_argv(rrd_argv, [])
     if False:
       # debugging graphs for various parameters
-      for hdr in sorted(self.data_hdrs):
-        rrdspec = self.csv2rrd[hdr]
-        if rrdspec is None:
-          continue
-        rrdfield, _ = rrdspec.split(':')
-        graphfile = f"{self.csvfile_site}_{self.mapping_name}_hdr_{rrdfield}.png"
+      for rrd_spec in self.rrd_specs():
+        graphfile = f"{self.site}_{self.mapping_name}_hdr_{rrd_spec.ds_name}.png"
         rrd_argv = [
             'rrdtool', 'graph', graphfile,
             f'--start={start}', f'--end={end}', '--width=2048',
-            f"DEF:{rrdfield}={self.rrdfile}:{rrdfield}:MAX",
-            f"LINE1:{rrdfield}#000000:Field {rrdfield} - {hdr}",
+            ##f'--start=end-36000', '--width=2048',
+            f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
+            f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
         ]
         self.run_argv(rrd_argv, [])
 
