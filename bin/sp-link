@@ -89,7 +89,7 @@ GRAPH_DAYS = 6 * 24 * 3600
 
 RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
 
-# SP polls seem to be every 15 minutes, set heartbeat to 20 minutes in case of skew
+# SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
 ##RRD_HEARTBEAT = 1200
 RRD_HEARTBEAT = 1200
 
@@ -99,9 +99,6 @@ RRD_SLOTS = 3153600     # a year in 10s slots
 # scale factor for per-slot rates to get per-hour rates
 # base rate is kwh/s
 RRD_Y_SCALE = 3600
-
-# hourly power consumption implied by a given power rate poll
-KW_to_KWH = 3600 / SP_DATA_INTERVAL
 
 ##RRD_STEP = 900
 ##RRD_SLOTS = 35040
