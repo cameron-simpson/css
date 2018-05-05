@@ -398,7 +398,7 @@ else
           echo "$cmd: missing .hbsource" >&2
           badopts=1
         else
-          src=$(<.hbsource)
+          src=$(cat .hbsource)
           [ -n "$src" ] || { echo "$cmd: empty source from .hbsource" >&2; badopts=1; }
         fi
         ;;
