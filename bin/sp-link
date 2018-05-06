@@ -23,6 +23,19 @@ from cs.py.func import prop
 ENV_BASEDIR = 'SP_LINK_BASEDIR'
 ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
 
+# TODO: needs to come from a config in the site dir
+BATTERY_CAPACITY_KWH = 10.0
+
+GRAPH_DAYS = 6 * 24 * 3600
+
+RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
+
+# SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
+RRD_HEARTBEAT = 1200
+
+RRD_STEP = 10           # 10s slot size
+RRD_SLOTS = 3153600     # a year in 10s slots
+
 USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
   -D basedir
     Base directory for RRD file data, containing per-site subdirectories.
@@ -85,19 +98,8 @@ def main(argv=None):
 UNIX_EPOCH = datetime(1970, 1, 1)
 SP_EPOCH = datetime(2001, 1, 1).astimezone()
 
-GRAPH_DAYS = 6 * 24 * 3600
-
-RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
-
-# SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
-##RRD_HEARTBEAT = 1200
-RRD_HEARTBEAT = 1200
-
-RRD_STEP = 10           # 10s slot size
-RRD_SLOTS = 3153600     # a year in 10s slots
-
 # scale factor for per-slot rates to get per-hour rates
-# base rate is kwh/s
+# base rate is kwh/s, this converts to kw
 RRD_Y_SCALE = 3600
 
 ##RRD_STEP = 900
