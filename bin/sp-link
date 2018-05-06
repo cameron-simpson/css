@@ -158,6 +158,14 @@ MAPPINGS = {
                 'DEF:batterySOCPcnt:batterySOCPcnt:MAX',
                 'LINE:batterySOCPcnt#000080:Battery SOC %'
             ],
+            'ac': [
+                'LINE1:acInputPwrAvgKW#ff0000:AC Input Power Avg KW',
+                'LINE1:acInputCumKWH#ff8080:AC Input kWh Accumulated (Sample) [kWh]',
+                'LINE1:acExportCumKWH#00ff00:AC Export kWh Accumulated (Sample) [kWh]',
+                'LINE1:totACCoupledPwrKW#0000ff:Total AC Coupled Power (Average) [kW]',
+                'LINE1:totACCoupledEgyKWH#00ff00:Total AC Coupled Energy (Sample) [kWh]',
+                'LINE1:acLoadPwrAvgKW#00000:Load AC Power (Average) [kW]',
+            ],
             'power': [
                 f'CDEF:acloadkw=acLoadCumKWH,{RRD_Y_SCALE},*',
                 f'CDEF:acloadkw_=acloadkw,300,TRENDNAN',
