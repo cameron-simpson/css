@@ -261,7 +261,7 @@ def cmd_graph(argv, cfg):
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
-      dataset.rrd_graph()
+      dataset.gen_graphs()
   return xit
 
 def cmd_import(argv, cfg):
@@ -481,46 +481,66 @@ class DataSet(object):
       data_argv.append(':'.join(str(value) for value in values))
     self.run_argv(pre_argv, data_argv)
 
-  def rrd_graph(self):
+  def rrdgraph_ds_defs(self):
+    ''' Yield DEFs for each ds-name in the RRD file, used to prime rrdgraph incantations.
+    '''
+    for rrd_spec in self.rrd_specs():
+      yield f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX'
+
+  def rrdgraph(self, graph_name, graph_argv,
+      start='end-1000000', end=None,
+      width=2048, height=512):
+    graphfile = self.pathto(f"{self.site}_{self.mapping_name}_{graph_name}.png")
+    with Pfx(graphfile):
+      rrd_argv = [
+          'rrdtool', 'graph', graphfile,
+          f'--width={width}', f'--height={height}'
+      ]
+      if start is not None:
+        rrd_argv.append(f'--start={start}')
+      if end is not None:
+        rrd_argv.append(f'--end={end}')
+      rrd_argv.extend(self.rrdgraph_ds_defs())
+      rrd_argv.extend(graph_argv)
+      self.run_argv(rrd_argv, [])
+
+  def gen_graphs(self):
     ''' Generate the various graphs defined for this DataSet.
     '''
     ##start = int(self.data[0]['unixtime'])
     end = int(self.data[-1]['unixtime'])
     start = end - GRAPH_DAYS
     for graph_name, graph_spec in self.graphs.items():
-      graphfile = self.pathto(f"{self.site}_{self.mapping_name}_{graph_name}.png")
-      with Pfx(graphfile):
-        rrd_argv = [
-            'rrdtool', 'graph', graphfile,
-            f'--start={start}', f'--end={end}',
-            '--width=2048', '--height=512'
-        ]
-        for rrd_spec in self.rrd_specs():
-          rrd_argv.append(f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX')
-        for spec in graph_spec:
-          with Pfx(spec):
-            fields = spec.split(':')
-            spec_type = fields[0]
-            if spec_type == 'DEF':
-              # append the RRD file to the vname
-              fields[1] = f"{fields[1]}={self.rrdfile}"
-            elif spec_type == 'LINE':
-              fields[0] = fields[0] + '1'
-            spec = ':'.join(fields)
-            rrd_argv.append(spec)
-        self.run_argv(rrd_argv, [])
-    if True:
+      graph_argv = []
+      for spec in graph_spec:
+        with Pfx(spec):
+          fields = spec.split(':')
+          spec_type = fields[0]
+          if spec_type == 'DEF':
+            # append the RRD file to the vname
+            fields[1] = f"{fields[1]}={self.rrdfile}"
+          elif spec_type == 'LINE':
+            fields[0] = fields[0] + '1'
+          spec = ':'.join(fields)
+          graph_argv.append(spec)
+      self.rrdgraph(graph_name, graph_argv)
+    graph_argv = []
+    for rrd_spec in self.rrd_specs():
+      if 'kwh' in rrd_spec.csv_hdr.lower():
+        graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
+    self.rrdgraph('kwh', graph_argv)
+    graph_argv = []
+    for rrd_spec in self.rrd_specs():
+      if 'kw' in rrd_spec.csv_hdr.lower() and 'kwh' not in rrd_spec.csv_hdr.lower():
+        graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
+    self.rrdgraph('kw', graph_argv)
+    if False:
       # debugging graphs for various parameters
       for rrd_spec in self.rrd_specs():
-        graphfile = f"{self.site}_{self.mapping_name}_hdr_{rrd_spec.ds_name}.png"
-        rrd_argv = [
-            'rrdtool', 'graph', graphfile, '--title', ': '.join((rrd_spec.ds_name, rrd_spec.csv_hdr)),
-            f'--start={start}', f'--end={end}', '--width=2048',
-            ##f'--start=end-36000', '--width=2048',
+        self.rrdgraph(f'ds_{rrd_spec.ds_name}', [
             f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
             f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
-        ]
-        self.run_argv(rrd_argv, [])
+        ])
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
