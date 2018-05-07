@@ -8,25 +8,6 @@ structures and to access Beyonwiz devices via the net. Also support for
 newer Beyonwiz devices running Enigma and their recording format.
 '''
 
-DISTINFO = {
-    'keywords': ["python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': [
-        'cs.app.ffmpeg',
-        'cs.logutils',
-        'cs.pfx',
-        'cs.urlutils',
-    ],
-    'entry_points': {
-      'console_scripts': [
-          'beyonwiz = cs.app.beyonwiz:main',
-          ],
-    },
-}
-
 import datetime
 import errno
 import json
@@ -39,7 +20,25 @@ from cs.app.ffmpeg import multiconvert as ffmconvert, \
 from cs.deco import strable
 from cs.logutils import info, warning, error
 from cs.pfx import Pfx
-from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'requires': [
+        'cs.app.ffmpeg',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.urlutils',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'beyonwiz = cs.app.beyonwiz:main',
+        ],
+    },
+}
 
 # UNUSED
 def trailing_nul(bs):
