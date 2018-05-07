@@ -36,6 +36,7 @@ from types import SimpleNamespace as NS
 from cs.app.ffmpeg import multiconvert as ffmconvert, \
                           MetaData as FFmpegMetaData, \
                           ConversionSource as FFSource
+from cs.deco import strable
 from cs.logutils import info, warning, error
 from cs.pfx import Pfx
 from cs.x import X
@@ -107,17 +108,13 @@ class _Recording(object):
   def start_dt_iso(self):
     return self.metadata.start_dt_iso
 
+  @strable(open_func=lambda filename: open(filename, 'wb'))
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
     '''
-    if isinstance(output, str):
-      outpath = output
-      with open(outpath, "wb") as output:
-        self.copyto(output)
-    else:
-      for buf in self.data():
-        output.write(buf)
+    for buf in self.data():
+      output.write(buf)
 
   def path_parts(self):
     ''' The 3 components contributing to the .convertpath() method.
