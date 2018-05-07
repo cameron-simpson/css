@@ -30,7 +30,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': ['cs.logutils'],
 }
 
@@ -63,19 +63,20 @@ def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
-  icontext="expected exactly one value"
+  icontext = "expected exactly one value"
   if context is not None:
-    icontext=icontext+" for "+context
+    icontext = icontext + " for " + context
 
-  first=True
+  first = True
   for elem in iterable:
     if first:
-      it=elem
-      first=False
+      it = elem
+      first = False
     else:
-      raise IndexError("%s: got more than one element (%s, %s, ...)"
-                        % (icontext, it, elem)
-                      )
+      raise IndexError(
+          "%s: got more than one element (%s, %s, ...)"
+          % (icontext, it, elem)
+      )
 
   if first:
     raise IndexError("%s: got no elements" % (icontext,))
@@ -193,7 +194,7 @@ def onetomany(func):
         all_chars = X.chars()
   '''
   def gather(self, *a, **kw):
-    return itertools.chain(*[ func(item) for item in self ])
+    return itertools.chain(*[ func(item, *a, **kw) for item in self ])
   return gather
 
 def isordered(s, reverse=False, strict=False):
@@ -203,7 +204,7 @@ def isordered(s, reverse=False, strict=False):
   '''
   first = True
   prev = None
-  for i, item in enumerate(s):
+  for item in s:
     if not first:
       if reverse:
         ordered = item < prev if strict else item <= prev

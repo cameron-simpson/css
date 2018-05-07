@@ -38,6 +38,7 @@ but used with a little discretion produces far more debugable results.
 
 from __future__ import print_function
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
@@ -60,12 +61,18 @@ DISTINFO = {
 
 cmd = None
 
-def pfx_iter(tag, iter):
-  ''' Wrapper for iterators to prefix exceptions with `tag`.
+def pfx_iter(tag, iterable):
+  ''' Wrapper for iterables to prefix exceptions with `tag`.
   '''
   with Pfx(tag):
-    for i in iter:
-      yield i
+    I = iter(iterable)
+  while True:
+    with Pfx(tag):
+      try:
+        i = next(I)
+      except StopIteration:
+        break
+    yield i
 
 def pfx(func):
   ''' Decorator for functions that should run inside:
@@ -102,6 +109,7 @@ class _PfxThreadState(threading.local):
   '''
 
   def __init__(self):
+    threading.local.__init__(self)
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
@@ -149,8 +157,50 @@ class _PfxThreadState(threading.local):
     '''
     return self.stack.pop()
 
+def gen(func):
+  ''' Decorator for generators to manage the Pfx stack.
+      Before running the generator the current stack height is
+      noted.  After yield, the stack above that height is trimmed
+      and saved, and the value yielded.  On recommencement the saved
+      stack is reapplied to the current stack (which may have
+      changed) and the generator continued.
+  '''
+  def wrapper(*a, **kw):
+    if not isgeneratorfunction(func):
+      raise ValueError("@gen: generatior function required, received %s" % (func,))
+    # commence the generator
+    g = func(*a, **kw)
+    # note the current Thread's Pfx stack
+    stack = Pfx._state.stack
+    height = len(stack)
+    while True:
+      try:
+        value = next(g)
+      except StopIteration:
+        # clean up and reraise
+        stack[height:] = []
+        return
+      except:
+        # clean up and reraise
+        stack[height:] = []
+        raise
+      # shelve the in-generator Pfx stack and yield
+      saved = stack[height:]
+      stack[height:] = []
+      yield value
+      # note the current Thread's Pfx stack
+      stack = Pfx._state.stack
+      height = len(stack)
+      # reapply the in-generator Pfx stack
+      stack.extend(saved)
+      del saved
+  wrapper.__name__ = "@Pfx.gen(%s)" % (func.__name__,)
+  fdoc = func.__doc__
+  wrapper.__doc__ = wrapper.__name__ + ":\n" + fdoc if fdoc else ''
+  return wrapper
+
 class Pfx(object):
-  ''' A context manager to maintain a per-thread stack of message prefices.
+  ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
   # instantiate the thread-local state object
@@ -160,7 +210,9 @@ class Pfx(object):
     ''' Initialise a new Pfx instance.
         `mark`: message prefix string
         `args`: if not empty, apply to the prefix string with `%`
-        `absolute`: optional keyword argument, default False. If true, this message forms the base of the message prefixes; existing prefixes will be suppressed.
+        `absolute`: optional keyword argument, default False. If
+          true, this message forms the base of the message prefixes;
+          existing prefixes will be suppressed.
         `loggers`: which loggers should receive log messages.
     '''
     absolute = kwargs.pop('absolute', False)
@@ -195,6 +247,8 @@ class Pfx(object):
         prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
+            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+            ##  prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix \
               + ': ' \
@@ -246,10 +300,10 @@ class Pfx(object):
       self._umark = u
     return u
 
-  def logto(self, newLoggers):
+  def logto(self, new_loggers):
     ''' Define the Loggers anew.
     '''
-    self._loggers = newLoggers
+    self._loggers = new_loggers
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
@@ -290,7 +344,7 @@ class Pfx(object):
       try:
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
-        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s", self._state.prefix, L, msg, args, kwargs, e, file=sys.stderr)
+        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" % (self._state.prefix, L, msg, args, kwargs, e), file=sys.stderr)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
@@ -308,16 +362,18 @@ def prefix():
   return Pfx._state.prefix
 
 @contextmanager
-def PrePfx(pfx, *args):
+def PrePfx(tag, *args):
   ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
   '''
   if args:
-    pfx = pfx % args
+    tag = tag % args
   state = Pfx._state
   old_ur_prefix = state._ur_prefix
-  state._ur_prefix = pfx
-  yield None
-  state._ur_prefix = old_ur_prefix
+  state._ur_prefix = tag
+  try:
+    yield None
+  finally:
+    state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.

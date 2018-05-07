@@ -1,0 +1,45 @@
+  lib/python/cs/logutils.py: merge default ==> venti
+  lib/python/cs/logutils.py: cs.logutils: remove cs.excutils from install_requires; drop unused imported symbol
+  lib/python/cs/logutils.py: merge pypi ==> venti: cs-release: new "check" mode to report module status, related changes
+  lib/python/cs/logutils.py: merge default ==> beyonwiz
+  lib/python/cs/logutils.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/logutils.py: cs.logutils: unconditionally import cs.upd
+  lib/python/cs/logutils.py: cs.logutils: trace Pfx.__enter__/__exit__ if using upd_mode
+  lib/python/cs/logutils.py: cs.logutils: additional X_via_log global, causing X() to log a warning
+  lib/python/cs/logutils.py: cs.logutils: Pfx: if loginfo.upd_mode, only trace __enter__/__exit__ in the thread that called setup_logging
+  lib/python/cs/logutils.py: cs.logutils: initialise loginfo with upd_mode=False to support use of Pfx without setup_logging
+  lib/python/cs/logutils.py: cs.logutils: trace Pfx if "trace" in $DEBUG
+  lib/python/cs/logutils.py: cs.logutils: bugfix Pfx tracing
+  lib/python/cs/logutils.py: cs.logutils: make sure loginfo has an upd_mode attribute
+  lib/python/cs/logutils.py: merge default ==> venti
+  lib/python/cs/logutils.py: cs.logutils: set Pfx._state.trace of main thread only if TRACE in $DEBUG
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: update upd line if _state.trace, not if loginfo.upd_mode
+  lib/python/cs/logutils.py: cs.logutils: Pfx: remove unused global declarations
+  lib/python/cs/logutils.py: cs.logutils: new Pfxthread factory to return a threading.Thread with the current Pfx context
+  lib/python/cs/logutils.py: cs.logutils: Pfx.__exit__: special case for getopt.GetoptError
+  lib/python/cs/logutils.py: cs.py.func: @prop: catch exception from evalled raise; FIXME: this is raising a SyntaxError, find out why
+  lib/python/cs/logutils.py: cs.logutils: nl(): improve an error message
+  lib/python/cs/logutils.py: cs.logutils: PfxThread: fix docstring typo
+  lib/python/cs/logutils.py: cs.logutils: PfxThread docstring typo fix
+  lib/python/cs/logutils.py: move Pfx et al into standalone cs.pfx module
+  lib/python/cs/logutils.py: cs.logutils: move DISTINFO below imports (lint) and tidy up imports
+  lib/python/cs/logutils.py: cs.logutils: lint and shadowing fixes
+  lib/python/cs/logutils.py: cs.logutils: remove X and XP, now in cs.x and cs.pfx respectively
+  lib/python/cs/logutils.py: cs.logutils: lint
+  lib/python/cs/logutils.py: cs.pfx,cs.logutils: move global "cmd" from cs.logutils to cs.pfx
+  lib/python/cs/logutils.py: cs.pfx,cs.logutils: cs.pfx._PfxThreadState.trace is now a callback, removing final dependency of cs.logutils from cs.pfx
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: upd_mode defaults to False instead of to isatty(main_log)
+  lib/python/cs/logutils.py: cs.logutils: bugfix: drop PfxFormatter.format context_level keyword argument, unused and was inserting the pfx an extra time
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: accept new option `verbose` which sets the default log level to INFO
+  lib/python/cs/logutils.py: cs.logutils: UpdHandler.emit: remove redundant _withoutCOntext wrapper
+  lib/python/cs/logutils.py: cs.logutils: drop nl(), unused
+  lib/python/cs/logutils.py: cs.logutils: upd_mode no longer implies trace_mode; create Upd using cs.upd.upd_for; expose UpdHandler.nl_level
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: pass logging_level to UpdHandler init
+  lib/python/cs/logutils.py: my email address has changed - update Python code
+  lib/python/cs/README-logutils.rst lib/python/cs/logutils.py: cs.logutils: move README into module docstring
+  lib/python/cs/logutils.py: cs.logutils: mention colouring and cs.upd
+  lib/python/cs/logutils.py: cs.logutils: drop DP(), make D() call cs.pfx.XP(), clean lots of lint
+  lib/python/cs/README-logutils.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-logutils.rst: merge default ==> beyonwiz
+  lib/python/cs/README-logutils.rst: merge default ==> iphoto
+  lib/python/cs/README-logutils.rst: merge default ==> venti

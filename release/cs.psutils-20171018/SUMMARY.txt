@@ -1,0 +1,1 @@
+run: replace `trace` parameter with `logger`, default None

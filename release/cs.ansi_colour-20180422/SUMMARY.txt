@@ -1,0 +1,3 @@
+New function colourise to colour strings with regexp matches.
+New helper functions make_pattern and make_patterns to construct (colour, regexp)s from specifications.
+New public names NORMAL_COLOUR and DEFAULT_HIGHLIGHT.
