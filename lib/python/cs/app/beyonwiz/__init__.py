@@ -131,15 +131,9 @@ class _Recording(object):
            )
 
   def convertpath(self, outext):
-    ''' Generate the output filename
+    ''' Generate the output filename.
     '''
     left, middle, right = self.path_parts()
-    # fixed length of the path
-    fixed_len = len(left) \
-              + len(right) \
-              + len(self.metadata.start_dt_iso) \
-              + len(outext) \
-              + 7
     filename = '--'.join( (left,
                            middle,
                            right,
