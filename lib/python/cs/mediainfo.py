@@ -8,6 +8,7 @@
 Simple facilities for media information.
 '''
 
+from collections import namedtuple
 import re
 from types import SimpleNamespace as NS
 from cs.pfx import Pfx
@@ -27,15 +28,39 @@ DISTINFO = {
     ],
 }
 
+_EpisodeDatumDefn = namedtuple('EpisodeDatumDefn', 'name prefix re')
+class EpisodeDatumDefn(_EpisodeDatumDefn):
+  ''' An EpisodeInfo marker definition.
+  '''
+
+  def __init__(self, name, prefix):
+    _EpisodeDatumDefn.__init__(self, name, prefix, re.compile(name + r'(\d+)', re.I))
+
+  def parse(self, s, offset=0):
+    ''' Parse an episode datum from a string, return the value and new offset.
+        `s`: the string
+        `offset`: parse offset, default 0
+        Raises ValueError if the string doesn't match this EpisodeDatumDefn.
+    '''
+    m = self.re.match(s[offset:])
+    if m:
+      return int(m.group(1)), offset + m.end()
+    raise ValueError(
+        '%s: unparsed episode datum: %r'
+        % (type(self).__name__, s[offset:])
+    )
+
 class EpisodeInfo(NS):
   ''' Trite class for episodic information, used to store, match
       or transcribe series/season, episode, etc values.
   '''
 
-  RE_SERIES = re.compile(r's(\d+)', re.I)
-  RE_EPISODE = re.compile(r'e(\d+)', re.I)
-  RE_PART = re.compile(r'pt(\d+)', re.I)
-  RE_SCENE = re.compile(r'sc(\d+)', re.I)
+  MARKERS = [
+      EpisodeDatumDefn('series', 's'),
+      EpisodeDatumDefn('episode', 'e'),
+      EpisodeDatumDefn('part', 'pt'),
+      EpisodeDatumDefn('scene', 'sc'),
+  ]
 
   def __init__(self, series=None, episode=None, part=None, scene=None):
     self.series = series
@@ -44,12 +69,30 @@ class EpisodeInfo(NS):
     self.scene = scene
 
   def __str__(self):
-    return ''.join( (
-        '' if self.series is None else 's%02d' % self.series,
-        '' if self.episode is None else 'e%02d' % self.episode,
-        '' if self.part is None else 'pt%02d' % self.part,
-        '' if self.scene is None else 'sc%02d' % self.scene,
-    ) )
+    marks = []
+    for marker in self.MARKERS:
+      value = self.get(marker.name)
+      if value is not None:
+        marks.append(marker.prefix + '%02d' % value)
+    return ''.join(marks)
+
+  def __getitem__(self, name):
+    ''' We can look up values by name.
+    '''
+    try:
+      value = getattr(self, name)
+    except AttributeError:
+      raise KeyError(name)
+    return value
+
+  def get(self, name, default=None):
+    ''' Look up value by name with default.
+    '''
+    try:
+      value = self[name]
+    except KeyError:
+      return default
+    return value
 
   @classmethod
   def from_filename_part(cls, s, offset=0):
@@ -73,16 +116,12 @@ class EpisodeInfo(NS):
     '''
     with Pfx("parse_filename_part: %r", s):
       fields = {}
-      for attr, r in (
-          ('series', cls.RE_SERIES),
-          ('episdoe', cls.RE_EPISODE),
-          ('part', cls.RE_PART),
-          ('scene', cls.RE_SCENE),
-      ):
-        m = r.match(s[offset:])
-        if m:
-          fields[attr] = int(m.group(1))
-          offset += m.end()
+      for defn in cls.MARKERS:
+        try:
+          value, offset = defn.parse(s, offset)
+        except ValueError:
+          pass
+        fields[defn.name] = value
       return fields, offset
 
   @prop
