@@ -5,10 +5,9 @@ import datetime
 import os
 import os.path
 import struct
-from types import SimpleNamespace as NS
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.threads import locked_property
-from cs.x import X
 from . import _Recording, RecordingMetaData
 
 # constants related to headers
@@ -85,10 +84,17 @@ def unrle(data, fmt, offset=0):
 
 class TVWizMetaData(RecordingMetaData):
 
-  @property
-  def start_unixtime(self):
-    H = self.sources['header']
-    return (H['mjd'] - 40587) * DAY + H['start']
+  def __init__(self, raw):
+    RecordingMetaData.__init__(self, raw)
+    self.series_name = raw['evtName']
+    self.description = raw['synopsis']
+    self.start_unixtime = (raw['mjd'] - 40587) * DAY + raw['start']
+    channel = raw['svcName']
+    if channel:
+      self.source_name = channel
+    episode = raw['episode']
+    if episode:
+      self.episodeinfo.episode = int(episode)
 
 class TVWiz(_Recording):
 
@@ -165,21 +171,7 @@ class TVWiz(_Recording):
 
   @locked_property
   def metadata(self):
-    H = self.read_header()
-    hdata = H._asdict()
-    hdata['pathname'] = self.headerpath
-    data = {
-        'channel': H.svcName,
-        'title': H.evtName,
-        'episode': H.episode,
-        'description': H.synopsis,
-        'start_unixtime':  H.start,
-        'tags': set(),
-        'sources': {
-          'header': hdata,
-        }
-      }
-    return TVWizMetaData(**data)
+    return TVWizMetaData(self.read_header().as_dict())
 
   @staticmethod
   def tvwiz_parse_trunc(fp):
@@ -204,6 +196,7 @@ class TVWiz(_Recording):
     ''' A generator that yields MPEG2 data from the stream.
     '''
     with Pfx("data(%s)", self.dirpath):
+      fp = None
       lastFileNum = None
       for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
