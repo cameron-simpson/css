@@ -6,6 +6,7 @@ import os
 import os.path
 import struct
 from types import SimpleNamespace as NS
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.threads import locked_property
 from cs.x import X
@@ -166,7 +167,7 @@ class TVWiz(_Recording):
   @locked_property
   def metadata(self):
     H = self.read_header()
-    hdata = H._asdict()
+    hdata = H.as_dict()
     hdata['pathname'] = self.headerpath
     data = {
         'channel': H.svcName,
@@ -204,6 +205,7 @@ class TVWiz(_Recording):
     ''' A generator that yields MPEG2 data from the stream.
     '''
     with Pfx("data(%s)", self.dirpath):
+      fp = None
       lastFileNum = None
       for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
