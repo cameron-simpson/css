@@ -1,10 +1,11 @@
 #!/bin/sh
 #
-# Script to aid scheduled itunes downloads.
+# Script to aid scheduled iTunes downloads.
+#
 # It still astonishes me that iTunes lacks any kind of download
-# scheduling, yet may people have times that are far better for
+# scheduling, yet many people have times that are far better for
 # downloading, such as special ISP off peak times with larger data
-# quotas or simply period of known low network utilisation.
+# quotas or simply periods of known low network utilisation.
 # - Cameron Simpson <cs@cskk.id.au> 08nov2017
 #
 
@@ -12,7 +13,10 @@ set -ue
 
 : ${VARLOG:=$HOME/var/log}
 
+# Required flags before commencing download.
+# On my systems, a default route and the ISP off peak period.
 flagnames=${ITUNES_DL_FLAGS:-'ROUTE_DEFAULT ISP_OFF_PEAK'}
+
 queuefile=$VARLOG/itunes-dl-queue.log
 
 cmd=$( basename "$0" )
@@ -99,6 +103,8 @@ case "$op" in
                 tell application \"iTunes\"
                   download $item
                 end tell"
+            # TODO: how to tell the download is complete before
+            # queuing another?
             exit 1
           done
         exit
