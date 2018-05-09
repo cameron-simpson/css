@@ -73,7 +73,7 @@ class RecordingMetaData(NS):
   def __getattr__(self, attr):
     try:
       return self.raw[attr]
-    except IndexError:
+    except KeyError:
       raise AttributeError(attr)
 
   def as_dict(self):
