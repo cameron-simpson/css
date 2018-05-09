@@ -82,7 +82,7 @@ class Enigma2(_Recording):
     '''
     path = self.tspath
     fmeta = {'pathname': path}
-    base, ext = os.path.splitext(os.path.basename(path))
+    base, _ = os.path.splitext(os.path.basename(path))
     fields = base.split(' - ', 2)
     if len(fields) != 3:
       warning('cannot parse into "time - channel - program": %r', base)
@@ -91,10 +91,11 @@ class Enigma2(_Recording):
       fmeta['channel'] = channel
       fmeta['title'] = title
       time_fields = time_field.split()
-      if ( len(time_fields) != 2
-        or not all(_.isdigit() for _ in time_fields)
-        or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
-         ):
+      if (
+          len(time_fields) != 2
+          or not all(_.isdigit() for _ in time_fields)
+          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
+      ):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
@@ -172,6 +173,6 @@ class Enigma2(_Recording):
       with open(self.tspath, 'rb') as tsfp:
         while True:
           chunk = tsfp.read(bufsize)
-          if len(chunk) == 0:
+          if not chunk:
             break
           yield chunk
