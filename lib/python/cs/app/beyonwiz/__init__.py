@@ -67,12 +67,21 @@ class RecordingMetaData(NS):
   ''' Base class for recording metadata.
   '''
 
-  def _asdict(self):
+  def __init__(self, raw):
+    self.raw = raw
+
+  def __getattr__(self, attr):
+    try:
+      return self.raw[attr]
+    except IndexError:
+      raise AttributeError(attr)
+
+  def as_dict(self):
     d = dict(self.__dict__)
     d["start_dt_iso"] = self.start_dt_iso
     return d
 
-  def _asjson(self, indent=None):
+  def as_json(self, indent=None):
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
   @property
