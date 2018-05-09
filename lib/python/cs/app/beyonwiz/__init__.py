@@ -271,14 +271,15 @@ class _Recording(ABC):
               % (self.path, M.start_dt_iso)
     if M.tags:
       comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
+    episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(dstfmt,
-                          title=( '%s: %s' % (M.title, M.episode)
-                                  if M.episode
-                                  else M.title
+                          title=( '%s: %s' % (M.series_name, episode_marker)
+                                  if episode_marker
+                                  else M.series_name
                                 ),
-                          show=M.title,
-                          episode_id=M.episode,
+                          show=M.series_name,
+                          episode_id=episode_marker,
                           synopsis=M.description,
-                          network=M.channel,
+                          network=M.source_name,
                           comment=comment,
                          )
