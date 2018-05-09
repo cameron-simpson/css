@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 r'''
 Beyonwiz PVR and TVWiz recording utilities.
@@ -8,10 +8,12 @@ structures and to access Beyonwiz devices via the net. Also support for
 newer Beyonwiz devices running Enigma and their recording format.
 '''
 
+from abc import ABC, abstractmethod
 import datetime
 import errno
 import json
 import os.path
+import re
 from threading import Lock
 from types import SimpleNamespace as NS
 from cs.app.ffmpeg import multiconvert as ffmconvert, \
@@ -20,6 +22,7 @@ from cs.app.ffmpeg import multiconvert as ffmconvert, \
 from cs.deco import strable
 from cs.logutils import info, warning, error
 from cs.pfx import Pfx
+from cs.py.func import prop
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -95,9 +98,19 @@ def Recording(path):
     return Enigma2(path)
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(object):
+class _Recording(ABC):
   ''' Base class for video recordings.
   '''
+
+  PATH_FIELDS = (
+      'series_name',
+      'episode_info_part',
+      'episode_name',
+      'tags_part',
+      'source_name',
+      'start_dt_iso',
+      'description'
+  )
 
   def __init__(self, path):
     self.path = path
@@ -107,6 +120,10 @@ class _Recording(object):
   def start_dt_iso(self):
     return self.metadata.start_dt_iso
 
+  @abstractmethod
+  def data(self):
+    raise NotImplementedError('data')
+
   @strable(open_func=lambda filename: open(filename, 'wb'))
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
@@ -115,30 +132,25 @@ class _Recording(object):
     for buf in self.data():
       output.write(buf)
 
-  def path_parts(self):
-    ''' The 3 components contributing to the .convertpath() method.
-        The middle component may be trimmed to fit into a legal filename.
-    '''
-    M = self.metadata
-    title = '--'.join([M.title, str(M.episode)]) if M.episode else M.title
-    return ( title,
-             '-'.join(sorted(M.tags)),
-             M.channel
-           )
+  @prop
+  def tags_part(self):
+    return '+'.join(self.tags)
 
-  def convertpath(self, outext):
-    ''' Generate the output filename.
+  @prop
+  def episode_info_part(self):
+    return self.metadata.episodeinfo
+
+  def converted_path(self, outext):
+    ''' Generate the output filename with parts separated by '--'.
     '''
-    left, middle, right = self.path_parts()
-    filename = '--'.join( (left,
-                           middle,
-                           right,
-                           self.start_dt_iso,
-                           self.metadata.description ) ) \
-               .lower() \
-               .replace('/', '|') \
-               .replace(' ', '-') \
-               .replace('----', '--')
+    parts = []
+    for field in self.PATH_FIELDS:
+      part = getattr(self, field, None)
+      if part:
+        part = str(part).lower().replace('/', '|').replace(' ', '-')
+        part = re.sub('--+', '-', part)
+        parts.append(part)
+    filename = '--'.join(parts)
     filename = filename[:250 - (len(outext) + 1)]
     filename += '.' + outext
     return filename
@@ -154,7 +166,7 @@ class _Recording(object):
       path2 = "%s--%d%s" % (pfx, i+1, ext)
       if not os.path.exists(path2):
         return path2
-    raise ValueError("no available --0..--%d variations: %r", max_n-1, path)
+    raise ValueError("no available --0..--%d variations: %r" % (max_n-1, path))
 
   def convert(self,
               dstpath, dstfmt='mp4', max_n=None,
@@ -177,7 +189,7 @@ class _Recording(object):
       if not os.path.isabs(srcpath):
         srcpath = os.path.join('.', srcpath)
     if dstpath is None:
-      dstpath = self.convertpath(outext=dstfmt)
+      dstpath = self.converted_path(outext=dstfmt)
     # stop path looking like a URL
     if not os.path.isabs(dstpath):
       dstpath = os.path.join('.', dstpath)
