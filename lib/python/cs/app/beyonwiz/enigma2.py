@@ -17,7 +17,18 @@ from cs.x import X
 from . import _Recording, RecordingMetaData
 
 class Enigma2MetaData(RecordingMetaData):
-  pass
+
+  def __init__(self, raw):
+    RecordingMetaData.__init__(self, raw)
+    raw_meta = raw['meta']
+    raw_file = raw['file']
+    self.series_name = raw_meta['title']
+    self.description = raw_meta['description']
+    self.start_unixtime = raw_meta['start_unixtime']
+    channel = raw_file['channel']
+    if channel:
+      self.source_name = channel
+    self.tags.update(raw_meta['tags'])
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -33,11 +44,13 @@ class Enigma2(_Recording):
     self.cutpath = tspath + '.cuts'
 
   def read_meta(self):
+    ''' Read the .meta file and return the contents as a dict.
+    '''
     path = self.metapath
     data = {
         'pathname': path,
         'tags': set(),
-      }
+    }
     with Pfx("meta %r", path):
       try:
         with open(path) as metafp:
@@ -53,28 +66,16 @@ class Enigma2(_Recording):
           warning("cannot open: %s", e)
         else:
           raise
-    return Enigma2MetaData(**data)
+    return data
 
   @locked_property
   def metadata(self):
-    ''' Return the meta information from a recording's .meta associated file.
+    ''' The metadata associated with this recording.
     '''
-    M = self.read_meta()
-    mdata = M._asdict()
-    fdata = self.filename_metadata()
-    data = {
-        'channel': fdata['channel'],
-        'title': M.title,
-        'episode': None,
-        'description': M.description,
-        'start_unixtime': M.start_unixtime,
-        'tags': set(),
-        'sources': {
-          'filename': fdata,
-          'meta': mdata,
-        }
-      }
-    return Enigma2MetaData(**data)
+    return Enigma2MetaData({
+        'meta': self.read_meta(),
+        'file': self.filename_metadata(),
+    })
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.
