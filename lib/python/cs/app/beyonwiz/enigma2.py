@@ -8,8 +8,10 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
+import struct
 from cs.logutils import warning
 from cs.pfx import Pfx
+from cs.py.func import prop
 from cs.threads import locked_property
 from cs.x import X
 from . import _Recording, RecordingMetaData
