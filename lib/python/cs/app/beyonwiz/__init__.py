@@ -21,6 +21,7 @@ from cs.app.ffmpeg import multiconvert as ffmconvert, \
                           ConversionSource as FFSource
 from cs.deco import strable
 from cs.logutils import info, warning, error
+from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx
 from cs.py.func import prop
 
@@ -69,6 +70,8 @@ class RecordingMetaData(NS):
 
   def __init__(self, raw):
     self.raw = raw
+    self.episodeinfo = EpisodeInfo()
+    self.tags = set()
 
   def __getattr__(self, attr):
     try:
@@ -128,10 +131,13 @@ class _Recording(ABC):
   def __getattr__(self, attr):
     if attr in (
         'description',
+        'episodeinfo',
         'series_name',
+        'source_name',
         'start_dt',
         'start_dt_iso',
         'start_unixtime',
+        'tags',
         'title',
     ):
       return getattr(self.metadata, attr)
@@ -155,7 +161,7 @@ class _Recording(ABC):
 
   @prop
   def episode_info_part(self):
-    return self.metadata.episodeinfo
+    return str(self.metadata.episodeinfo)
 
   def converted_path(self, outext):
     ''' Generate the output filename with parts separated by '--'.
