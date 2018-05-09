@@ -116,9 +116,17 @@ class _Recording(ABC):
     self.path = path
     self._lock = Lock()
 
-  @property
-  def start_dt_iso(self):
-    return self.metadata.start_dt_iso
+  def __getattr__(self, attr):
+    if attr in (
+        'description',
+        'series_name',
+        'start_dt',
+        'start_dt_iso',
+        'start_unixtime',
+        'title',
+    ):
+      return getattr(self.metadata, attr)
+    raise AttributeError(attr)
 
   @abstractmethod
   def data(self):
