@@ -33,8 +33,9 @@ class EpisodeDatumDefn(_EpisodeDatumDefn):
   ''' An EpisodeInfo marker definition.
   '''
 
-  def __init__(self, name, prefix):
-    _EpisodeDatumDefn.__init__(self, name, prefix, re.compile(name + r'(\d+)', re.I))
+  def __new__(cls, name, prefix):
+    r = re.compile(name + r'(\d+)', re.I)
+    return super(EpisodeDatumDefn, cls).__new__(cls, name, prefix, r)
 
   def parse(self, s, offset=0):
     ''' Parse an episode datum from a string, return the value and new offset.
