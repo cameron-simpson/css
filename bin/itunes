@@ -55,12 +55,16 @@ case "$flagnames" in
   *,*)  flagnames=$( printf '%s\n' "$flagnames" | tr  , ' ' ) ;;
 esac
 
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ $# -gt 0 ] || set -- add
-
-op=$1
-shift
 
 case "$op" in
   dl|download)
