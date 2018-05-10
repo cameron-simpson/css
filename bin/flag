@@ -16,7 +16,7 @@ verbose_all=    # print flag state regardless
 [ -t 2 ] && verbose=1
 ##[ -t 2 ] && trace=set-x
 
-cmd=$0
+cmd=$( basename "$0" )
 usage="Usage:
   $cmd [options...] [glob]
     List flags and values. If supplied, select names matching glob.
