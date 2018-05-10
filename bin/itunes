@@ -11,16 +11,19 @@
 
 set -ue
 
+: ${ITUNES_DL_FLAGS:='ROUTE_DEFAULT ISP_OFF_PEAK !DOWNLOAD_DISABLED'}
+: ${TMPDIR:=/tmp}
 : ${VARLOG:=$HOME/var/log}
 
 # Required flags before commencing download.
 # On my systems, a default route and the ISP off peak period.
-flagnames=${ITUNES_DL_FLAGS:-'ROUTE_DEFAULT ISP_OFF_PEAK'}
+flagnames=$ITUNES_DL_FLAGS
 
 queuefile=$VARLOG/itunes-dl-queue.log
 
 trace=
-[ -t 2 ] && trace=set-x
+echo=:
+[ -t 2 ] && { echo=eecho trace=set-x; }
 
 opts=
 
@@ -28,10 +31,13 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-x] [-F flags,...] [--] [op [args...]]
   -F flags,...
       Specify flags which must be satisfied before the run operation commences.
-      Default from \$ITUNES_DL_FLAGS: $flagnames
+      Default from \$ITUNES_DL_FLAGS: $ITUNES_DL_FLAGS
   -x  Trace execution.
-  $cmd {dl|download} {itunes-track-specs...|-}
-      Tail the queue file (default: $queuefile) and tell iTunes to download the items.
+  $cmd {dl|download} {itunes-track-specs...|-|selected}
+      Queue the specified items. Tell itunes to download the items
+      once the flags are true.
+      -         Read track specifications from standard input.
+      selected  Use the currently selected iTunes tracks.
   $cmd selected
       Report the currently selected iTunes tracks to standard output."
 
@@ -66,54 +72,65 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+selected(){
+  $trace \
+  reattach-to-user-namespace \
+  osascript -e '
+      tell application "iTunes"
+        selection
+      end tell
+    ' \
+  | tr , '\012'
+}
+
+download(){
+  _dl_cmds=
+  for _dl_item
+  do
+    case "$_dl_item" in
+      selected)
+        tmpf=$TMPDIR/$cmd.$$selected
+        selected >"$tmpf"
+        while read _dl_item
+        do
+          $echo "queue selected: $_dl_item"
+          _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        done <"$tmpf"
+        rm "$tmpf"
+        ;;
+      -)while read _dl_item
+        do
+          $echo "queue stdin: $_dl_item"
+          _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        done
+        ;;
+      *)$echo "queue item: $_dl_item"
+        _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        ;;
+    esac
+  done
+  [ -z "$flagnames" ] || $trace await flag -t $flagnames
+  $trace \
+  reattach-to-user-namespace \
+  osascript -e "
+      activate \"iTunes\"
+      tell application \"iTunes\"
+        $_dl_cmds
+      end tell"
+}
+
 case "$op" in
   dl|download)
-    for item
-    do
-      case "$item" in
-        -)
-          while read trackspec
-          do
-            $trace "$0" -F "$flagnames" $opts -- "$op" "$trackspec"
-          done
-          ;;
-        *)
-          # wait for the flags to align
-          first=1
-          while :
-          do
-            ok=1
-            for flagname in $flagnames
-            do
-              case "$flagname" in
-                \!*)  flagname=$( expr "x$flagname" : 'x.\(.*\)' )
-                      flag "$flagname" && ok=
-                      ;;
-                *)    flag "$flagname" || ok=
-                      ;;
-              esac
-              [ $ok ] || break
-            done
-            [ $ok ] && break
-            sleep 17
-            if [ $first ]
-            then
-              echo "$0: waiting for flags: $flagnames ..." >&2
-              first=
-            fi
-          done
-          $trace \
-          reattach-to-user-namespace \
-          osascript -e "
-              activate \"iTunes\"
-              tell application \"iTunes\"
-                download $item
-              end tell"
-          # TODO: how to tell the download is complete before
-          # queuing another?
-          ;;
-      esac
-    done
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing download items" >&2
+      badopts=1
+    else
+      download "$@"
+    fi
     ;;
   selected)
     if [ $# -gt 0 ]
@@ -121,17 +138,10 @@ case "$op" in
       echo "$cmd: $op: extra arguments: $*" >&2
       badopts=1
     else
-      $trace \
-      reattach-to-user-namespace \
-      osascript -e '
-          tell application "iTunes"
-            selection
-          end tell
-        ' \
-      | tr , '\012'
+      selected
     fi
     ;;
-*)  echo "$cmd: $op: unrecognised op" >&2
+  *)echo "$cmd: $op: unrecognised op" >&2
     badopts=1
     ;;
 esac
