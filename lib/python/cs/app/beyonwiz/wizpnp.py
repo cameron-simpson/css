@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+import os
 from threading import RLock
+import xml.etree.ElementTree as etree
 from cs.threads import locked_property
 from cs.urlutils import URL
 
@@ -35,7 +37,7 @@ class WizPnP(object):
 
   @locked_property
   def _tvdevicedesc_XML(self):
-    return XML(self.tvdevicedesc_URL.content)
+    return etree.fromstring(self.tvdevicedesc_URL.content)
 
   @locked_property
   def specVersion(self):
