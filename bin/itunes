@@ -107,7 +107,6 @@ case "$op" in
               end tell"
           # TODO: how to tell the download is complete before
           # queuing another?
-          exit 1
           ;;
       esac
     done
