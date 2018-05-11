@@ -1,8 +1,10 @@
 #!/usr/bin/python
 #
 
-from __future__ import print_function
+''' Command line utility for working with Beyonwiz PVR devices.
+'''
 
+from __future__ import print_function
 import sys
 import os.path
 import json
@@ -10,6 +12,8 @@ from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx
 from cs.x import X
 from . import Recording
+from .tvwiz import TVWiz
+from .wizpnp import WizPnP
 
 TRY_N = 32
 
@@ -39,6 +43,8 @@ USAGE = '''Usage:
         Run unit tests.'''
 
 def main(argv=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   args = list(argv)
@@ -97,7 +103,7 @@ def main(argv=None):
         stdout_bfd = os.dup(sys.stdout.fileno())
         stdout_bfp = os.fdopen(stdout_bfd, "wb")
         TVWiz(arg).copyto(stdout_bfp)
-        stdoutp.bfp.close()
+        stdout_bfp.close()
     elif op == "convert":
       srcpath = args.pop(0)
       with Pfx(srcpath):
