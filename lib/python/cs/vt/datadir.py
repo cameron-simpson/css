@@ -37,7 +37,7 @@ from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
-from .blockify import top_block_for, blocked_chunks_of, spliced_blocks
+from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
@@ -204,6 +204,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
+    self._unindexed = {}
+    self.index = {}         # dummy value
     self._filemap = {}
     self._extra_state = {}
     self._load_state()
@@ -259,7 +261,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     # This lets us add data, stash the location in _unindexed and
     # drop the location onto the _indexQ for persistent storage in
     # the index asynchronously.
-    self._unindexed = {}
     self._indexQ = IterableQueue(64)
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
@@ -343,7 +344,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                   try:
                     indexed_to = int(indexed_to)
                   except ValueError as e:
-                    error("discrading record: invalid indexed_to (column 3), expected int: %s: %r",
+                    error("discarding record: invalid indexed_to (column 3), expected int: %s: %r",
                           e, indexed_to)
                     continue
                   filestate = FileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
@@ -574,7 +575,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def get_blockmap(self, B):
     ''' Return a persistent BlockMap for the supplied Block.
     '''
-    raise NotImplementedError("return singleton persistent BlockMap here")
+    raise RuntimeError("return singleton persistent BlockMap here")
 
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
   ''' A block record for a DataDir.
@@ -1079,7 +1080,6 @@ class PlatonicDir(_FilesDir):
   def scan(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
-    global DEFAULT_SCAN_SIZE
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
