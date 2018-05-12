@@ -618,12 +618,16 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       IndirectBlock. The referenced Blocks are encoded and assembled
       into the data for this Block.
 
-      The second way is to supplying the `hashcode` and `span` for an
-      existing Stored block, whose content is used to initialise an IndirectBlock is
-      with a hashcode and a span indicating the length of the data
-      encompassed by the block speified by the hashcode; the data of that
-      Block can be decoded to obtain the reference Blocks for this
-      IndirectBlock.
+      The second way is to supplying the `hashcode` and `span` for
+      an existing Stored block, whose content is used to initialise
+      an IndirectBlock is with a hashcode and a span indicating the
+      length of the data encompassed by the block speified by the
+      hashcode; the data of that Block can be decoded to obtain the
+      reference Blocks for this IndirectBlock.
+
+      As an optimisation, unless `force` is true, if `subblocks`
+      is empty a direct Block for b'' is returned or if `subblocks`
+      has just one element then that element is returned.
 
       TODO: allow data= initialisation, to decode raw iblock data.
   '''
