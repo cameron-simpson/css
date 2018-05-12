@@ -61,13 +61,13 @@ class MappedFD:
     self.submap_index = submap_index
     self.prevmap = None
     self.nextmap = None
+    fd = os.dup(fp.fileno())
+    self.fd = fd
+    self.mmap = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
     self.record_count = self.mmap.size() // self.recsize
     assert self.mmap.size() % self.recsize == 0, \
         "mmap.size()=%s, recsize=%s, modulus=%d" \
         % (self.mmap.size(), self.recsize, self.mmap.size() % self.recsize)
-    fd = os.dup(fp.fileno())
-    self.fd = fd
-    self.mmap = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
 
   def __del__(self):
     ''' Release resouces on object deletion.
