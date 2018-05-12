@@ -42,16 +42,18 @@ class MappedFD:
 
   def __init__(self, fp, mapsize, recsize, start_offset, end_offset, submap_index):
     ''' Initialise a MappedFD from a file.
-        `fp`: the file whose contents will be mapped
+        `f`: the file whose contents will be mapped
+          This may be an open file object or the path to a persistent map file.
         `mapsize`: the span covered by a submap
         `recsize`: the size of each record in the file
         `start_offset`: the offset of the first leaf
         `end_offset`: the offset of the end of the last leaf
         `submap_index`: the index of this map
-        The file's file descriptor is dup()ed and the dup used to manage the
-        memory map, allowing the original file to be closed.
+        If `f` is a file path it is opened for read.
+        If `f` is an open file, the file's file descriptor is dup()ed
+        and the dup used to manage the memory map, allowing the
+        original file to be closed by the caller.
     '''
-    # TODO: rename `fp` to `f`, accept pathname or file object
     assert recsize > OFF_STRUCT.size
     self.mapsize = mapsize
     self.recsize = recsize
@@ -61,7 +63,13 @@ class MappedFD:
     self.submap_index = submap_index
     self.prevmap = None
     self.nextmap = None
-    fd = os.dup(fp.fileno())
+    if isinstance(f, str):
+      with Pfx("open(%r)", f):
+        fd = os.open(f, os.O_RDONLY)
+    else:
+      # `f` should be an open file
+      with Pfx("dup(%r.fileno())", f):
+        fd = os.dup(f.fileno())
     self.fd = fd
     self.mapped = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
     self.record_count = self.mapped.size() // self.recsize
