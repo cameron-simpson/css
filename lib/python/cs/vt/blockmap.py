@@ -40,7 +40,7 @@ class MappedFD:
   ''' Manage a memory map of the contents of a file representing a block's backing leaf content.
   '''
 
-  def __init__(self, fp, mapsize, recsize, start_offset, end_offset, submap_index):
+  def __init__(self, f, mapsize, recsize, start_offset, end_offset, submap_index):
     ''' Initialise a MappedFD from a file.
         `f`: the file whose contents will be mapped
           This may be an open file object or the path to a persistent map file.
