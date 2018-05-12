@@ -63,11 +63,11 @@ class MappedFD:
     self.nextmap = None
     fd = os.dup(fp.fileno())
     self.fd = fd
-    self.mmap = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
-    self.record_count = self.mmap.size() // self.recsize
-    assert self.mmap.size() % self.recsize == 0, \
-        "mmap.size()=%s, recsize=%s, modulus=%d" \
-        % (self.mmap.size(), self.recsize, self.mmap.size() % self.recsize)
+    self.mapped = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
+    self.record_count = self.mapped.size() // self.recsize
+    assert self.mapped.size() % self.recsize == 0, \
+        "mapped.size()=%s, recsize=%s, modulus=%d" \
+        % (self.mapped.size(), self.recsize, self.mapped.size() % self.recsize)
 
   def __del__(self):
     ''' Release resouces on object deletion.
@@ -77,7 +77,7 @@ class MappedFD:
   def close(self):
     ''' Release the map and its file descriptor.
     '''
-    self.mmap.close()
+    self.mapped.close()
 
   def __len__(self):
     return self.record_count
@@ -90,7 +90,7 @@ class MappedFD:
       raise IndexError(i)
     rec_offset = i * self.recsize
     hash_offset = rec_offset + OFF_STRUCT.size
-    buf = self.mmap[rec_offset:hash_offset]
+    buf = self.mapped[rec_offset:hash_offset]
     value, = OFF_STRUCT.unpack(buf)
     return value
 
@@ -99,13 +99,13 @@ class MappedFD:
     '''
     if i < 0 or i >= self.record_count:
       raise ValueError(i)
-    mmap = self.mmap
+    mapped = self.mapped
     recsize = self.recsize
     rec_offset = i * recsize
     hash_offset = rec_offset + OFF_STRUCT.size
     next_rec_offset = rec_offset + recsize
-    offset, = OFF_STRUCT.unpack(mmap[rec_offset:hash_offset])
-    hashcode = mmap[hash_offset:next_rec_offset]
+    offset, = OFF_STRUCT.unpack(mapped[rec_offset:hash_offset])
+    hashcode = mapped[hash_offset:next_rec_offset]
     try:
       next_offset = self[i+1]
     except IndexError:
