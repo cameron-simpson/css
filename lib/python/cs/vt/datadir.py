@@ -570,6 +570,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
       raise KeyError(str(hashcode))
 
+  # TODO: memoised BlockMap on demand function?
+  def get_blockmap(self, B):
+    ''' Return a persistent BlockMap for the supplied Block.
+    '''
+    raise NotImplementedError("return singleton persistent BlockMap here")
+
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
   ''' A block record for a DataDir.
   '''
