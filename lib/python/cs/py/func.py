@@ -72,10 +72,11 @@ def prop(func):
       e2 = RuntimeError("inner function %s raised %s" % (func, e))
       if sys.version_info[0] >= 3:
         try:
-          eval('raise e2 from e', globals(), locals())
-        except:
-          # FIXME: why does this raise a SyntaxError?
+          code = compile('raise e2 from e', __file__, 'single')
+        except SyntaxError:
           raise e2
+        else:
+          eval(code, globals(), locals())
       else:
         raise e2
   return property(wrapper)
