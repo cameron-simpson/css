@@ -48,7 +48,7 @@ class MappedFD:
         The file's file descriptor is dup()ed and the dup used to manage the
         memory map, allowing the original file to be closed.
     '''
-    assert recsize > 4
+    assert recsize > OFF_STRUCT.size
     self.mapsize = mapsize
     self.recsize = recsize
     self.base = mapsize * submap_index
@@ -85,7 +85,8 @@ class MappedFD:
     if i < 0 or i >= self.record_count:
       raise IndexError(i)
     rec_offset = i * self.recsize
-    buf = self.mmap[rec_offset:rec_offset + 4]
+    hash_offset = rec_offset + OFF_STRUCT.size
+    buf = self.mmap[rec_offset:hash_offset]
     value, = OFF_STRUCT.unpack(buf)
     return value
 
@@ -97,7 +98,7 @@ class MappedFD:
     mmap = self.mmap
     recsize = self.recsize
     rec_offset = i * recsize
-    hash_offset = rec_offset + 4
+    hash_offset = rec_offset + OFF_STRUCT.size
     next_rec_offset = rec_offset + recsize
     offset, = OFF_STRUCT.unpack(mmap[rec_offset:hash_offset])
     hashcode = mmap[hash_offset:next_rec_offset]
@@ -141,7 +142,7 @@ class BlockMap(RunStateMixin):
     self.S = defaults.S
     self.maps = [_MappedFDStub(0)]
     self.mapped_to = 0
-    self.recsize = 4 + self.S.hashclass.HASHLEN
+    self.recsize = OFF_STRUCT.size + len(hashcode)
     self._loaded = False
     self._load_lock = Lock()
     self._worker = Thread(target=self._load_maps)
