@@ -358,6 +358,8 @@ class RunState(object):
   @running.setter
   def running(self, status):
     ''' Set the running property.
+        `status`: the new running state, a Boolean
+        A change in status triggers the time measurements.
     '''
     if self._running:
       if not status:
