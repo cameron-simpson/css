@@ -307,9 +307,14 @@ class Portfwd(FlaggedMixin):
   def test_func(self):
     for condition in self.conditions:
       if not condition.probe():
+        if self.verbose:
+          info('failed precondition: %s', condition)
         return False
     if self.test_shcmd:
-      return os.system(self.test_shcmd) == 0
+      shcmd_ok = os.system(self.test_shcmd) == 0
+      if not shcmd_ok:
+        info('failed shell command: %r', self.test_shcmd)
+        return False
     return True
 
 class Portfwds(object):
