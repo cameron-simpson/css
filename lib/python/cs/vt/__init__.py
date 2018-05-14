@@ -46,7 +46,7 @@ class _Defaults(threading.local):
     if Ss:
       return Ss[-1]
     warning("no per-Thread Store stack, using the global stack")
-    raise RuntimeError("BANG")
+    ##raise RuntimeError("BANG")
     Ss = self._Ss
     if Ss:
       return Ss[-1]
