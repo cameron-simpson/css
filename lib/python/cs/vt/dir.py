@@ -674,11 +674,15 @@ class Dir(_Dirent):
       # compute the dictionary holding the live Dir entries
       emap = {}
       offset = 0
-      data = self._block.data
-      while offset < len(data):
-        E, offset = _Dirent.from_bytes(data, offset)
-        E.parent = self
-        emap[E.name] = E
+      try:
+        data = self._block.data
+      except Exception as e:
+        warning("Dir.entries: self._block.data: %s", e)
+      else:
+        while offset < len(data):
+          E, offset = _Dirent.from_bytes(data, offset)
+          E.parent = self
+          emap[E.name] = E
       self._entries = emap
     return emap
 
