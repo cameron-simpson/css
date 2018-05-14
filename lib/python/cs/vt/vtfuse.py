@@ -1086,7 +1086,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
                 st = os.stat(dirname(self._vt_core.mnt_path))
               except OSError as e:
                 warning("os.stat(%r): %s", dirname(self._vt_core.mnt_path), e)
-                raise FuseOSError(e.errno)
+                E = None
               EA = self._stat_EntryAttributes(st)
             else:
               with S:
