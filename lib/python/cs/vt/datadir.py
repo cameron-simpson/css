@@ -44,6 +44,8 @@ from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
 
+DEFAULT_DATADIR_STATE = 'default.vt'
+
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
 
@@ -876,7 +878,7 @@ class PlatonicDir(_FilesDir):
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
     if meta_store is not None and archive is None:
-      archive = joinpath(statedirpath, 'data.vt')
+      archive = joinpath(statedirpath, DEFAULT_DATADIR_STATE)
     if archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
