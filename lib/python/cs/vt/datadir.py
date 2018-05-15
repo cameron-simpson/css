@@ -44,7 +44,7 @@ from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
 
-DEFAULT_DATADIR_STATE = 'default.vt'
+DEFAULT_DATADIR_STATE_NAME = 'default'
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -309,6 +309,16 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def statefilepath(self):
     return self.localpathto(self.state_localpath(self.hashclass))
 
+  def get_Archive(self, name=None):
+    with Pfx("%s.get_Archive", self):
+      if name is None:
+        name = DEFAULT_DATADIR_STATE_NAME
+      elif not name or name.startswith('.') or os.sep in name:
+        raise ValueError("invalid name: '.' and %r forbidden" % (os.sep,))
+      archive_path = self.localpathto(name + '.vt')
+      archive = Archive(archive_path)
+      return archive
+
   @property
   def indexbase(self):
     ''' Basename of the index.
@@ -390,7 +400,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def datadirpath(self):
     path = longpath(self._extra_state.get('datadir', 'data'))
     if not isabspath(path):
-      path = joinpath(self.statedirpath, path)
+      path = self.localpathto(path)
     return path
 
   @datadirpath.setter
@@ -861,7 +871,8 @@ class PlatonicDir(_FilesDir):
           representing the ideal directory; unhashed data blocks
           encountered during scans which are promoted to HashCodeBlocks
           are also stored here
-        `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
+        `archive`: optional Archive ducktype instance with a
+          .save(Dirent[,when]) method
         Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
@@ -878,8 +889,8 @@ class PlatonicDir(_FilesDir):
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
     if meta_store is not None and archive is None:
-      archive = joinpath(statedirpath, DEFAULT_DATADIR_STATE)
-    if archive is not None:
+      archive = super().get_Archive()
+    elif archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
     self.archive = archive
@@ -900,6 +911,11 @@ class PlatonicDir(_FilesDir):
     super().shutdown()
     if self.meta_store is not None:
       self.meta_store.close()
+
+  def get_Archive(self, name=None):
+    if name is None:
+      return self.archive
+    return super().get_Archive(name=name)
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
