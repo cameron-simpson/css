@@ -519,6 +519,9 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
 
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
+
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
       This is needed because if a meta_store is specified then it
@@ -527,14 +530,14 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   '''
   if meta_store is None:
     return _PlatonicStore(name, statedirpath, *a, **kw)
-  return ProxyStore(
+  PS = _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw)
+  S = ProxyStore(
       name,
       save=(),
-      read=(
-          _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw),
-          meta_store
-      )
+      read=(PS, meta_store)
   )
+  S.get_Archive = PS.get_Archive
+  return S
 
 class _PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
@@ -564,6 +567,9 @@ class _PlatonicStore(MappingStore):
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
+
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
 
 class _ProgressStoreTemplateMapping(object):
 
