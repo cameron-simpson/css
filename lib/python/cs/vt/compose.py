@@ -102,16 +102,17 @@ def get_store_spec(s, offset):
         offset += 1
         params = {}
         if store_type == 'tcp':
-          hostpart, offset = get_token(s, offset)
+          colon2 = s.find(':', offset)
+          if colon2 < offset:
+            raise ValueError("missing second colon after offset %d" % (offset,))
+          hostpart = s[offset:colon2]
+          offset = colon2 + 1
           if not isinstance(hostpart, str):
             raise ValueError(
                 "expected hostpart to be a string, got: %r" % (hostpart,))
+          if not hostpart:
+            hostpart = 'localhost'
           params['host'] = hostpart
-          if not s.startswith(':', offset):
-            raise ValueError(
-                "missing port at offset %d, found: %r"
-                % (offset, s[offset:]))
-          offset += 1
           portpart, offset = get_token(s, offset)
           params['port'] = portpart
         else:
