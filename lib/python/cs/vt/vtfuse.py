@@ -732,6 +732,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     S = self._vt_core.S
     with S:
+      defaults.push_Ss(S)
       llfuse.init(self, mnt, self._vt_llf_opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
@@ -742,6 +743,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
           llfuse.main()
           llfuse.close()
         S.close()
+        defaults.pop_Ss()
       T = PfxThread(target=mainloop)
       S.open()
       T.start()
