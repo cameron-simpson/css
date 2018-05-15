@@ -216,9 +216,9 @@ class _Dirent(Transcriber):
       attrs['meta'] = self.meta
     if self.block:
       attrs['block'] = self.block
-    prevE = self.prev_dirent
-    if prevE is not None:
-      attrs['prevblock'] = Block(data=prevE.encode())
+    prev_blockref = self._prev_dirent_blockref
+    if prev_blockref is not None:
+      attrs['prevblock'] = prev_blockref
     T.transcribe_mapping(attrs, fp)
 
   @classmethod
