@@ -1076,6 +1076,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       names = FH.names
       while True:
         try:
+          E = None
           EA = None
           if o == 0:
             name = '.'
@@ -1088,8 +1089,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
                 st = os.stat(dirname(self._vt_core.mnt_path))
               except OSError as e:
                 warning("os.stat(%r): %s", dirname(self._vt_core.mnt_path), e)
-                E = None
-              EA = self._stat_EntryAttributes(st)
+              else:
+                EA = self._stat_EntryAttributes(st)
             else:
               with S:
                 E = D[name]
@@ -1097,7 +1098,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
             o2 = o - 2
             if o2 == len(names) and fs.show_prev_dirent:
               name = PREV_DIRENT_NAME
-              E = D.prev_dirent
+              try:
+                E = D.prev_dirent
+              except MissingHashcodeError as e:
+                warning("prev_dirent unavailable: %s", e)
             elif o2 >= len(names):
               break
             else:
