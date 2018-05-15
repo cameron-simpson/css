@@ -65,6 +65,7 @@ class VTCmd:
                 /path/to/dir    GDBMStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
+              Default from $VT_STORE, or "[default]".
     -f        Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
@@ -79,7 +80,7 @@ class VTCmd:
     ftp archive.vt
     import [-oW] path {-|archive.vt}
     ls [-R] dirrefs...
-    mount [-a] [-o {append_only,readonly}] [-r] {Dir|archive.vt} [mountpoint [subpath]]
+    mount [-a] [-o {append_only,readonly}] [-r] {Dir|config-clause|archive.vt} [mountpoint [subpath]]
       -a  All dates. Implies readonly.
       -o options
           Mount options:
@@ -93,7 +94,7 @@ class VTCmd:
     serve {-|host:port}
     test blockify file
     unpack dirrefs...
-  '''
+'''
 
   def main(self, argv=None, environ=None, verbose=None):
     global loginfo
@@ -124,7 +125,7 @@ class VTCmd:
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
     ####cs.x.X_logger = logging.getLogger()
 
-    store_spec = None
+    store_spec = os.environ.get('VT_STORE', '[default]')
     dflt_log = os.environ.get('VT_LOGFILE')
     no_cache = False
 
@@ -613,9 +614,12 @@ class VTCmd:
           readonly = True
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
-    # special is either a D{dir} or an archive pathname
+    # special is either a D{dir} or [clause] or an archive pathname
     A = None            # becomes not None for a pathname
     specialD = None     # becomes not None for a D{dir}
+    mount_store = defaults.S
+    special_store = None # the special may derive directly from a config Store clause
+    archive = None
     try:
       special = args.pop(0)
     except IndexError:
@@ -638,10 +642,27 @@ class VTCmd:
               specialD = D
           if specialD is None:
             badopts = True
+        elif special.startswith('[') and special.endswith(']'):
+          special_store = self.config.Store_from_spec(special)
+          X("special_store=%s", special_store)
+          if special_store is not mount_store:
+            warning(
+                "mounting using Store from special %r instead of default: %s",
+                special, mount_store)
+            mount_store = special_store
+          try:
+            get_Archive = special_store.get_Archive
+          except AttributeError:
+            error("%s: no get_Archive method", special_store)
+            badopts = True
+          else:
+            X("MAIN: get_Archive=%s", get_Archive)
+            archive = get_Archive()
         else:
           # pathname to archive file
-          if not isfilepath(special):
-            error("not a file: %r", special)
+          archive = special
+          if not isfilepath(archive):
+            error("not a file: %r", archive)
             badopts = True
     if args:
       mountpoint = args.pop(0)
@@ -670,15 +691,16 @@ class VTCmd:
         # D{dir}
         E = specialD
       else:
-        # pathname
-        A = Archive(special)
+        # pathname or Archive obtained from Store
+        if isinstance(archive, str):
+          archive = Archive(archive)
         if all_dates:
           E = Dir(mount_base)
-          for when, subD in A:
+          for when, subD in archive:
             E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
           try:
-            when, E = A.last
+            when, E = archive.last
           except OSError as e:
             error("can't access special: %s", e)
             return 1
@@ -714,7 +736,7 @@ class VTCmd:
             else:
               raise
         try:
-          T = mount(mountpoint, E, defaults.S, archive=A, subpath=subpath, readonly=readonly, append_only=append_only)
+          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:
