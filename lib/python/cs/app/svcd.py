@@ -373,7 +373,7 @@ class SvcD(FlaggedMixin, object):
     debug("%s: " + msg, self, *a)
 
   def test(self):
-    with Pfx("test"):
+    with Pfx("%s: test", self.name):
       if self.flag_override:
         self.dbg("flag_override true -> True")
         return True
