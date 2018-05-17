@@ -210,7 +210,8 @@ class BlockMap(RunStateMixin):
     if not isinstance(block, _IndirectBlock):
       raise TypeError("block needs to be a _IndirectBlock, got a %s instead" % (type(block),))
     hashcode = block.superblock.hashcode
-    self.hashclass = type(hashcode)
+    hashclass = type(hashcode)
+    self.hashclass = hashclass
     self.mapsize = mapsize
     self.mappath = mappath = joinpath(base_mappath, "mapsize:%d" % (mapsize,), hashcode.filename)
     if mappath:
@@ -221,13 +222,26 @@ class BlockMap(RunStateMixin):
     self.block = block
     self.S = defaults.S
     nsubmaps = len(block) // mapsize + 1
-    self.maps = [None] * nsubmaps
-    self.mapped_to = 0
+    submaps = [None] * nsubmaps
+    self.maps = submaps
+    mapped_to = 0
     self.rec_size = OFF_STRUCT.size + len(hashcode)
     self._loaded = False
-    self._worker = Thread(target=self._load_maps, args=(defaults.S,))
-    self.runstate.start()
-    self._worker.start()
+    # preattach any existing blockmap files
+    for submap_index in range(nsubmaps):
+      submappath = joinpath(self.mappath, '%d.blockmap' % (submap_index,))
+      if not pathexists(submappath):
+        break
+      # existing map, attach and install, advance and restart loop
+      X("Blockmap.__init__: preattach existing map %r", submappath)
+      submaps[submap_index] = MappedFD(submappath, hashclass)
+      mapped_to += mapsize
+    self.mapped_to = mapped_to
+    if mapped_to < len(block):
+      X("BlockMap.__init__: dispatch worker to scan from offset %d ...", mapped_to)
+      self._worker = Thread(target=self._load_maps, args=(defaults.S,))
+      self.runstate.start()
+      self._worker.start()
 
   def join(self):
     ''' Wait for the worker to complete.
@@ -255,6 +269,10 @@ class BlockMap(RunStateMixin):
 
   @logexc
   def _load_maps(self, S):
+    ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
+    '''
+    offset = self.mapped_to
+    submap_index = offset // mapsize - 1
     with S:
       runstate = self.runstate
       mapsize = self.mapsize
@@ -262,8 +280,6 @@ class BlockMap(RunStateMixin):
       blocklen = len(block)
       hashclass = self.hashclass
       submaps = self.maps
-      offset = 0
-      submap_index = -1
       submap_fp = None
       nleaves = 0
       while offset < blocklen and not runstate.cancelled:
@@ -329,6 +345,7 @@ class BlockMap(RunStateMixin):
           nleaves += 1
           if nleaves % 4096 == 0:
             X("LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves, runstate.run_time, runstate.run_time // nleaves)
+      X("LOAD MAPS: leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
         # consume the submap in progress
@@ -338,6 +355,7 @@ class BlockMap(RunStateMixin):
         self.mapped_to = last_entry.offset + last_entry.span
         submap_fp.close()
         submap_fp = None
+      X("LOAD MAPS: COMPLETE")
 
   def self_check(self):
     ''' Perform some integrity tests.
