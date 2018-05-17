@@ -40,7 +40,7 @@ from functools import lru_cache
 import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning
+from cs.logutils import warning, exception
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
@@ -218,6 +218,7 @@ class _Block(Transcriber, ABC):
         raise ValueError("invalid span: %r", span)
       self.span = span
     self.indirect = False
+    self.blockmap = None
     self._lock = RLock()
 
   def __eq__(self, oblock):
@@ -360,16 +361,13 @@ class _Block(Transcriber, ABC):
   @locked
   def get_blockmap(self, force=False, savedir=None):
     ''' Get the blockmap for this block, creating it if necessary.
-        `force`: if True, create a new blockmap anyway; default: False
+        `force`: if true, create a new blockmap anyway; default: False
         `savedir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
     else:
-      try:
-        blockmap = self.blockmap
-      except AttributeError:
-        blockmap = None
+      blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
       self.blockmap = blockmap = BlockMap(self, base_mappath=savedir)
@@ -385,6 +383,7 @@ class _Block(Transcriber, ABC):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
+    X("slices %s ...", self)
     if start is None:
       start = 0
     elif start < 0:
@@ -396,13 +395,12 @@ class _Block(Transcriber, ABC):
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
-        try:
-          blockmap = self.blockmap
-        except AttributeError:
-          pass
-        else:
+        blockmap = self.blockmap
+        if blockmap:
+          X("_Block.slices: yield from blockmap.slices...")
           yield from blockmap.slices(start, end - start)
           return
+        X("_Block:%s.slices: no BlockMap, fall through", self)
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
