@@ -69,6 +69,9 @@ class CornuCopyBuffer(object):
     self.input_data = input_data
     self.copy_offsets = copy_offsets
 
+  def __str__(self):
+    return "CCB(offset:%d,buf:%d)" % (self.offset, len(self.buf))
+
   def __len__(self):
     ''' The length is the length of the internal buffer: data available without a fetch.
     '''
