@@ -404,9 +404,9 @@ class _Block(Transcriber, ABC):
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
-        substart = max(0, start - offset)
-        subend = min(sublen, end - offset)
-        if substart < subend:
+        if start <= offset:
+          substart = max(0, start - offset)
+          subend = min(sublen, end - offset)
           yield from B.slices(substart, subend)
         offset += sublen
         if offset >= end:
