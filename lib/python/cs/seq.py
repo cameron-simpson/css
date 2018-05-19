@@ -311,6 +311,35 @@ class TrackingCounter(object):
       watcher.acquire()
     watcher.wait()
 
+class StatefulIterator(object):
+  ''' A trivial iterator which wraps another iterator to expose some tracking state.
+
+      This has 2 attributes:
+      .it, the internal iterator which should yield (item, new_state)
+      .state, the last state value from the internal iterator
+
+      The originating use case is resuse of an iterator by independent
+      calls that are typically sequential, specificly the .read
+      method of file like objects. Naive sequential reads require
+      the underlying storage to locate the data on every call, even
+      though the previous call has just performed this task for the
+      previous read. Saving the iterator used from the preceeding
+      call allows the iterator to pick up directly if the file
+      offset hasn't been fiddled in the meantime.
+  '''
+
+  def __init__(self, it):
+    self.it = it
+    self.state = None
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    item, new_state = next(self.it)
+    self.state = new_state
+    return item
+
 if __name__ == '__main__':
   import sys
   import cs.seq_tests
