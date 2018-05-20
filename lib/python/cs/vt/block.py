@@ -383,7 +383,7 @@ class _Block(Transcriber, ABC):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
-    X("slices %s ...", self)
+    ##X("slices %s ...", self)
     if start is None:
       start = 0
     elif start < 0:
@@ -397,11 +397,12 @@ class _Block(Transcriber, ABC):
         # use the blockmap to access the data if present
         blockmap = self.blockmap
         if blockmap:
-          X("_Block.slices: yield from blockmap.slices...")
+          ##X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
           yield from blockmap.slices(start, end - start)
           return
         X("_Block:%s.slices: no BlockMap, fall through", self)
       offset = 0
+      X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:
         sublen = len(B)
         if start <= offset:
