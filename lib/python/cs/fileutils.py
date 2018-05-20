@@ -8,6 +8,7 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import datetime
 import errno
+from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
@@ -892,45 +893,32 @@ class BackedFile(ReadMixin):
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
 
-  def file_data(self, n, rsize=None):
-    ''' Return "natural" file data.
-        This is used to support readinto efficiently.
+  def datafrom(self, offset):
+    ''' Generator yielding natural chunks from the file commencing at offset.
     '''
-    if n < 1:
-      return
-    start = self._offset
-    end = start + n
-    back_file = self.back_file
     front_file = self.front_file
-    SLICES = list(self.front_range.slices(start, end))
-    for in_front, span in SLICES:
-      assert span.start == self._offset
-      assert span.end <= end
-      size = span.size
-      src_file = front_file if in_front else back_file
-      src_file.seek(self._offset)
-      try:
-        rn = src_file.read_natural
-      except AttributeError:
-        while size > 0:
-          bs = src_file.read(size)
-          bs_len = len(bs)
-          assert bs_len <= size
-          if bs:
-            self._offset += bs_len
-            yield bs
-          else:
-            break
-          size -= bs_len
-          assert self._offset <= end
+    try:
+      front_datafrom = front_file.datafrom
+    except AttributeError:
+      front_datafrom = partial(ReadMixin.datafrom, front_file)
+    back_file = self.back_file
+    try:
+      back_datafrom = back_file.datafrom
+    except AttributeError:
+      back_datafrom = partial(ReadMixin.datafrom, back_file)
+    for in_front, span in self.front_range.slices(offset, len(self)):
+      consume = len(span)
+      if in_front:
+        chunks = front_datafrom(offset)
       else:
-        for bs in rn(size, rsize=rsize):
-          self._offset += len(bs)
-          yield bs
-          assert self._offset <= end
-      if self._offset < span.end:
-        # short data, infer EOF, exit loop
-        break
+        chunks = back_datafrom(offset)
+      for bs in chunks:
+        if len(bs) > consume:
+          bs = memoryview(bs)[:consume]
+        yield bs
+        bs_len = len(bs)
+        consume -= bs_len
+        offset += bs_len
 
   @locked
   def write(self, b):
