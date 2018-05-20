@@ -43,11 +43,6 @@ class BlockFile(RawIOBase, ReadMixin):
     '''
     return len(self.block)
 
-  def _auto_blockmap(self):
-    backing_block = self.block
-    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      backing_block.get_blockmap()
-
   def seek(self, offset, whence=0):
     ''' Set the current file offset.
     '''
@@ -63,34 +58,17 @@ class BlockFile(RawIOBase, ReadMixin):
     '''
     return self._offset
 
-  def read(self, n=-1):
-    ''' Read up to `n` bytes in one go.
-        Only bytes from the first subslice are returned, taking the
-        flavour of RawIOBase, which should only make one underlying
-        read system call.
+  def datafrom(self, offset):
+    ''' Generator yielding natural chunks from the file commencing at offset.
+        This supports the ReadMixin.read method.
     '''
-    self._auto_blockmap()
-    if n == -1:
-      data = self.readall()
-    else:
-      data = b''
-      for B, start, end in self.block.slices(self._offset, self._offset + n):
-        data = B.data[start:end]
-        break
-    self._offset += len(data)
-    return data
-
-  def readinto(self, b):
-    ''' Read data into the bytearray `b`.
-    '''
-    self._auto_blockmap()
-    nread = 0
-    for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
-      Blen = end - start
-      b[nread:nread + Blen] = B[start:end]
-      nread += Blen
-    self._offset += nread
-    return nread
+    # data from the backing block
+    backing_block = self.block
+    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
+      X("BlockFile.datafrom: get_blockmap...")
+      backing_block.get_blockmap()
+    for B, Bstart, Bend in backing_block.slices(span.start, span.end):
+      yield B[Bstart:Bend]
 
 class File(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
