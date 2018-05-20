@@ -1001,18 +1001,23 @@ class NullFile(object):
   def flush(self):
     pass
 
-def file_data(fp, nbytes, rsize=None):
+def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
-      If `nbytes` is None, copy until EOF.
+      `nbytes`: number of bytes to read; if None read until EOF.
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
+  # try to use the "short read" flavour of read if available
   if rsize is None:
     rsize = DEFAULT_READSIZE
+  try:
+    read1 = fp.read1
+  except AttributeError:
+    read1 = fp.read
   ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
   copied = 0
   while nbytes is None or nbytes > 0:
     to_read = rsize if nbytes is None else min(nbytes, rsize)
-    data = fp.read(to_read)
+    data = read1(to_read)
     if not data:
       if nbytes is not None:
         if copied > 0:
