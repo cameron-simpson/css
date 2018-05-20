@@ -87,7 +87,6 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     self._backing_block = None
     self._blockmap = None
     self._reset(backing_block)
-    self._reading_bfr = None
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
     self.open()
@@ -242,70 +241,23 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     return self._file.write(data)
 
-  def _auto_blockmap(self):
-    backing_block = self._backing_block
-    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      backing_block.get_blockmap()
-
   def datafrom(self, offset):
     ''' Generator yielding natural chunks from the file commencing at offset.
+        This supports the ReadMixin.read method.
     '''
-    for inside, span in self._file.front_range.slices(offset, len(self)):
+    ##raise RuntimeError("BANG")
+    f = self._file
+    backing_block = self.backing_block
+    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
+      backing_block.get_blockmap()
+    for inside, span in f.front_range.slices(offset, len(self)):
       if inside:
         # data from the front file
         yield from filedata(f.front_file, start=span.start, end=span.end)
       else:
         # data from the backing block
-        for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
+        for B, Bstart, Bend in backing_block.slices(span.start, span.end):
           yield B[Bstart:Bend]
-
-  def read(self, size=-1, offset=None, longread=False):
-    ''' Read up to `size` bytes, honouring the "single system call" spirit.
-    '''
-    f = self._file
-    if offset is None:
-      offset = f.tell()
-    else:
-      with self._lock:
-        self.seek(offset)
-        return self.read(size=size)
-    if size == 0:
-      return b''
-    flen = len(f)
-    if offset >= flen:
-      return b''
-    self._auto_blockmap()
-    if size < 0:
-      size = flen - offset
-    with self._lock:
-      bfr = self._reading_bfr
-      if bfr is None or bfr.offset != offset:
-        X("File.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
-        self._reading_bfr = bfr = CornuCopyBuffer(self.datafrom(offset), offset=offset)
-      # use the existing CornuCopyBuffer
-      if longread:
-        bss = []
-      while size > 0:
-        bfr.extend(1, short_ok=True)
-        if not bfr.buf:
-          break
-        consume = min(size, len(bfr.buf))
-        assert consume > 0
-        chunk = bfr.take(consume)
-        assert len(chunk) == consume
-        size -= consume
-        if longread:
-          bss.append(chunk)
-        else:
-          self.seek(bfr.offset)
-          return chunk
-    return b''.join(bss)
-
-  @locked
-  def readall(self):
-    ''' Concatenate all the data from the current offset to the end of the file.
-    '''
-    return self.read(-1)
 
   @locked
   def high_level_blocks(self, start=None, end=None, scanner=None):
