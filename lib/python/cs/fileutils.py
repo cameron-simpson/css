@@ -18,6 +18,7 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
+from cs.buffer import CornuCopyBuffer
 from cs.deco import cached, decorator
 from cs.env import envsub
 from cs.filestate import FileState
@@ -715,8 +716,82 @@ class Pathname(str):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
 class ReadMixin(object):
-  ''' Useful read methods to accodmodate modes not necessarily available in a class.
+  ''' Useful read methods to accomodate modes not necessarily available in a class.
+
+      Note that this mixin presumes that the attribute `self._lock`
+      is a threading.RLock like context manager.
+
+      Classes using this mixin should consider overriding the default
+      .datafrom method with something more efficient or direct.
   '''
+
+  def datafrom(self, offset):
+    ''' Yield data from the specified offset in some approximation of the "natural" chunk size.
+
+        Note: this function may move the file position.
+
+        The aspiration here is to read data with only a single call
+        to the underlying storage, and to return the chunks in
+        natural sizes instead of some default read size.
+        Classes using this mixin should consider overriding this
+        method with an efficient alternative.
+
+        This implementation calls the file_data function, which has
+        a default read size and uses the file's .read1 method if
+        available.
+    '''
+    self.seek(offset)
+    return file_data(self)
+
+  def read(self, size=-1, offset=None, longread=False):
+    ''' Read up to `size` bytes, honouring the "single system call" spirit unless `longread` is true.
+        `size`: the number of bytes requested. A size of -1 requests
+          all bytes to the end of the file.
+        `offset`: the starting point of the read; if None, use the
+          current file position; if not None, seek to this position
+          before reading, even if `size` == 0.
+        `longread`: switch from "single system call" to "as many
+          as required to obtain `size` bytes"; short data will still
+          be returned if the file is too short.
+    '''
+    if offset is None:
+      offset = self.tell()
+    else:
+      with self._lock:
+        self.seek(offset)
+        return self.read(size=size, longread=longread)
+    if size == 0:
+      return b''
+    flen = len(self)
+    if offset >= flen:
+      return b''
+    if size < 0:
+      size = flen - offset
+    # use the existing CornuCopyBuffer
+    if longread:
+      bss = []
+    while size > 0:
+      with self._lock:
+        bfr = getattr(self, '_reading_bfr', None)
+        if bfr is None or bfr.offset != offset or offset != self.tell():
+          ##X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
+          self.seek(offset)
+          self._reading_bfr = bfr = CornuCopyBuffer(self.datafrom(offset), offset=offset)
+        bfr.extend(1, short_ok=True)
+        if not bfr.buf:
+          break
+        consume = min(size, len(bfr.buf))
+        assert consume > 0
+        chunk = bfr.take(consume)
+      assert len(chunk) == consume
+      self.seek(bfr.offset)
+      if longread:
+        bss.append(chunk)
+      else:
+        return chunk
+      size -= consume
+      offset += consume
+    return b''.join(bss)
 
   def read_n(self, n):
     ''' Read `n` bytes of data and return them.
@@ -730,35 +805,18 @@ class ReadMixin(object):
     nread = self.readinto(data)
     return memoryview(data)[:nread] if nread != n else data
 
-  def read_natural(self, n, rsize=None):
-    ''' A generator that yields data from the file in its natural blocking if possible.
-        `n`: the maximum number of bytes to read.
-        `rsize`: read size hint if relevant.
-        WARNING: this function may move the current file offset.
-        This function should be overridden by classes with natural
-        direct and efficient data streams. Example override cases
-        include a BackedFile which has natural blocks from the front
-        and back files and a CornuCopyBuffer which has natural
-        blocks from its source iterator.
-    '''
-    return file_data(self, n, rsize=rsize)
-
-  def read(self, n):
-    ''' Do a single potentially short read.
-    '''
-    for bs in self.file_data(n):
-      return bs
-
   @locked
   def readinto(self, barray):
     ''' Read data into a bytearray.
-        Uses read_natural to obtain data in as efficient a fashion as possible.
     '''
     needed = len(barray)
     boff = 0
-    for bs in self.read_natural(needed):
+    for bs in self.datafrom(self.tell()):
+      if not bs:
+        break
+      if len(bs) > needed:
+        bs = memoryview(bs)[:needed]
       bs_len = len(bs)
-      assert bs_len <= needed
       boff2 = boff + bs_len
       barray[boff:boff2] = bs
       boff = boff2
