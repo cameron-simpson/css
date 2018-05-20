@@ -39,9 +39,7 @@ class MapEntry(_MapEntry):
   def leaf(self):
     ''' Return the leaf block for this entry.
     '''
-    leaf = defaults.S.get(self.hashcode)
-    assert len(leaf) == self.span
-    return leaf
+    return HashCodeBlock(hashcode=self.hashcode, span=self.span)
   @prop
   def data(self):
     ''' Return the data from this leaf block.
