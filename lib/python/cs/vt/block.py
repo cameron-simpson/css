@@ -47,7 +47,6 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext
-from .blockmap import BlockMap
 from .hash import decode as hash_decode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -370,6 +369,7 @@ class _Block(Transcriber, ABC):
       blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
+      from .blockmap import BlockMap
       self.blockmap = blockmap = BlockMap(self, base_mappath=savedir)
     return blockmap
 
@@ -397,10 +397,10 @@ class _Block(Transcriber, ABC):
         # use the blockmap to access the data if present
         blockmap = self.blockmap
         if blockmap:
-          ##X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
+          X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
           yield from blockmap.slices(start, end - start)
           return
-        X("_Block:%s.slices: no BlockMap, fall through", self)
+        X("_Block:%s.slices: no BlockMap (%r), fall through", self, blockmap)
       offset = 0
       X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:

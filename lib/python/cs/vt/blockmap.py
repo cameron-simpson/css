@@ -26,6 +26,7 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.x import X
 from . import defaults
+from .block import HashCodeBlock
 
 # the record format uses 4 byte integer offsets
 # to this is the maximum (and default) scale for the mmory maps
