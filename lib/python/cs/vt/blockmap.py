@@ -270,10 +270,10 @@ class BlockMap(RunStateMixin):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
     offset = self.mapped_to
+    mapsize = self.mapsize
     submap_index = offset // mapsize - 1
     with S:
       runstate = self.runstate
-      mapsize = self.mapsize
       block = self.block
       blocklen = len(block)
       hashclass = self.hashclass
@@ -342,7 +342,7 @@ class BlockMap(RunStateMixin):
           offset += leaf.span
           nleaves += 1
           if nleaves % 4096 == 0:
-            X("LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves, runstate.run_time, runstate.run_time // nleaves)
+            X("LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves, runstate.run_time, nleaves // runstate.run_time)
       X("LOAD MAPS: leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
