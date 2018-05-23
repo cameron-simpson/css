@@ -175,12 +175,7 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    fp = self.Eopen._open_file
-    with fp:
-      with self._lock:
-        fp.seek(offset)
-        data = fp.read(size, longread=True)
-    return data
+    return self.Eopen._open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
     ''' Truncate the file, mark it as modified.
