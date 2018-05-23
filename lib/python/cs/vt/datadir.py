@@ -816,17 +816,16 @@ class PlatonicFile(MultiOpenMixin):
     return "PlatonicFile(%s)" % (shortpath(self.path,))
 
   def startup(self):
-    self._fp = open(self.path, 'rb')
+    X("PlatonicFile: open %r", self.path)
+    self._fd = os.open(self.path, os.O_RDONLY)
 
   def shutdown(self):
-    self._fp.close()
-    del self._fp
+    X("PlatonicFile: close %r", self.path)
+    os.close(self._fd)
+    del self._fd
 
   def fetch(self, offset, length):
-    fp = self._fp
-    with self._lock:
-      fp.seek(offset)
-      data = fp.read(length)
+    data = os.pread(self._fd, length, offset)
     if len(data) != length:
       raise RuntimeError(
           "%r: asked for %d bytes from offset %d, but got %d"
