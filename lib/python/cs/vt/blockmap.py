@@ -212,8 +212,10 @@ class BlockMap(RunStateMixin):
     hashclass = type(hashcode)
     self.hashclass = hashclass
     self.mapsize = mapsize
-    self.mappath = mappath = joinpath(base_mappath, "mapsize:%d" % (mapsize,), hashcode.filename)
-    if mappath:
+    if base_mappath is None:
+      self.mappath = mappath = None
+    else:
+      self.mappath = mappath = joinpath(base_mappath, "mapsize:%d" % (mapsize,), hashcode.filename)
       if not isdir(mappath):
         with Pfx("makedirs(%r)", mappath):
           X("MKDIR %r", mappath)
@@ -227,14 +229,15 @@ class BlockMap(RunStateMixin):
     self.rec_size = OFF_STRUCT.size + len(hashcode)
     self._loaded = False
     # preattach any existing blockmap files
-    for submap_index in range(nsubmaps):
-      submappath = joinpath(self.mappath, '%d.blockmap' % (submap_index,))
-      if not pathexists(submappath):
-        break
-      # existing map, attach and install, advance and restart loop
-      X("Blockmap.__init__: preattach existing map %r", submappath)
-      submaps[submap_index] = MappedFD(submappath, hashclass)
-      mapped_to += mapsize
+    if mappath is not None:
+      for submap_index in range(nsubmaps):
+        submappath = joinpath(mappath, '%d.blockmap' % (submap_index,))
+        if not pathexists(submappath):
+          break
+        # existing map, attach and install, advance and restart loop
+        X("Blockmap.__init__: preattach existing map %r", submappath)
+        submaps[submap_index] = MappedFD(submappath, hashclass)
+        mapped_to += mapsize
     self.mapped_to = mapped_to
     if mapped_to < len(block):
       X("BlockMap.__init__: dispatch worker to scan from offset %d ...", mapped_to)
@@ -280,6 +283,7 @@ class BlockMap(RunStateMixin):
       hashclass = self.hashclass
       submaps = self.maps
       submap_fp = None
+      submap_path = None
       nleaves = 0
       while offset < blocklen and not runstate.cancelled:
         for leaf, start, length in block.slices(offset):
@@ -296,6 +300,9 @@ class BlockMap(RunStateMixin):
             if submap_fp is not None:
               # consume the submap in progress
               submap = MappedFD(submap_fp, hashclass)
+              if submap_path is not None:
+                X("NEW submap: %r", submap_path)
+                os.link(submap_fp.name, submap_path)
               submaps[submap_index] = submap
               last_entry = submap.entry(-1)
               self.mapped_to = last_entry.offset + last_entry.span
@@ -305,11 +312,11 @@ class BlockMap(RunStateMixin):
             submap_index = leaf_submap_index
             if self.mappath:
               # if we're doing persistent submaps...
-              submappath = joinpath(self.mappath, '%d.blockmap' % (submap_index,))
-              if pathexists(submappath):
+              submap_path = joinpath(self.mappath, '%d.blockmap' % (submap_index,))
+              if pathexists(submap_path):
                 # existing map, attach and install, advance and restart loop
-                X("LOAD MAPS: attach existing map %r", submappath)
-                submaps[submap_index] = MappedFD(submappath, hashclass)
+                X("LOAD MAPS: attach existing map %r", submap_path)
+                submaps[submap_index] = MappedFD(submap_path, hashclass)
                 offset = ( submap_index + 1 ) * mapsize
                 X("LOAD MAPS: skip to offset=0x%x", offset)
                 break
@@ -318,13 +325,14 @@ class BlockMap(RunStateMixin):
             else:
               # not persistent - start a new temp file to attach later
               submap_fp = TemporaryFile('wb')
+              submap_path = None
           # post condition: correct submap_index and correct submap_fp state
           assert (
               submap_index == leaf_submap_index
               and submap_index < len(submaps)
               and (
                   submap_fp is None
-                  if self.mappath and pathexists(submappath)
+                  if self.mappath and pathexists(submap_path)
                   else submap_fp is not None
               )
           )
@@ -349,6 +357,9 @@ class BlockMap(RunStateMixin):
       if submap_fp is not None:
         # consume the submap in progress
         submap = MappedFD(submap_fp, hashclass)
+        if submap_path is not None:
+          X("NEW submap: %r", submap_path)
+          os.link(submap_fp.name, submap_path)
         submaps[submap_index] = submap
         last_entry = submap.entry(-1)
         self.mapped_to = last_entry.offset + last_entry.span
