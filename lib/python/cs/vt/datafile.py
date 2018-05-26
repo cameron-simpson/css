@@ -1,7 +1,8 @@
 #!/usr/bin/python -tt
 #
-# The basic flat file data store for venti blocks.
+# The basic flat file data store for vt blocks.
 # These are kept in a directory accessed by a DataDir class.
+# The file extension is .vtd
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -12,8 +13,7 @@ import sys
 from threading import Lock
 import time
 from zlib import compress, decompress
-from cs.buffer import CornuCopyBuffer
-from cs.fileutils import fdreader
+from cs.fileutils import ReadMixin
 from cs.logutils import info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
@@ -46,40 +46,12 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-def read_chunk(fp, do_decompress=False):
-  ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
-      If do_decompress is true and flags&F_COMPRESSED, strip that
-      flag and decompress the data before return.
-      Raises EOFError on premature end of file.
-  '''
-  flags = read_bs(fp)
-  if (flags & ~F_COMPRESSED) != 0:
-    raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
-  flags = DataFlags(flags)
-  data = read_bsdata(fp)
-  offset = fp.tell()
-  if do_decompress and (flags & F_COMPRESSED):
-    data = decompress(data)
-    flags &= ~F_COMPRESSED
-  return flags, data, offset
-
-def scan_chunks(fp, do_decompress=False):
-  ''' Read data chunks from `fp` and yield (offset, flags, data, offset2).
-      Raises EOFError on premature end of file.
-  '''
-  offset = fp.tell()
-  while True:
-    flags, data, offset2 = read_chunk(fp, do_decompress=do_decompress)
-    yield offset, flags, data, offset2
-    offset = offset2
-
-class DataFile(MultiOpenMixin):
+class DataFile(MultiOpenMixin, ReadMixin):
   ''' A data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local Store.
 
       A DataFile is a MultiOpenMixin and supports:
-        .flush()        Flush any pending output to the file.
-        .fetch(offset)  Fetch the data chunk from `offset`.
+        .fetch(offset)  Fetch the uncompressed data chunk from `offset`.
         .add(data)      Store data chunk, return (offset, offset2) indicating its location.
         .scan([do_decompress=],[offset=0])
                         Scan the data file and yield (offset, flags, zdata, offset2) tuples.
@@ -104,7 +76,6 @@ class DataFile(MultiOpenMixin):
     with Pfx("%s.startup: open(%r)", self, self.pathname):
       rfd = os.open(self.pathname, O_RDONLY)
       self._rfd = rfd
-      self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384))
       self._rlock = Lock()
       if self.readwrite:
         self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
@@ -118,65 +89,91 @@ class DataFile(MultiOpenMixin):
     os.close(self._rfd)
     del self._rfd
 
-  def fetch(self, offset):
-    flags, data, _ = self._fetch(offset, do_decompress=True)
-    if flags:
-      raise ValueError("unhandled flags: 0x%02x" % (flags,))
-    return data
+  def tell(self):
+    return lseek(self._rfd, 0, SEEK_CUR)
 
-  def _fetch(self, offset, do_decompress=False):
-    ''' Fetch data bytes from the supplied offset.
-    '''
-    rfd = self._rfd
-    bfr = self._rbuf
-    with self._rlock:
-      if bfr.offset != offset:
-        os.lseek(rfd, offset, SEEK_SET)
-        bfr = self._rbuf = CornuCopyBuffer(fdreader(rfd, 16384), offset=offset)
-      flags, data, offset2 = read_chunk(bfr, do_decompress=do_decompress)
-    return flags, data, offset2
+  def seek(self, offset):
+    return lseek(self._rfd, offset, how=SEEK_SET)
 
-  def add(self, data, no_compress=False):
-    ''' Append a chunk of data to the file, return the store start and end offsets.
+  def datafrom(self, offset, readsize=None):
+    ''' Yield data from the file starting at `offset`.
     '''
-    if not self.readwrite:
-      raise RuntimeError("%s: not readwrite" % (self,))
+    if readsize is None:
+      readsize = 512
+    fd = self._rfd
+    while True:
+      data = os.pread(fd, readsize, offset)
+      yield data
+      offset += len(data)
+
+  @staticmethod
+  def data_record(data, no_compress=False):
+    ''' Compose a data record for transcription to a DataFile.
+    '''
     flags = 0
     if not no_compress:
       data2 = compress(data)
       if len(data2) < len(data):
         data = data2
         flags |= F_COMPRESSED
-    bs = put_bs(flags) + put_bsdata(data)
+    return put_bs(flags) + put_bsdata(data)
+
+  @staticmethod
+  def read_record(fp, do_decompress=False):
+    ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
+        If do_decompress is true and flags&F_COMPRESSED, strip that
+        flag and decompress the data before return.
+        Raises EOFError on premature end of file.
+    '''
+    flags = read_bs(fp)
+    if (flags & ~F_COMPRESSED) != 0:
+      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
+    flags = DataFlags(flags)
+    data = read_bsdata(fp)
+    post_offset = fp.tell()
+    if do_decompress and (flags & F_COMPRESSED):
+      data = decompress(data)
+      flags &= ~F_COMPRESSED
+    return flags, data, post_offset
+
+  def fetch_record(self, offset, do_decompress=False):
+    ''' Fetch a record from the supplied `offset`. Return (flags, data, new_offset).
+    '''
+    return self.read_record(self.bufferfrom(offset), do_decompress=do_decompress)
+
+  def fetch(self, offset):
+    ''' Fetch the nucompressed data at `offset`.
+    '''
+    flags, data, _ = self.fetch_record(offset, do_decompress=True)
+    assert flags == 0
+    return data
+
+  @staticmethod
+  def scan_records(fp, do_decompress=False):
+    ''' Generator yielding (flags, data, post_offset) from a data file from its current offset.
+        `do_decompress`: decompress the scanned data, default False
+    '''
+    while True:
+      yield read_record(fp, do_decompress=do_decompress)
+
+  def scanfrom(self, offset, do_decompress=False):
+    ''' Generator yielding (flags, data, post_offset) from the DataFile.
+        `offset`: the starting offset for the scan
+        `do_decompress`: decompress the scanned data, default False
+    '''
+    return self.scan_records(datafrom(offset), do_decompress=do_decompress)
+
+  def add(self, data, no_compress=False):
+    ''' Append a chunk of data to the file, return the store start and end offsets.
+    '''
+    if not self.readwrite:
+      raise RuntimeError("%s: not readwrite" % (self,))
+    bs = self.data_record(data, no_compress=no_compress)
     wfd = self._wfd
     with self._wlock:
       offset = os.lseek(wfd, 0, SEEK_CUR)
       os.write(wfd, bs)
     return offset, offset + len(bs)
-
-def scan_datafile(pathname, offset=None, do_decompress=False):
-  ''' Scan a data file and yield (start_offset, flags, zdata, end_offset) tuples.
-      Start the scan ot `offset`, default 0.
-      If `do_decompress` is true, decompress the data and strip
-      that flag value.
-  '''
-  start = time.time()
-  if offset is None:
-    offset = 0
-  offset0 = offset
-  D = DataFile(pathname)
-  with D:
-    while True:
-      try:
-        flags, data, offset2 = D._fetch(offset, do_decompress=do_decompress)
-      except EOFError:
-        break
-      yield offset, flags, data, offset2
-      offset = offset2
-  end = time.time()
-  if offset > offset0 and end > start:
-    info("%r: scanned %d bytes in %ss at %sB/s",
-         pathname, offset - offset0, end - start, (offset - offset0) / (end - start))
 
 if __name__ == '__main__':
   from .datafile_tests import selftest
