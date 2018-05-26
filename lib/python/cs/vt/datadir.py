@@ -38,7 +38,7 @@ from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
-from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
+from .datafile import DataFile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
@@ -134,11 +134,11 @@ class FileState(SimpleNamespace):
       return None
     return S.st_size
 
-  def scan(self, offset=0, **kw):
+  def scanfrom(self, offset=0, **kw):
     ''' Scan this datafile from the supplied `offset` (default 0) yielding (offset, flags, data, post_offset).
         We use the DataDir's .scan method because it knows the format of the file.
     '''
-    yield from self.datadir.scan(self.pathname, offset=offset, **kw)
+    yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
 
 class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin, Mapping):
   ''' Base class for locally stored data in files.
@@ -508,6 +508,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           need_sync = True
         F = filemap[entry.n]
         if post_offset <= F.indexed_to:
+          X("F.filename=%r", F.filename)
+          X("F.indexed_to=%r", F.indexed_to)
+          X("post_offset=%r", post_offset)
           error("%r: indexed_to already %s but post_offset=%s",
               F.filename, F.indexed_to, post_offset)
         F.indexed_to = max(F.indexed_to, post_offset)
@@ -781,10 +784,11 @@ class DataDir(_FilesDir):
     return hashcode
 
   @staticmethod
-  def scan(filepath, offset=0):
+  def scanfrom(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
-    return scan_datafile(filepath, offset)
+    with DataFile(filepath) as DF:
+      yield from DF.scanfrom(offset)
 
 class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
   ''' A block record for a PlatonicDir.
@@ -1094,7 +1098,7 @@ class PlatonicDir(_FilesDir):
       time.sleep(11)
 
   @staticmethod
-  def scan(filepath, offset=0):
+  def scanfrom(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
     scanner = scanner_from_filename(filepath)

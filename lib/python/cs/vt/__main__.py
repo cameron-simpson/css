@@ -37,7 +37,7 @@ from .blockify import blocked_chunks_of
 from .cache import FileCacheStore
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
-from .datafile import DataFile, F_COMPRESSED, decompress, scan_chunks
+from .datafile import DataFile, F_COMPRESSED, decompress
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
@@ -365,7 +365,7 @@ class VTCmd:
         print(path)
         with open(path, 'rb') as fp:
           try:
-            for offset, flags, data, offset2 in scan_chunks(fp, do_decompress=True):
+            for offset, flags, data, offset2 in DataFile.scan_records(fp, do_decompress=True):
               hashcode = hashclass(data)
               leadin = '%9d %16.16s' % (offset, hashcode)
               dump_chunk(data, leadin, max_width, one_line)

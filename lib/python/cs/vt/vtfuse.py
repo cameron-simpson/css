@@ -175,6 +175,9 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
+    ##fp = self.Eopen._open_file
+    ##X("fp = %s %s", type(fp), fp)
+    ##X("fp.read = %s %s", type(fp.read), fp.read)
     return self.Eopen._open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
