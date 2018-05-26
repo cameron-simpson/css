@@ -13,7 +13,7 @@ import sys
 from threading import Lock
 import time
 from zlib import compress, decompress
-from cs.fileutils import ReadMixin
+from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
@@ -100,11 +100,7 @@ class DataFile(MultiOpenMixin, ReadMixin):
     '''
     if readsize is None:
       readsize = 512
-    fd = self._rfd
-    while True:
-      data = os.pread(fd, readsize, offset)
-      yield data
-      offset += len(data)
+    return datafrom_fd(self._rfd, offset, readsize)
 
   @staticmethod
   def data_record(data, no_compress=False):
