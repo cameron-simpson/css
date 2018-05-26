@@ -12,6 +12,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
+from os import lseek, SEEK_SET, SEEK_CUR
 from os.path import basename, join as joinpath, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
 import stat
 import sys
@@ -23,7 +24,7 @@ from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader
 from cs.excutils import logexc
-from cs.fileutils import makelockfile, shortpath, longpath, read_from
+from cs.fileutils import makelockfile, shortpath, longpath, read_from, DEFAULT_READSIZE, datafrom_fd, ReadMixin
 from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, XP, PfxThread as Thread
 from cs.py.func import prop
@@ -810,7 +811,7 @@ class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length
     '''
     return put_bs(self.n) + put_bs(self.offset) + put_bs(self.length)
 
-class PlatonicFile(MultiOpenMixin):
+class PlatonicFile(MultiOpenMixin, ReadMixin):
 
   def __init__(self, path):
     MultiOpenMixin.__init__(self)
@@ -828,8 +829,20 @@ class PlatonicFile(MultiOpenMixin):
     os.close(self._fd)
     del self._fd
 
+  def tell(self):
+    return lseek(self._fd, 0, SEEK_CUR)
+
+  def seek(self, offset):
+    return lseek(self._fd, offset, SEEK_SET)
+
+  def datafrom(self, offset, readsize=None):
+    if readsize is None:
+      readsize = DEFAULT_READSIZE
+    return datafrom_fd(self._fd, offset, readsize)
+
   def fetch(self, offset, length):
-    data = os.pread(self._fd, length, offset)
+    X("PlatonicFile: read(fd=%d, length=%d, offset=%d)", self._fd, length, offset)
+    data = self.read(length, offset=offset, longread=True)
     if len(data) != length:
       raise RuntimeError(
           "%r: asked for %d bytes from offset %d, but got %d"
