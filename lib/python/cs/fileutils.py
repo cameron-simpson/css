@@ -706,16 +706,27 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-def datafrom_fd(fd, offset, readsize=None):
+def datafrom_fd(fd, offset, readsize=None, aligned=True):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       This does not move the file offset.
   '''
   if readsize is None:
     readsize = DEFAULT_READSIZE
+  if aligned:
+    # do an initial read to align all subsequent reads
+    alignsize = offset % readsize
+    if alignsize > 0:
+      X("PREAD ALIGN fd=%d, readsize=%d, offset=%d", fd, alignsize, offset)
+      bs = pread(fd, alignsize, offset)
+      if not bs:
+        return
+      yield bs
+      offset += len(bs)
   while True:
+    X("PREAD fd=%d, readsize=%d, offset=%d", fd, readsize, offset)
     bs = pread(fd, readsize, offset)
     if not bs:
-      break
+      return
     yield bs
     offset += len(bs)
 
