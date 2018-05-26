@@ -2,7 +2,6 @@ support bare "vt mount '[clause]'" ==> mounts on [GLOBAL].mountdir/{clause}
 support per-clause mountdir, for clauses that should mount elsewhere
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
-datafile and datadir: use "DF" for DataFiles throughout instead of "D"
 default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
 PlatonicStore:
   keep mapping of paths => (mtime, size) to monitor changes
