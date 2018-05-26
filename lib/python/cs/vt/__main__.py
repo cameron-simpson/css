@@ -208,7 +208,7 @@ class VTCmd:
     args = args[1:]
     with Pfx(op):
       if op == "profile":
-        return self.cmd_profile()
+        return self.cmd_profile(args)
       try:
         op_func = getattr(self, "cmd_" + op)
       except AttributeError:
