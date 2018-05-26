@@ -11,7 +11,7 @@ import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, splitext, \
+from os.path import basename, splitext, expanduser, \
     exists as existspath, join as joinpath, \
     isabs as isabspath, isdir as isdirpath, isfile as isfilepath
 import shutil
@@ -619,6 +619,7 @@ class VTCmd:
     specialD = None     # becomes not None for a D{dir}
     mount_store = defaults.S
     special_store = None # the special may derive directly from a config Store clause
+    special_basename = None
     archive = None
     try:
       special = args.pop(0)
@@ -642,7 +643,10 @@ class VTCmd:
               specialD = D
           if specialD is None:
             badopts = True
+          else:
+            special_basename = D.name
         elif special.startswith('[') and special.endswith(']'):
+          special_basename = special[1:-1].strip()
           special_store = self.config.Store_from_spec(special)
           X("special_store=%s", special_store)
           if special_store is not mount_store:
@@ -664,15 +668,30 @@ class VTCmd:
           if not isfilepath(archive):
             error("not a file: %r", archive)
             badopts = True
+          else:
+            spfx, sext = splitext(basename(special))
+            if spfx and sext == '.vt':
+              special_basename = spfx
+            else:
+              special_basename = special
+    if special_basename is not None:
+      # Make the name for an explicit mount safer:
+      # no path components, no dots (thus no leading dots).
+      special_basename = special_basename.replace(os.sep, '_').replace('.', '_')
     if args:
       mountpoint = args.pop(0)
     else:
-      spfx, sext = splitext(special)
-      if sext != '.vt':
-        error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt"): %r', special)
+      if special_basename is None:
+        error('missing mountpoint, and cannot infer mountpoint from special: %r', special)
+        badopts = True
+      try:
+        mount_area = mount_store.mountdir
+      except AttributeError:
+        error('missing mountpoint, no Sotre.mountdir, cannot infer mountpoint: store=%s', mount_store)
         badopts = True
       else:
-        mountpoint = spfx
+        mount_area = expanduser(mount_area)
+        mountpoint = joinpath(mount_area, special_basename)
     if args:
       subpath = args.pop(0)
     else:
