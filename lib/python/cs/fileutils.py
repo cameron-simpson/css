@@ -798,28 +798,26 @@ class ReadMixin(object):
           as required to obtain `size` bytes"; short data will still
           be returned if the file is too short.
     '''
+    bfr = getattr(self, '_reading_bfr', None)
     if offset is None:
-      offset = self.tell()
-    else:
-      with self._lock:
-        self.seek(offset)
-        return self.read(size=size, longread=longread)
+      if bfr is None:
+        offset = self.tell()
+      else:
+        offset = bfr.offset
+    if size == -1:
+      size = len(self) - offset
+      if size < 0:
+        size = 0
     if size == 0:
       return b''
-    flen = len(self)
-    if offset >= flen:
-      return b''
-    if size < 0:
-      size = flen - offset
-    # use the existing CornuCopyBuffer
     if longread:
       bss = []
     while size > 0:
       with self._lock:
-        bfr = getattr(self, '_reading_bfr', None)
-        if bfr is None or bfr.offset != offset or offset != self.tell():
+        # We need to retest on each iteration because other reads
+        # may be interleaved, interfering with the buffer.
+        if bfr is None or bfr.offset != offset:
           X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
-          self.seek(offset)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:
@@ -827,14 +825,18 @@ class ReadMixin(object):
         consume = min(size, len(bfr.buf))
         assert consume > 0
         chunk = bfr.take(consume)
+        offset += consume
+        self.seek(offset)
       assert len(chunk) == consume
-      self.seek(bfr.offset)
       if longread:
         bss.append(chunk)
       else:
         return chunk
       size -= consume
-      offset += consume
+    if not bss:
+      return b''
+    if len(bss) == 1:
+      return bss[0]
     return b''.join(bss)
 
   def read_n(self, n):
