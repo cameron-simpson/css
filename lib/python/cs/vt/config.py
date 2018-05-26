@@ -81,16 +81,22 @@ class Config:
           clause,
           clause_name=clause_name
       )
+      # bit of a hack to provide a mountdir attribute
+      mountdir = clause.get('mountdir')
+      if mountdir is None:
+        mountdir = self.get_default('mountdir')
+      if mountdir is not None:
+        S.mountdir = mountdir
       R.result = S
     return S
 
-  def get_default(self, param):
+  def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
     G = self.map.get('GLOBAL')
     if not G:
-      return None
-    return G.get(param)
+      return default
+    return G.get(param, default)
 
   def Store_from_spec(self, store_spec):
     ''' Factory function to return an appropriate BasicStore* subclass
