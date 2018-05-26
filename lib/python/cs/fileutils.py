@@ -10,7 +10,7 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET
+from os import lseek, pread, SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import shutil
@@ -20,7 +20,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.deco import cached, decorator
+from cs.deco import cached, decorator, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -30,6 +30,7 @@ from cs.py3 import ustr, bytes
 from cs.range import Range
 from cs.threads import locked
 from cs.timeutils import TimeoutError
+from cs.x import X
 
 DISTINFO = {
     'description': "convenience functions and classes for files and filenames/pathnames",
@@ -75,17 +76,6 @@ except ImportError:
     os.lseek(fd, offset0, SEEK_SET)
     data = b''.join(chunks)
     return data
-
-def fdreader(fd, readsize=None):
-  ''' Generator yielding data chunks from a file descriptor until EOF.
-  '''
-  if readsize is None:
-    readsize = 1024
-  while True:
-    bs = os.read(fd, readsize)
-    if not bs:
-      break
-    yield bs
 
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
@@ -716,6 +706,45 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
+def datafrom_fd(fd, offset, readsize=None):
+  ''' General purpose reader for file descriptors yielding data from `offset`.
+      This does not move the file offset.
+  '''
+  if readsize is None:
+    readsize = DEFAULT_READSIZE
+  while True:
+    bs = pread(fd, readsize, offset)
+    if not bs:
+      break
+    yield bs
+    offset += len(bs)
+
+@strable
+def datafrom(f, offset, readsize=None):
+  ''' General purpose reader for files yielding data from `offset`.
+      NOTE: this function may move the file pointer.
+      `readsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if readsize is None:
+    readsize = DEFAULT_READSIZE
+  if isinstance(f, int):
+    # operating system file descriptor
+    return datafrom_fd(f, offset, readsize=readsize)
+  # presume a file-like object
+  try:
+    read1 = f.read1
+  except AttrubuteError:
+    read1 = f.read
+  seek = f.seek
+  while True:
+    offset0 = f.tell()
+    f.seek(offset, SEEK_SET)
+    bs = read1(readsize)
+    f.seek(offset0)
+    if not bs:
+      yield bs
+    offset += len(bs)
+
 class ReadMixin(object):
   ''' Useful read methods to accomodate modes not necessarily available in a class.
 
@@ -726,23 +755,26 @@ class ReadMixin(object):
       .datafrom method with something more efficient or direct.
   '''
 
-  def datafrom(self, offset):
-    ''' Yield data from the specified offset in some approximation of the "natural" chunk size.
+  def datafrom(self, offset, readsize=None):
+    ''' Yield data from the specified `offset` onward in some approximation of the "natural" chunk size.
 
-        Note: this function may move the file position.
+        NOTE: UNLIKE the global datafrom() function, this method
+        MUST NOT move the logical file position. Implementors may need
+        to save and restore the file pointer within a lock around
+        the I/O if they do not use a direct access method like
+        os.pread.
 
         The aspiration here is to read data with only a single call
         to the underlying storage, and to return the chunks in
         natural sizes instead of some default read size.
-        Classes using this mixin should consider overriding this
-        method with an efficient alternative.
-
-        This implementation calls the file_data function, which has
-        a default read size and uses the file's .read1 method if
-        available.
+        Classes using this mixin must implement this method.
     '''
-    self.seek(offset)
-    return file_data(self)
+    raise NotImplementedError("return an iterator which does not change the file offset")
+
+  def bufferfrom(self, offset):
+    ''' Return a CornuCopyBuffer from the specified `offset`.
+    '''
+    return CornuCopyBuffer(self.datafrom(offset), offset=offset)
 
   def read(self, size=-1, offset=None, longread=False):
     ''' Read up to `size` bytes, honouring the "single system call" spirit unless `longread` is true.
@@ -775,9 +807,9 @@ class ReadMixin(object):
       with self._lock:
         bfr = getattr(self, '_reading_bfr', None)
         if bfr is None or bfr.offset != offset or offset != self.tell():
-          ##X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
+          X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
           self.seek(offset)
-          self._reading_bfr = bfr = CornuCopyBuffer(self.datafrom(offset), offset=offset)
+          self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:
           break
