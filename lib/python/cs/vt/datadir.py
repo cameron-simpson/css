@@ -469,8 +469,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     if n is None:
       n = self._new_datafile()
       self.current_save_filenum = n
-    D = self._open_datafile(n)
-    return n, D
+    DF = self._open_datafile(n)
+    return n, DF
 
   def _queue_index(self, hashcode, entry, post_offset):
     if not isinstance(entry, self.index_entry_class):
@@ -677,24 +677,24 @@ class DataDir(_FilesDir):
     ''' Return the DataFile with index `n`.
     '''
     cache = self._cache
-    D = cache.get(n)
-    if D is None:
+    DF = cache.get(n)
+    if DF is None:
       with self._lock:
         # first, look again now that we have the _lock
-        D = cache.get(n)
-        if D is None:
+        DF = cache.get(n)
+        if DF is None:
           # still not in the cache, open the DataFile and put into the cache
           F = self._filemap[n]
           readwrite = (n == self.current_save_filenum)
-          D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
-          D.open()
-    return D
+          DF = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
+          DF.open()
+    return DF
 
   def fetch(self, entry):
     ''' Return the data chunk stored in DataFile `n` at `offset`.
     '''
-    D = self._open_datafile(entry.n)
-    return D.fetch(entry.offset)
+    DF = self._open_datafile(entry.n)
+    return DF.fetch(entry.offset)
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
@@ -773,9 +773,9 @@ class DataDir(_FilesDir):
     '''
     # save the data in the current datafile, record the file number and offset
     with self._lock:
-      n, D = self._get_current_save_datafile()
-      with D:
-        offset, post_offset = D.add(data)
+      n, DF = self._get_current_save_datafile()
+      with DF:
+        offset, post_offset = DF.add(data)
     hashcode = self.hashclass.from_chunk(data)
     self._queue_index(hashcode, DataDirIndexEntry(n, offset), post_offset)
     rollover = self.rollover
@@ -953,23 +953,23 @@ class PlatonicDir(_FilesDir):
     ''' Return the DataFile with index `n`.
     '''
     cache = self._cache
-    D = cache.get(n)
-    if D is None:
+    DF = cache.get(n)
+    if DF is None:
       with self._lock:
         # first, look again now that we have the _lock
-        D = cache.get(n)
-        if D is None:
+        DF = cache.get(n)
+        if DF is None:
           # still not in the cache, open the DataFile and put into the cache
           F = self._filemap[n]
-          D = cache[n] = PlatonicFile(self.datapathto(F.filename))
-          D.open()
-    return D
+          DF = cache[n] = PlatonicFile(self.datapathto(F.filename))
+          DF.open()
+    return DF
 
   def fetch(self, entry):
     ''' Return the data chunk stored in DataFile `n` at `offset`.
     '''
-    D = self._open_datafile(entry.n)
-    return D.fetch(entry.offset, entry.length)
+    DF = self._open_datafile(entry.n)
+    return DF.fetch(entry.offset, entry.length)
 
   @logexc
   def _monitor_datafiles(self):

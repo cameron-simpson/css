@@ -802,9 +802,9 @@ class VTCmd:
             print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
       else:
         filepath = arg
-        F = DataFile(filepath)
-        with F:
-          for offset, flags, data in F.scan():
+        DF = DataFile(filepath)
+        with DF:
+          for offset, flags, data in DF.scan():
             if flags & F_COMPRESSED:
               data = decompress(data)
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
