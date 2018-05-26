@@ -99,7 +99,12 @@ class DataFile(MultiOpenMixin, ReadMixin):
     ''' Yield data from the file starting at `offset`.
     '''
     if readsize is None:
-      readsize = 512
+      # Default read size.
+      # This number is arbitrary, chosen on the basis that the
+      # average size of blocks for random data is around 4093 bytes
+      # (from vt.scan) and the size for parsed data is often much
+      # smaller.
+      readsize = 2048
     return datafrom_fd(self._rfd, offset, readsize)
 
   @staticmethod
