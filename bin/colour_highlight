@@ -10,15 +10,17 @@ import os
 from os.path import basename
 import re
 import sys
-from cs.ansi_colour import COLOURS
+from cs.ansi_colour import COLOURS, DEFAULT_HIGHLIGHT, make_patterns, colourise
 from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
 
 USAGE = '''Usage: %%s default-colour [colour:]regexp...
-  Known colours: %s''' % (','.join(sorted(COLOURS.keys())),)
-
-NORMAL_COLOUR = 'normal'
-assert NORMAL_COLOUR in COLOURS
+  If default-colour is empty or the word "DEFAULT" then the colour
+    cs.ansi_colour.DEFAULT_HIGHT will be used (%r).
+  Known colours: %s''' % (
+    DEFAULT_HIGHLIGHT,
+    ','.join(sorted(COLOURS.keys())),
+)
 
 def main(argv, stdin=None, stdout=None, stderr=None):
   if stdin is None:
@@ -31,61 +33,25 @@ def main(argv, stdin=None, stdout=None, stderr=None):
   setup_logging(cmd)
   usage = USAGE % (cmd,)
   badopts = False
-  default_colour = NORMAL_COLOUR
   if not argv:
     error("missing default-colour")
     badopts = True
   else:
     default_colour = argv.pop(0)
-    if default_colour not in COLOURS:
-      error("invalid colour: %r", default_colour)
+    if not default_colour or default_colour == 'DEFAULT':
+      default_colour = None
+    elif default_colour not in COLOURS:
+      error("invalid default-colour: %r", default_colour)
       badopts = True
   if not argv:
     error("missing [colour:]regexp")
     badopts = True
-  else:
-    patterns = []
-    for arg in argv:
-      with Pfx(arg):
-        try:
-          colour, regexp = arg.split(':', 1)
-        except ValueError:
-          regexp = arg
-          colour = default_colour
-        else:
-          if colour not in COLOURS:
-            error("invalid colour: %r", colour)
-            badopts = True
-        R = re.compile(regexp)
-        patterns.append(Match(colour, R))
   if badopts:
     print(usage, file=stderr)
     return 2
+  patterns = make_patterns(argv)
   for line in stdin:
-    if line.endswith('\n'):
-      end = '\n'
-      line = line[:-1]
-    else:
-      end = ''
-    chars = [ [c, NORMAL_COLOUR] for c in line ]
-    for pattern in patterns:
-      for m in pattern.finditer(line):
-        for pos in range(m.start(), m.end()):
-          chars[pos][1] = pattern.colour
-    prev_colour = NORMAL_COLOUR
-    for c, colour in chars:
-      if colour != prev_colour:
-        stdout.write(COLOURS[colour])
-        prev_colour = colour
-      stdout.write(c)
-    if prev_colour != NORMAL_COLOUR:
-      stdout.write(COLOURS[NORMAL_COLOUR])
-    stdout.write(end)
-
-_Match = namedtuple('Match', 'colour pattern')
-class Match(_Match):
-  def finditer(self, s):
-    return self.pattern.finditer(s)
+    stdout.write(colourise(line, patterns))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

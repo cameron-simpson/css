@@ -26,6 +26,7 @@ from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
+from cs.mediaino import EpisodeInfo
 from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
@@ -322,6 +323,9 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  ''' Usage: tag criteria... [--] {+tag|-tag}...
+      Add or remove tags from selected images.
+  '''
   xit = 0
   badopts = False
   if not argv:
@@ -423,56 +427,17 @@ def cmd_autotag(I, argv):
           continue
         with Pfx(part):
           # look for series/episode/scene/part markers
-          m = None
-          for ptn in (
-            RE_SCENE,
-            RE_SCENE_PART,
-            RE_EPISODE,
-            RE_EPISODE_PART,
-            RE_EPISODE_SCENE,
-            RE_SERIES_EPISODE,
-            RE_SERIES_EPISODE_SCENE,
-            RE_PART,
-          ):
-            m = re.match(ptn, part)
-            if not m:
-              continue
-            if m.group() != part:
-              m = None
-              continue
+          fields, offset = EpisodeInfo.parse_filename_part(part)
+          if offset == len(part):
             kwnames = []
-            if ptn == RE_SCENE:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-            elif ptn == RE_SCENE_PART:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-            elif ptn == RE_EPISODE_PART:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE_SCENE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('scene-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE_SCENE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-              kwnames.append('scene-%02d' % (int(m.group(3))))
-            elif ptn == RE_PART:
-              kwnames.append('part-%02d' % (int(m.group(1))))
-            else:
-              raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
+            for field, value in fields.items():
+              kwnames.append('%s-%02d' % (field, value))
             for kwname in kwnames:
               try:
                 kw = I.keyword(kwname)
               except KeyError:
                 kw = I.create_keyword(kwname)
               kws.add(kw)
-            break
-          if m:
             continue
           # look for person+person...
           if '+' in part:

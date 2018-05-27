@@ -38,7 +38,9 @@ USAGE = '''Usage:
     %s test
         Run unit tests.'''
 
-def main(argv):
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)

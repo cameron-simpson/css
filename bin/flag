@@ -11,15 +11,19 @@ qopt=
 invert=
 makemissing=
 flushflags=
+testmode=
 verbose=        # print flag state changes
 verbose_all=    # print flag state regardless
 [ -t 2 ] && verbose=1
 ##[ -t 2 ] && trace=set-x
 
-cmd=$0
+cmd=$( basename "$0" )
 usage="Usage:
   $cmd [options...] [glob]
     List flags and values. If supplied, select names matching glob.
+  $cmd [options] -t [!]flag...
+    Test that the specified flags are all true (or false if \"!\" supplied.
+    Example: $cmd -t ROUTE_DEFAULT ISP_OFF_PEAK '!DOWNLOAD_DISABLED'
   $cmd [options...] [!] flagname
     Test flag for truth, or falsehood if \"!\" supplied.
   $cmd [options...] [!] flagname {true|false|0|1}
@@ -34,6 +38,7 @@ usage="Usage:
     -d flagdir  Specify directory to hold flag files.
     -F          Flush flags. Delete files for false flags.
     -q          Quiet. Turn off verbose. Do not report false flags in list mode.
+    -t          Test flags.
     -v          Verbose. Recite flag value changes.
     -V          Very verbose. Recite all flag values set, even when not a change.
     -w          Update/create the flag file with the derived flag if missing.
@@ -47,6 +52,7 @@ do
     -d) flagdir=$2; shift ;;
     -F) flushflags=1 ;;
     -q) quiet=1 verbose=1 qopt=$1 ;;
+    -t) testmode=1 ;;
     -v) verbose=1 ;;
     -V) verbose=1 verbose_all=1 ;;
     -w) makemissing=1 ;;
@@ -58,6 +64,20 @@ do
   esac
   shift
 done
+
+normflag(){
+  [ $# = 1 ] || { echo "Usage: normflag flagname" >&2; return 2; }
+  case "$1" in
+    '' | */* | . | .. )
+      echo "$cmd: normflag: illegal flagname: $1" >&2
+      return 2
+      ;;
+    *[a-z.-]*)
+      echo "$1" | tr '.[a-z]-' '_[A-Z]_'
+      ;;
+    *)printf '%s\n' "$1" ;;
+  esac
+}
 
 testflag(){
   [ -s "$flagdir/$1" ]
@@ -78,6 +98,12 @@ then
             }"
       ;;
   esac
+fi
+
+if [ $testmode ] && [ $# = 0 ]
+then
+  echo "$cmd: test mode: missing flags" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -110,19 +136,30 @@ then
   exit 0
 fi
 
+if [ $testmode ]
+then
+  # test all supplied flags
+  for flagname
+  do
+    case "$flagname" in
+      \!*)  invert=1 flagname=$( expr "x$flagname" : 'x.\(.*\)' ) ;;
+      *)    invert= ;;
+    esac
+    flagname=$( normflag "$flagname" )
+    if testflag "$flagname"
+    then  [ $invert ] && exit 1
+    else  [ $invert ] || exit 1
+    fi
+  done
+  exit 0
+fi
+
 # look for "!" before flag name
 [ $# -gt 0 ] && [ "x$1" = x!  ] && { invert=1; shift; }
 
 flagname=$1
 shift
-case "$flagname" in
-  '' | */* | . | .. )
-    echo "$cmd: illegal flagname: $flagname" >&2
-    badopts=1
-    ;;
-  *[a-z.-]*)
-    flagname=$( echo "$flagname" | tr '.[a-z]-' '_[A-Z]_' )
-esac
+flagname=$( normflag "$flagname" )
 
 if [ $# = 0 ]
 then

@@ -307,7 +307,7 @@ def copy_in_file(E, filepath, modes, log=None):
     if B.span != st.st_size:
       warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
       filedata = open(filepath, "rb").read()
-      blockdata = B.all_data()
+      blockdata = B.data
       X("len(filedata)=%d", len(filedata))
       X("len(blockdata)=%d", len(blockdata))
       open("data1file", "wb").write(filedata)
@@ -415,7 +415,7 @@ def copy_out_file(E, ospath, modes=None, log=None):
     log("rewrite %s", ospath)
     with open(ospath, "wb") as fp:
       wrote = 0
-      for chunk in B.chunks:
+      for chunk in B.chunks():
         fp.write(chunk)
         wrote += len(chunk)
     if Blen != wrote:

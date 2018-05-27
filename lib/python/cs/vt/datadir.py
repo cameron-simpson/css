@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
-from os.path import basename, join as joinpath, samefile, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
+from os.path import basename, join as joinpath, exists as existspath, isdir as isdirpath, relpath, isabs as isabspath
 import stat
 import sys
 from threading import RLock
@@ -37,13 +37,12 @@ from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
-from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
+from .blockify import top_block_for, blocked_chunks_of, spliced_blocks
 from .datafile import DataFile, scan_datafile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
-from .paths import decode_Dirent_text
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
@@ -157,7 +156,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
       create_statedir=None, create_datadir=None,
-      flags=None, flag_prefix=None):
+      flags=None, flag_prefix=None
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -372,6 +372,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             if F is not None:
               csvw.writerow( [n, F.filename] + F.csvrow() )
       ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+    X("SAVE DONE")
 
   def set_state(self, key, value):
     if not key.islower():
@@ -459,7 +460,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def _queue_index(self, hashcode, entry, post_offset):
     if not isinstance(entry, self.index_entry_class):
-      raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
+      raise RuntimeError("expected %s but got %s %r" % (self.index_entry_class, type(entry), entry))
     with self._lock:
       self._unindexed[hashcode] = entry
     self._indexQ.put( (hashcode, entry, post_offset) )
@@ -477,7 +478,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       oldF = None
       nsaves = 0
       need_sync = False
-      for hashcode, entry, post_offset in self._indexQ:
+      indexQ = self._indexQ
+      for hashcode, entry, post_offset in indexQ:
         if not isinstance(entry, entry_class):
           raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
         with self._lock:
@@ -502,11 +504,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             XP("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
           oldF = F
           need_sync = True
-        if need_sync:
+        if need_sync and indexQ.empty():
+          X("INDEX UPDATER SYNC...")
           index.flush()
           self._save_state()
           need_sync = False
           nsaves = 0
+          X("INDEX UPDATER SYNC DONE")
       index.flush()
       self._save_state()
 
@@ -571,7 +575,7 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
   '''
 
   @classmethod
-  def from_bytes(cls, data:bytes):
+  def from_bytes(cls, data: bytes):
     ''' Parse a binary index entry, return (n, offset).
     '''
     n, offset = get_bs(data)
@@ -604,7 +608,8 @@ class DataDir(_FilesDir):
   def __init__(self,
       statedirpath, datadirpath, hashclass, *,
       rollover=None,
-      **kw):
+      **kw
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -767,7 +772,7 @@ class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length
   '''
 
   @classmethod
-  def from_bytes(cls, data:bytes):
+  def from_bytes(cls, data: bytes):
     ''' Parse a binary index entry, return (n, offset).
     '''
     n, offset = get_bs(data)
@@ -824,7 +829,8 @@ class PlatonicDir(_FilesDir):
       create_datadir=False,
       exclude_dir=None, exclude_file=None,
       follow_symlinks=False, archive=None, meta_store=None,
-      **kw):
+      **kw
+  ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
@@ -843,12 +849,16 @@ class PlatonicDir(_FilesDir):
           whose basename commences with a dot.
         `follow_symlinks`: follow symbolic links, default False.
         `meta_store`: an optional Store used to maintain a Dir
-          representing the ideal directory
+          representing the ideal directory; unhashed data blocks
+          encountered during scans which are promoted to HashCodeBlocks
+          are also stored here
         `archive`: optional Archive ducktype with a .save(Dirent[,when]) method
         Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
     '''
+    if meta_store is None:
+      raise ValueError("meta_store may not be None")
     super().__init__(statedirpath, datadirpath, hashclass, create_datadir=False, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
@@ -938,9 +948,15 @@ class PlatonicDir(_FilesDir):
       datadirpath = self.datadirpath
       with Pfx("walk(%r)", datadirpath):
         seen = set()
+        X("NEW WALK %r", datadirpath)
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
           if self.cancelled or self.flag_scan_disable:
             break
+          X("WALK: dirpath=%r", dirpath)
+          # update state before scan
+          if need_save:
+            need_save = False
+            self._save_state()
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
             pruned_dirnames = []
@@ -970,6 +986,7 @@ class PlatonicDir(_FilesDir):
                     info("del %r", name)
                     del D[name]
             for filename in filenames:
+              X("WALK: dirpath=%r, filename=%r", dirpath, filename)
               with Pfx(filename):
                 if self.cancelled or self.flag_scan_disable:
                   break
@@ -980,6 +997,7 @@ class PlatonicDir(_FilesDir):
                   try:
                     F = filemap[rfilepath]
                   except KeyError:
+                    X("F: add datafile %r", rfilepath)
                     filenum = self._add_datafile(rfilepath)
                     F = filemap[filenum]
                     need_save = True
@@ -1045,13 +1063,10 @@ class PlatonicDir(_FilesDir):
                       E.block = top_block
                       D.changed = True
                       need_save = True
-                    # update state after completion of a scan
-                    if need_save:
-                      self._save_state()
-                      need_save = False
       if need_save:
-        self._save_state()
         need_save = False
+        self._save_state()
+      X("SLEEP 1 AFTER WALK")
       time.sleep(11)
 
   @staticmethod

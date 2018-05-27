@@ -4,6 +4,10 @@
 #   - Cameron Simpson <cs@cskk.id.au> 2017-12-25
 #
 
+'''
+Store definition configuration file.
+'''
+
 import os
 from os.path import abspath, isabs as isabspath, join as joinpath
 from threading import Lock
@@ -14,14 +18,14 @@ from cs.lex import skipwhite
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
-from cs.x import X
-from .archive import Archive
 from .cache import FileCacheStore
 from .compose import parse_store_specs, get_integer
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .tcp import TCPStoreClient
 
 def Store(spec, config=None):
+  ''' Factory to construct Stores from string specifications.
+  '''
   if config is None:
     config = Config()
   return config.Store_from_spec(spec)
@@ -128,6 +132,11 @@ class Config:
     ''' Construct a store given its specification.
     '''
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
+      if not isinstance(params, dict):
+        params = dict(params)
+        if 'type' in params:
+          # shuffle to avoid using builtin "type" as parameter name
+          params['type_'] = params.pop('type')
       if store_name is None:
         store_name = str(self) + '[' + clause_name + ']'
       if store_type == 'config':
@@ -152,15 +161,15 @@ class Config:
       self,
       store_name,
       *,
-      type=None,
+      type_=None,
       clause_name=None,
   ):
     ''' Construct a Store from a reference to a configuration clause.
     '''
-    if type is None:
-      type = 'config'
+    if type_ is None:
+      type_ = 'config'
     else:
-      assert type == 'config'
+      assert type_ == 'config'
     if clause_name is None:
       raise ValueError("clause_name may not be None")
     return self[clause_name]
@@ -169,15 +178,15 @@ class Config:
       self,
       store_name, clause_name,
       *,
-      type=None,
+      type_=None,
       path=None,
       basedir=None,
       data=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
-    if type is not None:
-      assert type == 'datadir'
+    if type_ is not None:
+      assert type_ == 'datadir'
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -205,7 +214,7 @@ class Config:
       self,
       store_name, clause_name,
       *,
-      type=None,
+      type_=None,
       path=None,
       max_files=None,
       max_file_size=None,
@@ -213,8 +222,8 @@ class Config:
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
-    if type is not None:
-      assert type == 'filecache'
+    if type_ is not None:
+      assert type_ == 'filecache'
     if basedir is None:
       basedir = self.get_default('basedir')
     if max_files is not None:
@@ -252,7 +261,7 @@ class Config:
       self,
       store_name, clause_name,
       *,
-      type=None,
+      type_=None,
       path=None,
       basedir=None,
       data=None,
@@ -262,8 +271,8 @@ class Config:
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
-    if type is not None:
-      assert type == 'platonic'
+    if type_ is not None:
+      assert type_ == 'platonic'
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -305,15 +314,15 @@ class Config:
       self,
       store_name,
       *,
-      type=None,
+      type_=None,
       save=None,
       read=None,
       read2=None,
   ):
     ''' Construct a ProxyStore.
     '''
-    if type is not None:
-      assert type == 'proxy'
+    if type_ is not None:
+      assert type_ == 'proxy'
     if save is None:
       save_stores = []
       readonly = True
@@ -343,14 +352,14 @@ class Config:
       self,
       store_name,
       *,
-      type=None,
+      type_=None,
       host=None,
       port=None,
   ):
     ''' Construct a TCPStoreClient from a "tcp" clause.
     '''
-    if type is not None:
-      assert type == 'tcp'
+    if type_ is not None:
+      assert type_ == 'tcp'
     if not host:
       host = 'localhost'
     if port is None:

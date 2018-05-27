@@ -13,7 +13,7 @@ import unittest
 from unittest import skip
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
-from cs.logutils import D
+from cs.logutils import warning
 from cs.randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
@@ -115,18 +115,12 @@ class TestAll(unittest.TestCase):
           all_chunks = []
           start_time = time.time()
           offset = 0
-          prev_chunk = None
           chunky_scanner = chunky(scanner) if scanner else None
           histogram = defaultdict(int)
           for chunk in blocked_chunks_of(source_chunks, chunky_scanner, histogram=histogram):
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
-            if prev_chunk is not None:
-              # this avoids issues with the final block, which may be short
-              self.assertTrue(len(prev_chunk) >= MIN_BLOCKSIZE,
-                              "len(prev_chunk)=%d < MIN_BLOCKSIZE=%d"
-                              % (len(prev_chunk), MIN_BLOCKSIZE))
             offset += len(chunk)
             # the pending.flush operation can return short blocks
             self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
@@ -136,7 +130,6 @@ class TestAll(unittest.TestCase):
               self.assertTrue(chunk_total <= src_total,
                               "chunk_total:%d > src_total:%d"
                               % (chunk_total, src_total))
-            prev_chunk = chunk
           end_time = time.time()
           X("%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
             input_desc, scanner_desc,

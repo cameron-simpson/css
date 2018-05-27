@@ -57,7 +57,7 @@ do
   [ $first ] && set --
 
   case "$word" in
-    */*)  word=`echo "$word" | sed 's;/;\\\\/;g'`
+    */*)  word=$( echo "$word" | sed 's;/;\\/;g' )
   esac
   case "$word" in
     !*)
@@ -71,7 +71,7 @@ do
       if [ $colour ]
       then
         [ -z "$replwords" ] || replwords="$replwords; "
-        replwords="${replwords}s${word}${replsubst}g"
+        [ $colour ] && replwords="${replwords}s${word}${replsubst}g"
       fi
       ;;
   esac

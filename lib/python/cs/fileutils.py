@@ -867,7 +867,7 @@ class BackedFile(ReadMixin):
           assert self._offset <= end
       else:
         for bs in rn(size, rsize=rsize):
-          self._offset += bs_len
+          self._offset += len(bs)
           yield bs
           assert self._offset <= end
       if self._offset < span.end:
@@ -892,6 +892,7 @@ class BackedFile(ReadMixin):
 
 class BackedFile_TestMethods(object):
   ''' Mixin for testing subclasses of BackedFile.
+      Tests self.backed_fp.
   '''
 
   def _eq(self, a, b, opdesc):
@@ -1021,7 +1022,8 @@ def file_data(fp, nbytes, rsize=None):
       break
     yield data
     copied += len(data)
-    nbytes -= len(data)
+    if nbytes is not None:
+      nbytes -= len(data)
 
 def copy_data(fpin, fpout, nbytes, rsize=None):
   ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
