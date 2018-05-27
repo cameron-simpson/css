@@ -841,7 +841,6 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
     return datafrom_fd(self._fd, offset, readsize)
 
   def fetch(self, offset, length):
-    X("PlatonicFile: read(fd=%d, length=%d, offset=%d)", self._fd, length, offset)
     data = self.read(length, offset=offset, longread=True)
     if len(data) != length:
       raise RuntimeError(
