@@ -238,11 +238,14 @@ class PacketConnection(object):
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
     '''
-    with Pfx("_run_request[ch=%d,tag=%d, rq_type=%d,flags=0x%02x,payload=%r",
-              channel, tag, rq_type, flags, payload):
+    with Pfx(
+        "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s",
+        channel, tag, rq_type, flags,
+        repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'
+    ):
       try:
         result_flags = 0
-        result_payload = bytes(())
+        result_payload = b''
         result = handler(rq_type, flags, payload)
         if result is not None:
           if isinstance(result, int):
