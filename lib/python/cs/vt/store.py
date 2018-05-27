@@ -27,7 +27,7 @@ from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
-  ''' Subclass of KeyError raised when accessing a hashcode not present in the Store.
+  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
   '''
   def __init__(self, hashcode):
     KeyError.__init__(self, str(hashcode))
@@ -90,10 +90,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       self.name = name
       self.hashclass = hashclass
       self.logfp = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
+      self.mountdir = None
       self.readonly = False
       self.writeonly = False
       self._archives = {}
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
     params = [

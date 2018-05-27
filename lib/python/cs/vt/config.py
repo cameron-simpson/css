@@ -81,12 +81,6 @@ class Config:
           clause,
           clause_name=clause_name
       )
-      # bit of a hack to provide a mountdir attribute
-      mountdir = clause.get('mountdir')
-      if mountdir is None:
-        mountdir = self.get_default('mountdir')
-      if mountdir is not None:
-        S.mountdir = mountdir
       R.result = S
     return S
 
@@ -143,6 +137,11 @@ class Config:
         if 'type' in params:
           # shuffle to avoid using builtin "type" as parameter name
           params['type_'] = params.pop('type')
+      # process general purpose params
+      # mountdir: default location for "mount [clausename]" => mountdir/clausename
+      mountdir = params.pop('mountdir', None)
+      if mountdir is None:
+        mountdir = self.get_default('mountdir')
       if store_name is None:
         store_name = str(self) + '[' + clause_name + ']'
       if store_type == 'config':
@@ -161,6 +160,8 @@ class Config:
         S = self.tcp_Store(store_name, **params)
       else:
         raise ValueError("unsupported type %r" % (store_type,))
+      if mountdir is not None:
+        S.mountdir = mountdir
       return S
 
   def config_Store(

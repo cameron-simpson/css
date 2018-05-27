@@ -684,14 +684,14 @@ class VTCmd:
       if special_basename is None:
         error('missing mountpoint, and cannot infer mountpoint from special: %r', special)
         badopts = True
-      try:
-        mount_area = mount_store.mountdir
-      except AttributeError:
-        error('missing mountpoint, no Sotre.mountdir, cannot infer mountpoint: store=%s', mount_store)
-        badopts = True
       else:
-        mount_area = expanduser(mount_area)
-        mountpoint = joinpath(mount_area, special_basename)
+        mountdir = mount_store.mountdir
+        if mountdir is None:
+          error('missing mountpoint, no Sotre.mountdir, cannot infer mountpoint: store=%s', mount_store)
+          badopts = True
+        else:
+          mountdir = expanduser(mountdir)
+          mountpoint = joinpath(mountdir, special_basename)
     if args:
       subpath = args.pop(0)
     else:
