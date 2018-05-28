@@ -1,3 +1,4 @@
+ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
 vt setup/tutorial
 vt-blockmap.5 man entry
 vt-datadir.5 man entry
