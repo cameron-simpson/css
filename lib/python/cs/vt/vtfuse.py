@@ -11,7 +11,7 @@ from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFo
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
-from os.path import abspath, dirname
+from os.path import abspath, dirname, basename
 import stat
 import subprocess
 import sys
@@ -50,7 +50,7 @@ XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
-def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False):
+def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -76,7 +76,7 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=Fals
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
   FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=True)
-  return FS._vt_runfuse(mnt)
+  return FS._vt_runfuse(mnt, fsname=fsname)
 
 def umount(mnt):
   ''' Unmount the filesystem mounted at `mnt`, return umount(8) exit status.
@@ -725,13 +725,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vt_core)
 
-  def _vt_runfuse(self, mnt):
+  def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
     '''
     S = self._vt_core.S
+    if fsname is None:
+      fsname = str(S).replace(',', ':')
     with S:
       defaults.push_Ss(S)
-      llfuse.init(self, mnt, self._vt_llf_opts)
+      opts = set(self._vt_llf_opts)
+      opts.add("fsname=" + fsname)
+      llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
       self._vt_core.mnt_path = abspath(mnt)

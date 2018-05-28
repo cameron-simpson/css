@@ -755,7 +755,7 @@ class VTCmd:
             else:
               raise
         try:
-          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only)
+          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, fsname=special)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:
