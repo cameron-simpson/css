@@ -21,6 +21,10 @@ class FileCacheStore(BasicStoreSync):
   ''' A Store wrapping another Store that provides fast access to
       previously fetched data and fast storage of new data with
       asynchronous updates to the backing Store.
+
+      This class is a thin Store shaped shim over a FileDataMappingProxy,
+      which does the heavy lifting of storing data and ensuring all
+      new data is passed to the backend.
   '''
 
   def __init__(
