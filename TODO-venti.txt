@@ -1,3 +1,4 @@
+vtrc.5 man entry
 vt.1 man entry
 blockmap updates - use lower priority than regular I/O
 platonic updates - use lower priority than regular I/O
