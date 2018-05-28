@@ -865,7 +865,7 @@ class PlatonicDir(_FilesDir):
       follow_symlinks=False, archive=None, meta_store=None,
       **kw
   ):
-    ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
+    ''' Initialise the PlatonicDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
             about the DataFiles; this is the index-state.csv file and
             the associated index dbm-ish files.
