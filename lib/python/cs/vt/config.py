@@ -138,6 +138,8 @@ class Config:
           # shuffle to avoid using builtin "type" as parameter name
           params['type_'] = params.pop('type')
       # process general purpose params
+      # blockmapdir: location to store persistent blockmaps
+      blockmapdir = params.pop('blockmapdir', None)
       # mountdir: default location for "mount [clausename]" => mountdir/clausename
       mountdir = params.pop('mountdir', None)
       if mountdir is None:
@@ -160,6 +162,10 @@ class Config:
         S = self.tcp_Store(store_name, **params)
       else:
         raise ValueError("unsupported type %r" % (store_type,))
+      if S.config is None:
+        S.config = self
+      if blockmapdir is not None:
+        S.blockmapdir = blockmapdir
       if mountdir is not None:
         S.mountdir = mountdir
       return S
