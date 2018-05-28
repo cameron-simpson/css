@@ -1,3 +1,4 @@
+vt-blockmap.5 man entry
 vt-datadir.5 man entry
 vtd.5 man entry
 vtrc.5 man entry
