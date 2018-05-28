@@ -1,3 +1,4 @@
+Store.archive plumbing
 ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
 support bare "vt mount '[clause]'" ==> mounts on [GLOBAL].mountdir/{clause}
 support per-clause mountdir, for clauses that should mount elsewhere
