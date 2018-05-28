@@ -358,10 +358,10 @@ class _Block(Transcriber, ABC):
       yield self
 
   @locked
-  def get_blockmap(self, force=False, savedir=None):
+  def get_blockmap(self, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
         `force`: if true, create a new blockmap anyway; default: False
-        `savedir`: directory to hold persistent block maps
+        `blockmapdir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
@@ -370,7 +370,9 @@ class _Block(Transcriber, ABC):
     if blockmap is None:
       warning("making blockmap for %s", self)
       from .blockmap import BlockMap
-      self.blockmap = blockmap = BlockMap(self, base_mappath=savedir)
+      if blockmapdir is None:
+        blockmapdir = defaults.S.blockmapdir
+      self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
   def chunks(self, start=None, end=None, no_blockmap=False):

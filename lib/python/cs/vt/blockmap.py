@@ -188,11 +188,11 @@ class BlockMap(RunStateMixin):
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
-  def __init__(self, block, mapsize=None, base_mappath=None):
+  def __init__(self, block, mapsize=None, blockmapdir=None):
     ''' Initialise the BlockMap, dispatch the index generator.
         `block`: the source Block
         `mapsize`: the size of each index map, default `OFFSET_SCALE`
-        `base_mappath`: the pathname for persistent storage of BlockMaps
+        `blockmapdir`: the pathname for persistent storage of BlockMaps
     '''
     if mapsize is None:
       mapsize = OFFSET_SCALE
@@ -201,9 +201,11 @@ class BlockMap(RunStateMixin):
           "mapsize(%d) out of range, must be >0 and <=%d"
           % (mapsize, OFFSET_SCALE))
     # DEBUGGING
-    if base_mappath is None:
-      base_mappath = '/Users/cameron/hg/css-venti/test_blockmaps'
-      X("BlockMap: set base_mappath to %r (was None)", base_mappath)
+    if blockmapdir is None:
+      blockmapdir = '/Users/cameron/hg/css-venti/test_blockmaps'
+      X("BlockMap: set blockmapdir to %r (was None)", blockmapdir)
+    else:
+      X("BlockMap: supplied blockmapdir=%r", blockmapdir)
     RunStateMixin.__init__(self)
     from .block import _IndirectBlock
     if not isinstance(block, _IndirectBlock):
@@ -212,10 +214,10 @@ class BlockMap(RunStateMixin):
     hashclass = type(hashcode)
     self.hashclass = hashclass
     self.mapsize = mapsize
-    if base_mappath is None:
+    if blockmapdir is None:
       self.mappath = mappath = None
     else:
-      self.mappath = mappath = joinpath(base_mappath, "mapsize:%d" % (mapsize,), hashcode.filename)
+      self.mappath = mappath = joinpath(blockmapdir, "mapsize:%d" % (mapsize,), hashcode.filename)
       if not isdir(mappath):
         with Pfx("makedirs(%r)", mappath):
           X("MKDIR %r", mappath)
