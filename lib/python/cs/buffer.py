@@ -69,6 +69,9 @@ class CornuCopyBuffer(object):
     self.input_data = input_data
     self.copy_offsets = copy_offsets
 
+  def __str__(self):
+    return "CCB(offset:%d,buf:%d)" % (self.offset, len(self.buf))
+
   def __len__(self):
     ''' The length is the length of the internal buffer: data available without a fetch.
     '''
@@ -158,6 +161,7 @@ class CornuCopyBuffer(object):
     self.extend(size, short_ok=short_ok)
     buf = self.buf
     taken = buf[:size]
+    size = len(taken)   # adjust for possible short fetch
     self.buf = buf[size:]
     self.offset += size
     return taken
@@ -172,7 +176,10 @@ class CornuCopyBuffer(object):
     if size < 1:
       raise ValueError("size < 1: %r" % (size,))
     if one_fetch and size >= len(self):
-      return next(self)
+      try:
+        return next(self)
+      except StopIteration:
+        return b''
     try:
       return self.take(size)
     except ValueError as e:

@@ -8,6 +8,7 @@
 
 from __future__ import with_statement
 import sys
+from cs.excutils import logexc
 from cs.inttypes import Enum
 from cs.logutils import setup_logging, info, debug, warning, error
 from cs.pfx import Pfx, XP
@@ -118,6 +119,7 @@ class StreamStore(BasicStoreSync):
     '''
     self._conn.join()
 
+  @logexc
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
         Return as for the `request_handler` parameter to PacketConnection.

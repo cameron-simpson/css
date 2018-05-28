@@ -84,13 +84,13 @@ class Config:
       R.result = S
     return S
 
-  def get_default(self, param):
+  def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
     G = self.map.get('GLOBAL')
     if not G:
-      return None
-    return G.get(param)
+      return default
+    return G.get(param, default)
 
   def Store_from_spec(self, store_spec):
     ''' Factory function to return an appropriate BasicStore* subclass
@@ -137,6 +137,13 @@ class Config:
         if 'type' in params:
           # shuffle to avoid using builtin "type" as parameter name
           params['type_'] = params.pop('type')
+      # process general purpose params
+      # blockmapdir: location to store persistent blockmaps
+      blockmapdir = params.pop('blockmapdir', None)
+      # mountdir: default location for "mount [clausename]" => mountdir/clausename
+      mountdir = params.pop('mountdir', None)
+      if mountdir is None:
+        mountdir = self.get_default('mountdir')
       if store_name is None:
         store_name = str(self) + '[' + clause_name + ']'
       if store_type == 'config':
@@ -155,6 +162,12 @@ class Config:
         S = self.tcp_Store(store_name, **params)
       else:
         raise ValueError("unsupported type %r" % (store_type,))
+      if S.config is None:
+        S.config = self
+      if blockmapdir is not None:
+        S.blockmapdir = blockmapdir
+      if mountdir is not None:
+        S.mountdir = mountdir
       return S
 
   def config_Store(

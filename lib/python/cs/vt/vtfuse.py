@@ -11,12 +11,13 @@ from logging import getLogger, FileHandler as LogFileHandler, Formatter as LogFo
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
-from os.path import abspath, dirname
+from os.path import abspath, dirname, basename
 import stat
 import subprocess
 import sys
 from threading import Thread, RLock, Lock
 from types import SimpleNamespace as NS
+from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import debug, info, warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
@@ -49,7 +50,7 @@ XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
-def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False):
+def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -75,7 +76,7 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=Fals
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
   FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=True)
-  return FS._vt_runfuse(mnt)
+  return FS._vt_runfuse(mnt, fsname=fsname)
 
 def umount(mnt):
   ''' Unmount the filesystem mounted at `mnt`, return umount(8) exit status.
@@ -111,9 +112,10 @@ def handler(method):
       raise RuntimeError("UNCAUGHT EXCEPTION") from e
   return handle
 
-def log_traces_queued(Q):
-  for logcall, citation, elapsed, ctx, msg, *a in Q:
-    dolog(logcall, citation, elapsed, ctx, msg, *a)
+def log_traces_queued(Q, S):
+  with S:
+    for logcall, citation, elapsed, ctx, msg, *a in Q:
+      dolog(logcall, citation, elapsed, ctx, msg, *a)
 
 def dolog(logcall, citation, elapsed, ctx, msg, *a):
   logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
@@ -173,12 +175,10 @@ class FileHandle(O):
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    fp = self.Eopen._open_file
-    with fp:
-      with self._lock:
-        fp.seek(offset)
-        data = fp.read(size, longread=True)
-    return data
+    ##fp = self.Eopen._open_file
+    ##X("fp = %s %s", type(fp), fp)
+    ##X("fp.read = %s %s", type(fp.read), fp.read)
+    return self.Eopen._open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
     ''' Truncate the file, mark it as modified.
@@ -472,11 +472,13 @@ class _StoreFS_core(object):
     # and a thread to process them asynchronously
     self.log = getLogger(LOGGER_NAME)
     self.logQ = IterableQueue()
-    T = Thread(name="log-queue(%s)" % (self,),
-               target=log_traces_queued,
-               args=(self.logQ,))
+    T = Thread(
+        name="log-queue(%s)" % (self,),
+        target=log_traces_queued,
+        args=(self.logQ, S))
     T.daemon = True
     T.start()
+    self._log_worker = T
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
@@ -486,6 +488,11 @@ class _StoreFS_core(object):
     # preassign inode 1, llfuse seems to presume it :-(
     self.mnt_inum = 1
     self._inodes._add_Dirent(self.mnt_inum, self.mntE)
+
+  def close(self):
+    self._sync()
+    self.logQ.close()
+    self._log_worker.join()
 
   def __str__(self):
     if self.subpath:
@@ -718,19 +725,27 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vt_core)
 
-  def _vt_runfuse(self, mnt):
+  def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
     '''
     S = self._vt_core.S
+    if fsname is None:
+      fsname = str(S).replace(',', ':')
     with S:
-      llfuse.init(self, mnt, self._vt_llf_opts)
+      defaults.push_Ss(S)
+      opts = set(self._vt_llf_opts)
+      opts.add("fsname=" + fsname)
+      llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
       self._vt_core.mnt_path = abspath(mnt)
+      @logexc
       def mainloop():
-        llfuse.main()
-        llfuse.close()
+        with S:
+          llfuse.main()
+          llfuse.close()
         S.close()
+        defaults.pop_Ss()
       T = PfxThread(target=mainloop)
       S.open()
       T.start()
@@ -825,7 +840,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def destroy(self):
     # TODO: call self.forget with all kreffed inums?
-    self._vt_core._sync()
+    X("%s.destroy...", self)
+    self._vt_core.close()
+    X("%s.destroy COMPLETE", self)
 
   @handler
   def flush(self, fh):
@@ -934,12 +951,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
       E = P
     elif name == '..':
       if E is self._vt_core.mntE:
+        # directly stat the directory above the mountpoint
         try:
           st = os.stat(dirname(self._vt_core.mnt_path))
         except OSError as e:
           raise FuseOSError(e.errno)
         EA = self._stat_EntryAttributes(st)
       else:
+        # otherwise use the parent with the FS
         E = P.parent
     elif name == PREV_DIRENT_NAME and self._vt_core.show_prev_dirent:
       E = P.prev_dirent
@@ -1059,6 +1078,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       names = FH.names
       while True:
         try:
+          E = None
           EA = None
           if o == 0:
             name = '.'
@@ -1071,8 +1091,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
                 st = os.stat(dirname(self._vt_core.mnt_path))
               except OSError as e:
                 warning("os.stat(%r): %s", dirname(self._vt_core.mnt_path), e)
-                raise FuseOSError(e.errno)
-              EA = self._stat_EntryAttributes(st)
+              else:
+                EA = self._stat_EntryAttributes(st)
             else:
               with S:
                 E = D[name]
@@ -1080,7 +1100,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
             o2 = o - 2
             if o2 == len(names) and fs.show_prev_dirent:
               name = PREV_DIRENT_NAME
-              E = D.prev_dirent
+              try:
+                E = D.prev_dirent
+              except MissingHashcodeError as e:
+                warning("prev_dirent unavailable: %s", e)
             elif o2 >= len(names):
               break
             else:

@@ -8,8 +8,9 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import datetime
 import errno
+from functools import partial
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET
+from os import lseek, pread, SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import shutil
@@ -18,7 +19,8 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
-from cs.deco import cached, decorator
+from cs.buffer import CornuCopyBuffer
+from cs.deco import cached, decorator, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -28,6 +30,7 @@ from cs.py3 import ustr, bytes
 from cs.range import Range
 from cs.threads import locked
 from cs.timeutils import TimeoutError
+from cs.x import X
 
 DISTINFO = {
     'description': "convenience functions and classes for files and filenames/pathnames",
@@ -73,17 +76,6 @@ except ImportError:
     os.lseek(fd, offset0, SEEK_SET)
     data = b''.join(chunks)
     return data
-
-def fdreader(fd, readsize=None):
-  ''' Generator yielding data chunks from a file descriptor until EOF.
-  '''
-  if readsize is None:
-    readsize = 1024
-  while True:
-    bs = os.read(fd, readsize)
-    if not bs:
-      break
-    yield bs
 
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
@@ -714,9 +706,138 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class ReadMixin(object):
-  ''' Useful read methods to accodmodate modes not necessarily available in a class.
+def datafrom_fd(fd, offset, readsize=None, aligned=True):
+  ''' General purpose reader for file descriptors yielding data from `offset`.
+      This does not move the file offset.
   '''
+  if readsize is None:
+    readsize = DEFAULT_READSIZE
+  if aligned:
+    # do an initial read to align all subsequent reads
+    alignsize = offset % readsize
+    if alignsize > 0:
+      X("PREAD ALIGN fd=%d, readsize=%d, offset=%d", fd, alignsize, offset)
+      bs = pread(fd, alignsize, offset)
+      if not bs:
+        return
+      yield bs
+      offset += len(bs)
+  while True:
+    X("PREAD fd=%d, readsize=%d, offset=%d", fd, readsize, offset)
+    bs = pread(fd, readsize, offset)
+    if not bs:
+      return
+    yield bs
+    offset += len(bs)
+
+@strable
+def datafrom(f, offset, readsize=None):
+  ''' General purpose reader for files yielding data from `offset`.
+      NOTE: this function may move the file pointer.
+      `readsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if readsize is None:
+    readsize = DEFAULT_READSIZE
+  if isinstance(f, int):
+    # operating system file descriptor
+    return datafrom_fd(f, offset, readsize=readsize)
+  # presume a file-like object
+  try:
+    read1 = f.read1
+  except AttrubuteError:
+    read1 = f.read
+  seek = f.seek
+  while True:
+    offset0 = f.tell()
+    f.seek(offset, SEEK_SET)
+    bs = read1(readsize)
+    f.seek(offset0)
+    if not bs:
+      yield bs
+    offset += len(bs)
+
+class ReadMixin(object):
+  ''' Useful read methods to accomodate modes not necessarily available in a class.
+
+      Note that this mixin presumes that the attribute `self._lock`
+      is a threading.RLock like context manager.
+
+      Classes using this mixin should consider overriding the default
+      .datafrom method with something more efficient or direct.
+  '''
+
+  def datafrom(self, offset, readsize=None):
+    ''' Yield data from the specified `offset` onward in some approximation of the "natural" chunk size.
+
+        NOTE: UNLIKE the global datafrom() function, this method
+        MUST NOT move the logical file position. Implementors may need
+        to save and restore the file pointer within a lock around
+        the I/O if they do not use a direct access method like
+        os.pread.
+
+        The aspiration here is to read data with only a single call
+        to the underlying storage, and to return the chunks in
+        natural sizes instead of some default read size.
+        Classes using this mixin must implement this method.
+    '''
+    raise NotImplementedError("return an iterator which does not change the file offset")
+
+  def bufferfrom(self, offset):
+    ''' Return a CornuCopyBuffer from the specified `offset`.
+    '''
+    return CornuCopyBuffer(self.datafrom(offset), offset=offset)
+
+  def read(self, size=-1, offset=None, longread=False):
+    ''' Read up to `size` bytes, honouring the "single system call" spirit unless `longread` is true.
+        `size`: the number of bytes requested. A size of -1 requests
+          all bytes to the end of the file.
+        `offset`: the starting point of the read; if None, use the
+          current file position; if not None, seek to this position
+          before reading, even if `size` == 0.
+        `longread`: switch from "single system call" to "as many
+          as required to obtain `size` bytes"; short data will still
+          be returned if the file is too short.
+    '''
+    bfr = getattr(self, '_reading_bfr', None)
+    if offset is None:
+      if bfr is None:
+        offset = self.tell()
+      else:
+        offset = bfr.offset
+    if size == -1:
+      size = len(self) - offset
+      if size < 0:
+        size = 0
+    if size == 0:
+      return b''
+    if longread:
+      bss = []
+    while size > 0:
+      with self._lock:
+        # We need to retest on each iteration because other reads
+        # may be interleaved, interfering with the buffer.
+        if bfr is None or bfr.offset != offset:
+          X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
+          self._reading_bfr = bfr = self.bufferfrom(offset)
+        bfr.extend(1, short_ok=True)
+        if not bfr.buf:
+          break
+        consume = min(size, len(bfr.buf))
+        assert consume > 0
+        chunk = bfr.take(consume)
+        offset += consume
+        self.seek(offset)
+      assert len(chunk) == consume
+      if longread:
+        bss.append(chunk)
+      else:
+        return chunk
+      size -= consume
+    if not bss:
+      return b''
+    if len(bss) == 1:
+      return bss[0]
+    return b''.join(bss)
 
   def read_n(self, n):
     ''' Read `n` bytes of data and return them.
@@ -730,35 +851,18 @@ class ReadMixin(object):
     nread = self.readinto(data)
     return memoryview(data)[:nread] if nread != n else data
 
-  def read_natural(self, n, rsize=None):
-    ''' A generator that yields data from the file in its natural blocking if possible.
-        `n`: the maximum number of bytes to read.
-        `rsize`: read size hint if relevant.
-        WARNING: this function may move the current file offset.
-        This function should be overridden by classes with natural
-        direct and efficient data streams. Example override cases
-        include a BackedFile which has natural blocks from the front
-        and back files and a CornuCopyBuffer which has natural
-        blocks from its source iterator.
-    '''
-    return file_data(self, n, rsize=rsize)
-
-  def read(self, n):
-    ''' Do a single potentially short read.
-    '''
-    for bs in self.file_data(n):
-      return bs
-
   @locked
   def readinto(self, barray):
     ''' Read data into a bytearray.
-        Uses read_natural to obtain data in as efficient a fashion as possible.
     '''
     needed = len(barray)
     boff = 0
-    for bs in self.read_natural(needed):
+    for bs in self.datafrom(self.tell()):
+      if not bs:
+        break
+      if len(bs) > needed:
+        bs = memoryview(bs)[:needed]
       bs_len = len(bs)
-      assert bs_len <= needed
       boff2 = boff + bs_len
       barray[boff:boff2] = bs
       boff = boff2
@@ -834,45 +938,32 @@ class BackedFile(ReadMixin):
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
 
-  def file_data(self, n, rsize=None):
-    ''' Return "natural" file data.
-        This is used to support readinto efficiently.
+  def datafrom(self, offset):
+    ''' Generator yielding natural chunks from the file commencing at offset.
     '''
-    if n < 1:
-      return
-    start = self._offset
-    end = start + n
-    back_file = self.back_file
     front_file = self.front_file
-    SLICES = list(self.front_range.slices(start, end))
-    for in_front, span in SLICES:
-      assert span.start == self._offset
-      assert span.end <= end
-      size = span.size
-      src_file = front_file if in_front else back_file
-      src_file.seek(self._offset)
-      try:
-        rn = src_file.read_natural
-      except AttributeError:
-        while size > 0:
-          bs = src_file.read(size)
-          bs_len = len(bs)
-          assert bs_len <= size
-          if bs:
-            self._offset += bs_len
-            yield bs
-          else:
-            break
-          size -= bs_len
-          assert self._offset <= end
+    try:
+      front_datafrom = front_file.datafrom
+    except AttributeError:
+      front_datafrom = partial(ReadMixin.datafrom, front_file)
+    back_file = self.back_file
+    try:
+      back_datafrom = back_file.datafrom
+    except AttributeError:
+      back_datafrom = partial(ReadMixin.datafrom, back_file)
+    for in_front, span in self.front_range.slices(offset, len(self)):
+      consume = len(span)
+      if in_front:
+        chunks = front_datafrom(offset)
       else:
-        for bs in rn(size, rsize=rsize):
-          self._offset += len(bs)
-          yield bs
-          assert self._offset <= end
-      if self._offset < span.end:
-        # short data, infer EOF, exit loop
-        break
+        chunks = back_datafrom(offset)
+      for bs in chunks:
+        if len(bs) > consume:
+          bs = memoryview(bs)[:consume]
+        yield bs
+        bs_len = len(bs)
+        consume -= bs_len
+        offset += bs_len
 
   @locked
   def write(self, b):
@@ -1001,18 +1092,23 @@ class NullFile(object):
   def flush(self):
     pass
 
-def file_data(fp, nbytes, rsize=None):
+def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
-      If `nbytes` is None, copy until EOF.
+      `nbytes`: number of bytes to read; if None read until EOF.
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
+  # try to use the "short read" flavour of read if available
   if rsize is None:
     rsize = DEFAULT_READSIZE
+  try:
+    read1 = fp.read1
+  except AttributeError:
+    read1 = fp.read
   ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
   copied = 0
   while nbytes is None or nbytes > 0:
     to_read = rsize if nbytes is None else min(nbytes, rsize)
-    data = fp.read(to_read)
+    data = read1(to_read)
     if not data:
       if nbytes is not None:
         if copied > 0:

@@ -19,10 +19,11 @@ import time
 from datetime import datetime
 import errno
 from itertools import chain
+from os.path import isfile
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import info, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
@@ -37,14 +38,19 @@ CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 # shared mapping of archive paths to Archive instances
 _ARCHIVES = {}
 
-def Archive(path, mapping=None):
+def Archive(path, mapping=None, missing_ok=False, weird_ok=False):
   ''' Return an Archive for the named file.
-      Maintains a mapping of issues Archives in order to reuse that
+      Maintains a mapping of issued Archives in order to reuse that
       same Archive for a given path.
   '''
   global _ARCHIVES
   if not path.endswith('.vt'):
-    warning("unusual Archive path: %r", path)
+    if weird_ok:
+      warning("unusual Archive path: %r", path)
+    else:
+      raise ValueError("invalid Archive path (should end in '.vt'): %r" % (path,))
+  if not missing_ok and not isfile(path):
+    raise ValueError("not a file: %r" % (path,))
   if mapping is None:
     mapping = _ARCHIVES
   path = realpath(path)
@@ -176,7 +182,7 @@ class _Archive(object):
         E, offset = parse(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
-        info("when=%s, E=%s", when, E)
+        ##info("when=%s, E=%s", when, E)
         yield when, E
 
   @staticmethod

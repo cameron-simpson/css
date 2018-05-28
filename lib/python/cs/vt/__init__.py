@@ -17,7 +17,10 @@ import os
 from string import ascii_letters, digits
 import tempfile
 import threading
+from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
+from cs.logutils import error, warning
+from cs.py.func import prop
 from cs.seq import isordered
 
 # Default OS level file high water mark.
@@ -32,21 +35,34 @@ class _Defaults(threading.local):
       A Store's __enter__/__exit__ methods push/pop that store
       from the default.
   '''
-  def __getattr__(self, attr):
-    if attr == 'S':
-      return None
-    if attr == 'oldS':
-      oldS = self.oldS = []
-      return oldS
-    raise AttributeError("no .%s attribute" % attr)
+  _Ss = []  # global stack of fallback Store values
+  def __init__(self):
+    threading.local.__init__(self)
+    self.Ss = []
+  @prop
+  @logexc
+  def S(self):
+    Ss = self.Ss
+    if Ss:
+      return Ss[-1]
+    warning("no per-Thread Store stack, using the global stack")
+    ##raise RuntimeError("BANG")
+    Ss = self._Ss
+    if Ss:
+      return Ss[-1]
+    error("%s: no per-Thread defaults.S and no global stack, returning None", self)
+    return None
   def pushStore(self, newS):
-    ##X("PUSH STORE %s => %s", defaults.S, newS)
-    defaults.oldS.append(defaults.S)
-    defaults.S = newS
+    newS.open()
+    self.Ss.append(newS)
   def popStore(self):
-    oldS = defaults.oldS.pop()
-    ##X("POP STORE %s => %s", defaults.S, oldS)
-    defaults.S = oldS
+    oldS = self.Ss.pop()
+    oldS.close()
+    return oldS
+  def push_Ss(self, newS):
+    self._Ss.append(newS)
+  def pop_Ss(self):
+    return self._Ss.pop()
 
 defaults = _Defaults()
 

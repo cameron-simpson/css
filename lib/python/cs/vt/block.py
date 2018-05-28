@@ -40,14 +40,13 @@ from functools import lru_cache
 import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning
+from cs.logutils import warning, exception
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext
-from .blockmap import BlockMap
 from .hash import decode as hash_decode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -218,6 +217,7 @@ class _Block(Transcriber, ABC):
         raise ValueError("invalid span: %r", span)
       self.span = span
     self.indirect = False
+    self.blockmap = None
     self._lock = RLock()
 
   def __eq__(self, oblock):
@@ -358,20 +358,21 @@ class _Block(Transcriber, ABC):
       yield self
 
   @locked
-  def get_blockmap(self, force=False):
+  def get_blockmap(self, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
-        `force`: if True, create a new blockmap anyway; default: False
+        `force`: if true, create a new blockmap anyway; default: False
+        `blockmapdir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
     else:
-      try:
-        blockmap = self.blockmap
-      except AttributeError:
-        blockmap = None
+      blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
-      self.blockmap = blockmap = BlockMap(self)
+      from .blockmap import BlockMap
+      if blockmapdir is None:
+        blockmapdir = defaults.S.blockmapdir
+      self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
   def chunks(self, start=None, end=None, no_blockmap=False):
@@ -384,6 +385,7 @@ class _Block(Transcriber, ABC):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
+    ##X("slices %s ...", self)
     if start is None:
       start = 0
     elif start < 0:
@@ -395,19 +397,19 @@ class _Block(Transcriber, ABC):
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
-        try:
-          blockmap = self.blockmap
-        except AttributeError:
-          pass
-        else:
+        blockmap = self.blockmap
+        if blockmap:
+          X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
           yield from blockmap.slices(start, end - start)
           return
+        X("_Block:%s.slices: no BlockMap (%r), fall through", self, blockmap)
       offset = 0
+      X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:
         sublen = len(B)
-        substart = max(0, start - offset)
-        subend = min(sublen, end - offset)
-        if substart < subend:
+        if start <= offset:
+          substart = max(0, start - offset)
+          subend = min(sublen, end - offset)
           yield from B.slices(substart, subend)
         offset += sublen
         if offset >= end:
@@ -617,12 +619,16 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       IndirectBlock. The referenced Blocks are encoded and assembled
       into the data for this Block.
 
-      The second way is to supplying the `hashcode` and `span` for an
-      existing Stored block, whose content is used to initialise an IndirectBlock is
-      with a hashcode and a span indicating the length of the data
-      encompassed by the block speified by the hashcode; the data of that
-      Block can be decoded to obtain the reference Blocks for this
-      IndirectBlock.
+      The second way is to supplying the `hashcode` and `span` for
+      an existing Stored block, whose content is used to initialise
+      an IndirectBlock is with a hashcode and a span indicating the
+      length of the data encompassed by the block speified by the
+      hashcode; the data of that Block can be decoded to obtain the
+      reference Blocks for this IndirectBlock.
+
+      As an optimisation, unless `force` is true, if `subblocks`
+      is empty a direct Block for b'' is returned or if `subblocks`
+      has just one element then that element is returned.
 
       TODO: allow data= initialisation, to decode raw iblock data.
   '''

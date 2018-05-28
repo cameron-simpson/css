@@ -14,11 +14,13 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
+from os.path import expanduser, isabs as isabspath
 import sys
 from cs.later import Later
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
+from cs.py.func import prop
 from cs.resources import MultiOpenMixin
 from cs.result import Result, report
 from cs.seq import Seq
@@ -27,7 +29,7 @@ from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
-  ''' Subclass of KeyError raised when accessing a hashcode not present in the Store.
+  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
   '''
   def __init__(self, hashcode):
     KeyError.__init__(self, str(hashcode))
@@ -89,11 +91,14 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       MultiOpenMixin.__init__(self, lock=lock)
       self.name = name
       self.hashclass = hashclass
+      self.config = None
       self.logfp = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
+      self.mountdir = None
       self.readonly = False
       self.writeonly = False
       self._archives = {}
+      self._blockmapdir = None
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
     params = [
@@ -201,35 +206,35 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def add_bg(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush_bg(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   ##########################################################################
   # Archive support.
@@ -246,6 +251,57 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     ''' Fetch the named archive or None.
     '''
     return self._archives.get(name)
+
+  ##########################################################################
+  # Blockmaps.
+  @prop
+  def blockmapdir(self):
+    ''' The path to this Store's blockmap directory, if specified.
+    '''
+    with Pfx("%s.blockmapdir", self):
+      dirpath = self._blockmapdir
+      if dirpath is None:
+        cfg = self.config
+        dirpath = cfg.get_default('blockmapdir')
+        if dirpath is not None:
+          if dirpath.startswith('['):
+            endpos = dirpath.find(']', 1)
+            if endpos < 0:
+              warning('[GLOBAL].blockmapdir: starts with "[" but no "]": %r', dirpath)
+            else:
+              clausename = dirpath[1:endpos].strip()
+              with Pfx('[%s]', clausename):
+                if not clausename:
+                  warning('[GLOBAL].blockmapdir: empty clause name: %r', dirpath)
+                else:
+                  try:
+                    S = cfg[clausename]
+                  except KeyError:
+                    warning("unknown config clause")
+                  else:
+                    rdirpathpos = endpos + 1
+                    if rdirpathpos == len(dirpath):
+                      rdirpath = 'blockmaps'
+                    elif dirpath.startswith('/', rdirpathpos):
+                      rdirpath = dirpath[rdirpathpos+1:]
+                      if not rdirpath:
+                        rdirpath = 'blockmaps'
+                    else:
+                      warning('[GLOBAL].blockmapdir: %r not followed with a slash: %r', dirpath[:endpos+1], dirpath)
+                      rdirpath = None
+                    if rdirpath:
+                      dirpath = S.localpathto(rdirpath)
+          else:
+            # TODO: generic handler for Store subpaths needed
+            if not isabspath(dirpath):
+              dirpath = expanduser(dirpath)
+              if not isabspath(dirpath):
+                dirpath = S.localpathto(dirpath)
+      return dirpath
+
+  @blockmapdir.setter
+  def blockmapdir(self, dirpath):
+    self._blockmapdir = dirpath
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
@@ -486,6 +542,7 @@ class ProxyStore(BasicStoreSync):
                 fillS.add_bg(data)
           self._defer(fill)
           return data
+    return None
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
@@ -499,7 +556,7 @@ class ProxyStore(BasicStoreSync):
   def flush(self):
     ''' Flush all the save Stores.
     '''
-    for result in self._multicall(self.save, 'flush_bg', ()):
+    for _ in self._multicall(self.save, 'flush_bg', ()):
       pass
 
 class DataDirStore(MappingStore):
@@ -519,6 +576,12 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
 
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
+
+  def localpathto(self, rpath):
+    return self._datadir.localpathto(rpath)
+
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
       This is needed because if a meta_store is specified then it
@@ -527,14 +590,14 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   '''
   if meta_store is None:
     return _PlatonicStore(name, statedirpath, *a, **kw)
-  return ProxyStore(
+  PS = _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw)
+  S = ProxyStore(
       name,
       save=(),
-      read=(
-          _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw),
-          meta_store
-      )
+      read=(PS, meta_store)
   )
+  S.get_Archive = PS.get_Archive
+  return S
 
 class _PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
@@ -564,6 +627,9 @@ class _PlatonicStore(MappingStore):
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
+
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
 
 class _ProgressStoreTemplateMapping(object):
 

@@ -13,7 +13,7 @@ import unittest
 from cs.randutils import randblock
 import cs.x
 from cs.x import X
-from .block import IndirectBlock, HashCodeBlock
+from .block import IndirectBlock, HashCodeBlock, _IndirectBlock
 from .blockmap import BlockMap
 from .store import MappingStore
 
@@ -60,6 +60,8 @@ class TestAll(unittest.TestCase):
         for width in 1, 2, 7:   ## , 17:
           X("gen depth=%d, width=%d ...", depth, width)
           top_block, flat_data = self._gen_data(depth, width)
+          if not isinstance(top_block, _IndirectBlock):
+            top_block = IndirectBlock(subblocks=[top_block], force=True)
           for mapsize in 999999, 10000007, 13131313, None:
             with self.subTest(mapsize=mapsize, depth=depth, width=width):
               X("test mapsize=%s", mapsize)

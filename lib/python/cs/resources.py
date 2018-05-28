@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from threading import Condition, RLock, Lock
 import time
 from cs.logutils import error
-from cs.obj import O, Proxy
+from cs.obj import O, Proxy, TrackedClassMixin
 from cs.py.stack import caller
 
 DISTINFO = {
@@ -35,7 +35,7 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class MultiOpenMixin(O):
+class MultiOpenMixin(O, TrackedClassMixin):
   ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
@@ -59,6 +59,7 @@ class MultiOpenMixin(O):
     if subopens:
       raise RuntimeError("subopens not implemented")
     O.__init__(self)
+    ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
     if lock is None:
       lock = RLock()
     self.opened = False
@@ -69,6 +70,9 @@ class MultiOpenMixin(O):
     self._lock = lock
     self._finalise_later = finalise_later
     self._finalise = None
+
+  def tcm_get_state(self):
+    return {'opened': self.opened, 'opens': self._opens}
 
   def __enter__(self):
     self.open(caller_frame=caller())
@@ -124,6 +128,7 @@ class MultiOpenMixin(O):
       self._opens -= 1
       opens = self._opens
     if opens == 0:
+      ##INACTIVE##self.tcm_dump(MultiOpenMixin)
       if caller_frame is None:
         caller_frame = caller()
       self._final_close_from = caller_frame
@@ -353,6 +358,8 @@ class RunState(object):
   @running.setter
   def running(self, status):
     ''' Set the running property.
+        `status`: the new running state, a Boolean
+        A change in status triggers the time measurements.
     '''
     if self._running:
       if not status:
