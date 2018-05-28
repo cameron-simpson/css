@@ -202,35 +202,35 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def add_bg(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush_bg(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   ##########################################################################
   # Archive support.
@@ -487,6 +487,7 @@ class ProxyStore(BasicStoreSync):
                 fillS.add_bg(data)
           self._defer(fill)
           return data
+    return None
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
@@ -500,7 +501,7 @@ class ProxyStore(BasicStoreSync):
   def flush(self):
     ''' Flush all the save Stores.
     '''
-    for result in self._multicall(self.save, 'flush_bg', ()):
+    for _ in self._multicall(self.save, 'flush_bg', ()):
       pass
 
 class DataDirStore(MappingStore):
