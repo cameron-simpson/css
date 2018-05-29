@@ -125,8 +125,10 @@ class CornuCopyBuffer(object):
         except StopIteration as e:
           if short_ok:
             break
-          raise EOFError("insufficient chunks, wanted %d but only found %d"
-                           % (min_size, length)) from e
+          raise EOFError(
+              "insufficient chunks, wanted %d but only found %d"
+              % (min_size, length)
+          )
         if next_chunk:
           # nonempty chunk, stash it
           bufs.append(next_chunk)
