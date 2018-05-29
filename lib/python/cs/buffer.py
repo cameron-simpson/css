@@ -280,8 +280,10 @@ class CornuCopyBuffer(object):
           except StopIteration as e:
             if short_ok:
               break
-            raise EOFError("insufficient chunks: skipto:%d but only reached %d"
-                             % (new_offset, offset)) from e
+            raise EOFError(
+                "insufficient chunks: skipto:%d but only reached %d"
+                % (new_offset, offset)
+            )
           bufskip = min(len(buf), toskip)
           if bufskip > 0:
             if copy_skip:
@@ -313,7 +315,9 @@ def chunky(bfr_func):
       @chunky
       def func(bfr, ...):
   '''
-  def chunks_func(chunks, *a, offset=0, copy_offsets=None, **kw):
+  def chunks_func(chunks, *a, **kw):
+    offset = kw.pop('offset', 0)
+    copy_offsets = kw.pop('copy_offsets', None)
     bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
     return bfr_func(bfr, *a, **kw)
   return chunks_func
