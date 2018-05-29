@@ -91,7 +91,7 @@ class VTCmd:
     pull other-store objects...
     report
     scan datafile
-    serve {-|host:port}
+    serve {-|/path/to/socket|host:port}
     test blockify file
     unpack dirrefs...
 '''
@@ -549,6 +549,13 @@ class VTCmd:
       RS = StreamStore("serve -", sys.stdin, sys.stdout,
                        local_store=defaults.S)
       RS.join()
+    elif isabspath(arg):
+      X("serve via UNIX socket at %r", arg)
+      from .socket import UNIXSocketStoreServer
+      with UNIXSocketStoreServer(arg, defaults.S) as srv:
+        self.runstate.notify_cancel.add(lambda rs: srv.cancel())
+        with self.runstate:
+          srv.join()
     else:
       cpos = arg.rfind(':')
       if cpos >= 0:
