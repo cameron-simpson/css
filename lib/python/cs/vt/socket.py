@@ -4,6 +4,7 @@
 # - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
+import os
 from socket import socket
 from socketserver import TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
 import sys
@@ -35,7 +36,7 @@ class _SocketStoreServer(MultiOpenMixin):
         name="%s[server-thread]" % (self,),
         target=self.server.serve_forever,
         kwargs={'poll_interval': 0.5})
-    self.server_thread.daemon = True
+    self.server_thread.daemon = False
     self.server_thread.start()
 
   def shutdown(self):
@@ -155,6 +156,10 @@ class UNIXSocketStoreServer(_SocketStoreServer):
     self.socket_path = socket_path
     self.server = _UNIXSocketServer(socket_path, S)
 
+  def shutdown(self):
+    super().shutdown()
+    os.remove(self.socket_path)
+
 class UNIXSocketStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.
   '''
@@ -162,7 +167,7 @@ class UNIXSocketStoreClient(StreamStore):
   def __init__(self, name, socket_path, addif=False):
     if name is None:
       name = "%s(socket_path=%r)" % (self.__class__.__name__, socket_path)
-    self.sock_socket_path = socket_path
+    self.socket_path = socket_path
     self.sock = None
     StreamStore.__init__(
         self, name, None, None,
@@ -175,11 +180,11 @@ class UNIXSocketStoreClient(StreamStore):
       self.sock.close()
 
   def _unixsock_connect(self):
-    info("UNIX SOCKET CONNECT to %r", self.sock_socket_path)
+    info("UNIX SOCKET CONNECT to %r", self.socket_path)
     assert not self.sock, "self.sock=%s" % (self.sock,)
     self.sock = socket()
     try:
-      self.sock.connect(self.sock_socket_path)
+      self.sock.connect(self.socket_path)
     except OSError:
       self.sock.close()
       self.sock = None
