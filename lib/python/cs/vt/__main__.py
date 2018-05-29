@@ -539,10 +539,10 @@ class VTCmd:
     return 0
 
   def cmd_serve(self, args):
-    ''' Start a service daemon listening on a TCP port or on stdin/stdout.
+    ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
     '''
     if len(args) != 1:
-      raise GetoptError("expected a port")
+      raise GetoptError("missing socket indicator")
     arg = args[0]
     if arg == '-':
       from .stream import StreamStore
@@ -564,13 +564,13 @@ class VTCmd:
         if len(host) == 0:
           host = '127.0.0.1'
         port = int(port)
-        from .tcp import TCPStoreServer
+        from .socket import TCPStoreServer
         with TCPStoreServer((host, port), defaults.S) as srv:
           self.runstate.notify_cancel.add(lambda rs: srv.cancel())
           with self.runstate:
             srv.join()
       else:
-        raise GetoptError("invalid serve argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
+        raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (arg,))
     return 0
 
   def cmd_ls(self, args):
