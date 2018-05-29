@@ -10,8 +10,6 @@ blockmap updates - use lower priority than regular I/O
 platonic updates - use lower priority than regular I/O
 Store.archive plumbing
 ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
-support bare "vt mount '[clause]'" ==> mounts on [GLOBAL].mountdir/{clause}
-support per-clause mountdir, for clauses that should mount elsewhere
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
 default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
