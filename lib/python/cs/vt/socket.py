@@ -5,48 +5,55 @@
 #
 
 from socket import socket
-from socketserver import TCPServer, UNIXStreamServer, ThreadingMixIn, StreamRequestHandler
+from socketserver import TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
 import sys
 from threading import Thread
-from .stream import StreamStore
 from cs.excutils import logexc
 from cs.logutils import info
 from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
 from cs.socketutils import OpenSocket
+from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin):
   ''' A threading TCPServer that accepts connections from TCPStoreClients.
   '''
 
   def __init__(self, S):
+    ''' Initialise the server.
+    '''
     super().__init__(self)
     self.S = S
-
-  def __str__(self):
-    return "%s(%s,S=%s)" % (type(self), self.bind_addr, self.S)
+    self.server = None
+    self.server_thread = None
 
   def startup(self):
+    ''' Start up the server.
+    '''
     self.S.open()
-    self.T = Thread(
+    self.server_thread = Thread(
         name="%s[server-thread]" % (self,),
         target=self.server.serve_forever,
         kwargs={'poll_interval': 0.5})
-    self.T.daemon = True
-    self.T.start()
+    self.server_thread.daemon = True
+    self.server_thread.start()
 
   def shutdown(self):
+    ''' Shut down the server.
+    '''
     self.server.shutdown()
-    self.T.join()
+    self.server_thread.join()
     self.S.close()
 
   def flush(self):
+    ''' Flush the backing Store.
+    '''
     self.S.flush()
 
   def join(self):
     ''' Wait for the server thread to exit.
     '''
-    self.T.join()
+    self.server_thread.join()
 
   def cancel(self):
     ''' Shut down the server thread.
@@ -127,20 +134,20 @@ class TCPStoreClient(StreamStore):
       raise
     return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
-class _UNIXSocketServer(ThreadingMixIn, UNIXStreamServer):
+class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, socket_path, S):
     with Pfx("%s.__init__(socket_path=%r, S=%s)", type(self), socket_path, S):
-      UNIXStreamServer.__init__(self, socket_path, _RequestHandler)
+      UnixStreamServer.__init__(self, socket_path, _RequestHandler)
       self.socket_path = socket_path
       self.S = S
       self.handlers = set()
 
   def __str__(self):
-    return "%s(%s,%s)" % (type(self), self.bind_addr, self.S,)
+    return "%s(%s,%s)" % (type(self), self.socket_path, self.S,)
 
 class UNIXSocketStoreServer(_SocketStoreServer):
-  ''' A threading UNIXStreamServer that accepts connections from UNIXSocketStoreClients.
+  ''' A threading UnixStreamServer that accepts connections from UNIXSocketStoreClients.
   '''
 
   def __init__(self, socket_path, S):
