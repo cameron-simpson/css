@@ -10,7 +10,7 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import lseek, pread, SEEK_CUR, SEEK_END, SEEK_SET
+from os import lseek, SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import shutil
@@ -740,7 +740,8 @@ def datafrom(f, offset, readsize=None):
     readsize = DEFAULT_READSIZE
   if isinstance(f, int):
     # operating system file descriptor
-    return datafrom_fd(f, offset, readsize=readsize)
+    for data in datafrom_fd(f, offset, readsize=readsize):
+      yield data
   # presume a file-like object
   try:
     read1 = f.read1
