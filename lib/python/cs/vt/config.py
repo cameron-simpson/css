@@ -21,7 +21,7 @@ from cs.result import Result
 from .cache import FileCacheStore
 from .compose import parse_store_specs, get_integer
 from .store import PlatonicStore, ProxyStore, DataDirStore
-from .tcp import TCPStoreClient
+from .socket import TCPStoreClient, UNIXSocketStoreClient
 
 def Store(spec, config=None):
   ''' Factory to construct Stores from string specifications.
@@ -107,7 +107,7 @@ class Config:
     '''
     with Pfx(repr(store_spec)):
       stores = self.Stores_from_spec(store_spec)
-      if len(stores) == 0:
+      if not stores:
         raise ValueError("empty Store specification: %r" % (store_spec,))
       if len(stores) == 1:
         return stores[0]
@@ -156,6 +156,10 @@ class Config:
         S = self.platonic_Store(store_name, clause_name, **params)
       elif store_type == 'proxy':
         S = self.proxy_Store(store_name, **params)
+      elif store_type == 'socket':
+        if 'socket_path' not in params:
+          params['socket_path'] = clause_name
+        S = self.socket_Store(store_name, **params)
       elif store_type == 'tcp':
         if 'host' not in params:
           params['host'] = clause_name
@@ -344,7 +348,7 @@ class Config:
         save_stores = self.Stores_from_spec(save)
       else:
         save_stores = save
-      readonly = len(save_stores) == 0
+      readonly = not save_stores
     if read is None:
       read_stores = []
     elif isinstance(read, str):
@@ -380,3 +384,16 @@ class Config:
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
     return TCPStoreClient(store_name, (host, port))
+
+  def socket_Store(
+      self,
+      store_name,
+      *,
+      type_=None,
+      socket_path = None,
+  ):
+    ''' Construct a UNIXSocketStoreClient from a "socket" clause.
+    '''
+    if type_ is not None:
+      assert type_ == 'socket'
+    return UNIXSocketStoreClient(store_name, socket_path)
