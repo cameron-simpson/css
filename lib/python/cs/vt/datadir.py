@@ -1077,7 +1077,7 @@ class PlatonicDir(_FilesDir):
                           E.block, blockQ)
                     scan_from = F.scanned_to
                     scan_start = time.time()
-                    for offset, flags, data, post_offset in F.scan(offset=F.scanned_to):
+                    for offset, flags, data, post_offset in F.scanfrom(offset=F.scanned_to):
                       hashcode = self.hashclass.from_chunk(data)
                       indexQ.put( (hashcode, PlatonicDirIndexEntry(filenum, offset, len(data)), post_offset) )
                       if meta_store is not None:
