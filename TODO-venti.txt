@@ -1,4 +1,3 @@
-global cs.vt.PATHSEP = / to use in place of os.sep in vt internal contexts
 make datadirs sharable by multiple vt instances: shared state csv
 cs.vt.socket_tests: UNIX domain socket tests
 ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore

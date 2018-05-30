@@ -28,7 +28,7 @@ from cs.seq import isordered
 MAX_FILE_SIZE = 1024 * 1024 * 1024
 
 # path separator, hardwired
-SEP = '/'
+PATHSEP = '/'
 
 class _Defaults(threading.local):
   ''' Per-thread default store stack.

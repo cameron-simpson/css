@@ -21,7 +21,7 @@ from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from cs.x import X
-from . import totext, SEP
+from . import totext, PATHSEP
 from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
@@ -731,7 +731,7 @@ class Dir(_Dirent):
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
-    return len(name) > 0 and name.find(SEP) < 0
+    return len(name) > 0 and name.find(PATHSEP) < 0
 
   def get(self, name, dflt=None):
     if name not in self:
@@ -828,7 +828,7 @@ class Dir(_Dirent):
     ''' Change directory to `path`, return the ending directory.
     '''
     D = self
-    for name in path.split(SEP):
+    for name in path.split(PATHSEP):
       if len(name) == 0:
         continue
       D = D.chdir1(name)
@@ -925,7 +925,7 @@ class DirFTP(Cmd):
   @property
   def prompt(self):
     prompt = self._prompt
-    pwd = SEP + self.op_pwd()
+    pwd = PATHSEP + self.op_pwd()
     return ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
 
   def emptyline(self):
@@ -956,11 +956,11 @@ class DirFTP(Cmd):
   def op_cd(self, path):
     ''' Change working directory.
     '''
-    if path.startswith(SEP):
+    if path.startswith(PATHSEP):
       D = self.root
     else:
       D = self.cwd
-    for base in path.split(SEP):
+    for base in path.split(PATHSEP):
       if base == '' or base == '.':
         pass
       elif base == '..':
@@ -1021,7 +1021,7 @@ class DirFTP(Cmd):
           raise ValueError("detached: E not present in P: E=%s, P=%s" % (E, P))
       names.append(name)
       E = P
-    return SEP.join(reversed(names))
+    return PATHSEP.join(reversed(names))
 
   @docmd
   def do_ls(self, args):
