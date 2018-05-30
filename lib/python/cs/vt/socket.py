@@ -13,20 +13,28 @@ from cs.excutils import logexc
 from cs.logutils import info
 from cs.pfx import Pfx
 from cs.queues import MultiOpenMixin
+from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
 from .stream import StreamStore
 
-class _SocketStoreServer(MultiOpenMixin):
+class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   ''' A threading TCPServer that accepts connections from TCPStoreClients.
   '''
 
-  def __init__(self, S):
+  def __init__(self, S, runstate=None):
     ''' Initialise the server.
     '''
-    super().__init__(self)
+    MultiOpenMixin.__init__(self)
+    RunStateMixin.__init__(self, runstate=runstate)
     self.S = S
     self.server = None
     self.server_thread = None
+    self.runstate.notify_start.add(lambda rs: self.open())
+    self.runstate.notify_end.add(lambda rs: self.close())
+    self.runstate.notify_cancel.add(lambda rs: self.shutdown_now())
+
+  def __str__(self):
+    return "%s[%s](S=%s)" % (type(self), self.runstate.state, self.S)
 
   def startup(self):
     ''' Start up the server.
@@ -46,6 +54,12 @@ class _SocketStoreServer(MultiOpenMixin):
     self.server_thread.join()
     self.S.close()
 
+  def shutdown_now(self):
+    ''' Issue closes until all current opens have been consumed.
+    '''
+    while not self.closed:
+      self.close()
+
   def flush(self):
     ''' Flush the backing Store.
     '''
@@ -55,12 +69,6 @@ class _SocketStoreServer(MultiOpenMixin):
     ''' Wait for the server thread to exit.
     '''
     self.server_thread.join()
-
-  def cancel(self):
-    ''' Shut down the server thread.
-        TODO: shutdown handler threads.
-    '''
-    self.server.shutdown()
 
 class _RequestHandler(StreamRequestHandler):
 
@@ -85,8 +93,8 @@ class _RequestHandler(StreamRequestHandler):
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
-  def __init__(self, bind_addr, S):
-    with Pfx("%s.__init__(bind_addr=%r, S=%s)", type(self), bind_addr, S):
+  def __init__(self, S, bind_addr):
+    with Pfx("%s.__init__(S=%s, bind_addr=%r)", type(self), S, bind_addr):
       TCPServer.__init__(self, bind_addr, _RequestHandler)
       self.bind_addr = bind_addr
       self.S = S
@@ -99,10 +107,10 @@ class TCPStoreServer(_SocketStoreServer):
   ''' A threading TCPServer that accepts connections from TCPStoreClients.
   '''
 
-  def __init__(self, bind_addr, S):
-    super().__init__(S)
+  def __init__(self, S, bind_addr, **kw):
+    super().__init__(S, **kw)
     self.bind_addr = bind_addr
-    self.server = _TCPServer(bind_addr, S)
+    self.server = _TCPServer(S, bind_addr)
 
 class TCPStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
@@ -137,8 +145,8 @@ class TCPStoreClient(StreamStore):
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
-  def __init__(self, socket_path, S):
-    with Pfx("%s.__init__(socket_path=%r, S=%s)", type(self), socket_path, S):
+  def __init__(self, S, socket_path):
+    with Pfx("%s.__init__(S=%s, socket_path=%r)", type(self), S, socket_path):
       UnixStreamServer.__init__(self, socket_path, _RequestHandler)
       self.socket_path = socket_path
       self.S = S
@@ -151,10 +159,10 @@ class UNIXSocketStoreServer(_SocketStoreServer):
   ''' A threading UnixStreamServer that accepts connections from UNIXSocketStoreClients.
   '''
 
-  def __init__(self, socket_path, S):
-    super().__init__(S)
+  def __init__(self, S, socket_path, **kw):
+    super().__init__(S, **kw)
     self.socket_path = socket_path
-    self.server = _UNIXSocketServer(socket_path, S)
+    self.server = _UNIXSocketServer(S, socket_path)
 
   def shutdown(self):
     super().shutdown()
