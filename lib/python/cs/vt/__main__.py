@@ -46,6 +46,7 @@ from .index import LMDBIndex
 from .parsers import scanner_from_filename
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
+from .server import serve_tcp, serve_socket
 from .smuggling import import_dir, import_file
 from .store import ProgressStore, DataDirStore
 from .transcribe import parse
@@ -551,11 +552,8 @@ class VTCmd:
       RS.join()
     elif isabspath(arg):
       X("serve via UNIX socket at %r", arg)
-      from .socket import UNIXSocketStoreServer
-      with UNIXSocketStoreServer(arg, defaults.S) as srv:
-        self.runstate.notify_cancel.add(lambda rs: srv.cancel())
-        with self.runstate:
-          srv.join()
+      srv = serve_socket(defaults.S, arg, runstate=self.runstate)
+      srv.join()
     else:
       cpos = arg.rfind(':')
       if cpos >= 0:
@@ -564,11 +562,8 @@ class VTCmd:
         if len(host) == 0:
           host = '127.0.0.1'
         port = int(port)
-        from .socket import TCPStoreServer
-        with TCPStoreServer((host, port), defaults.S) as srv:
-          self.runstate.notify_cancel.add(lambda rs: srv.cancel())
-          with self.runstate:
-            srv.join()
+        srv = serve_tcp(defaults.S, (host, port), runstate=self.runstate)
+        srv.join()
       else:
         raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (arg,))
     return 0
