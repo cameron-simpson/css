@@ -9,6 +9,7 @@ from threading import Condition, RLock, Lock
 import time
 from cs.logutils import error
 from cs.obj import O, Proxy, TrackedClassMixin
+from cs.py.func import prop
 from cs.py.stack import caller
 
 DISTINFO = {
@@ -19,7 +20,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.stack'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py.stack'],
 }
 
 class ClosedError(Exception):
@@ -327,12 +328,31 @@ class RunState(object):
     return self.running
   __nonzero__ = __bool__
 
+  def __str__(self):
+    return "RunState[%s:%ss]" % (self.state, self.elapsed_time)
+
   def __enter__(self):
     self.start()
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.end()
+
+  @prop
+  def state(self):
+    start_time = self.start_time
+    if start_time is None:
+      label = "pending"
+    elif self.running:
+      if self.cancelled:
+        label = "stopping"
+      else:
+        label = "running"
+    elif self.cancelled:
+      label = "cancelled"
+    else:
+      label = "stopped"
+    return label
 
   def start(self):
     ''' Start: adjust state, set start_time to now.
@@ -397,11 +417,14 @@ class RunState(object):
     ''' Property returning most recent run time (end_time-start_time).
         If still running, use now as the end time.
     '''
+    start_time = self.start_time
+    if start_time is None:
+      return None
     if self.running:
         end_time = time.time()
     else:
         end_time = self.end_time
-    return max(0, end_time - self.start_time)
+    return max(0, end_time - start_time)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a RunState.
