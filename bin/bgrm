@@ -8,9 +8,9 @@ rmopts=
 while :
 do
   case $1 in
-    --)	shift; break ;;
-    -?*)	rmopts="$rmopts $1" ;;
-    *)	break ;;
+    --) shift; break ;;
+    -?*)rmopts="$rmopts $1" ;;
+    *)  break ;;
   esac
   shift
 done
@@ -21,12 +21,12 @@ n=0
 for arg
 do
   case $arg in
-	*/*)	d=`dirname "$arg"` ;;
-	*)	d=. ;;
+    */*)d=`dirname "$arg"` ;;
+    *)  d=. ;;
   esac
   case $arg in
-	/*)	orig=$arg ;;
-	*)	orig=./$arg ;;
+    /*) orig=$arg ;;
+    *)  orig=./$arg ;;
   esac
   aside=$d/.frm.$$.$n
 
