@@ -18,24 +18,25 @@ xit=0
 
 n=0
 for arg
-do  case $arg in
+do
+  case $arg in
 	*/*)	d=`dirname "$arg"` ;;
 	*)	d=. ;;
-    esac
-    case $arg in
+  esac
+  case $arg in
 	/*)	orig=$arg ;;
 	*)	orig=./$arg ;;
-    esac
-    aside=$d/.frm.$$.$n
+  esac
+  aside=$d/.frm.$$.$n
 
-    n=`expr $n + 1`
-    if mv -i "$orig" "$aside"
-    then
-	# removed "lock bgrm" - fails if no access to lockdir
-	rm $rmopts "$aside" &
-    else
-	xit=$?
-    fi
+  n=`expr $n + 1`
+  if mv -i "$orig" "$aside"
+  then
+    # removed "lock bgrm" - fails if no access to lockdir
+    rm $rmopts "$aside" &
+  else
+    xit=$?
+  fi
 done
 
 exit $xit
