@@ -1,4 +1,3 @@
-config: store lists to be comma separates instead of colon separated, sidesteps colon in store_specs
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
 make datadirs sharable by multiple vt instances: shared state csv

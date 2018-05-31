@@ -25,9 +25,9 @@ def parse_store_specs(s, offset=0):
         with Pfx("offset %d", offset):
           sep = s[offset]
           offset += 1
-          if sep == ':':
+          if sep == ',':
             continue
-          raise ValueError("expected colon ':', found unexpected separator: %r" % (sep,))
+          raise ValueError("expected comma ',', found unexpected separator: %r" % (sep,))
     return store_specs
 
 def get_store_spec(s, offset):
