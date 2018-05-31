@@ -6,12 +6,13 @@
 
 rmopts=
 while :
-do  case $1 in
-	--)	shift; break ;;
-	-?*)	rmopts="$rmopts $1" ;;
-	*)	break ;;
-    esac
-    shift
+do
+  case $1 in
+    --)	shift; break ;;
+    -?*)	rmopts="$rmopts $1" ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 xit=0
