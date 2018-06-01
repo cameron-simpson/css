@@ -6,28 +6,30 @@
 # TODO: T_SYNC, to wait for pending requests before returning
 #
 
+''' Protocol for accessing Stores over a stream connection.
+'''
+
 from __future__ import with_statement
 import sys
 from cs.excutils import logexc
 from cs.inttypes import Enum
-from cs.logutils import setup_logging, info, debug, warning, error
-from cs.pfx import Pfx, XP
+from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
 from cs.threads import locked
-from cs.x import X
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum
 from .store import BasicStoreSync
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
-T_ADD = RqType(0)           # data->hashcode
-T_GET = RqType(1)           # hashcode->data
-T_CONTAINS = RqType(2)      # hash->boolean
-T_FLUSH = RqType(3)         # flush local and remote store
-T_HASHCODES = RqType(4)     # (hashcode,length)=>hashcodes
-T_HASHCODES_HASH = RqType(5)# (hashcode,length)=>hashcode_of_hashes
+T_ADD = RqType(0)               # data->hashcode
+T_GET = RqType(1)               # hashcode->data
+T_CONTAINS = RqType(2)          # hash->boolean
+T_FLUSH = RqType(3)             # flush local and remote store
+T_HASHCODES = RqType(4)         # (hashcode,length)=>hashcodes
+T_HASHCODES_HASH = RqType(5)    # (hashcode,length)=>hashcode_of_hashes
 
 class StreamStore(BasicStoreSync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -117,7 +119,7 @@ class StreamStore(BasicStoreSync):
       try:
         send_fp, recv_fp = self.connect()
       except Exception as e:
-        raise AttributeError("%r: connect fails: %s", attr, e) from e
+        raise AttributeError("%r: connect fails: %s" % (attr, e)) from e
       else:
         conn = self._conn = self._packet_connection(send_fp, recv_fp)
         return conn
@@ -127,8 +129,8 @@ class StreamStore(BasicStoreSync):
     ''' Wrap a pair of binary streams in a PacketConnection.
     '''
     conn = PacketConnection(
-      send_fp, recv_fp, self._handle_request,
-      name='PacketConnection:'+self.name)
+        send_fp, recv_fp, self._handle_request,
+        name='PacketConnection:'+self.name)
     # arrange to disassociate if the channel goes away
     conn.notify_recv_eof.add(self._packet_disconnect)
     conn.notify_send_eof.add(self._packet_disconnect)
@@ -163,8 +165,9 @@ class StreamStore(BasicStoreSync):
       # return 0 or (1, data)
       hashcode, offset = hash_decode(payload)
       if offset < len(payload):
-        raise ValueError("unparsed data after hashcode at offset %d: %r"
-                         % (offset, payload[offset:]))
+        raise ValueError(
+            "unparsed data after hashcode at offset %d: %r"
+            % (offset, payload[offset:]))
       data = local_store.get(hashcode)
       if data is None:
         return 0
@@ -173,8 +176,9 @@ class StreamStore(BasicStoreSync):
       # return flag
       hashcode, offset = hash_decode(payload)
       if offset < len(payload):
-        raise ValueError("unparsed data after hashcode at offset %d: %r"
-                         % (offset, payload[offset:]))
+        raise ValueError(
+            "unparsed data after hashcode at offset %d: %r"
+            % (offset, payload[offset:]))
       return 1 if hashcode in local_store else 0
     if rq_type == T_FLUSH:
       if payload:
@@ -183,33 +187,38 @@ class StreamStore(BasicStoreSync):
       return None
     if rq_type == T_HASHCODES:
       # return joined encoded hashcodes
-      hashclass, start_hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
-      hcodes = local_store.hashcodes(start_hashcode=start_hashcode,
-                                          reverse=reverse,
-                                          after=after,
-                                          length=length)
+      hashclass, start_hashcode, reverse, after, length \
+          = self._decode_request_hashcodes(flags, payload)
+      hcodes = local_store.hashcodes(
+          start_hashcode=start_hashcode,
+          reverse=reverse,
+          after=after,
+          length=length)
       payload = b''.join(h.encode() for h in hcodes)
       return payload
     if rq_type == T_HASHCODES_HASH:
       hashclass, start_hashcode, reverse, after, length \
-        = self._decode_request_hash_of_hashcodes(flags, payload)
+          = self._decode_request_hash_of_hashcodes(flags, payload)
       if hashclass is not local_store.hashclass:
-        raise ValueError("request hashclass %s does not match local_store hashclass %s"
-                         % (hashclass, local_store.hashclass))
+        raise ValueError(
+            "request hashclass %s does not match local_store hashclass %s"
+            % (hashclass, local_store.hashclass))
       if length is not None and length < 1:
         raise ValueError("length < 1: %r" % (length,))
       if after and start_hashcode is None:
         raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-      hashcode, h_final = local_store.hash_of_hashcodes(start_hashcode=start_hashcode,
-                                               reverse=reverse,
-                                               after=after,
-                                               length=length)
+      hashcode, h_final = local_store.hash_of_hashcodes(
+          start_hashcode=start_hashcode,
+          reverse=reverse,
+          after=after,
+          length=length)
       payload = hashcode.encode()
       if h_final is not None:
         payload += h_final.encode()
       return payload
-    raise ValueError("unrecognised request code: %d, payload=%r"
-                     % (rq_type, payload))
+    raise ValueError(
+        "unrecognised request code: %d, payload=%r"
+        % (rq_type, payload))
 
   def add(self, data):
     hashclass = self.hashclass
@@ -220,23 +229,24 @@ class StreamStore(BasicStoreSync):
     ok, flags, payload = self._conn.do(T_ADD, 0, data)
     if not ok:
       raise ValueError(
-          "NOT OK response from add(data=%r): flags=0x%0x, payload=%r",
-          data, flags, payload)
+          "NOT OK response from add(data=%r): flags=0x%0x, payload=%r"
+          % (data, flags, payload))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise ValueError("extra payload data after hashcode: %r" % (payload[offset:],))
     assert flags == 0
     if h != h2:
-      raise RuntimeError("hashclass=%s: precomputed hash %s:%s != hash from .add %s:%s"
-                         % (hashclass, type(h), h, type(h2), h2))
+      raise RuntimeError(
+          "hashclass=%s: precomputed hash %s:%s != hash from .add %s:%s"
+          % (hashclass, type(h), h, type(h2), h2))
     return h
 
   def get(self, h):
     ok, flags, payload = self._conn.do(T_GET, 0, h.encode())
     if not ok:
       raise ValueError(
-          "NOT OK response from get(h=%s): flags=0x%0x, payload=%r",
-          h, flags, payload)
+          "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
+          % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -245,7 +255,7 @@ class StreamStore(BasicStoreSync):
     if found:
       return payload
     if payload:
-      raise ValueError("not found, but payload=%r", payload)
+      raise ValueError("not found, but payload=%r" % (payload,))
     return None
 
   def contains(self, h):
@@ -254,8 +264,8 @@ class StreamStore(BasicStoreSync):
     ok, flags, payload = self._conn.do(T_CONTAINS, 0, h.encode())
     if not ok:
       raise ValueError(
-          "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r",
-          h, flags, payload)
+          "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
+          % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -266,9 +276,10 @@ class StreamStore(BasicStoreSync):
     return found
 
   def flush(self):
-    ok, flags, payload = self._conn.do(T_FLUSH, 0, b'')
+    _, flags, payload = self._conn.do(T_FLUSH, 0, b'')
     assert flags == 0
     assert not payload
+    local_store = self.local_store
     if local_store is not None:
       local_store.flush()
 
@@ -279,24 +290,28 @@ class StreamStore(BasicStoreSync):
 
   def hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
     if length is not None and length < 1:
-      raise ValueError("length should be None or >1, got: %r", length)
+      raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     hashclass = self.hashclass
     if length is not None and length < 1:
-      raise ValueError("length should be None or >1, got: %r", length)
+      raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-    flags = ( 0x01 if reverse else 0x00 ) \
-          | ( 0x02 if after else 0x00 )
-    payload = put_bss(hashclass.HASHNAME) \
-            + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode()) \
-            + put_bs(length if length else 0)
+    flags = (
+        ( 0x01 if reverse else 0x00 )
+        | ( 0x02 if after else 0x00 )
+    )
+    payload = (
+        put_bss(hashclass.HASHNAME)
+        + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
+        + put_bs(length if length else 0)
+    )
     ok, flags, payload = self._conn.do(T_HASHCODES, flags, payload)
     if not ok:
       raise ValueError(
-          "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r",
-          h, flags, payload)
+          "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
+          % (start_hashcode, flags, payload))
     if flags:
       raise ValueError("unexpected flags: 0x%02x" % (flags,))
     offset = 0
@@ -327,34 +342,46 @@ class StreamStore(BasicStoreSync):
       if hashcode_encoded:
         hashcode, offset2 = hash_decode(hashcode_encoded)
         if offset2 != len(hashcode_encoded):
-          raise ValueError("extra data in hashcode_encoded: %r",
-                           hashcode_encoded[offset2:])
+          raise ValueError(
+              "extra data in hashcode_encoded: %r"
+              % (hashcode_encoded[offset2:],))
       else:
         hashcode = None
       length, offset = get_bs(payload, offset)
       if length == 0:
         length = None
       if offset != len(payload):
-        raise ValueError("extra data in payload at offset=%d: %r", offset, payload[offset:])
+        raise ValueError(
+            "extra data in payload at offset=%d: %r"
+            % (offset, payload[offset:]))
       return hashclass, hashcode, reverse, after, length
 
-  def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(
+      self,
+      hashclass=None,
+      start_hashcode=None,
+      reverse=None, after=False, length=None
+  ):
     if length is not None and length < 1:
-      raise ValueError("length should be None or >1, got: %r", length)
+      raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     if hashclass is None:
       hashclass = self.hashclass
-    flags = ( 0x01 if reverse else 0x00 ) \
-          | ( 0x02 if after else 0x00 )
-    payload = put_bss(hashclass.HASHNAME) \
-            + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode()) \
-            + put_bs(length if length else 0)
+    flags = (
+        ( 0x01 if reverse else 0x00 )
+        | ( 0x02 if after else 0x00 )
+    )
+    payload = (
+        put_bss(hashclass.HASHNAME)
+        + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
+        + put_bs(length if length else 0)
+    )
     ok, flags, payload = self._conn.do(T_HASHCODES_HASH, flags, payload)
     if not ok:
       raise ValueError(
-          "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r",
-          flags, payload)
+          "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
+          % (flags, payload))
     if flags:
       raise ValueError("unexpected flags: 0x%02x" % (flags,))
     hashcode, offset = hash_decode(payload, 0)
@@ -363,8 +390,9 @@ class StreamStore(BasicStoreSync):
     else:
       h_final, offset = hash_decode(payload, offset)
       if offset < len(payload):
-        raise ValueError("after hashcode (%s) and h_final (%s), extra bytes: %r"
-                         % (hashcode, h_final, payload[offset:]))
+        raise ValueError(
+            "after hashcode (%s) and h_final (%s), extra bytes: %r"
+            % (hashcode, h_final, payload[offset:]))
     return hashcode, h_final
 
   @staticmethod
@@ -388,15 +416,18 @@ class StreamStore(BasicStoreSync):
       if hashcode_encoded:
         hashcode, offset2 = hash_decode(hashcode_encoded)
         if offset2 != len(hashcode_encoded):
-          raise ValueError("extra data in hashcode_encoded: %r",
-                           hashcode_encoded[offset2:])
+          raise ValueError(
+              "extra data in hashcode_encoded: %r"
+              % (hashcode_encoded[offset2:],))
       else:
         hashcode = None
       length, offset = get_bs(payload, offset)
       if length == 0:
         length = None
       if offset != len(payload):
-        raise ValueError("extra data in payload at offset=%d: %r", offset, payload[offset:])
+        raise ValueError(
+            "extra data in payload at offset=%d: %r"
+            % (offset, payload[offset:]))
       return hashclass, hashcode, reverse, after, length
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
