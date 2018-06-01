@@ -12,6 +12,7 @@ from cs.excutils import logexc
 from cs.inttypes import Enum
 from cs.logutils import setup_logging, info, debug, warning, error
 from cs.pfx import Pfx, XP
+from cs.py.func import prop
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
 from cs.threads import locked
@@ -34,21 +35,33 @@ class StreamStore(BasicStoreSync):
       or simply to implement the server side.
   '''
 
-  def __init__(self, name, send_fp, recv_fp, connect=None, local_store=None, addif=False, **kw):
+  def __init__(
+      self, name, send_fp, recv_fp,
+      *,
+      addif=False,
+      connect=None,
+      local_store=None,
+      exports=None,
+      **kw
+  ):
     ''' Initialise the Stream Store.
         `name`: the Store name.
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.
-        `connect`: if not None, a function to return `send_fp` and `recv_fp`.
-          If specified, the `send_fp` and `recv_fp` parameters must be None.
-        `local_store`: optional local Store for serving requests from the peer.
         `addif`: optional mode causing .add to probe the peer for
             the data chunk's hash and to only submit a T_ADD request
             if the block is missing; this is a bandwith optimisation
             at the expense of latency.
+        `connect`: if not None, a function to return `send_fp` and `recv_fp`.
+          If specified, the `send_fp` and `recv_fp` parameters must be None.
+        `local_store`: optional local Store for serving requests from the peer.
+        `exports`: a mapping of name=>Store providing requestable Stores
         Other keyword arguments are passed to BasicStoreSync.__init__.
     '''
     super().__init__('StreamStore:%s' % (name,), **kw)
+    self.mode_addif = addif
+    self._local_store = local_store
+    self.exports = exports
     if local_store is not None:
       if local_store.hashclass is not self.hashclass:
         raise ValueError("local_store.hashclass %s is not self.hashclass %s"
@@ -62,8 +75,24 @@ class StreamStore(BasicStoreSync):
       if send_fp is not None or recv_fp is not None:
         raise ValueError("connect is not None and one of send_fp or recv_fp is not None")
       self.connect = connect
-    self.local_store = local_store
-    self.mode_addif = addif
+
+  @prop
+  def local_store(self):
+    ''' The current local Store.
+    '''
+    return self._local_store
+
+  @local_store.setter
+  def local_store(self, newS):
+    ''' Switch out the local Store for a new one.
+    '''
+    if newS is not self.local_store:
+      oldS = self.local_store
+      if newS:
+        newS.open()
+      self.local_store = newS
+      if oldS:
+        oldS.close()
 
   def startup(self):
     super().startup()
@@ -124,18 +153,19 @@ class StreamStore(BasicStoreSync):
     ''' Perform the action for a request packet.
         Return as for the `request_handler` parameter to PacketConnection.
     '''
-    if self.local_store is None:
+    local_store = self._local_store
+    if local_store is None:
       raise ValueError("no local_store, request rejected")
     if rq_type == T_ADD:
       # return encoded hashcode
-      return self.local_store.add(payload).encode()
+      return local_store.add(payload).encode()
     if rq_type == T_GET:
       # return 0 or (1, data)
       hashcode, offset = hash_decode(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
-      data = self.local_store.get(hashcode)
+      data = local_store.get(hashcode)
       if data is None:
         return 0
       return 1, data
@@ -145,16 +175,16 @@ class StreamStore(BasicStoreSync):
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
-      return 1 if hashcode in self.local_store else 0
+      return 1 if hashcode in local_store else 0
     if rq_type == T_FLUSH:
       if payload:
         raise ValueError("unexpected payload for flush")
-      self.local_store.flush()
+      local_store.flush()
       return None
     if rq_type == T_HASHCODES:
       # return joined encoded hashcodes
       hashclass, start_hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
-      hcodes = self.local_store.hashcodes(start_hashcode=start_hashcode,
+      hcodes = local_store.hashcodes(start_hashcode=start_hashcode,
                                           reverse=reverse,
                                           after=after,
                                           length=length)
@@ -163,14 +193,14 @@ class StreamStore(BasicStoreSync):
     if rq_type == T_HASHCODES_HASH:
       hashclass, start_hashcode, reverse, after, length \
         = self._decode_request_hash_of_hashcodes(flags, payload)
-      if hashclass is not self.local_store.hashclass:
+      if hashclass is not local_store.hashclass:
         raise ValueError("request hashclass %s does not match local_store hashclass %s"
-                         % (hashclass, self.local_store.hashclass))
+                         % (hashclass, local_store.hashclass))
       if length is not None and length < 1:
         raise ValueError("length < 1: %r" % (length,))
       if after and start_hashcode is None:
         raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-      hashcode, h_final = self.local_store.hash_of_hashcodes(start_hashcode=start_hashcode,
+      hashcode, h_final = local_store.hash_of_hashcodes(start_hashcode=start_hashcode,
                                                reverse=reverse,
                                                after=after,
                                                length=length)
