@@ -1,3 +1,4 @@
+readahead for CornuCopyBuffer?
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
 make datadirs sharable by multiple vt instances: shared state csv
