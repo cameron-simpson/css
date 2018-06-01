@@ -21,7 +21,7 @@ from cs.result import Result
 from .cache import FileCacheStore
 from .compose import parse_store_specs, get_integer
 from .store import PlatonicStore, ProxyStore, DataDirStore
-from .socket import TCPStoreClient, UNIXSocketStoreClient
+from .socket import TCPClientStore, UNIXSocketClientStore
 
 def Store(spec, config=None):
   ''' Factory to construct Stores from string specifications.
@@ -373,7 +373,7 @@ class Config:
       host=None,
       port=None,
   ):
-    ''' Construct a TCPStoreClient from a "tcp" clause.
+    ''' Construct a TCPClientStore from a "tcp" clause.
     '''
     if type_ is not None:
       assert type_ == 'tcp'
@@ -383,7 +383,7 @@ class Config:
       raise ValueError('no "port"')
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
-    return TCPStoreClient(store_name, (host, port))
+    return TCPClientStore(store_name, (host, port))
 
   def socket_Store(
       self,
@@ -392,8 +392,8 @@ class Config:
       type_=None,
       socket_path = None,
   ):
-    ''' Construct a UNIXSocketStoreClient from a "socket" clause.
+    ''' Construct a UNIXSocketClientStore from a "socket" clause.
     '''
     if type_ is not None:
       assert type_ == 'socket'
-    return UNIXSocketStoreClient(store_name, socket_path)
+    return UNIXSocketClientStore(store_name, socket_path)

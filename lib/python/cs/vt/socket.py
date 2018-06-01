@@ -18,7 +18,7 @@ from cs.socketutils import OpenSocket
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
-  ''' A threading TCPServer that accepts connections from TCPStoreClients.
+  ''' A threading TCPServer that accepts connections from TCPClientStores.
   '''
 
   def __init__(self, S, runstate=None):
@@ -104,7 +104,7 @@ class _TCPServer(ThreadingMixIn, TCPServer):
     return "%s(%s,%s)" % (type(self), self.bind_addr, self.S,)
 
 class TCPStoreServer(_SocketStoreServer):
-  ''' A threading TCPServer that accepts connections from TCPStoreClients.
+  ''' A threading TCPServer that accepts connections from TCPClientStores.
   '''
 
   def __init__(self, S, bind_addr, **kw):
@@ -112,7 +112,7 @@ class TCPStoreServer(_SocketStoreServer):
     self.bind_addr = bind_addr
     self.server = _TCPServer(S, bind_addr)
 
-class TCPStoreClient(StreamStore):
+class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
@@ -156,7 +156,7 @@ class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
     return "%s(%s,%s)" % (type(self), self.socket_path, self.S,)
 
 class UNIXSocketStoreServer(_SocketStoreServer):
-  ''' A threading UnixStreamServer that accepts connections from UNIXSocketStoreClients.
+  ''' A threading UnixStreamServer that accepts connections from UNIXSocketClientStores.
   '''
 
   def __init__(self, S, socket_path, **kw):
@@ -168,7 +168,7 @@ class UNIXSocketStoreServer(_SocketStoreServer):
     super().shutdown()
     os.remove(self.socket_path)
 
-class UNIXSocketStoreClient(StreamStore):
+class UNIXSocketClientStore(StreamStore):
   ''' A Store attached to a remote Store at `socket_path`.
   '''
 

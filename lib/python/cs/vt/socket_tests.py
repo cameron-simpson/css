@@ -12,7 +12,7 @@ import sys
 import unittest
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
-from .socket import TCPStoreServer, TCPStoreClient
+from .socket import TCPStoreServer, TCPClientStore
 from .store import MappingStore
 from .store_tests import TestStore
 
@@ -35,11 +35,11 @@ def make_tcp_store():
     else:
       break
   remote_S.open()
-  S = TCPStoreClient(None, bind_addr)
+  S = TCPClientStore(None, bind_addr)
   return S, remote_S
 
 class TestTCPStore(TestStore, unittest.TestCase):
-  ''' Tests for TCPStoreServer and TCPStoreClient.
+  ''' Tests for TCPStoreServer and TCPClientStore.
   '''
 
   def _init_Store(self):
