@@ -126,7 +126,7 @@ class MultiOpenMixin(O, TrackedClassMixin):
         ##from threading import current_thread
         ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
-        return
+        return retval
       self._opens -= 1
       opens = self._opens
     if opens == 0:
@@ -184,9 +184,13 @@ class MultiOpenMixin(O, TrackedClassMixin):
     '''
     def is_opened_wrapper(self, *a, **kw):
       if self.closed:
-        raise RuntimeError("%s: %s: already closed from %s" % (is_opened_wrapper.__name__, self, self._final_close_from))
+        raise RuntimeError(
+            "%s: %s: already closed from %s"
+            % (is_opened_wrapper.__name__, self, self._final_close_from))
       if not self.opened:
-        raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
+        raise RuntimeError(
+            "%s: %s: not yet opened"
+            % (is_opened_wrapper.__name__, self))
       return func(self, *a, **kw)
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
@@ -432,9 +436,9 @@ class RunState(object):
     if start_time is None:
       return 0.0
     if self.running:
-        end_time = time.time()
+      end_time = time.time()
     else:
-        end_time = self.end_time
+      end_time = self.end_time
     return max(0, end_time - start_time)
 
 class RunStateMixin(object):
