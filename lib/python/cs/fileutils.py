@@ -28,6 +28,7 @@ from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes
 from cs.range import Range
+from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.x import X
@@ -471,7 +472,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
     return property(getprop)
   return made_files_property
 
-def makelockfile(path, ext=None, poll_interval=None, timeout=None):
+def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' Create a lockfile and return its path.
       The file can be removed with os.remove.
       This is the core functionality supporting the lockfile()
@@ -483,6 +484,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
       `timeout`: maximum time to wait before failing,
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
+      `runstate`: optional RunState duck instance supporting cancellation
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -493,6 +495,11 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
   start = None
   lockpath = path + ext
   while True:
+    if runstate is not None and runstate.cancelled:
+      warning(
+          "cs.fileutils.lockfile: cancelled; pid %d waited %ds for %r",
+          os.getpid(), now - start, lockpath)
+      raise CancellationError("lock acquisition cancelled")
     try:
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
     except OSError as e:
@@ -500,9 +507,10 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
         raise
       if timeout is not None and timeout <= 0:
         # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
+        raise TimeoutError(
+            "cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+            % (os.getpid(), lockpath),
+            timeout)
       now = time.time()
       # post: timeout is None or timeout > 0
       if start is None:
