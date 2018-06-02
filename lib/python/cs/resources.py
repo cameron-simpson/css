@@ -37,10 +37,11 @@ def not_closed(func):
   return not_closed_wrapper
 
 class MultiOpenMixin(O, TrackedClassMixin):
-  ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
+  ''' A mixin to count open and close calls, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
-      This mixin defines ._lock = RLock(); subclasses need not bother.
+      This mixin defines ._lock = RLock(); subclasses need not
+      bother, but may supply their own lock.
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
@@ -329,7 +330,7 @@ class RunState(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "RunState[%s:%ss]" % (self.state, self.elapsed_time)
+    return "RunState[%s:%gs]" % (self.state, self.run_time)
 
   def __enter__(self):
     self.start()
@@ -416,10 +417,11 @@ class RunState(object):
   def run_time(self):
     ''' Property returning most recent run time (end_time-start_time).
         If still running, use now as the end time.
+        If not started, return 0.0.
     '''
     start_time = self.start_time
     if start_time is None:
-      return None
+      return 0.0
     if self.running:
         end_time = time.time()
     else:
