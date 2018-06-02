@@ -228,19 +228,23 @@ class Pool(O):
         Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
   '''
 
-  def __init__(self, new_object, max_size=None):
+  def __init__(self, new_object, max_size=None, lock=None):
     ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
         `new_object` is a callable which returns a new object for the Pool.
         `max_size`: The maximum size of the pool of available objects saved for reuse.
             If omitted or None, defaults to 4.
             If 0, no upper limit is applied.
+        `lock`: optional shared Lock; if omitted or None a new Lock is allocated
     '''
+    O.__init__(self)
     if max_size is None:
       max_size = 4
+    if lock is None:
+      lock = Lock()
     self.new_object = new_object
     self.max_size = max_size
     self.pool = []
-    self._lock = Lock()
+    self._lock = lock
 
   def __str__(self):
     return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
