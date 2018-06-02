@@ -182,7 +182,7 @@ def get_integer(s, offset):
   )
 
 def CommandStore(shcmd, addif=False):
-  ''' Factory to return a StreamStore talking to command.
+  ''' Factory to return a StreamStore talking to a command.
   '''
   name = "StreamStore(%r)" % ("|" + shcmd, )
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
