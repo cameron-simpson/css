@@ -192,15 +192,20 @@ class MultiOpenMixin(O, TrackedClassMixin):
     return is_opened_wrapper
 
 class _SubOpen(Proxy):
+  ''' A single use proxy for another object with its own independent .closed attribute.
+
+      The target use case is MultiOpenMixins which return independent
+      closables from their .open method.
+  '''
 
   def __init__(self, proxied):
+    Proxy.__init__(self, proxied)
     self.closed = False
-    self.master = proxied
 
   def close(self):
     if self.closed:
       raise RuntimeError("already closed")
-    self.master.close()
+    self._proxied.close()
     self.closed = True
 
 class MultiOpen(MultiOpenMixin):
