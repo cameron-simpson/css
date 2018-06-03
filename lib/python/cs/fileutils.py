@@ -536,7 +536,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
     return lockpath
 
 @contextmanager
-def lockfile(path, ext=None, poll_interval=None, timeout=None):
+def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -544,12 +544,17 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       `timeout`: maximum time to wait before failing,
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
+      `runstate`: optional RunState duck instance supporting cancellation.
   '''
-  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
+  lockpath = makelockfile(
+      path,
+      ext=ext, poll_interval=poll_interval,
+      timeout=timeout, runstate=runstate)
   try:
     yield lockpath
   finally:
-    os.remove(lockpath)
+    with Pfx("remove %r", lockpath):
+      os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
