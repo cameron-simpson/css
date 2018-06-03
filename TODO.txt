@@ -1,3 +1,4 @@
+cs.flags: put a lock around all accesses
 SvcD to subclass RunStateMixin?
 Results to inherit from RunStateMixin
 SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
