@@ -6,16 +6,16 @@
 
 from .socket import TCPStoreServer, UNIXSocketStoreServer
 
-def serve_tcp(S, bind_addr, runstate=None):
+def serve_tcp(bind_addr, exports=None, runstate=None):
   ''' Return an open TCPStoreServer.
   '''
-  srv = TCPStoreServer(S, bind_addr, runstate=runstate)
+  srv = TCPStoreServer(bind_addr, exports=exports, runstate=runstate)
   srv.open()
   return srv
 
-def serve_socket(S, socket_path, runstate=None):
+def serve_socket(socket_path, exports=None, runstate=None):
   ''' Return an open UNIXSocketStoreServer.
   '''
-  srv = UNIXSocketStoreServer(S, socket_path, runstate=runstate)
+  srv = UNIXSocketStoreServer(socket_path, exports=exports, runstate=runstate)
   srv.open()
   return srv
