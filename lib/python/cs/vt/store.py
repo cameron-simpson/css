@@ -24,6 +24,7 @@ from cs.py.func import prop
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import Result, report
 from cs.seq import Seq
+from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
@@ -104,9 +105,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
-    params = [
-        attr + '=' + str(val) for attr, val in sorted(self._attrs.items())
-    ]
+    ##return "STORE(%s:%s)" % (type(self), self.name)
+    params = []
+    for attr, val in sorted(self._attrs.items()):
+      params.append(attr + '=' + str(val))
     return "%s:%s(%s)" % (
         self.__class__.__name__, self.hashclass.HASHNAME,
         ','.join([repr(self.name)] + params)
@@ -177,12 +179,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
   def startup(self):
     # Later already open
-    self.start()
+    pass
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
-    self.end()
     self.__funcQ.close()
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
