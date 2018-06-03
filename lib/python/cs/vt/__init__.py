@@ -13,6 +13,7 @@
           http://en.wikipedia.org/wiki/Venti
 '''
 
+from contextlib import contextmanager
 import os
 from string import ascii_letters, digits
 import tempfile
@@ -22,6 +23,7 @@ from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
 from cs.py.func import prop
 from cs.seq import isordered
+from cs.resources import RunState
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
@@ -39,6 +41,7 @@ class _Defaults(threading.local):
   def __init__(self):
     threading.local.__init__(self)
     self.Ss = []
+    self.runstate = RunState()
   @prop
   @logexc
   def S(self):
@@ -63,6 +66,13 @@ class _Defaults(threading.local):
     self._Ss.append(newS)
   def pop_Ss(self):
     return self._Ss.pop()
+
+  @contextmanager
+  def push_runstate(self, new_runstate):
+    old_runstate = self.runstate
+    self.runstate = new_runstate
+    yield new_runstate
+    self.runstate = old_runstate
 
 defaults = _Defaults()
 
