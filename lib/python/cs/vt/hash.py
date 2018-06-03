@@ -175,7 +175,11 @@ class HashCodeUtilsMixin(object):
         .hashcodes_missing, likewise
   '''
 
-  def hash_of_hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(
+      self,
+      start_hashcode=None,
+      reverse=None, after=False, length=None
+  ):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
     if length is not None and length < 1:
