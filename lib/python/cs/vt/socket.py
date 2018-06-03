@@ -21,12 +21,19 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   ''' A threading TCPServer that accepts connections from TCPClientStores.
   '''
 
-  def __init__(self, S, runstate=None):
+  def __init__(self, *, exports=None, runstate=None):
     ''' Initialise the server.
     '''
+    if exports is None:
+      exports = {}
+    elif not exports:
+      raise ValueError("empty exports: %r" % (exports,))
+    if '' not in exports:
+      exports[''] = defaults.S
     MultiOpenMixin.__init__(self)
     RunStateMixin.__init__(self, runstate=runstate)
-    self.S = S
+    self.exports = exports
+    self.S = exports['']
     self.server = None
     self.server_thread = None
     self.runstate.notify_start.add(lambda rs: self.open())
@@ -69,6 +76,16 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     ''' Wait for the server thread to exit.
     '''
     self.server_thread.join()
+
+  def switch_to(self, export_name):
+    ''' Switch the backend Store to one of the exports.
+    '''
+    newS = self.exports[export_name]
+    if newS is not self.S:
+      oldS = self.S
+      newS.open()
+      self.S = newS
+      oldS.close()
 
 class _RequestHandler(StreamRequestHandler):
 
