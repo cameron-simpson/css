@@ -161,43 +161,43 @@ class VTCmd:
       if upd is not None:
         upd.nl_level = logging.INFO
 
-    self.config = Config()
-
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
 
     xit = None
     self.runstate = RunState()
+    with defaults.push_runstate(self.runstate):
+      self.config = Config()
 
-    # catch signals, flag termination
-    def sig_handler(sig, frame):
-      ''' Signal handler
-      '''
-      warning("received signal %s from %s", sig, frame)
-      if sig == SIGQUIT:
-        thread_dump()
-      self.runstate.cancel()
-      if sig == SIGQUIT:
-        sys.exit(1)
-    signal(SIGHUP, sig_handler)
-    signal(SIGINT, sig_handler)
-    signal(SIGQUIT, sig_handler)
+      # catch signals, flag termination
+      def sig_handler(sig, frame):
+        ''' Signal handler
+        '''
+        warning("received signal %s from %s", sig, frame)
+        if sig == SIGQUIT:
+          thread_dump()
+        self.runstate.cancel()
+        if sig == SIGQUIT:
+          sys.exit(1)
+      signal(SIGHUP, sig_handler)
+      signal(SIGINT, sig_handler)
+      signal(SIGQUIT, sig_handler)
 
-    try:
-      xit = self.cmd_op(args)
-    except GetoptError as e:
-      error("%s", e)
-      badopts = True
+      try:
+        xit = self.cmd_op(args)
+      except GetoptError as e:
+        error("%s", e)
+        badopts = True
 
-    if badopts:
-      sys.stderr.write(usage)
-      return 2
+      if badopts:
+        sys.stderr.write(usage)
+        return 2
 
-    if not isinstance(xit, int):
-      raise RuntimeError("exit code not set by operation: %r" % (xit,))
+      if not isinstance(xit, int):
+        raise RuntimeError("exit code not set by operation: %r" % (xit,))
 
-    if ifdebug():
-      dump_debug_threads()
+      if ifdebug():
+        dump_debug_threads()
 
     return xit
 
