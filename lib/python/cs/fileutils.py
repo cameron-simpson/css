@@ -10,7 +10,11 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import lseek, SEEK_CUR, SEEK_END, SEEK_SET
+from os import SEEK_CUR, SEEK_END, SEEK_SET
+try:
+  from os import pread
+except ImportError:
+  pread = None
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import shutil
@@ -59,9 +63,7 @@ DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
 
-try:
-  from os import pread
-except ImportError:
+if pread is None:
   # implement our own pread
   # NB: not thread safe!
   def pread(fd, size, offset):
@@ -497,7 +499,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
   with Pfx("makelockfile: %r", lockpath):
     while True:
       if runstate is not None and runstate.cancelled:
-        warning("cancelled; pid %d waited %ds", os.getpid(), now - start)
+        warning("cancelled; pid %d waited %ds", os.getpid(), time.time() - start)
         raise CancellationError("lock acquisition cancelled")
       try:
         lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
@@ -583,9 +585,7 @@ def mkdirn(path, sep=''):
   '''
   with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
     if os.sep in sep:
-      raise ValueError(
-              "sep contains os.sep (%r)"
-              % (os.sep,))
+      raise ValueError("sep contains os.sep (%r)" % (os.sep,))
     opath = path
     if not path:
       path = '.' + os.sep
@@ -593,8 +593,8 @@ def mkdirn(path, sep=''):
     if path.endswith(os.sep):
       if sep:
         raise ValueError(
-                "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
-                % (path, sep, os.sep))
+            "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
+            % (path, sep, os.sep))
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
@@ -692,25 +692,37 @@ class Pathname(str):
 
   @property
   def dirname(self):
+    ''' The dirname of the Pathname.
+    '''
     return Pathname(dirname(self))
 
   @property
   def basename(self):
+    ''' The basename of this Pathname.
+    '''
     return Pathname(basename(self))
 
   @property
   def abs(self):
+    ''' The absolute form of this Pathname.
+    '''
     return Pathname(abspath(self))
 
   @property
   def isabs(self):
+    ''' Whether this Pathname is an absolute Pathname.
+    '''
     return isabspath(self)
 
   @property
   def short(self):
+    ''' The shortened form of this Pathname.
+    '''
     return self.shorten()
 
   def shorten(self, environ=None, prefixes=None):
+    ''' Shorten a Pathname using ~ and ~user.
+    '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
 def datafrom_fd(fd, offset, readsize=None, aligned=True):
@@ -752,14 +764,15 @@ def datafrom(f, offset, readsize=None):
   # presume a file-like object
   try:
     read1 = f.read1
-  except AttrubuteError:
+  except AttributeError:
     read1 = f.read
+  tell = f.tell
   seek = f.seek
   while True:
-    offset0 = f.tell()
-    f.seek(offset, SEEK_SET)
+    offset0 = tell()
+    seek(offset, SEEK_SET)
     bs = read1(readsize)
-    f.seek(offset0)
+    seek(offset0)
     if not bs:
       yield bs
     offset += len(bs)
@@ -1002,6 +1015,8 @@ class BackedFile_TestMethods(object):
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
   def test_BackedFile(self):
+    ''' Test function for a BackedFile to use in unit test suites.
+    '''
     from random import randint
     backing_text = self.backing_text
     bfp = self.backed_fp
@@ -1049,17 +1064,26 @@ class Tee(object):
     self._fps = list(fps)
 
   def add(self, output):
+    ''' Add a new output.
+    '''
     self._fps.append(output)
 
   def write(self, data):
+    ''' Write the data to all the outputs.
+        Note: does not detect or accodmodate short writes.
+    '''
     for fp in self._fps:
       fp.write(data)
 
   def flush(self):
+    ''' Flush all the outputs.
+    '''
     for fp in self._fps:
       fp.flush()
 
   def close(self):
+    ''' Close all the outputs and close the Tee.
+    '''
     for fp in self._fps:
       fp.close()
     self._fps = None
@@ -1090,14 +1114,20 @@ class NullFile(object):
   '''
 
   def __init__(self):
+    ''' Initialise the file offset to 0.
+    '''
     self.offset = 0
 
   def write(self, data):
+    ''' Discard data, advance file offset by length of data.
+    '''
     dlen = len(data)
     self.offset += dlen
     return dlen
 
   def flush(self):
+    ''' Flush buffered data to the subsystem.
+    '''
     pass
 
 def file_data(fp, nbytes=None, rsize=None):
@@ -1166,8 +1196,9 @@ def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
     raise ValueError("tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay))
   while True:
     chunk = fp.read(rsize)
-    if len(chunk) == 0:
+    if not chunk:
       if tail_mode:
+        # indicate EOF and pause
         yield chunk
         time.sleep(tail_delay)
       else:
