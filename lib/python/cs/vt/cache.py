@@ -9,6 +9,7 @@ from collections import namedtuple
 import sys
 from threading import Lock, Thread
 from cs.fileutils import RWFileBlockCache
+from cs.resources import RunStateMixin
 from cs.result import Result
 from cs.queues import IterableQueue
 from . import MAX_FILE_SIZE
@@ -31,6 +32,7 @@ class FileCacheStore(BasicStoreSync):
     self,
     name, backend, dirpath,
     max_cachefile_size=None, max_cachefiles=None,
+    runstate=None,
     **kw):
     ''' Initialise the FileCacheStore.
         `name`: the Store name
@@ -45,7 +47,8 @@ class FileCacheStore(BasicStoreSync):
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
-        max_cachefiles=max_cachefiles)
+        max_cachefiles=max_cachefiles,
+        runstate=runstate)
     self._attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
@@ -119,7 +122,7 @@ class CachedData(_CachedData):
   def fetch(self):
     return self.cachefile.get(self.offset, self.length)
 
-class FileDataMappingProxy(object):
+class FileDataMappingProxy(RunStateMixin):
   ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an asynchronous
       worker copies new data into a cache file and also to the backend
@@ -129,6 +132,7 @@ class FileDataMappingProxy(object):
   def __init__(
       self, backend, dirpath=None,
       max_cachefile_size=None, max_cachefiles=None,
+      runstate=None,
   ):
     ''' Initialise the cache.
         `backend`: mapping underlying us
@@ -140,6 +144,7 @@ class FileDataMappingProxy(object):
           more than this many cache files are kept at a time; default:
           DEFAULT_MAX_CACHEFILES
     '''
+    RunStateMixin.__init__(self, runstate=runstate)
     if max_cachefile_size is None:
       max_cachefile_size = DEFAULT_CACHEFILE_HIGHWATER
     if max_cachefiles is None:
@@ -156,6 +161,7 @@ class FileDataMappingProxy(object):
     self._workQ = IterableQueue()
     self._worker = Thread(target=self._work)
     self._worker.start()
+    self.runstate.notify_cancel.add(lambda rs: self.close())
 
   def close(self):
     ''' Shut down the cache.
