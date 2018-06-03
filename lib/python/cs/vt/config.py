@@ -15,9 +15,10 @@ from cs.configutils import ConfigWatcher
 from cs.env import envsub
 from cs.fileutils import shortpath, longpath
 from cs.lex import skipwhite
-from cs.logutils import debug
+from cs.logutils import debug, warning
 from cs.pfx import Pfx
 from cs.result import Result
+from . import defaults
 from .cache import FileCacheStore
 from .compose import parse_store_specs, get_integer
 from .store import PlatonicStore, ProxyStore, DataDirStore
@@ -40,9 +41,10 @@ class Config:
   CONFIG_PATH_ENVVAR = 'VT_CONFIG'
   CONFIG_PATH_DEFAULT = '$HOME/.vtrc'
 
-  def __init__(self, config_map=None, environ=None):
+  def __init__(self, config_map=None, environ=None, runstate=None):
     if environ is None:
       environ = os.environ
+    self.environ = environ
     if config_map is None:
       config_map = environ.get(
           self.CONFIG_PATH_ENVVAR,
@@ -50,7 +52,10 @@ class Config:
     if isinstance(config_map, str):
       self.path = config_map
       config_map = ConfigWatcher(self.path)
+    if runstate is None:
+      runstate = defaults.runstate
     self.map = config_map
+    self.runstate = runstate
     self._stores_by_name = {}  # clause_name => Result->Store
     self._lock = Lock()
 
@@ -132,6 +137,7 @@ class Config:
     ''' Construct a store given its specification.
     '''
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
+      warning("START")
       if not isinstance(params, dict):
         params = dict(params)
         if 'type' in params:
@@ -176,7 +182,7 @@ class Config:
 
   def config_Store(
       self,
-      store_name,
+      _,    # store_name, unused
       *,
       type_=None,
       clause_name=None,
@@ -199,6 +205,7 @@ class Config:
       path=None,
       basedir=None,
       data=None,
+      runstate=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -225,7 +232,9 @@ class Config:
         debug("path ==> %r", path)
     if data is not None:
       data = longpath(data)
-    return DataDirStore(store_name, path, data, None, None)
+    if runstate is None:
+      runstate = self.runstate
+    return DataDirStore(store_name, path, data, None, None, runstate=runstate)
 
   def filecache_Store(
       self,
@@ -236,6 +245,7 @@ class Config:
       max_files=None,
       max_file_size=None,
       basedir=None,
+      runstate=None,
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
@@ -268,10 +278,13 @@ class Config:
         debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
+    if runstate is None:
+      runstate = self.runstate
     return FileCacheStore(
         store_name, None, path,
         max_cachefile_size=max_file_size,
         max_cachefiles=max_files,
+        runstate=runstate,
     )
 
   def platonic_Store(
@@ -285,6 +298,7 @@ class Config:
       follow_symlinks=False,
       meta=None,
       archive=None,
+      runstate=None,
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
@@ -318,13 +332,16 @@ class Config:
       meta_store = Store(meta, self)
     if isinstance(archive, str):
       archive = longpath(archive)
+    if runstate is None:
+      runstate = self.runstate
     return PlatonicStore(
         store_name, path,
         datadirpath=data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
         meta_store=meta_store, archive=archive,
-        flag_prefix='VT_' + clause_name
+        flag_prefix='VT_' + clause_name,
+        runstate=runstate,
     )
 
   def proxy_Store(
@@ -335,6 +352,7 @@ class Config:
       save=None,
       read=None,
       read2=None,
+      runstate=None,
   ):
     ''' Construct a ProxyStore.
     '''
@@ -361,7 +379,9 @@ class Config:
       read2_stores = self.Stores_from_spec(read2)
     else:
       read2_stores = read2
-    S = ProxyStore(store_name, save_stores, read_stores, read2_stores)
+    if runstate is None:
+      runstate = self.runstate
+    S = ProxyStore(store_name, save_stores, read_stores, read2_stores, runstate=runstate)
     S.readonly = readonly
     return S
 
@@ -372,6 +392,7 @@ class Config:
       type_=None,
       host=None,
       port=None,
+      runstate=None,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
@@ -383,17 +404,22 @@ class Config:
       raise ValueError('no "port"')
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
-    return TCPClientStore(store_name, (host, port))
+    if runstate is None:
+      runstate = self.runstate
+    return TCPClientStore(store_name, (host, port), runstate=runstate)
 
   def socket_Store(
       self,
       store_name,
       *,
       type_=None,
-      socket_path = None,
+      socket_path=None,
+      runstate=None,
   ):
     ''' Construct a UNIXSocketClientStore from a "socket" clause.
     '''
     if type_ is not None:
       assert type_ == 'socket'
-    return UNIXSocketClientStore(store_name, socket_path)
+    if runstate is None:
+      runstate = self.runstate
+    return UNIXSocketClientStore(store_name, socket_path, runstate=runstate)
