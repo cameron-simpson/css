@@ -5,12 +5,13 @@
 #
 
 from contextlib import contextmanager
+import sys
 from threading import Condition, RLock, Lock
 import time
-from cs.logutils import error
+from cs.logutils import error, warning
 from cs.obj import O, Proxy, TrackedClassMixin
 from cs.py.func import prop
-from cs.py.stack import caller
+from cs.py.stack import caller, frames as stack_frames, stack_dump
 
 DISTINFO = {
     'description': "resourcing related classes and functions",
@@ -372,6 +373,12 @@ class RunState(object):
     ''' Start: adjust state, set start_time to now.
         Sets .cancelled to False and sets .running to True.
     '''
+    if self.running:
+      warning("runstate.start() when already running")
+      print("runstate.start(): originally started from:", file=sys.stderr)
+      stack_dump(Fs=self._started_from)
+    else:
+      self._started_from = stack_frames()
     assert not self.running
     self.cancelled = False
     self.running = True
