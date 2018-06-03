@@ -251,7 +251,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                       str(self.datadirpath)) )
 
   def startup(self):
-    self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(
         maxsize=4,
@@ -276,7 +275,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     T.start()
 
   def shutdown(self):
-    self.runstate.cancel()
     # shut down the monitor Thread
     self._monitor_Thread.join()
     # drain index update queue
