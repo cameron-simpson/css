@@ -494,52 +494,46 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
-  while True:
-    if runstate is not None and runstate.cancelled:
-      warning(
-          "cs.fileutils.lockfile: cancelled; pid %d waited %ds for %r",
-          os.getpid(), now - start, lockpath)
-      raise CancellationError("lock acquisition cancelled")
-    try:
-      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
-    except OSError as e:
-      if e.errno != errno.EEXIST:
-        raise
-      if timeout is not None and timeout <= 0:
-        # immediate failure
-        raise TimeoutError(
-            "cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-            % (os.getpid(), lockpath),
-            timeout)
-      now = time.time()
-      # post: timeout is None or timeout > 0
-      if start is None:
-        # first try - set up counters
-        start = now
-        complaint_last = start
-        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+  with Pfx("makelockfile: %r", lockpath):
+    while True:
+      if runstate is not None and runstate.cancelled:
+        warning("cancelled; pid %d waited %ds", os.getpid(), now - start)
+        raise CancellationError("lock acquisition cancelled")
+      try:
+        lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+      except OSError as e:
+        if e.errno != errno.EEXIST:
+          raise
+        if timeout is not None and timeout <= 0:
+          # immediate failure
+          raise TimeoutError( "pid %d timed out" % (os.getpid(),), timeout)
+        now = time.time()
+        # post: timeout is None or timeout > 0
+        if start is None:
+          # first try - set up counters
+          start = now
+          complaint_last = start
+          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+        else:
+          if now - complaint_last >= complaint_interval:
+            warning("pid %d waited %ds",
+                    os.getpid(), now - start)
+            complaint_last = now
+            complaint_interval *= 2
+        # post: start is set
+        if timeout is None:
+          sleep_for = poll_interval
+        else:
+          sleep_for = min(poll_interval, start + timeout - now)
+        # test for timeout
+        if sleep_for <= 0:
+          raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
+        time.sleep(sleep_for)
+        continue
       else:
-        if now - complaint_last >= complaint_interval:
-          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
-                  os.getpid(), now - start, lockpath)
-          complaint_last = now
-          complaint_interval *= 2
-      # post: start is set
-      if timeout is None:
-        sleep_for = poll_interval
-      else:
-        sleep_for = min(poll_interval, start + timeout - now)
-      # test for timeout
-      if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
-      time.sleep(sleep_for)
-      continue
-    else:
-      break
-  os.close(lockfd)
-  return lockpath
+        break
+    os.close(lockfd)
+    return lockpath
 
 @contextmanager
 def lockfile(path, ext=None, poll_interval=None, timeout=None):
