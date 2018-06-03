@@ -21,7 +21,7 @@ from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import Result, report
 from cs.seq import Seq
 from . import defaults
@@ -37,7 +37,7 @@ class MissingHashcodeError(KeyError):
   def __str__(self):
     return "missing hashcode: %s" % (self.hashcode,)
 
-class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
@@ -77,7 +77,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   _seq = Seq()
 
-  def __init__(self, name, capacity=None, hashclass=None, lock=None):
+  def __init__(self, name, capacity=None, hashclass=None, lock=None, runstate=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if not isinstance(name, str):
         raise TypeError("initial `name` argument must be a str, got %s", type(name))
@@ -87,8 +87,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
         capacity = 4
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
-      self._attrs = {}
+      if runstate is None:
+        runstate = defaults.runstate
       MultiOpenMixin.__init__(self, lock=lock)
+      RunStateMixin.__init__(self, runstate=runstate)
+      self._attrs = {}
       self.name = name
       self.hashclass = hashclass
       self.config = None
@@ -174,11 +177,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   def startup(self):
     # Later already open
-    pass
+    self.start()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
+    self.end()
     self.__funcQ.close()
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
@@ -453,7 +457,7 @@ class ProxyStore(BasicStoreSync):
       very low latency reads if data are in the cache.
   '''
 
-  def __init__(self, name, save, read, read2=()):
+  def __init__(self, name, save, read, read2=(), **kw):
     ''' Initialise a ProxyStore.
         `name`: ProxyStore name.
         `save`: iterable of Stores to which to save blocks
@@ -462,7 +466,7 @@ class ProxyStore(BasicStoreSync):
           to fetch blocks if not found via `read`. Typically these
           would be higher latency upstream Stores.
     '''
-    BasicStoreSync.__init__(self, name)
+    BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.read2 = frozenset(read2)
@@ -563,9 +567,9 @@ class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
   '''
 
-  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
-    MappingStore.__init__(self, name, datadir, **kw)
+  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, runstate=None, **kw):
+    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover, runstate=runstate)
+    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
     self._datadir = datadir
 
   def startup(self, **kw):
@@ -609,14 +613,17 @@ class _PlatonicStore(MappingStore):
       datadirpath=None, hashclass=None, indexclass=None,
       follow_symlinks=False, archive=None, meta_store=None,
       flag_prefix=None,
+      runstate=None,
       **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
-        flag_prefix=flag_prefix)
-    MappingStore.__init__(self, name, datadir, **kw)
+        flag_prefix=flag_prefix,
+        runstate=runstate,
+    )
+    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
     self._datadir = datadir
     self.readonly = True
 
