@@ -159,7 +159,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def __init__(self,
       statedirpath, datadirpath, hashclass, indexclass=None,
       create_statedir=None, create_datadir=None,
-      flags=None, flag_prefix=None
+      flags=None, flag_prefix=None,
+      runstate=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
         `statedirpath`: a directory containing state information
@@ -181,9 +182,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         `flags`: optional Flags object for control; if specified
             then `flag_prefix` is also required
         `flag_prefix`: prefix for control flag names
+        `runstate`: optional RunState, passed to RunStateMixin.__init__
     '''
     MultiOpenMixin.__init__(self, lock=RLock())
-    RunStateMixin.__init__(self)
+    RunStateMixin.__init__(self, runstate=runstate)
     if flags is None:
       if flag_prefix is None:
         flags = DummyFlags()
@@ -255,7 +257,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._cache = LRU_Cache(maxsize=4,
                             on_remove=lambda k, datafile: datafile.close())
     # obtain lock
-    self.lockpath = makelockfile(self.statefilepath)
+    self.lockpath = makelockfile(self.statefilepath, runstate=self.runstate)
     # open dbm index
     self.index = self.indexclass(self.indexbasepath, self.hashclass, self.index_entry_class.from_bytes, lock=self._lock)
     self.index.open()
