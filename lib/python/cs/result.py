@@ -77,7 +77,7 @@ class AsynchState(object):
   ready = 'ready'
   cancelled = 'cancelled'
 
-class CancellationError(RuntimeError):
+class CancellationError(Exception):
   ''' Raised when accessing result or exc_info after cancellation.
   '''
 
@@ -86,7 +86,7 @@ class CancellationError(RuntimeError):
       msg = "cancelled"
     elif not isinstance(msg, StringTypes):
       msg = "%s: cancelled" % (msg,)
-    RuntimeError.__init__(msg)
+    Exception.__init__(self, msg)
 
 class Result(O):
   ''' Basic class for asynchronous collection of a result.
