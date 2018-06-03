@@ -1,3 +1,6 @@
+Results to inherit from RunStateMixin
+SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
+SvcD/Portfwd: cleanup mode polling pid files to kill former processes
 take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
 cs.resources: finish subopen proxy support
 PyPI: remove cs.asynchron once dependent packages updated
