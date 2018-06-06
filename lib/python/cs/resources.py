@@ -280,10 +280,10 @@ class RunState(object):
       Its purpose is twofold, to provide easily queriable state
       around tasks which can start and stop, and to provide control
       methods to pronounce that a task has started, should stop
-      (cancel) and has stopped (end).
+      (cancel) and has stopped (stop).
 
       A RunState can be used a a context manager, with the enter
-      and exit methods calling .start and .end respectively.
+      and exit methods calling .start and .stop respectively.
 
       Monitor or daemon processes can poll the RunState to see when
       they should terminate, and may also manage the overall state
@@ -298,7 +298,7 @@ class RunState(object):
 
       .start(): set .running and clear .cancelled
       .cancel(): set .cancelled
-      .end(): clear .running
+      .stop(): clear .running
 
       A RunState has the following properties:
 
@@ -306,11 +306,11 @@ class RunState(object):
 
       running: true if the task is running. Assigning a true value
         to it also sets .start_time to now. Assigning a false value
-        to it also sets .end_time to now.
+        to it also sets .stop_time to now.
 
       start_time: the time .running was last set to true.
-      end_time: the time .running was last set to false.
-      run_time: max(0, .end_time - .start_time)
+      stop_time: the time .running was last set to false.
+      run_time: max(0, .stop_time - .start_time)
 
       stopped: true if the task is not running.
 
@@ -330,7 +330,7 @@ class RunState(object):
     self.cancelled = False
     # timing state
     self.start_time = None
-    self.end_time = None
+    self.stop_time = None
     self.total_time = 0
     # callbacks
     self.notify_start = set()
@@ -351,7 +351,7 @@ class RunState(object):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    self.end()
+    self.stop()
 
   @prop
   def state(self):
@@ -383,12 +383,15 @@ class RunState(object):
     self.cancelled = False
     self.running = True
 
-  def end(self):
-    ''' End: adjust state, set end_time to now.
+  def stop(self):
+    ''' Stop: adjust state, set stop_time to now.
         Sets sets .running to False.
     '''
     assert self.running
     self.running = False
+
+  # compatibility
+  end = stop
 
   @property
   def running(self):
@@ -404,7 +407,7 @@ class RunState(object):
     '''
     if self._running:
       if not status:
-        self.end_time = time.time()
+        self.stop_time = time.time()
         self.total_time += self.run_time
         for notify in self.notify_end:
           notify(self)
@@ -435,18 +438,18 @@ class RunState(object):
 
   @property
   def run_time(self):
-    ''' Property returning most recent run time (end_time-start_time).
-        If still running, use now as the end time.
+    ''' Property returning most recent run time (stop_time-start_time).
+        If still running, use now as the stop time.
         If not started, return 0.0.
     '''
     start_time = self.start_time
     if start_time is None:
       return 0.0
     if self.running:
-      end_time = time.time()
+      stop_time = time.time()
     else:
-      end_time = self.end_time
-    return max(0, end_time - start_time)
+      stop_time = self.stop_time
+    return max(0, stop_time - start_time)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a RunState.
