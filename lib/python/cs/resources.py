@@ -37,7 +37,7 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class MultiOpenMixin(O, TrackedClassMixin):
+class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
   ''' A mixin to count open and close calls, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
@@ -218,13 +218,19 @@ class MultiOpen(MultiOpenMixin):
   '''
 
   def __init__(self, openable, finalise_later=False, lock=None):
+    ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
+    '''
     MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
     self.openable = openable
 
   def startup(self):
+    ''' Open the associated openable object.
+    '''
     self.openable.open()
 
   def shutdown(self):
+    ''' Close the associated openable object.
+    '''
     self.openable.close()
 
 class Pool(O):
@@ -355,6 +361,13 @@ class RunState(object):
 
   @prop
   def state(self):
+    ''' The RunState's state as a string.
+        pending: not yet running/started.
+        stopping: running and cancelled.
+        running: running and not cancelled.
+        cancelled: cancelled and no longer running.
+        stopping: no longer running and not cancelled.
+    '''
     start_time = self.start_time
     if start_time is None:
       label = "pending"
@@ -456,20 +469,34 @@ class RunStateMixin(object):
       Provides: .runstate, .cancelled, .running, .stopping, .stopped.
   '''
   def __init__(self, runstate=None):
+    ''' Initialise the RunStateMixin; sets the .runstate attribute.
+        `runstate`: optional RunState instance. If omitted or None,
+          a new RunState is allocated.
+    '''
     if runstate is None:
       runstate = RunState()
     self.runstate = runstate
   def cancel(self):
+    ''' Call .runstate.cancel().
+    '''
     return self.runstate.cancel()
   @property
   def cancelled(self):
+    ''' Test .runstate.cancelled.
+    '''
     return self.runstate.cancelled
   @property
   def running(self):
+    ''' Test .runstate.running.
+    '''
     return self.runstate.running
   @property
   def stopping(self):
+    ''' Test .runstate.stopping.
+    '''
     return self.runstate.stopping
   @property
   def stopped(self):
+    ''' Test .runstate.stopped.
+    '''
     return self.runstate.stopped
