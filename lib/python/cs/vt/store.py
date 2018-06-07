@@ -24,6 +24,7 @@ from cs.py.func import prop
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import Result, report
 from cs.seq import Seq
+from cs.threads import bg
 from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
@@ -307,6 +308,59 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   @blockmapdir.setter
   def blockmapdir(self, dirpath):
     self._blockmapdir = dirpath
+
+  def pushto(self, S2, capacity=1024):
+    ''' Allocate a Queue for Blocks to push from this Store to another Store `S2`.
+        Return (Q, T) where `Q` is the new Queue and `T` is the
+        Thread processing thw Queue.  The caller can then .put
+        Blocks onto the Queue. When finished, call Q.close() to
+        indicate end of Blocks and T.join() to wait for the processing
+        completion.
+    '''
+    X("NEW PUSHTO %r ==> %r", self.name, S2.name)
+    Q = IterableQueue(capacity=capacity)
+    lock = Lock()
+    S1 = self
+    S1.open()
+    S2.open()
+    pending = set()
+    def pusher():
+      X("START PUSHTO PROCESSING...")
+      with S1:
+        for B in Q:
+          X("PUSHTO: B=%s", B)
+          try:
+            h = B.hashcode
+          except AttributeError:
+            warning("not a hashcode Block, skipping: %s", B)
+            continue
+          inR = S2.contains_bg(h)
+          with lock:
+            pending.add(inR)
+          def addif(S2, B, inR):
+            with lock:
+              pending.remove(inR)
+            if not inR.result:
+              addR = S2.add_bg(B.data)
+              with lock:
+                pending.add(addR)
+              def post_add():
+                with lock:
+                  pending.remove(addR)
+              addR.notify(post_add)
+          inR.notify(addif)
+        X("PUSHTO: NO MORE BLOCKS")
+        with lock:
+          outstanding = list(pending)
+        X("PUSHTO: %d outstanding, waiting...", len(outstanding))
+        for R in outstanding:
+          R.join()
+      X("PUSHTO: RELEASE S1 and S2")
+      S2.close()
+      S1.close()
+      X("PUSHTO: PROCESSING THREAD COMPLETES")
+    T = bg(pusher)
+    return Q, T
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
