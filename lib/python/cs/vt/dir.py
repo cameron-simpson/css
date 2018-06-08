@@ -57,6 +57,15 @@ F_NOBLOCK = 0x04        # has no Block reference
 F_HASUUID = 0x08        # has a UUID
 F_PREVDIRENT = 0x10     # has reference to serialised previous Dirent
 
+def Dirents_from_data(data, offset=0):
+  ''' Decode Dirents from `data`, yield each in turn.
+      `data`: the data to decode.
+      `offset`: the starting offset within the data, default 0.
+  '''
+  while offset < len(data):
+    E, offset = _Dirent.from_bytes(data, offset)
+    yield E
+
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
@@ -682,14 +691,12 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      offset = 0
       try:
         data = self._block.data
       except Exception as e:
         warning("Dir.entries: self._block.data: %s", e)
       else:
-        while offset < len(data):
-          E, offset = _Dirent.from_bytes(data, offset)
+        for E in Dirents_from_data(data):
           E.parent = self
           emap[E.name] = E
       self._entries = emap
@@ -920,6 +927,30 @@ class Dir(_Dirent):
 
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
+
+  def pushto(self, S2, Q=None):
+    ''' Push the Dir Blocks to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        This pushes the Dir's Block encoding to `S2` and then
+        recursively pushes each Dirent's Block data to `S2`.
+    '''
+    if Q is None:
+      # create a Queue and a worker Thread
+      Q, T = defaults.S.pushto(S2)
+    else:
+      # use an existing Queue, no Thread to wait for
+      T = None
+    B = self.block
+    # push the Dir block data
+    B.pushto(S2, Q=Q)
+    # and recurse into contents
+    for E in Dirents_from_data(B.data):
+      E.pushto(S2, Q=Q)
+    if T:
+      Q.close()
+      T.join()
 
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.
