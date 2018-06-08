@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+#
+
+''' Implementation of directories (Dir) and their entries (FileDirent, etc).
+'''
+
 import os
 import os.path
 from cmd import Cmd
@@ -21,13 +27,12 @@ from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from cs.x import X
-from . import totext, PATHSEP
+from . import totext, PATHSEP, defaults
 from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
-from .transcribe import Transcriber, transcribe_s, transcribe_mapping, \
-                        parse_mapping, \
+from .transcribe import Transcriber, \
                         register as register_transcriber
 
 uid_nobody = -1
@@ -41,6 +46,8 @@ D_DIR_T = 1
 D_SYM_T = 2
 D_HARD_T = 3
 def D_type2str(type_):
+  ''' Convert a numeric Dirent type value to a string.
+  '''
   if type_ == D_FILE_T:
     return "D_FILE_T"
   if type_ == D_DIR_T:
@@ -70,7 +77,14 @@ class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta=None, uuid=None, parent=None, prevblock=None):
+  def __init__(
+      self,
+      type_, name,
+      meta=None,
+      uuid=None,
+      parent=None,
+      prevblock=None
+  ):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -98,11 +112,13 @@ class _Dirent(Transcriber):
     self.parent = parent
 
   def __repr__(self):
-    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
-                               id(self),
-                               D_type2str(self.type),
-                               self.name,
-                               self.meta)
+    return "%s:%d(%s,%s,%s)" % (
+        self.__class__.__name__,
+        id(self),
+        D_type2str(self.type),
+        self.name,
+        self.meta
+    )
 
   @classmethod
   def from_bytes(cls, data, offset=0):
@@ -154,11 +170,16 @@ class _Dirent(Transcriber):
   def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
     '''
-    if type_ == D_DIR_T:    cls = Dir
-    elif type_ == D_FILE_T: cls = FileDirent
-    elif type_ == D_SYM_T:  cls = SymlinkDirent
-    elif type_ == D_HARD_T: cls = HardlinkDirent
-    else:                   cls = InvalidDirent
+    if type_ == D_DIR_T:
+      cls = Dir
+    elif type_ == D_FILE_T:
+      cls = FileDirent
+    elif type_ == D_SYM_T:
+      cls = SymlinkDirent
+    elif type_ == D_HARD_T:
+      cls = HardlinkDirent
+    else:
+      cls = InvalidDirent
     return cls(name, **kw)
 
   def encode(self):
@@ -252,6 +273,8 @@ class _Dirent(Transcriber):
 
   @prop
   def uuid(self):
+    ''' Return this Dirent's UUID, creating it if necessary.
+    '''
     u = self._uuid
     if u is None:
       u = self._uuid = uuid4()
@@ -270,11 +293,12 @@ class _Dirent(Transcriber):
 
   # TODO: support .block=None
   def __eq__(self, other):
-    return ( self.name == other.name
-         and self.type == other.type
-         and self.meta == other.meta
-         and self.block == other.block
-           )
+    return (
+        self.name == other.name
+        and self.type == other.type
+        and self.meta == other.meta
+        and self.block == other.block
+    )
 
   @locked_property
   def prev_dirent(self):
@@ -288,13 +312,16 @@ class _Dirent(Transcriber):
     data = prev_blockref.data
     E, offset = _Dirent.from_bytes(data)
     if offset < len(data):
-      warning("prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
-        B, offset, data[offset:])
+      warning(
+          "prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
+          prev_blockref, offset, data[offset:])
     return E
 
   @prev_dirent.setter
   @locked
   def prev_dirent(self, E):
+    ''' Set the previous Dirent.
+    '''
     assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
     self._prev_dirent = None
     Ebs = E.encode()
@@ -339,15 +366,21 @@ class _Dirent(Transcriber):
 
   @property
   def size(self):
+    ''' Return this Dirent's length: its Block's span length.
+    '''
     block = self.block
     return None if block is None else len(block)
 
   @property
   def mtime(self):
+    ''' Return this Dirent's modification time (meta.mtime).
+    '''
     return self.meta.mtime
 
   @mtime.setter
   def mtime(self, newtime):
+    ''' Set this Dirent's modification time (meta.mtime).
+    '''
     self.meta.mtime = newtime
 
   def touch(self, when=None):
@@ -358,6 +391,8 @@ class _Dirent(Transcriber):
     self.mtime = when
 
   def stat(self):
+    ''' Return this Dirent's meta.stat().
+    '''
     return self.meta.stat()
 
   def complete(self, S2, recurse=False):
@@ -365,7 +400,7 @@ class _Dirent(Transcriber):
         TODO: parallelise like _Block.complete.
     '''
     self.block.complete(S2)
-    if self.isdir:
+    if self.isdir and recurse:
       for name, entry in self.entries.items():
         if name != '.' and name != '..':
           entry.complete(S2, True)
@@ -379,6 +414,8 @@ register_transcriber(_Dirent, (
 ))
 
 class InvalidDirent(_Dirent):
+  ''' Encapsulation for an invalid Dirent data chunk.
+  '''
 
   transcribe_prefix = 'INVALIDDirent'
 
@@ -402,25 +439,31 @@ class InvalidDirent(_Dirent):
     return self.chunk
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of this InvalidDirent's transcription.
+    '''
     attrs = OrderedDict()
-    attrs['block'] = self.block # data block if any
-    attrs['chunk'] = self.chunk # original encoded data
+    attrs['block'] = self.block     # data block if any
+    attrs['chunk'] = self.chunk     # original encoded data
     return super().transcribe_inner(T, fp, attrs)
 
 class SymlinkDirent(_Dirent):
+  ''' A symbolic link.
+  '''
 
   transcribe_prefix = 'SymLink'
 
   def __init__(self, name, *, block=None, **kw):
     super().__init__(D_SYM_T, name, **kw)
     if block is not None:
-      raise ValueError("block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
     if self.meta.pathref is None:
       raise ValueError("meta.pathref required")
 
   @property
   def pathref(self):
+    ''' The symbolic link's path reference.
+    '''
     return self.meta.pathref
 
   def transcribe_inner(self, T, fp):
@@ -428,7 +471,7 @@ class SymlinkDirent(_Dirent):
 
 class HardlinkDirent(_Dirent):
   ''' A hard link.
-      Unlike the regular UNIX filesystem, in a venti filesystem a
+      Unlike the regular UNIX filesystem, in a vt filesystem a
       hard link is a wrapper for an ordinary Dirent; this wrapper references
       a persistent inode number and the source Dirent. Most attributes
       are proxied from the wrapped Dirent.
@@ -441,7 +484,7 @@ class HardlinkDirent(_Dirent):
   def __init__(self, name, meta, block=None):
     _Dirent.__init__(self, D_HARD_T, name, meta=meta)
     if block is not None:
-      raise ValueError("block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
     if not hasattr(self.meta, 'inum'):
       raise ValueError("meta.inum required (no iref in meta=%r)" % (meta,))
@@ -550,6 +593,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
     return sz
 
   def flush(self, scanner=None):
+    ''' Flush the contents of the file.
+    '''
     return self._open_file.flush(scanner)
 
   def truncate(self, length):
@@ -559,6 +604,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if Esize != length:
       with self:
         return self._open_file.truncate(length)
+    return None
 
   # TODO: move into distinctfile utilities class with rsync-like stuff etc
   def restore(self, path, makedirs=False, verbosefp=None):
@@ -569,7 +615,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
         verbosefp.write(path)
         verbosefp.write('\n')
       dirpath = os.path.dirname(path)
-      if len(dirpath) and not os.path.isdir(dirpath):
+      if dirpath and not os.path.isdir(dirpath):
         if makedirs:
           os.makedirs(dirpath)
       with open(path, "wb") as ofp:
@@ -598,6 +644,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
         os.utime(path, (st.st_atime, self.meta.mtime))
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of this FileDirent's transcription.
+    '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
   def pushto(self, S2, Q=None):
@@ -639,6 +687,8 @@ class Dir(_Dirent):
 
   @prop
   def changed(self):
+    ''' Whether this Dir has been changed.
+    '''
     return self._changed
 
   @changed.setter
@@ -746,18 +796,27 @@ class Dir(_Dirent):
     '''
     return [ name for name in self.keys() if self[name].isfile ]
 
-  def _validname(self, name):
+  @staticmethod
+  def _validname(name):
+    ''' Test if a name is valid: not empty and not containing the path separator.
+    '''
     return len(name) > 0 and name.find(PATHSEP) < 0
 
   def get(self, name, dflt=None):
+    ''' Fetch the Dirent named `name` or `dflt`.
+    '''
     if name not in self:
       return dflt
     return self[name]
 
   def keys(self):
+    ''' Return the Dirent names contained in this Dir. (Mapping method.)
+    '''
     return self.entries.keys()
 
   def items(self):
+    ''' Return the Dirents contained in this Dir. (Mapping method.)
+    '''
     return self.entries.items()
 
   def __contains__(self, name):
@@ -812,7 +871,7 @@ class Dir(_Dirent):
     '''
     name = E.name
     if name in self:
-      raise KeyError("name already exists: %r", name)
+      raise KeyError("name already exists: %r" % (name,))
     self[name] = E
 
   @locked
@@ -1079,17 +1138,19 @@ class DirFTP(Cmd):
           M = E.meta
           u, g, perms = M.unix_perms
           typemode = M.unix_typemode
-          typechar = ( '-' if typemode == stat.S_IFREG
-                  else 'd' if typemode == stat.S_IFDIR
-                  else 's' if typemode == stat.S_IFLNK
-                  else '?'
-                     )
-          print("%s%s%s%s %s" % ( typechar,
-                                  rwx((typemode>>6)&7),
-                                  rwx((typemode>>3)&7),
-                                  rwx((typemode)&7),
-                                  name
-                                ))
+          typechar = (
+              '-' if typemode == stat.S_IFREG
+              else 'd' if typemode == stat.S_IFDIR
+              else 's' if typemode == stat.S_IFLNK
+              else '?'
+          )
+          print("%s%s%s%s %s" % (
+              typechar,
+              rwx((typemode>>6)&7),
+              rwx((typemode>>3)&7),
+              rwx((typemode)&7),
+              name
+          ))
 
   def op_ls(self):
     ''' Return a dict mapping current directories names to Dirents.
@@ -1103,7 +1164,7 @@ class DirFTP(Cmd):
       raise GetoptError("missing arguments")
     for arg in argv:
       with Pfx(arg):
-        E, P, tail = resolve(self.cwd, arg)
+        E, _, tail = resolve(self.cwd, arg)
         if not tail:
           error("path exists")
         elif len(tail) > 1:
