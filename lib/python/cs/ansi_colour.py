@@ -99,7 +99,7 @@ def make_patterns(patterns, default_colour=None):
       for pattern in patterns
   ]
 
-def colourise(s, patterns, default_colour=None):
+def colourise_patterns(s, patterns, default_colour=None):
   ''' Colourise a string according to regular expressions.
       `s`: the string
       `patterns`: a sequence of patterns
