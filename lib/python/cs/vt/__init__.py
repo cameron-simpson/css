@@ -45,6 +45,8 @@ class _Defaults(threading.local):
   @prop
   @logexc
   def S(self):
+    ''' The topmost per-Thread Store, or the topmost global Store.
+    '''
     Ss = self.Ss
     if Ss:
       return Ss[-1]
@@ -56,19 +58,29 @@ class _Defaults(threading.local):
     error("%s: no per-Thread defaults.S and no global stack, returning None", self)
     return None
   def pushStore(self, newS):
+    ''' Push a new Store onto the per-Thread stack.
+    '''
     newS.open()
     self.Ss.append(newS)
   def popStore(self):
+    ''' Pop and return the topmost Store from the per-Thread stack.
+    '''
     oldS = self.Ss.pop()
     oldS.close()
     return oldS
   def push_Ss(self, newS):
+    ''' Push a new Store onto the global stack.
+    '''
     self._Ss.append(newS)
   def pop_Ss(self):
+    ''' Pop and return the topmost Store from the global stack.
+    '''
     return self._Ss.pop()
 
   @contextmanager
   def push_runstate(self, new_runstate):
+    ''' Context manager to push a new RunState instance onto the per-Thread stack.
+    '''
     old_runstate = self.runstate
     self.runstate = new_runstate
     yield new_runstate
@@ -99,6 +111,8 @@ class _TestAdditionsMixin:
 
   @classmethod
   def mktmpdir(cls, prefix=None):
+    ''' Create a temporary directory.
+    '''
     if prefix is None:
       prefix = cls.__qualname__
     return tempfile.TemporaryDirectory(
@@ -115,11 +129,13 @@ class _TestAdditionsMixin:
     except TypeError:
       from cs.x import X
       X("no len(0) for o=%s:%r", type(o), o)
-      pass
+      ##pass
     else:
       self.assertEqual(olen, length, *a, **kw)
 
   def assertIsOrdered(self, s, reverse, strict=False):
+    ''' Assertion to test that an object's elements are ordered.
+    '''
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
