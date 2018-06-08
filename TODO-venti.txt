@@ -1,3 +1,4 @@
+streamstore: rename requesthandler to clienthandler, make current Store local to it for independence
 RunState: rename .end to .stop, keep .end compatibility name
 move CancellationError into cs.resources, associate with RunState
 readahead for CornuCopyBuffer?
