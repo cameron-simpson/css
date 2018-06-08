@@ -5,6 +5,9 @@
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
+''' Facilities to do with buffers, primarily CornuCopyBuffer.
+'''
+
 import os
 
 DISTINFO = {
@@ -14,7 +17,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
-        ],
+    ],
     'install_requires': [],
 }
 
@@ -122,7 +125,7 @@ class CornuCopyBuffer(object):
       while length < min_size:
         try:
           next_chunk = next(chunks)
-        except StopIteration as e:
+        except StopIteration:
           if short_ok:
             break
           raise EOFError(
@@ -277,7 +280,7 @@ class CornuCopyBuffer(object):
         while toskip > 0:
           try:
             buf = next(chunks)
-          except StopIteration as e:
+          except StopIteration:
             if short_ok:
               break
             raise EOFError(
@@ -294,7 +297,7 @@ class CornuCopyBuffer(object):
     self.buf = buf
     self.offset = offset
 
-def CopyingIterator(object):
+class CopyingIterator(object):
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
   def __init__(self, I, copy_to):
@@ -316,6 +319,8 @@ def chunky(bfr_func):
       def func(bfr, ...):
   '''
   def chunks_func(chunks, *a, **kw):
+    ''' Function accepting chunk iterator.
+    '''
     offset = kw.pop('offset', 0)
     copy_offsets = kw.pop('copy_offsets', None)
     bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
