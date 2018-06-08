@@ -1230,8 +1230,7 @@ class RWFileBlockCache(object):
     opathname = pathname
     if pathname is None:
       tmpfd, pathname = mkstemp(dir=dirpath, suffix=suffix)
-    self.rfd = os.open(pathname, os.O_RDONLY)
-    self.wfd = os.open(pathname, os.O_WRONLY)
+    self.fd = os.open(pathname, os.O_RDWR | os.O_APPEND)
     if opathname is None:
       os.remove(pathname)
       os.close(tmpfd)
@@ -1242,26 +1241,32 @@ class RWFileBlockCache(object):
       lock = Lock()
     self._lock = lock
 
+  def __str__(self):
+    return "%s(pathname=%s)" % (type(self).__name__, self.pathname)
+
   def close(self):
     ''' Close the file descriptors.
     '''
-    os.close(self.wfd)
-    self.wfd = None
-    os.close(self.rfd)
-    self.rfd = None
+    with Pfx("%s.close", self):
+      fd = self.fd
+      if fd is None:
+        warning("fd already closed")
+      else:
+        os.close(fd)
+        self.fd = None
 
   @property
   def closed(self):
-    return self.wfd is None
+    return self.fd is None
 
   def put(self, data):
     ''' Store `data`, return offset.
     '''
     assert len(data) > 0
-    wfd = self.wfd
+    fd = self.fd
     with self._lock:
-      offset = os.lseek(wfd, 0, 1)
-      length = os.write(wfd, data)
+      offset = os.lseek(fd, 0, 1)
+      length = os.write(fd, data)
     assert length == len(data)
     return offset
 
@@ -1269,10 +1274,8 @@ class RWFileBlockCache(object):
     ''' Get data from `offset` of length `length`.
     '''
     assert length > 0
-    rfd = self.rfd
-    with self._lock:
-      os.lseek(rfd, offset, 0)
-      data = os.read(rfd, length)
+    fd = self.fd
+    data = os.pread(fd, length, offset)
     assert len(data) == length
     return data
 
