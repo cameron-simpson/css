@@ -16,11 +16,13 @@ from __future__ import with_statement
 from abc import ABC, abstractmethod
 from os.path import expanduser, isabs as isabspath
 import sys
+from threading import Lock
 from cs.later import Later
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import Result, report
 from cs.seq import Seq
@@ -320,49 +322,58 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         completion.
     '''
     X("NEW PUSHTO %r ==> %r", self.name, S2.name)
-    Q = IterableQueue(capacity=capacity)
-    lock = Lock()
-    S1 = self
-    S1.open()
-    S2.open()
-    pending = set()
-    def pusher():
-      X("START PUSHTO PROCESSING...")
-      with S1:
-        for B in Q:
-          X("PUSHTO: B=%s", B)
-          try:
-            h = B.hashcode
-          except AttributeError:
-            warning("not a hashcode Block, skipping: %s", B)
-            continue
-          inR = S2.contains_bg(h)
-          with lock:
-            pending.add(inR)
-          def addif(S2, B, inR):
-            with lock:
-              pending.remove(inR)
-            if not inR.result:
-              addR = S2.add_bg(B.data)
-              with lock:
-                pending.add(addR)
-              def post_add():
+    name="%s.pushto(%s)" % (self.name, S2.name)
+    with Pfx(name):
+      Q = IterableQueue(capacity=capacity, name=name)
+      lock = Lock()
+      S1 = self
+      S1.open()
+      S2.open()
+      pending = set()
+      def worker(name):
+        ''' This is the worker function which pushes Blocks from the Queue to the second Store.
+        '''
+        X("START PUSHTO PROCESSING...")
+        with Pfx("%s: worker", name):
+          with S1:
+            for B in Q:
+              X("PUSHTO: B=%s", B)
+              with Pfx("%s", B):
+                try:
+                  h = B.hashcode
+                except AttributeError:
+                  warning("not a hashcode Block, skipping")
+                  continue
+                def addblock(S1, S2, h, B):
+                  ''' Add the Block `B` to `S2` if not present.
+                  '''
+                  with S1:
+                    if S2.contains(h):
+                      return False
+                    S2.add(B.data)
+                  return True
+                addR = S2.bg(addblock, S1, S2, h, B)
                 with lock:
-                  pending.remove(addR)
-              addR.notify(post_add)
-          inR.notify(addif)
-        X("PUSHTO: NO MORE BLOCKS")
-        with lock:
-          outstanding = list(pending)
-        X("PUSHTO: %d outstanding, waiting...", len(outstanding))
-        for R in outstanding:
-          R.join()
-      X("PUSHTO: RELEASE S1 and S2")
-      S2.close()
-      S1.close()
-      X("PUSHTO: PROCESSING THREAD COMPLETES")
-    T = bg(pusher)
-    return Q, T
+                  pending.add(addR)
+                def after_add(addR):
+                  ''' Forget that `addR` is pending.
+                      This will be called after `addR` completes.
+                  '''
+                  with lock:
+                    pending.remove(addR)
+                addR.notify(after_add, addR)
+            X("PUSHTO: NO MORE BLOCKS")
+            with lock:
+              outstanding = list(pending)
+            X("PUSHTO: %d outstanding, waiting...", len(outstanding))
+            for R in outstanding:
+              R.join()
+          X("PUSHTO: RELEASE S1 and S2")
+          S2.close()
+          S1.close()
+        X("PUSHTO: PROCESSING THREAD COMPLETES")
+      T = bg(worker, name)
+      return Q, T
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
