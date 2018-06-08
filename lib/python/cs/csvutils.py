@@ -11,7 +11,14 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+''' Utility functions for CSV files.
+'''
+
 from __future__ import absolute_import
+import csv
+import sys
+from cs.logutils import warning
+from cs.pfx import Pfx
 
 DISTINFO = {
     'description': "CSV file related facilities",
@@ -21,16 +28,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils'],
+    'install_requires': ['cs.logutils', 'cs.pfx' ],
 }
-
-from contextlib import contextmanager
-import csv
-from io import BytesIO
-import sys
-from threading import Thread
-from cs.logutils import warning
-from cs.pfx import Pfx
 
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
@@ -42,6 +41,9 @@ if sys.hexversion >= 0x03000000:
     return csv.reader(fp)
 
   def csv_writerow(csvw, row, encoding='utf-8'):
+    ''' Write the supplied row as strings encoded with the supplied `encoding`,
+        default 'utf-8'.
+    '''
     with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
       return csvw.writerow(row)
 
@@ -56,8 +58,7 @@ else:
     '''
     r = csv.reader(fp)
     for row in r:
-      for i in range(len(row)):
-        value = row[i]
+      for i, value in enumerate(row):
         if isinstance(value, str):
           # transmute str (== bytes) to unicode
           try:
