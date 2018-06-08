@@ -591,6 +591,15 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
+  def pushto(self, S2, Q=None):
+    ''' Push the Block with the file contents to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        Semantics are as for cs.vt.block.Block.pushto.
+    '''
+    return self.block.pushto(S2, Q=Q)
+
 class Dir(_Dirent):
   ''' A directory.
 
