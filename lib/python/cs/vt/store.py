@@ -191,14 +191,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     self.__funcQ.wait()
 
   def bg(self, func, *a, **kw):
-    ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
+    ''' Queue a function without consuming the queue capacity.
+
+        This is intended for "control" functions which themselves
+        do all their work through the Store's function queue, such
+        as the .pushto method's worker.
     '''
-    R = Result(name="%s:%s" % (self, func))
     def func2():
       with self:
         return func(*a, **kw)
-    R.bg(func2)
-    return R
+    return self.__funcQ.bg(func2)
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
