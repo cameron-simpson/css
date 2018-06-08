@@ -492,11 +492,12 @@ class _Block(Transcriber, ABC):
   def pushto(self, S2, Q=None):
     ''' Push this Block and any implied subblocks to the Store `S2`.
         `S2`: the secondary Store to receive Blocks
-        `Q`: optional preexisting Queue, which itself should have some from a .pushto targetting the Store `S2`.
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
         If `Q` is supplied, this method will return as soon as all
         the relevant Blocks have been pushed i.e. possibly before
         delivery is complete. If `Q` is not supplied, a new Queue
-        is allocated; after all Blocks have been pushed the QUeue
+        is allocated; after all Blocks have been pushed the Queue
         is closed and its worker waited for.
         TODO: optional `no_wait` parameter to control waiting,
         default False, which would support closing the Queue but
