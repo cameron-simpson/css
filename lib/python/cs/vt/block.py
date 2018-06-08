@@ -40,7 +40,7 @@ from functools import lru_cache
 import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning, exception
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
@@ -214,7 +214,7 @@ class _Block(Transcriber, ABC):
     self.type = block_type
     if span is not None:
       if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r", span)
+        raise ValueError("invalid span: %r" % (span,))
       self.span = span
     self.indirect = False
     self.blockmap = None
@@ -487,7 +487,7 @@ class _Block(Transcriber, ABC):
     if mode == 'w+b':
       from .file import File
       return File(backing_block=self)
-    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
 
   def pushto(self, S2, Q=None):
     ''' Push this Block and any implied subblocks to the Store `S2`.
@@ -578,8 +578,10 @@ class HashCodeBlock(_Block):
 
   @span.setter
   def span(self, newspan):
+    ''' Set the span of the data encompassed by this HashCodeBlock.
+    '''
     if newspan < 0:
-      raise ValueError("%s: set .span: invalid newspan=%s", self, newspan)
+      raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
     else:
@@ -600,6 +602,8 @@ class HashCodeBlock(_Block):
     return bs
 
   def encode(self, flags=0, span=None):
+    ''' Return the bytes encoding of this HashCodeBlock.
+    '''
     hashcode = self.hashcode
     return self._encode(flags, span, BlockType.BT_HASHCODE, 0,
                         ( hashcode.encode(), ))
@@ -690,7 +694,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       raise ValueError("span(%d) does not match subblocks (totalling %d)"
                        % (span, subspan))
     if not force:
-      if len(subblocks) == 0:
+      if not subblocks:
         return Block(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
@@ -828,7 +832,7 @@ def SubBlock(superB, suboffset, span, **kw):
     if suboffset < 0 or suboffset > len(superB):
       raise ValueError("suboffset out of range")
     if span < 0 or suboffset + span > len(superB):
-      raise ValueError("span(%d) out of range", span)
+      raise ValueError("span(%d) out of range" % (span,))
     if span == 0:
       ##warning("span==0, returning empty LiteralBlock")
       return LiteralBlock(b'')
