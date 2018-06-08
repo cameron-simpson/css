@@ -313,19 +313,43 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def blockmapdir(self, dirpath):
     self._blockmapdir = dirpath
 
-  def pushto(self, S2, capacity=1024):
+  def pushto(self, S2, capacity=1024, block_progress=None, bytes_progress=None):
     ''' Allocate a Queue for Blocks to push from this Store to another Store `S2`.
+        `S2`: the secondary Store to receive Blocks.
+        `capacity`: the Queue capacity, arbitrary default 1024.
+        `block_progress`: an optional Progress counting submitted and completed Blocks.
+        `bytes_progress`: an optional Progress counting submitted and completed data bytes.
         Return (Q, T) where `Q` is the new Queue and `T` is the
         Thread processing thw Queue.  The caller can then .put
         Blocks onto the Queue. When finished, call Q.close() to
         indicate end of Blocks and T.join() to wait for the processing
         completion.
     '''
+    lock = Lock()
+    if block_progress is None:
+      added_block = lambda B: None
+      did_block = lambda B: None
+    else:
+      def added_block(B):
+        with lock:
+          block_progress.total += 1
+      def did_block(B):
+        with lock:
+          block_progress.position += 1
+    if bytes_progress is None:
+      added_bytes = lambda B: None
+      did_bytes = lambda B: None
+    else:
+      def added_bytes(B):
+        with lock:
+          bytes_progress.total += B.span
+      def did_bytes(B):
+        with lock:
+          bytes_progress.position += B.span
     X("NEW PUSHTO %r ==> %r", self.name, S2.name)
     name="%s.pushto(%s)" % (self.name, S2.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
-      lock = Lock()
       S1 = self
       S1.open()
       S2.open()
@@ -338,11 +362,15 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           with S1:
             for B in Q:
               X("PUSHTO: B=%s", B)
+              added_block(B)
+              added_bytes(B)
               with Pfx("%s", B):
                 try:
                   h = B.hashcode
                 except AttributeError:
                   warning("not a hashcode Block, skipping")
+                  did_block(B)
+                  did_bytes(B)
                   continue
                 def addblock(S1, S2, h, B):
                   ''' Add the Block `B` to `S2` if not present.
@@ -361,6 +389,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                   '''
                   with lock:
                     pending.remove(addR)
+                  did_block(B)
+                  did_bytes(B)
                 addR.notify(after_add, addR)
             X("PUSHTO: NO MORE BLOCKS")
             with lock:
