@@ -489,6 +489,37 @@ class _Block(Transcriber, ABC):
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
+  def pushto(self, S2, Q=None):
+    ''' Push this Block and any implied subblocks to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have some from a .pushto targetting the Store `S2`.
+        If `Q` is supplied, this method will return as soon as all
+        the relevant Blocks have been pushed i.e. possibly before
+        delivery is complete. If `Q` is not supplied, a new Queue
+        is allocated; after all Blocks have been pushed the QUeue
+        is closed and its worker waited for.
+        TODO: optional `no_wait` parameter to control waiting,
+        default False, which would support closing the Queue but
+        not waiting for the worker completion. This is on the premise
+        that the final Store shutdown of `S2` will wait for outstanding
+        operations anyway.
+    '''
+    S1 = defaults.S
+    if Q is None:
+      # create a Queue and a worker Thread
+      Q, T = S1.pushto(S2)
+    else:
+      # use an existing Queue, no Thread to wait for
+      T = None
+    Q.put(self)
+    if self.indirect:
+      # recurse, reusing the Queue
+      for subB in self.subblocks:
+        subB.pushto(S2, Q)
+    if T:
+      Q.close()
+      T.join()
+
 @lru_cache(maxsize=1024*1024, typed=True)
 def get_HashCodeBlock(hashcode):
   ''' Caching constructor for HashCodeBlocks of known code.
