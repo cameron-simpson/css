@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from os.path import expanduser, isabs as isabspath
 from functools import partial
 import sys
-from threading import Lock
+from threading import Lock, Semaphore
 from cs.later import Later
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
@@ -326,7 +326,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         indicate end of Blocks and T.join() to wait for the processing
         completion.
     '''
+    if capacity < 1:
+      raise ValueError("capacity must be >= 1, got: %r" % (capacity,))
     lock = Lock()
+    sem = Semaphore(capacity)
+    ##sem = Semaphore(1)
     if block_progress is None:
       added_block = lambda B: None
       did_block = lambda B: None
@@ -347,6 +351,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       def did_bytes(B):
         with lock:
           bytes_progress.position += B.span
+    def Xs(s): print(s, file=sys.stderr, end='', flush=True)
     X("NEW PUSHTO %r ==> %r", self.name, S2.name)
     name="%s.pushto(%s)" % (self.name, S2.name)
     with Pfx(name):
@@ -362,7 +367,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         with Pfx("%s: worker", name):
           with S1:
             for B in Q:
-              X("PUSHTO: B=%s", B)
+              Xs("B")
               added_block(B)
               added_bytes(B)
               with Pfx("%s", B):
@@ -376,22 +381,34 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                 def addblock(S1, S2, h, B):
                   ''' Add the Block `B` to `S2` if not present.
                   '''
-                  with S1:
-                    if S2.contains(h):
-                      return False
-                    S2.add(B.data)
+                  Xs("?")
+                  if S2.contains(h):
+                    return False
+                  try:
+                    data = S1[h]
+                  except KeyError as e:
+                    error("missing %s[%s]: %s", S1.name, h, e)
+                    return None
+                  Xs("+")
+                  S2.add(data)
                   return True
+                Xs("{")
+                sem.acquire()
                 addR = S2.bg(addblock, S1, S2, h, B)
+                Xs("<")
                 with lock:
                   pending.add(addR)
                 def after_add(addR):
                   ''' Forget that `addR` is pending.
                       This will be called after `addR` completes.
                   '''
+                  Xs(">")
                   with lock:
                     pending.remove(addR)
                   did_block(B)
                   did_bytes(B)
+                  Xs("}")
+                  sem.release()
                 addR.notify(after_add)
             X("PUSHTO: NO MORE BLOCKS")
             with lock:
@@ -399,7 +416,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
             X("PUSHTO: %d outstanding, waiting...", len(outstanding))
             for R in outstanding:
               R.join()
-          X("PUSHTO: RELEASE S1 and S2")
           S2.close()
           S1.close()
         X("PUSHTO: PROCESSING THREAD COMPLETES")
