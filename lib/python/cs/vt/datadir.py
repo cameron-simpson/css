@@ -510,9 +510,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         if nsaves >= flush_rate:
           need_sync = True
         F = filemap[entry.n]
-        if post_offset <= F.indexed_to:
-          error("%r: indexed_to already %s but post_offset=%s",
-              F.filename, F.indexed_to, post_offset)
         F.indexed_to = max(F.indexed_to, post_offset)
         if F is not oldF:
           info("switch to %r: %r", F.filename, F.pathname)
