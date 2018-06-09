@@ -360,7 +360,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       S1.open()
       S2.open()
       pending = set()
-      def worker(name):
+      def worker(name, Q, S1, S2, sem):
         ''' This is the worker function which pushes Blocks from the Queue to the second Store.
         '''
         X("START PUSHTO PROCESSING...")
@@ -419,7 +419,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           S2.close()
           S1.close()
         X("PUSHTO: PROCESSING THREAD COMPLETES")
-      T = bg(partial(worker, name))
+      T = bg(partial(worker, name, Q, S1, S2, sem))
       return Q, T
 
 class BasicStoreSync(_BasicStoreCommon):
