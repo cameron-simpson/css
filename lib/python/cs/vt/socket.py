@@ -93,7 +93,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
       self.S = newS
       oldS.close()
 
-class _RequestHandler(StreamRequestHandler):
+class _ClientConnectionHandler(StreamRequestHandler):
   ''' Handler for a connection the the server.
   '''
 
@@ -139,7 +139,7 @@ class _TCPServer(ThreadingMixIn, TCPServer):
 
   def __init__(self, srv, bind_addr):
     with Pfx("%s.__init__(srv=%s, bind_addr=%r)", type(self), srv, bind_addr):
-      TCPServer.__init__(self, bind_addr, _RequestHandler)
+      TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.srv = srv
       self.handlers = set()
@@ -192,7 +192,7 @@ class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, srv, socket_path, exports=None):
     with Pfx("%s.__init__(srv, socket_path=%r)", type(self), srv, socket_path):
-      UnixStreamServer.__init__(self, socket_path, _RequestHandler)
+      UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
       self.srv = srv
       self.socket_path = socket_path
       self.exports = exports
