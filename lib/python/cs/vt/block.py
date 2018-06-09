@@ -489,11 +489,12 @@ class _Block(Transcriber, ABC):
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
 
-  def pushto(self, S2, Q=None):
+  def pushto(self, S2, Q=None, runstate=None):
     ''' Push this Block and any implied subblocks to the Store `S2`.
         `S2`: the secondary Store to receive Blocks
         `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
+        `runstate`: optional RunState used to cancel operation
         If `Q` is supplied, this method will return as soon as all
         the relevant Blocks have been pushed i.e. possibly before
         delivery is complete. If `Q` is not supplied, a new Queue
@@ -516,7 +517,10 @@ class _Block(Transcriber, ABC):
     if self.indirect:
       # recurse, reusing the Queue
       for subB in self.subblocks:
-        subB.pushto(S2, Q)
+        if runstate and runstate.cancelled:
+          warning("pushto(%s) cancelled", self)
+          break
+        subB.pushto(S2, Q, runstate=runstate)
     if T:
       Q.close()
       T.join()
