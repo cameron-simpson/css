@@ -137,7 +137,7 @@ def get_params(s, offset, endchar):
       offset += 1
     param, offset = get_qstr_or_identifier(s, offset)
     if not param:
-      raise ValueError("rejecting empty parameter name")
+      raise ValueError("rejecting empty parameter name at: %r" % (s[offset:],))
     offset = skipwhite(s, offset)
     ch = s[offset:offset + 1]
     if not ch:
