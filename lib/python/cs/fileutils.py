@@ -735,14 +735,12 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
     # do an initial read to align all subsequent reads
     alignsize = offset % readsize
     if alignsize > 0:
-      X("PREAD ALIGN fd=%d, readsize=%d, offset=%d", fd, alignsize, offset)
       bs = pread(fd, alignsize, offset)
       if not bs:
         return
       yield bs
       offset += len(bs)
   while True:
-    X("PREAD fd=%d, readsize=%d, offset=%d", fd, readsize, offset)
     bs = pread(fd, readsize, offset)
     if not bs:
       return
