@@ -167,27 +167,29 @@ class VTCmd:
     xit = None
     self.runstate = RunState()
     with defaults.push_runstate(self.runstate):
-      self.config = Config()
+      with self.runstate:
+        self.config = Config()
 
-      # catch signals, flag termination
-      def sig_handler(sig, frame):
-        ''' Signal handler
-        '''
-        warning("received signal %s from %s", sig, frame)
-        if sig == SIGQUIT:
-          thread_dump()
-        self.runstate.cancel()
-        if sig == SIGQUIT:
-          sys.exit(1)
-      signal(SIGHUP, sig_handler)
-      signal(SIGINT, sig_handler)
-      signal(SIGQUIT, sig_handler)
+        # catch signals, flag termination
+        def sig_handler(sig, frame):
+          ''' Signal handler
+          '''
+          warning("received signal %s from %s", sig, frame)
+          if sig == SIGQUIT:
+            thread_dump()
+          X("%s.cancel()...", self.runstate)
+          self.runstate.cancel()
+          if sig == SIGQUIT:
+            sys.exit(1)
+        signal(SIGHUP, sig_handler)
+        signal(SIGINT, sig_handler)
+        signal(SIGQUIT, sig_handler)
 
-      try:
-        xit = self.cmd_op(args)
-      except GetoptError as e:
-        error("%s", e)
-        badopts = True
+        try:
+          xit = self.cmd_op(args)
+        except GetoptError as e:
+          error("%s", e)
+          badopts = True
 
       if badopts:
         sys.stderr.write(usage)
@@ -562,7 +564,7 @@ class VTCmd:
     except AttributeError:
       raise GetoptError("no pushto facility for %s objects: %s" % (type(src), src))
     else:
-      pushto(S2)
+      pushto(S2, runstate=defaults.runstate)
     return 0
 
   def cmd_serve(self, args):
