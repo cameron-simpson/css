@@ -713,6 +713,7 @@ class _IndirectBlock(_Block):
     if span is None:
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
+    self.hashcode = superB.hashcode
 
   def __getattr__(self, attr):
     if attr == 'subblocks':
