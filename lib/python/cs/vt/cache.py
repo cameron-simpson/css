@@ -41,6 +41,8 @@ class FileCacheStore(BasicStoreSync):
           time
         `dirpath`: directory to hold the cache files
     '''
+    if backend is None:
+      raise ValueError("backend=None")
     super().__init__(name, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
