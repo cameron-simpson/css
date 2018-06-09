@@ -539,6 +539,32 @@ class VTCmd:
         os.system("ls -la %s" % (statedirpath,))
     return 0
 
+  def cmd_pushto(self, args):
+    ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
+        Usage: pushto source secondary-storespec
+    '''
+    if not args:
+      raise GetopError("missing source")
+    source = args.pop(0)
+    if not args:
+      raise GetoptError("missing secondary-storespec")
+    S2spec = args.pop(0)
+    if args:
+      raise GetopError("extra arguments after secondary-storespec: %r" % (args,))
+    with Pfx("source %r", source):
+      src, offset = parse(source)
+      if offset < len(source):
+        raise GetopError("unparsed text: %r" % (src[offset:],))
+    with Pfx("secondary-storespec %r", S2spec):
+      S2 = Store(S2spec, self.config)
+    try:
+      pushto = src.pushto
+    except AttributeError:
+      raise GetoptError("no pushto facility for %s objects: %s" % (type(src), src))
+    else:
+      pushto(S2)
+    return 0
+
   def cmd_serve(self, args):
     ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
         Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
