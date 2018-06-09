@@ -349,7 +349,7 @@ class RunState(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "RunState[%s:%gs]" % (self.state, self.run_time)
+    return "RunState:%s[%s:%gs]" % (id(self), self.state, self.run_time)
 
   def __enter__(self):
     self.start()
