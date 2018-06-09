@@ -160,8 +160,7 @@ class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
     if self._opens > 0:
       return False
     ##if self._opens < 0:
-    ##  XP("_opens < 0: %r", self._opens)
-    ##  raise RuntimeError("_OPENS UNDERFLOW")
+    ##  raise RuntimeError("_OPENS UNDERFLOW: _opens < 0: %r" % (self._opens,))
     if not self.opened:
       # never opened, so not totally closed
       return False
