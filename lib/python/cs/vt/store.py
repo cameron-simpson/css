@@ -15,6 +15,7 @@
 from __future__ import with_statement
 from abc import ABC, abstractmethod
 from os.path import expanduser, isabs as isabspath
+from functools import partial
 import sys
 from threading import Lock
 from cs.later import Later
@@ -391,7 +392,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                     pending.remove(addR)
                   did_block(B)
                   did_bytes(B)
-                addR.notify(after_add, addR)
+                addR.notify(after_add)
             X("PUSHTO: NO MORE BLOCKS")
             with lock:
               outstanding = list(pending)
@@ -402,7 +403,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           S2.close()
           S1.close()
         X("PUSHTO: PROCESSING THREAD COMPLETES")
-      T = bg(worker, name)
+      T = bg(partial(worker, name))
       return Q, T
 
 class BasicStoreSync(_BasicStoreCommon):
