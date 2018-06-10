@@ -279,11 +279,14 @@ class Box(object):
               box_data[:32],
               '...' if len(box_data) > 32 else '')
 
-  def dump(self, indent='', fp=None):
+  def dump(self, indent='', fp=None, crop_length=170):
     if fp is None:
       fp = sys.stdout
     fp.write(indent)
-    fp.write(str(self))
+    summary = str(self)
+    if len(summary) > crop_length - len(indent):
+      summary = summary[:crop_length - len(indent) - 4] + '...)'
+    fp.write(summary)
     fp.write('\n')
 
   @staticmethod
