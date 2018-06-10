@@ -1197,6 +1197,38 @@ class DREFBox(FullBox):
 
 add_box_class(DREFBox)
 
+class VMHDBox(FullBox):
+  ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    self.graphicsmode, = unpack('>H', bfr.take(2))
+    self.opcolor = unpack('>HHH', bfr.take(6))
+
+  def __str__(self):
+    return '%s(graphicsmode=%d,opcolor=%r)' \
+           % (self.__class__.__name__, self.graphicsmode, self.opcolor)
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+    indent += '  '
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack(
+        '>HHHH',
+        self.graphicsmode,
+        self.opcolor[0],
+        self.opcolor[1],
+        self.opcolor[2])
+
+add_box_class(VMHDBox)
+
 def parse_file(fp, discard=False, copy_offsets=None):
   return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
 
