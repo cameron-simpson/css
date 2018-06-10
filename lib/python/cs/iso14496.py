@@ -1187,26 +1187,6 @@ class STSZBox(FullBox):
     return '%s(%s,sample_size=%d,sample_count=%d,entry_sizes=%r)' \
            % (self.__class__.__name__, self.sample_size, self.sample_count, self.entry_sizes)
 
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    print(
-        self.__class__.__name__,
-        'sample_size=%d' % (self.sample_size,),
-        'sample_count=%d' % (self.sample_count,),
-        end='', fp=fp)
-    if self.sample_size == 0:
-      for entry_size in self.entry_sizes:
-        yield pack('>L', entry_size)
-
-    fp.write('\n')
-    indent += '  '
-    for E in self.entries:
-      fp.write(indent)
-      fp.write(str(E))
-      fp.write('\n')
-
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
     yield pack('>LL', self.sample_size, self.sample_count)
@@ -1234,18 +1214,6 @@ class STSCBox(FullBox):
     return '%s(%s)' \
            % (self.__class__.__name__, ','.join(str(E) for E in self.entries))
 
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(self.__class__.__name__)
-    fp.write('\n')
-    indent += '  '
-    for E in self.entries:
-      fp.write(indent)
-      fp.write(str(E))
-      fp.write('\n')
-
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
     yield pack('>L', len(self.entries))
@@ -1270,13 +1238,6 @@ class STCOBox(FullBox):
     return '%s(%s)' \
            % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
 
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(str(self))
-    fp.write('\n')
-
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
     yield pack('>L', len(self.chunk_offsets))
@@ -1300,13 +1261,6 @@ class CO64Box(FullBox):
   def __str__(self):
     return '%s(%s)' \
            % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
-
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(str(self))
-    fp.write('\n')
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1359,13 +1313,6 @@ class VMHDBox(FullBox):
     return '%s(graphicsmode=%d,opcolor=%r)' \
            % (self.__class__.__name__, self.graphicsmode, self.opcolor)
 
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(str(self))
-    fp.write('\n')
-
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
     yield pack(
@@ -1388,13 +1335,6 @@ class SMHDBox(FullBox):
   def __str__(self):
     return '%s(balance=%d)' \
            % (self.__class__.__name__, self.balance)
-
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(str(self))
-    fp.write('\n')
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
