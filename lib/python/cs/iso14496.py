@@ -216,6 +216,17 @@ class Box(object):
     return self.header.type
 
   @property
+  def box_type_s(self):
+    ''' The box type as a string.
+    '''
+    box_type_b = bytes(self.box_type)
+    try:
+      box_type_name = box_type_b.decode('ascii')
+    except UnicodeDecodeError:
+      box_type_name = repr(box_type_b)
+    return box_type_name
+
+  @property
   def user_type(self):
     return self.header.user_type
 
@@ -260,11 +271,11 @@ class Box(object):
 
   def __str__(self):
     if self.data_chunks is None:
-      return '%s(%r,box_data=DISCARDED)' \
-             % (type(self).__name__, bytes(self.box_type))
+      return '%s(%s,box_data=DISCARDED)' \
+             % (type(self).__name__, self.box_type_s)
     box_data = b''.join(self.data_chunks)
-    return '%s(%r,box_data=%d:%r%s)' \
-           % (type(self).__name__, bytes(self.box_type), len(box_data),
+    return '%s(%s,box_data=%d:%r%s)' \
+           % (type(self).__name__, self.box_type_s, len(box_data),
               box_data[:32],
               '...' if len(box_data) > 32 else '')
 
@@ -439,8 +450,8 @@ class FullBox(Box):
     self.flags = (flags_bs[0]<<16) | (flags_bs[1]<<8) | flags_bs[2]
 
   def __str__(self):
-    prefix = '%s(%r-v%d-0x%02x' % (self.__class__.__name__,
-                                   self.box_type,
+    prefix = '%s(%s-v%d-0x%02x' % (self.__class__.__name__,
+                                   self.box_type_s,
                                    self.version,
                                    self.flags)
     attr_summary = self.attribute_summary()
