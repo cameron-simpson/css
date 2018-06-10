@@ -1179,16 +1179,14 @@ class STSZBox(FullBox):
     self.sample_size, self.sample_count = unpack('>LL', bfr.take(8))
     if self.sample_size == 0:
       self.entry_sizes = [
-          unpack('>L', bfr.take(4))
+          unpack('>L', bfr.take(4))[0]
           for _ in range(self.sample_count)
       ]
 
-  def __str__(self):
-    if self.same_size > 0:
-      return '%s(%s,sample_size=%d,sample_count=%d)' \
-             % (self.__class__.__name__, self.sample_size, self.sample_count)
-    return '%s(%s,sample_size=%d,sample_count=%d,entry_sizes=%r)' \
-           % (self.__class__.__name__, self.sample_size, self.sample_count, self.entry_sizes)
+  def attribute_summary(self):
+    if self.sample_size > 0:
+      return 'sample_size=%d,sample_count=%d' % (self.sample_size, self.sample_count)
+    return 'sample_size=%d,sample_count=%d,entry_sizes=%r' % (self.sample_size, self.sample_count, self.entry_sizes)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1205,6 +1203,8 @@ class STSCBox(FullBox):
   ''' 'stsc' (Sample Table box - section 8.7.4.1.
   '''
 
+  ATTRIBUTES = ( ('entries', '%r'), )
+
   def parse_data(self, bfr):
     super().parse_data(bfr)
     entry_count, = unpack('>L', bfr.take(4))
@@ -1212,10 +1212,6 @@ class STSCBox(FullBox):
         STSCEntry(*unpack('>LLL', bfr.take(12)))
         for _ in range(entry_count)
     ]
-
-  def __str__(self):
-    return '%s(%s)' \
-           % (self.__class__.__name__, ','.join(str(E) for E in self.entries))
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1229,17 +1225,15 @@ class STCOBox(FullBox):
   ''' A 'stco' Chunk Offset box - section 8.7.5.
   '''
 
+  ATTRIBUTES = ( ('chunk_offsets', '%r'), )
+
   def parse_data(self, bfr):
     super().parse_data(bfr)
     entry_count, = unpack('>L', bfr.take(4))
     self.chunk_offsets = [
-        unpack('>L', bfr.take(4))
+        unpack('>L', bfr.take(4))[0]
         for _ in range(entry_count)
     ]
-
-  def __str__(self):
-    return '%s(%s)' \
-           % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1253,17 +1247,15 @@ class CO64Box(FullBox):
   ''' A 'c064' Chunk Offset box - section 8.7.5.
   '''
 
+  ATTRIBUTES = ( ('chunk_offsets', '%r'), )
+
   def parse_data(self, bfr):
     super().parse_data(bfr)
     entry_count, = unpack('>L', bfr.take(4))
     self.chunk_offsets = [
-        unpack('>Q', bfr.take(8))
+        unpack('>Q', bfr.take(8))[0]
         for _ in range(entry_count)
     ]
-
-  def __str__(self):
-    return '%s(%s)' \
-           % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1307,14 +1299,15 @@ class VMHDBox(FullBox):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
 
+  ATTRIBUTES = (
+      ( 'graphicsmode', '%d' ),
+      ( 'opcolor', '%r' ),
+  )
+
   def parse_data(self, bfr):
     super().parse_data(bfr)
     self.graphicsmode, = unpack('>H', bfr.take(2))
     self.opcolor = unpack('>HHH', bfr.take(6))
-
-  def __str__(self):
-    return '%s(graphicsmode=%d,opcolor=%r)' \
-           % (self.__class__.__name__, self.graphicsmode, self.opcolor)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1331,13 +1324,11 @@ class SMHDBox(FullBox):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
 
+  ATTRIBUTES = ( ('balance', '%d'), )
+
   def parse_data(self, bfr):
     super().parse_data(bfr)
     self.balance, _ = unpack('>HH', bfr.take(4))
-
-  def __str__(self):
-    return '%s(balance=%d)' \
-           % (self.__class__.__name__, self.balance)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
