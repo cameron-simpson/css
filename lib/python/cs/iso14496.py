@@ -1167,6 +1167,44 @@ class URN_Box(FullBox):
 
 add_box_class(URN_Box)
 
+STSCEntry = namedtuple('STSCEntry', 'first_chunk samples_per_chunk sample_desciption_index')
+
+class STSCBox(FullBox):
+  ''' A 'stsc' Sample Table box - section 8.7.42.1.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    entry_count, = unpack('>L', bfr.take(4))
+    self.entries = [
+        STSCEntry(*unpack('>LLL', bfr.take(12)))
+        for _ in range(entry_count)
+    ]
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(E) for E in self.entries))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for E in self.entries:
+      fp.write(indent)
+      fp.write(str(E))
+      fp.write('\n')
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack('>L', len(self.entries))
+    for E in self.entries:
+      yield pack('>LLL', *E)
+
+add_box_class(STSCBox)
+
 class DREFBox(FullBox):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
