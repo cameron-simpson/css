@@ -1219,7 +1219,7 @@ add_box_class(STSZBox)
 STSCEntry = namedtuple('STSCEntry', 'first_chunk samples_per_chunk sample_description_index')
 
 class STSCBox(FullBox):
-  ''' A 'stsc' Sample Table box - section 8.7.4.1.
+  ''' 'stsc' (Sample Table box - section 8.7.4.1.
   '''
 
   def parse_data(self, bfr):
@@ -1253,6 +1253,68 @@ class STSCBox(FullBox):
       yield pack('>LLL', *E)
 
 add_box_class(STSCBox)
+
+class STCOBox(FullBox):
+  ''' A 'stco' Chunk Offset box - section 8.7.5.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    entry_count, = unpack('>L', bfr.take(4))
+    self.chunk_offsets = [
+        unpack('>L', bfr.take(4))
+        for _ in range(entry_count)
+    ]
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack('>L', len(self.chunk_offsets))
+    for chunk_offset in self.chunk_offsets:
+      yield pack('>L', chunk_offset)
+
+add_box_class(STCOBox)
+
+class CO64Box(FullBox):
+  ''' A 'c064' Chunk Offset box - section 8.7.5.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    entry_count, = unpack('>L', bfr.take(4))
+    self.chunk_offsets = [
+        unpack('>Q', bfr.take(8))
+        for _ in range(entry_count)
+    ]
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(E) for E in self.chunk_offsets))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack('>L', len(self.chunk_offsets))
+    for chunk_offset in self.chunk_offsets:
+      yield pack('>Q', chunk_offset)
+
+add_box_class(CO64Box)
 
 class DREFBox(FullBox):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
