@@ -1216,7 +1216,6 @@ class VMHDBox(FullBox):
     fp.write(indent)
     fp.write(str(self))
     fp.write('\n')
-    indent += '  '
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1228,6 +1227,31 @@ class VMHDBox(FullBox):
         self.opcolor[2])
 
 add_box_class(VMHDBox)
+
+class SMHDBox(FullBox):
+  ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    self.balance, _ = unpack('>HH', bfr.take(4))
+
+  def __str__(self):
+    return '%s(balance=%d)' \
+           % (self.__class__.__name__, self.balance)
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack('>HH', self.balance, 0)
+
+add_box_class(SMHDBox)
 
 def parse_file(fp, discard=False, copy_offsets=None):
   return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
