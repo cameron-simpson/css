@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Record a Mercurial commit.
-#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#       - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
 
 hg log -r "$HG_NODE" --template='{desc}\n' --limit 1 \

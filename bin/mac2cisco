@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Convert an ethernet address into CISCO format.
-#	- Cameron Simpson <cs@zip.com.au> 19aug99
+#	- Cameron Simpson <cs@cskk.id.au> 19aug99
 #
 
 if (@ARGV)

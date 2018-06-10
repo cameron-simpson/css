@@ -2,16 +2,23 @@
 #
 # Locate and update the local tags file.
 # Recite "set tags=/path/to/tagsfile".
-#   - Cameron Simpson <cs@zip.com.au> 28feb2017
+#   - Cameron Simpson <cs@cskk.id.au> 28feb2017
 #
 
-exec 0</dev/null 3>&1 2>/dev/tty 1>&2
-if tags=$(findup tags)
+set -ue
+
+cmd=$0
+usage="Usage: $cmd filenames..."
+
+badopts=
+
+if [ $# = 0 ]
 then
-  echo "set tags=$tags" >&3
-else
-  echo 'set tags=NO-TAGS' >&3
-  exit 0
+  echo "$cmd: missing filenames" >&2
+  badopts=1
 fi
-exec 3>&-
-lock -P "$tags" ctags-update -o "$tags" -- "$@" &
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tags=$( ctags-update -- "$@" & )
+echo "set tags=$tags"

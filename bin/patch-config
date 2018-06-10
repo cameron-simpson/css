@@ -1,10 +1,10 @@
-#!/usr/bin/env py25+
+#!/usr/bin/python
 #
 # Apply a configuration patch to a file, writing the patched config
 # to the standard output.
 # The patch file contains lines of the form:
 #       keyword value
-# - Cameron Simpson <cs@zip.com.au> 18sep2008
+# - Cameron Simpson <cs@cskk.id.au> 18sep2008
 #
 
 from __future__ import with_statement

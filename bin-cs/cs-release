@@ -1,41 +1,53 @@
 #!/usr/bin/env python3
 #
 # General release stuff for packages.
-#   - Cameron Simpson <cs@zip.com.au> 28feb2009
+#   - Cameron Simpson <cs@cskk.id.au> 28feb2009
 #
 # Redo in python; it is getting unmanagable in shell.
-#   - Cameron Simpson <cs@zip.com.au> 23jul2015
+#   - Cameron Simpson <cs@cskk.id.au> 23jul2015
 #
 
 from __future__ import print_function
+from collections import defaultdict
+from getopt import GetoptError
 import sys
+import os
 import os.path
 import re
 from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
 import importlib
 from cs.app.lastvalue import LastValues
-import cs.cmdutils
 from cs.dateutils import isodate
+from cs.deco import cached
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
-from cs.logutils import setup_logging, Pfx, exception, error, warning, info, X, XP
+from cs.logutils import setup_logging, exception, error, warning, info
+from cs.pfx import Pfx, XP
+import cs.psutils
+from cs.py.func import prop
 from cs.py.modules import module_files
+from cs.x import X
 
 PYLIBTOP = 'lib/python'
 
-USAGE = '''Usage: %s [-f] [op [names...]]
-  -f  Force. Sanity checks that would stop some actions will not prevent them.
-  With no op, report all pypi and testpypi lastvalues.
+# defaults for packages without their own specifics
+DISTINFO_DEFAULTS = {
+    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
+}
+
+USAGE = '''Usage: %s [-f] op [names...]
+  -f  Force. Sanity checks that would stop some actions normally  will not prevent them.
+  With no op, report all pypi lastvalues.
   op:
     check       Check simple things about a module's DISTINFO map.
     last        Report last release issued.
     log         Changelog from last release to now.
-    ls          List all release prefixes in use.
+    ls          List latest release prefixes.
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
-    status      Report latest release tag and differing releases at pypi and testpypi.
-    testpypi    Upload latest release to test PyPI.'''
+    status      Report latest release tag and differing releases at pypi.
+'''
 
 ##  export      Export release to temporary directory, report directory.
 ##  freshmeat-submit Announce last release to freshmeat.
@@ -47,32 +59,36 @@ def main(argv):
 
   force = False
 
+  xit = 0
   badopts = False
 
   if argv and argv[0] == '-f':
     argv.pop(0)
     force = True
-
-  xit = 0
-
-  Ms = Modules()
+  modules = Modules()
   LV = LastValues()
   VCS = VCS_Hg()
 
   if not argv:
-    for k in sorted(LV.keys()):
-      if k.startswith("pypi-css-cs."):
-        print(k[9:], LV[k])
+    error("missing op")
+    badopts = True
   else:
     op = argv.pop(0)
-    if argv:
-      names = argv
-    else:
-      names = sorted(VCS.release_prefixes())
-    for name in names:
-      with Pfx(op):
+    with Pfx(op):
+      if argv:
+        names = argv
+      else:
+        # all the release tags starting with "cs."
+        names = [
+            name
+            for name in sorted(VCS.release_prefixes())
+            if name.startswith('cs.')
+        ]
+      for name in names:
+        if xit != 0:
+          break
         with Pfx(name):
-          N = ReleaseName(name, Ms, VCS, LV)
+          N = ReleaseName(name, modules, VCS, LV)
           if op == 'check':
             if name.startswith('cs.'):
               if N.check():
@@ -81,7 +97,8 @@ def main(argv):
                 print(name, 'NOT OK')
                 xit = 1
             else:
-              warning('skipped, not a "cs." module name')
+              warning('not a "cs." module name')
+              xit = 1
           elif op == 'last':
             print(name, N.last_suffix())
           elif op == 'log':
@@ -93,12 +110,14 @@ def main(argv):
               files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
               print(' ', ' '.join(files)+':', firstline)
           elif op == 'ls':
-            for suffix in sorted(N.release_suffixes()):
-              print(name, suffix)
+            for k in sorted(LV.keys()):
+              if k.startswith("pypi-css-cs."):
+                print(k[9:], LV[k])
+            return 0
           elif op == 'next':
             print(name, N.next_suffix())
           elif op == 'pypi':
-            # upload latest release to testpypi
+            # upload latest release to pypi
             N.submit_pypi(force=force)
           elif op == 'release':
             # issue new release tag
@@ -114,7 +133,7 @@ def main(argv):
                 return 1
             changes = list(N.log_since())
             if not changes:
-              error("no changes since last release, aborting")
+              error("no changes since last release, not making new release")
               xit = 1
             else:
               print("Changes since the last release:")
@@ -124,7 +143,7 @@ def main(argv):
               with pipefrom('readdottext', keep_stdin=True) as dotfp:
                 release_message = dotfp.read().rstrip()
               if not release_message:
-                error("empty release message, aborting")
+                error("empty release message, not making new release")
                 xit = 1
               else:
                 next_tag = N.next_release_tag()
@@ -153,17 +172,15 @@ def main(argv):
           elif op == 'status':
             tagged = N.last_suffix()
             result = [name, tagged]
-            for pypi_flavour in 'testpypi', 'pypi':
+            for pypi_flavour in ('pypi',):
               lvkey, last_upload = N.last_upload(pypi_flavour)
               if last_upload != tagged:
                 result.append("%s:%s" % (pypi_flavour, last_upload))
             print(*result)
-          elif op == 'testpypi':
-            N.submit_testpypi(force=force)
           else:
-            warning("unrecognised op")
+            warning("unrecognised op %r", op)
             badopts = True
-
+            break
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
@@ -181,28 +198,21 @@ def ask(message):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  P = cs.cmdutils.pipefrom(argv, trace=False, **kw)
+  P = cs.psutils.pipefrom(argv, trace=False, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
     raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
 
-class Modules(object):
-
-  def __init__(self):
-    self.modules = {}
-
-  def module(self, name):
-    try:
-      M = self.modules[name]
-    except KeyError:
-      M = Module(name, self)
-      self.modules[name] = M
-    return M
-
-  __getitem__ = module
+class Modules(defaultdict):
+  ''' An autopopulating dict of mod_name->Module.
+  '''
+  def __missing__(self, mod_name):
+    return Module(mod_name, self)
 
 class Module(object):
+  ''' Metadata about a Python module.
+  '''
 
   def __init__(self, name, modules):
     self.name = name
@@ -221,24 +231,10 @@ class Module(object):
       self.module = None
       self.check_status = False
 
-  @property
-  def in_package(self):
-    ''' Is this module part of a package?
-    '''
-    M = self.module
-    if M is None:
-      return False
-    return hasattr(M, '__package__')
-
-  @property
-  def is_package(self):
-    ''' Is this module a package?
-    '''
-    pkg_name = self.package_name
-    return pkg_name is not None and pkg_name == self.name
-
-  @property
+  @prop
   def package_name(self):
+    ''' The name of the package containing this module, or None if this is not inside a package.
+    '''
     M = self.module
     if M is None:
       X("%r.package_name: self.module is None", self.name)
@@ -250,7 +246,23 @@ class Module(object):
       return None
     return pkg_name
 
-  @property
+  @prop
+  def in_package(self):
+    ''' Is this module part of a package?
+    '''
+    M = self.module
+    if M is None:
+      return False
+    return hasattr(M, '__package__')
+
+  @prop
+  def is_package(self):
+    ''' Is this module a package?
+    '''
+    pkg_name = self.package_name
+    return pkg_name is not None and pkg_name == self.name
+
+  @prop
   def dirpath(self):
     M = self.module
     if M is None:
@@ -260,10 +272,11 @@ class Module(object):
     return os.path.dirname(M.__file__)
 
   def paths(self):
-    ''' Generator returning the .py filenames comprising this package.
+    ''' Generator yield the .py filenames comprising this package.
     '''
     M = self.module
     if M is None:
+      warning("paths: no module found")
       return
     filename = self.module.__file__
     if not self.is_package:
@@ -275,7 +288,7 @@ class Module(object):
           if basename.endswith('.py'):
             yield os.path.join(dirpath, basename)
 
-  @property
+  @prop
   def DISTINFO(self):
     D = self._distinfo
     if D is None:
@@ -298,7 +311,7 @@ class Module(object):
               try:
                 D = PM.DISTINFO
               except AttributeError:
-                warning("missing and also missing in package %r", pkg_name)
+                warning("missing and also missing from package %r", pkg_name)
               else:
                 ##warning("DISTINFO from package %r", pkg_name)
                 pass
@@ -308,67 +321,69 @@ class Module(object):
         self._distinfo = D
     return D
 
+  @prop
+  def requires(self):
+    ''' Return other nonstdlib packages required by this module.
+    '''
+    return self.DISTINFO.get('install_requires')
+
   def check(self, silent=False):
-    with Pfx("check %r", self.name):
-      if self._check_status is not None:
-        return self._check_status
-      if not self._checking:
-        self._checking = True
-        self._check_status = self._check(silent)
-        self._checking = False
+    ''' Sanity check a package.
+    '''
+    if self._check_status is not None:
       return self._check_status
+    if not self._checking:
+      self._checking = True
+      self._check_status = self._check(silent)
+      self._checking = False
+    return self._check_status
 
   def _check(self, silent):
-    with Pfx("check %s", self.name):
-      ok = True
-      distinfo = self.DISTINFO
-      with Pfx('DISTINFO'):
-        install_requires = distinfo.get('install_requires')
-        if install_requires is None:
-          silent or error("missing DISTINFO[install_requires]")
-          ok = False
-          install_requires = distinfo.get('requires')
-          if install_requires is None:
-            install_requires = ()
-          else:
-            silent or warning("working off DISTINFO[requires]=%r", install_requires)
-        install_requires = set(install_requires)
-        # check imports against install_requires
-        subimports = set()
-        # check the imports for every file in the package
-        for pathname in sorted(self.paths()):
-          if not self.is_package:
-            module_name = self.name
-          else:
-            # compute module name from pathname
-            relpath = os.path.relpath(pathname, self.dirpath)
-            dirpart, basepart = os.path.split(relpath)
-            if basepart == '__init__.py':
-              module_name = dirpart.replace(os.sep, '.')
-            else:
-              mod_part, mod_ext = os.path.splitext(relpath)
-              if mod_ext != '.py':
-                warning("relpath %r does not end in '.py', computing module_name from %r", relpath, mod_part)
-              module_name = mod_part.replace(os.sep, '.')
-            module_name = self.package_name + '.' + module_name
-          # check the file
-          fok, fimports = self._check_imports(module_name, pathname, install_requires, silent, self.modules)
-          subimports.update(fimports)
-          if not fok:
-            ok = False
-        for required in sorted(install_requires - subimports):
-          with Pfx("install_required[%s]", required):
-            silent or warning("not imported")
-
+    ok = True
+    distinfo = self.DISTINFO
+    install_requires = self.requires
+    if install_requires is None:
+      silent or error("missing DISTINFO[install_requires]")
+      ok = False
+      install_requires = distinfo.get('requires')
+      if install_requires is None:
+        install_requires = ()
+      else:
+        silent or warning("working off DISTINFO[requires]=%r", install_requires)
+    install_requires = set(install_requires)
+    pkg_name = self.package_name
+    if pkg_name is None:
+      pkg_prefix = None
+    else:
+      pkg_prefix = pkg_name + '.'
+    # check imports against install_requires
+    for name in sorted(self.imports):
+      if not name.startswith('cs.'):
+        continue
+      if pkg_prefix and name.startswith(pkg_prefix):
+        continue
+      if name not in install_requires:
+        silent or warning("import %r not mentioned in install_requires", name)
+        ok = False
+    for name in sorted(install_requires):
+      if name not in self.imports:
+        silent or warning("requirement %r not imported", name)
+        ok = False
     return ok
 
-  def _check_imports(self, module_name, filename, install_requires, silent, Ms):
-    ''' Scan the supplied filename for imports, check against `install_requires`.
-        Returns (ok, subimports).
-    '''
-    with Pfx("check_imports(%r)", filename):
-      ok = True
-      subimports = set()
+  @prop
+  @cached
+  def imports(self):
+    subnames = set()
+    for path in self.paths():
+      for name in self._direct_imports(self.name, path):
+        if name in subnames:
+          continue
+        subnames.add(name)
+    return subnames
+
+  def _direct_imports(self, module_name, filename, silent=False):
+    with Pfx(filename):
       with open(filename) as codefp:
         for lineno, line in enumerate(codefp, 1):
           with Pfx(lineno):
@@ -380,42 +395,26 @@ class Module(object):
                 if len(words) < 2:
                   silent or warning("missing module name")
                   continue
-                subimport = words[1]
-                if subimport.startswith('.'):
+                subimport0 = subimport = words[1]
+                if subimport == '.':
+                  # don't recurse into ourself
+                  pkg_name = self.package_name
+                  if pkg_name is None:
+                    silent or warning("import of '.' from non-package")
+                    continue
+                  subimport = pkg_name
+                elif subimport.startswith('.'):
                   # resolve relative import name
                   preparts = module_name.split('.')
+                  subimport = subimport[1:]
                   while subimport.startswith('.'):
                     preparts.pop(-1)
                     subimport = subimport[1:]
                   if preparts:
                     if subimport:
                       preparts.append(subimport)
-                    subimport = '.'.join(preparts)
-                with Pfx("import %s", subimport):
-                  if subimport in subimports:
-                    ##silent or warning("repeated")
-                    continue
-                  subimports.add(subimport)
-                  if subimport.startswith('cs.'):
-                    subM = Ms[subimport]
-                    if subM is None:
-                      warning("NO IMPORT FOR %r", subimport)
-                    if subimport not in install_requires:
-                      subpkg_name = subM.package_name
-                      if subpkg_name is None:
-                        warning("no package name?")
-                      elif subpkg_name != self.package_name:
-                        silent or error("not mentioned in install_requires")
-                        ok = False
-                    subcheck = subM.check(True)
-                    if subcheck is None:
-                      # already in progress
-                      ##silent or warning("subcheck(%r): None: already in progress?", subimport)
-                      pass
-                    elif not subcheck:
-                      silent or error("module NOT OK")
-                      ok = False
-    return ok, subimports
+                  subimport = '.'.join(preparts)
+                yield subimport
 
 #                              name       - YYYYMMDD                            [.n]
 re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
@@ -500,9 +499,9 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, Ms, VCS, LV):
+  def __init__(self, prefix, modules, VCS, LV):
     self.prefix = prefix
-    self.modules = Ms
+    self.modules = modules
     self.vcs = VCS
     self.lv = LV
 
@@ -514,15 +513,22 @@ class ReleaseName(object):
       ok = False
     unreleased_changes = list(self.log_since())
     if unreleased_changes:
+      show_log = not silent and ok
       ok = False
       if not silent:
         error("unreleased changes")
-        for files, firstline in unreleased_changes:
-          files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
-          info("  %s: %s", ' '.join(files)+':', firstline)
+        if show_log:
+          for files, firstline in unreleased_changes:
+            files = [
+                filename[11:] if filename.startswith('lib/python/') else filename
+                for filename in files
+            ]
+            info("  %s: %s", ' '.join(files)+':', firstline)
     return ok
 
   def tagname(self, suffix):
+    ''' Compute a tag name for this release with the supplied `suffix`.
+    '''
     tag = self.prefix + '-' + suffix
     m = re_RELEASE_TAG.match(tag)
     if not m:
@@ -574,16 +580,18 @@ class ReleaseName(object):
     return next_suffix
 
   def next_release_tag(self):
+    ''' Compute the next release tag.
+    '''
     return self.prefix + '-' + self.next_suffix()
 
   def paths(self):
     ''' List of paths relevant this name, for use with hg log.
     '''
     prefix = self.prefix
-    base = os.path.join(PYLIBTOP, prefix.replace('.', '/'))
+    base = os.path.join(PYLIBTOP, prefix.replace('.', os.sep))
     basepy = base + '.py'
     readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
-    return (base, basepy, readme)
+    return base, basepy, readme
 
   def log_since(self):
     ''' Generator yielding (files, line) tuples for log lines since the last release for the supplied `prefix`.
@@ -599,6 +607,8 @@ class ReleaseName(object):
       yield files, firstline
 
   def uncommitted(self):
+    ''' List of paths relevant to this release with uncommited changes.
+    '''
     pathset = set(self.paths())
     changed = []
     for path in self.vcs.uncommitted():
@@ -609,26 +619,32 @@ class ReleaseName(object):
   def submit_pypi(self, force=False):
     return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
 
-  def submit_testpypi(self, force=False):
-    return self._submit_pypi('testpypi', URL_PYPI_TEST, force=force)
-
   def last_upload(self, pypi_flavour):
     lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
     last_pypi_release = self.lv.get(lastvalue_key, "")
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+    ''' Submit the latest release of this package to PyPI.
+    '''
+    if not self.check():
+      warning("check fails")
+      if force:
+        warning("submitting anyway")
+      else:
+        return
     with Pfx(pypi_flavour):
       last_suffix = self.last_suffix()
       lastvalue_key, last_pypi_release = self.last_upload(pypi_flavour)
       if last_suffix == last_pypi_release:
         info("already released %r", last_suffix)
-        if not force:
+        if force:
+          warning("submitting anyway")
+        else:
           return
       with Pfx("%r->%r", last_pypi_release, last_suffix):
-        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix)
-        PKG.check()
-        PKG.register()
+        defaults = dict(DISTINFO_DEFAULTS)
+        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         PKG.upload()
         self.lv[lastvalue_key] = last_suffix
 

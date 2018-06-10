@@ -1,0 +1,10 @@
+  lib/python/cs/app/svcd.py: cs.app.svcd: interrupt: clear STOP flag after using to to terminate the service
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: add debug facility
+  lib/python/cs/app/svcd.py: cs.app.svcd: drop debug message
+  lib/python/cs/app/svcd.py: cs.app.svcd: bugfix the DISTINFO definition for the "svcd" console script
+  lib/python/cs/app/svcd.py: cs.app.svcd: drop extra `debug` parameter, use .trace and global logging level
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: back off some tracing to debug level
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD.start: clear _STOP flag if set, more info in stop message within monitor
+  lib/python/cs/app/svcd.py: cs.app.svcd: fix usage message text
+  lib/python/cs/app/svcd.py: cs.app.svcd: remove dependency on external script "sux"
+  lib/python/cs/app/svcd.py: cs.app.svcd: new -F option to supply condition flag names; SvcD: remove requirement for name with specified flags

@@ -1,0 +1,1 @@
+  lib/python/cs/result.py: cs.result: new Result.bg(func, *a, **kw) method to dispatch function in separate Thread to compute the Result value; matching unit test; lint for Result.raise_

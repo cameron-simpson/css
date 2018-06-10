@@ -2,7 +2,7 @@
 #
 # Convenience functions for working with VirtualBox.
 # Many operations are done by invoking VBoxManage.
-#   - Cameron Simpson <cs@zip.com.au> 23oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 23oct2016
 #
 
 from __future__ import print_function
@@ -12,8 +12,9 @@ import os.path
 from os.path import basename, splitext
 from subprocess import Popen, PIPE
 import sys
-from cs.cmdutils import run
-from cs.logutils import setup_logging, warning, Pfx
+from cs.psutils import run
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx
 
 USAGE = r'''Usage:
   %s [ls [VBoxManage list options...]]
@@ -90,25 +91,25 @@ def cmd_pause(argv):
   if not argv:
     raise GetoptError("missing vmname")
   vmspec = argv.pop(0)
-  return run([VBOXMANAGE, 'controlvm', vmspec, 'pause'] + argv, trace=True)
+  return run([VBOXMANAGE, 'controlvm', vmspec, 'pause'] + argv, logger=True)
 
 def cmd_resume(argv, trace=False):
   if not argv:
     raise GetoptError("missing vmname")
   vmspec = argv.pop(0)
-  return run([VBOXMANAGE, 'controlvm', vmspec, 'resume'] + argv, trace=True)
+  return run([VBOXMANAGE, 'controlvm', vmspec, 'resume'] + argv, logger=True)
 
 def cmd_start(argv):
   if not argv:
     raise GetoptError("missing vmname")
   vmspec = argv.pop(0)
-  return run([VBOXMANAGE, 'startvm', vmspec] + argv, trace=True)
+  return run([VBOXMANAGE, 'startvm', vmspec] + argv, logger=True)
 
 def cmd_suspend(argv):
   if not argv:
     raise GetoptError("missing vmname")
   vmspec = argv.pop(0)
-  return run([VBOXMANAGE, 'controlvm', vmspec, 'savestate'] + argv, trace=True)
+  return run([VBOXMANAGE, 'controlvm', vmspec, 'savestate'] + argv, logger=True)
 
 def parse_clauses(fp):
   ''' Generator that parses VBoxManage clause output and yields maps from field name to field value.
@@ -137,14 +138,14 @@ def mkvdi(srcimg, dstvdi, argv, trace=False):
   '''
   if os.path.exists(dstvdi):
     raise ValueError("destination VDI image already exists: %r" % (dstvdi,))
-  return run([VBOXMANAGE, 'convertfromraw', srcimg, dstvdi, '--format', 'VDI'] + argv, trace=trace)
+  return run([VBOXMANAGE, 'convertfromraw', srcimg, dstvdi, '--format', 'VDI'] + argv, logger=trace)
 
 def mkimg(src, dstimg, argv, trace=False):
   ''' Create raw image `dstimg` from source `src`. Return VBoxManage clonemedium exit code.
   '''
   if os.path.exists(dstimg):
     raise ValueError("destination RAW image already exists: %r" % (dstimg,))
-  return run([VBOXMANAGE, 'clonemedium', 'disk', src, dstimg, '--format', 'RAW'] + argv, trace=trace)
+  return run([VBOXMANAGE, 'clonemedium', 'disk', src, dstimg, '--format', 'RAW'] + argv, logger=trace)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

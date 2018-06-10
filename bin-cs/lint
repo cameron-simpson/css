@@ -1,13 +1,17 @@
 #!/bin/sh
 #
 # Lint the named files.
-#   - Cameron Simpson <cs@zip.com.au> 22apr2017
+#   - Cameron Simpson <cs@cskk.id.au> 22apr2017
 #
 
 set -ue
 
 trace=
 [ -t 2 ] && trace=set-x
+
+pep8_ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503
+pylint_disable=bad-whitespace,invalid-name
+pylintrc=$(findup .pylintrc || echo $HOME/.pylintrc)
 
 cmd=$0
 usage="Usage: $cmd filenames..."
@@ -18,18 +22,79 @@ xit=0
 
 for lintfile
 do
+  type=
+  magic=
   case "$lintfile" in
-    *.php)
+    [a-z]*:*)
+      type=$( expr "x$lintfile" : 'x\([a-z][^:]*\):.*' )
+      tail=$( expr "x$lintfile" : 'x[a-z][^:]*:\(.*\)' )
+      [ -f "$tail" ] && lintfile=$tail
+      ;;
+  esac
+  if [ -z "$type" ]
+  then
+    case "$lintfile" in
+      *.json | *.go | *.php | *.py )
+        type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
+        ;;
+      *.pl | *.pm )
+        type=pl
+        ;;
+      *.py)
+        type=py
+        ;;
+    esac
+  fi
+  if [ -z "$type" ] && magic=$( file "$lintfile" )
+  then
+    case "$magic" in
+      *'perl script'*)          type=pl ;;
+      *'python script'* | *'python3 script'* )
+                                type=py ;;
+      *'POSIX shell script'*)   type=sh ;;
+    esac
+  fi
+  [ -n "$type" ] || {
+    echo "$cmd: $lintfile: unknown type (magic=$magic)" >&2
+    continue
+  }
+
+  case "$type" in
+    json)
+      $trace json-pprint <"$lintfile" 2>&1 >/dev/null || xit=1
+      ;;
+    go)
+      $trace go tool vet -all -shadowstrict "$lintfile" || xit=1
+      ;;
+    php)
       { $trace php -l "$lintfile" \
         && $trace phpcs --standard=PSR2 --report=emacs "$lintfile"
       } || xit=1
       ;;
-    *.py)
-      { $trace python3 -m py_compile "$lintfile" \
-        && : $trace pep8 --ignore=E111,E114,E126,E265,E266,E302 "$lintfile"
-      } || xit=1
+    py)
+      if $trace python3 -m py_compile "$lintfile"
+      then
+        $trace pyflakes "$lintfile" || xit=1
+        $trace pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        $trace pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+      else
+        xit=1
+      fi
       ;;
-    *)echo "$cmd: no lint for $lintfile"
+    py2)
+      if $trace python -m py_compile "$lintfile"
+      then
+        $trace pyflakes "$lintfile" || xit=1
+        $trace pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        $trace pylint "--disable=$pylint_disable" "$lintfile" || xit=1
+      else
+        xit=1
+      fi
+      ;;
+    sh)
+      $trace shellcheck -s sh "$lintfile" || xit=1
+      ;;
+    *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
       ;;
   esac
 done

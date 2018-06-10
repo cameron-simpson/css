@@ -1,14 +1,13 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.range.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
 import unittest
 from random import randint
 from cs.range import Range, overlap, spans, Span
-from cs.logutils import X
 
 class TestAll(unittest.TestCase):
 

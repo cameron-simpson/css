@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convenience wrapper for iTerm2 opterations.
-#       - Cameron Simpson <cs@zip.com.au> 26apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 26apr2014
 #
 
 set -ue
@@ -11,7 +11,7 @@ trace=
 cmd=$0
 usage="Usage: $cmd [-x] op [op-args...]
   Ops:
-    badge-forma format...
+    badge-format format...
     open command [args...]
         Open new terminal window runnong command.
     setvar varname value...
@@ -140,8 +140,8 @@ case "$op" in
   setvar)
     varname=$1
     shift
-    value64=$( printf '%s' "$*" | base64 )
-    printf '\e]1337;SetUserVar=%s\a' "$value64"
+    value64=$( printf '%s' "$*" | /usr/bin/base64 )
+    printf '\e]1337;SetUserVar=%s=%s\a' "$varname" "$value64"
     ;;
 
   switch-profile)

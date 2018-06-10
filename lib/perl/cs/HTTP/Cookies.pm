@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Do HTTP-related cookie stuff.
-#	- Cameron Simpson <cs@zip.com.au> 12mar98
+#	- Cameron Simpson <cs@cskk.id.au> 12mar98
 #
 
 use strict qw(vars);

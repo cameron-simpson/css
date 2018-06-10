@@ -358,7 +358,7 @@ cs::NNTP(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt> 11may2000
+Cameron Simpson E<lt>cs@cskk.id.auE<gt> 11may2000
 
 =cut
 

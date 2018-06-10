@@ -2,7 +2,7 @@
 #
 # Run a command and remove a file afterwards if successful.
 # With -f (force), remove the file anyway.
-#	- Cameron Simpson <cs@zip.com.au> 18feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 18feb2002
 #
 
 set -ue

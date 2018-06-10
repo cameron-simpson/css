@@ -1,5 +1,65 @@
 #!/usr/bin/python
-#
+
+r'''
+Lexical analysis functions, tokenisers.
+
+An assortment of lexcial and tokenisation functions useful for writing recursive descent parsers, of which I have several.
+
+Generally the get_* functions accept a source string and an offset (often optional, default 0) and return a token and the new offset, raising ValueError on failed tokenisation.
+
+* as_lines(chunks, partials=None): parse text chunks, yield complete individual lines
+
+* get_chars(s, offset, gochars): collect adjacent characters from `gochars`
+
+* get_decimal(s, offset): collect decimal characters (0-9, string.digits)
+
+* get_delimited(s, offset, delim): collect text up to the first ocurrence of the character `delim`.
+
+* get_envvar(s, offset=0, environ=None, default=None, specials=None): parse an environment variable reference such as $foo
+
+* get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'): parse an identifier
+
+* get_nonwhite(s, offset=0): collect nonwhitespace characters
+
+* get_other_chars(s, offset=0, stopchars=None): collect adjacent characters not from `stopchars`
+
+* get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None): collect a quoted string, honouring slosh escapes and optionally expanding environment variable references
+
+* get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None): collect some slosh escaped text with optional special tokens (such as '$' introducing '$foo')
+
+* get_tokens(s, offset, getters): collect a sequence of tokens specified in `getters`
+
+* match_tokens(s, offset, getters): wrapper for get_tokens which catches ValueError and returns None instead
+
+* get_uc_identifier(s, offset=0, number=digits, extras='_'): collect an UPPERCASE identifier
+
+* get_white(s, offset=0): collect whitespace characters
+
+* isUC_(s): test if a string looks like an upper case identifier
+
+* htmlify(s,nbsp=False): transcribe text in HTML safe form, using &lt; for "<", etc
+
+* htmlquote(s): transcribe text as HTML quoted string suitable for HTML tag attribute values
+
+* jsquote(s): transcribe text as JSON quoted string; essentially like htmlquote without its htmlify step
+
+* parseUC_sAttr(attr): parse FOO or FOOs (or FOOes) and return (FOO, is_plural)
+
+* slosh_mapper(c, charmap=SLOSH_CHARMAP): return a string to replace \c; the default charmap matches Python slosh escapes
+
+* texthexify(bs, shiftin='[', shiftout=']', whitelist=None): a function like binascii.hexlify but also supporting embedded "printable text" subsequences for compactness and human readbility in the result; initial use case was for transcription of binary data with frequent text, specificly directory entry data
+
+* untexthexify(s, shiftin='[', shiftout=']'): the inverse of texthexify()
+
+* unctrl(s,tabsize=8): transcribe text removing control characters
+'''
+
+import binascii
+from functools import partial
+import os
+from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
+import sys
+from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
 DISTINFO = {
     'description': "lexical analysis, tokenisers",
@@ -11,16 +71,6 @@ DISTINFO = {
     ],
     'install_requires': ['cs.py3'],
 }
-
-import base64
-import binascii
-from functools import partial
-import quopri
-from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
-import re
-import sys
-import os
-from cs.py3 import bytes, unicode, ustr, sorted, StringTypes, joinbytes
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -34,8 +84,7 @@ ord_space = ord(' ')
 def unctrl(s, tabsize=8):
   s2 = ''
   sofar = 0
-  for i in range(len(s)):
-    ch = s[i]
+  for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
       pass
@@ -112,15 +161,12 @@ def phpquote(s):
   '''
   return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
-def dict2js(d):
-  import cs.json
-  return cs.json.json(d)
-
 # characters that may appear in text sections of a texthexify result
 # Notable exclusions:
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
+#  { } - used for JSON data and some other markup
 #  / - path separator
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
@@ -132,10 +178,6 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         converted to hexify() and texthexify() output strings may be
         freely concatenated and decoded with untexthexify().
   '''
-  if sys.hexversion < 0x03000000:
-    bschr = lambda bs, ndx: bs[ndx]
-  else:
-    bschr = lambda bs, ndx: chr(bs[ndx])
   if whitelist is None:
     whitelist = _texthexify_white_chars
   if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
@@ -186,27 +228,27 @@ def untexthexify(s, shiftin='[', shiftout=']'):
       have the values of the ordinals of the characters.
   '''
   chunks = []
-  while len(s) > 0:
+  while s:
     hexlen = s.find(shiftin)
     if hexlen < 0:
       break
     if hexlen > 0:
       hextext = s[:hexlen]
       if hexlen % 2 != 0:
-        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
+        raise ValueError("uneven hex sequence %r" % (hextext,))
       chunks.append(unhexify(s[:hexlen]))
     s = s[hexlen + len(shiftin):]
     textlen = s.find(shiftout)
     if textlen < 0:
-      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
+      raise ValueError("missing shift out marker \"%s\"" % (shiftout,))
     if sys.hexversion < 0x03000000:
       chunks.append(s[:textlen])
     else:
       chunks.append(bytes(ord(c) for c in s[:textlen]))
     s = s[textlen + len(shiftout):]
-  if len(s) > 0:
+  if s:
     if len(s) % 2 != 0:
-      raise TypeError("uneven hex sequence \"%s\"" % (s,))
+      raise ValueError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
   return joinbytes(chunks)
 
@@ -220,24 +262,34 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
 
-def skipwhite(s, offset):
+def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace starting at
-      `offset` (default 0).
+  ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_decimal(s, offset=0):
+  ''' Scan the string `s` for decimal characters starting at `offset`.
+      Return dec_string, new_offset.
+  '''
+  return get_chars(s, offset, digits)
+
+def get_decimal_value(s, offset=0):
+  value_s, offset = get_decimal(s, offset)
+  if not value_s:
+    raise ValueError("expected decimal value")
+  return int(value_s), offset
 
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
@@ -245,10 +297,14 @@ def get_hexadecimal(s, offset=0):
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
+def get_hexadecimal_value(s, offset=0):
+  value_s, offset = get_hexadecimal(s, offset)
+  if not value_s:
+    raise ValueError("expected hexadecimal value")
+  return int('0x' + value_s), offset
+
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -273,10 +329,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
-  ''' Scan the string `s` for a dotted identifier (by default an ASCII
-      letter or underscore followed by letters, digits or underscores)
-      with optional trailing dot and another dotted identifier,
-      starting at `offset` (default 0).
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) with optional trailing dot and another dotted identifier, starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -284,8 +337,8 @@ def get_dotted_identifier(s, offset=0, **kw):
   offset0 = offset
   _, offset = get_identifier(s, offset=offset, **kw)
   if _:
-    while offset < len(s)-1 and s[offset] == '.':
-      _, offset2 = get_identifier(s, offset=offset+1, **kw)
+    while offset < len(s) - 1 and s[offset] == '.':
+      _, offset2 = get_identifier(s, offset=offset + 1, **kw)
       if not _:
         break
       offset = offset2
@@ -319,7 +372,7 @@ SLOSH_CHARMAP = {
 }
 
 def slosh_mapper(c, charmap=SLOSH_CHARMAP):
-  ''' Return a string to replace \`c`, or None.
+  ''' Return a string to replace backslash-`c`, or None.
   '''
   return charmap.get(c)
 
@@ -358,7 +411,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     special_starts = set()
     special_seqs = []
     for special in specials.keys():
-      if len(special) == 0:
+      if not special:
         raise ValueError(
             'empty strings may not be used as keys for specials: %r' % (specials,))
       special_starts.add(special[0])
@@ -452,10 +505,11 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if (c == slosh
+      if (
+          c == slosh
           or (delim is not None and c == delim)
           or (specials is not None and c in special_starts)
-          ):
+      ):
         break
       offset += 1
     chunks.append(s[offset0:offset])

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.later.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from functools import partial
@@ -10,8 +10,8 @@ import time
 import unittest
 from cs.logutils import D, setup_logging
 from cs.timeutils import sleep
-from cs.asynchron import report
-from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR
+from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY, FUNC_SELECTOR
+from cs.result import report
 
 class TestLater(unittest.TestCase):
 
@@ -109,7 +109,7 @@ class TestLater(unittest.TestCase):
   def test09pipeline_00noop(self):
     with Later(1) as L:
       items = ['a', 'b', 'c', 'g', 'f', 'e']
-      P = L.pipeline([lambda x:x], items)
+      P = L.pipeline([ (FUNC_ONE_TO_ONE, lambda x:x) ], items)
       outQ = P.outQ
       result = list(P.outQ)
       self.assertEqual( items, result )
@@ -119,7 +119,7 @@ class TestLater(unittest.TestCase):
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     def func(x):
       yield x
-    P = L.pipeline([ func ], items)
+    P = L.pipeline([ (FUNC_ONE_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
     self.assertEqual( items, result )
@@ -131,7 +131,7 @@ class TestLater(unittest.TestCase):
     def func(x):
       yield x
       yield x
-    P = L.pipeline([ func ], items)
+    P = L.pipeline([ (FUNC_ONE_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
     # values may be interleaved due to parallelism
@@ -176,16 +176,18 @@ class TestLater(unittest.TestCase):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = [ 'a', 'a', 'a', 'a',
-              'b', 'b', 'b', 'b',
-              'c', 'c', 'c', 'c',
-              'e', 'e', 'e', 'e',
-              'f', 'f', 'f', 'f',
-              'g', 'g', 'g', 'g',
-            ]
+                 'b', 'b', 'b', 'b',
+                 'c', 'c', 'c', 'c',
+                 'e', 'e', 'e', 'e',
+                 'f', 'f', 'f', 'f',
+                 'g', 'g', 'g', 'g',
+               ]
     def double(x):
       yield x
       yield x
-    P = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
+    P = L.pipeline([ (FUNC_ONE_TO_MANY, double),
+                     (FUNC_ONE_TO_MANY, double),
+                     (FUNC_MANY_TO_MANY, sorted) ], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
     self.assertEqual( result, expected )

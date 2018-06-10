@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Create a suitable (480x320) JPEG for use as a Tungsten T5 background image.
-#	- Cameron Simpson <cs@zip.com.au> 14feb2005
+#	- Cameron Simpson <cs@cskk.id.au> 14feb2005
 #
 
 geom=480x320

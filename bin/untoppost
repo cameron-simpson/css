@@ -2,7 +2,7 @@
 #
 # Extremely simple minded script to mostly repair top posted messages
 # by moving all unquoted text to the bottom of the message.
-#   - Cameron Simpson <cs@zip.com.au> 29jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 29jan2017
 #
 
 # copy out the header directly

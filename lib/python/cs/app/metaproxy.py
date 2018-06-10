@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # MetaProxy: content rewriting aggressive cache web proxy toolkit.
-#   - Cameron Simpson <cs@zip.com.au> 26dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 26dec2014
 #
 # Design:
 #  local squid:
@@ -41,11 +41,13 @@ try:
   from urllib.parse import urlparse
 except ImportError:
   from urlparse import urlparse
-from cs.asynchron import Asynchron
+from cs.result import Asynchron
 from cs.env import envsub
 from cs.excutils import LogExceptions
 from cs.fileutils import copy_data, Tee
-from cs.logutils import setup_logging, Pfx, debug, info, warning, error, exception, D, X
+from cs.logutils import setup_logging, debug, info, warning, error, exception, D
+from cs.x import X
+from cs.pfx import Pfx
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars
 from cs.progress import Progress, ProgressWriter

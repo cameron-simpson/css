@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Write a possibly-colourised string to the alert log.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -178,7 +178,7 @@ then
     set -- timeout 10 reattach-to-user-namespace "$@"
     # async because I've seen terminal-notifier hang, stalling my mail filer
     # timeout also to stop hanging processes filling the process table
-    "$@" >/dev/null || to_stderr=1
+    "$@" >/dev/null &
   fi
 fi
 

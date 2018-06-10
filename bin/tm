@@ -3,7 +3,7 @@
 # Tmux convenience script, performing common higher level tasks.
 # Falls back to using screen if no tmux in some circumstances,
 # primarily when accessing remote sessions.
-#   - Cameron Simpson <cs@zip.com.au> 30oct2014
+#   - Cameron Simpson <cs@cskk.id.au> 30oct2014
 #
 
 set -ue
@@ -301,7 +301,19 @@ rcmd(){
     *\!*)   _rcmd_ssh=sshto ;;
     *)      _rcmd_ssh=ssh ;;
   esac
-  $trace $_rcmd_ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //"); case "$tmux_version" in ""|0.*|1.*|2.0|2.1) tmux="env TMPDIR=$TMUX_TMPDIR tmux" ;; *) tmux=tmux ;; esac; '"$*"
+  $trace $_rcmd_ssh -t "$_rcmd_rhost" "
+    $setx"'
+    PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH
+    : ${TMUX_TMPDIR:=}
+    if [ -z "$TMUX_TMPDIR" ]
+    then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR
+    fi
+    tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //")
+    case "$tmux_version" in
+      ""|0.*|1.*|2.0|2.1) tmux="env TMPDIR=$TMUX_TMPDIR tmux" ;;
+      *) tmux=tmux ;;
+    esac
+    '"$*"
 }
 
 case "$op" in

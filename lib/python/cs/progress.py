@@ -1,13 +1,14 @@
 #!/usr/bin/python
 #
 # Progress counting.
-#   - Cameron Simpson <cs@zip.com.au> 15feb2015
+#   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
 
 from collections import namedtuple
 import time
-from cs.logutils import warning, exception, X
+from cs.logutils import warning, exception
 from cs.seq import seq
+from cs.x import X
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 

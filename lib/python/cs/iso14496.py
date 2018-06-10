@@ -2,7 +2,7 @@
 #
 # Facilities for ISO14496 files - the ISO Base Media File Format,
 # the basis for several things including MP4.
-#   - Cameron Simpson <cs@zip.com.au> 26mar2016
+#   - Cameron Simpson <cs@cskk.id.au> 26mar2016
 #
 # ISO make the standard available here:
 #   http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html
@@ -17,9 +17,11 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_data, read_from, pread, seekable
-from cs.logutils import setup_logging, warning, X, Pfx
+from cs.logutils import setup_logging, warning
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py3 import bytes, pack, unpack, iter_unpack
+from cs.x import X
 
 USAGE = '''Usage:
   %s parse [{-|filename}]...
@@ -280,10 +282,8 @@ class Box(object):
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
           class or Box if not present.
         `discard_data`: if false (default), keep the unparsed data portion as
-          a list of data chunk in the attribute .data_chunks; if true,
+          a list of data chunks in the attribute .data_chunks; if true,
           discard the unparsed data
-        `copy_offsets`: if not None, call `copy_offsets` with each
-          Box starting offset
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
@@ -293,7 +293,6 @@ class Box(object):
       cls = pick_box_class(box_header.type)
     B = cls(box_header)
     B.offset = offset0
-    X("Box.from_buffer: found %s at %d", bytes(B.box_type), offset0)
     bfr.report_offset(offset0)
     # further parse some or all of the data
     B.parse_data(bfr)

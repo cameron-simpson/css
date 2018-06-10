@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # TokyoCabinet backend.
-#       - Cameron Simpson <cs@zip.com.au> 02may2010
+#       - Cameron Simpson <cs@cskk.id.au> 02may2010
 #
 
 import os
@@ -9,7 +9,8 @@ import os.path
 import unittest
 import sys
 from threading import Lock
-from cs.logutils import error, Pfx
+from cs.logutils import error
+from cs.pfx import Pfx
 from cs.excutils import unimplemented
 from cs.py3 import StringTypes
 from . import NodeDB, Backend

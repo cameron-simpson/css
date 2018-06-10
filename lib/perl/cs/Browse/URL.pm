@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Browse::URL - trivial URL object for browse history.
-#	- Cameron Simpson <cs@zip.com.au> 1feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 1feb2001
 #
 
 =head1 NAME
@@ -121,7 +121,7 @@ sub Url($)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

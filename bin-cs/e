@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Edit something.
-#   - Cameron Simpson <cs@zip.com.au> 02jun2016
+#   - Cameron Simpson <cs@cskk.id.au> 02jun2016
 #
 
 set -ue

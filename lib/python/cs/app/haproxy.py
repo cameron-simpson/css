@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for working with HAProxy.
-#       - Cameron Simpson <cs@zip.com.au> 14jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 14jul2012
 #
 
 from __future__ import print_function
@@ -13,7 +13,8 @@ try:
   from urllib.request import urlopen
 except ImportError:
   from urllib2 import urlopen
-from cs.logutils import setup_logging, Pfx, D, warning, error
+from cs.logutils import setup_logging, D, warning, error
+from cs.pfx import Pfx
 from cs.obj import O
 
 USAGE = '''Usage: {cmd} stats host:port print [columns...]'''

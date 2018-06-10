@@ -4,7 +4,7 @@
 # Why? Sed has historically discarded unterminated last lines,
 # and I've just discovered that bash does so too in backticks.
 # Which is slack.
-#	- Cameron Simpson <cs@zip.com.au> 31may2002
+#	- Cameron Simpson <cs@cskk.id.au> 31may2002
 #
 
 ( cat; echo ) | sed -e '$!b ok' -e '/^$/d' -e ':ok'

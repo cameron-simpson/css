@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for pdftohtml which makes a coarse attempt at paragraphing.
-#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 01jun2002
 #
 
 cmd=`basename "$0"`

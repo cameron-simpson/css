@@ -6,7 +6,9 @@ from __future__ import print_function
 import sys
 import os.path
 import json
-from cs.logutils import setup_logging, warning, error, Pfx, X
+from cs.logutils import setup_logging, warning, error
+from cs.pfx import Pfx
+from cs.x import X
 from . import Recording
 
 TRY_N = 32
@@ -36,7 +38,9 @@ USAGE = '''Usage:
     %s test
         Run unit tests.'''
 
-def main(argv):
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)

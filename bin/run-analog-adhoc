@@ -2,7 +2,7 @@
 #
 # Run an ad hoc analog report in the current directory for the specified
 # logs.
-#       - Cameron Simpson <cs@zip.com.au> 21dec2011
+#       - Cameron Simpson <cs@cskk.id.au> 21dec2011
 #
 
 set -ue

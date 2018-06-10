@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Convert HTML to troff-mm macros for printing.
-#	- Cameron Simpson <cs@zip.com.au>, 08jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 08jul94
 #
 # TABLE support.		- cameron, 30jun98
 # Better nested tag support.	- cameron, 01jul98

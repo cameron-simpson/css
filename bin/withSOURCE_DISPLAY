@@ -1,5 +1,5 @@
 #!/bin/sh
-# - Cameron Simpson <cs@zip.com.au> 22mar2001
+# - Cameron Simpson <cs@cskk.id.au> 22mar2001
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
 eval `rigSOURCE_DISPLAY`
 DISPLAY=$SOURCE_DISPLAY

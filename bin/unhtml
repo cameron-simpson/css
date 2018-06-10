@@ -1,14 +1,14 @@
 #!/bin/sh
 #
 # Mangle HTML to put URLs inline with the links for easy grabbing.
-#	- Cameron Simpson <cs@zip.com.au> 17may2002
+#	- Cameron Simpson <cs@cskk.id.au> 17may2002
 #
 
 cmd=$0
 usage="Usage: $cmd [-a] [-c] [-cols] [files...]
-	-a	No anchors - don't mangle HTML to show URLs.
-	-c	Clean: run code through htclean.
-	-cols	Use \"cols\" columns."
+        -a      No anchors - don't mangle HTML to show URLs.
+        -c      Clean: run code through htclean.
+        -cols   Use \"cols\" columns."
 
 mangle=1
 cols=
@@ -22,9 +22,9 @@ while :
 do
   case "$1" in
     -a)  mangle= ;;
-    +a)	 mangle= ;;
+    +a)  mangle=1 ;;
     -c)  clean=1 ;;
-    +c)	 clean= ;;
+    +c)  clean= ;;
     -[1-9]*) cols=`expr "x$1" : 'x-\(.*\)'` ;;
     --)  shift; break ;;
     -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -43,19 +43,23 @@ if [ $# = 0 ]
 then  detab
 else  for file
       do  case "$file" in
-	    -)				cat ;;
-	    http://* | ftp://* )	wcat "$file" ;;
-	    *)				cat "$file" ;;
-	  esac
+            -)  cat ;;
+            http://* | https://* | ftp://* )
+                wget -O - "$file" ;;
+            *)  cat "$file" ;;
+          esac
       done
 fi \
 | if [ $clean ]; then htclean; else cat; fi \
 | LC_ALL=C html-unsplit \
 | LC_ALL=C sed 's|</ *[Aa] *>|&|g' \
 | LC_ALL=C tr '\015' '\012' \
-| if [ $mangle ]
-  then perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)">[^<]*</a>; $& [$1];gi'
+| if false && [ $mangle ]
+  then set-x perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)"[^>]*>[^<]*</a>; $& [$1];gi'
   else cat
   fi \
-| set-x w3m $w3cols -dump -T text/html \
-| LC_ALL=C sed 's/[ 	][ 	]*$//'
+| if :
+  then  set-x lynx -stdin -dump
+  else  set-x w3m $w3cols -dump -T text/html
+  fi \
+| LC_ALL=C sed 's/[     ][      ]*$//'

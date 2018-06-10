@@ -1,6 +1,24 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement, print_function
+from collections import deque
+from getopt import getopt, GetoptError
+from email.utils import getaddresses, parseaddr, formataddr
+from itertools import chain
+import codecs
+import re
+import sys
+import os
+import tempfile
+from cs.lex import get_identifier
+from cs.logutils import setup_logging, info, warning, error, D
+from cs.mailutils import message_addresses, Message
+from cs.nodedb import NodeDB, Node, NodeDBFromURL
+from cs.pfx import Pfx
+from cs.py.func import derived_property
+from cs.py3 import StringTypes, ustr
+import cs.sh
+from cs.threads import locked_property
 
 DISTINFO = {
     'description': "a cs.nodedb NodeDB subclass for storing email address information (groups, addresses, so forth)",
@@ -9,35 +27,24 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
+    ],
+    'install_requires': [
+        'cs.lex',
+        'cs.logutils',
+        'cs.mailutils',
+        'cs.nodedb',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.sh',
+        'cs.threads',
+    ],
     'entry_points': {
-      'console_scripts': [
-          'maildb = cs.app.maildb:main',
-          ],
-        },
+        'console_scripts': [
+            'maildb = cs.app.maildb:main',
+        ],
+    },
 }
-
-from collections import deque
-from getopt import getopt, GetoptError
-from email.utils import getaddresses, parseaddr, formataddr
-from itertools import chain
-import codecs
-import logging
-import re
-import sys
-import os
-import tempfile
-import unittest
-from cs.logutils import setup_logging, Pfx, info, warning, error, D, X
-from cs.mailutils import ismaildir, message_addresses, Message
-from cs.nodedb import NodeDB, Node, NodeDBFromURL
-from cs.lex import get_identifier
-import cs.sh
-from cs.seq import get0, last
-from cs.threads import locked, locked_property
-from cs.py.func import derived_property
-from cs.py3 import StringTypes, ustr
 
 def main(argv=None, stdin=None):
   if argv is None:
@@ -51,7 +58,6 @@ def main(argv=None, stdin=None):
     Ops:
       abbreviate abbrev address
         (also "abbrev")
-      compact
       edit-group group
       edit-group /regexp/
       export exportpath
@@ -65,6 +71,7 @@ def main(argv=None, stdin=None):
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
         Using both -A and -G emits mutt aliases lines with the -group option.
+      rewrite
       update-domain @old-domain @new-domain [{/regexp/|address}...]''' \
     % (cmd,)
   setup_logging(cmd)
@@ -76,7 +83,7 @@ def main(argv=None, stdin=None):
   try:
     opts, argv = getopt(argv, 'm:')
   except GetoptError as e:
-    error("unrecognised option: %s: %s"% (e.opt, e.msg))
+    error("unrecognised option: %s: %s" % (e.opt, e.msg))
     badopts = True
     opts, argv = [], []
 
@@ -91,15 +98,16 @@ def main(argv=None, stdin=None):
   if mdburl is None:
     mdburl = os.environ['MAILDB']
 
-  if len(argv) == 0:
+  if not argv:
     error("missing op")
     badopts = True
   else:
     op = argv.pop(0)
     with Pfx(op):
-      readonly = op not in ('abbreviate', 'abbrev', 'compact',
+      readonly = op not in ('abbreviate', 'abbrev',
                             'edit-group', 'import-addresses',
                             'learn-addresses', 'update-domain',
+                            'rewrite',
                            )
       with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
@@ -121,8 +129,6 @@ def main(argv=None, stdin=None):
             except ValueError as e:
               error(e)
               xit = 1
-        elif op == 'compact':
-          MDB.rewrite()
         elif op == 'export':
           exportpath = argv.pop(0)
           if argv:
@@ -140,7 +146,7 @@ def main(argv=None, stdin=None):
           try:
             opts, argv = getopt(argv, 'A')
           except GetoptError as e:
-            error("unrecognised option: %s: %s"% (e.opt, e.msg))
+            error("unrecognised option: %s: %s" % (e.opt, e.msg))
             badopts = True
             opts, argv = [], []
           mutt_aliases = False
@@ -152,7 +158,7 @@ def main(argv=None, stdin=None):
                 error("unrecognised option")
                 badopts = True
           abbrevs = MDB.abbreviations
-          if len(argv):
+          if argv:
             abbrev_names = argv
           else:
             abbrev_names = sorted(abbrevs.keys())
@@ -177,8 +183,7 @@ def main(argv=None, stdin=None):
                 auto_alias = A.realname.strip()
                 if auto_alias:
                   names = auto_alias.lower().split()
-                  for i in range(len(names)):
-                    name = names[i]
+                  for i, name in enumerate(names):
                     if not name.isalpha():
                       name = ''.join( [ c for c in name if c.isalpha() ] )
                       names[i] = name
@@ -196,7 +201,7 @@ def main(argv=None, stdin=None):
           try:
             opts, argv = getopt(argv, 'AG')
           except GetoptError as e:
-            error("unrecognised option: %s: %s"% (e.opt, e.msg))
+            error("unrecognised option: %s: %s" % (e.opt, e.msg))
             badopts = True
             opts, argv = [], []
           mutt_aliases = False
@@ -210,7 +215,7 @@ def main(argv=None, stdin=None):
               else:
                 error("unrecognised option")
                 badopts = True
-          if len(argv):
+          if argv:
             group_names = argv
           else:
             group_names = sorted(MDB.address_groups.keys())
@@ -247,16 +252,16 @@ def main(argv=None, stdin=None):
                   print(', '.join(formatted_addresses))
         elif op == 'learn-addresses':
           only_ungrouped = False
-          if len(argv) and argv[0] == '--ungrouped':
+          if argv and argv[0] == '--ungrouped':
             argv.pop(0)
             only_ungrouped = True
-          if not len(argv):
+          if not argv:
             error("missing groups")
             badopts = True
           else:
             group_names = argv.pop(0)
             group_names = [ name for name in group_names.split(',') if name ]
-            if len(argv):
+            if argv:
               error("extra arguments after groups: %s", argv)
               badopts = True
             else:
@@ -267,20 +272,22 @@ def main(argv=None, stdin=None):
               else:
                 MDB.importAddresses_from_message(stdin, group_names)
         elif op == 'edit-group':
-          if not len(argv):
+          if not argv:
             error("missing group")
             badopts = True
           else:
             group = argv.pop(0)
-            if len(argv):
+            if argv:
               error("extra arguments after %s \"%s\": %s",
                     ('regexp' if group.startswith('/') else 'group'),
                     group, argv)
               badopts = True
             else:
               edit_group(MDB, group)
+        elif op == 'rewrite':
+          MDB.rewrite()
         elif op == 'update-domain':
-          if not len(argv):
+          if not argv:
             error("missing @old-domain")
             badopts = True
           else:
@@ -288,7 +295,7 @@ def main(argv=None, stdin=None):
             if not old_domain.startswith('@'):
               error('old domain must start with "@": %s' % (old_domain,))
               badopts = True
-          if not len(argv):
+          if not argv:
             error("missing @new-domain")
             badopts = True
           else:
@@ -334,19 +341,17 @@ def edit_groupness(MDB, addresses, subgroups):
   '''
   with Pfx("edit_groupness()"):
     Gs = sorted( set(subgroups),
-                 ( lambda G1, G2: cmp(G1.name, G2.name) )
+                 key=lambda G: G.name
                )
     As = sorted( set(addresses),
-                 ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
+                 key=lambda A: A.realname.lower()
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
         with codecs.open(T.name, "w", encoding="utf-8") as ofp:
           # present groups first
           for G in Gs:
-            supergroups = sorted( set(G.GROUPs),
-                                  ( lambda G1, G2: cmp(G1.name, G2.name) )
-                                )
+            supergroups = sorted( set(G.GROUPs), key=lambda g: g.name )
             line = u'%-15s @%s\n' % (",".join(supergroups), G.name)
             ofp.write(line)
           # present addresses next
@@ -422,7 +427,7 @@ def update_domain(MDB, old_domain, new_domain, argv):
           rexp = pattern[1:-1]
         else:
           rexp = pattern[1:]
-        addrs.extend( [ A.name for A in  MDB.matchAddresses(rexp) ] )
+        addrs.extend( [ A.name for A in MDB.matchAddresses(rexp) ] )
       else:
         addrs.append(pattern)
   if not addrs:
@@ -465,7 +470,7 @@ class AddressNode(Node):
     address_group = self.nodedb.address_groups.get(group_name)
     if address_group is None:
       return False
-    return self.name in G
+    return self.name in address_group
 
   @property
   def abbreviation(self):
@@ -554,9 +559,9 @@ def MailDB(mdburl, readonly=True, klass=None):
                        klass=klass)
 
 _MailDB_TypeFactories = {
-    'MESSAGE':      MessageNode,
-    'ADDRESS':      AddressNode,
-  }
+    'MESSAGE': MessageNode,
+    'ADDRESS': AddressNode,
+}
 
 class _MailDB(NodeDB):
   ''' Extend NodeDB for email.
@@ -570,7 +575,6 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    raise NotImplementedError("needs recode")
     obackend = self.backend
     self.backend = None
     self.scrub()
@@ -591,11 +595,11 @@ class _MailDB(NodeDB):
         rnsu = set(rns)
         if len(rnsu) < len(rns):
           N.REALNAMEs = rnsu
-      abs = N.ABBREVIATIONs
-      if abs:
-        absu = set(abs)
-        if len(absu) < len(abs):
-          N.ABBREVIATIONs = sorted(list(absu))
+      abbrevs = N.ABBREVIATIONs
+      if abbrevs:
+        abbrevs_unique = set(abbrevs)
+        if len(abbrevs_unique) < len(abbrevs):
+          N.ABBREVIATIONs = sorted(list(abbrevs_unique))
 
   @staticmethod
   def parsedAddress(addr):
@@ -616,14 +620,14 @@ class _MailDB(NodeDB):
         MailDB, return None and do not create an AddressNode.
     '''
     realname, coreaddr = self.parsedAddress(addr)
-    coreaddr = coreaddr.lower()
-    if  len(coreaddr) == 0:
+    if not coreaddr:
       raise ValueError("getAddressNode(addr=%r): coreaddr => %r" % (addr, coreaddr))
+    coreaddr = coreaddr.lower()
     A = self.get( ('ADDRESS', coreaddr), doCreate=not noCreate)
     if noCreate and A is None:
       return None
     Aname = A.realname
-    if not len(Aname) and len(realname) > 0:
+    if not Aname and realname:
       A.REALNAME = ustr(realname)
     return A
 
@@ -654,7 +658,7 @@ class _MailDB(NodeDB):
       else:
         short = abbrev
     return short
-  
+
   def header_shortlist(self, M, hdrs):
     ''' Return a list of the unique shortnames for the addresses in the specified headers.
     '''
@@ -669,7 +673,7 @@ class _MailDB(NodeDB):
     ''' Return the set of addresses in the group `group_name`.
         Create the set if necessary.
     '''
-    return self.address_groups.set_default(group_name, set())
+    return self.address_groups.setdefault(group_name, set())
 
   @derived_property
   def address_groups(self):
@@ -677,10 +681,9 @@ class _MailDB(NodeDB):
         set of A.name.lower().
         Return the mapping.
     '''
-    X("RECOMPUTE ADDRESS_GROUPS")
     try:
       agroups = { 'all': set() }
-      all = agroups['all']
+      allgroup = agroups['all']
       for A in self.ADDRESSes:
         coreaddr = A.name
         if coreaddr != coreaddr.lower():
@@ -688,7 +691,7 @@ class _MailDB(NodeDB):
         for group_name in A.GROUPs:
           agroup = agroups.setdefault(group_name, set())
           agroup.add(coreaddr)
-          all.add(coreaddr)
+          allgroup.add(coreaddr)
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
@@ -737,7 +740,7 @@ class _MailDB(NodeDB):
     return self.get( ('MESSAGE', message_id), doCreate=True)
 
   def getAddressNodes(self, *addrtexts):
-    return [ self.getAddressNode( (realname, addr), doCreate=True)
+    return [ self.getAddressNode( (realname, addr) )
              for realname, addr
              in getaddresses(addrtexts)
            ]
@@ -749,10 +752,11 @@ class _MailDB(NodeDB):
     info("import %s->%s: %s" % (msg['from'], msg['to'], msg['subject']))
 
     msgid = msg['message-id'].strip()
-    if ( not msgid.startswith('<')
-      or not msgid.endswith('>')
-      or msgid.find("@") < 0
-       ):
+    if (
+        not msgid.startswith('<')
+        or not msgid.endswith('>')
+        or msgid.find("@") < 0
+    ):
       raise ValueError("invalid Message-ID: %s" % (msgid,))
 
     M = self.getMessageNode(msgid)
@@ -761,7 +765,6 @@ class _MailDB(NodeDB):
     if 'date' in msg:
       M.DATE = msg['date']
     M.FROMs = self.getAddressNodes(*msg.get_all('from', []))
-    addrs = {}
     M.RECIPIENTS = self.getAddressNodes(
                        *chain( msg.get_all(hdr, [])
                                for hdr
@@ -801,7 +804,7 @@ class _MailDB(NodeDB):
           except ValueError:
             error("no addresses")
             continue
-          if not len(addr):
+          if not addr:
             info("SKIP - no address")
           try:
             A = self.getAddressNode(addr)

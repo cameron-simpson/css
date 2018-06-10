@@ -2,7 +2,7 @@
 #
 # Parse the Netscape bookmark file (post clean by nsbmclean)
 # and do things with the structure.
-#	- Cameron Simpson <cs@zip.com.au> 13mar1998
+#	- Cameron Simpson <cs@cskk.id.au> 13mar1998
 #
 
 use strict qw(vars);

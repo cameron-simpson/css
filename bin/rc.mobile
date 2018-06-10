@@ -5,7 +5,7 @@
 # For a roving laptop.
 # Some more doco here:
 #	http://www.cskk.ezoshosting.com/cs/css/#rc.mobile
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 # =head1 NAME
 #
@@ -635,5 +635,5 @@ runqueue "$@"
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson E<lt>cs@zip.com.auE<gt> July 2003
+# Cameron Simpson E<lt>cs@cskk.id.auE<gt> July 2003
 #

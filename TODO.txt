@@ -1,4 +1,26 @@
 iso14496: parser for mdat section - how to know the audio/video format?
+cs.flags: put a lock around all accesses
+SvcD to subclass RunStateMixin?
+Results to inherit from RunStateMixin
+SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
+SvcD/Portfwd: cleanup mode polling pid files to kill former processes
+take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
+cs.resources: finish subopen proxy support
+PyPI: remove cs.asynchron once dependent packages updated
+cs.logutils.status: fold into cs.statusline, merge features
+speed up cs.lex.unctrl using enumerate and join of substrs
+make Asynchrons __await__able
+port cs.fileutils.files_property to cs.deco.cached
+cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
+fvwm: move cs-fvwm-blah python code into cs.app.fvwm
+nodedb:
+  reform map: dunders update and push changes, foreign methods to
+    ingest changes, iter to watch foreign changes or all changes,
+    support multiple iterators by registering notifiers?
+cs.py.func: find out why eval causes syntax error with raise e from e2
+vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
+portfwd ARP_ADDR check for local networks
+colourise command highlighing multiple regexps and line ranges
 mailfiler: prepend received lines on pickup and filing
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
@@ -24,50 +46,25 @@ cs.fileutils:
   tail() with blocking and nonblocking mode; follow mode? emits chunks
 mp4/iso14496
   STTSBox (_GenericSampleBox): shorter rendition of .samples
-  how is video stored? decoder for common formats
+cs.logutils: PfxThread to clone current prefix to new Thread, use in venti.blockify
 venti:
-  vt ar yields .vtd file whose first block is a LiteralDirent and
-    all dependent Blocks are in the vtd file
-  "raw datafile store": point at a datafile and kick off a scanner,
-    fetch blocks until scanned if missing hash
-    for use with "vt ar"
-    "file:datafile.vtd" Store scheme
-  daemon: listen on UNIX domain socket
-    test access to socket via ssh forwarding
-  stats in new vs existing blocks when adding blocks
-  flat file cache - keep multiple caches, set of hashes per file,
-    pper limit, drop oldest file once set empty and >8 files
-  datafile: use os.open(O_APPEND) and raw fds, no buffering, no
-    seek, no flush, separate fd for read
-  parsers:
-    mbox look for nn and rnrn
-  is ctypes.addressof any use for i/o?
+  FIXED? BUG: new files forget their correct size on umount
   blockify
     sniff files to infer high level syntax
-    histograms on blockify block sizes
-    parser for .gz possible?
-    offset/chunk queue uses mutexes to store at most 1 offset or
-      chunk - in fact maybe not a queue at all - general queuelike
-      thingy with - maybe a 2 element heap with 1 element queues
-      feeding it or a pair with channels feeding it
-      problem: offset many chunks in the future?
-    blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
-  stream protocol: error flag, json flag (implies JSON additional payload)
-  vtfuse
-    store content-type in xattrs
-    FileHandle use raw file instead of stdio
-  File.close:
-    get a preferred parser in from outside
-    pass the parser to blockify
-    keep a partial_block bytes for use at the front of the filedata
-    modify the backing data part to examine the last B
-      update partial_block with it instead of yielding it if it is a partial
-  decode-Dir: use copy buffer and leaf blocks
-  decode binary stream: use copy buffer
+    parsers:
+      blockify should cope with parsers which exception
+      should blockify dup the source chunks and verify that the
+        chunks from the parser match the chunks from the source?
+      would that imply the parsers need only consume the chunks and
+        emit offsets, and not need to emit chunks?
+        that would avoid needing verification, and possibly avoid
+          some chunk reblocking a parser might do, and also allow
+          us to cope with parsers that exception out
+        * still need to accomodate data generation with offsets, eg big
+          Dirents being emitted with Dirent boundaries
   control module
     vtftp to be an API to it
   BackedFile to set change-on-close flag on write/truncate etc
-  meta: user.mime_type
   move to SHA-3-256, check hash size etc
     v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
       for k in S1: S2.add[S1[k]
@@ -123,23 +120,22 @@ venti:
     ticker to sync gdbm index? or just on _indexQ empty?
     report degree of gdbm batching
     maxsize setting, to be used for caches
-    file monitoring: tail() feeding to data block parser;
-      data block parser to use copy buffer
   ProgressStore
     proxy for a single subStore with various Progress attributes .progress_*
     convenient status line:
       {progress_add_bytes|human}:{progress_add_count} {progress_get_bytes|human} {progress_outstanding}
   S3Store
-    stores Blocks directly as texthashcode.{hashname}
+    stores Blocks directly as texthashcode.sha1
   HTTPStore
-    /texthashcode.{hashname}
+    /texthashcode.sha1
   HTTPDaemon
     /h/texthashcode.sha1 block (redirect to other http? eg an S3 backed one)
     /i/texthashcode.sha1 indirect block contents
     /d/textblockref/... Dir
       /d/textblockref/path/to/file content (internally retrieves content, presents with Content-Type)
-  CloundFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
+  CloudFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
   SyncProcess: context manager object performing some long operation
     .progress_{total|outstanding|done}
     SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents
     SyncDir(Dirent): pull in contents of dir, optionally including file contents
+  how is video stored? decoder for common formats

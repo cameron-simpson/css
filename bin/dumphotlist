@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read hotlists, print in canonical form, clean lists.
-#	- Cameron Simpson <cs@zip.com.au> 06sep95
+#	- Cameron Simpson <cs@cskk.id.au> 06sep95
 #
 
 ($cmd=$0) =~ s:.*/::;

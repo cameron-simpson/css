@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.iso14496.
-#   - Cameron Simpson <cs@zip.com.au> 06may2017
+#   - Cameron Simpson <cs@cskk.id.au> 06may2017
 #
 
 from __future__ import print_function
@@ -10,8 +10,9 @@ import os
 import os.path
 import unittest
 from .fileutils import read_from
-from .logutils import D, X
+from .logutils import D
 from .iso14496 import parse_file
+from .x import X
 
 TESTFILE = 'TEST.mp4'
 

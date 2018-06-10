@@ -2,7 +2,7 @@
 #
 # For each arg, run a shell command to convert data formats.
 # Diretories are walked. Support "-" as "read args from stdin".
-#	- Cameron Simpson <cs@zip.com.au> 20jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 20jul2002
 #
 
 cmd=`basename "$0"`

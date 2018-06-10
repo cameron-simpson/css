@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.rfc2616.
-#       - Cameron Simpson <cs@zip.com.au> 28dec2014
+#       - Cameron Simpson <cs@cskk.id.au> 28dec2014
 #
 
 import sys

@@ -2,7 +2,7 @@
 #
 # Crude parser for MP3 data based on:
 #   http://www.mp3-tech.org/programmer/frame_header.html
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 from cs.buffer import CornuCopyBuffer
@@ -108,4 +108,5 @@ def framesof(bfr):
 
 if __name__ == '__main__':
   import cs.mp3_tests
+  import sys
   cs.mp3_tests.selftest(sys.argv)

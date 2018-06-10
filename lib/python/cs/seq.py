@@ -1,8 +1,27 @@
 #!/usr/bin/python -tt
 #
 # Stuff to do with counters, sequences and iterables.
-#       - Cameron Simpson <cs@zip.com.au> 20jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 20jul2008
 #
+
+r'''
+Stuff to do with counters, sequences and iterables.
+
+Presents:
+
+* Seq, a class for thread safe sequential integer generation.
+
+* seq(), a function to return such a number from a default global Seq instance.
+
+* the(), first(), last(), get0(): return the only, first, last or optional-first element of an iterable respectively.
+
+* TrackingCounter, a counting object with facilities for users to wait for it to reach arbitrary values.
+'''
+
+import heapq
+import itertools
+from threading import Lock, Condition
+from cs.logutils import warning
 
 DISTINFO = {
     'description': "Stuff to do with counters, sequences and iterables.",
@@ -11,16 +30,9 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.logutils', 'cs.py.stack', 'cs.py3'],
+    ],
+    'install_requires': ['cs.logutils'],
 }
-
-import heapq
-import itertools
-from threading import Lock, Condition
-from cs.logutils import warning, debug, D, X
-from cs.py.stack import caller
-from cs.py3 import exec_code
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -51,19 +63,20 @@ def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
-  icontext="expected exactly one value"
+  icontext = "expected exactly one value"
   if context is not None:
-    icontext=icontext+" for "+context
+    icontext = icontext + " for " + context
 
-  first=True
+  first = True
   for elem in iterable:
     if first:
-      it=elem
-      first=False
+      it = elem
+      first = False
     else:
-      raise IndexError("%s: got more than one element (%s, %s, ...)"
-                        % (icontext, it, elem)
-                      )
+      raise IndexError(
+          "%s: got more than one element (%s, %s, ...)"
+          % (icontext, it, elem)
+      )
 
   if first:
     raise IndexError("%s: got no elements" % (icontext,))
@@ -106,27 +119,6 @@ def tee(iterable, *Qs):
     for Q in Qs:
       Q.put(item)
     yield item
-
-def NamedTupleClassFactory(*fields):
-  ''' Construct classes for named tuples a bit like the named tuples
-      coming in Python 2.6/3.0.
-      NamedTupleClassFactory('a','b','c') returns a subclass of "list"
-      whose instances have properties .a, .b and .c as references to
-      elements 0, 1 and 2 respectively.
-  '''
-  class NamedTuple(list):
-    for i in range(len(fields)):
-      f=fields[i]
-      exec_code('def getx(self): return self[%d]' % i)
-      exec_code('def setx(self,value): self[%d]=value' % i)
-      exec_code('%s=property(getx,setx)' % f)
-  return NamedTuple
-
-def NamedTuple(fields,iter=()):
-  ''' Return a named tuple with the specified fields.
-      Useful for one-off tuples/lists.
-  '''
-  return NamedTupleClassFactory(*fields)(iter)
 
 def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
@@ -202,7 +194,7 @@ def onetomany(func):
         all_chars = X.chars()
   '''
   def gather(self, *a, **kw):
-    return itertools.chain(*[ func(item) for item in self ])
+    return itertools.chain(*[ func(item, *a, **kw) for item in self ])
   return gather
 
 def isordered(s, reverse=False, strict=False):
@@ -212,7 +204,7 @@ def isordered(s, reverse=False, strict=False):
   '''
   first = True
   prev = None
-  for i, item in enumerate(s):
+  for item in s:
     if not first:
       if reverse:
         ordered = item < prev if strict else item <= prev
@@ -275,8 +267,6 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
-    if tag:
-      D("INC(%s): %s", tag[:10], caller())
     with self._lock:
       self.value += 1
       if tag is not None:
@@ -289,8 +279,6 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
-    if tag:
-      D("DEC(%s): %s:", tag[:10], caller())
     with self._lock:
       self.value -= 1
       if tag is not None:
@@ -299,14 +287,8 @@ class TrackingCounter(object):
         self._tag_down[tag] += 1
         if self._tag_up.get(tag, 0) < self._tag_down[tag]:
           warning("%s.dec: more .decs than .incs for tag %r", self, tag)
-          ##raise RuntimeError
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
-      elif self.value == 0:
-        D("ZERO HERE")
-        ##from time import sleep
-        ##sleep(3)
-        ##raise RuntimeError("ZERO HERE!")
       self._notify()
 
   def check(self):
@@ -314,7 +296,7 @@ class TrackingCounter(object):
       ups = self._tag_up[tag]
       downs = self._tag_down.get(tag, 0)
       if ups != downs:
-        D("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
+        warning("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
 
   def wait(self, value):
     ''' Wait for the counter to reach the specified `value`.
@@ -328,6 +310,35 @@ class TrackingCounter(object):
         watcher = self._watched[value]
       watcher.acquire()
     watcher.wait()
+
+class StatefulIterator(object):
+  ''' A trivial iterator which wraps another iterator to expose some tracking state.
+
+      This has 2 attributes:
+      .it, the internal iterator which should yield (item, new_state)
+      .state, the last state value from the internal iterator
+
+      The originating use case is resuse of an iterator by independent
+      calls that are typically sequential, specificly the .read
+      method of file like objects. Naive sequential reads require
+      the underlying storage to locate the data on every call, even
+      though the previous call has just performed this task for the
+      previous read. Saving the iterator used from the preceeding
+      call allows the iterator to pick up directly if the file
+      offset hasn't been fiddled in the meantime.
+  '''
+
+  def __init__(self, it):
+    self.it = it
+    self.state = None
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    item, new_state = next(self.it)
+    self.state = new_state
+    return item
 
 if __name__ == '__main__':
   import sys

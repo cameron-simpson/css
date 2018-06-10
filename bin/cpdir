@@ -2,7 +2,7 @@
 #
 # Copy a directory tree - refuse if target exists as safety measure.
 # Faster, safer, more accurate and more informative than "cp -rp".
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"` || exit 1

@@ -1,0 +1,2 @@
+  lib/python/cs/psutils.py: cs/psutils: docstring tweak
+  lib/python/cs/psutils.py: cs.psutils: run: accept optional pids parameter, a setlike collection of process ids

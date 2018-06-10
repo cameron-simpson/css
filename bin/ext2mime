@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Infer MIME type from file extension.
-#	- Cameron Simpson <cs@zip.com.au> 2003
+#	- Cameron Simpson <cs@cskk.id.au> 2003
 #
 
 cmd=$0

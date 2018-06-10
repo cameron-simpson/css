@@ -140,7 +140,7 @@ _home:
                 --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
 
-bin_suffixes = cs darwin lrn
+bin_suffixes = cs darwin
 
 _bin_$((bin_suffixes)):
     @sfx=$(@S[_]) \
@@ -176,7 +176,7 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push --new-branch $(hg_bitbucket)
+        hg push --new-branch -r tip $(hg_bitbucket)
         @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release

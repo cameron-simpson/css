@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::DBI::Table::Row: tie a hash to a DBI table row
-#	- Cameron Simpson <cs@zip.com.au> 25feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 25feb2000
 #
 
 =head1 NAME
@@ -112,7 +112,7 @@ sub STORE($$$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 
