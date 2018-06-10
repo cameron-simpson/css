@@ -452,13 +452,12 @@ class SymlinkDirent(_Dirent):
 
   transcribe_prefix = 'SymLink'
 
-  def __init__(self, name, *, block=None, **kw):
+  def __init__(self, name, pathref, *, block=None, **kw):
     super().__init__(D_SYM_T, name, **kw)
     if block is not None:
       raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
-    if self.meta.pathref is None:
-      raise ValueError("meta.pathref required")
+    self.meta.pathref = pathref
 
   @property
   def pathref(self):
