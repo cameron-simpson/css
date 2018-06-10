@@ -1167,10 +1167,59 @@ class URN_Box(FullBox):
 
 add_box_class(URN_Box)
 
-STSCEntry = namedtuple('STSCEntry', 'first_chunk samples_per_chunk sample_desciption_index')
+class STSZBox(FullBox):
+  ''' A 'stsz' Sample Size box - section 8.7.3.2.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    self.sample_size, self.sample_count = unpack('>LL', bfr.take(8))
+    if self.sample_size == 0:
+      self.entry_sizes = [
+          unpack('>L', bfr.take(4))
+          for _ in range(self.sample_count)
+      ]
+
+  def __str__(self):
+    if self.same_size > 0:
+      return '%s(%s,sample_size=%d,sample_count=%d)' \
+             % (self.__class__.__name__, self.sample_size, self.sample_count)
+    return '%s(%s,sample_size=%d,sample_count=%d,entry_sizes=%r)' \
+           % (self.__class__.__name__, self.sample_size, self.sample_count, self.entry_sizes)
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    print(
+        self.__class__.__name__,
+        'sample_size=%d' % (self.sample_size,),
+        'sample_count=%d' % (self.sample_count,),
+        end='', fp=fp)
+    if self.sample_size == 0:
+      for entry_size in self.entry_sizes:
+        yield pack('>L', entry_size)
+
+    fp.write('\n')
+    indent += '  '
+    for E in self.entries:
+      fp.write(indent)
+      fp.write(str(E))
+      fp.write('\n')
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield pack('>LL', self.sample_size, self.sample_count)
+    if self.sample_size == 0:
+      for entry_size in self.entry_sizes:
+        yield pack('>L', entry_size)
+
+add_box_class(STSZBox)
+
+STSCEntry = namedtuple('STSCEntry', 'first_chunk samples_per_chunk sample_description_index')
 
 class STSCBox(FullBox):
-  ''' A 'stsc' Sample Table box - section 8.7.42.1.
+  ''' A 'stsc' Sample Table box - section 8.7.4.1.
   '''
 
   def parse_data(self, bfr):
