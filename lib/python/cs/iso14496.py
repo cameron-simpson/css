@@ -42,10 +42,11 @@ def main(argv):
       for spec in argv:
         with Pfx(spec):
           if spec == '-':
-            fp = fdopen(sys.stdin.fileno(), 'rb')
+            fd = sys.stdin.fileno()
           else:
-            fp = open(spec, 'rb')
-          for B in parse_file(fp, discard=True):
+            fd = os.open(spec, os.O_RDONLY)
+          parser = parse_fd(fd, discard=True)
+          for B in parser:
             B.dump()
     elif op == 'test':
       import cs.iso14496_tests
@@ -1348,8 +1349,11 @@ class SMHDBox(FullBox):
 
 add_box_class(SMHDBox)
 
+def parse_fd(fd, discard=False, copy_offsets=None):
+  return parse_buffer(CornuCopyBuffer.from_fd(fd), discard=discard, copy_offsets=copy_offsets)
+
 def parse_file(fp, discard=False, copy_offsets=None):
-  return parse_chunks(read_from(fp), discard=discard, copy_offsets=copy_offsets)
+  return parse_buffer(CornuCopyBuffer.from_file(fp), discard=discard, copy_offsets=copy_offsets)
 
 def parse_chunks(chunks, discard=False, copy_offsets=None):
   return parse_buffer(CornuCopyBuffer(chunks, copy_offsets=copy_offsets),
