@@ -353,7 +353,9 @@ class Box(object):
     '''
     end_offset = self.end_offset
     if end_offset is None:
-      raise ValueError("end_offset is None, cannot deduce target offset")
+      raise RuntimeError(
+          "self.end_offset is None, cannot deduce Box end offset; remaining data starts: %r...",
+          bytes(bfr.take(128, short_ok=True)))
     data_chunks = None if discard else []
     bfr.skipto(end_offset, copy_skip=( None if discard else data_chunks.append ))
     self.data_chunks = data_chunks
@@ -895,8 +897,9 @@ class HDLRBox(FullBox):
     name_bs = self._take_tail(bfr)
     self.name, offset = get_utf8_nul(name_bs)
     if offset < len(name_bs):
-      raise ValueError('HDLR: extra data after name: %d bytes: %r'
-                       % (len(name_bs)-offset, name_bs[offset:]))
+      warning(
+          'HDLR: extra data after name: %d bytes: %r',
+          len(name_bs)-offset, bytes(name_bs[offset:]))
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
