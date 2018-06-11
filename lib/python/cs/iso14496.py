@@ -310,11 +310,9 @@ class Box(object):
         cls = pick_box_class(box_header.type, default_type=default_type)
     B = cls(box_header)
     with Pfx(B.box_type_s):
-      X("B type = %r", B.box_type_s)
       B.offset = offset0
       bfr.report_offset(offset0)
       # further parse some or all of the data
-      X("B.parse_data=%s", B.parse_data)
       B.parse_data(bfr)
       # record the offset of any unparsed data portion
       B.unparsed_offset = bfr.offset
