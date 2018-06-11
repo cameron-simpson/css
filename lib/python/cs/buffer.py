@@ -59,7 +59,8 @@ class CornuCopyBuffer(object):
   def __init__(
       self, input_data,
       buf=None, offset=0,
-      copy_offsets=None, copy_chunks=None):
+      copy_offsets=None, copy_chunks=None
+  ):
     ''' Prepare the buffer.
         `input_data`: an iterator yielding data chunks; if your
           data source is a file see the .from_file factory; if your
