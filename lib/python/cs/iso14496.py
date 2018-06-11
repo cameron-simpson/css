@@ -199,12 +199,12 @@ class Box(object):
         pass
       else:
         if box_type not in BOX_TYPES:
-          raise ValueError("box_type should be in %r but got %r"
-                           % (BOX_TYPES, box_type))
+          warning(
+            "box_type should be in %r but got %r",
+            BOX_TYPES, bytes(box_type))
     else:
       if box_type != BOX_TYPE:
-        raise ValueError("box_type should be %r but got %r"
-                         % (BOX_TYPE, box_type))
+        warning("box_type should be %r but got %r", BOX_TYPE, box_type)
     self.header = header
 
   @property
@@ -290,7 +290,7 @@ class Box(object):
     fp.write('\n')
 
   @staticmethod
-  def from_buffer(bfr, cls=None, discard_data=False):
+  def from_buffer(bfr, cls=None, discard_data=False, default_type=None):
     ''' Decode a Box from `bfr`. Return the Box or None at end of input.
         `cls`: the Box class; if not None, use to construct the instance.
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
@@ -304,7 +304,7 @@ class Box(object):
     if box_header is None:
       return None
     if cls is None:
-      cls = pick_box_class(box_header.type)
+      cls = pick_box_class(box_header.type, default_type=default_type)
     B = cls(box_header)
     B.offset = offset0
     bfr.report_offset(offset0)
@@ -353,10 +353,10 @@ class Box(object):
     self.data_chunks = data_chunks
     return data_chunks
 
-  def parse_subboxes(self, bfr, max_offset, max_boxes=None):
+  def parse_subboxes(self, bfr, max_offset, max_boxes=None, default_type=None):
     boxes = []
     while (max_boxes is None or len(boxes) < max_boxes) and bfr.offset < max_offset:
-      B = Box.from_buffer(bfr)
+      B = Box.from_buffer(bfr, default_type=default_type)
       if B is None:
         raise ValueError("end of input reached after %d contained Boxes"
                          % (len(boxes)))
@@ -435,9 +435,11 @@ def add_box_subclass(superclass, box_type, section, desc):
   K.__doc__ = "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
   add_box_class(K)
 
-def pick_box_class(box_type):
+def pick_box_class(box_type, default_type=None):
   global KNOWN_BOX_CLASSES
-  return KNOWN_BOX_CLASSES.get(box_type, Box)
+  if default_type is None:
+    default_type = Box
+  return KNOWN_BOX_CLASSES.get(box_type, default_type)
 
 class FullBox(Box):
   ''' A common extension of a basic Box, with a version and flags field.
@@ -554,9 +556,9 @@ class ContainerBox(Box):
   ''' A base class for pure container boxes.
   '''
 
-  def parse_data(self, bfr):
+  def parse_data(self, bfr, default_type=None):
     super().parse_data(bfr)
-    self.boxes = self.parse_subboxes(bfr, self.end_offset)
+    self.boxes = self.parse_subboxes(bfr, self.end_offset, default_type=default_type)
 
   def __str__(self):
     return '%s(%s)' \
@@ -747,7 +749,17 @@ class TKHDBox(FullBox):
     yield pack('>LL', self.width, self.height)
 
 add_box_class(TKHDBox)
-add_box_subclass(ContainerBox, 'tref', '8.3.3', 'track Reference')
+
+##add_box_subclass(ContainerBox, 'tref', '8.3.3', 'track Reference')
+
+class TREFBox(ContainerBox):
+  ''' Track Reference Box, container for trackReferenceTypeBoxes - ISO14496 section 8.3.3.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr, default_type=TrackReferenceTypeBox)
+
+add_box_class(TREFBox)
 
 class TrackReferenceTypeBox(Box):
   ''' A TrackReferenceTypeBox contains references to other tracks - ISO14496 section 8.3.3.2.
@@ -764,7 +776,7 @@ class TrackReferenceTypeBox(Box):
     self.track_ids = track_ids
 
   def __str__(self):
-    return '%s(type=%r,track_ids=%r)' % (self.__class__.__name__, self.box_type, self.track_ids)
+    return '%s(type=%s,track_ids=%r)' % (self.__class__.__name__, self.box_type_s, self.track_ids)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
