@@ -569,7 +569,7 @@ class ContainerBox(Box):
 
   def parse_data(self, bfr, default_type=None):
     super().parse_data(bfr)
-    self.boxes = self.parse_subboxes(bfr, self.end_offset, default_type=default_type)
+    self.boxes = self.parse_subboxes(bfr, default_type=default_type)
 
   def __str__(self):
     return '%s(%s)' \
@@ -948,7 +948,7 @@ class _SampleTableContainerBox(FullBox):
     super().parse_data(bfr)
     # obtain box data after version and flags decode
     entry_count, = unpack('>L', bfr.take(4))
-    self.boxes = self.parse_subboxes(bfr, self.end_offset, max_boxes=entry_count)
+    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count)
     if len(self.boxes) != entry_count:
       raise ValueError('expected %d contained Boxes but parsed %d'
                        % (entry_count, len(self.boxes)))
@@ -1296,7 +1296,7 @@ class DREFBox(FullBox):
   def parse_data(self, bfr):
     super().parse_data(bfr)
     entry_count = unpack('>L', bfr.take(4))
-    self.boxes = self.parse_subboxes(bfr, self.end_offset, max_boxes=entry_count)
+    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count)
 
   def __str__(self):
     return '%s(%s)' \
