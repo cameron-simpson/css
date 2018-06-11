@@ -1306,7 +1306,7 @@ class DREFBox(FullBox):
     if fp is None:
       fp = sys.stdout
     fp.write(indent)
-    fp.write(self.__class__.__name__)
+    fp.write(str(self))
     fp.write('\n')
     indent += '  '
     for B in self.boxes:
