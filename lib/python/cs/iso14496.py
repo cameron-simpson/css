@@ -185,7 +185,9 @@ class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
   '''
 
-  def __init__(self, header):
+  def __init__(self, header, parent=None):
+    ''' Basic Box initialisation given a BoxHeader and optiona `parent` Box.
+    '''
     # sanity check the supplied box_type
     # against the box types this class supports
     box_type = header.type
@@ -208,6 +210,7 @@ class Box(object):
       if box_type != BOX_TYPE:
         warning("box_type should be %r but got %r", BOX_TYPE, box_type)
     self.header = header
+    self.parent = parent
 
   @property
   def length(self):
@@ -227,6 +230,17 @@ class Box(object):
     except UnicodeDecodeError:
       box_type_name = repr(box_type_b)
     return box_type_name
+
+  @property
+  def box_type_path(self):
+    ''' The type path to this Box.
+    '''
+    types = [self.box_type_s]
+    box = self.parent
+    while box is not None:
+      types.append(box.box_type_s)
+      box = box.parent
+    return '.'.join(reversed(types))
 
   @property
   def user_type(self):
@@ -274,10 +288,10 @@ class Box(object):
   def __str__(self):
     if self.data_chunks is None:
       return '%s(%s,box_data=DISCARDED)' \
-             % (type(self).__name__, self.box_type_s)
+             % (type(self).__name__, self.box_type_path)
     box_data = b''.join(self.data_chunks)
     return '%s(%s,box_data=%d:%r%s)' \
-           % (type(self).__name__, self.box_type_s, len(box_data),
+           % (type(self).__name__, self.box_type_path, len(box_data),
               box_data[:32],
               '...' if len(box_data) > 32 else '')
 
@@ -369,6 +383,7 @@ class Box(object):
         if B is None:
           raise ValueError("end of input reached after %d contained Boxes"
                            % (len(boxes)))
+        B.parent = self
         boxes.append(B)
       if bfr.offset > max_offset:
         raise ValueError("contained Boxes overran max_offset:%d by %d bytes"
@@ -465,7 +480,7 @@ class FullBox(Box):
 
   def __str__(self):
     prefix = '%s(%s-v%d-0x%02x' % (self.__class__.__name__,
-                                   self.box_type_s,
+                                   self.box_type_path,
                                    self.version,
                                    self.flags)
     attr_summary = self.attribute_summary()
@@ -785,7 +800,7 @@ class TrackReferenceTypeBox(Box):
     self.track_ids = track_ids
 
   def __str__(self):
-    return '%s(type=%s,track_ids=%r)' % (self.__class__.__name__, self.box_type_s, self.track_ids)
+    return '%s(type=%s,track_ids=%r)' % (self.__class__.__name__, self.box_type_path, self.track_ids)
 
   def parsed_data_chunks(self):
     yield from super().parsed_data_chunks()
@@ -1326,6 +1341,7 @@ class METABox(FullBox):
   def parse_data(self, bfr):
     super().parse_data(bfr)
     self.handler_box = Box.from_buffer(bfr)
+    self.handler_box.parent = self
     self.boxes = self.parse_subboxes(bfr)
 
   def dump(self, indent='', fp=None):
