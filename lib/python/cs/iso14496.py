@@ -11,6 +11,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
+import os
 from os import fdopen, SEEK_CUR
 from os.path import basename
 from struct import Struct
