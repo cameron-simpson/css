@@ -73,35 +73,36 @@ BoxHeader = namedtuple('BoxHeader', 'type user_type length header_length')
 def parse_box_header(bfr):
   ''' Decode a box header from the CornuCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
   '''
-  # return BoxHeader=None if at the end of the data
-  bfr.extend(1, short_ok=True)
-  if not bfr:
-    return None
-  # note start point
-  offset0 = bfr.offset
-  user_type = None
-  bfr.extend(8)
-  box_size, = unpack('>L', bfr.take(4))
-  box_type = bfr.take(4)
-  if box_size == 0:
-    # box extends to end of data/file
-    length = None
-  elif box_size == 1:
-    # 64 bit length
-    length, = unpack('>Q', bfr.take(8))
-  else:
-    length = box_size
-  if box_type == 'uuid':
-    # user supplied 16 byte type
-    user_type = bfr.take(16)
-  else:
+  with Pfx("parse_box_header"):
+    # return BoxHeader=None if at the end of the data
+    bfr.extend(1, short_ok=True)
+    if not bfr:
+      return None
+    # note start point
+    offset0 = bfr.offset
     user_type = None
-  offset = bfr.offset
-  if length is not None and offset0+length < offset:
-    raise ValueError("box length:%d is less than the box header size:%d"
-                     % (length, offset-offset0))
-  return BoxHeader(type=box_type, user_type=user_type,
-                   length=length, header_length=offset-offset0)
+    bfr.extend(8)
+    box_size, = unpack('>L', bfr.take(4))
+    box_type = bfr.take(4)
+    if box_size == 0:
+      # box extends to end of data/file
+      length = None
+    elif box_size == 1:
+      # 64 bit length
+      length, = unpack('>Q', bfr.take(8))
+    else:
+      length = box_size
+    if box_type == 'uuid':
+      # user supplied 16 byte type
+      user_type = bfr.take(16)
+    else:
+      user_type = None
+    offset = bfr.offset
+    if length is not None and offset0+length < offset:
+      raise ValueError("box length:%d is less than the box header size:%d"
+                       % (length, offset-offset0))
+    return BoxHeader(type=box_type, user_type=user_type,
+                     length=length, header_length=offset-offset0)
 
 def transcribe_box(fp, box_type, box_tail):
   ''' Generator yielding bytes objects which together comprise a serialisation of this
@@ -304,18 +305,22 @@ class Box(object):
     box_header = parse_box_header(bfr)
     if box_header is None:
       return None
-    if cls is None:
-      cls = pick_box_class(box_header.type, default_type=default_type)
+    with Pfx(repr(box_header.type)):
+      if cls is None:
+        cls = pick_box_class(box_header.type, default_type=default_type)
     B = cls(box_header)
-    B.offset = offset0
-    bfr.report_offset(offset0)
-    # further parse some or all of the data
-    B.parse_data(bfr)
-    # record the offset of any unparsed data portion
-    B.unparsed_offset = bfr.offset
-    # advance over the remaining data, optionally keeping it
-    B.data_chunks = B._skip_data(bfr, discard=discard_data)
-    return B
+    with Pfx(B.box_type_s):
+      X("B type = %r", B.box_type_s)
+      B.offset = offset0
+      bfr.report_offset(offset0)
+      # further parse some or all of the data
+      X("B.parse_data=%s", B.parse_data)
+      B.parse_data(bfr)
+      # record the offset of any unparsed data portion
+      B.unparsed_offset = bfr.offset
+      # advance over the remaining data, optionally keeping it
+      B.data_chunks = B._skip_data(bfr, discard=discard_data)
+      return B
 
   @property
   def end_offset(self):
