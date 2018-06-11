@@ -359,18 +359,21 @@ class Box(object):
     self.data_chunks = data_chunks
     return data_chunks
 
-  def parse_subboxes(self, bfr, max_offset, max_boxes=None, default_type=None):
-    boxes = []
-    while (max_boxes is None or len(boxes) < max_boxes) and bfr.offset < max_offset:
-      B = Box.from_buffer(bfr, default_type=default_type)
-      if B is None:
-        raise ValueError("end of input reached after %d contained Boxes"
-                         % (len(boxes)))
-      boxes.append(B)
-    if bfr.offset > max_offset:
-      raise ValueError("contained Boxes overran max_offset:%d by %d bytes"
-                       % (max_offset, offset-max_offset))
-    return boxes
+  def parse_subboxes(self, bfr, max_offset=None, max_boxes=None, default_type=None):
+    with Pfx("parse_subboxes"):
+      if max_offset is None:
+        max_offset = self.end_offset
+      boxes = []
+      while (max_boxes is None or len(boxes) < max_boxes) and bfr.offset < max_offset:
+        B = Box.from_buffer(bfr, default_type=default_type)
+        if B is None:
+          raise ValueError("end of input reached after %d contained Boxes"
+                           % (len(boxes)))
+        boxes.append(B)
+      if bfr.offset > max_offset:
+        raise ValueError("contained Boxes overran max_offset:%d by %d bytes"
+                         % (max_offset, offset-max_offset))
+      return boxes
 
   def parsed_data_chunks(self):
     ''' Stub parsed_data_chunks to return chunks derived from parsed data fields.
