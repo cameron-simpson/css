@@ -1316,6 +1316,36 @@ class DREFBox(FullBox):
 
 add_box_class(DREFBox)
 
+add_box_subclass(ContainerBox, b'udta', '8.10.1', 'User Data')
+
+class METABox(FullBox):
+  ''' A 'meta' Meta Box - section 8.11.1.
+  '''
+
+  def parse_data(self, bfr):
+    super().parse_data(bfr)
+    self.handler_box = Box.from_buffer(bfr)
+    self.boxes = self.parse_subboxes(bfr)
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+    indent += '  '
+    self.handler_box.dump(indent, fp)
+    for B in self.boxes:
+      B.dump(indent, fp)
+
+  def parsed_data_chunks(self):
+    yield from super().parsed_data_chunks()
+    yield self.handler_box.parsed_data_chunks()
+    for B in self.boxes:
+      yield from B.parsed_data_chunks()
+
+add_box_class(METABox)
+
 class VMHDBox(FullBox):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
