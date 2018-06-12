@@ -26,12 +26,16 @@ from cs.py3 import bytes, pack, unpack, iter_unpack
 from cs.x import X
 
 USAGE = '''Usage:
-  %s parse [{-|filename}]...
+  %s extract [-H] filename boxref output
+            Extract the referenced Box from the specified filename into output.
+            -H  Skip the Box header.
+  %s [parse [{-|filename}]...]
             Parse the named files (or stdin for "-").
   %s test   Run unit tests.'''
 
 def main(argv):
   cmd = basename(argv.pop(0))
+  usage = USAGE % (cmd, cmd, cmd)
   setup_logging(cmd)
   if not argv:
     argv = ['parse']
@@ -44,12 +48,59 @@ def main(argv):
       for spec in argv:
         with Pfx(spec):
           if spec == '-':
-            fd = sys.stdin.fileno()
+            parsee = sys.stdin.fileno()
           else:
-            fd = os.open(spec, os.O_RDONLY)
-          parser = parse_fd(fd, discard=True)
-          for B in parser:
+            parsee = spec
+          for B in parse(parsee, discard_data=True):
             B.dump()
+    elif op == 'extract':
+      skip_header = False
+      if argv and argv[0] == '-H':
+        argv.pop(0)
+        skip_header = True
+      if not argv:
+        warning("missing filename")
+        badopts = True
+      else:
+        filename = argv.pop(0)
+      if not argv:
+        warning("missing boxref")
+        badopts = True
+      else:
+        boxref = argv.pop(0)
+      if not argv:
+        warning("missing output")
+        badopts = True
+      else:
+        output = argv.pop(0)
+      if argv:
+        warning("extra argments after boxref: %s", ' '.join(argv))
+        badopts = True
+      if not badopts:
+        BX = Boxes()
+        BX.load(filename)
+        for B in BX:
+          B.dump()
+        B = BX[boxref][0]
+        with Pfx(filename):
+          fd = os.open(filename, os.O_RDONLY)
+          fdout = sys.stdout.fileno()
+          bfr = CornuCopyBuffer.from_fd(fd)
+          offset = B.offset
+          need = B.length
+          if skip_header:
+            offset += B.header_length
+            if need is not None:
+              need -= B.header_length
+          bfr.seek(offset)
+          with Pfx(output):
+            with open(output, 'wb') as ofp:
+              for chunk in bfr:
+                if need is not None and need < len(chunk):
+                  chunk = chunk[need]
+                ofp.write(chunk)
+                need -= len(chunk)
+          os.close(fd)
     elif op == 'test':
       import cs.iso14496_tests
       cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
@@ -57,9 +108,45 @@ def main(argv):
       warning("unknown op")
       badopts = True
   if badopts:
-    print(USAGE % (cmd, cmd), file=sys.stderr)
+    print(usage, file=sys.stderr)
     return 2
   return 0
+
+class Boxes(list):
+
+  def __init__(self):
+    self.boxes = []
+    self.by_type = defaultdict(list)
+    self.by_path = defaultdict(list)
+
+  def append(self, box):
+    ''' Store a Box, indexing it by sequence and box_type_s and box_type_path.
+    '''
+    self.boxes.append(box)
+    self.by_type[box.box_type_s].append(box)
+    self.by_path[box.box_type_path].append(box)
+
+  def __getitem__(self, key):
+    if isinstance(key, str):
+      if '.' in key:
+        mapping = self.by_path
+      else:
+        mapping = self.by_type
+      if key not in mapping:
+        raise KeyError(key)
+      return mapping[key]
+    return self.boxes[key]
+
+  def __iter__(self):
+    return iter(self.boxes)
+
+  def load(self, o):
+    ''' Load the boxes from `o`.
+    '''
+    def copy_boxes(box):
+      self.append(box)
+    for box in parse(o, discard_data=True, copy_boxes=copy_boxes):
+      pass
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
