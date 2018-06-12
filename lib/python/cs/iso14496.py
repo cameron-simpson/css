@@ -482,15 +482,13 @@ class Box(object):
         max_offset = self.end_offset
       boxes = []
       while (max_boxes is None or len(boxes) < max_boxes) and bfr.offset < max_offset:
-        B = Box.from_buffer(bfr, default_type=default_type)
+        B = Box.from_buffer(bfr, default_type=default_type, copy_boxes=copy_boxes)
         if B is None:
           raise ValueError(
               "end of input reached after %d contained Boxes"
               % (len(boxes)))
         B.parent = self
         boxes.append(B)
-        if copy_boxes:
-          copy_boxes(B)
       if bfr.offset > max_offset:
         raise ValueError(
             "contained Boxes overran max_offset:%d by %d bytes"
