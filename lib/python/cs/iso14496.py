@@ -794,6 +794,7 @@ class MVHDBox(FullBox):
     yield pack('>L', self.next_track_id)
 
 add_box_class(MVHDBox)
+
 add_box_subclass(ContainerBox, 'trak', '8.3.1', 'Track')
 
 class TKHDBox(FullBox):
@@ -1286,6 +1287,7 @@ class SDTPBox(_GenericSampleBox):
         inferred_entry_count=True,
         **kw)
 add_box_class(SDTPBox)
+
 add_box_subclass(Box, b'edts', '8.6.5.1', 'Edit')
 
 class ELSTBox(_GenericSampleBox):
@@ -1297,6 +1299,7 @@ class ELSTBox(_GenericSampleBox):
         '>Ll', 'segment_duration media_time', sample_struct_format_v1='>Qq',
         **kw)
 add_box_class(ELSTBox)
+
 add_box_subclass(Box, b'dinf', '8.7.1', 'Data Information')
 
 class URL_Box(FullBox):
