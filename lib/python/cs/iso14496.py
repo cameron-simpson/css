@@ -1185,12 +1185,12 @@ class _GenericSampleBox(FullBox):
     self.inferred_entry_count = inferred_entry_count
     # obtain box data after version and flags decode
     if inferred_entry_count:
-      remaining = (self.end_offset-bfr.offset)
+      remaining = (self.end_offset - bfr.offset)
       entry_count = remaining // S.size
       remainder = remaining % S.size
       if remainder != 0:
-        warning("remaining length %d is not a multiple of len(%s), %d bytes left over: %r",
-                remaining, S.size, remainder, box_data[-remainder:])
+        warning("remaining length %d is not a multiple of len(%s), %d bytes left over",
+                remaining, S.size, remainder)
     else:
       entry_count, = unpack('>L', bfr.take(4))
     samples = []
