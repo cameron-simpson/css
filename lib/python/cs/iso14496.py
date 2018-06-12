@@ -12,7 +12,8 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
-from collections import namedtuple
+from collections import namedtuple, defaultdict
+from functools import partial
 import os
 from os.path import basename
 from struct import Struct
@@ -1443,32 +1444,48 @@ class SMHDBox(FullBox):
 
 add_box_class(SMHDBox)
 
-def parse_fd(fd, discard=False, copy_offsets=None):
+def parse(o, **kw):
+  ''' Yield top level Boxes from a source (str, int, file).
+  '''
+  close = None
+  with Pfx("parse(%r)", o):
+    if isinstance(o, str):
+      fd = os.open(o, os.O_RDONLY)
+      parser = parse_fd(fd, **kw)
+      close = partial(os.close, fd)
+    elif isinstance(o, int):
+      parser = parse_fd(o, **kw)
+    else:
+      parser = parse_file(o, **kw)
+    yield from parser
+    if close:
+      close()
+
+def parse_fd(fd, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
       `fd`: a file descriptor open for read
-      `discard`: whether to discard unparsed data, default False
+      `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive Box offsets
   '''
-  return parse_buffer(CornuCopyBuffer.from_fd(fd), discard=discard, copy_offsets=copy_offsets)
+  return parse_buffer(CornuCopyBuffer.from_fd(fd), **kw)
 
-def parse_file(fp, discard=False, copy_offsets=None):
+def parse_file(fp, **kw):
   ''' Parse an ISO14496 stream from the file `fp`, yield top level Boxes.
       `fp`: a file open for read
-      `discard`: whether to discard unparsed data, default False
+      `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive Box offsets
   '''
-  return parse_buffer(CornuCopyBuffer.from_file(fp), discard=discard, copy_offsets=copy_offsets)
+  return parse_buffer(CornuCopyBuffer.from_file(fp), **kw)
 
-def parse_chunks(chunks, discard=False, copy_offsets=None):
+def parse_chunks(chunks, **kw):
   ''' Parse an ISO14496 stream from the iterabor of data `chunks`, yield top level Boxes.
       `chunks`: an iterator yielding bytes objects
-      `discard`: whether to discard unparsed data, default False
+      `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive Box offsets
   '''
-  return parse_buffer(CornuCopyBuffer(chunks, copy_offsets=copy_offsets),
-                      discard=discard)
+  return parse_buffer(CornuCopyBuffer(chunks), **kw)
 
-def parse_buffer(bfr, discard=False, copy_offsets=None):
+def parse_buffer(bfr, copy_offsets=None, **kw):
   ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`, yield top level Boxes.
       `bfr`: a CornuCopyBuffer provided the stream data, preferably seekable
       `discard_data`: whether to discard unparsed data, default False
@@ -1477,7 +1494,7 @@ def parse_buffer(bfr, discard=False, copy_offsets=None):
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
   while True:
-    B = Box.from_buffer(bfr, discard_data=discard)
+    B = Box.from_buffer(bfr, **kw)
     if B is None:
       break
     yield B
