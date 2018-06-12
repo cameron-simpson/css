@@ -603,6 +603,8 @@ class FullBox(Box):
                   self.flags & 0xff
                 ])
 
+add_box_subclass(Box, 'mdat', '8.1.1.1', 'Media Data')
+
 class FREEBox(Box):
   ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
       Note the length and discard the data portion.
