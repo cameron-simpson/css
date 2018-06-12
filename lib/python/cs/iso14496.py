@@ -321,6 +321,7 @@ class Box(object):
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
+    offset1 = bfr.offset
     if box_header is None:
       return None
     with Pfx(repr(box_header.type)):
@@ -329,6 +330,7 @@ class Box(object):
     B = cls(box_header)
     with Pfx(B.box_type_s):
       B.offset = offset0
+      B.header_length = offset1 - offset0
       bfr.report_offset(offset0)
       # further parse some or all of the data
       B.parse_data(bfr, copy_boxes=copy_boxes)
