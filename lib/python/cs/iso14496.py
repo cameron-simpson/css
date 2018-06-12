@@ -365,21 +365,21 @@ class Box(object):
     # a base Box does not parse any of its data section
     pass
 
-  def _skip_data(self, bfr, discard=False):
+  def _skip_data(self, bfr, discard_data=False):
     ''' Consume any remaining Box data input. Return the data.
         `bfr`: a CornuCopyBuffer
         Return values:
-        `data`: the data section as a list of chunks. None if `discard` is true.
+        `data`: the data section as a list of chunks. None if `discard_data` is true.
     '''
     end_offset = self.end_offset
     if end_offset is None:
       raise RuntimeError(
           "self.end_offset is None, cannot deduce Box end offset; remaining data starts: %r...",
           bytes(bfr.take(128, short_ok=True)))
-    unparsed_data_chunks = None if discard else []
+    unparsed_data_chunks = None if discard_data else []
     bfr.skipto(
         end_offset,
-        copy_skip=( None if discard else unparsed_data_chunks.append ))
+        copy_skip=( None if discard_data else unparsed_data_chunks.append ))
     self.unparsed_data_chunks = unparsed_data_chunks
     return unparsed_data_chunks
 
@@ -527,7 +527,7 @@ class FREEBox(Box):
   def parse_data(self, bfr, **kw):
     super().parse_data(bfr, **kw)
     offset0 = bfr.offset
-    self._skip_data(bfr, discard=True)
+    self._skip_data(bfr, discard_data=True)
     self.free_size = bfr.offset - offset0
 
   def __str__(self):
@@ -1471,7 +1471,7 @@ def parse_chunks(chunks, discard=False, copy_offsets=None):
 def parse_buffer(bfr, discard=False, copy_offsets=None):
   ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`, yield top level Boxes.
       `bfr`: a CornuCopyBuffer provided the stream data, preferably seekable
-      `discard`: whether to discard unparsed data, default False
+      `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive Box offsets
   '''
   if copy_offsets is not None:
