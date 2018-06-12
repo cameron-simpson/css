@@ -309,7 +309,7 @@ class Box(object):
     fp.write('\n')
 
   @staticmethod
-  def from_buffer(bfr, cls=None, discard_data=False, default_type=None):
+  def from_buffer(bfr, cls=None, discard_data=False, default_type=None, copy_boxes=None):
     ''' Decode a Box from `bfr`. Return the Box or None at end of input.
         `cls`: the Box class; if not None, use to construct the instance.
           Otherwise, look up the box_type in KNOWN_BOX_CLASSES and use that
@@ -317,6 +317,7 @@ class Box(object):
         `discard_data`: if false (default), keep the unparsed data portion as
           a list of data chunks in the attribute .data_chunks; if true,
           discard the unparsed data
+        `copy_boxes`: optional callable for reporting new Box instances
     '''
     offset0 = bfr.offset
     box_header = parse_box_header(bfr)
@@ -330,11 +331,13 @@ class Box(object):
       B.offset = offset0
       bfr.report_offset(offset0)
       # further parse some or all of the data
-      B.parse_data(bfr)
+      B.parse_data(bfr, copy_boxes=copy_boxes)
       # record the offset of any unparsed data portion
       B.unparsed_offset = bfr.offset
       # advance over the remaining data, optionally keeping it
-      B.data_chunks = B._skip_data(bfr, discard=discard_data)
+      B.data_chunks = B._skip_data(bfr, discard_data=discard_data)
+      if copy_boxes:
+        copy_boxes(B)
       return B
 
   @property
@@ -354,7 +357,7 @@ class Box(object):
     '''
     return bfr.take(self.end_offset-bfr.offset)
 
-  def parse_data(self, bfr):
+  def parse_data(self, bfr, copy_boxes=None):
     ''' Decode the salient parts of the data section, return (new_buf, new_offset).
     '''
     # a base Box does not parse any of its data section
@@ -378,7 +381,12 @@ class Box(object):
     self.unparsed_data_chunks = unparsed_data_chunks
     return unparsed_data_chunks
 
-  def parse_subboxes(self, bfr, max_offset=None, max_boxes=None, default_type=None):
+  def parse_subboxes(
+      self,
+      bfr,
+      max_offset=None, max_boxes=None,
+      default_type=None,
+      copy_boxes=None):
     with Pfx("parse_subboxes"):
       if max_offset is None:
         max_offset = self.end_offset
@@ -391,6 +399,8 @@ class Box(object):
               % (len(boxes)))
         B.parent = self
         boxes.append(B)
+        if copy_boxes:
+          copy_boxes(B)
       if bfr.offset > max_offset:
         raise ValueError(
             "contained Boxes overran max_offset:%d by %d bytes"
@@ -483,8 +493,8 @@ class FullBox(Box):
 
   ATTRIBUTES = ()
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.version = bfr.take(1)[0]
     flags_bs = bfr.take(3)
     self.flags = (flags_bs[0]<<16) | (flags_bs[1]<<8) | flags_bs[2]
@@ -512,8 +522,8 @@ class FREEBox(Box):
 
   BOX_TYPES = (b'free', b'skip')
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     offset0 = bfr.offset
     self._skip_data(bfr, discard=True)
     self.free_size = bfr.offset - offset0
@@ -540,8 +550,8 @@ class FTYPBox(Box):
       Decode the major_brand, minor_version and compatible_brands.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.major_brand = bfr.take(4)
     self.minor_version, = unpack('>L', bfr.take(4))
     brands_bs = b''.join(self._skip_data(bfr))
@@ -572,8 +582,8 @@ class PDINBox(FullBox):
 
   ATTRIBUTES = (('pdinfo', '%r'),)
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     pdinfo_bs = b''.join(self._skip_data(bfr))
     self.pdinfo = [ PDInfo(unpack('>LL', pdinfo_bs[offset:offset+8]))
@@ -591,9 +601,9 @@ class ContainerBox(Box):
   ''' A base class for pure container boxes.
   '''
 
-  def parse_data(self, bfr, default_type=None):
-    super().parse_data(bfr)
-    self.boxes = self.parse_subboxes(bfr, default_type=default_type)
+  def parse_data(self, bfr, default_type=None, copy_boxes=None, **kw):
+    super().parse_data(bfr, copy_boxes=copy_boxes, **kw)
+    self.boxes = self.parse_subboxes(bfr, default_type=default_type, copy_boxes=copy_boxes)
 
   def __str__(self):
     return '%s(%s)' \
@@ -630,8 +640,8 @@ class MVHDBox(FullBox):
                  ('matrix', '%r'),
                  ('next_track_id', '%d') )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
       self.creation_time, \
@@ -716,8 +726,8 @@ class TKHDBox(FullBox):
                  'height',
                )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
       self.creation_time, \
@@ -800,8 +810,8 @@ class TREFBox(ContainerBox):
   ''' Track Reference Box, container for trackReferenceTypeBoxes - ISO14496 section 8.3.3.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr, default_type=TrackReferenceTypeBox)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, default_type=TrackReferenceTypeBox, **kw)
 
 add_box_class(TREFBox)
 
@@ -811,8 +821,8 @@ class TrackReferenceTypeBox(Box):
 
   BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     track_bs = b''.join(self._skip_data(bfr))
     track_ids = []
     for track_id, in iter_unpack('>L', track_bs):
@@ -838,8 +848,8 @@ class TrackGroupTypeBox(FullBox):
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     self.track_group_id, = unpack('>L', bfr.take(4))
 
@@ -860,8 +870,8 @@ class MDHDBox(FullBox):
                  'duration',
                  'language' )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
       self.creation_time, \
@@ -918,8 +928,8 @@ class HDLRBox(FullBox):
 
   ATTRIBUTES = ( ('handler_type', '%r'), 'name' )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     # NB: handler_type is supposed to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
     self.pre_defined, \
@@ -954,8 +964,8 @@ class ELNGBox(FullBox):
 
   ATTRIBUTES = ( 'extended_language', )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     # obtain box data after version and flags decode
     # extended language based on RFC4646
     lang_bs = self._take_tail(bfr)
@@ -977,11 +987,11 @@ class _SampleTableContainerBox(FullBox):
 
   ATTRIBUTES = ()
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, copy_boxes=None, **kw):
+    super().parse_data(bfr, copy_boxes=copy_boxes, **kw)
     # obtain box data after version and flags decode
     entry_count, = unpack('>L', bfr.take(4))
-    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count)
+    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count, copy_boxes=copy_boxes)
     if len(self.boxes) != entry_count:
       raise ValueError('expected %d contained Boxes but parsed %d'
                        % (entry_count, len(self.boxes)))
@@ -1013,8 +1023,8 @@ class _SampleEntry(Box):
   ''' Superclass of Sample Entry boxes.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.reserved, self.data_reference_index = unpack('>6sH', bfr.take(8))
 
   def __str__(self):
@@ -1039,7 +1049,8 @@ class BTRTBox(Box):
 
   ATTRIBUTES = ( 'bufferSizeDB', 'maxBitrate', 'avgBitrate' )
 
-  def parse_data(self, bfr):
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.bufferSizeDB, \
         self.maxBitrate, \
         self.avgBitrate = unpack('>LLL', self._take_tail(bfr))
@@ -1066,10 +1077,10 @@ class _GenericSampleBox(FullBox):
 
   ATTRIBUTES = ( ('samples', '%r'), )
 
-  def parse_data(self, bfr, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None, inferred_entry_count=False):
+  def parse_data(self, bfr, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None, inferred_entry_count=False, **kw):
     if sample_struct_format_v1 is None:
       sample_struct_format_v1 = sample_struct_format_v0
-    super().parse_data(bfr)
+    super().parse_data(bfr, **kw)
     if self.version == 0:
       S = Struct(sample_struct_format_v0)
     elif self.version == 1:
@@ -1109,15 +1120,15 @@ class _GenericSampleBox(FullBox):
 class _TimeToSampleBox(_GenericSampleBox):
   ''' Time to Sample box - section 8.6.1.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr, '>LL', 'count delta')
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, '>LL', 'count delta', **kw)
 add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
 class CTTSBox(_GenericSampleBox):
   ''' A 'ctts' Composition Time to Sample box - section 8.6.1.3.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr, '>LL', 'count offset', '>Ll')
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, '>LL', 'count offset', '>Ll', **kw)
 add_box_class(CTTSBox)
 
 class CSLGBox(FullBox):
@@ -1132,8 +1143,8 @@ class CSLGBox(FullBox):
       'compositionEndTime',
   )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     if self.version == 0:
       struct_format = '>lllll'
     elif self.version == 1:
@@ -1163,33 +1174,38 @@ add_box_class(CSLGBox)
 class STSSBox(_GenericSampleBox):
   ''' A 'stss' Sync Sample box - section 8.6.2.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr, '>L', 'number')
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, '>L', 'number', **kw)
 add_box_class(STSSBox)
 
 class STSHBox(_GenericSampleBox):
   ''' A 'stsh' Shadow Sync Table box - section 8.6.3.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr, '>LL', 'shadowed_sample_number sync_sample_number')
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, '>LL', 'shadowed_sample_number sync_sample_number', **kw)
 add_box_class(STSHBox)
 
 class SDTPBox(_GenericSampleBox):
   ''' A 'sdtp' Independent and Disposable Samples box - section 8.6.4.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr,
-                       '>HHHH',
-                       'is_leading sample_depends_on sample_is_depended_on sample_has_redundancy',
-                       inferred_entry_count=True)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(
+        bfr,
+        '>HHHH',
+        'is_leading sample_depends_on sample_is_depended_on sample_has_redundancy',
+        inferred_entry_count=True,
+        **kw)
 add_box_class(SDTPBox)
 add_box_subclass(Box, b'edts', '8.6.5.1', 'Edit')
 
 class ELSTBox(_GenericSampleBox):
   ''' A 'elst' Edit List box - section 8.6.6.
   '''
-  def parse_data(self, bfr):
-    super().parse_data(bfr, '>Ll', 'segment_duration media_time', sample_struct_format_v1='>Qq')
+  def parse_data(self, bfr, **kw):
+    super().parse_data(
+        bfr,
+        '>Ll', 'segment_duration media_time', sample_struct_format_v1='>Qq',
+        **kw)
 add_box_class(ELSTBox)
 add_box_subclass(Box, b'dinf', '8.7.1', 'Data Information')
 
@@ -1199,8 +1215,8 @@ class URL_Box(FullBox):
 
   ATTRIBUTES = ('location',)
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.location, _ = get_utf8_nul(self._take_tail())
 
   def parsed_data_chunks(self):
@@ -1215,8 +1231,8 @@ class URN_Box(FullBox):
 
   ATTRIBUTES = ('name', 'location',)
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     tail_bs = bfr._take_tail()
     self.name, offset = get_utf8_nul(tail_bs)
     self.location, offset = get_utf8_nul(tail_bs, offset=offset)
@@ -1232,8 +1248,8 @@ class STSZBox(FullBox):
   ''' A 'stsz' Sample Size box - section 8.7.3.2.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.sample_size, self.sample_count = unpack('>LL', bfr.take(8))
     if self.sample_size == 0:
       self.entry_sizes = [
@@ -1263,8 +1279,8 @@ class STSCBox(FullBox):
 
   ATTRIBUTES = ( ('entries', '%r'), )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     entry_count, = unpack('>L', bfr.take(4))
     self.entries = [
         STSCEntry(*unpack('>LLL', bfr.take(12)))
@@ -1285,8 +1301,8 @@ class STCOBox(FullBox):
 
   ATTRIBUTES = ( ('chunk_offsets', '%r'), )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     entry_count, = unpack('>L', bfr.take(4))
     self.chunk_offsets = [
         unpack('>L', bfr.take(4))[0]
@@ -1307,8 +1323,8 @@ class CO64Box(FullBox):
 
   ATTRIBUTES = ( ('chunk_offsets', '%r'), )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     entry_count, = unpack('>L', bfr.take(4))
     self.chunk_offsets = [
         unpack('>Q', bfr.take(8))[0]
@@ -1327,10 +1343,10 @@ class DREFBox(FullBox):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, copy_boxes=None, **kw):
+    super().parse_data(bfr, copy_boxes=copy_boxes, **kw)
     entry_count = unpack('>L', bfr.take(4))
-    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count)
+    self.boxes = self.parse_subboxes(bfr, max_boxes=entry_count, copy_boxes=copy_boxes)
 
   def __str__(self):
     return '%s(%s)' \
@@ -1359,11 +1375,11 @@ class METABox(FullBox):
   ''' A 'meta' Meta Box - section 8.11.1.
   '''
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
-    self.handler_box = Box.from_buffer(bfr)
+  def parse_data(self, bfr, copy_boxes=None, **kw):
+    super().parse_data(bfr, copy_boxes=copy_boxes, **kw)
+    self.handler_box = Box.from_buffer(bfr, copy_boxes=copy_boxes)
     self.handler_box.parent = self
-    self.boxes = self.parse_subboxes(bfr)
+    self.boxes = self.parse_subboxes(bfr, copy_boxes=copy_boxes)
 
   def dump(self, indent='', fp=None):
     if fp is None:
@@ -1393,8 +1409,8 @@ class VMHDBox(FullBox):
       ( 'opcolor', '%r' ),
   )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.graphicsmode, = unpack('>H', bfr.take(2))
     self.opcolor = unpack('>HHH', bfr.take(6))
 
@@ -1415,8 +1431,8 @@ class SMHDBox(FullBox):
 
   ATTRIBUTES = ( ('balance', '%d'), )
 
-  def parse_data(self, bfr):
-    super().parse_data(bfr)
+  def parse_data(self, bfr, **kw):
+    super().parse_data(bfr, **kw)
     self.balance, _ = unpack('>HH', bfr.take(4))
 
   def parsed_data_chunks(self):
