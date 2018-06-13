@@ -9,10 +9,7 @@
 '''
 
 import os
-try:
-  pread = os.pread
-except AttributeError:
-  from cs.fileutils import pread
+from cs.py3 import pread
 
 DISTINFO = {
     'description': "CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams",
@@ -22,7 +19,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.py3'],
 }
 
 DEFAULT_READSIZE = 131072

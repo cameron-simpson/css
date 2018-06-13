@@ -26,7 +26,7 @@ from cs.filestate import FileState
 from cs.lex import as_lines
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
-from cs.py3 import ustr, bytes
+from cs.py3 import ustr, bytes, pread
 from cs.range import Range
 from cs.threads import locked
 from cs.timeutils import TimeoutError
@@ -57,25 +57,6 @@ DISTINFO = {
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
-
-try:
-  from os import pread
-except ImportError:
-  # implement our own pread
-  # NB: not thread safe!
-  def pread(fd, size, offset):
-    offset0 = os.lseek(fd, 0, SEEK_CUR)
-    os.lseek(fd, offset, SEEK_SET)
-    chunks = []
-    while size > 0:
-      data = os.read(fd, size)
-      if not data:
-        break
-      chunks.append(data)
-      size -= len(data)
-    os.lseek(fd, offset0, SEEK_SET)
-    data = b''.join(chunks)
-    return data
 
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
