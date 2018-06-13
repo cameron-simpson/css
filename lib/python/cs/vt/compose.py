@@ -4,6 +4,8 @@
 #   - Cameron Simpson <cs@cskk.id.au> 20dec2016
 #
 
+import os
+from stat import S_ISDIR, S_ISSOCK
 from subprocess import Popen, PIPE
 from cs.lex import skipwhite, get_identifier, get_qstr
 from cs.pfx import Pfx
@@ -39,8 +41,11 @@ def get_store_spec(s, offset):
 
         [clause_name]   The name of a clause to be obtained from a Config.
 
-        /path/to/store  A DataDirStore directory.
-        ./subdir/to/store A relative path to a DataDirStore directory.
+        /path/to/directory
+                        A DataDirStore directory.
+        ./subdir/to/directory
+                        A relative path to a DataDirStore directory.
+        /path/to/socket A socket serving a Store.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -80,10 +85,23 @@ def get_store_spec(s, offset):
     offset += 1
     params = {'clause_name': clause_name}
   elif s.startswith('/', offset) or s.startswith('./', offset):
-    # /path/to/datadir
-    store_type = 'datadir'
-    params = {'path': s[offset:] }
+    path = s[offset:]
     offset = len(s)
+    with Pfx("%r", path):
+      try:
+        S = os.stat(path)
+      except OSError as e:
+        raise ValueError("cannot stat: %s" % (e,)) from e
+      if S_ISDIR(S.st_mode):
+        # /path/to/datadir
+        store_type = 'datadir'
+        params = {'path': path}
+      elif S_ISSOCK(S.st_mode):
+        # /path/to/socket
+        store_type = 'socket'
+        params = {'socket_path': path}
+      else:
+        raise ValueError("not a directory or a socket, st_mode=0o%04o" % (S.st_mode,))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
