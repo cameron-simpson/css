@@ -541,32 +541,6 @@ class VTCmd:
         os.system("ls -la %s" % (statedirpath,))
     return 0
 
-  def cmd_pushto(self, args):
-    ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
-        Usage: pushto source secondary-storespec
-    '''
-    if not args:
-      raise GetopError("missing source")
-    source = args.pop(0)
-    if not args:
-      raise GetoptError("missing secondary-storespec")
-    S2spec = args.pop(0)
-    if args:
-      raise GetopError("extra arguments after secondary-storespec: %r" % (args,))
-    with Pfx("source %r", source):
-      src, offset = parse(source)
-      if offset < len(source):
-        raise GetopError("unparsed text: %r" % (src[offset:],))
-    with Pfx("secondary-storespec %r", S2spec):
-      S2 = Store(S2spec, self.config)
-    try:
-      pushto = src.pushto
-    except AttributeError:
-      raise GetoptError("no pushto facility for %s objects: %s" % (type(src), src))
-    else:
-      pushto(S2, runstate=defaults.runstate)
-    return 0
-
   def cmd_ls(self, args):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
@@ -806,6 +780,32 @@ class VTCmd:
     if not args:
       raise GetoptError("missing stores")
     raise NotImplementedError
+
+  def cmd_pushto(self, args):
+    ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
+        Usage: pushto source secondary-storespec
+    '''
+    if not args:
+      raise GetopError("missing source")
+    source = args.pop(0)
+    if not args:
+      raise GetoptError("missing secondary-storespec")
+    S2spec = args.pop(0)
+    if args:
+      raise GetopError("extra arguments after secondary-storespec: %r" % (args,))
+    with Pfx("source %r", source):
+      src, offset = parse(source)
+      if offset < len(source):
+        raise GetopError("unparsed text: %r" % (src[offset:],))
+    with Pfx("secondary-storespec %r", S2spec):
+      S2 = Store(S2spec, self.config)
+    try:
+      pushto = src.pushto
+    except AttributeError:
+      raise GetoptError("no pushto facility for %s objects: %s" % (type(src), src))
+    else:
+      pushto(S2, runstate=defaults.runstate)
+    return 0
 
   def cmd_scan(self, args):
     ''' Read a datafile and report.
