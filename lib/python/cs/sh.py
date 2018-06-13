@@ -71,6 +71,8 @@ def quotestr(s):
     # unsafe but no single quotes
     return "'" + s + "'"
   def flush():
+    ''' Output the pending characters, which are either all safe or all unsafe.
+    '''
     if offset > start:
       part = s[start:offset]
       if not safe:
