@@ -10,6 +10,7 @@ Aids for code sharing between python2 and python3.
 Presents various names in python 3 flavour for common use in python 2 and python 3.
 '''
 
+import os
 import sys
 
 DISTINFO = {
@@ -82,6 +83,26 @@ except ImportError:
     while offset < len(buffer):
       yield unpack(fmt, buffer[offset:offset+chunk_size])
       offset += chunk_size
+
+# fill in missing pread with weak workalike
+try:
+  pread = os.pread
+except AttributeError:
+  # implement our own pread
+  # NB: not thread safe!
+  def pread(fd, size, offset):
+    offset0 = os.lseek(fd, 0, SEEK_CUR)
+    os.lseek(fd, offset, SEEK_SET)
+    chunks = []
+    while size > 0:
+      data = os.read(fd, size)
+      if not data:
+        break
+      chunks.append(data)
+      size -= len(data)
+    os.lseek(fd, offset0, SEEK_SET)
+    data = b''.join(chunks)
+    return data
 
 if __name__ == '__main__':
   import cs.py3_tests
