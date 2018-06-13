@@ -567,71 +567,6 @@ class VTCmd:
       pushto(S2, runstate=defaults.runstate)
     return 0
 
-  def cmd_serve(self, args):
-    ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
-        Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
-        With no name:storespec arguments the default Store is served,
-        otherwise the named Stores are exported with the first being
-        served initially.
-    '''
-    if not args:
-      raise GetoptError("missing socket indicator")
-    address = args.pop(0)
-    if not args:
-      exports = {'': defaults.S}
-    else:
-      exports = {}
-      for named_store_spec in arg:
-        with Pfx("name:storespec %r", named_store_spec):
-          name, offset = get_identifier(arg)
-          if not name:
-            raise GetoptError("missing name")
-          with Pfx(repr(name)):
-            if name in exports:
-              raise GetoptError("repeated name")
-            if not arg.startswith(':', offset):
-              raise GetoptError("missing colon after name")
-            offset += 1
-            try:
-              parsed, type_, params, offset = get_store_spec(arg, offset)
-            except ValueError as e:
-              raise GetoptError(
-                  "invalid Store specification after \"name:\": %s"
-                  % (e,)) from e
-            if offset < len(arg):
-              raise GetoptError("extra text after storespec: %r" % (arg[offset:],))
-            namedS = self.config.new_Store(parsed, type_, params)
-            exports[name] = namedS
-            if '' not in exports:
-              exports[''] = namedS
-    if address == '-':
-      from .stream import StreamStore
-      remoteS = StreamStore(
-          "serve -", sys.stdin, sys.stdout,
-          exports=exports)
-      remoteS.join()
-    elif isabspath(address):
-      # /path/to/socket
-      X("serve via UNIX socket at %r", address)
-      with defaults.S:
-        srv = serve_socket(socket_path=address, exports=exports, runstate=self.runstate)
-      srv.join()
-    else:
-      # [host]:port
-      cpos = address.rfind(':')
-      if cpos >= 0:
-        host = address[:cpos]
-        port = address[cpos+1:]
-        if len(host) == 0:
-          host = '127.0.0.1'
-        port = int(port)
-        with defaults.S:
-          srv = serve_tcp(band_addr=(host, port), exports=exports, runstate=self.runstate)
-        srv.join()
-      else:
-        raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
-    return 0
-
   def cmd_ls(self, args):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
@@ -893,6 +828,71 @@ class VTCmd:
             if flags & F_COMPRESSED:
               data = decompress(data)
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
+    return 0
+
+  def cmd_serve(self, args):
+    ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
+        Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
+        With no name:storespec arguments the default Store is served,
+        otherwise the named Stores are exported with the first being
+        served initially.
+    '''
+    if not args:
+      raise GetoptError("missing socket indicator")
+    address = args.pop(0)
+    if not args:
+      exports = {'': defaults.S}
+    else:
+      exports = {}
+      for named_store_spec in arg:
+        with Pfx("name:storespec %r", named_store_spec):
+          name, offset = get_identifier(arg)
+          if not name:
+            raise GetoptError("missing name")
+          with Pfx(repr(name)):
+            if name in exports:
+              raise GetoptError("repeated name")
+            if not arg.startswith(':', offset):
+              raise GetoptError("missing colon after name")
+            offset += 1
+            try:
+              parsed, type_, params, offset = get_store_spec(arg, offset)
+            except ValueError as e:
+              raise GetoptError(
+                  "invalid Store specification after \"name:\": %s"
+                  % (e,)) from e
+            if offset < len(arg):
+              raise GetoptError("extra text after storespec: %r" % (arg[offset:],))
+            namedS = self.config.new_Store(parsed, type_, params)
+            exports[name] = namedS
+            if '' not in exports:
+              exports[''] = namedS
+    if address == '-':
+      from .stream import StreamStore
+      remoteS = StreamStore(
+          "serve -", sys.stdin, sys.stdout,
+          exports=exports)
+      remoteS.join()
+    elif isabspath(address):
+      # /path/to/socket
+      X("serve via UNIX socket at %r", address)
+      with defaults.S:
+        srv = serve_socket(socket_path=address, exports=exports, runstate=self.runstate)
+      srv.join()
+    else:
+      # [host]:port
+      cpos = address.rfind(':')
+      if cpos >= 0:
+        host = address[:cpos]
+        port = address[cpos+1:]
+        if len(host) == 0:
+          host = '127.0.0.1'
+        port = int(port)
+        with defaults.S:
+          srv = serve_tcp(band_addr=(host, port), exports=exports, runstate=self.runstate)
+        srv.join()
+      else:
+        raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
     return 0
 
   def cmd_test(self, args):
