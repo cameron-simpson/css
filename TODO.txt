@@ -1,3 +1,6 @@
+iso14496: parser for mdat section - how to know the audio/video format?
+cs.flags: put a lock around all accesses
+SvcD to subclass RunStateMixin?
 Results to inherit from RunStateMixin
 SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
 SvcD/Portfwd: cleanup mode polling pid files to kill former processes

@@ -5,7 +5,11 @@
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
+''' Facilities to do with buffers, primarily CornuCopyBuffer.
+'''
+
 import os
+from cs.py3 import pread
 
 DISTINFO = {
     'description': "CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams",
@@ -14,9 +18,11 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Development Status :: 5 - Production/Stable",
-        ],
-    'install_requires': [],
+    ],
+    'install_requires': ['cs.py3'],
 }
+
+DEFAULT_READSIZE = 131072
 
 class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing of data streams.
@@ -32,7 +38,7 @@ class CornuCopyBuffer(object):
 
       len(CornuCopyBuffer) returns the length of `.buf`.
 
-      bool(CornuCopyBuffer) tests whther len() > 0.
+      bool(CornuCopyBuffer) tests whether len() > 0.
 
       Indexing a CornuCopyBuffer accesses `.buf`.
 
@@ -44,14 +50,18 @@ class CornuCopyBuffer(object):
       `.tell` and `.seek` supporting drop in use of the buffer in
       many file contexts. Backward seeks are not supported. `.seek`
       will take advantage of the `input_data`'s .seek method if it
-      has one.
+      has one, otherwise it will use reads.
   '''
 
-  def __init__(self, input_data, buf=None, offset=0, copy_offsets=None, copy_chunks=None):
+  def __init__(
+      self, input_data,
+      buf=None, offset=0,
+      copy_offsets=None, copy_chunks=None
+  ):
     ''' Prepare the buffer.
         `input_data`: an iterator yielding data chunks; if your
-          data source is a file you could supply `cs.fileutils.read_from(f)`
-          to this parameter.
+          data source is a file see the .from_file factory; if your
+          data source is a file descriptor see the .from_fd factory.
         `buf`: if not None, the initial state of the parse buffer
         `offset`: logical offset of the start of the buffer, default 0
         `copy_offsets`: if not None, a callable for parsers to
@@ -68,6 +78,29 @@ class CornuCopyBuffer(object):
       input_data = CopyingIterator(input_data, copy_chunks)
     self.input_data = input_data
     self.copy_offsets = copy_offsets
+
+  @classmethod
+  def from_fd(cls, fd, readsize=None, offset=None, **kw):
+    ''' Return a new CornuCopyBuffer attached to an open file descriptor.
+
+        Internally this constructs a SeekableFDIterator, which
+        provides the iteration that CornuCopyBuffer consumes, but
+        also seek support of the underlying file descriptor is
+        seekable.
+    '''
+    it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
+    return cls(it, offset=it.offset, **kw)
+
+  @classmethod
+  def from_file(cls, fp, readsize=None, offset=None, **kw):
+    ''' Return a new CornuCopyBuffer attached to an open file.
+
+        Internally this constructs a SeekableFileIterator, which
+        provides the iteration that CornuCopyBuffer consumes, but
+        also seek support of the underlying file is seekable.
+    '''
+    it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
+    return cls(it, offset=it.offset, **kw)
 
   def __str__(self):
     return "CCB(offset:%d,buf:%d)" % (self.offset, len(self.buf))
@@ -122,7 +155,7 @@ class CornuCopyBuffer(object):
       while length < min_size:
         try:
           next_chunk = next(chunks)
-        except StopIteration as e:
+        except StopIteration:
           if short_ok:
             break
           raise EOFError(
@@ -240,10 +273,10 @@ class CornuCopyBuffer(object):
 
   def skip(self, toskip, copy_skip=None, short_ok=False):
     ''' Advance position by `skip_to`. Return the new offset.
-        `skipto`: the distance to advance
+        `toskip`: the distance to advance
         `copy_skip`: callable to receive skipped data.
-        `short_ok`: default False; if true then skipto may return before
-          `new_offset` if there are insufficient `input_data`.
+        `short_ok`: default False; if true then skip may return before
+          `skipto` bytes if there are insufficient `input_data`.
         Return values:
         `buf`: the new state of `buf`
         `offset`: the final offset; this may be short if `short_ok`.
@@ -277,7 +310,7 @@ class CornuCopyBuffer(object):
         while toskip > 0:
           try:
             buf = next(chunks)
-          except StopIteration as e:
+          except StopIteration:
             if short_ok:
               break
             raise EOFError(
@@ -294,7 +327,7 @@ class CornuCopyBuffer(object):
     self.buf = buf
     self.offset = offset
 
-def CopyingIterator(object):
+class CopyingIterator(object):
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
   def __init__(self, I, copy_to):
@@ -316,8 +349,77 @@ def chunky(bfr_func):
       def func(bfr, ...):
   '''
   def chunks_func(chunks, *a, **kw):
+    ''' Function accepting chunk iterator.
+    '''
     offset = kw.pop('offset', 0)
     copy_offsets = kw.pop('copy_offsets', None)
     bfr = CornuCopyBuffer(chunks, offset=offset, copy_offsets=copy_offsets)
     return bfr_func(bfr, *a, **kw)
   return chunks_func
+
+class SeekableFDIterator(object):
+  ''' An iterator over the data of a file descriptor.
+  '''
+  def __init__(self, fd, readsize=None, offset=None):
+    if readsize is None:
+      readsize = DEFAULT_READSIZE
+    elif readsize < 1:
+      raise ValueError("readsize must be >=1, got: %r" % (readsize,))
+    if offset is None:
+      offset = os.lseek(fd, 0, os.SEEK_CUR)
+    elif offset < 0:
+      raise ValueError("offset must be >=0, got: %r" % (offset,))
+    self.fd = fd
+    self.readsize = readsize
+    self.offset = offset
+  def __iter__(self):
+    return self
+  def __next__(self):
+    data = pread(self.fd, self.readsize, self.offset)
+    if not data:
+      raise StopIteration("EOF, empty data from fd %s" % (self.fd,))
+    self.offset += len(data)
+    return data
+  def seek(self, new_offset, mode=os.SEEK_SET):
+    ''' Move the logical file pointer. WARNING: moves the underlying file descriptor's pointer.
+    '''
+    if mode == os.SEEK_CUR:
+      new_offset += self.offset
+    elif mode == os.SEEK_END:
+      new_offset += os.lseek(self.fd, 0, os.SEEK_END)
+    self.offset = new_offset
+    return new_offset
+
+class SeekableFileIterator(object):
+  ''' An iterator over the data of a file object.
+  '''
+  def __init__(self, fp, readsize=None, offset=None):
+    if readsize is None:
+      readsize = DEFAULT_READSIZE
+    elif readsize < 1:
+      raise ValueError("readsize must be >=1, got: %r" % (readsize,))
+    if offset is None:
+      offset = fp.tell()
+    elif offset < 0:
+      raise ValueError("offset must be >=0, got: %r" % (offset,))
+    self.fp = fp
+    self.readsize = readsize
+    self.offset = offset
+    # presume a file-like object
+    try:
+      read1 = fp.read1
+    except AttributeError:
+      read1 = fp.read
+    self.read1 = read1
+  def __iter__(self):
+    return self
+  def __next__(self):
+    data = self.fp.read1(self.readsize)
+    if not data:
+      raise StopIteration("EOF, empty data from fp %s" % (self.fp,))
+    self.offset += len(data)
+    return data
+  def seek(self, new_offset, mode=os.SEEK_SET):
+    ''' Move the logical file pointer. WARNING: moves the underlying file's pointer.
+    '''
+    return self.fp.seek(new_offset, mode)
