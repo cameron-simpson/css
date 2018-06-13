@@ -1,5 +1,4 @@
-streamstore: rename requesthandler to clienthandler, make current Store local to it for independence
-RunState: rename .end to .stop, keep .end compatibility name
+streamstore: Client handler: make current Store local to it for independence
 move CancellationError into cs.resources, associate with RunState
 readahead for CornuCopyBuffer?
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
