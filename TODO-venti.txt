@@ -1,3 +1,4 @@
+socket Stores: just use path instead of socket_path?
 streamstore: Client handler: make current Store local to it for independence
 move CancellationError into cs.resources, associate with RunState
 readahead for CornuCopyBuffer?
