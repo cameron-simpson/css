@@ -89,7 +89,8 @@ class VTCmd:
             readonly    Read only; data may not be modified.
       -r  Readonly, the same as "-o readonly".
     pack paths...
-    pull other-store objects...
+    pullfrom other-store objects...
+    pushto other-store objects...
     report
     scan datafile
     serve {-|/path/to/socket|host:port} [name:storespec]...
@@ -774,37 +775,57 @@ class VTCmd:
           os.remove(ospath)
     return xit
 
-  def cmd_pull(self, args):
+  def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
+        Usage: pullfrom other_store objects...
     '''
     if not args:
-      raise GetoptError("missing stores")
-    raise NotImplementedError
+      raise GetoptError("missing other_store")
+    S1spec = args.pop(0)
+    if not args:
+      raise GetoptError("missing objects")
+    with Pfx("other_store %r", S1spec):
+      S1 = Store(S1spec, self.config)
+    S2 = defaults.S
+    with Pfx("%s => %s", S1.name, S2spec):
+      with S1:
+        for obj_spec in args:
+          with Pfx(obj_spec):
+            try:
+              obj = parse(obj_spec)
+            except ValueError as e:
+              raise GetoptError("unparsed: %s", e) from e
+            try:
+              pushto = obj.pushto
+            except AttributeError:
+              raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
+            pushto(S2, runstate=defaults.runstate)
+    return 0
 
   def cmd_pushto(self, args):
     ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
-        Usage: pushto source secondary-storespec
+        Usage: pushto other_store objects...
     '''
     if not args:
-      raise GetopError("missing source")
-    source = args.pop(0)
-    if not args:
-      raise GetoptError("missing secondary-storespec")
+      raise GetoptError("missing other_store")
     S2spec = args.pop(0)
-    if args:
-      raise GetopError("extra arguments after secondary-storespec: %r" % (args,))
-    with Pfx("source %r", source):
-      src, offset = parse(source)
-      if offset < len(source):
-        raise GetopError("unparsed text: %r" % (src[offset:],))
-    with Pfx("secondary-storespec %r", S2spec):
+    if not args:
+      raise GetoptError("missing objects")
+    with Pfx("other_store %r", S2spec):
       S2 = Store(S2spec, self.config)
-    try:
-      pushto = src.pushto
-    except AttributeError:
-      raise GetoptError("no pushto facility for %s objects: %s" % (type(src), src))
-    else:
-      pushto(S2, runstate=defaults.runstate)
+    S1 = defaults.S
+    with Pfx("%s => %s", S1.name, S2spec):
+      for obj_spec in args:
+        with Pfx(obj_spec):
+          try:
+            obj = parse(obj_spec)
+          except ValueError as e:
+            raise GetoptError("unparsed: %s", e) from e
+          try:
+            pushto = obj.pushto
+          except AttributeError:
+            raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
+          pushto(S2, runstate=defaults.runstate)
     return 0
 
   def cmd_scan(self, args):
