@@ -21,7 +21,7 @@ usage="Usage: $cmd [options...] [--] {-|echo-args...}
     -e command [args...] --
                 Associate this command with clicking on the alert popup, if supported.
                 End the command arguments with \"--\".
-    -g group    Alert group.
+    -g group    Alert group, default from \$ALERT_GROUP.
     -l level    Alert level, default 1.
     -s subtitle Alert subtitle.
                 If unspecified and the alert text begins with an
@@ -194,7 +194,7 @@ then
     done
     set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
     # message group - this message updates/replaces last message in this group
-    [ -n "$ALERT_GROUP" ] && set -- "$@" -group "$ALERT_GROUP"
+    [ -n "$group" ] && set -- "$@" -group "$group"
     # command to run when notifier clicked
     [ -n "$execute" ] && set -- "$@" -execute "$execute"
     set -- timeout 10 reattach-to-user-namespace "$@"
