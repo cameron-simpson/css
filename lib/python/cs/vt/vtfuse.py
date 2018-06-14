@@ -364,7 +364,7 @@ class Inodes(object):
       raise RuntimeError("inum {inum} already in hard link dir")
     D[lastelem] = E
 
-  @locked_property
+  @locked
   def inode(self, inum):
     ''' The inum->Inode mapping, computed on demand.
     '''
@@ -379,7 +379,7 @@ class Inodes(object):
   __getitem__ = inode
 
   def __contains__(self, inum):
-    return inum in self.inode
+    return inum in self._inode_map
 
   def hardlink_for(self, E):
     ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
