@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@cskk.id.au> 01may2007
 #
 
+''' cs.vt command line utility.
+'''
+
 from __future__ import with_statement
 from collections import defaultdict
 from datetime import datetime
@@ -21,7 +24,7 @@ from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data
-from cs.lex import hexify
+from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
                         setup_logging, loginfo, logTo
@@ -34,7 +37,7 @@ from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
 from .block import Block, IndirectBlock, decodeBlock
 from .blockify import blocked_chunks_of
-from .cache import FileCacheStore
+from .compose import get_store_spec
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
 from .datafile import DataFile, F_COMPRESSED, decompress
@@ -205,6 +208,8 @@ class VTCmd:
     return xit
 
   def cmd_op(self, args):
+    ''' Run an command operation.
+    '''
     try:
       op = args[0]
     except IndexError:
@@ -271,7 +276,7 @@ class VTCmd:
     P.enable()
     try:
       xit = self.cmd_op(*a, **kw)
-    except Exception as e:
+    except Exception:
       P.disable()
       raise
     P.disable()
@@ -292,7 +297,7 @@ class VTCmd:
     '''  Emit the content of the blocks specified by the supplied hashcodes.
     '''
     indirect = False
-    if len(args) > 0 and args[0] == "-i":
+    if args and args[0] == "-i":
       indirect = True
       args.pop(0)
     if not args:
@@ -358,9 +363,8 @@ class VTCmd:
     if not args:
       raise GetoptError("missing filerefs")
     hashclass = DEFAULT_HASHCLASS
-    long_format = True
     one_line = True
-    rows, columns = ttysize(1)
+    _, columns = ttysize(1)
     if columns is None:
       columns = 80
     max_width = columns - 1
@@ -386,16 +390,14 @@ class VTCmd:
     return 0
 
   def cmd_fsck(self, args):
-    import cs.logutils
-    cs.logutils.X_via_log = True
     if not args:
       raise GetoptError("missing fsck type")
     fsck_type = args.pop(0)
     with Pfx(fsck_type):
       try:
         fsck_op = {
-          "block":    self.cmd_fsck_block,
-          "dir":      self.cmd_fsck_dir,
+            "block": self.cmd_fsck_block,
+            "dir": self.cmd_fsck_dir,
         }[fsck_type]
       except KeyError:
         raise GetoptError("unsupported fsck type")
@@ -429,6 +431,8 @@ class VTCmd:
     return xit
 
   def cmd_ftp(self, args):
+    ''' FTPlike interface to the Store.
+    '''
     if not args:
       raise GetoptError("missing dirent or archive")
     target = args.pop(0)
@@ -451,7 +455,7 @@ class VTCmd:
     overlay = False
     whole_read = False
     opts, args = getopt(args, 'oW')
-    for opt, val in opts:
+    for opt, _ in opts:
       with Pfx(opt):
         if opt == '-D':
           delete = True
@@ -481,7 +485,7 @@ class VTCmd:
         except OSError as e:
           error("cannot open archive for append: %s", e)
           return 1
-        when, D = Archive(special).last
+        _, D = Archive(special).last
     if D is None:
       D = Dir('import')
     srcbase = basename(srcpath.rstrip(os.sep))
@@ -495,8 +499,9 @@ class VTCmd:
           return 1
         elif not E.isdir:
           error("name %r is not a directory", srcbase)
-        E, errors = import_dir(srcpath, E,
-                      delete=delete, overlay=overlay, whole_read=whole_read)
+        E, errors = import_dir(
+            srcpath, E,
+            delete=delete, overlay=overlay, whole_read=whole_read)
         if errors:
           warning("directory not fully imported")
           for err in errors:
@@ -591,10 +596,10 @@ class VTCmd:
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
-    A = None            # becomes not None for a pathname
     specialD = None     # becomes not None for a D{dir}
     mount_store = defaults.S
-    special_store = None # the special may derive directly from a config Store clause
+    # the special may derive directly from a config Store clause
+    special_store = None
     special_basename = None
     archive = None
     try:
@@ -711,7 +716,7 @@ class VTCmd:
             if not E.isdir:
               error("expected directory, not file: %s", E)
               return 1
-      if E.name== '.':
+      if E.name == '.':
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
       # import vtfuse before doing anything with side effects
@@ -787,14 +792,14 @@ class VTCmd:
     with Pfx("other_store %r", S1spec):
       S1 = Store(S1spec, self.config)
     S2 = defaults.S
-    with Pfx("%s => %s", S1.name, S2spec):
+    with Pfx("%s => %s", S1.name, S2.name):
       with S1:
         for obj_spec in args:
           with Pfx(obj_spec):
             try:
               obj = parse(obj_spec)
             except ValueError as e:
-              raise GetoptError("unparsed: %s", e) from e
+              raise GetoptError("unparsed: %s" % (e,)) from e
             try:
               pushto = obj.pushto
             except AttributeError:
@@ -865,25 +870,27 @@ class VTCmd:
       exports = {'': defaults.S}
     else:
       exports = {}
-      for named_store_spec in arg:
+      for named_store_spec in args:
         with Pfx("name:storespec %r", named_store_spec):
-          name, offset = get_identifier(arg)
+          name, offset = get_identifier(named_store_spec)
           if not name:
             raise GetoptError("missing name")
           with Pfx(repr(name)):
             if name in exports:
               raise GetoptError("repeated name")
-            if not arg.startswith(':', offset):
+            if not named_store_spec.startswith(':', offset):
               raise GetoptError("missing colon after name")
             offset += 1
             try:
-              parsed, type_, params, offset = get_store_spec(arg, offset)
+              parsed, type_, params, offset = get_store_spec(named_store_spec, offset)
             except ValueError as e:
               raise GetoptError(
                   "invalid Store specification after \"name:\": %s"
                   % (e,)) from e
-            if offset < len(arg):
-              raise GetoptError("extra text after storespec: %r" % (arg[offset:],))
+            if offset < len(named_store_spec):
+              raise GetoptError(
+                  "extra text after storespec: %r"
+                  % (named_store_spec[offset:],))
             namedS = self.config.new_Store(parsed, type_, params)
             exports[name] = namedS
             if '' not in exports:
@@ -906,7 +913,7 @@ class VTCmd:
       if cpos >= 0:
         host = address[:cpos]
         port = address[cpos+1:]
-        if len(host) == 0:
+        if not host:
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
@@ -950,7 +957,7 @@ class VTCmd:
     X("arbase=%r, arext=%r", arbase, arext)
     if arext != '.vt':
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
-    if len(args) > 0:
+    if args:
       raise GetoptError("extra arguments after archive name %r" % (arpath,))
     if existspath(arbase):
       error("archive base already exists: %r", arbase)
@@ -974,7 +981,7 @@ def lsDirent(fp, E, name):
   B = E.block
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
-    st_atime, st_mtime, st_ctime = st
+      st_atime, st_mtime, st_ctime = st
   t = datetime.fromtimestamp(int(st_mtime))
   try:
     h = B.hashcode
@@ -982,9 +989,9 @@ def lsDirent(fp, E, name):
     detail = repr(B)
   else:
     detail = hexify(h)
-  fp.write("%c %-41s %s %6d %s\n" \
-           % (('d' if E.isdir else 'f'),
-              detail, t, st_size, name))
+  fp.write(
+      "%c %-41s %s %6d %s\n"
+      % (('d' if E.isdir else 'f'), detail, t, st_size, name))
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.
@@ -1021,7 +1028,7 @@ def cat(path, fp=None):
   '''
   if fp is None:
     with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
-      return cat(path, bfp)
+      cat(path, bfp)
   else:
     F = dirent_file(path)
     block = F.block
@@ -1029,6 +1036,8 @@ def cat(path, fp=None):
       fp.write(B.data)
 
 def dump(path, fp=None):
+  ''' Dump the Block contents of `path`.
+  '''
   if fp is None:
     fp = sys.stdout
   E, subname = dirent_resolve(path)
