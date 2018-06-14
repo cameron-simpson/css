@@ -609,6 +609,7 @@ class VTCmd:
       badopts = True
     else:
       with Pfx("special %r", special):
+        fsname = special
         if special.startswith('D{') and special.endswith('}'):
           # D{dir}
           try:
@@ -627,6 +628,7 @@ class VTCmd:
           else:
             special_basename = D.name
         elif special.startswith('[') and special.endswith(']'):
+          fsname = str(self.config) + special
           special_basename = special[1:-1].strip()
           special_store = self.config.Store_from_spec(special)
           X("special_store=%s", special_store)
@@ -736,7 +738,7 @@ class VTCmd:
             else:
               raise
         try:
-          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, fsname=special)
+          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, fsname=fsname)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:
