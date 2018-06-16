@@ -62,7 +62,7 @@ _help:
 _tags:  tags
 
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
-        ctags -R -o tags cs/
+        ctags-update -o '$@' $?
 
 _updcss:
         ./bin-cs/updcss
