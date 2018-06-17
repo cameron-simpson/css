@@ -247,6 +247,7 @@ class Config:
       max_files=None,
       max_file_size=None,
       basedir=None,
+      backend=None,
       runstate=None,
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
@@ -260,6 +261,9 @@ class Config:
       debug("path from clausename: %r", path)
     path = longpath(path)
     debug("longpath(path) ==> %r", path)
+    if backend is None:
+      raise ValueError('missing backend')
+    backend_store = self.Store_from_spec(backend)
     if not isabspath(path):
       if path.startswith('./'):
         path = abspath(path)
@@ -274,7 +278,7 @@ class Config:
     if runstate is None:
       runstate = self.runstate
     return FileCacheStore(
-        store_name, None, path,
+        store_name, backend_store, path,
         max_cachefile_size=max_file_size,
         max_cachefiles=max_files,
         runstate=runstate,
