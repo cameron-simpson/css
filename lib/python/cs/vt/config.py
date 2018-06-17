@@ -38,17 +38,10 @@ class Config:
       It is modelled on a .ini file, with named clauses each containing named values.
   '''
 
-  CONFIG_PATH_ENVVAR = 'VT_CONFIG'
-  CONFIG_PATH_DEFAULT = '$HOME/.vtrc'
-
-  def __init__(self, config_map=None, environ=None, runstate=None):
+  def __init__(self, config_map, environ=None, runstate=None):
     if environ is None:
       environ = os.environ
     self.environ = environ
-    if config_map is None:
-      config_map = environ.get(
-          self.CONFIG_PATH_ENVVAR,
-          envsub(self.CONFIG_PATH_DEFAULT, environ=environ))
     if isinstance(config_map, str):
       self.path = config_map
       config_map = ConfigWatcher(self.path)

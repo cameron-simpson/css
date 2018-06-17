@@ -23,6 +23,7 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
+from cs.env import envsub
 from cs.fileutils import file_data
 from cs.lex import hexify, get_identifier
 import cs.logutils
@@ -127,12 +128,13 @@ class VTCmd:
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
     ####cs.x.X_logger = logging.getLogger()
 
+    config_path = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
     store_spec = os.environ.get('VT_STORE', '[default]')
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
 
     try:
-      opts, args = getopt(args, 'C:S:qv')
+      opts, args = getopt(args, 'C:S:f:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s"% (e.opt, e.msg))
       badopts = True
@@ -147,6 +149,8 @@ class VTCmd:
       elif opt == '-S':
         # specify Store
         store_spec = val
+      elif opt == '-f':
+        config_path = val
       elif opt == '-q':
         # quiet: not verbose
         self.verbose = False
@@ -156,6 +160,7 @@ class VTCmd:
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
 
+    self.config_path = config_path
     self.store_spec = store_spec
     self.cache_store_spec = cache_store_spec
 
@@ -172,7 +177,7 @@ class VTCmd:
     self.runstate = RunState()
     with defaults.push_runstate(self.runstate):
       with self.runstate:
-        self.config = Config()
+        self.config = Config(self.config_path)
 
         # catch signals, flag termination
         def sig_handler(sig, frame):
