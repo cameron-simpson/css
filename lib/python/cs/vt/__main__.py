@@ -51,7 +51,7 @@ from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .server import serve_tcp, serve_socket
 from .smuggling import import_dir, import_file
-from .store import ProgressStore, DataDirStore
+from .store import ProgressStore, DataDirStore, ProxyStore
 from .transcribe import parse
 
 def main(argv):
@@ -61,16 +61,16 @@ class VTCmd:
 
   USAGE = '''Usage: %s [options...] [profile] operation [args...]
   Options:
-    -C        Do not put a cache in front of the store.
-              Default: use the filecache specified by the "[cache]"
-              configuration clause.
+    -C store  Specify the store to use as a cache.
+              Specify "NONE" for no cache.
+              Default: from $VT_CACHE_STORE or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
                 /path/to/dir    GDBMStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
               Default from $VT_STORE, or "[default]".
-    -f        Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
+    -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
   Operations:
@@ -131,11 +131,11 @@ class VTCmd:
     ####cs.x.X_logger = logging.getLogger()
 
     store_spec = os.environ.get('VT_STORE', '[default]')
+    cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
-    no_cache = False
 
     try:
-      opts, args = getopt(args, 'CS:qv')
+      opts, args = getopt(args, 'C:S:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s"% (e.opt, e.msg))
       badopts = True
@@ -143,7 +143,10 @@ class VTCmd:
 
     for opt, val in opts:
       if opt == '-C':
-        no_cache = True
+        if val == 'NONE':
+          cache_store_spec = None
+        else:
+          cache_store_spec = val
       elif opt == '-S':
         # specify Store
         store_spec = val
@@ -157,7 +160,7 @@ class VTCmd:
         raise RuntimeError("unhandled option: %s" % (opt,))
 
     self.store_spec = store_spec
-    self.no_cache = no_cache
+    self.cache_store_spec = cache_store_spec
 
     if self.verbose:
       loginfo.level = logging.INFO
@@ -234,12 +237,21 @@ class VTCmd:
         exception("can't open store %r: %s", self.store_spec, e)
         raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
       defaults.push_Ss(S)
-      if self.no_cache:
-        cacheS = None
-      else:
-        cacheS = self.config['cache']
-        cacheS.backend = S
-        S = cacheS
+      if self.cache_store_spec is not None:
+        try:
+          cacheS = Store(self.cache_store_spec, self.config)
+        except Exception as e:
+          exception("can't open cache store %r: %s", self.cache_store_spec, e)
+          raise GetoptError(
+              "unusable Store specification: %s"
+              % (self.cache_store_spec,))
+        else:
+          S = ProxyStore(
+              "%s:%s" % (cacheS.name, S.name),
+              read=(cacheS,),
+              read2=(S,),
+              save=(cacheS, S)
+          )
       defaults.push_Ss(S)
       # start the status ticker
       if False and sys.stdout.isatty():
