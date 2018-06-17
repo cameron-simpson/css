@@ -14,13 +14,13 @@ from threading import Lock
 from cs.configutils import ConfigWatcher
 from cs.env import envsub
 from cs.fileutils import shortpath, longpath
-from cs.lex import skipwhite
 from cs.logutils import debug, warning
 from cs.pfx import Pfx
 from cs.result import Result
 from . import defaults
-from .cache import FileCacheStore
-from .compose import parse_store_specs, get_integer
+from .cache import FileCacheStore, MemoryCacheStore
+from .compose import parse_store_specs
+from .convert import get_integer, convert_param_int, convert_param_scaled_int
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 
@@ -157,6 +157,8 @@ class Config:
       elif store_type == 'datadir':
         S = self.datadir_Store(store_name, clause_name, **params)
       elif store_type == 'filecache':
+        convert_param_int(params, 'max_files')
+        convert_param_scaled_int(params, 'max_file_size')
         S = self.filecache_Store(store_name, clause_name, **params)
       elif store_type == 'platonic':
         S = self.platonic_Store(store_name, clause_name, **params)
@@ -253,15 +255,6 @@ class Config:
       assert type_ == 'filecache'
     if basedir is None:
       basedir = self.get_default('basedir')
-    if max_files is not None:
-      max_files = int(max_files)
-    if max_file_size is not None:
-      if isinstance(max_file_size, str):
-        s = max_file_size
-        max_file_size, offset = get_integer(s, 0)
-        offset = skipwhite(s, offset)
-        if offset < len(s):
-          raise ValueError("max_file_size: unparsed text: %r" % (s[offset:],))
     if path is None:
       path = clause_name
       debug("path from clausename: %r", path)
