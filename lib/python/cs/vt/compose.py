@@ -9,9 +9,8 @@ from stat import S_ISDIR, S_ISSOCK
 from subprocess import Popen, PIPE
 from cs.lex import skipwhite, get_identifier, get_qstr
 from cs.pfx import Pfx
-from cs.units import multiparse as multiparse_units, \
-    BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
 from cs.x import X
+from .convert import get_integer
 from .stream import StreamStore
 
 def parse_store_specs(s, offset=0):
@@ -72,7 +71,7 @@ def get_store_spec(s, offset):
     qs, offset = get_qstr(s, offset, q='"')
     _, store_type, params, offset2 = get_store_spec(qs, 0)
     if offset2 < len(qs):
-      raise ValueError("unparsed text inside quotes: %r", qs[offset2:])
+      raise ValueError("unparsed text inside quotes: %r" % (qs[offset2:],))
   elif s.startswith('[', offset):
     # [clause_name]
     store_type = 'config'
@@ -189,15 +188,6 @@ def get_token(s, offset):
   else:
     token, offset = get_qstr_or_identifier(s, offset)
   return token, offset
-
-def get_integer(s, offset):
-  ''' Parse an integer followed by an optional scale and return computed value.
-  '''
-  return multiparse_units(
-      s,
-      (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE),
-      offset
-  )
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
