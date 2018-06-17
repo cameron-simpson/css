@@ -226,7 +226,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown operation \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("datadir", "init", "dump", "scan", "test"):
+      if op in ("datadir", "dump", "scan", "test"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -536,28 +536,6 @@ class VTCmd:
     else:
       Archive(special).save(D)
     return xit
-
-  # TODO: create dir, dir/data
-  def cmd_init(self, args):
-    ''' Initialise a directory for use as a store.
-        Usage: init dirpath [datadir]
-    '''
-    if not args:
-      raise GetoptError("missing dirpath")
-    statedirpath = args.pop(0)
-    if args:
-      datadirpath = args.pop(0)
-    else:
-      datadirpath = statedirpath
-    if args:
-      raise GetoptError("extra arguments after datadir: %s" % (' '.join(args),))
-    for dirpath in statedirpath, datadirpath:
-      with Pfx(dirpath):
-        if not isdirpath(dirpath):
-          raise GetoptError("not a directory")
-      with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS):
-        os.system("ls -la %s" % (statedirpath,))
-    return 0
 
   def cmd_ls(self, args):
     ''' Do a directory listing of the specified I<dirrefs>.
