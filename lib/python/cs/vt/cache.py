@@ -315,6 +315,9 @@ class MemoryCacheMapping:
         % (type(self).__name__, self.max_data, self.used_data, len(self.mapping))
     )
 
+  def __len__(self):
+    return len(self.mapping)
+
   def __contains__(self, hashcode):
     mapping = self.mapping
     with self._lock:
