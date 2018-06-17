@@ -76,9 +76,6 @@ class VTCmd:
   Operations:
     cat filerefs...
     catblock [-i] hashcodes...
-    datadir [indextype:[hashname:]]/dirpath index
-    datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
-    datadir [indextype:[hashname:]]/dirpath push other-datadir
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
     ftp archive.vt
@@ -226,7 +223,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown operation \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("datadir", "dump", "scan", "test"):
+      if op in ("dump", "scan", "test"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -329,45 +326,6 @@ class VTCmd:
     '''
     print("S =", defaults.S)
     return 0
-
-  def cmd_datadir(self, args):
-    ''' Perform various operations on DataDirs.
-    '''
-    xit = 1
-    if not args:
-      raise GetoptError("missing datadir spec")
-    datadir_spec = args.pop(0)
-    with Pfx(datadir_spec):
-      D = DataDir_from_spec(datadir_spec)
-      if not args:
-        raise GetoptError("missing subop")
-      subop = args.pop(0)
-      with Pfx(subop):
-        if subop == 'index':
-          if args:
-            raise GetoptError("extra arguments: %s" % (' '.join(args),))
-          D.reindex()
-        elif subop == 'pull':
-          if not args:
-            raise GetoptError("missing other-datadirs")
-          else:
-            for other_spec in args:
-              with Pfx(other_spec):
-                Dother = DataDir_from_spec(other_spec)
-                pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
-        elif subop == 'push':
-          if not args:
-            raise GetoptError("missing other-datadir")
-          else:
-            other_spec = args.pop(0)
-            if args:
-              raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
-            with Pfx(other_spec):
-              Dother = DataDir_from_spec(other_spec)
-              pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
-        else:
-          raise GetoptError('unrecognised subop')
-    return xit
 
   def cmd_dump(self, args):
     ''' Dump various file types.
