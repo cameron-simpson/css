@@ -302,3 +302,42 @@ class SeenSet(object):
 
   def __contains__(self, item):
     return item in self.set
+
+def named_column_tuples(rows):
+  ''' Process an iterable of data rows, with the first row being column names.
+      `rows`: an iterable of rows, each an iterable of data values.
+      Yields the generated namedtuple class for the first row in `rows` and then instances of the class for each subsequent row.
+  '''
+  column_names = None
+  first = True
+  for row in rows:
+    if first:
+      column_names = row
+      column_attributes = [
+          re.sub('_+$', '', re.sub(r'[^\w]+', '_', name)).lower()
+          for name in column_names
+      ]
+      class NamedRow(namedtuple('NamedRow', column_attributes)):
+        index_of = dict( (s, i) for i, s in enumerate(column_names) )
+        index_of.update( (s, i) for i, s in enumerate(column_attributes) )
+        def keys(self):
+          return column_attributes
+        def names(self):
+          return column_names
+        def __getitem__(self, key):
+          if isinstance(key, int):
+            i = key
+          elif isinstance(key, str):
+            i = self.index_of[key]
+            if i is None:
+              raise KeyError("unknown name: " + repr(key))
+          else:
+            raise TypeError("expected int or str, got %s" % (type(key),))
+          return super().__getitem__(i)
+      first = False
+      yield NamedRow
+    else:
+      # flatten a mapping into a list ordered by column_names
+      if hasattr(row, keys):
+        row = [ row[k] for k in column_names ]
+      yield NamedRow(*row)
