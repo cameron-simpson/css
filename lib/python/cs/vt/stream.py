@@ -3,16 +3,16 @@
 # Stream protocol for stores.
 #       - Cameron Simpson <cs@cskk.id.au> 06dec2007
 #
-# TODO: T_SYNC, to wait for pending requests before returning
+# TODO: SYNC, to wait for pending requests before returning
 #
 
 ''' Protocol for accessing Stores over a stream connection.
 '''
 
 from __future__ import with_statement
+from enum import IntEnum
 import sys
 from cs.excutils import logexc
-from cs.inttypes import Enum
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -23,13 +23,13 @@ from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum
 from .store import BasicStoreSync
 
-RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
-T_ADD = RqType(0)               # data->hashcode
-T_GET = RqType(1)               # hashcode->data
-T_CONTAINS = RqType(2)          # hash->boolean
-T_FLUSH = RqType(3)             # flush local and remote store
-T_HASHCODES = RqType(4)         # (hashcode,length)=>hashcodes
-T_HASHCODES_HASH = RqType(5)    # (hashcode,length)=>hashcode_of_hashes
+class RqType(IntEnum):
+  ADD = 0               # data -> hashcode
+  GET = 1               # hashcode -> data
+  CONTAINS = 2          # hashcode->Boolean
+  FLUSH = 3             # flush local and remote servers
+  HASHCODES = 4         # (hashcode,length) -> hashcodes
+  HASHCODES_HASH = 5    # (hashcode,length) -> hashcode of hashcodes
 
 class StreamStore(BasicStoreSync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -51,7 +51,7 @@ class StreamStore(BasicStoreSync):
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.
         `addif`: optional mode causing .add to probe the peer for
-            the data chunk's hash and to only submit a T_ADD request
+            the data chunk's hash and to only submit a ADD request
             if the block is missing; this is a bandwith optimisation
             at the expense of latency.
         `connect`: if not None, a function to return `send_fp` and `recv_fp`.
@@ -158,10 +158,10 @@ class StreamStore(BasicStoreSync):
     local_store = self._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    if rq_type == T_ADD:
+    if rq_type == RqType.ADD:
       # return encoded hashcode
       return local_store.add(payload).encode()
-    if rq_type == T_GET:
+    if rq_type == RqType.GET:
       # return 0 or (1, data)
       hashcode, offset = hash_decode(payload)
       if offset < len(payload):
@@ -172,7 +172,7 @@ class StreamStore(BasicStoreSync):
       if data is None:
         return 0
       return 1, data
-    if rq_type == T_CONTAINS:
+    if rq_type == RqType.CONTAINS:
       # return flag
       hashcode, offset = hash_decode(payload)
       if offset < len(payload):
@@ -180,12 +180,12 @@ class StreamStore(BasicStoreSync):
             "unparsed data after hashcode at offset %d: %r"
             % (offset, payload[offset:]))
       return 1 if hashcode in local_store else 0
-    if rq_type == T_FLUSH:
+    if rq_type == RqType.FLUSH:
       if payload:
         raise ValueError("unexpected payload for flush")
       local_store.flush()
       return None
-    if rq_type == T_HASHCODES:
+    if rq_type == RqType.HASHCODES:
       # return joined encoded hashcodes
       hashclass, start_hashcode, reverse, after, length \
           = self._decode_request_hashcodes(flags, payload)
@@ -196,7 +196,7 @@ class StreamStore(BasicStoreSync):
           length=length)
       payload = b''.join(h.encode() for h in hcodes)
       return payload
-    if rq_type == T_HASHCODES_HASH:
+    if rq_type == RqType.HASHCODES_HASH:
       hashclass, start_hashcode, reverse, after, length \
           = self._decode_request_hash_of_hashcodes(flags, payload)
       if hashclass is not local_store.hashclass:
@@ -226,7 +226,7 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    ok, flags, payload = self._conn.do(T_ADD, 0, data)
+    ok, flags, payload = self._conn.do(RqType.ADD, 0, data)
     if not ok:
       raise ValueError(
           "NOT OK response from add(data=%r): flags=0x%0x, payload=%r"
@@ -242,7 +242,7 @@ class StreamStore(BasicStoreSync):
     return h
 
   def get(self, h):
-    ok, flags, payload = self._conn.do(T_GET, 0, h.encode())
+    ok, flags, payload = self._conn.do(RqType.GET, 0, h.encode())
     if not ok:
       raise ValueError(
           "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
@@ -261,7 +261,7 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a Result for collection.
     '''
-    ok, flags, payload = self._conn.do(T_CONTAINS, 0, h.encode())
+    ok, flags, payload = self._conn.do(RqType.CONTAINS, 0, h.encode())
     if not ok:
       raise ValueError(
           "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
@@ -276,7 +276,7 @@ class StreamStore(BasicStoreSync):
     return found
 
   def flush(self):
-    _, flags, payload = self._conn.do(T_FLUSH, 0, b'')
+    _, flags, payload = self._conn.do(RqType.FLUSH, 0, b'')
     assert flags == 0
     assert not payload
     local_store = self.local_store
@@ -307,7 +307,7 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(T_HASHCODES, flags, payload)
+    ok, flags, payload = self._conn.do(RqType.HASHCODES, flags, payload)
     if not ok:
       raise ValueError(
           "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
@@ -377,7 +377,7 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(T_HASHCODES_HASH, flags, payload)
+    ok, flags, payload = self._conn.do(RqType.HASHCODES_HASH, flags, payload)
     if not ok:
       raise ValueError(
           "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
