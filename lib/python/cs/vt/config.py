@@ -160,6 +160,9 @@ class Config:
         convert_param_int(params, 'max_files')
         convert_param_scaled_int(params, 'max_file_size')
         S = self.filecache_Store(store_name, clause_name, **params)
+      elif store_type == 'memory':
+        convert_param_scaled_int(params, 'max_data')
+        S = self.memory_Store(store_name, clause_name, **params)
       elif store_type == 'platonic':
         S = self.platonic_Store(store_name, clause_name, **params)
       elif store_type == 'proxy':
@@ -283,6 +286,24 @@ class Config:
         max_cachefiles=max_files,
         runstate=runstate,
     )
+
+  def memory_Store(
+      self,
+      store_name, clause_name,
+      *,
+      type_=None,
+      max_data=None,
+      runstate=None,
+  ):
+    ''' Construct a PlatonicStore from a "datadir" clause.
+    '''
+    if type_ is not None:
+      assert type_ == 'memory'
+    if max_data is None:
+      raise ValueError("missing max_data")
+    if runstate is None:
+      runstate = self.runstate
+    return MemoryCacheStore(store_name, max_data)
 
   def platonic_Store(
       self,
