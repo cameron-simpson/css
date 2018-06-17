@@ -43,6 +43,7 @@ class FileCacheStore(BasicStoreSync):
     '''
     if backend is None:
       raise ValueError("backend=None")
+    backend.open()
     super().__init__(name, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
@@ -54,7 +55,7 @@ class FileCacheStore(BasicStoreSync):
     self._attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
-    )
+        )
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
@@ -76,11 +77,6 @@ class FileCacheStore(BasicStoreSync):
       self._attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
-
-  def startup(self):
-    super().startup()
-    if self.backend:
-      self.backend.open()
 
   def shutdown(self):
     self.cache.close()
