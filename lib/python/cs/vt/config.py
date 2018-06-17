@@ -137,7 +137,6 @@ class Config:
     ''' Construct a store given its specification.
     '''
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
-      warning("START")
       if not isinstance(params, dict):
         params = dict(params)
         if 'type' in params:
