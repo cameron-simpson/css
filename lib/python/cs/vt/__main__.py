@@ -41,7 +41,7 @@ from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
 from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
-from .datafile import DataFile, F_COMPRESSED, decompress
+from .datafile import DataFile, DataFlag, decompress
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
@@ -806,7 +806,7 @@ class VTCmd:
         DF = DataFile(filepath)
         with DF:
           for offset, flags, data in DF.scan():
-            if flags & F_COMPRESSED:
+            if flags & DataFlag.COMPRESSED:
               data = decompress(data)
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
     return 0
