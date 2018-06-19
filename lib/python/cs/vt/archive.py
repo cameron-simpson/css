@@ -104,6 +104,10 @@ class _Archive(object):
 
   def save(self, E, when=None, previous=None, force=False):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
+        `E`: the Dirent to save.
+        `when`: the POSIX timestamp for the save, default now.
+        `force`: append an entry even if the last entry is the same
+          as this entry, default False
     '''
     if isinstance(E, str):
       etc = E
@@ -137,7 +141,6 @@ class _Archive(object):
     ''' Write a Dirent to an open archive file. Return the Dirent transcription.
         Archive lines have the form:
           isodatetime unixtime transcribe(dirent) dirent.name
-       Note: does not flush the file.
     '''
     if when is None:
       when = time.time()
@@ -161,6 +164,7 @@ class _Archive(object):
       fp.write(' ')
       fp.write(etc_s)
     fp.write('\n')
+    fp.flush()
     return Es
 
   @staticmethod
