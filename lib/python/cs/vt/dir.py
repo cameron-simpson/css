@@ -91,7 +91,7 @@ class _Dirent(Transcriber):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     self.type = type_
     self.name = name
-    self._uuid = uuid
+    self.uuid = uuid
     assert prevblock is None or isinstance(prevblock, _Block), \
         "not _Block: prevblock=%r" % (prevblock,)
     self._prev_dirent_blockref = prevblock
@@ -208,7 +208,7 @@ class _Dirent(Transcriber):
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    uu = self._uuid
+    uu = self.uuid
     if uu is None:
       uubs = b''
     else:
@@ -240,8 +240,8 @@ class _Dirent(Transcriber):
     if self.name:
       T.transcribe(self.name, fp=fp)
       fp.write(':')
-    if self._uuid:
-      attrs['uuid'] = self._uuid
+    if self.uuid:
+      attrs['uuid'] = self.uuid
     if self.meta:
       attrs['meta'] = self.meta
     if self.block:
@@ -271,13 +271,12 @@ class _Dirent(Transcriber):
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
 
-  @prop
-  def uuid(self):
+  def get_uuid(self):
     ''' Return this Dirent's UUID, creating it if necessary.
     '''
-    u = self._uuid
+    u = self.uuid
     if u is None:
-      u = self._uuid = uuid4()
+      u = self.uuid = uuid4()
     return u
 
   def pathto(self, R=None):
