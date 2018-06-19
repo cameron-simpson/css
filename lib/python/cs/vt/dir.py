@@ -804,9 +804,11 @@ class Dir(_Dirent):
   def get(self, name, dflt=None):
     ''' Fetch the Dirent named `name` or `dflt`.
     '''
-    if name not in self:
+    try:
+      E = self[name]
+    except KeyError:
       return dflt
-    return self[name]
+    return E
 
   def keys(self):
     ''' Return the Dirent names contained in this Dir. (Mapping method.)
