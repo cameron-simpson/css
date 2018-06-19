@@ -124,14 +124,18 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def __hash__(self):
     return id(self)
 
+  def hash(self, data):
+    ''' Return a Hash object from data bytes.
+        NB: this does _not_ store the data.
+    '''
+    return self.hashclass.from_chunk(data)
+
+  # Stores are equal only to themselves.
   def __eq__(self, other):
     return self is other
 
-  def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(func, *args, **kwargs)
-
   ###################
-  ## Special methods.
+  ## Mapping methods.
   ##
 
   def __contains__(self, h):
@@ -164,6 +168,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
 
+  ###########################
+  ## Context manager methods.
+  ##
+
   def __enter__(self):
     defaults.pushStore(self)
     return MultiOpenMixin.__enter__(self)
@@ -175,11 +183,9 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
-  def hash(self, data):
-    ''' Return a Hash object from data bytes.
-        NB: does _not_ store the data.
-    '''
-    return self.hashclass.from_chunk(data)
+  ##########################
+  ## MultiOpenMixin methods.
+  ##
 
   def startup(self):
     # Later already open
@@ -193,6 +199,15 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
 
+  #############################
+  ## Function dispatch methods.
+  ##
+
+  def _defer(self, func, *args, **kwargs):
+    ''' Defer a function via the internal Later queue.
+    '''
+    return self.__funcQ.defer(func, *args, **kwargs)
+
   def bg(self, func, *a, **kw):
     ''' Queue a function without consuming the queue capacity.
 
@@ -204,14 +219,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       with self:
         return func(*a, **kw)
     return self.__funcQ.bg(func2)
-
-  def missing(self, hashes):
-    ''' Yield hashcodes that are not in the store from an iterable hash
-        code list.
-    '''
-    for h in hashes:
-      if h not in self:
-        yield h
 
   ##########################################################################
   # Core Store methods, all abstract.
