@@ -254,6 +254,7 @@ class VTCmd:
               read2=(S,),
               save=(cacheS, S)
           )
+          S.config = self.config
       defaults.push_Ss(S)
       # start the status ticker
       if False and sys.stdout.isatty():
