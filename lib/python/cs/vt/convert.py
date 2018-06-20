@@ -4,6 +4,8 @@
 ''' Conversion functions.
 '''
 
+from functools import partial
+from os.path import expanduser, isabs as isabspath, join as joinpath
 from cs.lex import skipwhite
 from cs.pfx import Pfx
 from cs.units import multiparse as multiparse_units, \
@@ -33,7 +35,7 @@ def convert_param(params, key, *, decoder=None):
   param = params.get(key)
   if isinstance(param, str):
     with Pfx("%s: %r", key, param):
-      params[key] = scaled_value(param)
+      params[key] = decoder(param)
 
 def convert_param_int(params, key):
   return convert_param(params, key, decoder=int)
@@ -42,3 +44,14 @@ def convert_param_scaled_int(params, key):
   ''' Convert a scaled value into an int.
   '''
   return convert_param(params, key, decoder=scaled_value)
+
+def expand_path(path, basedir=None):
+  ''' Expand a path specification.
+  '''
+  path = expanduser(path)
+  if basedir and not isabspath(path):
+    path = joinpath(basedir, path)
+  return path
+
+def convert_param_path(params, key, basedir=None):
+  return convert_param(params, key, decoder=partial(expand_path, basedir=basedir))
