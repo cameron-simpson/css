@@ -8,12 +8,13 @@
 '''
 
 import os
-from socket import socket
-from socketserver import TCPServer, UnixStreamServer, ThreadingMixIn, StreamRequestHandler
+from socket import socket, AF_INET, AF_UNIX
+from socketserver import TCPServer, UnixStreamServer, \
+    ThreadingMixIn, StreamRequestHandler
 import sys
 from threading import Thread
 from cs.excutils import logexc
-from cs.logutils import info
+from cs.logutils import info, exception
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -105,7 +106,7 @@ class _ClientConnectionHandler(StreamRequestHandler):
         `server`: the controlling server, a _TCPServer or _UNIXSocketServer
     '''
     X("CONNECTION on %s from %s, server=%s", request, client_address, server)
-    super().__init__(self, request, client_address, server)
+    super().__init__(request, client_address, server)
     self.server = server
 
   @prop
@@ -179,7 +180,8 @@ class TCPClientStore(StreamStore):
   def _tcp_connect(self):
     info("TCP CONNECT to %r", self.sock_bind_addr)
     assert not self.sock, "self.sock=%s" % (self.sock,)
-    self.sock = socket()
+    # TODO: IPv6 support
+    self.sock = socket(AF_INET)
     try:
       self.sock.connect(self.sock_bind_addr)
     except OSError:
@@ -237,13 +239,15 @@ class UNIXSocketClientStore(StreamStore):
   def _unixsock_connect(self):
     info("UNIX SOCKET CONNECT to %r", self.socket_path)
     assert not self.sock, "self.sock=%s" % (self.sock,)
-    self.sock = socket()
-    try:
-      self.sock.connect(self.socket_path)
-    except OSError:
-      self.sock.close()
-      self.sock = None
-      raise
+    self.sock = socket(AF_UNIX)
+    with Pfx("connect(%r)", self.socket_path):
+      try:
+        self.sock.connect(self.socket_path)
+      except OSError as e:
+        exception("%s.connect(%r): %s", self.sock, self.socket_path, e)
+        self.sock.close()
+        self.sock = None
+        raise
     return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
 if __name__ == '__main__':
