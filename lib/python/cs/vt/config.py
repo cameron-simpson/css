@@ -20,7 +20,9 @@ from cs.result import Result
 from . import defaults
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import parse_store_specs
-from .convert import get_integer, convert_param_int, convert_param_scaled_int
+from .convert import get_integer, \
+    convert_param_int, convert_param_scaled_int, \
+    convert_param_path
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 
@@ -162,6 +164,7 @@ class Config:
       elif store_type == 'socket':
         if 'socket_path' not in params:
           params['socket_path'] = clause_name
+        convert_param_path(params, 'socket_path')
         S = self.socket_Store(store_name, **params)
       elif store_type == 'tcp':
         if 'host' not in params:
