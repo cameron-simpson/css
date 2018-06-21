@@ -96,6 +96,11 @@ class StreamStore(BasicStoreSync):
       if oldS:
         oldS.close()
 
+  def switch_to(self, export_name):
+    ''' Switch the local backend Store to one of the exports.
+    '''
+    self.local_store = self.exports[export_name]
+
   def startup(self):
     super().startup()
     local_store = self.local_store
