@@ -24,6 +24,8 @@ from .pushpull import missing_hashcodes_by_checksum
 from .store import BasicStoreSync
 
 class RqType(IntEnum):
+  ''' Packet opcode values.
+  '''
   ADD = 0               # data -> hashcode
   GET = 1               # hashcode -> data
   CONTAINS = 2          # hashcode->Boolean
@@ -102,13 +104,16 @@ class StreamStore(BasicStoreSync):
     self.local_store = self.exports[export_name]
 
   def startup(self):
+    ''' Start up the StreamStore.
+        Open the local_store if not None.
+    '''
     super().startup()
     local_store = self.local_store
     if local_store is not None:
       local_store.open()
 
   def shutdown(self):
-    ''' Close the StreamStore.
+    ''' Shut down the StreamStore.
     '''
     with Pfx("SHUTDOWN %s", self):
       if '_conn' in dir(self):
@@ -449,6 +454,7 @@ class StreamStore(BasicStoreSync):
         return
       for hashcode in hashcodes:
         yield hashcode
+      # set the resume point: after the last yielded hashcode
       start_hashcode = hashcode
       after = True
 
