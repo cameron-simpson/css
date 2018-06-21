@@ -1,3 +1,4 @@
+sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
 Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
 socket Stores: just use path instead of socket_path?
 streamstore: Client handler: make current Store local to it for independence
