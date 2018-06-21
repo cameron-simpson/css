@@ -87,16 +87,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     '''
     self.socket_server_thread.join()
 
-  def switch_to(self, export_name):
-    ''' Switch the backend Store to one of the exports.
-    '''
-    newS = self.exports[export_name]
-    if newS is not self.S:
-      oldS = self.S
-      newS.open()
-      self.S = newS
-      oldS.close()
-
 class _ClientConnectionHandler(StreamRequestHandler):
   ''' Handler for a connection to the server.
   '''
