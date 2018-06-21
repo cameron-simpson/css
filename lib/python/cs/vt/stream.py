@@ -88,11 +88,11 @@ class StreamStore(BasicStoreSync):
   def local_store(self, newS):
     ''' Switch out the local Store for a new one.
     '''
-    if newS is not self.local_store:
-      oldS = self.local_store
+    oldS = self._local_store
+    if newS is not oldS:
       if newS:
         newS.open()
-      self.local_store = newS
+      self._local_store = newS
       if oldS:
         oldS.close()
 
