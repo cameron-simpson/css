@@ -873,7 +873,7 @@ class VTCmd:
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
-          srv = serve_tcp(band_addr=(host, port), exports=exports, runstate=self.runstate)
+          srv = serve_tcp(bind_addr=(host, port), exports=exports, runstate=self.runstate)
         srv.join()
       else:
         raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
