@@ -40,9 +40,11 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0):
+  def __init__(self, start=0, lock=None):
+    if lock is None:
+      lock = Lock()
     self.counter = itertools.count(start)
-    self._lock = Lock()
+    self._lock = lock
 
   def __iter__(self):
     return self

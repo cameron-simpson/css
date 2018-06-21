@@ -1,5 +1,23 @@
-support bare "vt mount '[clause]'" ==> mounts on [GLOBAL].mountdir/{clause}
-support per-clause mountdir, for clauses that should mount elsewhere
+Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
+socket Stores: just use path instead of socket_path?
+streamstore: Client handler: make current Store local to it for independence
+move CancellationError into cs.resources, associate with RunState
+readahead for CornuCopyBuffer?
+socket store: export = name[:storespec],... with default being "default:{defaults.S}"
+socket store: dflt socket_path = {basedir}/{clausename}.sock
+make datadirs sharable by multiple vt instances: shared state csv
+cs.vt.socket_tests: UNIX domain socket tests
+ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
+vt setup/tutorial
+vt-blockmap.5 man entry
+vt-datadir.5 man entry
+vtd.5 man entry
+vtrc.5 man entry
+vt.1 man entry
+blockmap updates - use lower priority than regular I/O
+platonic updates - use lower priority than regular I/O
+Store.archive plumbing
+ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
 default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option

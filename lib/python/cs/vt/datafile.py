@@ -6,6 +6,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+from enum import IntFlag
 import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
@@ -22,29 +23,8 @@ from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
-F_COMPRESSED = 0x01
-
-class DataFlags(int):
-  ''' Subclass of int to label stuff nicely.
-  '''
-
-  def __repr__(self):
-    return "<DataFlags %d>" % (self,)
-
-  def __str__(self):
-    if self == 0:
-      return '_'
-    flags = self
-    s = ''
-    if flags & F_COMPRESSED:
-      s += 'Z'
-      flags &= ~F_COMPRESSED
-    assert flags == 0
-    return s
-
-  @property
-  def compressed(self):
-    return self & F_COMPRESSED
+class DataFlag(IntFlag):
+  COMPRESSED = 0x01
 
 class DataFile(MultiOpenMixin, ReadMixin):
   ''' A data file, storing data chunks in compressed form.
@@ -111,30 +91,27 @@ class DataFile(MultiOpenMixin, ReadMixin):
   def data_record(data, no_compress=False):
     ''' Compose a data record for transcription to a DataFile.
     '''
-    flags = 0
+    flags = DataFlag(0)
     if not no_compress:
       data2 = compress(data)
       if len(data2) < len(data):
         data = data2
-        flags |= F_COMPRESSED
+        flags |= DataFlag.COMPRESSED
     return put_bs(flags) + put_bsdata(data)
 
   @staticmethod
   def read_record(fp, do_decompress=False):
     ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
-        If do_decompress is true and flags&F_COMPRESSED, strip that
+        If do_decompress is true and flags&DataFlag.COMPRESSED, strip that
         flag and decompress the data before return.
         Raises EOFError on premature end of file.
     '''
-    flags = read_bs(fp)
-    if (flags & ~F_COMPRESSED) != 0:
-      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
-    flags = DataFlags(flags)
+    flags = DataFlag(read_bs(fp))
     data = read_bsdata(fp)
     post_offset = fp.tell()
-    if do_decompress and (flags & F_COMPRESSED):
+    if do_decompress and (flags & DataFlag.COMPRESSED):
       data = decompress(data)
-      flags &= ~F_COMPRESSED
+      flags &= ~DataFlag.COMPRESSED
     return flags, data, post_offset
 
   def fetch_record(self, offset, do_decompress=False):

@@ -9,10 +9,12 @@ from collections import namedtuple
 import sys
 from threading import Lock, Thread
 from cs.fileutils import RWFileBlockCache
+from cs.resources import RunStateMixin
 from cs.result import Result
 from cs.queues import IterableQueue
+from cs.x import X
 from . import MAX_FILE_SIZE
-from .store import BasicStoreSync
+from .store import BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
@@ -31,6 +33,7 @@ class FileCacheStore(BasicStoreSync):
     self,
     name, backend, dirpath,
     max_cachefile_size=None, max_cachefiles=None,
+    runstate=None,
     **kw):
     ''' Initialise the FileCacheStore.
         `name`: the Store name
@@ -39,17 +42,21 @@ class FileCacheStore(BasicStoreSync):
           time
         `dirpath`: directory to hold the cache files
     '''
+    if backend is None:
+      raise ValueError("backend=None")
+    backend.open()
     super().__init__(name, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
-        max_cachefiles=max_cachefiles)
+        max_cachefiles=max_cachefiles,
+        runstate=runstate)
     self._attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
-    )
+        )
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
@@ -71,11 +78,6 @@ class FileCacheStore(BasicStoreSync):
       self._attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
-
-  def startup(self):
-    super().startup()
-    if self.backend:
-      self.backend.open()
 
   def shutdown(self):
     self.cache.close()
@@ -119,7 +121,7 @@ class CachedData(_CachedData):
   def fetch(self):
     return self.cachefile.get(self.offset, self.length)
 
-class FileDataMappingProxy(object):
+class FileDataMappingProxy(RunStateMixin):
   ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an asynchronous
       worker copies new data into a cache file and also to the backend
@@ -129,6 +131,7 @@ class FileDataMappingProxy(object):
   def __init__(
       self, backend, dirpath=None,
       max_cachefile_size=None, max_cachefiles=None,
+      runstate=None,
   ):
     ''' Initialise the cache.
         `backend`: mapping underlying us
@@ -140,6 +143,7 @@ class FileDataMappingProxy(object):
           more than this many cache files are kept at a time; default:
           DEFAULT_MAX_CACHEFILES
     '''
+    RunStateMixin.__init__(self, runstate=runstate)
     if max_cachefile_size is None:
       max_cachefile_size = DEFAULT_CACHEFILE_HIGHWATER
     if max_cachefiles is None:
@@ -156,6 +160,7 @@ class FileDataMappingProxy(object):
     self._workQ = IterableQueue()
     self._worker = Thread(target=self._work)
     self._worker.start()
+    self.runstate.notify_cancel.add(lambda rs: self.close())
 
   def close(self):
     ''' Shut down the cache.
@@ -281,6 +286,92 @@ class FileDataMappingProxy(object):
         backend = self.backend
         if backend:
           self.backend[h] = data
+
+def MemoryCacheStore(name, max_data):
+  ''' Factory to make a MappingStore of a MemoryCacheMapping.
+  '''
+  return MappingStore(name, MemoryCacheMapping(max_data))
+
+class MemoryCacheMapping:
+  ''' A lossy MT-safe in-memory mapping of hashcode->data.
+  '''
+
+  def __init__(self, max_data, lock=None):
+    if max_data < 65536:
+      raise ValueError("max_data should be >= 65536, got: %s" % (max_data,))
+    if lock is None:
+      lock = Lock()
+    self._lock = lock
+    self.max_data = max_data
+    self.used_data = 0
+    self.mapping = {}
+    self._ticker = 0
+    self._tick = {}
+    self._skip_flush = 32
+
+  def __str__(self):
+    return (
+        "%s[max_data=%d:used_data=%d:hashcodes=%d]"
+        % (type(self).__name__, self.max_data, self.used_data, len(self.mapping))
+    )
+
+  def __len__(self):
+    return len(self.mapping)
+
+  def __contains__(self, hashcode):
+    mapping = self.mapping
+    with self._lock:
+      return hashcode in mapping
+
+  def __getitem__(self, hashcode):
+    mapping = self.mapping
+    with self._lock:
+      data = mapping[hashcode]
+      self._tick[hashcode] = self._ticker
+      self._ticker += 1
+    return data
+
+  def get(self, hashcode, default=None):
+    mapping = self.mapping
+    with self._lock:
+      try:
+        data = mapping[hashcode]
+      except KeyError:
+        return default
+      self._tick[hashcode] = self._ticker
+      self._ticker += 1
+    return data
+
+  def __setitem__(self, hashcode, data):
+    mapping = self.mapping
+    with self._lock:
+      if hashcode in mapping:
+        # DEBUG: sanity check
+        if data != mapping[hashcode]:
+          raise RuntimeError(
+              "data mismatch: hashcode=%s, data=%r vs mapping[hashcode]=%r"
+              % (hashcode, data, mapping[hashcode]))
+      else:
+        mapping[hashcode] = data
+        used_data = self.used_data = self.used_data + len(data)
+        self._tick[hashcode] = self._ticker
+        self._ticker += 1
+        max_data = self.max_data
+        if used_data > max_data and len(mapping) > 1:
+          X("overflow: _skip_flush=%d", self._skip_flush)
+          if self._skip_flush > 0:
+            X("overflow: defer hashcode discard")
+            self._skip_flush -= 1
+          else:
+            X("overflow: discard hashcodes with lowest tick value...")
+            _tick = self._tick
+            for _, old_hashcode in sorted( (tick, h) for h, tick in _tick.items() ):
+              old_data = mapping.pop(old_hashcode)
+              used_data -= len(old_data)
+              del _tick[old_hashcode]
+              if used_data <= max_data:
+                break
+            self._skip_flush = 32
 
 if __name__ == '__main__':
   from .cache_tests import selftest
