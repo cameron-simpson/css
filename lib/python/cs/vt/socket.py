@@ -53,7 +53,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   def startup(self):
     ''' Start up the server.
     '''
-    self.S.open()
     self.socket_server_thread = Thread(
         name="%s(%s)[server-thread]" % (type(self), self.S),
         target=self.socket_server.serve_forever,
@@ -68,7 +67,6 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
       self.socket_server.shutdown()
     self.socket_server_thread.join()
     self.socket_server = None
-    self.S.close()
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
