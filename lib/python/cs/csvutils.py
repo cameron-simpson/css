@@ -19,6 +19,7 @@ import csv
 import sys
 from cs.deco import strable
 from cs.logutils import warning
+from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
 DISTINFO = {
@@ -81,3 +82,9 @@ else:
         default 'utf-8'.
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
+
+def cvs_import(fp, **kw):
+  ''' Read CSV data where the first row contains column headers,
+      yield named tuples for subsequent rows.
+  '''
+  return named_column_tuples(csv_reader(fp, **kw))
