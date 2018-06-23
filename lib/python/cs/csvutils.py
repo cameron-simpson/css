@@ -34,11 +34,11 @@ DISTINFO = {
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
 
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
+  def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader.
         Yield the rows.
     '''
-    return csv.reader(fp)
+    return csv.reader(fp, **kw)
 
   def csv_writerow(csvw, row, encoding='utf-8'):
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
@@ -50,13 +50,13 @@ if sys.hexversion >= 0x03000000:
 else:
   # python 2 compatability code
 
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
+  def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader and decode the str
         fields into unicode using the supplied `encoding`,
         default "utf-8".
         Yield the rows after decoding.
     '''
-    r = csv.reader(fp)
+    r = csv.reader(fp, **kw)
     for row in r:
       for i, value in enumerate(row):
         if isinstance(value, str):
