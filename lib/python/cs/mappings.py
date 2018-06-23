@@ -107,14 +107,12 @@ class AttributableList(list):
       Example:
 
         >>> class O(object):
-        >>>   def __init__(self, i):
-        >>>     self.i = i
+        ...   def __init__(self, i):
+        ...     self.i = i
         >>> Os = [ O(1), O(2), O(3) ]
         >>> AL = AttributableList( Os )
         >>> print(AL.i)
         [1, 2, 3]
-        >>> print(type(AL.i))
-        <class 'cs.mappings.AttributableList'>
   '''
 
   def __init__(self,  initlist=None, strict=False):
@@ -152,16 +150,19 @@ class MethodicalList(AttributableList):
       further dereference.
 
       Example:
+        >>> n = 1
         >>> class O(object):
+        ...   def __init__(self):
+        ...     global n
+        ...     self.n = n
+        ...     n += 1
         ...   def x(self):
-        ...     return id(self)
+        ...     return self.n
         ...
         >>> Os=[ O(), O(), O() ]
         >>> ML = MethodicalList( Os )
         >>> print(ML.x())
-        [4300801872, 4300801936, 4300802000]
-        >>> print(type(ML.x()))
-        <class 'cs.mappings.MethodicalList'>
+        [1, 2, 3]
   '''
 
   def __init__(self,  initlist=None, strict=False):
