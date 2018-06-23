@@ -11,6 +11,7 @@ from io import RawIOBase
 from os import SEEK_SET
 import sys
 from threading import RLock
+from cs.buffer import CornuCopyBuffer
 from cs.fileutils import BackedFile, ReadMixin
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
@@ -42,11 +43,6 @@ class BlockFile(RawIOBase, ReadMixin):
     '''
     return len(self.block)
 
-  def _auto_blockmap(self):
-    backing_block = self.block
-    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      backing_block.get_blockmap()
-
   def seek(self, offset, whence=0):
     ''' Set the current file offset.
     '''
@@ -62,34 +58,17 @@ class BlockFile(RawIOBase, ReadMixin):
     '''
     return self._offset
 
-  def read(self, n=-1):
-    ''' Read up to `n` bytes in one go.
-        Only bytes from the first subslice are returned, taking the
-        flavour of RawIOBase, which should only make one underlying
-        read system call.
+  def datafrom(self, offset):
+    ''' Generator yielding natural chunks from the file commencing at offset.
+        This supports the ReadMixin.read method.
     '''
-    self._auto_blockmap()
-    if n == -1:
-      data = self.readall()
-    else:
-      data = b''
-      for B, start, end in self.block.slices(self._offset, self._offset + n):
-        data = B.data[start:end]
-        break
-    self._offset += len(data)
-    return data
-
-  def readinto(self, b):
-    ''' Read data into the bytearray `b`.
-    '''
-    self._auto_blockmap()
-    nread = 0
-    for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
-      Blen = end - start
-      b[nread:nread + Blen] = B[start:end]
-      nread += Blen
-    self._offset += nread
-    return nread
+    # data from the backing block
+    backing_block = self.block
+    if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
+      X("BlockFile.datafrom: get_blockmap...")
+      backing_block.get_blockmap()
+    for B, Bstart, Bend in backing_block.slices(span.start, span.end):
+      yield B[Bstart:Bend]
 
 class File(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
@@ -262,69 +241,23 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     return self._file.write(data)
 
-  def _auto_blockmap(self):
-    backing_block = self._backing_block
+  def datafrom(self, offset):
+    ''' Generator yielding natural chunks from the file commencing at offset.
+        This supports the ReadMixin.read method.
+    '''
+    ##raise RuntimeError("BANG")
+    f = self._file
+    backing_block = self.backing_block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       backing_block.get_blockmap()
-
-  def read(self, size=-1, offset=None, longread=False):
-    ''' Read up to `size` bytes, honouring the "single system call" spirit.
-    '''
-    ##X("File.read(size=%s,offset=%s)...", size, offset)
-    self._auto_blockmap()
-    f = self._file
-    if offset is not None:
-      with self._lock:
-        self.seek(offset)
-        return self.read(size=size)
-    if size == -1:
-      return self.readall()
-    if size < 1:
-      raise ValueError("%s.read: size(%r) < 1 but not -1", self, size)
-    start = f.tell()
-    end = start + size
-    chunks = []
-    ##X("File.read: front_range=%s", f.front_range)
-    for inside, span in f.front_range.slices(start, end):
-      if inside:
-        # data from the front file; return the first chunk
-        for chunk in filedata(f.front_file, start=span.start, end=span.end):
-          chunks.append(chunk)
-          if not longread:
-            break
-      else:
-        # data from the backing block: return the first chunk
-        ##X("File.read: backing_block span=%s", span)
-        for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
-          chunks.append(B[Bstart:Bend])
-          if not longread:
-            break
-    data = b''.join(chunks)
-    f.seek(start + len(data))
-    return data
-
-  @locked
-  def readall(self):
-    ''' Concatenate all the data from the current offset to the end of the file.
-    '''
-    self._auto_blockmap()
-    f = self._file
-    offset = self.tell()
-    bss = []
     for inside, span in f.front_range.slices(offset, len(self)):
       if inside:
-        # data from the front file; return the spanned chunks
-        for chunk in filedata(f.front_file, start=span.start, end=span.end):
-          bss.append(chunk)
-          offset += len(chunk)
+        # data from the front file
+        yield from filedata(f.front_file, start=span.start, end=span.end)
       else:
-        # data from the backing block: return the first chunk
-        for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
-          chunk = B[Bstart:Bend]
-          bss.append(chunk)
-          offset += len(chunk)
-    f.seek(offset)
-    return b''.join(bss)
+        # data from the backing block
+        for B, Bstart, Bend in backing_block.slices(span.start, span.end):
+          yield B[Bstart:Bend]
 
   @locked
   def high_level_blocks(self, start=None, end=None, scanner=None):

@@ -14,20 +14,27 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
+from os.path import expanduser, isabs as isabspath
+from functools import partial
 import sys
+from threading import Lock, Semaphore
 from cs.later import Later
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.resources import MultiOpenMixin
+from cs.py.func import prop
+from cs.queues import IterableQueue
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import Result, report
 from cs.seq import Seq
+from cs.threads import bg
+from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class MissingHashcodeError(KeyError):
-  ''' Subclass of KeyError raised when accessing a hashcode not present in the Store.
+  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
   '''
   def __init__(self, hashcode):
     KeyError.__init__(self, str(hashcode))
@@ -35,7 +42,7 @@ class MissingHashcodeError(KeyError):
   def __str__(self):
     return "missing hashcode: %s" % (self.hashcode,)
 
-class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
@@ -75,7 +82,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   _seq = Seq()
 
-  def __init__(self, name, capacity=None, hashclass=None, lock=None):
+  def __init__(self, name, capacity=None, hashclass=None, lock=None, runstate=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if not isinstance(name, str):
         raise TypeError("initial `name` argument must be a str, got %s", type(name))
@@ -85,20 +92,27 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
         capacity = 4
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
-      self._attrs = {}
+      if runstate is None:
+        runstate = defaults.runstate
       MultiOpenMixin.__init__(self, lock=lock)
+      RunStateMixin.__init__(self, runstate=runstate)
+      self._attrs = {}
       self.name = name
       self.hashclass = hashclass
+      self.config = None
       self.logfp = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
+      self.mountdir = None
       self.readonly = False
       self.writeonly = False
       self._archives = {}
+      self._blockmapdir = None
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
-    params = [
-        attr + '=' + str(val) for attr, val in sorted(self._attrs.items())
-    ]
+    ##return "STORE(%s:%s)" % (type(self), self.name)
+    params = []
+    for attr, val in sorted(self._attrs.items()):
+      params.append(attr + '=' + str(val))
     return "%s:%s(%s)" % (
         self.__class__.__name__, self.hashclass.HASHNAME,
         ','.join([repr(self.name)] + params)
@@ -110,14 +124,18 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   def __hash__(self):
     return id(self)
 
+  def hash(self, data):
+    ''' Return a Hash object from data bytes.
+        NB: this does _not_ store the data.
+    '''
+    return self.hashclass.from_chunk(data)
+
+  # Stores are equal only to themselves.
   def __eq__(self, other):
     return self is other
 
-  def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(func, *args, **kwargs)
-
   ###################
-  ## Special methods.
+  ## Mapping methods.
   ##
 
   def __contains__(self, h):
@@ -150,6 +168,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
 
+  ###########################
+  ## Context manager methods.
+  ##
+
   def __enter__(self):
     defaults.pushStore(self)
     return MultiOpenMixin.__enter__(self)
@@ -161,11 +183,9 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
-  def hash(self, data):
-    ''' Return a Hash object from data bytes.
-        NB: does _not_ store the data.
-    '''
-    return self.hashclass.from_chunk(data)
+  ##########################
+  ## MultiOpenMixin methods.
+  ##
 
   def startup(self):
     # Later already open
@@ -179,57 +199,60 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
       debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
 
-  def bg(self, func, *a, **kw):
-    ''' Dispatch a Thread to run `func` with this Store as the default, return a Result to collect its value.
+  #############################
+  ## Function dispatch methods.
+  ##
+
+  def _defer(self, func, *args, **kwargs):
+    ''' Defer a function via the internal Later queue.
     '''
-    R = Result(name="%s:%s" % (self, func))
+    return self.__funcQ.defer(func, *args, **kwargs)
+
+  def bg(self, func, *a, **kw):
+    ''' Queue a function without consuming the queue capacity.
+
+        This is intended for "control" functions which themselves
+        do all their work through the Store's function queue, such
+        as the .pushto method's worker.
+    '''
     def func2():
       with self:
         return func(*a, **kw)
-    R.bg(func2)
-    return R
-
-  def missing(self, hashes):
-    ''' Yield hashcodes that are not in the store from an iterable hash
-        code list.
-    '''
-    for h in hashes:
-      if h not in self:
-        yield h
+    return self.__funcQ.bg(func2)
 
   ##########################################################################
   # Core Store methods, all abstract.
   @abstractmethod
   def add(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def add_bg(self, data):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def get_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def contains_bg(self, h):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   @abstractmethod
   def flush_bg(self):
-    raise NotImplemented
+    raise NotImplementedError()
 
   ##########################################################################
   # Archive support.
@@ -246,6 +269,165 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
     ''' Fetch the named archive or None.
     '''
     return self._archives.get(name)
+
+  ##########################################################################
+  # Blockmaps.
+  @prop
+  def blockmapdir(self):
+    ''' The path to this Store's blockmap directory, if specified.
+    '''
+    with Pfx("%s.blockmapdir", self):
+      dirpath = self._blockmapdir
+      if dirpath is None:
+        cfg = self.config
+        dirpath = cfg.get_default('blockmapdir')
+        if dirpath is not None:
+          if dirpath.startswith('['):
+            endpos = dirpath.find(']', 1)
+            if endpos < 0:
+              warning('[GLOBAL].blockmapdir: starts with "[" but no "]": %r', dirpath)
+            else:
+              clausename = dirpath[1:endpos].strip()
+              with Pfx('[%s]', clausename):
+                if not clausename:
+                  warning('[GLOBAL].blockmapdir: empty clause name: %r', dirpath)
+                else:
+                  try:
+                    S = cfg[clausename]
+                  except KeyError:
+                    warning("unknown config clause")
+                  else:
+                    rdirpathpos = endpos + 1
+                    if rdirpathpos == len(dirpath):
+                      rdirpath = 'blockmaps'
+                    elif dirpath.startswith('/', rdirpathpos):
+                      rdirpath = dirpath[rdirpathpos+1:]
+                      if not rdirpath:
+                        rdirpath = 'blockmaps'
+                    else:
+                      warning('[GLOBAL].blockmapdir: %r not followed with a slash: %r', dirpath[:endpos+1], dirpath)
+                      rdirpath = None
+                    if rdirpath:
+                      dirpath = S.localpathto(rdirpath)
+          else:
+            # TODO: generic handler for Store subpaths needed
+            if not isabspath(dirpath):
+              dirpath = expanduser(dirpath)
+              if not isabspath(dirpath):
+                dirpath = S.localpathto(dirpath)
+      return dirpath
+
+  @blockmapdir.setter
+  def blockmapdir(self, dirpath):
+    self._blockmapdir = dirpath
+
+  def pushto(self, S2, capacity=1024, block_progress=None, bytes_progress=None):
+    ''' Allocate a Queue for Blocks to push from this Store to another Store `S2`.
+        `S2`: the secondary Store to receive Blocks.
+        `capacity`: the Queue capacity, arbitrary default 1024.
+        `block_progress`: an optional Progress counting submitted and completed Blocks.
+        `bytes_progress`: an optional Progress counting submitted and completed data bytes.
+        Return (Q, T) where `Q` is the new Queue and `T` is the
+        Thread processing thw Queue.  The caller can then .put
+        Blocks onto the Queue. When finished, call Q.close() to
+        indicate end of Blocks and T.join() to wait for the processing
+        completion.
+    '''
+    if capacity < 1:
+      raise ValueError("capacity must be >= 1, got: %r" % (capacity,))
+    lock = Lock()
+    sem = Semaphore(capacity)
+    ##sem = Semaphore(1)
+    if block_progress is None:
+      added_block = lambda B: None
+      did_block = lambda B: None
+    else:
+      def added_block(B):
+        with lock:
+          block_progress.total += 1
+      def did_block(B):
+        with lock:
+          block_progress.position += 1
+    if bytes_progress is None:
+      added_bytes = lambda B: None
+      did_bytes = lambda B: None
+    else:
+      def added_bytes(B):
+        with lock:
+          bytes_progress.total += B.span
+      def did_bytes(B):
+        with lock:
+          bytes_progress.position += B.span
+    def Xs(s): print(s, file=sys.stderr, end='', flush=True)
+    X("NEW PUSHTO %r ==> %r", self.name, S2.name)
+    name="%s.pushto(%s)" % (self.name, S2.name)
+    with Pfx(name):
+      Q = IterableQueue(capacity=capacity, name=name)
+      S1 = self
+      S1.open()
+      S2.open()
+      pending = set()
+      def worker(name, Q, S1, S2, sem):
+        ''' This is the worker function which pushes Blocks from the Queue to the second Store.
+        '''
+        X("START PUSHTO PROCESSING...")
+        with Pfx("%s: worker", name):
+          with S1:
+            for B in Q:
+              Xs("B")
+              added_block(B)
+              added_bytes(B)
+              with Pfx("%s", B):
+                try:
+                  h = B.hashcode
+                except AttributeError:
+                  warning("not a hashcode Block, skipping")
+                  did_block(B)
+                  did_bytes(B)
+                  continue
+                def addblock(S1, S2, h, B):
+                  ''' Add the Block `B` to `S2` if not present.
+                  '''
+                  Xs("?")
+                  if S2.contains(h):
+                    return False
+                  try:
+                    data = S1[h]
+                  except KeyError as e:
+                    error("missing %s[%s]: %s", S1.name, h, e)
+                    return None
+                  Xs("+")
+                  S2.add(data)
+                  return True
+                Xs("{")
+                sem.acquire()
+                addR = S2.bg(addblock, S1, S2, h, B)
+                Xs("<")
+                with lock:
+                  pending.add(addR)
+                def after_add(addR):
+                  ''' Forget that `addR` is pending.
+                      This will be called after `addR` completes.
+                  '''
+                  Xs(">")
+                  with lock:
+                    pending.remove(addR)
+                  did_block(B)
+                  did_bytes(B)
+                  Xs("}")
+                  sem.release()
+                addR.notify(after_add)
+            X("PUSHTO: NO MORE BLOCKS")
+            with lock:
+              outstanding = list(pending)
+            X("PUSHTO: %d outstanding, waiting...", len(outstanding))
+            for R in outstanding:
+              R.join()
+          S2.close()
+          S1.close()
+        X("PUSHTO: PROCESSING THREAD COMPLETES")
+      T = bg(partial(worker, name, Q, S1, S2, sem))
+      return Q, T
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
@@ -397,7 +579,7 @@ class ProxyStore(BasicStoreSync):
       very low latency reads if data are in the cache.
   '''
 
-  def __init__(self, name, save, read, read2=()):
+  def __init__(self, name, save, read, read2=(), **kw):
     ''' Initialise a ProxyStore.
         `name`: ProxyStore name.
         `save`: iterable of Stores to which to save blocks
@@ -406,7 +588,7 @@ class ProxyStore(BasicStoreSync):
           to fetch blocks if not found via `read`. Typically these
           would be higher latency upstream Stores.
     '''
-    BasicStoreSync.__init__(self, name)
+    BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.read2 = frozenset(read2)
@@ -486,6 +668,7 @@ class ProxyStore(BasicStoreSync):
                 fillS.add_bg(data)
           self._defer(fill)
           return data
+    return None
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
@@ -499,16 +682,16 @@ class ProxyStore(BasicStoreSync):
   def flush(self):
     ''' Flush all the save Stores.
     '''
-    for result in self._multicall(self.save, 'flush_bg', ()):
+    for _ in self._multicall(self.save, 'flush_bg', ()):
       pass
 
 class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
   '''
 
-  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
-    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
-    MappingStore.__init__(self, name, datadir, **kw)
+  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, runstate=None, **kw):
+    datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover, runstate=runstate)
+    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
     self._datadir = datadir
 
   def startup(self, **kw):
@@ -519,6 +702,12 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
 
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
+
+  def localpathto(self, rpath):
+    return self._datadir.localpathto(rpath)
+
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
       This is needed because if a meta_store is specified then it
@@ -527,14 +716,14 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   '''
   if meta_store is None:
     return _PlatonicStore(name, statedirpath, *a, **kw)
-  return ProxyStore(
+  PS = _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw)
+  S = ProxyStore(
       name,
       save=(),
-      read=(
-          _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw),
-          meta_store
-      )
+      read=(PS, meta_store)
   )
+  S.get_Archive = PS.get_Archive
+  return S
 
 class _PlatonicStore(MappingStore):
   ''' A MappingStore using a PlatonicDir as its backend.
@@ -546,14 +735,17 @@ class _PlatonicStore(MappingStore):
       datadirpath=None, hashclass=None, indexclass=None,
       follow_symlinks=False, archive=None, meta_store=None,
       flag_prefix=None,
+      runstate=None,
       **kw
   ):
     datadir = PlatonicDir(
         statedirpath, datadirpath, hashclass, indexclass,
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
-        flag_prefix=flag_prefix)
-    MappingStore.__init__(self, name, datadir, **kw)
+        flag_prefix=flag_prefix,
+        runstate=runstate,
+    )
+    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
     self._datadir = datadir
     self.readonly = True
 
@@ -564,6 +756,9 @@ class _PlatonicStore(MappingStore):
   def shutdown(self):
     super().shutdown()
     self._datadir.close()
+
+  def get_Archive(self, archive_name=None):
+    return self._datadir.get_Archive(archive_name)
 
 class _ProgressStoreTemplateMapping(object):
 

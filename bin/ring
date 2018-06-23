@@ -9,9 +9,10 @@ from os.path import expanduser, basename, isdir, isfile, join as joinpath
 import re
 from subprocess import Popen, PIPE
 import sys
+from cs.ansi_colour import colourise_patterns
 
 CMD = basename(__file__)
-USAGE = 'Usage: %s patterns...'
+USAGE = 'Usage: %s regexps...'
 
 def main(argv=None):
   if argv is None:
@@ -19,6 +20,7 @@ def main(argv=None):
   cmd = argv.pop(0)
   CMD = cmd
   usage = USAGE % (cmd,)
+  do_colour = sys.stdout.isatty()
   badopts = False
   if not argv:
     print("%s: missing paterrns" % (cmd,), file=sys.stderr)
@@ -48,7 +50,11 @@ def main(argv=None):
           break
       if not matched:
         continue
-      print(clause.rstrip())
+      clause = clause.rstrip()
+      if do_colour:
+        clause0 = clause
+        clause = colourise_patterns(clause, ptns)
+      print(clause)
   return 0
 
 def pathsof(path):

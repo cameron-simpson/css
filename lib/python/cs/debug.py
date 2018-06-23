@@ -37,6 +37,7 @@ from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
+from cs.result import Result
 from cs.seq import seq
 from cs.x import X
 
@@ -54,10 +55,15 @@ DISTINFO = {
         'cs.py.func',
         'cs.py.stack',
         'cs.py3',
+        'cs.result',
         'cs.seq',
         'cs.x',
     ],
 }
+
+# @DEBUG dispatches a thread to monitor function elapsed time.
+# This is how often it polls for function completion.
+DEBUG_POLL_RATE = 0.25
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -83,7 +89,7 @@ class TimingOutLock(object):
   def __init__(self, deadlock_timeout=20.0, recursive=False):
     self._lock = threading.RLock() if recursive else threading.Lock()
     self._deadlock_timeout = deadlock_timeout
-  def acquire(self,blocking=True,timeout=-1,name=None):
+  def acquire(self, blocking=True, timeout=-1, name=None):
     if timeout < 0:
       timeout = self._deadlock_timeout
     else:
@@ -100,7 +106,7 @@ class TimingOutLock(object):
     self.acquire()
     self.owner = caller()
     return True
-  def __exit__(self,*a):
+  def __exit__(self, *a):
     return self._lock.__exit__(*a)
 
 class TraceSuite(object):
@@ -167,13 +173,12 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
     for line in text.splitlines():
       logger.log(log_level, line.rstrip())
 
-def DEBUG(f):
+def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
-  if not ifdebug():
-    return f
   def inner(*a, **kw):
-    from cs.result import Result
+    if not force and not ifdebug():
+      return f(*a, **kw)
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
@@ -183,14 +188,14 @@ def DEBUG(f):
     debug("%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a, kw)
     start = time.time()
     try:
-      result = f(*a, **kw)
+      retval = f(*a, **kw)
     except Exception as e:
       error("EXCEPTION from %s(*%s, **%s): %s", f, a, kw, e)
       raise
     end = time.time()
-    debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, result)
-    R.put(result)
-    return result
+    debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, retval)
+    R.put(retval)
+    return retval
   return inner
 
 def _debug_watcher(filename, lineno, n, funcname, R):
@@ -203,9 +208,16 @@ def _debug_watcher(filename, lineno, n, funcname, R):
       # reset report time and complain more slowly next time
       slowness = 0
       slow += 1
-    time.sleep(1)
-    sofar += 1
-    slowness += 1
+    time.sleep(DEBUG_POLL_RATE)
+    sofar += DEBUG_POLL_RATE
+    slowness += DEBUG_POLL_RATE
+
+def DF(func, *a, **kw):
+  ''' Wrapper for a function call to debug its use.
+      Requires rewriting the call from f(*a, *kw) to DF(f, *a, **kw).
+      Alternatively one could rewrite as DEBUG(f)(*a, **kw).
+  '''
+  return DEBUG(func, force=True)(*a, **kw)
 
 class DebugWrapper(O):
   ''' Base class for classes presenting debugging wrappers.

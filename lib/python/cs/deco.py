@@ -12,6 +12,7 @@ Some decorator functions: @decorator, @cached.
 '''
 
 import time
+from cs.pfx import Pfx
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -21,6 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.pfx',
     ],
 }
 
@@ -118,9 +120,10 @@ def cached(func, **dkw):
         # too early to check the signature function?
         now = time.time()
         lastpoll = getattr(self, lastpoll_attr, None)
-        if ( value0 is not unset_value
-         and lastpoll is not None
-         and now - lastpoll < poll_delay
+        if (
+            value0 is not unset_value
+            and lastpoll is not None
+            and now - lastpoll < poll_delay
         ):
           return value0
         setattr(self, lastpoll_attr, now)
@@ -153,6 +156,42 @@ def cached(func, **dkw):
       return value0
 
   return wrapper
+
+@decorator
+def strable(func, open_func=None):
+  ''' Decorator for functions which may accept a str instead of their core type.
+      The usual (and default) example is a function to process an
+      open file, designed to be handed a file object but which may
+      be called with a filename. If the first argument is a str
+      then that file is opened and the function called with the
+      open file.
+      `func`: the function to docorate
+      `open_func`: the "open" factory to produce the core type form
+        the string if a string is provided; the default is the builtin
+        "open" function
+
+      Examples:
+
+        @strable
+        def count_lines(f):
+          return len(line for line in f)
+
+        class Recording:
+          "Class representing a video recording."
+          ...
+        @strable
+        def process_video(r, open_func=Recording):
+          ... do stuff with `r` as a Recording instance ...
+  '''
+  if open_func is None:
+    open_func = open
+  def accepts_str(arg, *a, **kw):
+    if isinstance(arg, str):
+      with Pfx(arg):
+        with open_func(arg) as opened:
+          return func(opened, *a, **kw)
+    return func(arg, *a, **kw)
+  return accepts_str
 
 if __name__ == '__main__':
   class Foo:

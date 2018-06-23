@@ -98,6 +98,12 @@ class _Hash(bytes, Transcriber):
     '''
     return self.__class__.from_chunk
 
+  @property
+  def filename(self):
+    ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
+    '''
+    return hexify(self) + '.' + self.HASHNAME
+
   def transcribe_inner(self, T, fp):
     fp.write(self.HASHNAME)
     fp.write(':')
@@ -169,7 +175,11 @@ class HashCodeUtilsMixin(object):
         .hashcodes_missing, likewise
   '''
 
-  def hash_of_hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(
+      self,
+      start_hashcode=None,
+      reverse=None, after=False, length=None
+  ):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
     if length is not None and length < 1:

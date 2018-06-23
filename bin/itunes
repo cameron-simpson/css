@@ -1,0 +1,153 @@
+#!/bin/sh
+#
+# Script to aid scheduled iTunes downloads.
+#
+# It still astonishes me that iTunes lacks any kind of download
+# scheduling, yet many people have times that are far better for
+# downloading, such as special ISP off peak times with larger data
+# quotas or simply periods of known low network utilisation.
+# - Cameron Simpson <cs@cskk.id.au> 08nov2017
+#
+
+set -ue
+
+: ${ITUNES_DL_FLAGS:='ROUTE_DEFAULT ISP_OFF_PEAK !DOWNLOAD_DISABLED'}
+: ${TMPDIR:=/tmp}
+: ${VARLOG:=$HOME/var/log}
+
+# Required flags before commencing download.
+# On my systems, a default route and the ISP off peak period.
+flagnames=$ITUNES_DL_FLAGS
+
+queuefile=$VARLOG/itunes-dl-queue.log
+
+trace=
+echo=:
+[ -t 2 ] && { echo=eecho trace=set-x; }
+
+opts=
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-x] [-F flags,...] [--] [op [args...]]
+  -F flags,...
+      Specify flags which must be satisfied before the run operation commences.
+      Default from \$ITUNES_DL_FLAGS: $ITUNES_DL_FLAGS
+  -x  Trace execution.
+  $cmd {dl|download} {itunes-track-specs...|-|selected}
+      Queue the specified items. Tell itunes to download the items
+      once the flags are true.
+      -         Read track specifications from standard input.
+      selected  Use the currently selected iTunes tracks.
+  $cmd selected
+      Report the currently selected iTunes tracks to standard output."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -F) flagnames=$2; shift ;;
+    -x) trace=set-x opts="$opts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+case "$flagnames" in
+  *,*)  flagnames=$( printf '%s\n' "$flagnames" | tr  , ' ' ) ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+selected(){
+  $trace \
+  reattach-to-user-namespace \
+  osascript -e '
+      tell application "iTunes"
+        selection
+      end tell
+    ' \
+  | tr , '\012'
+}
+
+download(){
+  _dl_cmds=
+  for _dl_item
+  do
+    case "$_dl_item" in
+      selected)
+        tmpf=$TMPDIR/$cmd.$$selected
+        selected >"$tmpf"
+        while read _dl_item
+        do
+          $echo "queue selected: $_dl_item"
+          _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        done <"$tmpf"
+        rm "$tmpf"
+        ;;
+      -)while read _dl_item
+        do
+          $echo "queue stdin: $_dl_item"
+          _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        done
+        ;;
+      *)$echo "queue item: $_dl_item"
+        _dl_cmds="$_dl_cmds
+            download $_dl_item"
+        ;;
+    esac
+  done
+  [ -z "$flagnames" ] || $trace await flag -t $flagnames
+  $trace \
+    lock "$cmd-download" \
+    $trace \
+    reattach-to-user-namespace \
+    osascript -e "
+      activate \"iTunes\"
+      tell application \"iTunes\"
+        $_dl_cmds
+      end tell"
+}
+
+case "$op" in
+  dl|download)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing download items" >&2
+      badopts=1
+    else
+      download "$@"
+    fi
+    ;;
+  selected)
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    else
+      selected
+    fi
+    ;;
+  *)echo "$cmd: $op: unrecognised op" >&2
+    badopts=1
+    ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exit 0

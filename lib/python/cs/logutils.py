@@ -89,7 +89,8 @@ try:
 except ImportError:
   pass
 else:
-  builtins.X = lambda msg, *a: None
+  if not hasattr(builtins, 'X'):
+    builtins.X = lambda msg, *a: None
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'

@@ -1,15 +1,18 @@
 #!/bin/sh
 #
-# Update the tags file from the specified files, or from all files.
+# Update the tags file from the specified files.
+# Recite the chosen tags file to standard output.
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
 
+exec 3>&1 1>&2
+
 tags=
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-o tagfile] [--] [files...]"
+usage="Usage: $cmd [-o tagfile] [--] paths..."
 
 badopts=
 
@@ -26,19 +29,57 @@ do
   shift
 done
 
-[ -n "$tags" ] || tags=$(findup tags) || {
-  echo "$cmd: no tags file located, aborting" >&2
-  exit 1
-}
-
-if [ -s "$tags" -a $# -gt 0 ]
+if [ $# = 0 ]
 then
-  set -- -a "$@"
+  echo "$cmd: missing filenames" >&2
+  badopts=1
 else
-  set -- -R --exclude='bin/*' --exclude='*.pl' --exclude='*.pm'
-  cd "$(dirname "$tags")"
+  first=1
+  for filename
+  do
+    rfilename=$( realpath "$filename" ) || {
+      echo "$cmd: unresolved filename: $filename" >&2
+      badopts=1
+      continue
+    }
+    if [ $first ]
+    then
+      set --
+      first=
+    fi
+    if [ -d "$rfilename" ]
+    then
+      dirpath=$rfilename
+      for rfile in $( find "$dirpath" -type f -size +0 -print )
+      do
+        set -- ${1+"$@"} "$rfile"
+      done
+    else
+      dirpath=$( dirname "$rfilename" )
+      [ -s "$rfilename" ] && set -- ${1+"$@"} "$rfilename"
+    fi
+    [ -n "$tags" ] || {
+      if tags=$( cd "$dirpath" && findup tags )
+      then
+        echo "$tags" >&3
+        exec 3>&-
+      else
+        echo "$cmd: no tags found from $dirpath/" >&2
+      fi
+    }
+  done
+  [ $# -gt 0 ] || {
+    echo "$cmd: no filenames after scan" >&2
+    badopts=1
+  }
 fi
 
-set -- ctags -o "$tags" --tag-relative --links=no "$@"
+[ -n "$tags" ] || {
+  echo "$cmd: no tags file found" >&2
+  badopts=1
+}
 
-exec "$@"
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+lock -P "$tags" ctags -a -o "$tags" --tag-relative --links=no "$@" &
+exit 0

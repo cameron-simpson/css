@@ -1,8 +1,27 @@
-PlatonicDir: maintain a Dir of the file tree? make available as .content_dir - implies getting a File for each scanned file, and updating it on growth?
+Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
+socket Stores: just use path instead of socket_path?
+streamstore: Client handler: make current Store local to it for independence
+move CancellationError into cs.resources, associate with RunState
+readahead for CornuCopyBuffer?
+socket store: export = name[:storespec],... with default being "default:{defaults.S}"
+socket store: dflt socket_path = {basedir}/{clausename}.sock
+make datadirs sharable by multiple vt instances: shared state csv
+cs.vt.socket_tests: UNIX domain socket tests
+ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
+vt setup/tutorial
+vt-blockmap.5 man entry
+vt-datadir.5 man entry
+vtd.5 man entry
+vtrc.5 man entry
+vt.1 man entry
+blockmap updates - use lower priority than regular I/O
+platonic updates - use lower priority than regular I/O
+Store.archive plumbing
+ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
+Store.archive([name]) ==> an Archive instance for state updates for Dirs
+[clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
 default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
 PlatonicStore:
-  potentially lossy DataDir like mapping to existing files (eg a media tree)
-  keep mapping of hashcode => (path, offset, size)
   keep mapping of paths => (mtime, size) to monitor changes
   update should rescan whole file, toss old hashcode mapping for that file
 Dirent:
@@ -11,16 +30,21 @@ Dirent:
 FS:
   file system layer on top of Dir etc
   split out from vtfuse
-  inodes derives from uuids
-  vtfuse: no .. in top dir?
-store specs: support readlist, savelist, read-by-not-save i.e. proxy-for
+  inodes derived from uuids, but only on request or for hardlinks
+  vtfuse: no .. in top dir? check mount point .. impl
+config:
+  Config object with singleton mapping to clauses
+  clauses to support direct [key]=value for access and update
+.vtd export format:
+  block 0 is indirect ref to top dirent contents
+
 index of hashcode to remote store refs, to support multistore cooperation and proxying
 stream protocol: error flag, json flag (implies JSON additional payload)
 stream protocol: new channel ==> recursive substream
-√ datafile: use os.open(O_APPEND) and raw fds, separate fd for read
 flat file cache - keep multiple caches, set of hashes per file,
   upper limit, drop oldest file once set empty and >8 files
 mount -o append: accept O_TRUNC for empty/missing files
+audit fs: append only, no deletes, maybe no renames
 mount -a: live mode, tracing new .vt entries
 mount -e command...
 test vtfuse MT functionality: 2 threads, then 16
@@ -28,7 +52,6 @@ xfstests
 daemon: listen on UNIX domain socket
   test access to socket via ssh forwarding
 ticker to regularly sync the fs
-audit fs: append only, no deletes, maybe no renames
 import: import_file for existing files: efficient content comparison etc
     prepare a CornuCopyBuffer fed from the existing vt blocks as the leading comparison process blockifier, use .take to 
     compare a pair of CornuCopyBuffers using one as the reference blockifer source
