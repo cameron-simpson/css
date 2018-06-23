@@ -1,8 +1,9 @@
 #!/usr/bin/python -tt
 
 from __future__ import print_function
-from collections import defaultdict, deque
+from collections import defaultdict, deque, namedtuple
 from functools import partial
+import re
 from threading import Lock, Thread
 from cs.py3 import StringTypes
 import os
@@ -313,6 +314,48 @@ def named_column_tuples(rows):
       row.
       Rows may be flat iterables in the same order as the column
       names or mappings keyed on the column names.
+      If the column headering contain empty strings they are dropped
+      and the corresponding data row entries are also dropped. This
+      is very common with spreadsheet exports with unused padding
+      columns.
+
+      Basic example::
+
+        >>> data1 = [
+        ...   ('a', 'b', 'c'),
+        ...   (1, 11, "one"),
+        ...   (2, 22, "two"),
+        ... ]
+        >>> rows = list(named_column_tuples(data1))
+        >>> cls = rows.pop(0)
+        >>> print(rows)
+        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
+
+      Rows which are mappings::
+
+        >>> data1 = [
+        ...   ('a', 'b', 'c'),
+        ...   (1, 11, "one"),
+        ...   {'a': 2, 'c': "two", 'b': 22},
+        ... ]
+        >>> rows = list(named_column_tuples(data1))
+        >>> cls = rows.pop(0)
+        >>> print(rows)
+        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
+
+      CSV export with unused padding columns::
+
+        >>> data1 = [
+        ...   ('a', 'b', 'c', '', ''),
+        ...   (1, 11, "one"),
+        ...   {'a': 2, 'c': "two", 'b': 22},
+        ...   [3, 11, "three", '', ''],
+        ... ]
+        >>> rows = list(named_column_tuples(data1))
+        >>> cls = rows.pop(0)
+        >>> print(rows)
+        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two'), NamedRow(a=3, b=11, c='three')]
+
   '''
   column_names = None
   first = True
@@ -348,9 +391,9 @@ def named_column_tuples(rows):
       yield NamedRow
     else:
       # flatten a mapping into a list ordered by column_names
-      if hasattr(row, keys):
-        row = [ row[k] for k in column_names ]
+      if hasattr(row, 'keys'):
+        row = [ row[k] for k in tuple_attributes ]
       if tuple_attributes is not column_attributes:
-        # drop itemsfrom columns with empty names
+        # drop items from columns with empty names
         row = [ item for item, key in zip(row, column_attributes) if key ]
       yield NamedRow(*row)
