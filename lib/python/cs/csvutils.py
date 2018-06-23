@@ -17,6 +17,7 @@
 from __future__ import absolute_import
 import csv
 import sys
+from cs.deco import strable
 from cs.logutils import warning
 from cs.pfx import Pfx
 
@@ -34,9 +35,13 @@ DISTINFO = {
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
 
+  @strable
   def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader.
+        `fp` may also be a filename.
         Yield the rows.
+        Warning: _ignores_ the `encoding` and `errors` parameters
+        because `fp` should already be decoded.
     '''
     return csv.reader(fp, **kw)
 
@@ -50,10 +55,12 @@ if sys.hexversion >= 0x03000000:
 else:
   # python 2 compatability code
 
+  @strable
   def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader and decode the str
         fields into unicode using the supplied `encoding`,
         default "utf-8".
+        `fp` may also be a filename.
         Yield the rows after decoding.
     '''
     r = csv.reader(fp, **kw)
