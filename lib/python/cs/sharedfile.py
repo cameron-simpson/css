@@ -32,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.range', 'cs.timeutils'],
+    'requires': ['cs.filestate', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.range', 'cs.timeutils'],
 }
 
 DEFAULT_POLL_INTERVAL = 1.0
