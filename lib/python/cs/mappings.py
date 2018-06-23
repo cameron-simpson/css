@@ -314,10 +314,14 @@ def named_column_tuples(rows):
       row.
       Rows may be flat iterables in the same order as the column
       names or mappings keyed on the column names.
-      If the column headering contain empty strings they are dropped
+      If the column headers contain empty strings they are dropped
       and the corresponding data row entries are also dropped. This
       is very common with spreadsheet exports with unused padding
       columns.
+      Typical human readable column headings, also common in
+      speadsheet exports, are lowercased and have runs of whitespace
+      or punctuation turned into single underscores; trailing
+      underscores then get dropped.
 
       Basic example::
 
