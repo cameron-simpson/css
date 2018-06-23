@@ -105,6 +105,7 @@ class AttributableList(list):
       further dereference.
 
       Example:
+
         >>> class O(object):
         >>>   def __init__(self, i):
         >>>     self.i = i
@@ -306,7 +307,11 @@ class SeenSet(object):
 def named_column_tuples(rows):
   ''' Process an iterable of data rows, with the first row being column names.
       `rows`: an iterable of rows, each an iterable of data values.
-      Yields the generated namedtuple class for the first row in `rows` and then instances of the class for each subsequent row.
+      Yields the generated namedtuple class for the first row in
+      `rows` and then instances of the class for each subsequent
+      row.
+      Rows may be flat iterables in the same order as the column
+      names or mappings keyed on the column names.
   '''
   column_names = None
   first = True
@@ -317,7 +322,11 @@ def named_column_tuples(rows):
           re.sub('_+$', '', re.sub(r'[^\w]+', '_', name)).lower()
           for name in column_names
       ]
-      class NamedRow(namedtuple('NamedRow', column_attributes)):
+      # skip empty columns
+      tuple_attributes = [ name for name in column_attributes if name ]
+      if len(tuple_attributes) == len(column_attributes):
+        tuple_attributes = column_attributes
+      class NamedRow(namedtuple('NamedRow', tuple_attributes)):
         index_of = dict( (s, i) for i, s in enumerate(column_names) )
         index_of.update( (s, i) for i, s in enumerate(column_attributes) )
         def keys(self):
@@ -340,4 +349,7 @@ def named_column_tuples(rows):
       # flatten a mapping into a list ordered by column_names
       if hasattr(row, keys):
         row = [ row[k] for k in column_names ]
+      if tuple_attributes is not column_attributes:
+        # drop itemsfrom columns with empty names
+        row = [ item for item, key in zip(row, column_attributes) if key ]
       yield NamedRow(*row)
