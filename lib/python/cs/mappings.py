@@ -331,6 +331,18 @@ def named_column_tuples(rows):
         >>> print(rows)
         [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
+      Human readable column headings::
+
+        >>> data1 = [
+        ...   ('Index', 'Value Found', 'Descriptive Text'),
+        ...   (1, 11, "one"),
+        ...   (2, 22, "two"),
+        ... ]
+        >>> rows = list(named_column_tuples(data1))
+        >>> cls = rows.pop(0)
+        >>> print(rows)
+        [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
+
       Rows which are mappings::
 
         >>> data1 = [
