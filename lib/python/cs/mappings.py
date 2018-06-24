@@ -360,16 +360,22 @@ class StackableValues(object):
     self._values = defaultdict(list)
 
   def __str__(self):
-    return "%s(%s)" \
-        % (type(self).__name__,
-           ','.join( "%s=%s" % (k, v) for k, v in sorted(self.items()) )
+    return (
+        "%s(%s)"
+        % (
+            type(self).__name__,
+            ','.join( "%s=%s" % (k, v) for k, v in sorted(self.items()) )
         )
+    )
 
   def __repr__(self):
-    return "%s(%s)" \
-        % (type(self),
-           ','.join( "%r=%r" % (k, v) for k, v in sorted(self.items()) )
+    return (
+        "%s(%s)"
+        % (
+            type(self),
+            ','.join( "%r=%r" % (k, v) for k, v in sorted(self.items()) )
         )
+    )
 
   def keys(self):
     ''' Mapping method returning an iterable of the names.
@@ -379,13 +385,13 @@ class StackableValues(object):
   def values(self):
     ''' Mapping method returning an iterable of the values.
     '''
-    for key in self.keys:
+    for key in self.keys():
       try:
         v = self[key]
       except KeyError:
         pass
       else:
-        yield key, v
+        yield v
 
   def items(self):
     ''' Mapping method returning an iterable of (name, value) tuples.
@@ -438,7 +444,8 @@ class StackableValues(object):
     try:
       v = self[key]
     except KeyError:
-      return default
+      v = default
+    return v
 
   def push(self, key, value):
     ''' Push a new `value` for `key`.
