@@ -4,6 +4,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 from functools import partial
 import re
 from cs.sharedfile import SharedAppendLines
@@ -328,6 +329,31 @@ class StackableValues(object):
       as attributes and must be accessed via __getitem__. As a
       matter of practice, in addition to the mapping methods, avoid
       names which are verbs or which begin with an underscore.
+
+      >>> S = StackableValues()
+      >>> print(S)
+      StackableValues()
+      >>> S.push('x', 1)
+      >>> print(S)
+      StackableValues(x=1)
+      >>> print(S.x)
+      1
+      >>> S.push('x', 2)
+      >>> print(S.x)
+      2
+      >>> S.x = 3
+      >>> print(S.x)
+      3
+      >>> S.pop('x')
+      3
+      >>> print(S.x)
+      1
+      >>> with S.stack('x', 4):
+      ...   print(S.x)
+      ...
+      4
+      >>> print(S.x)
+      1
   '''
 
   def __init__(self):
@@ -375,11 +401,26 @@ class StackableValues(object):
   def __getattr__(self, attr):
     ''' Present the top value of key `attr` as an attribute.
     '''
+    if attr.startswith('_'):
+      raise AttributeError(attr)
     try:
       v = self[attr]
     except KeyError:
-      raise AttributeError(key)
+      raise AttributeError(attr)
     return v
+
+  def __setattr__(self, attr, value):
+    if attr.startswith('_'):
+      self.__dict__[attr] = value
+    else:
+      try:
+        vs = self._values[attr]
+      except KeyError:
+        raise AttributeError(attr)
+      else:
+        if not vs:
+          raise AttributeError(attr)
+        vs[-1] = value
 
   def __getitem__(self, key):
     ''' Return the top value for `key` or raise KeyError.
