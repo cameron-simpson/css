@@ -1,3 +1,4 @@
+vt.fs.FileSystem: make the modes into a set, simplify the initialiser
 Dir.D_*_T values to be IntEnums
 ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates from archive, push local changes to Dir and archive
 get rid of uses of totext/fromtext and dirent_fromtext etc
