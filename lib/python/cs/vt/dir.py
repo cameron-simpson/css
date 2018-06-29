@@ -19,7 +19,7 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.cmdutils import docmd
-from cs.logutils import debug, error, warning
+from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
@@ -946,44 +946,62 @@ class Dir(_Dirent):
         return name2
       n += 1
 
-  def absorb(self, D2):
-    ''' Absorb `D2` into this Dir.
+  def update(self, D2, path=None):
+    ''' Update this Dir with changes from `D2` which is presumed to be new.
         Note: this literally attaches nodes from `D2` into this
         Dir's tree where possible.
     '''
-    for name in D2:
-      E2 = D2[name]
-      if name in self:
-        # conflict
-        # TODO: support S_IFWHT whiteout entries
-        E1 = self[name]
-        if E1.uuid == E2.uuid:
-          # same file
-          assert E1.type == E2.type
-          if E2.meta.ctime > E1.meta.ctime:
-            E1.meta.update(E2.meta.items())
-          if E1.block != E2.block:
-            if E2.mtime > E1.mtime:
-              # TODO: E1.flush _after_ backend update? or before?
-              E1.block = E2.block
-            E1.meta.mtime = E2.mtime
-        else:
-          # distinct objects, resolve l
-          if E1.isdir and E2.isdir:
-            # merge subtrees
-            E1.absorb(E2)
-          elif E1.isfile and E2.isfile and E1.block == E2.block:
-            # file with same content, fold
-            # TODO: use Block.compare_content if different blocks
-            if E2.meta.ctime > E1.meta.ctime:
-              E1.meta.update(E2.meta.items())
+    if path is None:
+      path = self.pathto()
+    with Pfx("update(%r)", path):
+      for name in D2:
+        with Pfx(name):
+          E2 = D2[name]
+          if name in self:
+            # conflict
+            # TODO: support S_IFWHT whiteout entries
+            E1 = self[name]
+            if E1.uuid == E2.uuid:
+              # same file
+              assert E1.type == E2.type
+              if E2.meta.ctime > E1.meta.ctime:
+                info("update meta")
+                E1.meta.update(E2.meta.items())
+              if E1.block != E2.block:
+                if E2.mtime > E1.mtime:
+                  # TODO: E1.flush _after_ backend update? or before?
+                  info("update block => %s", E2.block)
+                  E1.block = E2.block
+                  E1.meta.mtime = E2.mtime
+            else:
+              # distinct objects
+              if E1.isdir and E2.isdir:
+                # merge subtrees
+                E1.update(E2)
+              elif E1.isfile and E2.isfile and E1.block == E2.block:
+                # file with same content, fold
+                # TODO: use Block.compare_content if different blocks
+                if E2.meta.ctime > E1.meta.ctime:
+                  info("update meta")
+                  E1.meta.update(E2.meta.items())
+              else:
+                # different content
+                # add other object under a different name
+                new_name = self.new_name(name)
+                info("add new entry as %r: %s", new_name, E2)
+                self[new_name] = E2
           else:
-            # add other object under a different name
-            self[self.new_name(name)] = E2
-      else:
-        # new item
-        # NB: we don't recurse into new Dirs, not needed
-        self[name] = E2
+            # new item
+            # NB: we don't recurse into new Dirs, not needed
+            info("add new entry: %s", E2)
+            self[name] = E2
+
+  def update_notification(self, newE, when, source):
+    ''' Receptor for Archive.update() notifications.
+    '''
+    with Pfx("update_notification(%s,when=%s,source=%s)", newE, when, source):
+      if newE is not self:
+        self.update(newE)
 
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
