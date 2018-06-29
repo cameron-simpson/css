@@ -295,6 +295,7 @@ class SvcD(FlaggedMixin, object):
   def __init__(self, argv, name=None,
         environ=None,
         flags=None,
+        group_name=None,
         pidfile=None,
         sig_func=None,
         test_flags=None,
@@ -311,6 +312,7 @@ class SvcD(FlaggedMixin, object):
         `argv`: command to run as a subprocess.
         `flags`: a cs.app.flag.Flags -like object, default None;
           if None the default flags will be used.
+        `group_name`: alert group name, default "SVCD " + `name`.
         `pidfile`: path to pid file, default $VARRUN/{name}.pid.
         `sig_func`: signature function to compute a string which
           causes a restart if it changes
@@ -327,14 +329,16 @@ class SvcD(FlaggedMixin, object):
         `on_spawn`: to be called after a new subprocess is spawned
         `on_reap`: to be called after a subprocess is reaped
     '''
+    if name is None:
+      name = 'UNNAMED'
     if environ is None:
       environ = os.environ
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
       flags = Flags(environ=environ, debug=trace)
-    if name is None:
-      name = 'UNNAMED'
+    if group_name is None:
+      group_name = "SVCD " + name
     if test_flags is None:
       test_flags = {}
     if test_rate is None:
@@ -344,6 +348,7 @@ class SvcD(FlaggedMixin, object):
     FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
     self.name = name
+    self.group_name = group_name
     self.test_flags = test_flags
     self.test_func = test_func
     self.test_rate = test_rate
@@ -373,7 +378,7 @@ class SvcD(FlaggedMixin, object):
     debug("%s: " + msg, self, *a)
 
   def test(self):
-    with Pfx("test"):
+    with Pfx("%s: test", self.name):
       if self.flag_override:
         self.dbg("flag_override true -> True")
         return True
@@ -401,7 +406,7 @@ class SvcD(FlaggedMixin, object):
       return
     if a:
       msg = msg % a
-    alert_argv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
+    alert_argv = ['alert', '-g', self.group_name, 'SVCD %s: %s' % (self.name, msg)]
     if self.trace:
       info("alert: %s: %s" % (self.name, msg))
     Popen(alert_argv, stdin=DEVNULL)

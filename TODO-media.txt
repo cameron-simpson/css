@@ -1,0 +1,3 @@
+BoxLIst subclass of list, checks additions are Boxes
+easy Box construction?
+iso14496: patch mode for Boxes: Box.patch(fp, new_box)

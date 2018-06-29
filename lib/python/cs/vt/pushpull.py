@@ -157,33 +157,6 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       yield hashcode
     start_hashcode = hashcodes2[-1]
 
-def complete_Block(B, S, S2):
-  ''' Complete storage of this Block in `S` from alternative Store `S2`.
-      If `S` does not contain the Block, fetch data from `S2`.
-      If indirect, repeat for all children.
-  '''
-  L = S.later
-  with L.pool() as LP:
-    LFs = []
-    try:
-      h = B.hashcode
-    except AttributeError:
-      # Blocks with no hashcode are considered Stored, because they
-      # aren't kept in Stores
-      pass
-    else:
-      if h not in S:
-        # dispatch fetch for missing data
-        X("complete: fetch S2[%s]...", h)
-        LP.add(L.with_result_of(partial(S2.get, h), S.add))
-    if B.indirect:
-      for subB in B.subbblocks():
-        X("complete: complete subblock %s...", subB)
-        LP.defer(complete, subB, S, S2)
-  X("complete: join...")
-  LP.join()
-  X("complete: completed")
-
 if __name__ == '__main__':
   from .pushpull_tests import selftest
   selftest(sys.argv)

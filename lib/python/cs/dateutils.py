@@ -1,6 +1,9 @@
 #!/usr/bin/python
 #
 
+''' Convenience functions to do with date and time.
+'''
+
 from datetime import tzinfo, timedelta, date
 from time import localtime, strftime, strptime
 
@@ -56,9 +59,9 @@ def parse_date(datestr):
     return None
   try:
     parsed = strptime(datestr, '%Y-%m-%d')
-  except ValueError as e:
+  except ValueError:
     try:
       parsed = strptime(datestr, '%d %B %Y')
-    except ValueError as e:
+    except ValueError:
       parsed = strptime(datestr, '%d/%m/%Y')
   return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)

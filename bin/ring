@@ -9,7 +9,7 @@ from os.path import expanduser, basename, isdir, isfile, join as joinpath
 import re
 from subprocess import Popen, PIPE
 import sys
-from cs.ansi_colour import colourise
+from cs.ansi_colour import colourise_patterns
 
 CMD = basename(__file__)
 USAGE = 'Usage: %s regexps...'
@@ -53,7 +53,7 @@ def main(argv=None):
       clause = clause.rstrip()
       if do_colour:
         clause0 = clause
-        clause = colourise(clause, ptns)
+        clause = colourise_patterns(clause, ptns)
       print(clause)
   return 0
 

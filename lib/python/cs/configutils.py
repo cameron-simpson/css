@@ -4,16 +4,8 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-DISTINFO = {
-    'description': "utility functions for .ini style configuration files",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'install_requires': [ 'cs.py3', 'cs.fileutils', 'cs.threads', 'cs.logutils' ],
-}
+''' Utility functions and classes for configuration files.
+'''
 
 import os
 import os.path
@@ -21,11 +13,19 @@ import sys
 from collections import Mapping
 from threading import RLock
 from cs.fileutils import file_property
-from cs.logutils import info, D
-from cs.pfx import Pfx
 from cs.py3 import ConfigParser, StringTypes
-from cs.threads import locked, locked_property
-from cs.x import X
+from cs.threads import locked
+
+DISTINFO = {
+    'description': "utility functions for .ini style configuration files",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [ 'cs.py3', 'cs.fileutils', 'cs.threads' ],
+}
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
@@ -37,7 +37,7 @@ def load_config(config_path, parser=None):
     parser = ConfigParser
   CP = parser()
   with open(config_path) as fp:
-    CP.readfp(fp) 
+    CP.readfp(fp)
   return CP
 
 class ConfigWatcher(Mapping):
@@ -58,11 +58,15 @@ class ConfigWatcher(Mapping):
 
   @file_property
   def config(self, filename):
+    ''' Live configuration.
+    '''
     self._mapping = None
     return load_config(filename)
 
   @property
   def path(self):
+    ''' The path to the config file.
+    '''
     return self._config__filename
 
   def as_dict(self):
@@ -86,6 +90,8 @@ class ConfigWatcher(Mapping):
     return [ name for name, value in CP.items(section) ]
 
   def section_value(self, section, key):
+    ''' Return the value of [section]key.
+    '''
     CP = self.config
     if CP is None or not CP.has_option(section, key):
       raise KeyError(key)
@@ -109,7 +115,7 @@ class ConfigWatcher(Mapping):
 
   def __len__(self):
     n = 0
-    for i in self:
+    for _ in self:
       n += 1
     return n
 
@@ -146,12 +152,16 @@ class ConfigSectionWatcher(Mapping):
     return self.config.path
 
   def as_dict(self):
+    ''' Return the config section as a dict.
+    '''
     d = {}
     for k in self:
       d[k] = self[k]
     return d
 
   def keys(self):
+    ''' Return the keys of the config section.
+    '''
     ks = set(self.config.section_keys(self.section))
     if self.section != self.defaults:
       ks.update(set(self.config.section_keys(self.defaults)))
@@ -169,6 +179,5 @@ class ConfigSectionWatcher(Mapping):
     return len(self.keys())
 
 if __name__ == '__main__':
-  import sys
   import cs.configutils_tests
   cs.configutils_tests.selftest(sys.argv)

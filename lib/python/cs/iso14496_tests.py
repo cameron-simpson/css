@@ -33,8 +33,9 @@ class Test_iso14496(unittest.TestCase):
     self.assertEqual(total_size, mp4_size,
                      "file size = %d, frames total = %d" % (mp4_size, total_size))
 
-def selftest(argv):
-  unittest.main(__name__, None, argv, failfast=True)
+def selftest(argv, **kw):
+  sys.argv = argv
+  unittest.main(__name__, defaultTest=None, argv=argv, failfast=True, **kw)
 
 if __name__ == '__main__':
   selftest(sys.argv)

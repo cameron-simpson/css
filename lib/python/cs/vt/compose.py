@@ -4,12 +4,13 @@
 #   - Cameron Simpson <cs@cskk.id.au> 20dec2016
 #
 
+import os
+from stat import S_ISDIR, S_ISSOCK
 from subprocess import Popen, PIPE
 from cs.lex import skipwhite, get_identifier, get_qstr
 from cs.pfx import Pfx
-from cs.units import multiparse as multiparse_units, \
-    BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE
 from cs.x import X
+from .convert import get_integer
 from .stream import StreamStore
 
 def parse_store_specs(s, offset=0):
@@ -25,9 +26,9 @@ def parse_store_specs(s, offset=0):
         with Pfx("offset %d", offset):
           sep = s[offset]
           offset += 1
-          if sep == ':':
+          if sep == ',':
             continue
-          raise ValueError("expected colon ':', found unexpected separator: %r" % (sep,))
+          raise ValueError("expected comma ',', found unexpected separator: %r" % (sep,))
     return store_specs
 
 def get_store_spec(s, offset):
@@ -39,8 +40,11 @@ def get_store_spec(s, offset):
 
         [clause_name]   The name of a clause to be obtained from a Config.
 
-        /path/to/store  A DataDirStore directory.
-        ./subdir/to/store A relative path to a DataDirStore directory.
+        /path/to/directory
+                        A DataDirStore directory.
+        ./subdir/to/directory
+                        A relative path to a DataDirStore directory.
+        /path/to/socket A socket serving a Store.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -67,7 +71,7 @@ def get_store_spec(s, offset):
     qs, offset = get_qstr(s, offset, q='"')
     _, store_type, params, offset2 = get_store_spec(qs, 0)
     if offset2 < len(qs):
-      raise ValueError("unparsed text inside quotes: %r", qs[offset2:])
+      raise ValueError("unparsed text inside quotes: %r" % (qs[offset2:],))
   elif s.startswith('[', offset):
     # [clause_name]
     store_type = 'config'
@@ -80,10 +84,23 @@ def get_store_spec(s, offset):
     offset += 1
     params = {'clause_name': clause_name}
   elif s.startswith('/', offset) or s.startswith('./', offset):
-    # /path/to/datadir
-    store_type = 'datadir'
-    params = {'path': s[offset:] }
+    path = s[offset:]
     offset = len(s)
+    with Pfx("%r", path):
+      try:
+        S = os.stat(path)
+      except OSError as e:
+        raise ValueError("cannot stat: %s" % (e,)) from e
+      if S_ISDIR(S.st_mode):
+        # /path/to/datadir
+        store_type = 'datadir'
+        params = {'path': path}
+      elif S_ISSOCK(S.st_mode):
+        # /path/to/socket
+        store_type = 'socket'
+        params = {'socket_path': path}
+      else:
+        raise ValueError("not a directory or a socket, st_mode=0o%04o" % (S.st_mode,))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
@@ -102,16 +119,17 @@ def get_store_spec(s, offset):
         offset += 1
         params = {}
         if store_type == 'tcp':
-          hostpart, offset = get_token(s, offset)
+          colon2 = s.find(':', offset)
+          if colon2 < offset:
+            raise ValueError("missing second colon after offset %d" % (offset,))
+          hostpart = s[offset:colon2]
+          offset = colon2 + 1
           if not isinstance(hostpart, str):
             raise ValueError(
                 "expected hostpart to be a string, got: %r" % (hostpart,))
+          if not hostpart:
+            hostpart = 'localhost'
           params['host'] = hostpart
-          if not s.startswith(':', offset):
-            raise ValueError(
-                "missing port at offset %d, found: %r"
-                % (offset, s[offset:]))
-          offset += 1
           portpart, offset = get_token(s, offset)
           params['port'] = portpart
         else:
@@ -136,7 +154,7 @@ def get_params(s, offset, endchar):
       offset += 1
     param, offset = get_qstr_or_identifier(s, offset)
     if not param:
-      raise ValueError("rejecting empty parameter name")
+      raise ValueError("rejecting empty parameter name at: %r" % (s[offset:],))
     offset = skipwhite(s, offset)
     ch = s[offset:offset + 1]
     if not ch:
@@ -171,17 +189,8 @@ def get_token(s, offset):
     token, offset = get_qstr_or_identifier(s, offset)
   return token, offset
 
-def get_integer(s, offset):
-  ''' Parse an integer followed by an optional scale and return computed value.
-  '''
-  return multiparse_units(
-      s,
-      (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE),
-      offset
-  )
-
 def CommandStore(shcmd, addif=False):
-  ''' Factory to return a StreamStore talking to command.
+  ''' Factory to return a StreamStore talking to a command.
   '''
   name = "StreamStore(%r)" % ("|" + shcmd, )
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)

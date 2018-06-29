@@ -296,7 +296,11 @@ class Pfx(object):
           mark = unicode(mark)
       u = mark
       if self.mark_args:
-        u = u % self.mark_args
+        try:
+          u = u % self.mark_args
+        except TypeError as e:
+          X("FORMAT CONVERSION: %s: %r %% %r", e, u, self.mark_args)
+          u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
 
