@@ -730,11 +730,17 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
     yield bs
     offset += len(bs)
 
-@strable
+@strable(open_func=partial(open, mode='rb'))
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
       NOTE: this function may move the file pointer.
+      `f`: the file from which to read data; if a string, the file
+        is opened with mode="rb"; if an int, treated as an OS file
+        descriptor; otherwise presumed to be a file-like object
+      `offset`: starting offset for the data
       `readsize`: read size, default DEFAULT_READSIZE.
+      For file-like objects, the read1 method is used in preference
+      to read if available.
   '''
   if readsize is None:
     readsize = DEFAULT_READSIZE
