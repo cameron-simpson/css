@@ -102,7 +102,7 @@ class _Archive(object):
           return
         raise
 
-  def save(self, E, when=None, previous=None, force=False):
+  def update(self, E, when=None, previous=None, force=False):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
         `E`: the Dirent to save.
         `when`: the POSIX timestamp for the save, default now.
