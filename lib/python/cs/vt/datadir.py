@@ -879,7 +879,7 @@ class PlatonicDir(_FilesDir):
           encountered during scans which are promoted to HashCodeBlocks
           are also stored here
         `archive`: optional Archive ducktype instance with a
-          .save(Dirent[,when]) method
+          .update(Dirent[,when]) method
         Other keyword arguments are passed to _FilesDir.__init__.
         The directory and file paths tested are relative to the
         data directory path.
@@ -910,7 +910,7 @@ class PlatonicDir(_FilesDir):
       if D is None:
         info("%r: no entries in %s, create empty topdir Dir", self.datadirpath, archive)
         D = Dir('.')
-        archive.save(D)
+        archive.update(D)
       self.topdir = D
     super().startup()
 
@@ -930,7 +930,7 @@ class PlatonicDir(_FilesDir):
     # update the topdir state before any save
     if self.meta_store is not None:
       with self.meta_store:
-        self.archive.save(self.topdir)
+        self.archive.update(self.topdir)
     return _FilesDir._save_state(self)
 
   @staticmethod

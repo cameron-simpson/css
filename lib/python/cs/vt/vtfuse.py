@@ -55,7 +55,7 @@ def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=Fals
       `mnt`: mount point
       `E`: Dirent of root Store directory
       `S`: backing Store
-      `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
+      `archive`: if not None, an Archive or similar, with a .update(Dirent[,when]) method
       `subpath`: relative path from `E` to the directory to attach to the mountpoint
       `readonly`: forbid data modification operations
       `append_only`: files may not be truncated or overwritten
@@ -437,7 +437,7 @@ class _StoreFS_core(object):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
-        `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
+        `archive`: if not None, an Archive or similar, with a .update(Dirent[,when]) method
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification
         `append_only`: append only mode: files may only grow, filenames may not be changed or deleted
@@ -532,7 +532,7 @@ class _StoreFS_core(object):
           X("snapshot: afterwards E=%s", E)
           new_state = archive.strfor_Dirent(E)
           if new_state != self._last_sync_state:
-            archive.save(E)
+            archive.update(E)
             self._last_sync_state = new_state
             updated = True
         # debugging
@@ -699,7 +699,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     ''' Initialise a new FUSE mountpoint.
         `E`: the root directory reference
         `S`: the backing Store
-        `archive`: if not None, an Archive or similar, with a .save(Dirent[,when]) method
+        `archive`: if not None, an Archive or similar, with a .update(Dirent[,when]) method
         `subpath`: relative path to mount Dir
         `readonly`: forbid data modification; if omitted or None, infer from S.readonly
         `append_only`: forbid truncation or overwrite of file data

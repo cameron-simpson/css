@@ -445,4 +445,4 @@ class ArchiveFTP(DirFTP):
 
   def postloop(self):
     super().postloop()
-    self.archive.save(self.rootD)
+    self.archive.update(self.rootD)

@@ -498,7 +498,7 @@ class VTCmd:
     elif special is None:
       Archive.write(sys.stdout, D)
     else:
-      Archive(special).save(D)
+      Archive(special).update(D)
     return xit
 
   def cmd_ls(self, args):
