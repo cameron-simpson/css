@@ -106,8 +106,10 @@ class _Archive(object):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
         `E`: the Dirent to save.
         `when`: the POSIX timestamp for the save, default now.
-        `force`: append an entry even if the last entry is the same
-          as this entry, default False
+        `previous`: optional previous Dirent transcription; defaults
+          to the latest Transcription from of the Archive
+        `force`: append an entry even if the previous entry has the
+          same transcription as `previous`, default False
     '''
     if isinstance(E, str):
       etc = E
