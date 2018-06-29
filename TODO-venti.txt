@@ -1,3 +1,4 @@
+Dir.D_*_T values to be IntEnums
 ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates from archive, push local changes to Dir and archive
 get rid of uses of totext/fromtext and dirent_fromtext etc
 sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
