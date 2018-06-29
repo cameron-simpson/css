@@ -1,8 +1,9 @@
 #!/usr/bin/python
 #
 # Assorted convenience functions for files and filenames/pathnames.
-#       - Cameron Simpson <cs@cskk.id.au>
-#
+# - Cameron Simpson <cs@cskk.id.au>
+
+''' Assorted convenience functions for files and filenames/pathnames.'''
 
 from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
@@ -272,11 +273,14 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
   ''' A decorator which caches a value obtained from a file.
       In addition to all the keyword arguments for @cs.deco.cached,
       this decorator also accepts the following argument:
+      `attr_name`: the name for the associated attribute, used as
+        the basis for the internal cache value attribute
       `filename`: the filename to monitor. Default from the
         ._{attr_name}__filename attribute. This value will be passed
         to the method as the `filename` keyword parameter.
-      If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
-      If the `sig_func` is not specified it defaults to
+      `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
+      `sig_func`: signature function used to encapsulate the relevant
+        information about the file; default
         cs.filestate.FileState({filename}).
       If the decorated function raises OSError with errno == ENOENT,
       this returns None. Other exceptions are reraised.
@@ -1244,6 +1248,8 @@ class RWFileBlockCache(object):
 
   @property
   def closed(self):
+    ''' Test whether the file descriptor has been closed.
+    '''
     return self.fd is None
 
   def put(self, data):
