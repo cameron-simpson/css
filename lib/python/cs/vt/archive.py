@@ -23,12 +23,12 @@ from os.path import isfile
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import warning, error
+from cs.logutils import warning, error, exception
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
-from .dir import FileDirent, DirFTP
+from .dir import _Dirent, FileDirent, DirFTP
 from .file import filedata
 from .paths import resolve, walk
 from .transcribe import transcribe_s, parse
@@ -70,6 +70,7 @@ class _Archive(object):
     self.path = arpath
     self._last = None
     self._last_s = None
+    self.notify_update = []
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
@@ -105,7 +106,7 @@ class _Archive(object):
           return
         raise
 
-  def update(self, E, when=None, previous=None, force=False):
+  def update(self, E, when=None, previous=None, force=False, source=None):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
         `E`: the Dirent to save.
         `when`: the POSIX timestamp for the save, default now.
@@ -113,24 +114,19 @@ class _Archive(object):
           to the latest Transcription from of the Archive
         `force`: append an entry even if the previous entry has the
           same transcription as `previous`, default False
+        `source`: optional source indicator for the update, default None
     '''
-    if isinstance(E, str):
-      etc = E
-    else:
-      etc = E.name
+    assert isinstance(E, _Dirent), "expected E<%s> to be a _Dirent" % (type(E),)
+    etc = E.name
     if not force:
+      # see if we should discard this update
       if previous is None:
         previous = self._last_s
       if previous is not None:
         # do not save if the previous transcription is unchanged
-        if isinstance(E, str):
-          Es = E
-        else:
-          Es = transcribe_s(E)
+        Es = transcribe_s(E)
         if Es == previous:
           return Es
-        # use the transcription directly
-        E = Es
     if when is None:
       when = time.time()
     path = self.path
@@ -139,6 +135,13 @@ class _Archive(object):
         s = self.write(fp, E, when=when, etc=etc)
     self._last = when, E
     self._last_s = s
+    for notify in self.notify_update:
+      try:
+        notify(E, when=when, source=source)
+      except Exception as e:
+        exception(
+            "notify[%s](%s,when=%s,source=%s): %s",
+            notify, E, when, source, e)
     return s
 
   @staticmethod
