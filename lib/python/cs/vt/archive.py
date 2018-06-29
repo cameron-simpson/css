@@ -64,6 +64,9 @@ class _Archive(object):
   '''
 
   def __init__(self, arpath):
+    ''' Initialise this Archive.
+        `arpath`: path to file holding the archive records
+    '''
     self.path = arpath
     self._last = None
     self._last_s = None
