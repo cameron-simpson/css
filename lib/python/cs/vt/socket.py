@@ -90,21 +90,16 @@ class _ClientConnectionHandler(StreamRequestHandler):
   '''
 
   @logexc
-  def __init__(self, request, client_address, server):
+  def __init__(self, request, client_address, socket_server):
     ''' Initialise the handler for a stream from a connection.
         `request`: the connected stream file descriptor
         `client_address`: the peer address
-        `server`: the controlling server, a _TCPServer or _UNIXSocketServer
+        `socket_server`: the controlling server, a _TCPServer or _UNIXSocketServer
     '''
     X("CONNECTION on %s from %s, server=%s", request, client_address, server)
-    super().__init__(request, client_address, server)
-    self.socket_server = server
-
-  @prop
-  def S(self):
-    ''' Return the current Store.
-    '''
-    return self.socket_server.store_server.S
+    super().__init__(request, client_address, socket_server)
+    self.socket_server = socket_server
+    self.store_server = socket_server.store_server
 
   @prop
   def exports(self):
@@ -114,6 +109,8 @@ class _ClientConnectionHandler(StreamRequestHandler):
 
   @logexc
   def handle(self):
+    # the local Store starts as the current default Store
+    self.S = self.store_server.S
     remoteS = StreamStore(
         "server-StreamStore(local=%s)" % self.S,
         OpenSocket(self.request, False),
