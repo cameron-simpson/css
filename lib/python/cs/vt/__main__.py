@@ -676,7 +676,7 @@ class VTCmd:
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
       # import vtfuse before doing anything with side effects
-      from .vtfuse import mount, umount
+      from cs.vtfuse import mount, umount
       with Pfx(mountpoint):
         need_rmdir = False
         if not isdirpath(mountpoint):

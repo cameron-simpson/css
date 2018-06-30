@@ -21,12 +21,12 @@ import sys
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
+from cs.vt import defaults
+from cs.vt.dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent
+from cs.vt.fs import FileHandle, FileSystem
+from cs.vt.store import MissingHashcodeError
 from cs.x import X
 import llfuse
-from . import defaults
-from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent
-from .fs import FileHandle, FileSystem
-from .store import MissingHashcodeError
 
 FuseOSError = llfuse.FUSEError
 
