@@ -12,14 +12,13 @@
 '''
 
 from __future__ import print_function
-import os
-from os.path import realpath
-import stat
-import time
 from datetime import datetime
 import errno
 from itertools import chain
-from os.path import isfile
+import os
+from os.path import realpath, isfile
+import stat
+import time
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
@@ -315,7 +314,7 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
         # finally, update the Dir meta info
         dirD.meta.update_from_stat(dst)
 
-def copy_in_file(E, filepath, modes, log=None):
+def copy_in_file(E, filepath, modes):
   ''' Store the file named `filepath` over the FileDirent `E`.
   '''
   with Pfx(filepath):
@@ -410,7 +409,7 @@ def copy_out_file(E, ospath, modes=None, log=None):
   try:
     # TODO: should this be os.stat if we don't support symlinks?
     st = os.lstat(ospath)
-  except OSError as e:
+  except OSError:
     st = None
   else:
     if modes.ignore_existing:
