@@ -89,23 +89,14 @@ class _ClientConnectionHandler(StreamRequestHandler):
   ''' Handler for a connection to the server.
   '''
 
-  @logexc
-  def __init__(self, request, client_address, socket_server):
-    ''' Initialise the handler for a stream from a connection.
-        `request`: the connected stream file descriptor
-        `client_address`: the peer address
-        `socket_server`: the controlling server, a _TCPServer or _UNIXSocketServer
-    '''
-    X("CONNECTION on %s from %s, server=%s", request, client_address, server)
-    super().__init__(request, client_address, socket_server)
-    self.socket_server = socket_server
-    self.store_server = socket_server.store_server
+  def setup(self):
+    self.store_server = self.server.store_server
 
   @prop
   def exports(self):
     ''' Return the exports mapping.
     '''
-    return self.socket_server.store_server.exports
+    return self.store_server.exports
 
   @logexc
   def handle(self):
@@ -119,10 +110,8 @@ class _ClientConnectionHandler(StreamRequestHandler):
         exports=self.exports,
     )
     remoteS.startup()
-    self.socket_server.handlers.add(remoteS)
     remoteS.join()
     remoteS.shutdown()
-    self.socket_server.handlers.remove(remoteS)
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
@@ -131,7 +120,6 @@ class _TCPServer(ThreadingMixIn, TCPServer):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.store_server = store_server
-      self.handlers = set()
 
   def __str__(self):
     return "%s(%s,%s)" % (type(self), self.bind_addr, self.store_server,)
@@ -187,7 +175,6 @@ class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
       self.store_server = store_server
       self.socket_path = socket_path
       self.exports = exports
-      self.handlers = set()
 
   def __str__(self):
     return "%s(store_server=%s,socket_path=%s,exports=%r)" \
