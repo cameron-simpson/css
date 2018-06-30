@@ -40,7 +40,7 @@ from .block import Block, IndirectBlock, decodeBlock
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
-from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
+from .datadir import DataDir, DataDirIndexEntry
 from .datafile import DataFile, DataFlag, decompress
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
@@ -49,10 +49,9 @@ from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
 from .parsers import scanner_from_filename
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
-from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .server import serve_tcp, serve_socket
 from .smuggling import import_dir, import_file
-from .store import ProgressStore, DataDirStore, ProxyStore
+from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
 def main(argv):
@@ -884,6 +883,8 @@ class VTCmd:
     return 0
 
   def cmd_test(self, args):
+    ''' Test various facilites.
+    '''
     if not args:
       raise GetoptError("missing test subcommand")
     subcmd = args.pop(0)
