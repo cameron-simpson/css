@@ -86,7 +86,7 @@ def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
     hashclass = DEFAULT_HASHCLASS
   return DataDir(indexdirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
 
-class FileState(SimpleNamespace):
+class DataFileState(SimpleNamespace):
   ''' General state information about a data file in use by a files based data dir.
       Attributes:
       `datadir`: the _FilesDir tracking this state
@@ -364,7 +364,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                     error("discarding record: invalid indexed_to (column 3), expected int: %s: %r",
                           e, indexed_to)
                     continue
-                  filestate = FileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
+                  filestate = DataFileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
                   filestate.filenum = filenum
                   self._add_datafilestate(filestate)
 
@@ -427,7 +427,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     ''' Add the specified data file named `filename` to the filemap, returning the filenum.
         `filename`: the filename relative to the data directory
     '''
-    F = FileState(self, None, filename, indexed_to=0)
+    F = DataFileState(self, None, filename, indexed_to=0)
     return self._add_datafilestate(F)
 
   def _add_datafilestate(self, F):
@@ -438,7 +438,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     filemap = self._filemap
     filename = F.filename
     if filename in filemap:
-      raise KeyError('FileState:%s: already in filemap: %r' % (F, filename,))
+      raise KeyError('DataFileState:%s: already in filemap: %r' % (F, filename,))
     with self._lock:
       if filenum is None:
         # TODO: keep the max floating around and make this O(1)
@@ -451,7 +451,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return filenum
 
   def _del_datafilestate(self, F):
-    ''' Delete references to the specified FileState, leaving a None placeholder behind.
+    ''' Delete references to the specified DataFileState, leaving a None placeholder behind.
     '''
     filename = F.filename
     filenum = F.filenum
