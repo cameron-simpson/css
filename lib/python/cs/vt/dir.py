@@ -32,7 +32,7 @@ from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
-from .transcribe import Transcriber, \
+from .transcribe import Transcriber, parse as parse_transcription, \
                         register as register_transcriber
 
 uid_nobody = -1
@@ -119,6 +119,17 @@ class _Dirent(Transcriber):
         self.name,
         self.meta
     )
+
+  @classmethod
+  def from_str(cls, s, offset=0):
+    ''' Parse a Dirent transcription from the str `s`.
+    '''
+    E, offset2 = parse_transcription(s, offset)
+    if not isinstance(E, cls):
+      raise ValueError(
+          "expected instance of %s (got %s) at offset %d of %r"
+          % (cls, type(E), offset, s))
+    return E, offset2
 
   @classmethod
   def from_bytes(cls, data, offset=0):
