@@ -1,3 +1,4 @@
+DataDir: compute current on open as the newest data file less than maxsize-maxblocksize, drop from state CSV - what to do about shared append to the file?
 vt.fs: does Inodes._hardlinked need to exist?
 vt.fs.FileSystem: make the modes into a set, simplify the initialiser
 Dir.D_*_T values to be IntEnums
