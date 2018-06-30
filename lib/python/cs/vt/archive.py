@@ -30,7 +30,6 @@ from .blockify import blockify, top_block_for
 from .dir import _Dirent, FileDirent, DirFTP
 from .file import filedata
 from .paths import resolve, walk
-from .transcribe import transcribe_s, parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -123,7 +122,7 @@ class _Archive(object):
         previous = self._last_s
       if previous is not None:
         # do not save if the previous transcription is unchanged
-        Es = transcribe_s(E)
+        Es = str(E)
         if Es == previous:
           return Es
     if when is None:
@@ -160,7 +159,7 @@ class _Archive(object):
     if isinstance(E, str):
       Es = E
     else:
-      Es = transcribe_s(E)
+      Es = str(E)
     etc_s = None if etc is None else unctrl(etc)
     fp.write(iso_s)
     fp.write(' ')
@@ -190,7 +189,7 @@ class _Archive(object):
         fields = line.split(None, 3)
         _, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E, offset = parse(dent)
+        E, offset = _Dirent.from_str(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
