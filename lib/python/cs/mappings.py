@@ -4,6 +4,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 from functools import partial
 import re
 from cs.sharedfile import SharedAppendLines
@@ -319,6 +320,157 @@ class SeenSet(object):
 
   def __contains__(self, item):
     return item in self.set
+
+class StackableValues(object):
+  ''' A collection of named stackable values with the latest value
+      available as an attribute.
+
+      Note that names conflicting with methods are not available
+      as attributes and must be accessed via __getitem__. As a
+      matter of practice, in addition to the mapping methods, avoid
+      names which are verbs or which begin with an underscore.
+
+      >>> S = StackableValues()
+      >>> print(S)
+      StackableValues()
+      >>> S.push('x', 1)
+      >>> print(S)
+      StackableValues(x=1)
+      >>> print(S.x)
+      1
+      >>> S.push('x', 2)
+      >>> print(S.x)
+      2
+      >>> S.x = 3
+      >>> print(S.x)
+      3
+      >>> S.pop('x')
+      3
+      >>> print(S.x)
+      1
+      >>> with S.stack('x', 4):
+      ...   print(S.x)
+      ...
+      4
+      >>> print(S.x)
+      1
+  '''
+
+  def __init__(self):
+    self._values = defaultdict(list)
+
+  def __str__(self):
+    return (
+        "%s(%s)"
+        % (
+            type(self).__name__,
+            ','.join( "%s=%s" % (k, v) for k, v in sorted(self.items()) )
+        )
+    )
+
+  def __repr__(self):
+    return (
+        "%s(%s)"
+        % (
+            type(self),
+            ','.join( "%r=%r" % (k, v) for k, v in sorted(self.items()) )
+        )
+    )
+
+  def keys(self):
+    ''' Mapping method returning an iterable of the names.
+    '''
+    return self._values.keys()
+
+  def values(self):
+    ''' Mapping method returning an iterable of the values.
+    '''
+    for key in self.keys():
+      try:
+        v = self[key]
+      except KeyError:
+        pass
+      else:
+        yield v
+
+  def items(self):
+    ''' Mapping method returning an iterable of (name, value) tuples.
+    '''
+    for key in self.keys():
+      try:
+        v = self[key]
+      except KeyError:
+        pass
+      else:
+        yield key, v
+
+  def __getattr__(self, attr):
+    ''' Present the top value of key `attr` as an attribute.
+    '''
+    if attr.startswith('_'):
+      raise AttributeError(attr)
+    try:
+      v = self[attr]
+    except KeyError:
+      raise AttributeError(attr)
+    return v
+
+  def __setattr__(self, attr, value):
+    if attr.startswith('_'):
+      self.__dict__[attr] = value
+    else:
+      try:
+        vs = self._values[attr]
+      except KeyError:
+        raise AttributeError(attr)
+      else:
+        if not vs:
+          raise AttributeError(attr)
+        vs[-1] = value
+
+  def __getitem__(self, key):
+    ''' Return the top value for `key` or raise KeyError.
+    '''
+    vs = self._values[key]
+    try:
+      v = vs[-1]
+    except IndexError:
+      raise KeyError(key)
+    return v
+
+  def get(self, key, default=None):
+    ''' Get the top value for `key`, or `default`.
+    '''
+    try:
+      v = self[key]
+    except KeyError:
+      v = default
+    return v
+
+  def push(self, key, value):
+    ''' Push a new `value` for `key`.
+    '''
+    self._values[key].append(value)
+
+  def pop(self, key):
+    ''' Pop and return the latest value for `key`.
+    '''
+    vs = self._values[key]
+    try:
+      v = vs.pop()
+    except IndexError:
+      raise KeyError(key)
+    return v
+
+  @contextmanager
+  def stack(self, key, value):
+    ''' Context manager which pushes and pops a new `value` for `key`.
+    '''
+    self.push(key, value)
+    try:
+      yield
+    finally:
+      self.pop(key)
 
 def named_column_tuples(rows):
   ''' Process an iterable of data rows, with the first row being column names.

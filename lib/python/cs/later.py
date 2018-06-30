@@ -40,7 +40,7 @@ from cs.pfx import Pfx, PrePfx, XP
 from cs.py.func import funcname
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
-from cs.result import Result, _PendingFunction, AsynchState, report, after
+from cs.result import Result, _PendingFunction, ResultState, report, after
 from cs.seq import seq, TrackingCounter
 from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
 
@@ -258,7 +258,7 @@ class LateFunction(_PendingFunction):
     with self._lock:
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s", self.state)
-      self.state = AsynchState.running
+      self.state = ResultState.running
       L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
 
   @OBSOLETE
