@@ -135,7 +135,7 @@ class VTCmd:
     try:
       opts, args = getopt(args, 'C:S:f:qv')
     except GetoptError as e:
-      error("unrecognised option: %s: %s"% (e.opt, e.msg))
+      error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
       opts, args = [], []
 
