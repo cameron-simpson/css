@@ -12,9 +12,8 @@ import os
 from os.path import abspath, isabs as isabspath, join as joinpath
 from threading import Lock
 from cs.configutils import ConfigWatcher
-from cs.env import envsub
 from cs.fileutils import shortpath, longpath
-from cs.logutils import debug, warning
+from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
 from . import defaults
@@ -26,11 +25,9 @@ from .convert import get_integer, \
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 
-def Store(spec, config=None):
+def Store(spec, config):
   ''' Factory to construct Stores from string specifications.
   '''
-  if config is None:
-    config = Config()
   return config.Store_from_spec(spec)
 
 class Config:
