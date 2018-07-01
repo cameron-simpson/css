@@ -88,7 +88,7 @@ def import_file(srcpath):
     start = time.time()
     with open(srcpath, 'rb') as fp:
       scanner = scanner_from_filename(srcpath)
-      blocks = blocks_of(read_from(fp), scanner)
+      blocks = blockify(read_from(fp), scanner)
       B = top_block_for(blocks)
       S = os.fstat(fp.fileno())
     end = time.time()
