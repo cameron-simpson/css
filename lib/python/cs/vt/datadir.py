@@ -175,7 +175,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             in the DataFiles. If not specified, a supported index
             class with an existing index file will be chosen, otherwise
             the most favoured indexclass available will be chosen.
-        `hashclass`: the hash class used to index chunk contents.
         `create_statedir`: os.mkdir the state directory if missing
         `create_datadir`: os.mkdir the data directory if missing
         `flags`: optional Flags object for control; if specified
