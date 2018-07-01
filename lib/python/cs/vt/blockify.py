@@ -1,19 +1,19 @@
 #!/usr/bin/python -tt
 #
-# Utility routines to parse data streams into Blocks and Block streams
-# into IndirectBlocks.
-#       - Cameron Simpson <cs@cskk.id.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
-from heapq import heapify, heappush, heappushpop, heappop
+''' Utility routines to parse data streams into Blocks and Block streams into IndirectBlocks.
+'''
+
+from heapq import heappush, heappop
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
-from cs.logutils import debug, warning, error, exception, D
+from cs.logutils import warning, exception
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
 from cs.seq import tee
-from cs.x import X
 from .block import Block, IndirectBlock
 from .scan import scanbuf
 
@@ -72,8 +72,9 @@ def indirect_blocks(blocks):
       # overflow
       if not subblocks:
         # do not yield empty indirect block, flag logic error instead
-        warning("no pending subblocks at flush, presumably len(block.encode()) %d > MAX_BLOCKSIZE %d",
-                len(enc), MAX_BLOCKSIZE)
+        warning(
+            "no pending subblocks at flush, presumably len(block.encode()) %d > MAX_BLOCKSIZE %d",
+            len(enc), MAX_BLOCKSIZE)
       else:
         yield IndirectBlock(subblocks)
         subblocks = []
@@ -82,7 +83,7 @@ def indirect_blocks(blocks):
     subsize += len(enc)
 
   # handle the termination case
-  if len(subblocks) > 0:
+  if subblocks:
     if len(subblocks) == 1:
       # one block unyielded - don't bother wrapping into an iblock
       block = subblocks[0]
@@ -118,12 +119,9 @@ class _PendingBuffer(object):
     if max_block < 1:
       raise ValueError("max_block must be >= 1, received: %s" % (max_block,))
     self.max_block = max_block
-    self.offset = offset
-    self._reset()
-
-  def _reset(self):
     self.pending = []
     self.pending_room = self.max_block
+    self.offset = offset
 
   def flush(self):
     ''' Yield the pending chunks joined together, if any.
@@ -132,7 +130,8 @@ class _PendingBuffer(object):
     if self.pending:
       assert self.pending_room < self.max_block
       chunk = b''.join(self.pending)
-      self._reset()
+      self.pending = []
+      self.pending_room = self.max_block
       self.offset += len(chunk)
       yield chunk
 
@@ -151,12 +150,15 @@ class _PendingBuffer(object):
       self.pending.append(chunk)
       self.pending_room -= len(chunk)
 
-def blocked_chunks_of(chunks, scanner,
-        min_block=None, max_block=None,
-        histogram=None):
+def blocked_chunks_of(
+    chunks,
+    scanner=None,
+    min_block=None, max_block=None,
+    histogram=None,
+    ):
   ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
       `chunks`: a source iterable of data chunks, handed to `scanner`
-      `scanner`: a callable accepting a CornuCopyBuffer and
+      `scanner`: optional callable accepting a CornuCopyBuffer and
         returning an iterable of ints, such as a generator. `scanner`
         may be None, in which case only the rolling hash is used
         to locate boundaries.
@@ -203,11 +205,14 @@ def blocked_chunks_of(chunks, scanner,
       # The scanner puts offsets onto the queue.
       # When the scanner fetches from the chunks, those chunks are copied to the queue.
       # When the scanner terminates, any remaining chunks are also copied to the queue.
-      parseQ = IterableQueue();
+      parseQ = IterableQueue()
       chunk_iter = tee(chunk_iter, parseQ)
       def run_parser():
+        ''' Thread body to run the supplied scanner against the input data.
+        '''
+        bfr = CornuCopyBuffer(chunk_iter)
         try:
-          for offset in scanner(CornuCopyBuffer(chunk_iter)):
+          for offset in scanner(bfr):
             # the scanner should yield only offsets, not chunks and offsets
             if not isinstance(offset, int):
               warning("discarding non-int from scanner %s: %s", scanner, offset)
@@ -216,7 +221,7 @@ def blocked_chunks_of(chunks, scanner,
         except Exception as e:
           exception("exception from scanner %s: %s", scanner, e)
         # Consume the remainder of chunk_iter; the tee() will copy it to parseQ.
-        for chunk in chunk_iter:
+        for _ in chunk_iter:
           pass
         # end of offsets and chunks
         parseQ.close()
@@ -244,7 +249,7 @@ def blocked_chunks_of(chunks, scanner,
         return None
       next_chunk = available_chunk
       available_chunk = None
-      assert not(isinstance(next_chunk, int))
+      assert not isinstance(next_chunk, int)
       # scan the new chunk and load potential edges into the offset heap
       hash_value, chunk_scan_offsets = scanbuf(hash_value, next_chunk)
       for cso in chunk_scan_offsets:
@@ -287,6 +292,7 @@ def blocked_chunks_of(chunks, scanner,
     hash_value = 0
     offset = 0
     chunk0 = None
+    offset0 = None
     # unblocked outbound data
     pending = _PendingBuffer(max_block)
     # Read data chunks and locate desired boundaries.
@@ -295,9 +301,9 @@ def blocked_chunks_of(chunks, scanner,
       if chunk is None:
         break
       # verify current chunk start offset against end of previous chunk
-      if chunk0 is not None:
-        if offset != offset0 + len(chunk0):
-          raise RuntimeError("offset0=%d, len(chunk0)=%d: sum(%d) != current offset %d" % (offset0, len(chunk0), offset0+len(chunk0), offset))
+      assert chunk0 is None or offset == offset0 + len(chunk0), \
+          "offset0=%d, len(chunk0)=%d: sum(%d) != current offset %d" \
+          % (offset0, len(chunk0), offset0 + len(chunk0), offset)
       chunk0 = chunk
       offset0 = offset
       chunk = memoryview(chunk)
@@ -367,9 +373,6 @@ def blocked_chunks_of(chunks, scanner,
         out_chunk_size = len(out_chunk)
         histogram['bytes_total'] += out_chunk_size
         histogram[out_chunk_size] += 1
-
-def Xoffsets(d):
-  X(' => '.join([ "%s:%s" % (k2,v2) for v2, k2 in sorted([ ((-1 if v is None else v), k) for k, v in d.items() ]) ]))
 
 if __name__ == '__main__':
   from .blockify_tests import selftest
