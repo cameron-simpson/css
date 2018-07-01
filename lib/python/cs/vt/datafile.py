@@ -6,17 +6,18 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Implementation of DataFile: a file containing Block records.
+'''
+
 from enum import IntFlag
 from fcntl import flock, LOCK_EX, LOCK_UN
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END, \
+from os import SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
 from threading import Lock
-import time
 from zlib import compress, decompress
 from cs.fileutils import ReadMixin, datafrom_fd
-from cs.logutils import info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
@@ -25,6 +26,9 @@ DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
+  ''' Flag values for DataFile records.
+      COMPRESSED: the data are compressed using zlib.compress.
+  '''
   COMPRESSED = 0x01
 
 class DataFile(MultiOpenMixin, ReadMixin):
@@ -49,32 +53,33 @@ class DataFile(MultiOpenMixin, ReadMixin):
     if do_create:
       fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
       os.close(fd)
+    self._rfd = None
+    self._rlock = None
+    self._wfd = None
+    self._wlock = None
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
   def startup(self):
+    ''' Start up the DataFile: open the read and write file descriptors.
+    '''
     with Pfx("%s.startup: open(%r)", self, self.pathname):
       rfd = os.open(self.pathname, O_RDONLY)
       self._rfd = rfd
       self._rlock = Lock()
       if self.readwrite:
         self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
-        os.lseek(self._wfd, 0, SEEK_END)
         self._wlock = Lock()
 
   def shutdown(self):
+    ''' Shut down the DataFIle: close read and write file descriptors.
+    '''
     if self.readwrite:
       os.close(self._wfd)
-      del self._wfd
+      self._wfd = None
     os.close(self._rfd)
-    del self._rfd
-
-  def tell(self):
-    return lseek(self._rfd, 0, SEEK_CUR)
-
-  def seek(self, offset):
-    return lseek(self._rfd, offset, how=SEEK_SET)
+    self._rfd = None
 
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
