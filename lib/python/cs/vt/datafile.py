@@ -7,6 +7,7 @@
 #
 
 from enum import IntFlag
+from fcntl import flock, LOCK_EX, LOCK_UN
 import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
@@ -143,14 +144,25 @@ class DataFile(MultiOpenMixin, ReadMixin):
 
   def add(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store start and end offsets.
+        The fcntl.flock function is used to hold an OS level lock
+        for the duration of the write to support shared use of the
+        file.
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
     bs = self.data_record(data, no_compress=no_compress)
     wfd = self._wfd
     with self._wlock:
-      offset = os.lseek(wfd, 0, SEEK_CUR)
+      try:
+        flock(wfd, LOCK_EX)
+      except OSError:
+        is_locked = False
+      else:
+        is_locked = True
+      offset = os.lseek(wfd, 0, SEEK_END)
       os.write(wfd, bs)
+      if is_locked:
+        flock(wfd, LOCK_UN)
     return offset, offset + len(bs)
 
 if __name__ == '__main__':
