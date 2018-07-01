@@ -346,9 +346,10 @@ class VTCmd:
     for path in args:
       if path.endswith('.vtd'):
         print(path)
-        with open(path, 'rb') as fp:
+        DF = DataFile(path)
+        with DF:
           try:
-            for offset, flags, data, offset2 in DataFile.scan_records(fp, do_decompress=True):
+            for offset, flags, data, offset2 in DF.scanfrom(0, do_decompress=True):
               hashcode = hashclass(data)
               leadin = '%9d %16.16s' % (offset, hashcode)
               dump_chunk(data, leadin, max_width, one_line)

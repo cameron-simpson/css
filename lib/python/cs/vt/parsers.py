@@ -102,7 +102,7 @@ def scan_vtd(bfr):
   '''
   with Pfx("scan_vtd"):
     def run_parser(bfr):
-      for offset, *etc in DataFile.scan_records(bfr):
+      for offset, *etc in DataFile.scanbuffer(bfr, do_decompress=False):
         bfr.report_offset(offset)
     return report_offsets(bfr, run_parser)
 
