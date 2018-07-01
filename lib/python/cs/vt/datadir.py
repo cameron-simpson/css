@@ -784,6 +784,10 @@ class DataDir(_FilesDir):
           except OSError as e:
             warning("stat: %s", e)
             continue
+          else:
+            if new_size is None:
+              info("skip nonfile")
+              continue
           if new_size > DFstate.scanned_to:
             need_save = False
             for offset, flags, data, post_offset in DFstate.scanfrom(offset=DFstate.scanned_to, do_decompress=True):
