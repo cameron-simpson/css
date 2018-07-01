@@ -37,10 +37,12 @@ class PacketConnection(object):
         `send_fp`: outbound binary stream
         `request_handler`: if supplied and not None, should be a
             callable accepting (request_type, ok, flags, payload)
-        The request_handler may return one of 4 values on success:
+        The request_handler may return one of 5 values on success:
           None  Response will be 0 flags and an empty payload.
           int   Flags only. Response will be the flags and an empty payload.
           bytes Payload only. Response will be 0 flags and the payload.
+          str   Payload only. Response will be 0 flags and the str
+                encoded as bytes using UTF-8.
           (int, bytes) Specify flags and payload for response.
         An unsuccessful request should raise an exception, which
         will cause a failure response packet.
@@ -246,15 +248,17 @@ class PacketConnection(object):
         channel, tag, rq_type, flags,
         repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'
     ):
+      result_flags = 0
+      result_payload = b''
       try:
-        result_flags = 0
-        result_payload = b''
         result = handler(rq_type, flags, payload)
         if result is not None:
           if isinstance(result, int):
             result_flags = result
           elif isinstance(result, bytes):
             result_payload = result
+          elif isinstance(result, str):
+            result_payload = result.encode(encoding='utf-8', errors='xmlcharrefreplace')
           else:
             result_flags, result_payload = result
       except Exception as e:
