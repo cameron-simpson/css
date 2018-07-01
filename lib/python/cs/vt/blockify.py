@@ -90,10 +90,7 @@ def indirect_blocks(blocks):
       block = IndirectBlock(subblocks)
     yield block
 
-def blockify(data_chunks, scanner=None):
-  return blocks_of(data_chunks, scanner)
-
-def blocks_of(chunks, scanner, min_block=None, max_block=None):
+def blockify(chunks, scanner=None, min_block=None, max_block=None):
   ''' Wrapper for blocked_chunks_of which yields Blocks from the data chunks.
   '''
   for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block, max_block=max_block):
