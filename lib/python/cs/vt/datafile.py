@@ -133,19 +133,21 @@ class DataFile(MultiOpenMixin, ReadMixin):
     return data
 
   @staticmethod
-  def scan_records(fp, do_decompress=False):
-    ''' Generator yielding (flags, data, post_offset) from a data file from its current offset.
+  def scanbuffer(bfr, do_decompress=False):
+    ''' Generator yielding (flags, data, post_offset) from a CornuCOpyBuffer attached to a data file.
+        `bfr`: the buffer
         `do_decompress`: decompress the scanned data, default False
     '''
+    read_record = DataFile.read_record
     while True:
-      yield read_record(fp, do_decompress=do_decompress)
+      yield read_record(bfr, do_decompress=do_decompress)
 
   def scanfrom(self, offset, do_decompress=False):
     ''' Generator yielding (flags, data, post_offset) from the DataFile.
         `offset`: the starting offset for the scan
         `do_decompress`: decompress the scanned data, default False
     '''
-    return self.scan_records(datafrom(offset), do_decompress=do_decompress)
+    return self.scanbuffer(self.bufferfrom(offset), do_decompress=do_decompress)
 
   def add(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store start and end offsets.
