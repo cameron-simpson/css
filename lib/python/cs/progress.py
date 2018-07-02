@@ -4,11 +4,13 @@
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
 
+''' A progress tracker with methods for throughput, ETA and update notification.
+'''
+
 from collections import namedtuple
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
-from cs.x import X
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -16,7 +18,13 @@ class Progress(object):
   ''' A progress counter to track task completion with various utility methods.
   '''
 
-  def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None, name=None):
+  def __init__(
+      self,
+      total=None,
+      start=0, position=None,
+      start_time=None, throughput_window=None,
+      name=None
+  ):
     ''' Initialise the Progesss object.
         `total`: expected completion value, default None.
         `start`: starting position of progress range, default 0.
@@ -34,9 +42,9 @@ class Progress(object):
     if start_time is None:
       start_time = now
     elif start_time > now:
-      raise ValueError("start_time(%s) > now(%s)", start_time, now)
+      raise ValueError("start_time(%s) > now(%s)" % (start_time, now))
     if throughput_window is not None and throughput_window <= 0:
-      raise ValueError("throughput_window <= 0: %s", throughput_window)
+      raise ValueError("throughput_window <= 0: %s" % (throughput_window,))
     self.name = name
     self.start = start
     self.total = total
@@ -48,15 +56,24 @@ class Progress(object):
       posns.append(CheckPoint(now, position))
     self._positions = posns
     self._flushed = True
+    self.notify_update = set()
+
+  @property
+  def latest(self):
+    ''' Latest datum.
+    '''
+    return self._positions[-1]
 
   @property
   def position(self):
     ''' Latest position.
     '''
-    return self._positions[-1][1]
+    return self.latest.position
 
   @position.setter
   def position(self, new_position):
+    ''' Update the latest position.
+    '''
     self.update(new_position)
 
   def update(self, new_position, update_time=None):
@@ -67,8 +84,14 @@ class Progress(object):
     ##if new_position < self.position:
     ##  warning("%s.update: .position going backwards from %s to %s",
     ##          self, self.position, new_position)
-    self._positions.append( CheckPoint(update_time, new_position) )
+    datum = CheckPoint(update_time, new_position)
+    self._positions.append(datum)
     self._flushed = False
+    for notify in self.notify_update:
+      try:
+        notify(self, datum)
+      except Exception as e:
+        exception("%s: notify_update %s: %s", self, notify, e)
 
   def advance(self, delta, update_time=None):
     ''' Record more progress, return the advanced position.
@@ -125,8 +148,9 @@ class Progress(object):
         on a flat pro rata basis.
     '''
     if time_window <= 0:
-      raise ValueError("%s.throughput_recent: invalid time_window <= 0: %s",
-                       self, time_window)
+      raise ValueError(
+          "%s.throughput_recent: invalid time_window <= 0: %s"
+          % (self, time_window))
     if not self._flushed:
       self._flush()
     now = time.time()
@@ -139,7 +163,7 @@ class Progress(object):
     low_time = None
     low_pos = None
     # walk forward through the samples, assumes monotonic
-    for t, p  in self._positions:
+    for t, p in self._positions:
       if t >= time0:
         low_time = t
         low_pos = p
