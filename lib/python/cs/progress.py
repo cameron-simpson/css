@@ -12,28 +12,55 @@ import time
 from cs.logutils import warning, exception
 from cs.seq import seq
 
+DISTINFO = {
+    'description': "A progress tracker with methods for throughput, ETA and update notification",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.logutils', 'cs.seq'],
+}
+
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(object):
   ''' A progress counter to track task completion with various utility methods.
+
+      >>> P = Progress("example")
+      >>> P                         #doctest: +ELLIPSIS
+      Progress('example',start=0,position=0,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0)]
+      >>> P.advance(5)
+      >>> P                         #doctest: +ELLIPSIS
+      Progress('example',start=0,position=5,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+      >>> P.total = 100
+      >>> P                         #doctest: +ELLIPSIS
+      Progress('example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+
+      A Progress instance has an attribute ``notify_update`` which
+      is a set of callables. Whenever the position is updates, each
+      of these will be called with the Progress instance and the
+      latest CheckPoint.
   '''
 
   def __init__(
       self,
-      total=None,
+      name=None,
       start=0, position=None,
       start_time=None, throughput_window=None,
-      name=None
+      total=None,
   ):
     ''' Initialise the Progesss object.
-        `total`: expected completion value, default None.
+        `name`: optional name for this instance.
         `start`: starting position of progress range, default 0.
         `position`: initial position, default from `start`.
         `start_time`: start time of the process, default now.
         `throughput_window`: length of throughput time window, default None.
+        `total`: expected completion value, default None.
     '''
     if name is None:
-      name = 'Progress-%d' % (seq(),)
+      name = '-'.join( ( str(type(self)), str(seq())) )
     now = time.time()
     if start is None:
       start = 0
@@ -51,12 +78,24 @@ class Progress(object):
     self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
-    posns = [ CheckPoint(start_time, start) ]
+    positions = [ CheckPoint(start_time, start) ]
     if position != start:
-      posns.append(CheckPoint(now, position))
-    self._positions = posns
+      positions.append(CheckPoint(now, position))
+    self._positions = positions
     self._flushed = True
     self.notify_update = set()
+
+  def __str__(self):
+    return "%s[start=%s:pos=%s:total=%s]" \
+        % (self.name, self.start, self.position, self.total)
+
+  def __repr__(self):
+    return "%s(%r,start=%s,position=%s,start_time=%s,thoughput_window=%s,total=%s):%r" \
+        % (
+            type(self).__name__, self.name,
+            self.start, self.position, self.start_time,
+            self.throughput_window, self.total,
+            self._positions)
 
   @property
   def latest(self):
@@ -108,12 +147,12 @@ class Progress(object):
       if window is None:
         raise ValueError("oldest may not be None when throughput_window is None")
       oldest = time.time() - window
-    posns = self._positions
+    positions = self._positions
     # scan for first item still in time window
-    for ndx, posn in enumerate(posns):
+    for ndx, posn in enumerate(positions):
       if posn.time >= oldest:
         if ndx > 0:
-          del posns[0:ndx]
+          del positions[0:ndx]
         break
     self._flushed = True
 
