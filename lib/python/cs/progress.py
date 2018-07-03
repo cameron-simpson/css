@@ -74,7 +74,7 @@ class Progress(object):
       raise ValueError("throughput_window <= 0: %s" % (throughput_window,))
     self.name = name
     self.start = start
-    self.total = total
+    self._total = total
     self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
@@ -97,6 +97,14 @@ class Progress(object):
             self.throughput_window, self.total,
             self._positions)
 
+  def _updated(self):
+    datum = self.latest
+    for notify in self.notify_update:
+      try:
+        notify(self, datum)
+      except Exception as e:
+        exception("%s: notify_update %s: %s", self, notify, e)
+
   @property
   def latest(self):
     ''' Latest datum.
@@ -114,6 +122,19 @@ class Progress(object):
     ''' Update the latest position.
     '''
     self.update(new_position)
+
+  @property
+  def total(self):
+    ''' Return the current total.
+    '''
+    return self._total
+
+  @total.setter
+  def total(self, new_total):
+    ''' Update the total.
+    '''
+    self._total = new_total
+    self._updated()
 
   @property
   def ratio(self):
@@ -155,11 +176,7 @@ class Progress(object):
     datum = CheckPoint(update_time, new_position)
     self._positions.append(datum)
     self._flushed = False
-    for notify in self.notify_update:
-      try:
-        notify(self, datum)
-      except Exception as e:
-        exception("%s: notify_update %s: %s", self, notify, e)
+    self._updated()
 
   def advance(self, delta, update_time=None):
     ''' Record more progress, return the advanced position.
