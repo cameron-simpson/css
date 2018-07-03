@@ -115,8 +115,37 @@ class Progress(object):
     '''
     self.update(new_position)
 
+  @property
+  def ratio(self):
+    ''' The fraction progress completed: (position-start)/(total-start).
+        Returns None if total is None or total <= start.
+
+        >>> P = Progress()
+        >>> P.ratio
+        >>> P.total = 16
+        >>> P.ratio
+        0.0
+        >>> P.update(4)
+        >>> P.ratio
+        0.25
+    '''
+    total = self.total
+    if total is None:
+      return None
+    start = self.start
+    if total <= start:
+      return None
+    return float(self.position - start) / (total - start)
+
   def update(self, new_position, update_time=None):
     ''' Record more progress.
+
+        >>> P = Progress()
+        >>> P.position
+        0
+        >>> P.update(12)
+        >>> P.position
+        12
     '''
     if update_time is None:
       update_time = time.time()
@@ -134,10 +163,32 @@ class Progress(object):
 
   def advance(self, delta, update_time=None):
     ''' Record more progress, return the advanced position.
+
+        >>> P = Progress()
+        >>> P.position
+        0
+        >>> P.advance(4)
+        >>> P.position
+        4
+        >>> P.advance(4)
+        >>> P.position
+        8
     '''
     self.update(self.position + delta, update_time=update_time)
 
   def __iadd__(self, delta):
+    ''' Operator += form of advance().
+
+        >>> P = Progress()
+        >>> P.position
+        0
+        >>> P += 4
+        >>> P.position
+        4
+        >>> P += 4
+        >>> P.position
+        8
+    '''
     self.advance(delta)
     return self
 
@@ -157,6 +208,12 @@ class Progress(object):
     self._flushed = True
 
   @property
+  def elapsed_time(self):
+    ''' Time elapsed since start_time.
+    '''
+    return time.time() - self.start_time
+
+  @property
   def throughput(self):
     ''' Compute current overall throughput.
         If self.throughput_window is not None,
@@ -171,15 +228,14 @@ class Progress(object):
               self, self.position, self.start)
     if consumed == 0:
       return 0
-    now = time.time()
-    elapsed = now - self.start_time
+    elapsed = self.elapsed_time
     if elapsed == 0:
       return 0
     if elapsed <= 0:
       warning("%s.throughput: negative elapsed time since start_time=%s: %s",
               self, self.start_time, elapsed)
       return 0
-    return consumed / elapsed
+    return float(consumed) / elapsed
 
   def throughput_recent(self, time_window):
     ''' Recent throughput within a time window.
@@ -214,14 +270,14 @@ class Progress(object):
       # in the future? warn and return None
       warning('low_time=%s >= now=%s', low_time, now)
       return 0
-    rate = (self.position - low_pos) / (now - low_time)
+    rate = float(self.position - low_pos) / (now - low_time)
     if rate < 0:
       warning('rate < 0 (%s)', rate)
     return rate
 
   @property
-  def projected(self):
-    ''' Return the projected time to end based on the current throughput and the total.
+  def remaining_time(self):
+    ''' Return the projected time remaining to end based on the current throughput and the total.
     '''
     total = self.total
     if total is None:
@@ -238,12 +294,12 @@ class Progress(object):
 
   @property
   def eta(self):
-    ''' Return the estimated time of completion.
+    ''' Return the projected time of completion.
     '''
-    runtime = self.projected
-    if runtime is None:
+    remaining = self.remaining_time
+    if remaining is None:
       return None
-    return time.time() + runtime
+    return time.time() + remaining
 
 if __name__ == '__main__':
   from cs.debug import selftest
