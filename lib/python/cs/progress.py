@@ -301,7 +301,7 @@ class Progress(object):
       return None
     remaining = total - self.position
     if remaining < 0:
-      warning("%s.eta: self.position(%s) > self.total(%s)",
+      warning("%s.remaining_time: self.position(%s) > self.total(%s)",
               self, self.position, self.total)
       return None
     throughput = self.throughput
