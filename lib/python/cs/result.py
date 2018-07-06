@@ -130,6 +130,12 @@ class Result(object):
     return "%s[%s]{%s}" % (self.__class__.__name__, self.name, self.state)
   __repr__ = __str__
 
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, other):
+    return self is other
+
   @property
   def ready(self):
     state = self.state
@@ -306,7 +312,7 @@ class Result(object):
     '''
     self._get_lock.acquire()
     self._get_lock.release()
-    return (self._result, self._exc_info)
+    return self._result, self._exc_info
 
   def get(self, default=None):
     ''' Wait for readiness; return the result if exc_info is None, otherwise `default`.
