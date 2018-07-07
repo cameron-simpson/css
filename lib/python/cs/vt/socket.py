@@ -90,6 +90,7 @@ class _ClientConnectionHandler(StreamRequestHandler):
   '''
 
   def setup(self):
+    super().setup()
     self.store_server = self.server.store_server
 
   @prop
