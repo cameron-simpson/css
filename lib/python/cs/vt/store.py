@@ -5,11 +5,6 @@
 #
 
 ''' Basic Store classes.
-
-    Throughout these classes the term 'channel' means an object with a .get()
-    method and usually a .put() method (unless it is instantiated with a
-    pre-queued value for the .get()). It may be a Queue, Q1, Channel, Get1
-    or any similar object for delivery of a result "later".
 '''
 
 from __future__ import with_statement
