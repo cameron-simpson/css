@@ -563,24 +563,32 @@ class ProxyStore(BasicStoreSync):
 
       Read Stores. Requested data may be obtained from these Stores.
 
-      A typical setup utilising a working ProxyStore might look like this:
+      A example setup utilising a working ProxyStore might look like this:
 
-        FileCacheStore(
-          ProxyStore(
-            save=local,upstream
-            read=local
-            read2=upstream
-          ),
-          cache_dir
+        ProxyStore(
+          save=[local,upstream],
+          save2=[spool],
+          read=[local],
+          read2=[upstream],
         )
 
-      where "local" is a local low latency store such as a DataDirStore
-      and "upstream" is a remote high latency Store such as a
-      TCPStore. This setup causes all saved data to be saved to
-      both Stores and data is fetched from the local Store in
-      preference to the remote Store. A FileCacheStore is placed
-      in front of the proxy to provide very low latency saves and
-      very low latency reads if data are in the cache.
+      In this example:
+        "local" is a local low latency store such as a DataDirStore.
+        "upstream" is a remote high latency Store such as a TCPStore.
+        "spool" is a local scondary Store, probably a DataDirStore
+
+      This setup causes all saved data to be saved to "local" and
+      "upstream". If a save to "local" or "upstream" fails, for
+      example if the upstream if offline, the save is repeated to
+      the "spool", intended as a holding location for data needing
+      a resave.
+
+      Reads are attempted first from the "read" Stores, then from
+      the "read2" Stores".
+
+      TODO: implement save2 saves
+      TODO: replay and purge the spool? probably better as a separate
+      pushto operation ("vt despool spool_store upstream_store").
   '''
 
   def __init__(self, name, save, read, read2=(), **kw):
