@@ -57,7 +57,6 @@ from functools import partial
 import sys
 from threading import Lock, Thread
 from cs.logutils import exception, error, warning, debug
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
@@ -110,8 +109,6 @@ class Result(object):
         `lock`: optional locking object, defaults to a new Lock
         `result`: if not None, prefill the .result property
     '''
-    O.__init__(self)
-    self._O_omit.extend(['result', 'exc_info'])
     if lock is None:
       lock = Lock()
     if name is None:
@@ -138,6 +135,8 @@ class Result(object):
 
   @property
   def ready(self):
+    ''' Whether the Result state is ready or cancelled.
+    '''
     state = self.state
     return state == ResultState.ready or state == ResultState.cancelled
 
@@ -149,6 +148,8 @@ class Result(object):
 
   @property
   def pending(self):
+    ''' Whether the Result is pending.
+    '''
     return self.state == ResultState.pending
 
   def empty(self):
@@ -158,7 +159,7 @@ class Result(object):
 
   def cancel(self):
     ''' Cancel this function.
-        If self.state is ResultState.pending or ResultState.cancelled, return True.
+        If self.state is pending or cancelled, return True.
         Otherwise return False (too late to cancel).
     '''
     with self._lock:
@@ -175,12 +176,16 @@ class Result(object):
       else:
         # state error
         raise RuntimeError(
-            "<%s>.state not one of (ResultState.pending, ResultState.cancelled, ResultState.running, ResultState.ready): %r", self, state)
+            "<%s>.state not one of (pending, cancelled, running, ready): %r"
+            % (self, state))
       self._complete(None, None)
     return True
 
   @property
   def result(self):
+    ''' The result.
+        This property is not available before completion.
+    '''
     state = self.state
     if state == ResultState.cancelled:
       raise CancellationError()
@@ -190,6 +195,8 @@ class Result(object):
 
   @result.setter
   def result(self, new_result):
+    ''' Set the .result attribute, completing the Result.
+    '''
     with self._lock:
       self._complete(new_result, None)
 
@@ -200,6 +207,9 @@ class Result(object):
 
   @property
   def exc_info(self):
+    ''' The exception information from a completed Result.
+        This is not available before completion.
+    '''
     state = self.state
     if state == ResultState.cancelled:
       raise CancellationError()
@@ -237,14 +247,21 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate Thread, returning the Thread.
+    ''' Submit a function to compute the result in a separate Thread,
+        returning the Thread.
+
         The Result must be in "pending" state, and transitions to "running".
     '''
     with self._lock:
       state = self.state
       if state != ResultState.pending:
-        raise RuntimeError("<%s>.state is not ResultState.pending, rejecting background function call of %s" % (self, func))
-      T = Thread(name="<%s>.bg(func=%s,...)" % (self, func), target=self.call, args=[func] + list(a), kwargs=kw)
+        raise RuntimeError(
+            "<%s>.state is not pending, rejecting background function call of %s"
+            % (self, func))
+      T = Thread(
+          name="<%s>.bg(func=%s,...)" % (self, func),
+          target=self.call,
+          args=[func] + list(a), kwargs=kw)
       self.state = ResultState.running
     T.start()
     return T
@@ -256,9 +273,14 @@ class Result(object):
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
-          "one of (result, exc_info) must be None, got (%r, %r)" % (result, exc_info))
+          "one of (result, exc_info) must be None, got (%r, %r)"
+          % (result, exc_info))
     state = self.state
-    if state == ResultState.cancelled or state == ResultState.running or state == ResultState.pending:
+    if (
+        state == ResultState.cancelled
+        or state == ResultState.running
+        or state == ResultState.pending
+    ):
       self._result = result
       self._exc_info = exc_info
       if state != ResultState.cancelled:
@@ -272,7 +294,7 @@ class Result(object):
             % (self, result, exc_info)
         )
       raise RuntimeError(
-          "<%s>.state is not one of (ResultState.cancelled, ResultState.running, ResultState.pending, ResultState.ready): %r"
+          "<%s>.state is not one of (cancelled, running, pending, ready): %r"
           % (self, state)
       )
     if self.final is not None:
@@ -346,16 +368,18 @@ class Result(object):
     ''' On completion without an exception, call `submitter(self.result)` or report exception.
     '''
     def notifier(R):
+      ''' Wrapper for `submitter`.
+      '''
       exc_info = R.exc_info
       if exc_info is None:
         return submitter(R.result)
-      else:
-        # report error
-        if prefix:
-          with Pfx(prefix):
-            error("exception: %r", exc_info)
-        else:
+      # report error
+      if prefix:
+        with Pfx(prefix):
           error("exception: %r", exc_info)
+      else:
+        error("exception: %r", exc_info)
+      return None
     self.notify(notifier)
 
 def bg(func, *a, **kw):
@@ -381,7 +405,9 @@ def report(LFs):
     yield Q.get()
 
 def after(Rs, R, func, *a, **kw):
-  ''' After the completion of `Rs` call `func(*a, **kw)` and return its result via `R`; return the Result object.
+  ''' After the completion of `Rs` call `func(*a, **kw)` and return
+      its result via `R`; return the Result object.
+
       `Rs`: an iterable of Results.
       `R`: a Result to collect to result of calling `func`. If None,
            one will be created.
@@ -398,7 +424,7 @@ def after(Rs, R, func, *a, **kw):
     R.call(func, *a, **kw)
   else:
     countery = [count]  # to stop "count" looking like a local var inside the closure
-    def count_down(subR):
+    def count_down(_):
       ''' Notification function to submit `func` after sufficient invocations.
       '''
       with lock:
@@ -410,7 +436,7 @@ def after(Rs, R, func, *a, **kw):
       if count == 0:
         R.call(func, *a, **kw)
       else:
-        raise RuntimeError("count < 0: %d", count)
+        raise RuntimeError("count < 0: %d" % (count,))
     # submit the notifications
     for subR in Rs:
       subR.notify(count_down)
