@@ -225,7 +225,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       finally:
         self.close()
       return value
-    return self.__funcQ.bg(func2, *a, **kw)
+    return self.__funcQ.bg(func2)
 
   ##########################################################################
   # Core Store methods, all abstract.
