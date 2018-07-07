@@ -586,11 +586,12 @@ class ProxyStore(BasicStoreSync):
       pushto operation ("vt despool spool_store upstream_store").
   '''
 
-  def __init__(self, name, save, read, read2=(), **kw):
+  def __init__(self, name, save, read, *, save2=(), read2=(), **kw):
     ''' Initialise a ProxyStore.
         `name`: ProxyStore name.
         `save`: iterable of Stores to which to save blocks
         `read`: iterable of Stores from which to fetch blocks
+        `save2`: fallback Store for saves which fail
         `read2`: optional fallback iterable of Stores from which
           to fetch blocks if not found via `read`. Typically these
           would be higher latency upstream Stores.
@@ -598,18 +599,21 @@ class ProxyStore(BasicStoreSync):
     BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
+    self.save2 = frozenset(save2)
     self.read2 = frozenset(read2)
     self._attrs.update(save=save, read=read)
+    if save2:
+      self._attrs.update(save2=save2)
     if read2:
       self._attrs.update(read2=read2)
     self.readonly = len(self.save) == 0
 
   def startup(self):
-    for S in self.save | self.read | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2:
       S.open()
 
   def shutdown(self):
-    for S in self.save | self.read | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2:
       S.close()
 
   def _multicall(self, stores, method_name, args):
