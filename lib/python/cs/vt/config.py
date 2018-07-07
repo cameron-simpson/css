@@ -361,6 +361,7 @@ class Config:
       type_=None,
       save=None,
       read=None,
+      save2=None,
       read2=None,
       runstate=None,
   ):
@@ -383,6 +384,13 @@ class Config:
       read_stores = self.Stores_from_spec(read)
     else:
       read_stores = read
+    if save2 is None:
+      save2_stores = []
+    else:
+      if isinstance(save2, str):
+        save2_stores = self.Stores_from_spec(save2)
+      else:
+        save2_stores = save2
     if read2 is None:
       read2_stores = []
     elif isinstance(read2, str):
@@ -391,7 +399,11 @@ class Config:
       read2_stores = read2
     if runstate is None:
       runstate = self.runstate
-    S = ProxyStore(store_name, save_stores, read_stores, read2_stores, runstate=runstate)
+    S = ProxyStore(
+        store_name,
+        save_stores, read_stores,
+        save2=save2_stores, read2=read2_stores,
+        runstate=runstate)
     S.readonly = readonly
     return S
 
