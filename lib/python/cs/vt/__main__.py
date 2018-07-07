@@ -238,7 +238,9 @@ class VTCmd:
         exception("can't open store %r: %s", self.store_spec, e)
         raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
       defaults.push_Ss(S)
-      if self.cache_store_spec is not None:
+      if self.cache_store_spec is None:
+        cacheS = None
+      else:
         try:
           cacheS = Store(self.cache_store_spec, self.config)
         except Exception as e:
