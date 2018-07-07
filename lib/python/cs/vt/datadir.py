@@ -823,11 +823,11 @@ class DataDir(_FilesDir):
     return hashcode
 
   @staticmethod
-  def scanfrom(filepath, offset=0):
+  def scanfrom(filepath, offset=0, **kw):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
     with DataFile(filepath) as DF:
-      yield from DF.scanfrom(offset)
+      yield from DF.scanfrom(offset, **kw)
 
 class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
   ''' A block record for a PlatonicDir.
@@ -1161,9 +1161,10 @@ class PlatonicDir(_FilesDir):
       time.sleep(11)
 
   @staticmethod
-  def scanfrom(filepath, offset=0):
+  def scanfrom(filepath, offset=0, do_decompress=False):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
+    assert do_decompress is True
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
