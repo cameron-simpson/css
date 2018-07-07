@@ -1,0 +1,1 @@
+Progress: additions and changes to API: new .ratio, .elapsed_time, rename .projected to .remaining_time.
