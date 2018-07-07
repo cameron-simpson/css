@@ -215,10 +215,14 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         do all their work through the Store's function queue, such
         as the .pushto method's worker.
     '''
+    self.open()
     def func2():
-      with self:
-        return func(*a, **kw)
-    return self.__funcQ.bg(func2)
+      try:
+        value = func(*a, **kw)
+      finally:
+        self.close()
+      return value
+    return self.__funcQ.bg(func2, *a, **kw)
 
   ##########################################################################
   # Core Store methods, all abstract.
