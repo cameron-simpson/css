@@ -4,10 +4,13 @@
 #   - Cameron Simpson <cs@cskk.id.au> 28oct2015
 #
 
+''' Utility functions and classes for sockets.
+'''
+
 import os
 import errno
 import socket
-from cs.logutils import warning, info
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.x import X
 
@@ -45,18 +48,26 @@ class OpenSocket(object):
     X("OpenSocket init done")
 
   def __str__(self):
-    return "OpenSocket[fd=%d,fd0=%d]" % (self._fd, self._fd0)
+    return "%s[fd=%d,fd0=%d]" % (type(self).__name__, self._fd, self._fd0)
 
   def write(self, data):
+    ''' Write to the socket.
+    '''
     return self._fp.write(data)
 
   def read(self, size=None):
+    ''' Read from the socket.
+    '''
     return self._fp.read(size)
 
   def flush(self):
+    ''' Flush any buffered data to the socket.
+    '''
     return self._fp.flush()
 
   def close(self):
+    ''' Close the socket.
+    '''
     with Pfx("%s.close", self):
       if self._sock is None:
         warning("close when _sock=None")
@@ -81,7 +92,7 @@ class OpenSocket(object):
           else:
             X("UNEXPECTED ERROR 1: %s:%r", type(e), e)
             raise
-        except:
+        except Exception as e:
           X("UNEXPECTED ERROR 2: %s:%r", type(e), e)
         self._close()
 
@@ -101,6 +112,8 @@ class OpenSocket(object):
       self._sock = None
 
   def selfcheck(self):
+    ''' Perform an internal self check.
+    '''
     st1 = os.fstat(self._fd)
     st2 = os.fstat(self._fd0)
     st3 = os.fstat(self._sock)
