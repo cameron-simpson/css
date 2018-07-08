@@ -16,7 +16,7 @@ which will raise an exception in the caller.
 A Result may be called by multiple users, before or after the value has been delivered;
 if the value has been delivered the caller returns with it immediately.
 A Result's state may be inspected (pending, running, ready, cancelled).
-Callbacks can be registered via an Asychron's .notify method.
+Callbacks can be registered via a Result's .notify method.
 
 An incomplete Result can be told to call a function to compute its value;
 the function return will be stored as the value unless the function raises an exception,
@@ -42,10 +42,11 @@ Trite example::
 
 You can also collect multiple Results in completion order using the report() function::
 
-  Rs = [ ... list of Results or whatever type ... ]
+  Rs = [ ... list of Results of whatever type ... ]
   ...
   for R in report(Rs):
-    x = R()     # collect result, will return immediately
+    x = R()     # collect result, will return immediately because
+                # the Result is complete
     print(x)    # print result
 '''
 
@@ -103,7 +104,7 @@ class Result(object):
   def __init__(self, name=None, final=None, lock=None, result=None):
     ''' Base initialiser for Result objects and subclasses.
         `name`: optional parameter naming this object.
-        `final`: a function to run after completion of the asynchron,
+        `final`: a function to run after completion of the Result,
                  regardless of the completion mode (result, exception,
                  cancellation).
         `lock`: optional locking object, defaults to a new Lock
