@@ -101,12 +101,9 @@ class Result(object):
       objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None, final=None, lock=None, result=None):
+  def __init__(self, name=None, lock=None, result=None):
     ''' Base initialiser for Result objects and subclasses.
         `name`: optional parameter naming this object.
-        `final`: a function to run after completion of the Result,
-                 regardless of the completion mode (result, exception,
-                 cancellation).
         `lock`: optional locking object, defaults to a new Lock
         `result`: if not None, prefill the .result property
     '''
@@ -115,7 +112,6 @@ class Result(object):
     if name is None:
       name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
-    self.final = final
     self.state = ResultState.pending
     self.notifiers = []
     self.collected = False
@@ -310,15 +306,6 @@ class Result(object):
           "<%s>.state is not one of (cancelled, running, pending, ready): %r"
           % (self, state)
       )
-    if self.final is not None:
-      try:
-        final_result = self.final()
-      except Exception as e:
-        exception("%s: exception from .final(): %s", self.name, e)
-      else:
-        if final_result is not None:
-          warning(
-              "%s: discarding non-None result from .final(): %r", self.name, final_result)
     self._get_lock.release()
     notifiers = self.notifiers
     del self.notifiers
@@ -461,8 +448,7 @@ class _PendingFunction(Result):
   '''
 
   def __init__(self, func, *a, **kw):
-    final = kw.pop('final', None)
-    Result.__init__(self, final=final)
+    Result.__init__(self)
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
