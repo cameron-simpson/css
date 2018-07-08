@@ -90,7 +90,13 @@ class OpenSocket(object):
 
   def _close(self):
     if self._fp:
-      self._fp.close()
+      try:
+        self._fp.close()
+      except OSError as e:
+        if e.errno == errno.EPIPE:
+          warning("%s: %s.close: %s", self, self._fp, e)
+        else:
+          raise
       self._fp = None
       self._sock = None
 
