@@ -112,7 +112,7 @@ class Result(object):
     if lock is None:
       lock = Lock()
     if name is None:
-      name = "%s-%d" % (self.__class__.__name__, seq(),)
+      name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
     self.final = final
     self.state = ResultState.pending
@@ -124,7 +124,7 @@ class Result(object):
       self.result = result
 
   def __str__(self):
-    return "%s[%s]{%s}" % (self.__class__.__name__, self.name, self.state)
+    return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
   __repr__ = __str__
 
   def __hash__(self):
