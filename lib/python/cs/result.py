@@ -118,6 +118,7 @@ class Result(object):
     self.final = final
     self.state = ResultState.pending
     self.notifiers = []
+    self.collected = False
     self._get_lock = Lock()
     self._get_lock.acquire()
     self._lock = lock
@@ -127,6 +128,13 @@ class Result(object):
   def __str__(self):
     return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
   __repr__ = __str__
+
+  def __del__(self):
+    if not self.collected:
+      if self.ready:
+        exc_info = self.exc_info
+        if exc_info:
+          raise RuntimeError("UNREPORTED EXCEPTION: %r" % (exc_info,))
 
   def __hash__(self):
     return id(self)
@@ -189,8 +197,10 @@ class Result(object):
     '''
     state = self.state
     if state == ResultState.cancelled:
+      self.collected = True
       raise CancellationError()
     if state == ResultState.ready:
+      self.collected = True
       return self._result
     raise AttributeError("%s not ready: no .result attribute" % (self,))
 
@@ -213,8 +223,10 @@ class Result(object):
     '''
     state = self.state
     if state == ResultState.cancelled:
+      self.collected = True
       raise CancellationError()
     if state == ResultState.ready:
+      self.collected = True
       return self._exc_info
     raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
 
