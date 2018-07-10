@@ -1,0 +1,3 @@
+use a runstate for global control and SIGINT
+make + rules not set the "filed" flag - for xref, labels etc
+prepend received lines on pickup and filing
