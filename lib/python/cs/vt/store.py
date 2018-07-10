@@ -26,16 +26,12 @@ from cs.threads import bg
 from cs.x import X
 from . import defaults
 from .datadir import DataDir, PlatonicDir
-from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin, MissingHashcodeError
 
-class MissingHashcodeError(KeyError):
-  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
+class StoreError(Exception):
+  ''' Raised by Store operation failures.
   '''
-  def __init__(self, hashcode):
-    KeyError.__init__(self, str(hashcode))
-    self.hashcode = hashcode
-  def __str__(self):
-    return "missing hashcode: %s" % (self.hashcode,)
+  pass
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
