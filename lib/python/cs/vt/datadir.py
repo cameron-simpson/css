@@ -28,7 +28,7 @@ from cs.csvutils import csv_reader
 from cs.excutils import logexc
 from cs.fileutils import makelockfile, shortpath, longpath, read_from, DEFAULT_READSIZE, datafrom_fd, ReadMixin
 from cs.logutils import debug, info, warning, error, exception
-from cs.pfx import Pfx, PfxThread as Thread
+from cs.pfx import Pfx, PfxThread as Thread, XP
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
@@ -36,11 +36,13 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.x import X
 from . import MAX_FILE_SIZE
 from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, DATAFILE_DOT_EXT
+from .debug import dump_Dirent
 from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
@@ -546,9 +548,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         DFstate = filemap[entry.n]
         DFstate.indexed_to = max(DFstate.indexed_to, post_offset)
         if DFstate is not oldF:
-          info("switch to %r: %r", DFstate.filename, DFstate.pathname)
-          if oldF is not None:
-            info("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
+          ##info("switch to %r: %r", DFstate.filename, DFstate.pathname)
+          ##if oldF is not None:
+          ##  info("previous: %r indexed_to=%s", oldF.filename, oldF.indexed_to)
           oldF = DFstate
           need_sync = True
         if need_sync and indexQ.empty():
@@ -982,6 +984,7 @@ class PlatonicDir(_FilesDir):
     if self.meta_store is not None:
       with self.meta_store:
         self.archive.update(self.topdir)
+        ##dump_Dirent(self.topdir, recurse=True)
     return _FilesDir._save_state(self)
 
   @staticmethod
@@ -1022,6 +1025,8 @@ class PlatonicDir(_FilesDir):
     indexQ = self._indexQ
     if meta_store is not None:
       topdir = self.topdir
+    else:
+      warning("%s: no meta_store!", self)
     while not self.cancelled:
       if self.flag_scan_disable:
         time.sleep(1)
@@ -1040,18 +1045,23 @@ class PlatonicDir(_FilesDir):
             self._save_state()
           rdirpath = relpath(dirpath, datadirpath)
           with Pfx(rdirpath):
+            # this will be the subdirectories into which to recurse
             pruned_dirnames = []
             for dname in dirnames:
               if self.exclude_dir(joinpath(rdirpath, dname)):
+                # unwanted
                 continue
               subdirpath = joinpath(dirpath, dname)
               try:
                 S = os.stat(subdirpath)
               except OSError as e:
+                # inaccessable
                 warning("stat(%r): %s, skipping", subdirpath, e)
                 continue
               ino = S.st_dev, S.st_ino
               if ino in seen:
+                # we have seen this subdir before, probably via a symlink
+                # TODO: preserve symlinks? attach alter ego directly as a Dir?
                 info("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
                 continue
               seen.add(ino)
@@ -1106,7 +1116,8 @@ class PlatonicDir(_FilesDir):
                       info("new FileDirent replacing previous nonfile")
                       E = D[E] = FileDirent(filename)
                 if new_size > DFstate.scanned_to:
-                  info("scan from %d", DFstate.scanned_to)
+                  if DFstate.scanned_to > 0:
+                    info("scan from %d", DFstate.scanned_to)
                   if meta_store is not None:
                     blockQ = IterableQueue()
                     R = meta_store.bg(
