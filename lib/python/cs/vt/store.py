@@ -17,8 +17,9 @@ from cs.later import Later
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py.func import prop
-from cs.queues import IterableQueue
+from cs.py.func import prop, funccite
+from cs.py.stack import caller
+from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.result import report
 from cs.seq import Seq
@@ -212,15 +213,21 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         do all their work through the Store's function queue, such
         as the .pushto method's worker.
     '''
+    # keep the Store open
     self.open()
     def func2():
       ''' Inner function to call `func` and then close the Store.
       '''
-      try:
-        value = func(*a, **kw)
-      finally:
-        self.close()
-      return value
+      # use the Store as the context for actions
+      with self:
+        try:
+          value = func(*a, **kw)
+        finally:
+          # release the Store from earlier
+          self.close()
+        return value
+    clr = caller()
+    func2.__name__ = "%s (from %s)" % (funccite(func), clr)
     return self.__funcQ.bg(func2)
 
   ##########################################################################
