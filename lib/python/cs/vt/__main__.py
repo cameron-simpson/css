@@ -561,6 +561,7 @@ class VTCmd:
     try:
       special = args.pop(0)
     except IndexError:
+      special = None
       error("missing special")
       badopts = True
     else:
