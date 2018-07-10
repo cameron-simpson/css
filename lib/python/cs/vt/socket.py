@@ -14,7 +14,7 @@ from socketserver import TCPServer, UnixStreamServer, \
 import sys
 from threading import Thread
 from cs.excutils import logexc
-from cs.logutils import info, exception
+from cs.logutils import info, warning, exception
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -117,7 +117,9 @@ class _ClientConnectionHandler(StreamRequestHandler):
 class _TCPServer(ThreadingMixIn, TCPServer):
 
   def __init__(self, store_server, bind_addr):
-    with Pfx("%s.__init__(store_server=%s, bind_addr=%r)", type(self), store_server, bind_addr):
+    with Pfx(
+        "%s.__init__(store_server=%s, bind_addr=%r)",
+        type(self).__name__, store_server, bind_addr):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.store_server = store_server
@@ -155,23 +157,27 @@ class TCPClientStore(StreamStore):
       self.sock.close()
 
   def _tcp_connect(self):
-    info("TCP CONNECT to %r", self.sock_bind_addr)
-    assert not self.sock, "self.sock=%s" % (self.sock,)
-    # TODO: IPv6 support
-    self.sock = socket(AF_INET)
-    try:
-      self.sock.connect(self.sock_bind_addr)
-    except OSError as e:
-      exception("socket.connect(bind_addr=%r): %s", self.sock_bind_addr, e)
-      self.sock.close()
-      self.sock = None
-      raise
-    return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+    with Pfx("connect %r", self.sock_bind_addr):
+      X("TCP CONNECT to %r ...", self.sock_bind_addr)
+      if self.sock:
+        warning("self.sock already set, leaking: %s", self.sock)
+      # TODO: IPv6 support
+      self.sock = socket(AF_INET)
+      try:
+        self.sock.connect(self.sock_bind_addr)
+      except:
+        self.sock.close()
+        self.sock = None
+        raise
+      X("TCP CONNECT to %r: CONNECTED", self.sock_bind_addr)
+      return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, store_server, socket_path, exports=None):
-    with Pfx("%s.__init__(store_server, socket_path=%r)", type(self), store_server, socket_path):
+    with Pfx(
+        "%s.__init__(store_server=%s, socket_path=%r)",
+        type(self), store_server, socket_path):
       UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
       self.store_server = store_server
       self.socket_path = socket_path
@@ -215,18 +221,18 @@ class UNIXSocketClientStore(StreamStore):
       self.sock.close()
 
   def _unixsock_connect(self):
-    info("UNIX SOCKET CONNECT to %r", self.socket_path)
-    assert not self.sock, "self.sock=%s" % (self.sock,)
-    self.sock = socket(AF_UNIX)
-    with Pfx("connect(%r)", self.socket_path):
-      try:
-        self.sock.connect(self.socket_path)
-      except OSError as e:
-        exception("%s.connect(%r): %s", self.sock, self.socket_path, e)
-        self.sock.close()
-        self.sock = None
-        raise
-    return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+    with Pfx("connect %r", self.socket_path):
+      info("UNIX SOCKET CONNECT to %r", self.socket_path)
+      assert not self.sock, "self.sock=%s" % (self.sock,)
+      self.sock = socket(AF_UNIX)
+      with Pfx("connect(%r)", self.socket_path):
+        try:
+          self.sock.connect(self.socket_path)
+        except OSError as e:
+          self.sock.close()
+          self.sock = None
+          raise
+      return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
 if __name__ == '__main__':
   from .socket_tests import selftest
