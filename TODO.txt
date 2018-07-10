@@ -1,3 +1,4 @@
+mailfiler: use a runstate for global control and SIGINT
 make + rules not set the "filed" flag - for xref, labels etc
 take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
 cs.resources: finish subopen proxy support
