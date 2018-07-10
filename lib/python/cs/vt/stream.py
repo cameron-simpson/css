@@ -16,12 +16,13 @@ from cs.excutils import logexc
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.resources import ClosedError
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
 from cs.threads import locked
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum
-from .store import BasicStoreSync
+from .store import StoreError, BasicStoreSync
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -159,6 +160,23 @@ class StreamStore(BasicStoreSync):
     ''' Wait for the PacketConnection to shut down.
     '''
     self._conn.join()
+
+  def do(self, rqtype, flags, data):
+    ''' Wrapper for self._conn.do to catch and report failed autoconnection.
+    '''
+    with Pfx(
+        "%s.do(rqtype=%s,flags=0x%02x,data=%d-bytes)",
+        self, rqtype, flags, len(data)):
+      try:
+        conn = self._conn
+      except AttributeError as e:
+        raise StoreError("no connection: %s" % (e,)) from e
+      else:
+        try:
+          return conn.do(rqtype, flags, data)
+        except ClosedError as e:
+          del self._conn
+          raise StoreError("connection closed: %s" % (e,)) from e
 
   @logexc
   def _handle_request(self, rq_type, flags, payload):
