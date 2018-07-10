@@ -42,7 +42,7 @@ from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
 from .datafile import DataFile, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
 
@@ -1052,7 +1052,7 @@ class PlatonicDir(_FilesDir):
                 continue
               ino = S.st_dev, S.st_ino
               if ino in seen:
-                warning("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
+                info("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
                 continue
               seen.add(ino)
               pruned_dirnames.append(dname)
@@ -1071,87 +1071,90 @@ class PlatonicDir(_FilesDir):
                 if self.cancelled or self.flag_scan_disable:
                   break
                 rfilepath = joinpath(rdirpath, filename)
-                with Pfx(filename):
-                  if self.exclude_file(rfilepath):
-                    continue
-                  try:
-                    DFstate = filemap[rfilepath]
-                  except KeyError:
-                    filenum = self._add_datafile(rfilepath)
-                    DFstate = filemap[filenum]
+                if self.exclude_file(rfilepath):
+                  continue
+                try:
+                  DFstate = filemap[rfilepath]
+                except KeyError:
+                  filenum = self._add_datafile(rfilepath)
+                  DFstate = filemap[filenum]
+                  need_save = True
+                else:
+                  filenum = DFstate.filenum
+                try:
+                  new_size = DFstate.stat_size(self.follow_symlinks)
+                except OSError as e:
+                  if e.errno == errno.ENOENT:
+                    warning("forgetting missing file")
+                    self._del_datafilestate(DFstate)
                     need_save = True
                   else:
-                    filenum = DFstate.filenum
+                    warning("stat: %s", e)
+                  continue
+                if new_size is None:
+                  # skip non files
+                  debug("SKIP non-file")
+                  continue
+                if meta_store is not None:
                   try:
-                    new_size = DFstate.stat_size(self.follow_symlinks)
-                  except OSError as e:
-                    if e.errno == errno.ENOENT:
-                      warning("forgetting missing file")
-                      self._del_datafilestate(DFstate)
-                      need_save = True
-                    else:
-                      warning("stat: %s", e)
-                    continue
-                  if new_size is None:
-                    # skip non files
-                    debug("SKIP non-file")
-                    continue
+                    E = D[filename]
+                  except KeyError:
+                    E = FileDirent(filename)
+                    D[filename] = E
+                  else:
+                    if not E.isfile:
+                      info("new FileDirent replacing previous nonfile")
+                      E = D[E] = FileDirent(filename)
+                if new_size > DFstate.scanned_to:
+                  info("scan from %d", DFstate.scanned_to)
                   if meta_store is not None:
+                    blockQ = IterableQueue()
+                    R = meta_store.bg(
+                        lambda B, Q: top_block_for(spliced_blocks(B, Q)),
+                        E.block, blockQ)
+                  scan_from = DFstate.scanned_to
+                  scan_start = time.time()
+                  for offset, flags, data, post_offset in DFstate.scanfrom(
+                      offset=DFstate.scanned_to, do_decompress=True):
+                    assert flags == 0
+                    hashcode = self.hashclass.from_chunk(data)
+                    indexQ.put( (
+                        hashcode,
+                        PlatonicDirIndexEntry(filenum, offset, len(data)),
+                        post_offset
+                    ) )
+                    if meta_store is not None:
+                      B = Block(data=data, hashcode=hashcode, added=True)
+                      blockQ.put( (offset, B) )
+                    DFstate.scanned_to = post_offset
+                    need_save = True
+                    if self.cancelled or self.flag_scan_disable:
+                      break
+                  elapsed = time.time() - scan_start
+                  scanned = DFstate.scanned_to - scan_from
+                  if elapsed > 0:
+                    scan_rate = scanned / elapsed
+                  else:
+                    scan_rate = None
+                  if scan_rate is None:
+                    info(
+                        "scanned to %d: %s",
+                        DFstate.scanned_to,
+                        transcribe_bytes_geek(scanned))
+                  else:
+                    info(
+                        "scanned to %d: %s at %s/s",
+                        DFstate.scanned_to,
+                        transcribe_bytes_geek(scanned),
+                        transcribe_bytes_geek(scan_rate))
+                  if meta_store is not None:
+                    blockQ.close()
                     try:
-                      E = D[filename]
-                    except KeyError:
-                      info("new FileDirent")
-                      E = FileDirent(filename)
-                      D[filename] = E
-                    else:
-                      if not E.isfile:
-                        info("new FileDirent replacing previous nonfile")
-                        E = D[E] = FileDirent(filename)
-                  if new_size > DFstate.scanned_to:
-                    info("scan from %d", DFstate.scanned_to)
-                    if meta_store is not None:
-                      blockQ = IterableQueue()
-                      R = meta_store.bg(
-                          lambda B, Q: top_block_for(spliced_blocks(B, Q)),
-                          E.block, blockQ)
-                    scan_from = DFstate.scanned_to
-                    scan_start = time.time()
-                    for offset, flags, data, post_offset in DFstate.scanfrom(
-                        offset=DFstate.scanned_to, do_decompress=True):
-                      assert flags == 0
-                      hashcode = self.hashclass.from_chunk(data)
-                      indexQ.put( (
-                          hashcode,
-                          PlatonicDirIndexEntry(filenum, offset, len(data)),
-                          post_offset
-                      ) )
-                      if meta_store is not None:
-                        B = Block(data=data, hashcode=hashcode, added=True)
-                        blockQ.put( (offset, B) )
-                      DFstate.scanned_to = post_offset
-                      need_save = True
-                      if self.cancelled or self.flag_scan_disable:
-                        break
-                    elapsed = time.time() - scan_start
-                    scanned = DFstate.scanned_to - scan_from
-                    if elapsed > 0:
-                      scan_rate = scanned / elapsed
-                    else:
-                      scan_rate = None
-                    if scan_rate is None:
-                      info(
-                          "scanned to %d: %s",
-                          DFstate.scanned_to,
-                          transcribe_bytes_geek(scanned))
-                    else:
-                      info(
-                          "scanned to %d: %s at %s/s",
-                          DFstate.scanned_to,
-                          transcribe_bytes_geek(scanned),
-                          transcribe_bytes_geek(scan_rate))
-                    if meta_store is not None:
-                      blockQ.close()
                       top_block = R()
+                    except MissingHashcodeError as e:
+                      error("missing data, forcing rescan: %s", e)
+                      DFstate.scanned_to=0
+                    else:
                       E.block = top_block
                       D.changed = True
                       need_save = True
