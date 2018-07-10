@@ -65,7 +65,6 @@ def make_pattern(pattern, default_colour=None):
         a tuple of the form (colour, regexp)
         a regexp object
   '''
-  pattern0 = pattern
   if default_colour is None:
     default_colour = DEFAULT_HIGHLIGHT
   if isinstance(pattern, str):
@@ -99,7 +98,7 @@ def make_patterns(patterns, default_colour=None):
       for pattern in patterns
   ]
 
-def colourise(s, patterns, default_colour=None):
+def colourise_patterns(s, patterns, default_colour=None):
   ''' Colourise a string according to regular expressions.
       `s`: the string
       `patterns`: a sequence of patterns

@@ -47,7 +47,6 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext
-from .blockmap import BlockMap
 from .hash import decode as hash_decode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -215,9 +214,10 @@ class _Block(Transcriber, ABC):
     self.type = block_type
     if span is not None:
       if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r", span)
+        raise ValueError("invalid span: %r" % (span,))
       self.span = span
     self.indirect = False
+    self.blockmap = None
     self._lock = RLock()
 
   def __eq__(self, oblock):
@@ -358,20 +358,21 @@ class _Block(Transcriber, ABC):
       yield self
 
   @locked
-  def get_blockmap(self, force=False):
+  def get_blockmap(self, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
-        `force`: if True, create a new blockmap anyway; default: False
+        `force`: if true, create a new blockmap anyway; default: False
+        `blockmapdir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
     else:
-      try:
-        blockmap = self.blockmap
-      except AttributeError:
-        blockmap = None
+      blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
-      self.blockmap = blockmap = BlockMap(self)
+      from .blockmap import BlockMap
+      if blockmapdir is None:
+        blockmapdir = defaults.S.blockmapdir
+      self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
   def chunks(self, start=None, end=None, no_blockmap=False):
@@ -384,6 +385,7 @@ class _Block(Transcriber, ABC):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
+    ##X("slices %s ...", self)
     if start is None:
       start = 0
     elif start < 0:
@@ -395,19 +397,19 @@ class _Block(Transcriber, ABC):
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
-        try:
-          blockmap = self.blockmap
-        except AttributeError:
-          pass
-        else:
+        blockmap = self.blockmap
+        if blockmap:
+          X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
           yield from blockmap.slices(start, end - start)
           return
+        X("_Block:%s.slices: no BlockMap (%r), fall through", self, blockmap)
       offset = 0
+      X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:
         sublen = len(B)
-        substart = max(0, start - offset)
-        subend = min(sublen, end - offset)
-        if substart < subend:
+        if start <= offset:
+          substart = max(0, start - offset)
+          subend = min(sublen, end - offset)
           yield from B.slices(substart, subend)
         offset += sublen
         if offset >= end:
@@ -485,7 +487,43 @@ class _Block(Transcriber, ABC):
     if mode == 'w+b':
       from .file import File
       return File(backing_block=self)
-    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
+
+  def pushto(self, S2, Q=None, runstate=None):
+    ''' Push this Block and any implied subblocks to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        `runstate`: optional RunState used to cancel operation
+        If `Q` is supplied, this method will return as soon as all
+        the relevant Blocks have been pushed i.e. possibly before
+        delivery is complete. If `Q` is not supplied, a new Queue
+        is allocated; after all Blocks have been pushed the Queue
+        is closed and its worker waited for.
+        TODO: optional `no_wait` parameter to control waiting,
+        default False, which would support closing the Queue but
+        not waiting for the worker completion. This is on the premise
+        that the final Store shutdown of `S2` will wait for outstanding
+        operations anyway.
+    '''
+    S1 = defaults.S
+    if Q is None:
+      # create a Queue and a worker Thread
+      Q, T = S1.pushto(S2)
+    else:
+      # use an existing Queue, no Thread to wait for
+      T = None
+    Q.put(self)
+    if self.indirect:
+      # recurse, reusing the Queue
+      for subB in self.subblocks:
+        if runstate and runstate.cancelled:
+          warning("pushto(%s) cancelled", self)
+          break
+        subB.pushto(S2, Q, runstate=runstate)
+    if T:
+      Q.close()
+      T.join()
 
 @lru_cache(maxsize=1024*1024, typed=True)
 def get_HashCodeBlock(hashcode):
@@ -544,8 +582,10 @@ class HashCodeBlock(_Block):
 
   @span.setter
   def span(self, newspan):
+    ''' Set the span of the data encompassed by this HashCodeBlock.
+    '''
     if newspan < 0:
-      raise ValueError("%s: set .span: invalid newspan=%s", self, newspan)
+      raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
     else:
@@ -566,6 +606,8 @@ class HashCodeBlock(_Block):
     return bs
 
   def encode(self, flags=0, span=None):
+    ''' Return the bytes encoding of this HashCodeBlock.
+    '''
     hashcode = self.hashcode
     return self._encode(flags, span, BlockType.BT_HASHCODE, 0,
                         ( hashcode.encode(), ))
@@ -617,12 +659,16 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       IndirectBlock. The referenced Blocks are encoded and assembled
       into the data for this Block.
 
-      The second way is to supplying the `hashcode` and `span` for an
-      existing Stored block, whose content is used to initialise an IndirectBlock is
-      with a hashcode and a span indicating the length of the data
-      encompassed by the block speified by the hashcode; the data of that
-      Block can be decoded to obtain the reference Blocks for this
-      IndirectBlock.
+      The second way is to supplying the `hashcode` and `span` for
+      an existing Stored block, whose content is used to initialise
+      an IndirectBlock is with a hashcode and a span indicating the
+      length of the data encompassed by the block speified by the
+      hashcode; the data of that Block can be decoded to obtain the
+      reference Blocks for this IndirectBlock.
+
+      As an optimisation, unless `force` is true, if `subblocks`
+      is empty a direct Block for b'' is returned or if `subblocks`
+      has just one element then that element is returned.
 
       TODO: allow data= initialisation, to decode raw iblock data.
   '''
@@ -652,7 +698,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       raise ValueError("span(%d) does not match subblocks (totalling %d)"
                        % (span, subspan))
     if not force:
-      if len(subblocks) == 0:
+      if not subblocks:
         return Block(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
@@ -671,6 +717,7 @@ class _IndirectBlock(_Block):
     if span is None:
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
+    self.hashcode = superB.hashcode
 
   def __getattr__(self, attr):
     if attr == 'subblocks':
@@ -790,7 +837,7 @@ def SubBlock(superB, suboffset, span, **kw):
     if suboffset < 0 or suboffset > len(superB):
       raise ValueError("suboffset out of range")
     if span < 0 or suboffset + span > len(superB):
-      raise ValueError("span(%d) out of range", span)
+      raise ValueError("span(%d) out of range" % (span,))
     if span == 0:
       ##warning("span==0, returning empty LiteralBlock")
       return LiteralBlock(b'')

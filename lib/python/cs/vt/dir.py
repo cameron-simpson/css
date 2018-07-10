@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+#
+
+''' Implementation of directories (Dir) and their entries (FileDirent, etc).
+'''
+
 import os
 import os.path
 from cmd import Cmd
@@ -13,7 +19,7 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.cmdutils import docmd
-from cs.logutils import debug, error, warning
+from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
@@ -21,13 +27,12 @@ from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from cs.x import X
-from . import totext, SEP
+from . import totext, PATHSEP, defaults
 from .block import Block, decodeBlock, encodeBlock, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
-from .transcribe import Transcriber, transcribe_s, transcribe_mapping, \
-                        parse_mapping, \
+from .transcribe import Transcriber, parse as parse_transcription, \
                         register as register_transcriber
 
 uid_nobody = -1
@@ -41,6 +46,8 @@ D_DIR_T = 1
 D_SYM_T = 2
 D_HARD_T = 3
 def D_type2str(type_):
+  ''' Convert a numeric Dirent type value to a string.
+  '''
   if type_ == D_FILE_T:
     return "D_FILE_T"
   if type_ == D_DIR_T:
@@ -57,18 +64,34 @@ F_NOBLOCK = 0x04        # has no Block reference
 F_HASUUID = 0x08        # has a UUID
 F_PREVDIRENT = 0x10     # has reference to serialised previous Dirent
 
+def Dirents_from_data(data, offset=0):
+  ''' Decode Dirents from `data`, yield each in turn.
+      `data`: the data to decode.
+      `offset`: the starting offset within the data, default 0.
+  '''
+  while offset < len(data):
+    E, offset = _Dirent.from_bytes(data, offset)
+    yield E
+
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta=None, uuid=None, parent=None, prevblock=None):
+  def __init__(
+      self,
+      type_, name,
+      meta=None,
+      uuid=None,
+      parent=None,
+      prevblock=None
+  ):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     self.type = type_
     self.name = name
-    self._uuid = uuid
+    self.uuid = uuid
     assert prevblock is None or isinstance(prevblock, _Block), \
         "not _Block: prevblock=%r" % (prevblock,)
     self._prev_dirent_blockref = prevblock
@@ -89,11 +112,24 @@ class _Dirent(Transcriber):
     self.parent = parent
 
   def __repr__(self):
-    return "%s:%d(%s,%s,%s)" % (self.__class__.__name__,
-                               id(self),
-                               D_type2str(self.type),
-                               self.name,
-                               self.meta)
+    return "%s:%d(%s,%s,%s)" % (
+        self.__class__.__name__,
+        id(self),
+        D_type2str(self.type),
+        self.name,
+        self.meta
+    )
+
+  @classmethod
+  def from_str(cls, s, offset=0):
+    ''' Parse a Dirent transcription from the str `s`.
+    '''
+    E, offset2 = parse_transcription(s, offset)
+    if not isinstance(E, cls):
+      raise ValueError(
+          "expected instance of %s (got %s) at offset %d of %r"
+          % (cls, type(E), offset, s))
+    return E, offset2
 
   @classmethod
   def from_bytes(cls, data, offset=0):
@@ -145,11 +181,16 @@ class _Dirent(Transcriber):
   def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
     '''
-    if type_ == D_DIR_T:    cls = Dir
-    elif type_ == D_FILE_T: cls = FileDirent
-    elif type_ == D_SYM_T:  cls = SymlinkDirent
-    elif type_ == D_HARD_T: cls = HardlinkDirent
-    else:                   cls = InvalidDirent
+    if type_ == D_DIR_T:
+      cls = Dir
+    elif type_ == D_FILE_T:
+      cls = FileDirent
+    elif type_ == D_SYM_T:
+      cls = SymlinkDirent
+    elif type_ == D_HARD_T:
+      cls = HardlinkDirent
+    else:
+      cls = InvalidDirent
     return cls(name, **kw)
 
   def encode(self):
@@ -178,7 +219,7 @@ class _Dirent(Transcriber):
       blockref = b''
     else:
       blockref = encodeBlock(block)
-    uu = self._uuid
+    uu = self.uuid
     if uu is None:
       uubs = b''
     else:
@@ -210,15 +251,15 @@ class _Dirent(Transcriber):
     if self.name:
       T.transcribe(self.name, fp=fp)
       fp.write(':')
-    if self._uuid:
-      attrs['uuid'] = self._uuid
+    if self.uuid:
+      attrs['uuid'] = self.uuid
     if self.meta:
       attrs['meta'] = self.meta
     if self.block:
       attrs['block'] = self.block
-    prevE = self.prev_dirent
-    if prevE is not None:
-      attrs['prevblock'] = Block(data=prevE.encode())
+    prev_blockref = self._prev_dirent_blockref
+    if prev_blockref is not None:
+      attrs['prevblock'] = prev_blockref
     T.transcribe_mapping(attrs, fp)
 
   @classmethod
@@ -241,11 +282,12 @@ class _Dirent(Transcriber):
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
 
-  @prop
-  def uuid(self):
-    u = self._uuid
+  def get_uuid(self):
+    ''' Return this Dirent's UUID, creating it if necessary.
+    '''
+    u = self.uuid
     if u is None:
-      u = self._uuid = uuid4()
+      u = self.uuid = uuid4()
     return u
 
   def pathto(self, R=None):
@@ -261,11 +303,12 @@ class _Dirent(Transcriber):
 
   # TODO: support .block=None
   def __eq__(self, other):
-    return ( self.name == other.name
-         and self.type == other.type
-         and self.meta == other.meta
-         and self.block == other.block
-           )
+    return (
+        self.name == other.name
+        and self.type == other.type
+        and self.meta == other.meta
+        and self.block == other.block
+    )
 
   @locked_property
   def prev_dirent(self):
@@ -279,19 +322,21 @@ class _Dirent(Transcriber):
     data = prev_blockref.data
     E, offset = _Dirent.from_bytes(data)
     if offset < len(data):
-      warning("prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
-        B, offset, data[offset:])
+      warning(
+          "prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
+          prev_blockref, offset, data[offset:])
     return E
 
   @prev_dirent.setter
   @locked
   def prev_dirent(self, E):
+    ''' Set the previous Dirent.
+    '''
     assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
     self._prev_dirent = None
     Ebs = E.encode()
     self._prev_dirent_blockref = Block(data=Ebs)
     self.changed = True
-    X("SET .PREVDIRENT: self=%s", self)
 
   def snapshot(self):
     ''' Update the Dirent's previous block state if missing or changed.
@@ -331,15 +376,21 @@ class _Dirent(Transcriber):
 
   @property
   def size(self):
+    ''' Return this Dirent's length: its Block's span length.
+    '''
     block = self.block
     return None if block is None else len(block)
 
   @property
   def mtime(self):
+    ''' Return this Dirent's modification time (meta.mtime).
+    '''
     return self.meta.mtime
 
   @mtime.setter
   def mtime(self, newtime):
+    ''' Set this Dirent's modification time (meta.mtime).
+    '''
     self.meta.mtime = newtime
 
   def touch(self, when=None):
@@ -350,6 +401,8 @@ class _Dirent(Transcriber):
     self.mtime = when
 
   def stat(self):
+    ''' Return this Dirent's meta.stat().
+    '''
     return self.meta.stat()
 
   def complete(self, S2, recurse=False):
@@ -357,7 +410,7 @@ class _Dirent(Transcriber):
         TODO: parallelise like _Block.complete.
     '''
     self.block.complete(S2)
-    if self.isdir:
+    if self.isdir and recurse:
       for name, entry in self.entries.items():
         if name != '.' and name != '..':
           entry.complete(S2, True)
@@ -371,6 +424,8 @@ register_transcriber(_Dirent, (
 ))
 
 class InvalidDirent(_Dirent):
+  ''' Encapsulation for an invalid Dirent data chunk.
+  '''
 
   transcribe_prefix = 'INVALIDDirent'
 
@@ -394,25 +449,30 @@ class InvalidDirent(_Dirent):
     return self.chunk
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of this InvalidDirent's transcription.
+    '''
     attrs = OrderedDict()
-    attrs['block'] = self.block # data block if any
-    attrs['chunk'] = self.chunk # original encoded data
+    attrs['block'] = self.block     # data block if any
+    attrs['chunk'] = self.chunk     # original encoded data
     return super().transcribe_inner(T, fp, attrs)
 
 class SymlinkDirent(_Dirent):
+  ''' A symbolic link.
+  '''
 
   transcribe_prefix = 'SymLink'
 
-  def __init__(self, name, *, block=None, **kw):
+  def __init__(self, name, pathref, *, block=None, **kw):
     super().__init__(D_SYM_T, name, **kw)
     if block is not None:
-      raise ValueError("block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
-    if self.meta.pathref is None:
-      raise ValueError("meta.pathref required")
+    self.meta.pathref = pathref
 
   @property
   def pathref(self):
+    ''' The symbolic link's path reference.
+    '''
     return self.meta.pathref
 
   def transcribe_inner(self, T, fp):
@@ -420,7 +480,7 @@ class SymlinkDirent(_Dirent):
 
 class HardlinkDirent(_Dirent):
   ''' A hard link.
-      Unlike the regular UNIX filesystem, in a venti filesystem a
+      Unlike the regular UNIX filesystem, in a vt filesystem a
       hard link is a wrapper for an ordinary Dirent; this wrapper references
       a persistent inode number and the source Dirent. Most attributes
       are proxied from the wrapped Dirent.
@@ -433,7 +493,7 @@ class HardlinkDirent(_Dirent):
   def __init__(self, name, meta, block=None):
     _Dirent.__init__(self, D_HARD_T, name, meta=meta)
     if block is not None:
-      raise ValueError("block must be None, received: %s", block)
+      raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
     if not hasattr(self.meta, 'inum'):
       raise ValueError("meta.inum required (no iref in meta=%r)" % (meta,))
@@ -542,6 +602,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
     return sz
 
   def flush(self, scanner=None):
+    ''' Flush the contents of the file.
+    '''
     return self._open_file.flush(scanner)
 
   def truncate(self, length):
@@ -551,6 +613,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if Esize != length:
       with self:
         return self._open_file.truncate(length)
+    return None
 
   # TODO: move into distinctfile utilities class with rsync-like stuff etc
   def restore(self, path, makedirs=False, verbosefp=None):
@@ -561,7 +624,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
         verbosefp.write(path)
         verbosefp.write('\n')
       dirpath = os.path.dirname(path)
-      if len(dirpath) and not os.path.isdir(dirpath):
+      if dirpath and not os.path.isdir(dirpath):
         if makedirs:
           os.makedirs(dirpath)
       with open(path, "wb") as ofp:
@@ -590,7 +653,19 @@ class FileDirent(_Dirent, MultiOpenMixin):
         os.utime(path, (st.st_atime, self.meta.mtime))
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of this FileDirent's transcription.
+    '''
     return _Dirent.transcribe_inner(self, T, fp, {})
+
+  def pushto(self, S2, Q=None, runstate=None):
+    ''' Push the Block with the file contents to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        `runstate`: optional RunState used to cancel operation
+        Semantics are as for cs.vt.block.Block.pushto.
+    '''
+    return self.block.pushto(S2, Q=Q, runstate=runstate)
 
 class Dir(_Dirent):
   ''' A directory.
@@ -622,6 +697,8 @@ class Dir(_Dirent):
 
   @prop
   def changed(self):
+    ''' Whether this Dir has been changed.
+    '''
     return self._changed
 
   @changed.setter
@@ -674,12 +751,14 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      offset = 0
-      data = self._block.data
-      while offset < len(data):
-        E, offset = _Dirent.from_bytes(data, offset)
-        E.parent = self
-        emap[E.name] = E
+      try:
+        data = self._block.data
+      except Exception as e:
+        warning("Dir.entries: self._block.data: %s", e)
+      else:
+        for E in Dirents_from_data(data):
+          E.parent = self
+          emap[E.name] = E
       self._entries = emap
     return emap
 
@@ -727,18 +806,29 @@ class Dir(_Dirent):
     '''
     return [ name for name in self.keys() if self[name].isfile ]
 
-  def _validname(self, name):
-    return len(name) > 0 and name.find(SEP) < 0
+  @staticmethod
+  def _validname(name):
+    ''' Test if a name is valid: not empty and not containing the path separator.
+    '''
+    return len(name) > 0 and name.find(PATHSEP) < 0
 
   def get(self, name, dflt=None):
-    if name not in self:
+    ''' Fetch the Dirent named `name` or `dflt`.
+    '''
+    try:
+      E = self[name]
+    except KeyError:
       return dflt
-    return self[name]
+    return E
 
   def keys(self):
+    ''' Return the Dirent names contained in this Dir. (Mapping method.)
+    '''
     return self.entries.keys()
 
   def items(self):
+    ''' Return the Dirents contained in this Dir. (Mapping method.)
+    '''
     return self.entries.items()
 
   def __contains__(self, name):
@@ -793,7 +883,7 @@ class Dir(_Dirent):
     '''
     name = E.name
     if name in self:
-      raise KeyError("name already exists: %r", name)
+      raise KeyError("name already exists: %r" % (name,))
     self[name] = E
 
   @locked
@@ -825,7 +915,7 @@ class Dir(_Dirent):
     ''' Change directory to `path`, return the ending directory.
     '''
     D = self
-    for name in path.split(SEP):
+    for name in path.split(PATHSEP):
       if len(name) == 0:
         continue
       D = D.chdir1(name)
@@ -867,47 +957,93 @@ class Dir(_Dirent):
         return name2
       n += 1
 
-  def absorb(self, D2):
-    ''' Absorb `D2` into this Dir.
+  def update(self, D2, path=None):
+    ''' Update this Dir with changes from `D2` which is presumed to be new.
         Note: this literally attaches nodes from `D2` into this
         Dir's tree where possible.
     '''
-    for name in D2:
-      E2 = D2[name]
-      if name in self:
-        # conflict
-        # TODO: support S_IFWHT whiteout entries
-        E1 = self[name]
-        if E1.uuid == E2.uuid:
-          # same file
-          assert E1.type == E2.type
-          if E2.meta.ctime > E1.meta.ctime:
-            E1.meta.update(E2.meta.items())
-          if E1.block != E2.block:
-            if E2.mtime > E1.mtime:
-              # TODO: E1.flush _after_ backend update? or before?
-              E1.block = E2.block
-            E1.meta.mtime = E2.mtime
-        else:
-          # distinct objects, resolve l
-          if E1.isdir and E2.isdir:
-            # merge subtrees
-            E1.absorb(E2)
-          elif E1.isfile and E2.isfile and E1.block == E2.block:
-            # file with same content, fold
-            # TODO: use Block.compare_content if different blocks
-            if E2.meta.ctime > E1.meta.ctime:
-              E1.meta.update(E2.meta.items())
+    if path is None:
+      path = self.pathto()
+    with Pfx("update(%r)", path):
+      for name in D2:
+        with Pfx(name):
+          E2 = D2[name]
+          if name in self:
+            # conflict
+            # TODO: support S_IFWHT whiteout entries
+            E1 = self[name]
+            if E1.uuid == E2.uuid:
+              # same file
+              assert E1.type == E2.type
+              if E2.meta.ctime > E1.meta.ctime:
+                info("update meta")
+                E1.meta.update(E2.meta.items())
+              if E1.block != E2.block:
+                if E2.mtime > E1.mtime:
+                  # TODO: E1.flush _after_ backend update? or before?
+                  info("update block => %s", E2.block)
+                  E1.block = E2.block
+                  E1.meta.mtime = E2.mtime
+            else:
+              # distinct objects
+              if E1.isdir and E2.isdir:
+                # merge subtrees
+                E1.update(E2)
+              elif E1.isfile and E2.isfile and E1.block == E2.block:
+                # file with same content, fold
+                # TODO: use Block.compare_content if different blocks
+                if E2.meta.ctime > E1.meta.ctime:
+                  info("update meta")
+                  E1.meta.update(E2.meta.items())
+              else:
+                # different content
+                # add other object under a different name
+                new_name = self.new_name(name)
+                info("add new entry as %r: %s", new_name, E2)
+                self[new_name] = E2
           else:
-            # add other object under a different name
-            self[self.new_name(name)] = E2
-      else:
-        # new item
-        # NB: we don't recurse into new Dirs, not needed
-        self[name] = E2
+            # new item
+            # NB: we don't recurse into new Dirs, not needed
+            info("add new entry: %s", E2)
+            self[name] = E2
+
+  def update_notification(self, newE, when, source):
+    ''' Receptor for Archive.update() notifications.
+    '''
+    with Pfx("update_notification(%s,when=%s,source=%s)", newE, when, source):
+      if newE is not self:
+        self.update(newE)
 
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
+
+  def pushto(self, S2, Q=None, runstate=None):
+    ''' Push the Dir Blocks to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        `runstate`: optional RunState used to cancel operation
+        This pushes the Dir's Block encoding to `S2` and then
+        recursively pushes each Dirent's Block data to `S2`.
+    '''
+    if Q is None:
+      # create a Queue and a worker Thread
+      Q, T = defaults.S.pushto(S2)
+    else:
+      # use an existing Queue, no Thread to wait for
+      T = None
+    B = self.block
+    # push the Dir block data
+    B.pushto(S2, Q=Q, runstate=runstate)
+    # and recurse into contents
+    for E in Dirents_from_data(B.data):
+      if runstate and runstate.cancelled:
+        warning("pushto(%s) cancelled", self)
+        break
+      E.pushto(S2, Q=Q, runstate=runstate)
+    if T:
+      Q.close()
+      T.join()
 
 class DirFTP(Cmd):
   ''' Class for FTP-like access to a Dir.
@@ -922,7 +1058,7 @@ class DirFTP(Cmd):
   @property
   def prompt(self):
     prompt = self._prompt
-    pwd = SEP + self.op_pwd()
+    pwd = PATHSEP + self.op_pwd()
     return ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
 
   def emptyline(self):
@@ -953,11 +1089,11 @@ class DirFTP(Cmd):
   def op_cd(self, path):
     ''' Change working directory.
     '''
-    if path.startswith(SEP):
+    if path.startswith(PATHSEP):
       D = self.root
     else:
       D = self.cwd
-    for base in path.split(SEP):
+    for base in path.split(PATHSEP):
       if base == '' or base == '.':
         pass
       elif base == '..':
@@ -1018,7 +1154,7 @@ class DirFTP(Cmd):
           raise ValueError("detached: E not present in P: E=%s, P=%s" % (E, P))
       names.append(name)
       E = P
-    return SEP.join(reversed(names))
+    return PATHSEP.join(reversed(names))
 
   @docmd
   def do_ls(self, args):
@@ -1036,17 +1172,19 @@ class DirFTP(Cmd):
           M = E.meta
           u, g, perms = M.unix_perms
           typemode = M.unix_typemode
-          typechar = ( '-' if typemode == stat.S_IFREG
-                  else 'd' if typemode == stat.S_IFDIR
-                  else 's' if typemode == stat.S_IFLNK
-                  else '?'
-                     )
-          print("%s%s%s%s %s" % ( typechar,
-                                  rwx((typemode>>6)&7),
-                                  rwx((typemode>>3)&7),
-                                  rwx((typemode)&7),
-                                  name
-                                ))
+          typechar = (
+              '-' if typemode == stat.S_IFREG
+              else 'd' if typemode == stat.S_IFDIR
+              else 's' if typemode == stat.S_IFLNK
+              else '?'
+          )
+          print("%s%s%s%s %s" % (
+              typechar,
+              rwx((typemode>>6)&7),
+              rwx((typemode>>3)&7),
+              rwx((typemode)&7),
+              name
+          ))
 
   def op_ls(self):
     ''' Return a dict mapping current directories names to Dirents.
@@ -1060,7 +1198,7 @@ class DirFTP(Cmd):
       raise GetoptError("missing arguments")
     for arg in argv:
       with Pfx(arg):
-        E, P, tail = resolve(self.cwd, arg)
+        E, _, tail = resolve(self.cwd, arg)
         if not tail:
           error("path exists")
         elif len(tail) > 1:

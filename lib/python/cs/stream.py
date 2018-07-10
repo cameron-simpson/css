@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@cskk.id.au> 21aug2015
 #
 
+''' A general purpose bidirectional packet stream connection.
+'''
+
 import sys
 import errno
 from collections import namedtuple
@@ -110,7 +113,7 @@ class PacketConnection(object):
         self._later.wait_outstanding(until_idle=True)
         self._later.close(enforce_final_close=True)
         if not self._later.closed:
-          raise RuntimeError("%s: ._later not closed! %r", self, self._later)
+          raise RuntimeError("%s: ._later not closed! %r" % (self, self._later))
       else:
         self._later.close()
 
@@ -162,10 +165,10 @@ class PacketConnection(object):
   def _pending_cancel(self):
     ''' Cancel all the pending requests.
     '''
-    for chtag, state in self._pending_states():
+    for chtag, _ in self._pending_states():
       channel, tag = chtag
       warning("%s: cancel pending request %d:%s", self, channel, tag)
-      decode_response, result = self._pending_pop(channel, tag)
+      _, result = self._pending_pop(channel, tag)
       result.cancel()
 
   def _queue_packet(self, P):
@@ -238,11 +241,14 @@ class PacketConnection(object):
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
     '''
-    with Pfx("_run_request[ch=%d,tag=%d, rq_type=%d,flags=0x%02x,payload=%r",
-              channel, tag, rq_type, flags, payload):
+    with Pfx(
+        "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s",
+        channel, tag, rq_type, flags,
+        repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'
+    ):
       try:
         result_flags = 0
-        result_payload = bytes(())
+        result_payload = b''
         result = handler(rq_type, flags, payload)
         if result is not None:
           if isinstance(result, int):

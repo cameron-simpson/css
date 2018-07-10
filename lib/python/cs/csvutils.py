@@ -11,7 +11,16 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+''' Utility functions for CSV files.
+'''
+
 from __future__ import absolute_import
+import csv
+import sys
+from cs.deco import strable
+from cs.logutils import warning
+from cs.mappings import named_column_tuples
+from cs.pfx import Pfx
 
 DISTINFO = {
     'description': "CSV file related facilities",
@@ -21,43 +30,43 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils'],
+    'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx' ],
 }
-
-from contextlib import contextmanager
-import csv
-from io import BytesIO
-import sys
-from threading import Thread
-from cs.logutils import warning
-from cs.pfx import Pfx
 
 if sys.hexversion >= 0x03000000:
   # python 3 onwards
 
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
+  @strable
+  def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader.
+        `fp` may also be a filename.
         Yield the rows.
+        Warning: _ignores_ the `encoding` and `errors` parameters
+        because `fp` should already be decoded.
     '''
-    return csv.reader(fp)
+    return csv.reader(fp, **kw)
 
   def csv_writerow(csvw, row, encoding='utf-8'):
+    ''' Write the supplied row as strings encoded with the supplied `encoding`,
+        default 'utf-8'.
+    '''
     with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
       return csvw.writerow(row)
 
 else:
   # python 2 compatability code
 
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
+  @strable
+  def csv_reader(fp, encoding='utf-8', errors='replace', **kw):
     ''' Read the file `fp` using csv.reader and decode the str
         fields into unicode using the supplied `encoding`,
         default "utf-8".
+        `fp` may also be a filename.
         Yield the rows after decoding.
     '''
-    r = csv.reader(fp)
+    r = csv.reader(fp, **kw)
     for row in r:
-      for i in range(len(row)):
-        value = row[i]
+      for i, value in enumerate(row):
         if isinstance(value, str):
           # transmute str (== bytes) to unicode
           try:
@@ -73,3 +82,9 @@ else:
         default 'utf-8'.
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
+
+def cvs_import(fp, **kw):
+  ''' Read CSV data where the first row contains column headers,
+      yield named tuples for subsequent rows.
+  '''
+  return named_column_tuples(csv_reader(fp, **kw))

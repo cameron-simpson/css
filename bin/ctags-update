@@ -58,9 +58,15 @@ else
       dirpath=$( dirname "$rfilename" )
       [ -s "$rfilename" ] && set -- ${1+"$@"} "$rfilename"
     fi
-    [ -n "$tags" ] \
-    || tags=$( cd "$dirpath" && findup tags ) \
-    || echo "$cmd: no tags found from $dirpath/" >&2
+    [ -n "$tags" ] || {
+      if tags=$( cd "$dirpath" && findup tags )
+      then
+        echo "$tags" >&3
+        exec 3>&-
+      else
+        echo "$cmd: no tags found from $dirpath/" >&2
+      fi
+    }
   done
   [ $# -gt 0 ] || {
     echo "$cmd: no filenames after scan" >&2
@@ -75,7 +81,5 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-echo "$tags" >&3
-exec 3>&-
-
-lock -P "$tags" ctags -o "$tags" --tag-relative --links=no "$@"
+lock -P "$tags" ctags -a -o "$tags" --tag-relative --links=no "$@" &
+exit 0
