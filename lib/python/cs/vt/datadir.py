@@ -1067,7 +1067,10 @@ class PlatonicDir(_FilesDir):
               seen.add(ino)
               pruned_dirnames.append(dname)
             dirnames[:] = pruned_dirnames
-            if meta_store is not None:
+            if meta_store is None:
+              warning("no meta_store")
+              D = None
+            else:
               with meta_store:
                 D = topdir.makedirs(rdirpath, force=True)
                 # prune removed names
