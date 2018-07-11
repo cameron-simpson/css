@@ -130,7 +130,7 @@ class StreamStore(BasicStoreSync):
       try:
         send_fp, recv_fp = self.connect()
       except Exception as e:
-        raise AttributeError("%r: connect fails: %s" % (attr, e)) from e
+        raise AttributeError("%r: connect fails: %s: %s" % (attr, type(e).__name__, e)) from e
       else:
         conn = self._conn = self._packet_connection(send_fp, recv_fp)
         return conn
