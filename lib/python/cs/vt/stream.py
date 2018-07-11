@@ -15,11 +15,11 @@ import sys
 from cs.excutils import logexc
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
 from cs.threads import locked
+from cs.x import X
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
@@ -81,7 +81,7 @@ class StreamStore(BasicStoreSync):
         raise ValueError("connect is not None and one of send_fp or recv_fp is not None")
       self.connect = connect
 
-  @prop
+  @property
   def local_store(self):
     ''' The current local Store.
     '''
@@ -166,7 +166,8 @@ class StreamStore(BasicStoreSync):
     '''
     with Pfx(
         "%s.do(rqtype=%s,flags=0x%02x,data=%d-bytes)",
-        self, rqtype, flags, len(data)):
+        self, rqtype, flags, len(data)
+    ):
       try:
         conn = self._conn
       except AttributeError as e:
@@ -251,6 +252,7 @@ class StreamStore(BasicStoreSync):
   def add(self, data):
     hashclass = self.hashclass
     h = hashclass.from_chunk(data)
+    X("ADD %s => %s", h, self.name)
     if self.mode_addif:
       if self.contains(h):
         return h
