@@ -21,7 +21,7 @@ import threading
 from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
-from cs.py.func import prop
+from cs.py.func import prop, stack_dump
 from cs.seq import isordered
 from cs.resources import RunState
 
@@ -51,7 +51,7 @@ class _Defaults(threading.local):
     if Ss:
       return Ss[-1]
     warning("no per-Thread Store stack, using the global stack")
-    ##raise RuntimeError("BANG")
+    stack_dump()
     Ss = self._Ss
     if Ss:
       return Ss[-1]
