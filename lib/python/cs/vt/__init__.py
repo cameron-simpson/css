@@ -21,7 +21,8 @@ import threading
 from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
-from cs.py.func import prop, stack_dump
+from cs.py.func import prop
+from cs.py.stack import stack_dump
 from cs.seq import isordered
 from cs.resources import RunState
 
