@@ -254,7 +254,7 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    ok, flags, payload = self._conn.do(RqType.ADD, 0, data)
+    ok, flags, payload = self.do(RqType.ADD, 0, data)
     if not ok:
       raise StoreError(
           "NOT OK response from add(data=%d bytes): flags=0x%0x, payload=%r"
@@ -270,7 +270,8 @@ class StreamStore(BasicStoreSync):
     return h
 
   def get(self, h):
-    ok, flags, payload = self._conn.do(RqType.GET, 0, h.encode())
+    X("GET %s <= %s", h, self.name)
+    ok, flags, payload = self.do(RqType.GET, 0, h.encode())
     if not ok:
       raise StoreError(
           "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
@@ -289,7 +290,8 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a Result for collection.
     '''
-    ok, flags, payload = self._conn.do(RqType.CONTAINS, 0, h.encode())
+    X("IN? %s => %s", h, self.name)
+    ok, flags, payload = self.do(RqType.CONTAINS, 0, h.encode())
     if not ok:
       raise ValueError(
           "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
@@ -304,7 +306,7 @@ class StreamStore(BasicStoreSync):
     return found
 
   def flush(self):
-    _, flags, payload = self._conn.do(RqType.FLUSH, 0, b'')
+    _, flags, payload = self.do(RqType.FLUSH, 0, b'')
     assert flags == 0
     assert not payload
     local_store = self.local_store
@@ -335,7 +337,7 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(RqType.HASHCODES, flags, payload)
+    ok, flags, payload = self.do(RqType.HASHCODES, flags, payload)
     if not ok:
       raise StoreError(
           "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
@@ -405,7 +407,7 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(RqType.HASHCODES_HASH, flags, payload)
+    ok, flags, payload = self.do(RqType.HASHCODES_HASH, flags, payload)
     if not ok:
       raise StoreError(
           "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
