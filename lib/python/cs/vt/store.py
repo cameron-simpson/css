@@ -114,6 +114,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
   __repr__ = __str__
 
+  __bool__ = lambda self: True
+
   # Basic support for putting Stores in sets.
   def __hash__(self):
     return id(self)
