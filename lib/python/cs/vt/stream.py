@@ -256,12 +256,12 @@ class StreamStore(BasicStoreSync):
         return h
     ok, flags, payload = self._conn.do(RqType.ADD, 0, data)
     if not ok:
-      raise ValueError(
-          "NOT OK response from add(data=%r): flags=0x%0x, payload=%r"
-          % (data, flags, payload))
+      raise StoreError(
+          "NOT OK response from add(data=%d bytes): flags=0x%0x, payload=%r"
+          % (len(data), flags, payload))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
-      raise ValueError("extra payload data after hashcode: %r" % (payload[offset:],))
+      raise StoreError("extra payload data after hashcode: %r" % (payload[offset:],))
     assert flags == 0
     if h != h2:
       raise RuntimeError(
@@ -272,14 +272,14 @@ class StreamStore(BasicStoreSync):
   def get(self, h):
     ok, flags, payload = self._conn.do(RqType.GET, 0, h.encode())
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
           % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if found:
       return payload
     if payload:
@@ -298,9 +298,9 @@ class StreamStore(BasicStoreSync):
     if found:
       flags &= ~0x01
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if payload:
-      raise ValueError("unexpected payload: %r" % (payload,))
+      raise StoreError("unexpected payload: %r" % (payload,))
     return found
 
   def flush(self):
@@ -337,11 +337,11 @@ class StreamStore(BasicStoreSync):
     )
     ok, flags, payload = self._conn.do(RqType.HASHCODES, flags, payload)
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
           % (start_hashcode, flags, payload))
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     offset = 0
     hashary = []
     while offset < len(payload):
@@ -407,18 +407,18 @@ class StreamStore(BasicStoreSync):
     )
     ok, flags, payload = self._conn.do(RqType.HASHCODES_HASH, flags, payload)
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
           % (flags, payload))
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     hashcode, offset = hash_decode(payload, 0)
     if offset == len(payload):
       h_final = None
     else:
       h_final, offset = hash_decode(payload, offset)
       if offset < len(payload):
-        raise ValueError(
+        raise StoreError(
             "after hashcode (%s) and h_final (%s), extra bytes: %r"
             % (hashcode, h_final, payload[offset:]))
     return hashcode, h_final
