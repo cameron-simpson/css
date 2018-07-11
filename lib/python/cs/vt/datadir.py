@@ -1086,9 +1086,20 @@ class PlatonicDir(_FilesDir):
                 rfilepath = joinpath(rdirpath, filename)
                 if self.exclude_file(rfilepath):
                   continue
-                try:
-                  DFstate = filemap[rfilepath]
-                except KeyError:
+                # look up this file in our file state index
+                else:
+                  DFstate = filemap.get(rfilepath)
+                if (
+                    DFstate is not None
+                    and D is not None
+                    and filename not in D
+                ):
+                  # filemap, but not in Dir: start again
+                  warning("in filemap but not in Dir, rescanning")
+                  self._del_datafilestate(DFstate)
+                  DFstate = None
+                if DFstate is None:
+                  XP("new DFstate")
                   filenum = self._add_datafile(rfilepath)
                   DFstate = filemap[filenum]
                   need_save = True
@@ -1108,7 +1119,7 @@ class PlatonicDir(_FilesDir):
                   # skip non files
                   debug("SKIP non-file")
                   continue
-                if meta_store is not None:
+                if meta_store:
                   try:
                     E = D[filename]
                   except KeyError:
