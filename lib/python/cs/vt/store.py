@@ -216,6 +216,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         as the .pushto method's worker.
     '''
     # keep the Store open
+    func2name = "%s (from %s)" % (funccite(func), caller())
     self.open()
     def func2():
       ''' Inner function to call `func` and then close the Store.
@@ -228,8 +229,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           # release the Store from earlier
           self.close()
         return value
-    clr = caller()
-    func2.__name__ = "%s (from %s)" % (funccite(func), clr)
+    func2.__name__ = func2name
     return self.__funcQ.bg(func2)
 
   ##########################################################################
@@ -699,39 +699,52 @@ class ProxyStore(BasicStoreSync):
         This queues all the saves in the background and returns the
         hashcode received.
     '''
-    Q = IterableQueue()
-    self.bg(self._queue_add(data, Q))
-    for hashcode in Q:
-      return hashcode
-    raise RuntimeError("no hashcodes returned from .add")
+    ch = Channel()
+    self.bg(self._bg_add, data, ch)
+    hashcode = ch.get()
+    if hashcode is None:
+      raise RuntimeError("no hashcode returned from .add")
+    return hashcode
 
-  def _bg_queue_add(self, data, Q):
+  def _bg_add(self, data, ch):
     ''' Add a data chunk to the save Stores.
+
+        `data`: the data to add
+        `ch`: a channel for hashocde return
     '''
+    X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
     try:
       if not self.save:
+        # no save - allow add if hashcode already present - dubious
         hashcode = self.hash(data)
         if hashcode in self:
-          return hashcode
+          ch.put(hashcode)
+          return
         raise RuntimeError("new add but no save Stores")
       hashcode1 = None
       ok = True
       fallback = None
       for S, hashcode, exc_info in self._multicall(self.save, 'add_bg', (data,)):
         if exc_info is None:
-          Q.put(hashcode)
+          assert hashcode is not None, "None from .add of %s" % (S,)
           if hashcode1 is None:
+            ch.put(hashcode)
             hashcode1 = hashcode
           elif hashcode1 != hashcode:
             warning(
                 "%s: different hashcodes returns from .add: %s vs %s",
                 S, hashcode1, hashcode)
         else:
-          error("exception from %s.add: %s", S, exc_info)
+          e = exc_info[1]
+          if isinstance(e, StoreError):
+            exc_info = None
+          X("================ exc_info=%r", exc_info)
+          error("exception from %s.add: %s", S, e, exc_info=exc_info)
           if ok:
             ok = False
             if self.save2:
               # kick off the fallback saves immediately
+              X("_BG_ADD: dispatch fallback %r", self.save2)
               fallback = list(self._multicall0(self.save2, 'add_bg', (data,)))
             else:
               error("no fallback Stores")
@@ -741,11 +754,15 @@ class ProxyStore(BasicStoreSync):
         for LF, S in fallback:
           hashcode, exc_info = LF.join()
           if exc_info:
-            error("exception saving to %s: %s", S, exc_info)
-            failures.append( (S, exc_info) )
+            e = exc_info[1]
+            if isinstance(e, StoreError):
+              exc_info = None
+            X("==== ==== ==== exc_info=%r", exc_info)
+            error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
+            failures.append( (S, e) )
           else:
-            Q.put(hashcode)
             if hashcode1 is None:
+              ch.put(hashcode)
               hashcode1 = hashcode
             elif hashcode1 != hashcode:
               warning(
@@ -755,7 +772,11 @@ class ProxyStore(BasicStoreSync):
           raise RuntimeError("exceptions saving to save2: %r" % (failures,))
     finally:
       # mark end of queue
-      Q.close()
+      if hashcode1 is None:
+        X("BG QUEUE ADD no hashcode1, put None")
+        ch.put(None)
+      self.close()
+      ch.close()
 
   def get(self, h):
     ''' Fetch a block from the first Store which has it.
