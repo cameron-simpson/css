@@ -1116,8 +1116,9 @@ class PlatonicDir(_FilesDir):
                     D[filename] = E
                   else:
                     if not E.isfile:
-                      info("new FileDirent replacing previous nonfile")
-                      E = D[E] = FileDirent(filename)
+                      info("new FileDirent replacing previous nonfile: %s", E)
+                      E = FileDirent(filename)
+                      D[filename] = E
                 if new_size > DFstate.scanned_to:
                   if DFstate.scanned_to > 0:
                     info("scan from %d", DFstate.scanned_to)
