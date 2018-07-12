@@ -52,7 +52,10 @@ You can also collect multiple Results in completion order using the report() fun
 try:
   from enum import Enum
 except ImportError:
-  from enum34 import Enum
+  try:
+    from enum34 import Enum
+  except ImportError:
+    Enum = None
 from functools import partial
 import sys
 from threading import Lock, Thread
@@ -73,13 +76,22 @@ DISTINFO = {
     'install_requires': ['cs.logutils', 'cs.obj', 'cs.pfx', 'cs.seq', 'cs.py3'],
 }
 
-class ResultState(Enum):
-  ''' State tokens for Results.
-  '''
-  pending = 'pending'
-  running = 'running'
-  ready = 'ready'
-  cancelled = 'cancelled'
+if Enum:
+  class ResultState(Enum):
+    ''' State tokens for Results.
+    '''
+    pending = 'pending'
+    running = 'running'
+    ready = 'ready'
+    cancelled = 'cancelled'
+else:
+  class ResultState(object):
+    ''' State tokens for Results.
+    '''
+    pending = 'pending'
+    running = 'running'
+    ready = 'ready'
+    cancelled = 'cancelled'
 
 # compatability name
 AsynchState = ResultState
