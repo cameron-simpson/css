@@ -316,6 +316,8 @@ class Result(object):
       except Exception as e:
         exception(
             "%s._complete: calling notifier %s: exc=%s", self, notifier, e)
+      else:
+        self.collected = True
 
   def join(self):
     ''' Calling the .join() method waits for the function to run to
@@ -363,6 +365,7 @@ class Result(object):
         notifier = None
     if notifier is not None:
       notifier(self)
+      self.collected = True
 
   def with_result(self, submitter, prefix=None):
     ''' On completion without an exception, call `submitter(self.result)` or report exception.
