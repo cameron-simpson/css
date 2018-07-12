@@ -1087,8 +1087,7 @@ class PlatonicDir(_FilesDir):
                 if self.exclude_file(rfilepath):
                   continue
                 # look up this file in our file state index
-                else:
-                  DFstate = filemap.get(rfilepath)
+                DFstate = filemap.get(rfilepath)
                 if (
                     DFstate is not None
                     and D is not None
