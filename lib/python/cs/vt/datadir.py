@@ -106,6 +106,9 @@ class DataFileState(SimpleNamespace):
     self.indexed_to = indexed_to
     self.scanned_to = scanned_to
 
+  def __str__(self):
+    return "%s(%d:%r)" % (type(self).__name__, self.filenum, self.filename)
+
   @classmethod
   def from_csvrow(cls, datadir, filenum, filename, indexed_to, *etc):
     ''' Construct a DataFileState from a CSV file row.
@@ -392,7 +395,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                     continue
                   filestate = DataFileState.from_csvrow(self, filenum, filename, indexed_to, *etc)
                   filestate.filenum = filenum
-                  self._add_datafilestate(filestate)
+                  self._add_datafilestate(filestate, force=True)
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
@@ -466,22 +469,33 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     DFstate = DataFileState(self, None, filename, indexed_to=0)
     return self._add_datafilestate(DFstate)
 
-  def _add_datafilestate(self, DFstate):
+  def _add_datafilestate(self, DFstate, force=False):
     ''' Add the supplied data file state `DFstate` to the filemap, returning the filenum.
     '''
     ##info("%s._add_datafilestate(DFstate=%s)", self, DFstate)
     filenum = DFstate.filenum
     filemap = self._filemap
     filename = DFstate.filename
-    if filename in filemap:
-      raise KeyError('DataFileState:%s: already in filemap: %r' % (DFstate, filename,))
+    DFstate2 = filemap.get(filename)
+    if DFstate is not None:
+      msg = '%s: already in filemap: %r' % (DFstate, filename,)
+      if force:
+        warning("%s, replaced", msg)
+      else:
+        raise KeyError(msg)
     with self._lock:
       if filenum is None:
         # TODO: keep the max floating around and make this O(1)
         filenum = max([0] + list(k for k in filemap if isinstance(k, int))) + 1
         DFstate.filenum = filenum
-      elif filenum in filemap:
-        raise KeyError('filenum %d already in filemap: %s' % (filenum, filemap[filenum]))
+      else:
+        DFstate2 = filemap.get(filename)
+        if filenum is not None:
+          msg = '%s: already in filemap: %d' % (DFstate, filenum)
+          if force:
+            warning("%s, replaced", msg)
+          else:
+            raise KeyError(msg)
       filemap[filenum] = DFstate
       filemap[filename] = DFstate
     return filenum
@@ -491,7 +505,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     filename = DFstate.filename
     filenum = DFstate.filenum
-    filemap = self.filemap
+    filemap = self._filemap
     with self._lock:
       assert filemap[filename] is DFstate
       filemap[filename] = None
