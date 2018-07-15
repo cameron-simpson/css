@@ -83,7 +83,13 @@ else:
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
 
-def csv_import(fp, class_name=None, column_names=None, **kw):
+def csv_import(
+    fp,
+    class_name=None,
+    column_names=None,
+    computed=None,
+    preprocess=None,
+    **kw):
   ''' Read CSV data where the first row contains column headers,
       yield named tuples for subsequent rows.
 
@@ -93,6 +99,16 @@ def csv_import(fp, class_name=None, column_names=None, **kw):
       `column_names`: optional iterable of column headings; if
         provided then the file is not expected to have internal column
         headings
+      `computed`: optional keyword parameter providing a mapping
+        of str to functions of `self`; these strings are available
+        via __getitem__
+      `preprocess`: optional keyword parameter providing a callable
+        to modify CSV rows before they are converted into the namedtuple.
+        It receives a context object an the data row. It may return
+        the row (possibly modified), or None to drop the row.
+
+      All other keyword paramaters are passed to csv_reader(). This
+      is a very thin shim around cs.mappings.named_column_tuples.
 
       Example:
         >>> list(csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB'))   #doctest: +ELLIPSIS
@@ -100,4 +116,9 @@ def csv_import(fp, class_name=None, column_names=None, **kw):
         >>> list(csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G ']))   #doctest: +ELLIPSIS
         [<function named_row_tuple.<locals>.factory at ...>, Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
   '''
-  return named_column_tuples(csv_reader(fp, **kw), class_name=class_name, column_names=column_names)
+  return named_column_tuples(
+      csv_reader(fp, **kw),
+      class_name=class_name,
+      column_names=column_names,
+      computed=computed,
+      preprocess=preprocess)
