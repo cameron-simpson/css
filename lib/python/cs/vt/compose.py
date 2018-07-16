@@ -28,7 +28,9 @@ def parse_store_specs(s, offset=0):
           offset += 1
           if sep == ',':
             continue
-          raise ValueError("expected comma ',', found unexpected separator: %r" % (sep,))
+          raise ValueError(
+              "expected comma ',', found unexpected separator: %r"
+              % (sep,))
     return store_specs
 
 def get_store_spec(s, offset):
@@ -40,11 +42,14 @@ def get_store_spec(s, offset):
 
         [clause_name]   The name of a clause to be obtained from a Config.
 
-        /path/to/directory
-                        A DataDirStore directory.
-        ./subdir/to/directory
-                        A relative path to a DataDirStore directory.
-        /path/to/socket A socket serving a Store.
+        /path/to/something
+        ./path/to/something
+                        A filesystem path to a local resource.
+                        Supported paths:
+                          .../foo.sock  A UNIX socket based StreamStore.
+                          .../dir       A DataDirStore directory.
+                        TODO:
+                          .../foo.vtd   A DataFileStore.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -62,6 +67,8 @@ def get_store_spec(s, offset):
                         A Store presenting content under prefix:
                           /h/hashcode.hashtype  Block data by hashcode
                           /i/hashcode.hashtype  Indirect block by hashcode.
+          s3://bucketname/prefix/hashcode.hashtype
+                        An AWS S3 bucket with raw blocks.
   '''
   offset0 = offset
   if offset >= len(s):
@@ -86,21 +93,16 @@ def get_store_spec(s, offset):
   elif s.startswith('/', offset) or s.startswith('./', offset):
     path = s[offset:]
     offset = len(s)
-    with Pfx("%r", path):
-      try:
-        S = os.stat(path)
-      except OSError as e:
-        raise ValueError("cannot stat: %s" % (e,)) from e
-      if S_ISDIR(S.st_mode):
-        # /path/to/datadir
-        store_type = 'datadir'
-        params = {'path': path}
-      elif S_ISSOCK(S.st_mode):
-        # /path/to/socket
-        store_type = 'socket'
-        params = {'socket_path': path}
-      else:
-        raise ValueError("not a directory or a socket, st_mode=0o%04o" % (S.st_mode,))
+    if path.endswith('.sock'):
+      store_type = 'socket'
+      params = {'socket_path': path}
+    elif isdir(path):
+      store_type = 'datadir'
+      params = {'path': path}
+    else:
+      raise ValueError(
+          "%r: not a directory or a socket"
+          % (path, S.st_mode))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
