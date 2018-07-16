@@ -15,7 +15,7 @@ import sys
 from threading import Lock, Semaphore
 from cs.later import Later
 from cs.logutils import debug, warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
 from cs.progress import Progress
 from cs.py.func import prop, funccite
 from cs.py.stack import caller
@@ -673,7 +673,7 @@ class ProxyStore(BasicStoreSync):
     for S in stores:
       with Pfx("%s.%s()", S, method_name):
         LF = getattr(S, method_name)(*args)
-        yield LF, S
+      yield LF, S   # outside Pfx because this is a generator
 
   def _multicall(self, stores, method_name, args):
     ''' Generator yielding (S, result, exc_info) for each call to
@@ -785,7 +785,8 @@ class ProxyStore(BasicStoreSync):
       for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
         if exc_info:
           error("exception fetching from %s: %s", S, exc_info)
-        else:
+        elif data is not None:
+          X("ProxyStore.GET %s succeeds from %s: %d bytes", h, S.name, len(data))
           return data
     return None
 
