@@ -13,6 +13,7 @@ from collections.abc import Mapping
 import csv
 import errno
 import os
+from os import SEEK_SET, SEEK_CUR, SEEK_END
 from os.path import (
     basename, join as joinpath, exists as existspath,
     isdir as isdirpath, relpath, isabs as isabspath)
@@ -866,13 +867,16 @@ class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length
     return put_bs(self.n) + put_bs(self.offset) + put_bs(self.length)
 
 class PlatonicFile(MultiOpenMixin, ReadMixin):
-  ''' A PlatonicFile is normal file whose content is used as the reference for block data.
+  ''' A PlatonicFile is a normal file whose content is used as the
+      reference for block data.
   '''
 
   def __init__(self, path):
     MultiOpenMixin.__init__(self)
     self.path = path
     self._fd = None
+    # dummy value since all I/O goes through datafrom, which uses pread
+    self._seek_offset = 0
 
   def __str__(self):
     return "PlatonicFile(%s)" % (shortpath(self.path,))
@@ -887,6 +891,26 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
     '''
     os.close(self._fd)
     self._fd = None
+
+  def tell(self):
+    ''' Return the notional file offset.
+    '''
+    return self._seek_offset
+
+  def seek(self, pos, how=SEEK_SET):
+    ''' Adjust the notional file offset.
+    '''
+    if how == SEEK_SET:
+      pass
+    elif how == SEEK_CUR:
+      pos += self._seek_offset
+    elif how == SEEK_END:
+      pos += os.fstat(self._fd).st_size
+    else:
+      raise ValueError("unsupported seek how value: 0x%02x" % (how,))
+    if pos < 0:
+      raise ValueError("seek out of range")
+    self._seek_offset = pos
 
   def datafrom(self, offset, readsize=None):
     ''' Return an iterable of data from this file from `offset`.
