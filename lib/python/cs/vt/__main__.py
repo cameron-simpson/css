@@ -234,8 +234,10 @@ class VTCmd:
         raise GetoptError("no $VT_STORE and no -S option")
       try:
         S = Store(self.store_spec, self.config)
+      except ValueError as e:
+        raise GetoptError("unusable Store specification: %s: %s" % (self.store_spec, e))
       except Exception as e:
-        exception("can't open store %r: %s", self.store_spec, e)
+        exception("UNEXPECTED EXCEPTION: can't open store %r: %s", self.store_spec, e)
         raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
       defaults.push_Ss(S)
       if self.cache_store_spec is None:
