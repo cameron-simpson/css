@@ -472,18 +472,155 @@ class StackableValues(object):
     finally:
       self.pop(key)
 
-def named_column_tuples(rows):
+def named_row_tuple(*column_names, **kw):
+  ''' Return a namedtuple subclass factory derived from `column_names`.
+
+      `column_names`: an iterable of str, such as the heading columns
+        of a CSV export
+      `class_name`: optional keyword parameter specifying the class name
+      `computed`: optional keyword parameter providing a mapping
+        of str to functions of `self`; these strings are available
+        via __getitem__
+
+      The tuple's attributes are computed by converting all runs
+      of nonalphanumerics (as defined by the re module's "\W"
+      sequence) to an underscore, lowercasing and then stripping
+      leading and trailing underscores.
+
+      In addition to the normal numeric indices, the tuple may
+      also be indexed by the attribute names or the column names.
+
+      The new class has the following additional attributes:
+      `_attributes`: the attribute names of each tuple in order
+      `_names`: the originating name strings
+      `_name_attributes`: the computed attribute names corresponding to the
+        `names`; there may be empty strings in this list
+      `_attr_of`: a mapping of column name to attribute name
+      `_name_of`: a mapping of attribute name to column name
+      `_index_of`: a mapping of column names and attributes their tuple indices
+
+      Examples::
+
+        >>> T = named_row_tuple('Column 1', '', 'Column 3', ' Column 4', 'Column 5 ', '', '', class_name='Example')
+        >>> T._attributes
+        ['column_1', 'column_3', 'column_4', 'column_5']
+        >>> row = T('val1', 'dropped', 'val3', 4, 5, 6, 7)
+        >>> row
+        Example(column_1='val1', column_3='val3', column_4=4, column_5=5)
+  '''
+  class_name = kw.pop('class_name', None)
+  computed = kw.pop('computed', None)
+  if kw:
+    raise ValueError("unexpected keyword arguments: %r" % (kw,))
+  if class_name is None:
+    class_name = 'NamedRow'
+  column_names = list(column_names)
+  if computed is None:
+    computed = {}
+  # compute candidate tuple attributes from the column names
+  name_attributes = [
+      re.sub(r'\W+', '_', name).strip('_').lower()
+      for name in column_names
+  ]
+  # final tuple attributes are the nonempty _name_attributes
+  attributes = [ attr for attr in name_attributes if attr ]
+  if len(attributes) == len(name_attributes):
+    attributes = name_attributes
+
+  _NamedRow = namedtuple(class_name, attributes)
+  class NamedRow(_NamedRow):
+    ''' A namedtuple to store row data.
+
+        In addition to the normal numeric indices, the tuple may
+        also be indexed by the attribute names or the column names.
+
+        The class has the following attributes:
+        `_attributes`: the attribute names of each tuple in order
+        `_computed`: a mapping of str to functions of `self`; these
+          values are also available via __getitem__
+        `_names`: the originating name strings
+        `_name_attributes`: the computed attribute names corresponding to the
+          `names`; there may be empty strings in this list
+        `_attr_of`: a mapping of column name to attribute name
+        `_name_of`: a mapping of attribute name to column name
+        `_index_of`: a mapping of column names and attributes their tuple indices
+    '''
+
+    _attributes = attributes
+    _computed = computed
+    _names = column_names
+    _name_attributes = name_attributes
+    _attr_of = {}   # map name to attr, omits those with empty/missing attrs
+    _name_of = {}   # map attr to name
+    _index_of = {}  # map name or attr to index
+    i = 0
+    for name, attr in zip(_names, _name_attributes):
+      if attr:
+        _attr_of[name] = attr
+        _name_of[attr] = name
+        _index_of[name] = i
+    del i, name, attr
+    _index_of.update( (s, i) for i, s in enumerate(_attributes) )
+
+    def __getitem__(self, key):
+      if isinstance(key, int):
+        i = key
+      elif isinstance(key, str):
+        func = self._computed.get(key)
+        if func is not None:
+          return func(self)
+        i = self._index_of[key]
+      else:
+        raise TypeError("expected int or str, got %s" % (type(key),))
+      return _NamedRow.__getitem__(self, i)
+
+  NamedRow.__name__ = class_name
+
+  # make a factory to avoid tromping the namedtuple __new__/__init__
+  def factory(*row):
+    ''' Factory function to create a NamedRow from a raw row.
+    '''
+    if attributes is not name_attributes:
+      row = [ item for item, attr in zip(row, name_attributes) if attr ]
+    return NamedRow(*row)
+  # pretty up the factory for external use
+  factory.__name__ = 'factory(%s)' % (NamedRow.__name__,)
+  factory._attributes = NamedRow._attributes
+  factory._names = NamedRow._names
+  factory._name_attributes = NamedRow._name_attributes
+  factory._attr_of = NamedRow._attr_of
+  factory._name_of = NamedRow._name_of
+  factory._index_of = NamedRow._index_of
+  return factory
+
+def named_column_tuples(rows, class_name=None, column_names=None, computed=None, preprocess=None):
   ''' Process an iterable of data rows, with the first row being column names.
+      Yields the generated namedtuple factory and then instances of the class
+      for each row.
+
       `rows`: an iterable of rows, each an iterable of data values.
-      Yields the generated namedtuple class for the first row in
-      `rows` and then instances of the class for each subsequent
-      row.
+      `class_name`: option class name for the namedtuple class
+      `column_names`: optional iterable of column names used as the basis for
+        the namedtuple. If this is not provided then the first row from
+        `rows` is taken to be the column names.
+      `computed`: optional mapping of str to functions of `self`
+      `preprocess`: optional callable to modify CSV rows before
+        they are converted into the namedtuple.  It receives a context
+        object an the data row.  It may return the row (possibly
+        modified), or None to drop the row.
+        The context object has the following attributes:
+          .index    attribute with the row's enumeration, which counts from 0
+          .previous the previously accepted row's namedtuple, or None
+                    if there is no previous row
+
       Rows may be flat iterables in the same order as the column
       names or mappings keyed on the column names.
-      If the column headers contain empty strings they are dropped
+
+      If the column names contain empty strings they are dropped
       and the corresponding data row entries are also dropped. This
       is very common with spreadsheet exports with unused padding
       columns.
+
       Typical human readable column headings, also common in
       speadsheet exports, are lowercased and have runs of whitespace
       or punctuation turned into single underscores; trailing
@@ -531,59 +668,41 @@ def named_column_tuples(rows):
         ...   ('a', 'b', 'c', '', ''),
         ...   (1, 11, "one"),
         ...   {'a': 2, 'c': "two", 'b': 22},
-        ...   [3, 11, "three", '', ''],
+        ...   [3, 11, "three", '', 'dropped'],
         ... ]
-        >>> rows = list(named_column_tuples(data1))
+        >>> rows = list(named_column_tuples(data1, 'CSV_Row'))
         >>> cls = rows.pop(0)
         >>> print(rows)
-        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two'), NamedRow(a=3, b=11, c='three')]
+        [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
   '''
-  column_names = None
-  first = True
-  for row in rows:
-    if first:
+  Context = namedtuple('Context', 'index previous')
+  if column_names is None:
+    cls = None
+  else:
+    cls = named_row_tuple(*column_names, class_name=class_name, computed=computed)
+    yield cls
+    tuple_attributes = cls._attributes
+    name_attributes = cls._name_attributes
+  previous = None
+  for index, row in enumerate(rows):
+    if preprocess:
+      row = preprocess(Context(index, previous), row)
+      if row is None:
+        continue
+    if cls is None:
       column_names = row
-      column_attributes = [
-          re.sub('_+$', '', re.sub(r'[^\w]+', '_', name)).lower()
-          for name in column_names
-      ]
-      # skip empty columns
-      tuple_attributes = [ name for name in column_attributes if name ]
-      if len(tuple_attributes) == len(column_attributes):
-        tuple_attributes = column_attributes
-      class NamedRow(namedtuple('NamedRow', tuple_attributes)):
-        ''' A namedtuple to store row data.
-        '''
-        index_of = dict( (s, i) for i, s in enumerate(column_names) )
-        index_of.update( (s, i) for i, s in enumerate(column_attributes) )
-        @staticmethod
-        def keys():
-          ''' Return the automatic column attributes from the `rows`.
-          '''
-          return column_attributes
-        @staticmethod
-        def names():
-          ''' Return the original column names from the `rows`.
-          '''
-          return column_names
-        def __getitem__(self, key):
-          if isinstance(key, int):
-            i = key
-          elif isinstance(key, str):
-            i = self.index_of[key]
-            if i is None:
-              raise KeyError("unknown name: " + repr(key))
-          else:
-            raise TypeError("expected int or str, got %s" % (type(key),))
-          return super().__getitem__(i)
-      first = False
-      yield NamedRow
-    else:
+      cls = named_row_tuple(*column_names, class_name=class_name, computed=computed)
+      yield cls
+      tuple_attributes = cls._attributes
+      name_attributes = cls._name_attributes
+      continue
+    if callable(getattr(row, 'get', None)):
       # flatten a mapping into a list ordered by column_names
-      if hasattr(row, 'keys'):
-        row = [ row[k] for k in tuple_attributes ]
-      if tuple_attributes is not column_attributes:
-        # drop items from columns with empty names
-        row = [ item for item, key in zip(row, column_attributes) if key ]
-      yield NamedRow(*row)
+      row = [ row.get(k) for k in column_names ]
+    if tuple_attributes is not name_attributes:
+      # drop items from columns with empty names
+      row = [ item for item, attr in zip(row, name_attributes) if attr ]
+    named_row = cls(*row)
+    yield named_row
+    previous = named_row
