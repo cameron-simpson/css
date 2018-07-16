@@ -377,7 +377,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           for lineno, row in enumerate(csv_reader(fp), 1):
             with Pfx("%d", lineno):
               col1 = row[0]
-              with Pfx(col1):
+              with Pfx("filenum %d", col1):
                 try:
                   filenum = int(col1)
                 except ValueError:
@@ -423,7 +423,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     ''' Set a persistent state value.
     '''
     if not key.islower():
-      raise ValueError("invalid state key, short be lower case: %r" % (key,))
+      raise ValueError("invalid state key, should be lower case: %r" % (key,))
     if value is None:
       if key in self._extra_state:
         del self._extra_state[key]
@@ -473,12 +473,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     ''' Add the supplied data file state `DFstate` to the filemap, returning the filenum.
     '''
     ##info("%s._add_datafilestate(DFstate=%s)", self, DFstate)
-    filenum = DFstate.filenum
     filemap = self._filemap
+    filenum = DFstate.filenum
     filename = DFstate.filename
     DFstate2 = filemap.get(filename)
-    if DFstate is not None:
-      msg = '%s: already in filemap: %r' % (DFstate, filename,)
+    if DFstate2 is not None:
+      msg = '%s: filename already in filemap as %s' % (DFstate, DFstate2,)
       if force:
         warning("%s, replaced", msg)
       else:
@@ -489,9 +489,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         filenum = max([0] + list(k for k in filemap if isinstance(k, int))) + 1
         DFstate.filenum = filenum
       else:
-        DFstate2 = filemap.get(filename)
-        if filenum is not None:
-          msg = '%s: already in filemap: %d' % (DFstate, filenum)
+        DFstate2 = filemap.get(filenum)
+        if DFstate2 is not None:
+          msg = '%s: filenum already in filemap: %s' % (DFstate, DFstate2)
           if force:
             warning("%s, replaced", msg)
           else:
