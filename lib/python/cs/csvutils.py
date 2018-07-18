@@ -14,7 +14,7 @@
 ''' Utility functions for CSV files.
 '''
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 import csv
 import sys
 from cs.deco import strable
@@ -122,3 +122,51 @@ def csv_import(
       column_names=column_names,
       computed=computed,
       preprocess=preprocess)
+
+def xl_import(
+    workbook, sheet_name,
+    skip_rows=0,
+    **kw):
+  ''' Read the named `sheet_name` from the Excel XLSX file named `filename` as for csv_import.
+
+      `workbook`: Excel work book from which to load the sheet; if this is a str then
+      `sheet_name`: the name of the work book sheet whose data should be imported
+
+      NOTE: this function requires the openpyxl module to be available.
+  '''
+  if isinstance(workbook, str):
+    from openpyxl import load_workbook
+    with Pfx(filename):
+      workbook = load_workbook(filename=filename, read_only=True)
+      return xl_import(workbook, sheet_name, **kw)
+  else:
+    return named_column_tuples(
+        (
+            [ cell.value for cell in row ]
+            for ri, row in enumerate(workbook[sheet_name])
+            if ri >= skip_rows
+        ),
+        **kw )
+
+if __name__ == '__main__':
+  args = sys.argv[1:]
+  if not args:
+    raise ValueError("missing filename")
+  for filename in args:
+    print(filename)
+    with Pfx(filename):
+      if filename.endswith('.csv'):
+        with open(filename, 'r') as csvfp:
+          for rownum, row in enumerate(csv_import(csvfp), 1):
+            print(filename, rownum, row)
+      elif filename.endswith('.xlsx'):
+        from openpyxl import load_workbook
+        workbook = load_workbook(filename=filename, read_only=True)
+        for sheet_name in workbook.get_sheet_names():
+          with Pfx(sheet_name):
+            # presume row 1 in some kind of title and column names are row 2
+            for rownum, row in enumerate(xl_import(workbook, sheet_name, skip_rows=1), 1):
+              print(filename, sheet_name, rownum, row)
+      else:
+        raise ValueError('not a .csv or .xlsx file')
+    print()
