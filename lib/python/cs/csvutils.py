@@ -133,7 +133,9 @@ def xl_import(
     **kw):
   ''' Read the named `sheet_name` from the Excel XLSX file named `filename` as for csv_import.
 
-      `workbook`: Excel work book from which to load the sheet; if this is a str then
+      `workbook`: Excel work book from which to load the sheet; if
+        this is a str then the work book is obtained from
+        openpyxl.load_workbook()
       `sheet_name`: the name of the work book sheet whose data should be imported
       Other keyword parameters are as for cs.mappings.named_column_tuples.
 
@@ -141,9 +143,10 @@ def xl_import(
   '''
   if isinstance(workbook, str):
     from openpyxl import load_workbook
+    filename = workbook
     with Pfx(filename):
       workbook = load_workbook(filename=filename, read_only=True)
-      return xl_import(workbook, sheet_name, **kw)
+      return xl_import(workbook, sheet_name, skip_rows=skip_rows, **kw)
   else:
     return named_column_tuples(
         (
