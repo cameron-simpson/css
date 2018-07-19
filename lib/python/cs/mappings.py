@@ -571,10 +571,17 @@ def named_row_tuple(*column_names, **kw):
       if isinstance(key, int):
         i = key
       elif isinstance(key, str):
-        func = self._computed.get(key)
-        if func is not None:
-          return func(self)
-        i = self._index_of[key]
+        try:
+          i = self._index_of[key]
+        except KeyError:
+          try:
+            method = getattr(self, key)
+          except AttributeError:
+            func = self._computed.get(key)
+            if func is not None:
+              return func(self)
+          else:
+            return method()
       else:
         raise TypeError("expected int or str, got %s" % (type(key),))
       return _NamedRow.__getitem__(self, i)
