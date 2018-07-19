@@ -485,7 +485,7 @@ def named_row_tuple(*column_names, **kw):
         to provide extra methods or properties
 
       The tuple's attributes are computed by converting all runs
-      of nonalphanumerics (as defined by the re module's "\W"
+      of nonalphanumerics (as defined by the re module's "\\W"
       sequence) to an underscore, lowercasing and then stripping
       leading and trailing underscores.
 
@@ -624,7 +624,8 @@ def named_column_tuples(
     rows,
     class_name=None, column_names=None,
     computed=None, preprocess=None,
-    mixin=None):
+    mixin=None
+):
   ''' Process an iterable of data rows, with the first row being column names.
       Yields the generated namedtuple factory and then instances of the class
       for each row.
