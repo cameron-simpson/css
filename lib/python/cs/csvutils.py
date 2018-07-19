@@ -89,6 +89,7 @@ def csv_import(
     column_names=None,
     computed=None,
     preprocess=None,
+    mixin=None,
     **kw):
   ''' Read CSV data where the first row contains column headers,
       yield named tuples for subsequent rows.
@@ -106,6 +107,8 @@ def csv_import(
         to modify CSV rows before they are converted into the namedtuple.
         It receives a context object an the data row. It may return
         the row (possibly modified), or None to drop the row.
+      `mixin`: an optional mixin class for the generated namedtuple subclass
+        to provide extra methods or properties
 
       All other keyword paramaters are passed to csv_reader(). This
       is a very thin shim around cs.mappings.named_column_tuples.
@@ -121,7 +124,8 @@ def csv_import(
       class_name=class_name,
       column_names=column_names,
       computed=computed,
-      preprocess=preprocess)
+      preprocess=preprocess,
+      mixin=mixin)
 
 def xl_import(
     workbook, sheet_name,
@@ -131,6 +135,7 @@ def xl_import(
 
       `workbook`: Excel work book from which to load the sheet; if this is a str then
       `sheet_name`: the name of the work book sheet whose data should be imported
+      Other keyword parameters are as for cs.mappings.named_column_tuples.
 
       NOTE: this function requires the openpyxl module to be available.
   '''
