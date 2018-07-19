@@ -493,18 +493,18 @@ def named_row_tuple(*column_names, **kw):
       also be indexed by the attribute names or the column names.
 
       The new class has the following additional attributes:
-      `_attributes`: the attribute names of each tuple in order
-      `_names`: the originating name strings
-      `_name_attributes`: the computed attribute names corresponding to the
+      `attributes_`: the attribute names of each tuple in order
+      `names_`: the originating name strings
+      `name_attributes_`: the computed attribute names corresponding to the
         `names`; there may be empty strings in this list
-      `_attr_of`: a mapping of column name to attribute name
-      `_name_of`: a mapping of attribute name to column name
-      `_index_of`: a mapping of column names and attributes their tuple indices
+      `attr_of_`: a mapping of column name to attribute name
+      `name_of_`: a mapping of attribute name to column name
+      `index_of_`: a mapping of column names and attributes their tuple indices
 
       Examples::
 
         >>> T = named_row_tuple('Column 1', '', 'Column 3', ' Column 4', 'Column 5 ', '', '', class_name='Example')
-        >>> T._attributes
+        >>> T.attributes_
         ['column_1', 'column_3', 'column_4', 'column_5']
         >>> row = T('val1', 'dropped', 'val3', 4, 5, 6, 7)
         >>> row
@@ -527,7 +527,7 @@ def named_row_tuple(*column_names, **kw):
       re.sub(r'\W+', '_', name).strip('_').lower()
       for name in column_names
   ]
-  # final tuple attributes are the nonempty _name_attributes
+  # final tuple attributes are the nonempty name_attributes_
   attributes = [ attr for attr in name_attributes if attr ]
   if len(attributes) == len(name_attributes):
     attributes = name_attributes
@@ -540,44 +540,44 @@ def named_row_tuple(*column_names, **kw):
         also be indexed by the attribute names or the column names.
 
         The class has the following attributes:
-        `_attributes`: the attribute names of each tuple in order
-        `_computed`: a mapping of str to functions of `self`; these
+        `attributes_`: the attribute names of each tuple in order
+        `computed_`: a mapping of str to functions of `self`; these
           values are also available via __getitem__
-        `_names`: the originating name strings
-        `_name_attributes`: the computed attribute names corresponding to the
+        `names_`: the originating name strings
+        `name_attributes_`: the computed attribute names corresponding to the
           `names`; there may be empty strings in this list
-        `_attr_of`: a mapping of column name to attribute name
-        `_name_of`: a mapping of attribute name to column name
-        `_index_of`: a mapping of column names and attributes their tuple indices
+        `attr_of_`: a mapping of column name to attribute name
+        `name_of_`: a mapping of attribute name to column name
+        `index_of_`: a mapping of column names and attributes their tuple indices
     '''
 
-    _attributes = attributes
-    _computed = computed
-    _names = column_names
-    _name_attributes = name_attributes
-    _attr_of = {}   # map name to attr, omits those with empty/missing attrs
-    _name_of = {}   # map attr to name
-    _index_of = {}  # map name or attr to index
+    attributes_ = attributes
+    computed_ = computed
+    names_ = column_names
+    name_attributes_ = name_attributes
+    attr_of_ = {}   # map name to attr, omits those with empty/missing attrs
+    name_of_ = {}   # map attr to name
+    index_of_ = {}  # map name or attr to index
     i = 0
-    for name, attr in zip(_names, _name_attributes):
+    for name, attr in zip(names_, name_attributes_):
       if attr:
-        _attr_of[name] = attr
-        _name_of[attr] = name
-        _index_of[name] = i
+        attr_of_[name] = attr
+        name_of_[attr] = name
+        index_of_[name] = i
     del i, name, attr
-    _index_of.update( (s, i) for i, s in enumerate(_attributes) )
+    index_of_.update( (s, i) for i, s in enumerate(attributes_) )
 
     def __getitem__(self, key):
       if isinstance(key, int):
         i = key
       elif isinstance(key, str):
         try:
-          i = self._index_of[key]
+          i = self.index_of_[key]
         except KeyError:
           try:
             method = getattr(self, key)
           except AttributeError:
-            func = self._computed.get(key)
+            func = self.computed_.get(key)
             if func is not None:
               return func(self)
           else:
@@ -597,12 +597,12 @@ def named_row_tuple(*column_names, **kw):
     return NamedRow(*row)
   # pretty up the factory for external use
   factory.__name__ = 'factory(%s)' % (NamedRow.__name__,)
-  factory._attributes = NamedRow._attributes
-  factory._names = NamedRow._names
-  factory._name_attributes = NamedRow._name_attributes
-  factory._attr_of = NamedRow._attr_of
-  factory._name_of = NamedRow._name_of
-  factory._index_of = NamedRow._index_of
+  factory.attributes_ = NamedRow.attributes_
+  factory.names_ = NamedRow.names_
+  factory.name_attributes_ = NamedRow.name_attributes_
+  factory.attr_of_ = NamedRow.attr_of_
+  factory.name_of_ = NamedRow.name_of_
+  factory.index_of_ = NamedRow.index_of_
   return factory
 
 # Context class for preprocessing rows.
@@ -744,8 +744,8 @@ def named_column_tuples(
         computed=computed,
         mixin=mixin)
     yield cls
-    tuple_attributes = cls._attributes
-    name_attributes = cls._name_attributes
+    tuple_attributes = cls.attributes_
+    name_attributes = cls.name_attributes_
   previous = None
   for index, row in enumerate(rows):
     if preprocess:
@@ -760,8 +760,8 @@ def named_column_tuples(
           computed=computed,
           mixin=mixin)
       yield cls
-      tuple_attributes = cls._attributes
-      name_attributes = cls._name_attributes
+      tuple_attributes = cls.attributes_
+      name_attributes = cls.name_attributes_
       continue
     if callable(getattr(row, 'get', None)):
       # flatten a mapping into a list ordered by column_names
