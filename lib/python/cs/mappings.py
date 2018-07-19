@@ -160,7 +160,7 @@ def named_row_tuple(*column_names, **kw):
 # Context class for preprocessing rows.
 # Its attributes have the following meanings:
 #
-#   .cls        attribute with the generate namedtuple subclass; this
+#   .cls        attribute with the generated namedtuple subclass; this
 #               is useful for obtaining things like the column named or column
 #               indices; this is None when preprocessing the header row, if any
 #
@@ -178,9 +178,9 @@ def named_column_tuples(
     computed=None, preprocess=None,
     mixin=None
 ):
-  ''' Process an iterable of data rows, with the first row being column names.
-      Yields the generated namedtuple factory and then instances of the class
-      for each row.
+  ''' Process an iterable of data rows, usually with the first row being
+      column names.  Returns a generated namedtuple factory and an iterable
+      of instances of the namedtuples for each row.
 
       `rows`: an iterable of rows, each an iterable of data values.
       `class_name`: option class name for the namedtuple class
@@ -194,7 +194,7 @@ def named_column_tuples(
         It should return the row (possibly modified), or None to drop the
         row.
         The context object has the following attributes:
-          .cls      attribute with the generate namedtuple subclass;
+          .cls      attribute with the generated namedtuple subclass;
                     this is useful for obtaining things like the column named
                     or column indices; this is None when preprocessing the
                     header row, if any
@@ -224,9 +224,8 @@ def named_column_tuples(
         ...   (1, 11, "one"),
         ...   (2, 22, "two"),
         ... ]
-        >>> rows = list(named_column_tuples(data1))
-        >>> cls = rows.pop(0)
-        >>> print(rows)
+        >>> cls, rows = named_column_tuples(data1)
+        >>> print(list(rows))
         [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
       Human readable column headings::
@@ -236,9 +235,8 @@ def named_column_tuples(
         ...   (1, 11, "one"),
         ...   (2, 22, "two"),
         ... ]
-        >>> rows = list(named_column_tuples(data1))
-        >>> cls = rows.pop(0)
-        >>> print(rows)
+        >>> cls, rows = named_column_tuples(data1)
+        >>> print(list(rows))
         [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
 
       Rows which are mappings::
@@ -248,9 +246,8 @@ def named_column_tuples(
         ...   (1, 11, "one"),
         ...   {'a': 2, 'c': "two", 'b': 22},
         ... ]
-        >>> rows = list(named_column_tuples(data1))
-        >>> cls = rows.pop(0)
-        >>> print(rows)
+        >>> cls, rows = named_column_tuples(data1)
+        >>> print(list(rows))
         [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
       CSV export with unused padding columns::
@@ -261,9 +258,8 @@ def named_column_tuples(
         ...   {'a': 2, 'c': "two", 'b': 22},
         ...   [3, 11, "three", '', 'dropped'],
         ... ]
-        >>> rows = list(named_column_tuples(data1, 'CSV_Row'))
-        >>> cls = rows.pop(0)
-        >>> print(rows)
+        >>> cls, rows = named_column_tuples(data1, 'CSV_Row')
+        >>> print(list(rows))
         [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
       A mixin class providing a test1 method and a test2 property:
@@ -279,14 +275,28 @@ def named_column_tuples(
         ...   (1, 11, "one"),
         ...   {'a': 2, 'c': "two", 'b': 22},
         ... ]
-        >>> rows = list(named_column_tuples(data1, mixin=Mixin))
-        >>> cls = rows.pop(0)
+        >>> cls, rows = named_column_tuples(data1, mixin=Mixin)
+        >>> rows = list(rows)
         >>> rows[0].test1()
         'test1'
         >>> rows[0].test2
         'test2'
 
   '''
+  gen = _named_column_tuples(
+    rows,
+    class_name=class_name, column_names=column_names,
+    computed=computed, preprocess=preprocess,
+    mixin=mixin)
+  cls = next(gen)
+  return cls, gen
+
+def _named_column_tuples(
+    rows,
+    class_name=None, column_names=None,
+    computed=None, preprocess=None,
+    mixin=None
+):
   if column_names is None:
     cls = None
   else:
