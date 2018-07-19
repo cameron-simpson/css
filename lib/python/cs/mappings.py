@@ -481,6 +481,8 @@ def named_row_tuple(*column_names, **kw):
       `computed`: optional keyword parameter providing a mapping
         of str to functions of `self`; these strings are available
         via __getitem__
+      `mixin`: an optional mixin class for the generated namedtuple subclass
+        to provide extra methods or properties
 
       The tuple's attributes are computed by converting all runs
       of nonalphanumerics (as defined by the re module's "\W"
@@ -510,6 +512,7 @@ def named_row_tuple(*column_names, **kw):
   '''
   class_name = kw.pop('class_name', None)
   computed = kw.pop('computed', None)
+  mixin = kw.pop('mixin', None)
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   if class_name is None:
@@ -517,6 +520,8 @@ def named_row_tuple(*column_names, **kw):
   column_names = list(column_names)
   if computed is None:
     computed = {}
+  if mixin is None:
+    mixin = object
   # compute candidate tuple attributes from the column names
   name_attributes = [
       re.sub(r'\W+', '_', name).strip('_').lower()
@@ -528,7 +533,7 @@ def named_row_tuple(*column_names, **kw):
     attributes = name_attributes
 
   _NamedRow = namedtuple(class_name, attributes)
-  class NamedRow(_NamedRow):
+  class NamedRow(_NamedRow, mixin):
     ''' A namedtuple to store row data.
 
         In addition to the normal numeric indices, the tuple may
@@ -593,7 +598,26 @@ def named_row_tuple(*column_names, **kw):
   factory._index_of = NamedRow._index_of
   return factory
 
-def named_column_tuples(rows, class_name=None, column_names=None, computed=None, preprocess=None):
+# Context class for preprocessing rows.
+# Its attributes have the following meanings:
+#
+#   .cls        attribute with the generate namedtuple subclass; this
+#               is useful for obtaining things like the column named or column
+#               indices; this is None when preprocessing the header row, if any
+#
+#   .index      attribute with the row's enumeration, which counts
+#               from 0
+#
+#   .previous   the previously accepted row's namedtuple, or None
+#               if there is no previous row
+#
+_nct_Context = namedtuple('Context', 'cls index previous')
+
+def named_column_tuples(
+    rows,
+    class_name=None, column_names=None,
+    computed=None, preprocess=None,
+    mixin=None):
   ''' Process an iterable of data rows, with the first row being column names.
       Yields the generated namedtuple factory and then instances of the class
       for each row.
@@ -606,12 +630,19 @@ def named_column_tuples(rows, class_name=None, column_names=None, computed=None,
       `computed`: optional mapping of str to functions of `self`
       `preprocess`: optional callable to modify CSV rows before
         they are converted into the namedtuple.  It receives a context
-        object an the data row.  It may return the row (possibly
-        modified), or None to drop the row.
+        object an the data row.
+        It should return the row (possibly modified), or None to drop the
+        row.
         The context object has the following attributes:
+          .cls      attribute with the generate namedtuple subclass;
+                    this is useful for obtaining things like the column named
+                    or column indices; this is None when preprocessing the
+                    header row, if any
           .index    attribute with the row's enumeration, which counts from 0
           .previous the previously accepted row's namedtuple, or None
                     if there is no previous row
+      `mixin`: an optional mixin class for the generated namedtuple subclass
+        to provide extra methods or properties
 
       Rows may be flat iterables in the same order as the column
       names or mappings keyed on the column names.
@@ -675,24 +706,51 @@ def named_column_tuples(rows, class_name=None, column_names=None, computed=None,
         >>> print(rows)
         [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
+      A mixin class providing a test1 method and a test2 property:
+
+        >>> class Mixin(object):
+        ...   def test1(self):
+        ...     return "test1"
+        ...   @property
+        ...   def test2(self):
+        ...     return "test2"
+        >>> data1 = [
+        ...   ('a', 'b', 'c'),
+        ...   (1, 11, "one"),
+        ...   {'a': 2, 'c': "two", 'b': 22},
+        ... ]
+        >>> rows = list(named_column_tuples(data1, mixin=Mixin))
+        >>> cls = rows.pop(0)
+        >>> rows[0].test1()
+        'test1'
+        >>> rows[0].test2
+        'test2'
+
   '''
-  Context = namedtuple('Context', 'index previous')
   if column_names is None:
     cls = None
   else:
-    cls = named_row_tuple(*column_names, class_name=class_name, computed=computed)
+    cls = named_row_tuple(
+        *column_names,
+        class_name=class_name,
+        computed=computed,
+        mixin=mixin)
     yield cls
     tuple_attributes = cls._attributes
     name_attributes = cls._name_attributes
   previous = None
   for index, row in enumerate(rows):
     if preprocess:
-      row = preprocess(Context(index, previous), row)
+      row = preprocess(_nct_Context(cls, index, previous), row)
       if row is None:
         continue
     if cls is None:
       column_names = row
-      cls = named_row_tuple(*column_names, class_name=class_name, computed=computed)
+      cls = named_row_tuple(
+          *column_names,
+          class_name=class_name,
+          computed=computed,
+          mixin=mixin)
       yield cls
       tuple_attributes = cls._attributes
       name_attributes = cls._name_attributes
