@@ -1,6 +1,17 @@
 #!/usr/bin/python -tt
 
 ''' Facilities for mappings and objects associated with mappings.
+
+    In particular:
+
+    - named_column_tuple(column_names), a function returning a factory
+        for namedtuples subclasses derived from the supplied column
+        names
+
+    - named_column_tuples(rows), a function returning a namedtuple
+        factory and an iterable of instances containing the row data
+
+    These are used by the csv_import and xl_import functions from cs.csvutils.
 '''
 
 from collections import defaultdict, namedtuple
