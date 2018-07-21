@@ -12,7 +12,7 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
-from cs.result import Result, report as report_LFs, AsynchState
+from cs.result import Result, report as report_LFs, ResultState
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
@@ -527,11 +527,11 @@ class Target(Result):
     '''
     with Pfx("%r.require()", self.name):
       with self._lock:
-        if self.state == AsynchState.pending:
+        if self.state == ResultState.pending:
           # commence make of this Target
           self.maker.target_active(self)
           self.notify(self.maker.target_inactive)
-          self.state = AsynchState.running
+          self.state = ResultState.running
           self.was_missing = self.mtime is None
           self.pending_actions = list(self.actions)
           Ts = []

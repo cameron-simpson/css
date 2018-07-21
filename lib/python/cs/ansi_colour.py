@@ -65,7 +65,6 @@ def make_pattern(pattern, default_colour=None):
         a tuple of the form (colour, regexp)
         a regexp object
   '''
-  pattern0 = pattern
   if default_colour is None:
     default_colour = DEFAULT_HIGHLIGHT
   if isinstance(pattern, str):

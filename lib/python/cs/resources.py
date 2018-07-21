@@ -4,12 +4,18 @@
 #       - Cameron Simpson <cs@cskk.id.au> 11sep2014
 #
 
+''' Resource management classes and functions.
+'''
+
+from __future__ import print_function
 from contextlib import contextmanager
+import sys
 from threading import Condition, RLock, Lock
 import time
-from cs.logutils import error
-from cs.obj import O, Proxy, TrackedClassMixin
-from cs.py.stack import caller
+from cs.logutils import error, warning
+from cs.obj import O, Proxy
+from cs.py.func import prop
+from cs.py.stack import caller, frames as stack_frames, stack_dump
 
 DISTINFO = {
     'description': "resourcing related classes and functions",
@@ -19,27 +25,33 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.stack'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py.stack'],
 }
 
 class ClosedError(Exception):
+  ''' Exception for operations invalid when something is closed.
+  '''
   pass
 
 def not_closed(func):
   ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
+    ''' Wrapper function to check that this instance is not closed.
+    '''
     if self.closed:
       raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class MultiOpenMixin(O, TrackedClassMixin):
-  ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
+## debug: TrackedClassMixin
+class MultiOpenMixin(O):
+  ''' A mixin to count open and close calls, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
-      This mixin defines ._lock = RLock(); subclasses need not bother.
+      This mixin defines ._lock = RLock(); subclasses need not
+      bother, but may supply their own lock.
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
@@ -72,6 +84,8 @@ class MultiOpenMixin(O, TrackedClassMixin):
     self._finalise = None
 
   def tcm_get_state(self):
+    ''' Support method for TrackedClassMixin.
+    '''
     return {'opened': self.opened, 'opens': self._opens}
 
   def __enter__(self):
@@ -124,7 +138,7 @@ class MultiOpenMixin(O, TrackedClassMixin):
         ##from threading import current_thread
         ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
-        return
+        return retval
       self._opens -= 1
       opens = self._opens
     if opens == 0:
@@ -154,11 +168,13 @@ class MultiOpenMixin(O, TrackedClassMixin):
 
   @property
   def closed(self):
+    ''' Whether this object has been closed.
+        Note: false if never opened.
+    '''
     if self._opens > 0:
       return False
     ##if self._opens < 0:
-    ##  XP("_opens < 0: %r", self._opens)
-    ##  raise RuntimeError("_OPENS UNDERFLOW")
+    ##  raise RuntimeError("_OPENS UNDERFLOW: _opens < 0: %r" % (self._opens,))
     if not self.opened:
       # never opened, so not totally closed
       return False
@@ -181,24 +197,37 @@ class MultiOpenMixin(O, TrackedClassMixin):
     ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise if the object is not yet open.
     '''
     def is_opened_wrapper(self, *a, **kw):
+      ''' Wrapper method which checks that the instance is open.
+      '''
       if self.closed:
-        raise RuntimeError("%s: %s: already closed from %s" % (is_opened_wrapper.__name__, self, self._final_close_from))
+        raise RuntimeError(
+            "%s: %s: already closed from %s"
+            % (is_opened_wrapper.__name__, self, self._final_close_from))
       if not self.opened:
-        raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
+        raise RuntimeError(
+            "%s: %s: not yet opened"
+            % (is_opened_wrapper.__name__, self))
       return func(self, *a, **kw)
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
 
 class _SubOpen(Proxy):
+  ''' A single use proxy for another object with its own independent .closed attribute.
+
+      The target use case is MultiOpenMixins which return independent
+      closables from their .open method.
+  '''
 
   def __init__(self, proxied):
+    Proxy.__init__(self, proxied)
     self.closed = False
-    self.master = proxied
 
   def close(self):
+    ''' Close the proxy.
+    '''
     if self.closed:
       raise RuntimeError("already closed")
-    self.master.close()
+    self._proxied.close()
     self.closed = True
 
 class MultiOpen(MultiOpenMixin):
@@ -206,13 +235,19 @@ class MultiOpen(MultiOpenMixin):
   '''
 
   def __init__(self, openable, finalise_later=False, lock=None):
+    ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
+    '''
     MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
     self.openable = openable
 
   def startup(self):
+    ''' Open the associated openable object.
+    '''
     self.openable.open()
 
   def shutdown(self):
+    ''' Close the associated openable object.
+    '''
     self.openable.close()
 
 class Pool(O):
@@ -226,19 +261,23 @@ class Pool(O):
         Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
   '''
 
-  def __init__(self, new_object, max_size=None):
+  def __init__(self, new_object, max_size=None, lock=None):
     ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
         `new_object` is a callable which returns a new object for the Pool.
         `max_size`: The maximum size of the pool of available objects saved for reuse.
             If omitted or None, defaults to 4.
             If 0, no upper limit is applied.
+        `lock`: optional shared Lock; if omitted or None a new Lock is allocated
     '''
+    O.__init__(self)
     if max_size is None:
       max_size = 4
+    if lock is None:
+      lock = Lock()
     self.new_object = new_object
     self.max_size = max_size
     self.pool = []
-    self._lock = Lock()
+    self._lock = lock
 
   def __str__(self):
     return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
@@ -264,10 +303,10 @@ class RunState(object):
       Its purpose is twofold, to provide easily queriable state
       around tasks which can start and stop, and to provide control
       methods to pronounce that a task has started, should stop
-      (cancel) and has stopped (end).
+      (cancel) and has stopped (stop).
 
       A RunState can be used a a context manager, with the enter
-      and exit methods calling .start and .end respectively.
+      and exit methods calling .start and .stop respectively.
 
       Monitor or daemon processes can poll the RunState to see when
       they should terminate, and may also manage the overall state
@@ -282,7 +321,7 @@ class RunState(object):
 
       .start(): set .running and clear .cancelled
       .cancel(): set .cancelled
-      .end(): clear .running
+      .stop(): clear .running
 
       A RunState has the following properties:
 
@@ -290,11 +329,11 @@ class RunState(object):
 
       running: true if the task is running. Assigning a true value
         to it also sets .start_time to now. Assigning a false value
-        to it also sets .end_time to now.
+        to it also sets .stop_time to now.
 
       start_time: the time .running was last set to true.
-      end_time: the time .running was last set to false.
-      run_time: max(0, .end_time - .start_time)
+      stop_time: the time .running was last set to false.
+      run_time: max(0, .stop_time - .start_time)
 
       stopped: true if the task is not running.
 
@@ -309,12 +348,13 @@ class RunState(object):
   '''
 
   def __init__(self):
+    self._started_from = None
     # core state
     self._running = False
     self.cancelled = False
     # timing state
     self.start_time = None
-    self.end_time = None
+    self.stop_time = None
     self.total_time = 0
     # callbacks
     self.notify_start = set()
@@ -327,27 +367,62 @@ class RunState(object):
     return self.running
   __nonzero__ = __bool__
 
+  def __str__(self):
+    return "RunState:%s[%s:%gs]" % (id(self), self.state, self.run_time)
+
   def __enter__(self):
     self.start()
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    self.end()
+    self.stop()
+
+  @prop
+  def state(self):
+    ''' The RunState's state as a string.
+        pending: not yet running/started.
+        stopping: running and cancelled.
+        running: running and not cancelled.
+        cancelled: cancelled and no longer running.
+        stopping: no longer running and not cancelled.
+    '''
+    start_time = self.start_time
+    if start_time is None:
+      label = "pending"
+    elif self.running:
+      if self.cancelled:
+        label = "stopping"
+      else:
+        label = "running"
+    elif self.cancelled:
+      label = "cancelled"
+    else:
+      label = "stopped"
+    return label
 
   def start(self):
     ''' Start: adjust state, set start_time to now.
         Sets .cancelled to False and sets .running to True.
     '''
+    if self.running:
+      warning("runstate.start() when already running")
+      print("runstate.start(): originally started from:", file=sys.stderr)
+      stack_dump(Fs=self._started_from)
+    else:
+      self._started_from = stack_frames()
     assert not self.running
     self.cancelled = False
     self.running = True
 
-  def end(self):
-    ''' End: adjust state, set end_time to now.
+  def stop(self):
+    ''' Stop: adjust state, set stop_time to now.
         Sets sets .running to False.
     '''
     assert self.running
     self.running = False
+
+  # compatibility
+  end = stop
 
   @property
   def running(self):
@@ -362,12 +437,14 @@ class RunState(object):
         A change in status triggers the time measurements.
     '''
     if self._running:
+      # running -> not running
       if not status:
-        self.end_time = time.time()
+        self.stop_time = time.time()
         self.total_time += self.run_time
         for notify in self.notify_end:
           notify(self)
     elif status:
+      # not running -> running
       self.start_time = time.time()
       for notify in self.notify_start:
         notify(self)
@@ -394,34 +471,52 @@ class RunState(object):
 
   @property
   def run_time(self):
-    ''' Property returning most recent run time (end_time-start_time).
-        If still running, use now as the end time.
+    ''' Property returning most recent run time (stop_time-start_time).
+        If still running, use now as the stop time.
+        If not started, return 0.0.
     '''
+    start_time = self.start_time
+    if start_time is None:
+      return 0.0
     if self.running:
-        end_time = time.time()
+      stop_time = time.time()
     else:
-        end_time = self.end_time
-    return max(0, end_time - self.start_time)
+      stop_time = self.stop_time
+    return max(0, stop_time - start_time)
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a RunState.
       Provides: .runstate, .cancelled, .running, .stopping, .stopped.
   '''
   def __init__(self, runstate=None):
+    ''' Initialise the RunStateMixin; sets the .runstate attribute.
+        `runstate`: optional RunState instance. If omitted or None,
+          a new RunState is allocated.
+    '''
     if runstate is None:
       runstate = RunState()
     self.runstate = runstate
   def cancel(self):
+    ''' Call .runstate.cancel().
+    '''
     return self.runstate.cancel()
   @property
   def cancelled(self):
+    ''' Test .runstate.cancelled.
+    '''
     return self.runstate.cancelled
   @property
   def running(self):
+    ''' Test .runstate.running.
+    '''
     return self.runstate.running
   @property
   def stopping(self):
+    ''' Test .runstate.stopping.
+    '''
     return self.runstate.stopping
   @property
   def stopped(self):
+    ''' Test .runstate.stopped.
+    '''
     return self.runstate.stopped

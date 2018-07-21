@@ -10,9 +10,12 @@ set -ue
 lastvalue=screenshot_dir
 
 cmd=$0
-usage="Usage: $cmd dir"
+usage="Usage: $cmd [dir]"
 
 badopts=
+
+# no dir? recite current location
+[ $# = 0 ] && exec defaults read com.apple.screencapture location
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 dir=$1; shift

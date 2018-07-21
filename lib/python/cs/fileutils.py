@@ -1,8 +1,9 @@
 #!/usr/bin/python
 #
 # Assorted convenience functions for files and filenames/pathnames.
-#       - Cameron Simpson <cs@cskk.id.au>
-#
+# - Cameron Simpson <cs@cskk.id.au>
+
+''' Assorted convenience functions for files and filenames/pathnames.'''
 
 from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
@@ -10,7 +11,11 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import lseek, SEEK_CUR, SEEK_END, SEEK_SET
+from os import SEEK_CUR, SEEK_END, SEEK_SET
+try:
+  from os import pread
+except ImportError:
+  pread = None
 from os.path import basename, dirname, isdir, isabs as isabspath, \
                     abspath, join as joinpath
 import shutil
@@ -26,8 +31,9 @@ from cs.filestate import FileState
 from cs.lex import as_lines
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
-from cs.py3 import ustr, bytes
+from cs.py3 import ustr, bytes, pread
 from cs.range import Range
+from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.x import X
@@ -57,25 +63,6 @@ DISTINFO = {
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
-
-try:
-  from os import pread
-except ImportError:
-  # implement our own pread
-  # NB: not thread safe!
-  def pread(fd, size, offset):
-    offset0 = os.lseek(fd, 0, SEEK_CUR)
-    os.lseek(fd, offset, SEEK_SET)
-    chunks = []
-    while size > 0:
-      data = os.read(fd, size)
-      if not data:
-        break
-      chunks.append(data)
-      size -= len(data)
-    os.lseek(fd, offset0, SEEK_SET)
-    data = b''.join(chunks)
-    return data
 
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
@@ -286,11 +273,14 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
   ''' A decorator which caches a value obtained from a file.
       In addition to all the keyword arguments for @cs.deco.cached,
       this decorator also accepts the following argument:
+      `attr_name`: the name for the associated attribute, used as
+        the basis for the internal cache value attribute
       `filename`: the filename to monitor. Default from the
         ._{attr_name}__filename attribute. This value will be passed
         to the method as the `filename` keyword parameter.
-      If the `poll_delay` is not specified is defaults to `DEFAULT_POLL_INTERVAL`.
-      If the `sig_func` is not specified it defaults to
+      `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
+      `sig_func`: signature function used to encapsulate the relevant
+        information about the file; default
         cs.filestate.FileState({filename}).
       If the decorated function raises OSError with errno == ENOENT,
       this returns None. Other exceptions are reraised.
@@ -471,7 +461,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
     return property(getprop)
   return made_files_property
 
-def makelockfile(path, ext=None, poll_interval=None, timeout=None):
+def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' Create a lockfile and return its path.
       The file can be removed with os.remove.
       This is the core functionality supporting the lockfile()
@@ -483,6 +473,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
       `timeout`: maximum time to wait before failing,
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
+      `runstate`: optional RunState duck instance supporting cancellation
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -492,49 +483,49 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None):
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
-  while True:
-    try:
-      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
-    except OSError as e:
-      if e.errno != errno.EEXIST:
-        raise
-      if timeout is not None and timeout <= 0:
-        # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
-      now = time.time()
-      # post: timeout is None or timeout > 0
-      if start is None:
-        # first try - set up counters
-        start = now
-        complaint_last = start
-        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+  with Pfx("makelockfile: %r", lockpath):
+    while True:
+      if runstate is not None and runstate.cancelled:
+        warning("cancelled; pid %d waited %ds", os.getpid(), time.time() - start)
+        raise CancellationError("lock acquisition cancelled")
+      try:
+        lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+      except OSError as e:
+        if e.errno != errno.EEXIST:
+          raise
+        if timeout is not None and timeout <= 0:
+          # immediate failure
+          raise TimeoutError( "pid %d timed out" % (os.getpid(),), timeout)
+        now = time.time()
+        # post: timeout is None or timeout > 0
+        if start is None:
+          # first try - set up counters
+          start = now
+          complaint_last = start
+          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+        else:
+          if now - complaint_last >= complaint_interval:
+            warning("pid %d waited %ds",
+                    os.getpid(), now - start)
+            complaint_last = now
+            complaint_interval *= 2
+        # post: start is set
+        if timeout is None:
+          sleep_for = poll_interval
+        else:
+          sleep_for = min(poll_interval, start + timeout - now)
+        # test for timeout
+        if sleep_for <= 0:
+          raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
+        time.sleep(sleep_for)
+        continue
       else:
-        if now - complaint_last >= complaint_interval:
-          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
-                  os.getpid(), now - start, lockpath)
-          complaint_last = now
-          complaint_interval *= 2
-      # post: start is set
-      if timeout is None:
-        sleep_for = poll_interval
-      else:
-        sleep_for = min(poll_interval, start + timeout - now)
-      # test for timeout
-      if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
-      time.sleep(sleep_for)
-      continue
-    else:
-      break
-  os.close(lockfd)
-  return lockpath
+        break
+    os.close(lockfd)
+    return lockpath
 
 @contextmanager
-def lockfile(path, ext=None, poll_interval=None, timeout=None):
+def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -542,12 +533,17 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       `timeout`: maximum time to wait before failing,
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
+      `runstate`: optional RunState duck instance supporting cancellation.
   '''
-  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
+  lockpath = makelockfile(
+      path,
+      ext=ext, poll_interval=poll_interval,
+      timeout=timeout, runstate=runstate)
   try:
     yield lockpath
   finally:
-    os.remove(lockpath)
+    with Pfx("remove %r", lockpath):
+      os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
@@ -576,9 +572,7 @@ def mkdirn(path, sep=''):
   '''
   with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
     if os.sep in sep:
-      raise ValueError(
-              "sep contains os.sep (%r)"
-              % (os.sep,))
+      raise ValueError("sep contains os.sep (%r)" % (os.sep,))
     opath = path
     if not path:
       path = '.' + os.sep
@@ -586,8 +580,8 @@ def mkdirn(path, sep=''):
     if path.endswith(os.sep):
       if sep:
         raise ValueError(
-                "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
-                % (path, sep, os.sep))
+            "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
+            % (path, sep, os.sep))
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
@@ -685,25 +679,37 @@ class Pathname(str):
 
   @property
   def dirname(self):
+    ''' The dirname of the Pathname.
+    '''
     return Pathname(dirname(self))
 
   @property
   def basename(self):
+    ''' The basename of this Pathname.
+    '''
     return Pathname(basename(self))
 
   @property
   def abs(self):
+    ''' The absolute form of this Pathname.
+    '''
     return Pathname(abspath(self))
 
   @property
   def isabs(self):
+    ''' Whether this Pathname is an absolute Pathname.
+    '''
     return isabspath(self)
 
   @property
   def short(self):
+    ''' The shortened form of this Pathname.
+    '''
     return self.shorten()
 
   def shorten(self, environ=None, prefixes=None):
+    ''' Shorten a Pathname using ~ and ~user.
+    '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
 def datafrom_fd(fd, offset, readsize=None, aligned=True):
@@ -716,25 +722,29 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
     # do an initial read to align all subsequent reads
     alignsize = offset % readsize
     if alignsize > 0:
-      X("PREAD ALIGN fd=%d, readsize=%d, offset=%d", fd, alignsize, offset)
       bs = pread(fd, alignsize, offset)
       if not bs:
         return
       yield bs
       offset += len(bs)
   while True:
-    X("PREAD fd=%d, readsize=%d, offset=%d", fd, readsize, offset)
     bs = pread(fd, readsize, offset)
     if not bs:
       return
     yield bs
     offset += len(bs)
 
-@strable
+@strable(open_func=partial(open, mode='rb'))
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
       NOTE: this function may move the file pointer.
+      `f`: the file from which to read data; if a string, the file
+        is opened with mode="rb"; if an int, treated as an OS file
+        descriptor; otherwise presumed to be a file-like object
+      `offset`: starting offset for the data
       `readsize`: read size, default DEFAULT_READSIZE.
+      For file-like objects, the read1 method is used in preference
+      to read if available.
   '''
   if readsize is None:
     readsize = DEFAULT_READSIZE
@@ -745,14 +755,15 @@ def datafrom(f, offset, readsize=None):
   # presume a file-like object
   try:
     read1 = f.read1
-  except AttrubuteError:
+  except AttributeError:
     read1 = f.read
+  tell = f.tell
   seek = f.seek
   while True:
-    offset0 = f.tell()
-    f.seek(offset, SEEK_SET)
+    offset0 = tell()
+    seek(offset, SEEK_SET)
     bs = read1(readsize)
-    f.seek(offset0)
+    seek(offset0)
     if not bs:
       yield bs
     offset += len(bs)
@@ -995,6 +1006,8 @@ class BackedFile_TestMethods(object):
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
   def test_BackedFile(self):
+    ''' Test function for a BackedFile to use in unit test suites.
+    '''
     from random import randint
     backing_text = self.backing_text
     bfp = self.backed_fp
@@ -1042,17 +1055,26 @@ class Tee(object):
     self._fps = list(fps)
 
   def add(self, output):
+    ''' Add a new output.
+    '''
     self._fps.append(output)
 
   def write(self, data):
+    ''' Write the data to all the outputs.
+        Note: does not detect or accodmodate short writes.
+    '''
     for fp in self._fps:
       fp.write(data)
 
   def flush(self):
+    ''' Flush all the outputs.
+    '''
     for fp in self._fps:
       fp.flush()
 
   def close(self):
+    ''' Close all the outputs and close the Tee.
+    '''
     for fp in self._fps:
       fp.close()
     self._fps = None
@@ -1083,14 +1105,20 @@ class NullFile(object):
   '''
 
   def __init__(self):
+    ''' Initialise the file offset to 0.
+    '''
     self.offset = 0
 
   def write(self, data):
+    ''' Discard data, advance file offset by length of data.
+    '''
     dlen = len(data)
     self.offset += dlen
     return dlen
 
   def flush(self):
+    ''' Flush buffered data to the subsystem.
+    '''
     pass
 
 def file_data(fp, nbytes=None, rsize=None):
@@ -1159,8 +1187,9 @@ def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
     raise ValueError("tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay))
   while True:
     chunk = fp.read(rsize)
-    if len(chunk) == 0:
+    if not chunk:
       if tail_mode:
+        # indicate EOF and pause
         yield chunk
         time.sleep(tail_delay)
       else:
@@ -1192,8 +1221,7 @@ class RWFileBlockCache(object):
     opathname = pathname
     if pathname is None:
       tmpfd, pathname = mkstemp(dir=dirpath, suffix=suffix)
-    self.rfd = os.open(pathname, os.O_RDONLY)
-    self.wfd = os.open(pathname, os.O_WRONLY)
+    self.fd = os.open(pathname, os.O_RDWR | os.O_APPEND)
     if opathname is None:
       os.remove(pathname)
       os.close(tmpfd)
@@ -1204,26 +1232,34 @@ class RWFileBlockCache(object):
       lock = Lock()
     self._lock = lock
 
+  def __str__(self):
+    return "%s(pathname=%s)" % (type(self).__name__, self.pathname)
+
   def close(self):
     ''' Close the file descriptors.
     '''
-    os.close(self.wfd)
-    self.wfd = None
-    os.close(self.rfd)
-    self.rfd = None
+    with Pfx("%s.close", self):
+      fd = self.fd
+      if fd is None:
+        warning("fd already closed")
+      else:
+        os.close(fd)
+        self.fd = None
 
   @property
   def closed(self):
-    return self.wfd is None
+    ''' Test whether the file descriptor has been closed.
+    '''
+    return self.fd is None
 
   def put(self, data):
     ''' Store `data`, return offset.
     '''
     assert len(data) > 0
-    wfd = self.wfd
+    fd = self.fd
     with self._lock:
-      offset = os.lseek(wfd, 0, 1)
-      length = os.write(wfd, data)
+      offset = os.lseek(fd, 0, 1)
+      length = os.write(fd, data)
     assert length == len(data)
     return offset
 
@@ -1231,10 +1267,8 @@ class RWFileBlockCache(object):
     ''' Get data from `offset` of length `length`.
     '''
     assert length > 0
-    rfd = self.rfd
-    with self._lock:
-      os.lseek(rfd, offset, 0)
-      data = os.read(rfd, length)
+    fd = self.fd
+    data = os.pread(fd, length, offset)
     assert len(data) == length
     return data
 

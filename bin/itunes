@@ -114,8 +114,10 @@ download(){
   done
   [ -z "$flagnames" ] || $trace await flag -t $flagnames
   $trace \
-  reattach-to-user-namespace \
-  osascript -e "
+    lock "$cmd-download" \
+    $trace \
+    reattach-to-user-namespace \
+    osascript -e "
       activate \"iTunes\"
       tell application \"iTunes\"
         $_dl_cmds

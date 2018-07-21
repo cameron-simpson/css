@@ -194,7 +194,7 @@ class Transcribe:
     # prefix{....}
     prefix, offset = get_identifier(s, offset)
     if not prefix:
-      raise ValueError("no prefix at offset %d" % (offset,))
+      raise ValueError("no type prefix at offset %d" % (offset,))
     with Pfx("prefix %r", prefix):
       if offset >= len(s) or s[offset] != '{':
         raise ValueError("missing opening '{' at offset %d" % (offset,))

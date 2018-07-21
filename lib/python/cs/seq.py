@@ -40,9 +40,11 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0):
+  def __init__(self, start=0, lock=None):
+    if lock is None:
+      lock = Lock()
     self.counter = itertools.count(start)
-    self._lock = Lock()
+    self._lock = lock
 
   def __iter__(self):
     return self
@@ -56,6 +58,8 @@ class Seq(object):
 __seq = Seq()
 
 def seq():
+  ''' Return a new sequential value.
+  '''
   global __seq
   return next(__seq)
 
@@ -66,19 +70,17 @@ def the(iterable, context=None):
   icontext = "expected exactly one value"
   if context is not None:
     icontext = icontext + " for " + context
-
-  first = True
+  is_first = True
   for elem in iterable:
-    if first:
+    if is_first:
       it = elem
-      first = False
+      is_first = False
     else:
       raise IndexError(
           "%s: got more than one element (%s, %s, ...)"
           % (icontext, it, elem)
       )
-
-  if first:
+  if is_first:
     raise IndexError("%s: got no elements" % (icontext,))
 
   return it
@@ -133,7 +135,7 @@ def imerge(*iters, **kw):
   '''
   reverse = kw.get('reverse', False)
   if kw:
-    raise ValueError("unexpected keyword arguments: %r", kw)
+    raise ValueError("unexpected keyword arguments: %r" % (kw,))
   if reverse:
     # tuples that compare in reverse order
     class _MergeHeapItem(tuple):
@@ -177,6 +179,8 @@ def onetoone(func):
         lower_strs = X.lower()
   '''
   def gather(self, *a, **kw):
+    ''' Yield the results of calling the function on each item.
+    '''
     for item in self:
       yield func(item, *a, **kw)
   return gather
@@ -194,6 +198,8 @@ def onetomany(func):
         all_chars = X.chars()
   '''
   def gather(self, *a, **kw):
+    ''' Chain the function results together.
+    '''
     return itertools.chain(*[ func(item, *a, **kw) for item in self ])
   return gather
 
@@ -202,10 +208,10 @@ def isordered(s, reverse=False, strict=False):
       Note that the iterable is iterated, so this is a destructive
       test for nonsequences.
   '''
-  first = True
+  is_first = True
   prev = None
   for item in s:
-    if not first:
+    if not is_first:
       if reverse:
         ordered = item < prev if strict else item <= prev
       else:
@@ -213,7 +219,7 @@ def isordered(s, reverse=False, strict=False):
       if not ordered:
         return False
     prev = item
-    first = False
+    is_first = False
   return True
 
 class TrackingCounter(object):
@@ -292,6 +298,8 @@ class TrackingCounter(object):
       self._notify()
 
   def check(self):
+    ''' Internal consistency check.
+    '''
     for tag in sorted(self._tag_up.keys()):
       ups = self._tag_up[tag]
       downs = self._tag_down.get(tag, 0)

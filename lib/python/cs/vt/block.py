@@ -40,7 +40,7 @@ from functools import lru_cache
 import sys
 from threading import RLock
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning, exception
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.serialise import get_bs, put_bs
@@ -214,7 +214,7 @@ class _Block(Transcriber, ABC):
     self.type = block_type
     if span is not None:
       if not isinstance(span, int) or span < 0:
-        raise ValueError("invalid span: %r", span)
+        raise ValueError("invalid span: %r" % (span,))
       self.span = span
     self.indirect = False
     self.blockmap = None
@@ -487,7 +487,43 @@ class _Block(Transcriber, ABC):
     if mode == 'w+b':
       from .file import File
       return File(backing_block=self)
-    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
+
+  def pushto(self, S2, Q=None, runstate=None):
+    ''' Push this Block and any implied subblocks to the Store `S2`.
+        `S2`: the secondary Store to receive Blocks
+        `Q`: optional preexisting Queue, which itself should have
+          come from a .pushto targetting the Store `S2`.
+        `runstate`: optional RunState used to cancel operation
+        If `Q` is supplied, this method will return as soon as all
+        the relevant Blocks have been pushed i.e. possibly before
+        delivery is complete. If `Q` is not supplied, a new Queue
+        is allocated; after all Blocks have been pushed the Queue
+        is closed and its worker waited for.
+        TODO: optional `no_wait` parameter to control waiting,
+        default False, which would support closing the Queue but
+        not waiting for the worker completion. This is on the premise
+        that the final Store shutdown of `S2` will wait for outstanding
+        operations anyway.
+    '''
+    S1 = defaults.S
+    if Q is None:
+      # create a Queue and a worker Thread
+      Q, T = S1.pushto(S2)
+    else:
+      # use an existing Queue, no Thread to wait for
+      T = None
+    Q.put(self)
+    if self.indirect:
+      # recurse, reusing the Queue
+      for subB in self.subblocks:
+        if runstate and runstate.cancelled:
+          warning("pushto(%s) cancelled", self)
+          break
+        subB.pushto(S2, Q, runstate=runstate)
+    if T:
+      Q.close()
+      T.join()
 
 @lru_cache(maxsize=1024*1024, typed=True)
 def get_HashCodeBlock(hashcode):
@@ -546,8 +582,10 @@ class HashCodeBlock(_Block):
 
   @span.setter
   def span(self, newspan):
+    ''' Set the span of the data encompassed by this HashCodeBlock.
+    '''
     if newspan < 0:
-      raise ValueError("%s: set .span: invalid newspan=%s", self, newspan)
+      raise ValueError("%s: set .span: invalid newspan=%s" % (self, newspan))
     if self._span is None:
       self._span = newspan
     else:
@@ -568,6 +606,8 @@ class HashCodeBlock(_Block):
     return bs
 
   def encode(self, flags=0, span=None):
+    ''' Return the bytes encoding of this HashCodeBlock.
+    '''
     hashcode = self.hashcode
     return self._encode(flags, span, BlockType.BT_HASHCODE, 0,
                         ( hashcode.encode(), ))
@@ -658,7 +698,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       raise ValueError("span(%d) does not match subblocks (totalling %d)"
                        % (span, subspan))
     if not force:
-      if len(subblocks) == 0:
+      if not subblocks:
         return Block(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
@@ -677,6 +717,7 @@ class _IndirectBlock(_Block):
     if span is None:
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
+    self.hashcode = superB.hashcode
 
   def __getattr__(self, attr):
     if attr == 'subblocks':
@@ -796,7 +837,7 @@ def SubBlock(superB, suboffset, span, **kw):
     if suboffset < 0 or suboffset > len(superB):
       raise ValueError("suboffset out of range")
     if span < 0 or suboffset + span > len(superB):
-      raise ValueError("span(%d) out of range", span)
+      raise ValueError("span(%d) out of range" % (span,))
     if span == 0:
       ##warning("span==0, returning empty LiteralBlock")
       return LiteralBlock(b'')
