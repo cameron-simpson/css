@@ -25,7 +25,7 @@ from . import defaults
 from .stream import StreamStore
 
 class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
-  ''' A threading TCPServer that accepts connections from TCPClientStores.
+  ''' The basis for TCPStoreServer and UNIXSocketStoreServer.
   '''
 
   def __init__(self, *, exports=None, runstate=None):
@@ -41,8 +41,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     RunStateMixin.__init__(self, runstate=runstate)
     self.exports = exports
     self.S = exports['']
-    self.server = None
-    self.server_thread = None
+    self.socket_server = None
+    self.socket_server_thread = None
     self.runstate.notify_start.add(lambda rs: self.open())
     self.runstate.notify_end.add(lambda rs: self.close())
     self.runstate.notify_cancel.add(lambda rs: self.shutdown_now())
@@ -53,26 +53,27 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   def startup(self):
     ''' Start up the server.
     '''
-    self.S.open()
-    self.server_thread = Thread(
+    self.socket_server_thread = Thread(
         name="%s(%s)[server-thread]" % (type(self), self.S),
-        target=self.server.serve_forever,
+        target=self.socket_server.serve_forever,
         kwargs={'poll_interval': 0.5})
-    self.server_thread.daemon = False
-    self.server_thread.start()
+    self.socket_server_thread.daemon = False
+    self.socket_server_thread.start()
 
   def shutdown(self):
     ''' Shut down the server.
     '''
-    self.server.shutdown()
-    self.server_thread.join()
-    self.S.close()
+    if self.socket_server:
+      self.socket_server.shutdown()
+    self.socket_server_thread.join()
+    self.socket_server = None
 
   def shutdown_now(self):
     ''' Issue closes until all current opens have been consumed.
     '''
-    while not self.closed:
-      self.close()
+    if self.socket_server:
+      self.socket_server.shutdown()
+      self.socket_server = None
 
   def flush(self):
     ''' Flush the backing Store.
@@ -82,47 +83,34 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   def join(self):
     ''' Wait for the server thread to exit.
     '''
-    self.server_thread.join()
-
-  def switch_to(self, export_name):
-    ''' Switch the backend Store to one of the exports.
-    '''
-    newS = self.exports[export_name]
-    if newS is not self.S:
-      oldS = self.S
-      newS.open()
-      self.S = newS
-      oldS.close()
+    self.socket_server_thread.join()
 
 class _ClientConnectionHandler(StreamRequestHandler):
-  ''' Handler for a connection the the server.
+  ''' Handler for a connection to the server.
   '''
 
   @logexc
-  def __init__(self, request, client_address, server):
+  def __init__(self, request, client_address, socket_server):
     ''' Initialise the handler for a stream from a connection.
         `request`: the connected stream file descriptor
         `client_address`: the peer address
-        `server`: the controlling server, a _TCPServer or _UNIXSocketServer
+        `socket_server`: the controlling server, a _TCPServer or _UNIXSocketServer
     '''
     X("CONNECTION on %s from %s, server=%s", request, client_address, server)
-    super().__init__(request, client_address, server)
-    self.server = server
-
-  @prop
-  def S(self):
-    ''' Return the current Store.
-    '''
-    return self.server.srv.S
+    super().__init__(request, client_address, socket_server)
+    self.socket_server = socket_server
+    self.store_server = socket_server.store_server
 
   @prop
   def exports(self):
     ''' Return the exports mapping.
     '''
-    return self.server.srv.exports
+    return self.socket_server.store_server.exports
 
   @logexc
   def handle(self):
+    # the local Store starts as the current default Store
+    self.S = self.store_server.S
     remoteS = StreamStore(
         "server-StreamStore(local=%s)" % self.S,
         OpenSocket(self.request, False),
@@ -131,22 +119,22 @@ class _ClientConnectionHandler(StreamRequestHandler):
         exports=self.exports,
     )
     remoteS.startup()
-    self.server.handlers.add(remoteS)
+    self.socket_server.handlers.add(remoteS)
     remoteS.join()
     remoteS.shutdown()
-    self.server.handlers.remove(remoteS)
+    self.socket_server.handlers.remove(remoteS)
 
 class _TCPServer(ThreadingMixIn, TCPServer):
 
-  def __init__(self, srv, bind_addr):
-    with Pfx("%s.__init__(srv=%s, bind_addr=%r)", type(self), srv, bind_addr):
+  def __init__(self, store_server, bind_addr):
+    with Pfx("%s.__init__(store_server=%s, bind_addr=%r)", type(self), store_server, bind_addr):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
-      self.srv = srv
+      self.store_server = store_server
       self.handlers = set()
 
   def __str__(self):
-    return "%s(%s,%s)" % (type(self), self.bind_addr, self.srv,)
+    return "%s(%s,%s)" % (type(self), self.bind_addr, self.store_server,)
 
 class TCPStoreServer(_SocketStoreServer):
   ''' A threading TCPServer that accepts connections from TCPClientStores.
@@ -155,7 +143,7 @@ class TCPStoreServer(_SocketStoreServer):
   def __init__(self, bind_addr, **kw):
     super().__init__(**kw)
     self.bind_addr = bind_addr
-    self.server = _TCPServer(self, bind_addr)
+    self.socket_server = _TCPServer(self, bind_addr)
 
 class TCPClientStore(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
@@ -184,7 +172,8 @@ class TCPClientStore(StreamStore):
     self.sock = socket(AF_INET)
     try:
       self.sock.connect(self.sock_bind_addr)
-    except OSError:
+    except OSError as e:
+      exception("socket.connect(bind_addr=%r): %s", self.sock_bind_addr, e)
       self.sock.close()
       self.sock = None
       raise
@@ -192,16 +181,17 @@ class TCPClientStore(StreamStore):
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
-  def __init__(self, srv, socket_path, exports=None):
-    with Pfx("%s.__init__(srv, socket_path=%r)", type(self), srv, socket_path):
+  def __init__(self, store_server, socket_path, exports=None):
+    with Pfx("%s.__init__(store_server, socket_path=%r)", type(self), store_server, socket_path):
       UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
-      self.srv = srv
+      self.store_server = store_server
       self.socket_path = socket_path
       self.exports = exports
       self.handlers = set()
 
   def __str__(self):
-    return "%s(srv=%s,socket_path=%s,exports=%r)" % (type(self), self.srv, self.socket_path, self.exports)
+    return "%s(store_server=%s,socket_path=%s,exports=%r)" \
+        % (type(self), self.store_server, self.socket_path, self.exports)
 
 class UNIXSocketStoreServer(_SocketStoreServer):
   ''' A threading UnixStreamServer that accepts connections from UNIXSocketClientStores.
@@ -210,7 +200,7 @@ class UNIXSocketStoreServer(_SocketStoreServer):
   def __init__(self, socket_path, **kw):
     super().__init__(**kw)
     self.socket_path = socket_path
-    self.server = _UNIXSocketServer(self, socket_path)
+    self.socket_server = _UNIXSocketServer(self, socket_path)
 
   def shutdown(self):
     super().shutdown()

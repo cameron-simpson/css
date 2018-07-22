@@ -12,26 +12,24 @@
 '''
 
 from __future__ import print_function
-import os
-from os.path import realpath
-import stat
-import time
 from datetime import datetime
 import errno
 from itertools import chain
-from os.path import isfile
+import os
+from os.path import realpath, isfile
+import stat
+import time
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import warning, error
+from cs.logutils import warning, error, exception
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
-from .dir import FileDirent, DirFTP
+from .dir import _Dirent, FileDirent, DirFTP
 from .file import filedata
 from .paths import resolve, walk
-from .transcribe import transcribe_s, parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
@@ -64,9 +62,13 @@ class _Archive(object):
   '''
 
   def __init__(self, arpath):
+    ''' Initialise this Archive.
+        `arpath`: path to file holding the archive records
+    '''
     self.path = arpath
     self._last = None
     self._last_s = None
+    self.notify_update = []
 
   def __str__(self):
     return "Archive(%s)" % (shortpath(self.path),)
@@ -102,30 +104,27 @@ class _Archive(object):
           return
         raise
 
-  def save(self, E, when=None, previous=None, force=False):
+  def update(self, E, when=None, previous=None, force=False, source=None):
     ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
         `E`: the Dirent to save.
         `when`: the POSIX timestamp for the save, default now.
-        `force`: append an entry even if the last entry is the same
-          as this entry, default False
+        `previous`: optional previous Dirent transcription; defaults
+          to the latest Transcription from of the Archive
+        `force`: append an entry even if the previous entry has the
+          same transcription as `previous`, default False
+        `source`: optional source indicator for the update, default None
     '''
-    if isinstance(E, str):
-      etc = E
-    else:
-      etc = E.name
+    assert isinstance(E, _Dirent), "expected E<%s> to be a _Dirent" % (type(E),)
+    etc = E.name
     if not force:
+      # see if we should discard this update
       if previous is None:
         previous = self._last_s
       if previous is not None:
         # do not save if the previous transcription is unchanged
-        if isinstance(E, str):
-          Es = E
-        else:
-          Es = transcribe_s(E)
+        Es = str(E)
         if Es == previous:
           return Es
-        # use the transcription directly
-        E = Es
     if when is None:
       when = time.time()
     path = self.path
@@ -134,6 +133,13 @@ class _Archive(object):
         s = self.write(fp, E, when=when, etc=etc)
     self._last = when, E
     self._last_s = s
+    for notify in self.notify_update:
+      try:
+        notify(E, when=when, source=source)
+      except Exception as e:
+        exception(
+            "notify[%s](%s,when=%s,source=%s): %s",
+            notify, E, when, source, e)
     return s
 
   @staticmethod
@@ -153,7 +159,7 @@ class _Archive(object):
     if isinstance(E, str):
       Es = E
     else:
-      Es = transcribe_s(E)
+      Es = str(E)
     etc_s = None if etc is None else unctrl(etc)
     fp.write(iso_s)
     fp.write(' ')
@@ -183,7 +189,7 @@ class _Archive(object):
         fields = line.split(None, 3)
         _, unixtime, dent = fields[:3]
         when = float(unixtime)
-        E, offset = parse(dent)
+        E, offset = _Dirent.from_str(dent)
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
@@ -307,7 +313,7 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
         # finally, update the Dir meta info
         dirD.meta.update_from_stat(dst)
 
-def copy_in_file(E, filepath, modes, log=None):
+def copy_in_file(E, filepath, modes):
   ''' Store the file named `filepath` over the FileDirent `E`.
   '''
   with Pfx(filepath):
@@ -402,7 +408,7 @@ def copy_out_file(E, ospath, modes=None, log=None):
   try:
     # TODO: should this be os.stat if we don't support symlinks?
     st = os.lstat(ospath)
-  except OSError as e:
+  except OSError:
     st = None
   else:
     if modes.ignore_existing:
@@ -445,4 +451,4 @@ class ArchiveFTP(DirFTP):
 
   def postloop(self):
     super().postloop()
-    self.archive.save(self.rootD)
+    self.archive.update(self.rootD)

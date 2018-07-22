@@ -498,7 +498,7 @@ class VTCmd:
     elif special is None:
       Archive.write(sys.stdout, D)
     else:
-      Archive(special).save(D)
+      Archive(special).update(D)
     return xit
 
   def cmd_ls(self, args):
@@ -676,7 +676,11 @@ class VTCmd:
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
       # import vtfuse before doing anything with side effects
-      from .vtfuse import mount, umount
+      try:
+        from cs.vtfuse import mount, umount
+      except ImportError as e:
+        error("required module cs.vtfuse not available: %s", e)
+        return 1
       with Pfx(mountpoint):
         need_rmdir = False
         if not isdirpath(mountpoint):
@@ -873,7 +877,7 @@ class VTCmd:
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
-          srv = serve_tcp(band_addr=(host, port), exports=exports, runstate=self.runstate)
+          srv = serve_tcp(bind_addr=(host, port), exports=exports, runstate=self.runstate)
         srv.join()
       else:
         raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
