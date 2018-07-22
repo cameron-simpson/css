@@ -259,7 +259,7 @@ def unfold_chunks(chunks):
   ''' Unfold `chunks` into an iterable of bytes.
       This exists to allow subclass methods to easily return ASCII
       strings or bytes or iterables, in turn allowing them to
-      simply return their subperclass' chunks iterators directly
+      simply return their superclass' chunks iterators directly
       instead of having to unpack them.
   '''
   if isinstance(chunks, bytes):
@@ -378,8 +378,8 @@ class Box(object):
 
   def __str__(self):
     if self.data_chunks is None:
-      return '%s(%s,box_data=DISCARDED)' \
-             % (type(self).__name__, self.box_type_path)
+      return '%s(%s,box_data=DISCARDED[:%d])' \
+             % (type(self).__name__, self.box_type_path, self.end_offset - self.unparsed_offset)
     box_data = b''.join(self.unparsed_data_chunks)
     return '%s(%s,box_data=%d:%r%s)' \
            % (type(self).__name__, self.box_type_path, len(box_data),
