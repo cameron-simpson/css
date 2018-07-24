@@ -89,13 +89,19 @@ def struct_field(format, class_name=None):
   StructField.format = format
   return StructField
 
+# a big endian unsigned 32 bit integer
+UInt32 = struct_field('>L')
+
+# a big endian unsigned 64 bit integer
+UInt64 = struct_field('>Q')
+
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
   '''
 
-  def __init__(self, value):
+  def __init__(self):
     # Packets are their own value
-    PacketField.__init__(value)
+    PacketField.__init__(self, self)
     # start with no fields
     self.field_names = []
     self.fields = []
@@ -179,42 +185,4 @@ class Packet(PacketField):
     self.field_names.append(field_name)
     self.fields.append(field)
     self.field_map[field_name] = field
-
-UInt32 = struct_field('>L')
-UInt64 = struct_field('>Q')
-
-class BoxHeader(Packet):
-  ''' An ISO14496 Box header packet.
-  '''
-
-  @classmethod
-  def from_buffer(cls, bfr):
-    ''' Decode a box header from the CornuCopyBuffer `bfr`.
-        Return (box_header, new_buf, new_offset) or None at end of input.
-    '''
-    packet = cls()
-    # note start point
-    offset0 = bfr.offset
-    box_size = packet.add_from_buffer('box_size', bfr, UInt32)
-    box_type = packet.add_field('box_type', PacketField(bfr.take(4)))
-    if box_size == 0:
-      # box extends to end of data/file
-      length = packet.add_field('length', None)
-    elif box_size == 1:
-      # 64 bit length
-      length = packet.add_from_buffer('length', bfr, UInt64)
-    else:
-      length = packet.add_field('length', bfr, PacketField(box_size))
-    if box_type == b'uuid':
-      # user supplied 16 byte type
-      packet.add_field('user_type', bfr.take(16))
-    else:
-      packet.add_field('user_type', None)
-    offset = bfr.offset
-    if length is not None and offset0 + length < offset:
-      raise ValueError(
-          "box length:%d is less than the box header size:%d"
-          % (length, offset-offset0))
-    packet.type = box_type
-    packet.header_length = offset - offset0
-    return packet
+    return None if field is None else field.value
