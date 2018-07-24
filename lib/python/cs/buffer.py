@@ -102,6 +102,33 @@ class CornuCopyBuffer(object):
     it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
     return cls(it, offset=it.offset, **kw)
 
+  @classmethod
+  def from_bytes(cls, bs, offset=0, length=None):
+    ''' Return a CornuCopyBuffer fed from the supplied bytes `bs`.
+
+        This is handy for callers parsing used buffers but handed bytes.
+    '''
+    if offset < 0:
+      raise ValueError("offset(%d) should be >= 0" % (offset,))
+    if offset >= len(bs):
+      raise ValueError(
+          "offset(%d) beyond end of bs (%d bytes)"
+          % (offset, len(bs)))
+    if length is None:
+      length = len(bs) - offset
+    else:
+      # sanity check supplied length
+      if length < 1:
+        raise ValueError("length(%d) < 1" % (length,))
+      end_offset = offset + length
+      if end_offset > len(bs):
+        raise ValueError(
+            "offset(%d)+length(%d) > len(bs):%d"
+            % (offset, length, len(bs)))
+    if offset > 0 or end_offset < len(bs):
+      bs = memoryview(bs)[offset:end_offset]
+    return cls([bs])
+
   def __str__(self):
     return "CCB(offset:%d,buf:%d)" % (self.offset, len(self.buf))
 
@@ -132,6 +159,15 @@ class CornuCopyBuffer(object):
       chunk = next(self.input_data)
     self.offset += len(chunk)
     return chunk
+
+  def at_eof(self):
+    ''' Test whether the buffer is at end of input. (*)
+
+        * Warning: this will fetch from the `input_data` if the buffer
+        is empty and so it may block.
+    '''
+    self.extend(1, short_ok=True)
+    return len(self) > 0
 
   def report_offset(self, offset):
     ''' Report a pertinent offset.
@@ -343,7 +379,9 @@ class CopyingIterator(object):
     return item
 
 def chunky(bfr_func):
-  ''' Decorator for a function acceptig a leading CornuCopyBuffer parameter. Returns a function accepting a leading data `chunks` parameter and optional `offset` and 'copy_offsets` keywords parameters.
+  ''' Decorator for a function acceptig a leading CornuCopyBuffer parameter.
+      Returns a function accepting a leading data `chunks` parameter
+      and optional `offset` and 'copy_offsets` keywords parameters.
 
       @chunky
       def func(bfr, ...):
