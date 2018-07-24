@@ -353,6 +353,9 @@ class CornuCopyBuffer(object):
                 "insufficient chunks: skipto:%d but only reached %d"
                 % (new_offset, offset)
             )
+          # TODO: an empty chunk from input_data indicates "not
+          #   yet" from a nonblocking tailing file - some kind of delay needs
+          #   to occur to avoid a spin.
           bufskip = min(len(buf), toskip)
           if bufskip > 0:
             if copy_skip:
