@@ -18,6 +18,7 @@ import os
 from os.path import basename
 from struct import Struct
 import sys
+from cs.binary import flatten as flatten_chunks, Packet, PacketField, UInt32, UInt64
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
@@ -160,39 +161,49 @@ SIZE_16MB = 1024*1024*16
 #       plus the length.
 BoxHeader = namedtuple('BoxHeader', 'type user_type length header_length')
 
+class BoxHeader(Packet):
+  ''' An ISO14496 Box header packet.
+  '''
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Decode a box header from the CornuCopyBuffer `bfr`.
+        Return (box_header, new_buf, new_offset) or None at end of input.
+    '''
+    packet = cls()
+    # note start point
+    offset0 = bfr.offset
+    box_size = packet.add_from_buffer('box_size', bfr, UInt32)
+    box_type = packet.add_field('box_type', PacketField(bfr.take(4)))
+    if box_size == 0:
+      # box extends to end of data/file
+      length = packet.add_field('length', None)
+    elif box_size == 1:
+      # 64 bit length
+      length = packet.add_from_buffer('length', bfr, UInt64)
+    else:
+      length = packet.add_field('length', PacketField(box_size))
+    if box_type == b'uuid':
+      # user supplied 16 byte type
+      packet.add_field('user_type', bfr.take(16))
+    else:
+      packet.add_field('user_type', None)
+    offset = bfr.offset
+    if length is not None and offset0 + length < offset:
+      raise ValueError(
+          "box length:%d is less than the box header size:%d"
+          % (length, offset-offset0))
+    packet.type = box_type
+    packet.header_length = offset - offset0
+    return packet
+
 def parse_box_header(bfr):
   ''' Decode a box header from the CornuCopyBuffer `bfr`. Return (box_header, new_buf, new_offset) or None at end of input.
   '''
-  with Pfx("parse_box_header"):
-    # return BoxHeader=None if at the end of the data
-    bfr.extend(1, short_ok=True)
-    if not bfr:
-      return None
-    # note start point
-    offset0 = bfr.offset
-    user_type = None
-    bfr.extend(8)
-    box_size, = unpack('>L', bfr.take(4))
-    box_type = bfr.take(4)
-    if box_size == 0:
-      # box extends to end of data/file
-      length = None
-    elif box_size == 1:
-      # 64 bit length
-      length, = unpack('>Q', bfr.take(8))
-    else:
-      length = box_size
-    if box_type == 'uuid':
-      # user supplied 16 byte type
-      user_type = bfr.take(16)
-    else:
-      user_type = None
-    offset = bfr.offset
-    if length is not None and offset0+length < offset:
-      raise ValueError("box length:%d is less than the box header size:%d"
-                       % (length, offset-offset0))
-    return BoxHeader(type=box_type, user_type=user_type,
-                     length=length, header_length=offset-offset0)
+  try:
+    return BoxHeader.from_buffer(bfr)
+  except EOFError:
+    return None
 
 def transcribe_box(fp, box_type, box_tail):
   ''' Generator yielding bytes objects which together comprise a serialisation of this
@@ -254,22 +265,6 @@ def put_utf8_nul(s):
   ''' Return bytes encoding a string in UTF-8 with a trailing NUL.
   '''
   return s.encode('utf-8') + b'\0'
-
-def unfold_chunks(chunks):
-  ''' Unfold `chunks` into an iterable of bytes.
-      This exists to allow subclass methods to easily return ASCII
-      strings or bytes or iterables, in turn allowing them to
-      simply return their superclass' chunks iterators directly
-      instead of having to unpack them.
-  '''
-  if isinstance(chunks, bytes):
-    yield chunks
-  elif isinstance(chunks, str):
-    yield chunks.encode('ascii')
-  else:
-    for subchunk in chunks:
-      for unfolded_chunk in unfold_chunks(subchunk):
-        yield unfolded_chunk
 
 class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
