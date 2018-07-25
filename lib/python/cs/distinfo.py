@@ -299,7 +299,7 @@ class PyPI_Package(O):
       odoc = o.__doc__
       if odoc is None:
         continue
-      odoc = odoc.strip()
+      odoc = odoc.strip().replace('\n','  \n')
       odoclines = odoc.split('\n', 2)
       if len(odoclines) > 1:
         # stick the indent of the second line onto the front of the doc
