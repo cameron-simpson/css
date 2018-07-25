@@ -175,6 +175,8 @@ class Packet(PacketField):
         Additional keyword arguments are passed to the internal
         factory call.
     '''
+    assert isinstance(field_name, str), "field_name not a str: %r" % (field_name,)
+    assert isinstance(bfr, CornuCopyBuffer), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if field_name in self.field_map:
       raise ValueError("field %r already in field_map" % (field_name,))
     if isinstance(factory, type):
