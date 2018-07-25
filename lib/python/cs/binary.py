@@ -30,8 +30,10 @@ class PacketField(object):
 
   def __init__(self, value):
     self.value = value
+
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.value)
+
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
     ''' Factory to return an PacketField instance from bytes.
@@ -135,7 +137,7 @@ class Packet(PacketField):
         for bs in flatten(field.transcribe()):
           yield bs
 
-  def add_from_bytes(self, field_name, bs, factory, offset=0, length=None):
+  def add_from_bytes(self, field_name, bs, factory, offset=0, length=None, **kw):
     ''' Add a new PacketField named `field_name` parsed from the
         bytes `bs` using `factory`. Updates the internal field
         records.
@@ -153,12 +155,14 @@ class Packet(PacketField):
         `length`: optional maximum number of bytes from `bs` to
           make available for the parse, default None meaning that
           everything from `offset` onwards is available.
+        Additional keyword arguments are passed to the internal
+        .add_from_buffer call.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    field = self.from_buffer(field_name, bfr, factory)
+    field = self.add_from_buffer(field_name, bfr, factory, **kw)
     return field, offset + bfr.offset
 
-  def add_from_buffer(self, field_name, bfr, factory):
+  def add_from_buffer(self, field_name, bfr, factory, **kw):
     ''' Add a new PacketField named `field_name` parsed from `bfr` using `factory`.
         Updates the internal field records.
         Returns the new PacketField's .value.
@@ -168,6 +172,8 @@ class Packet(PacketField):
         `factory`: a factory for parsing the field data, returning
           a PacketField. If `factory` is a class then its .from_buffer
           method is called, otherwise the factory is called directly.
+        Additional keyword arguments are passed to the internal
+        factory call.
     '''
     if field_name in self.field_map:
       raise ValueError("field %r already in field_map" % (field_name,))
@@ -175,7 +181,8 @@ class Packet(PacketField):
       from_buffer = factory.from_buffer
     else:
       from_buffer = factory
-    field = from_buffer(bfr)
+    X("add_from_buffer: from_buffer=%s", from_buffer)
+    field = from_buffer(bfr, **kw)
     self.add_field(field_name, field)
     return field.value
 
