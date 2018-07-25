@@ -49,8 +49,8 @@ assert DEFAULT_HIGHLIGHT in COLOURS
 
 def colourise(s, colour=None, uncolour='normal'):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
-      `colour` names the desired ANSI colour.
-      `uncolour` may be used to specify the colour-off colour;
+      `colour`: names the desired ANSI colour.
+      `uncolour`: may be used to specify the colour-off colour;
         the default is 'normal'.
   '''
   if colour is None:
@@ -60,10 +60,10 @@ def colourise(s, colour=None, uncolour='normal'):
 def make_pattern(pattern, default_colour=None):
   ''' Convert a pattern specification into a (colour, regexp) tuple.
       Each pattern may be:
-        a string of the form "[colour]:regexp"
-        a string containing no colon, taken to be a regexp
-        a tuple of the form (colour, regexp)
-        a regexp object
+      * a string of the form "[colour]:regexp"
+      * a string containing no colon, taken to be a regexp
+      * a tuple of the form (colour, regexp)
+      * a regexp object
   '''
   if default_colour is None:
     default_colour = DEFAULT_HIGHLIGHT
@@ -88,10 +88,10 @@ def make_pattern(pattern, default_colour=None):
 def make_patterns(patterns, default_colour=None):
   ''' Convert an iterable of pattern specifications into a list of (colour, regexp) tuples.
       Each pattern may be:
-        a string of the form "[colour]:regexp"
-        a string containing no colon, taken to be a regexp
-        a tuple of the form (colour, regexp)
-        a regexp object
+      * a string of the form "[colour]:regexp"
+      * a string containing no colon, taken to be a regexp
+      * a tuple of the form (colour, regexp)
+      * a regexp object
   '''
   return [
       make_pattern(pattern, default_colour=default_colour)
@@ -105,10 +105,10 @@ def colourise_patterns(s, patterns, default_colour=None):
       `default_colour`: if a string pattern has no colon, or starts
         with a colon, use this colour; default DEFAULT_HIGHLIGHT
       Each pattern may be:
-        a string of the form "[colour]:regexp"
-        a string containing no colon, taken to be a regexp
-        a tuple of the form (colour, regexp)
-        a regexp object
+      * a string of the form "[colour]:regexp"
+      * a string containing no colon, taken to be a regexp
+      * a tuple of the form (colour, regexp)
+      * a regexp object
       Returns the string with ANSI colour escapes embedded.
   '''
   patterns = make_patterns(patterns, default_colour=default_colour)
