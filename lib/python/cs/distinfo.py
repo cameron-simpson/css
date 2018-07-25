@@ -10,7 +10,7 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import cleandoc, getargspec, isfunction, isclass
+from inspect import cleandoc, getargspec, getcomments, isfunction, isclass
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
@@ -310,7 +310,7 @@ class PyPI_Package(O):
       o = getattr(M, Mname, None)
       if not isfunction(o) and not isfunction(o):
         continue
-      odoc = cleandoc(o.__doc__)
+      odoc = o.__doc__
       if odoc is None:
         continue
       odoc = cleandoc(odoc)
