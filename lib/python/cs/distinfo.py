@@ -10,6 +10,7 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
+from inspect import isfunction, isclass
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
@@ -17,6 +18,7 @@ from subprocess import Popen, PIPE
 import shutil
 import sys
 from tempfile import mkdtemp
+from textwrap import dedent
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
@@ -55,6 +57,7 @@ USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-ar
   @tag  Use the specified VCS tag. Default: the last release tag for pkgname.
   Operations:
     check       Run setup.py check on the resulting package.
+    distinfo    Recite the distinfo map for the package.
     register    Register/update the package description and version.
     upload      Upload the package source distribution.'''
 
@@ -105,7 +108,7 @@ def main(argv):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op in ("check", "register", "upload"):
+        if op in ("check", "distinfo", "register", "upload"):
           if argv:
             warning("extra arguments: %s", ' '.join(argv))
             badopts = True
@@ -131,6 +134,8 @@ def main(argv):
   with Pfx(op):
     if op == 'check':
       PKG.check()
+    elif op == 'distinfo':
+      print(PKG.distinfo)
     elif op == 'register':
       PKG.register()
     elif op == 'upload':
@@ -283,6 +288,36 @@ class PyPI_Package(O):
     else:
       doc_tail = doc_tail.lstrip()
 
+    from cs.x import X
+    for Mname in sorted(dir(M)):
+      if Mname == 'DISTINFO':
+        continue
+      if Mname.startswith('_'):
+        continue
+      X("Mname %r ...", Mname)
+      o = getattr(M, Mname, None)
+      if not isfunction(o) and not isfunction(o):
+        X("SKIP Mname %r", Mname)
+        continue
+      odoc = o.__doc__
+      if odoc is None:
+        continue
+      X("raw odoc = %r", odoc)
+      odoc = odoc.strip()
+      odoclines = odoc.split('\n', 2)
+      if len(odoclines) > 1:
+        # stick the indent of the second line onto the front of the doc
+        line1 = odoclines[1]
+        line1a = line1.lstrip()
+        line1indent = line1[:len(line1)-len(line1a)]
+        X("line1indent = %r", line1indent)
+        odoc = line1indent + odoc
+      odoc = dedent(odoc)
+      if isfunction(o):
+        doc_tail += f'\n\n## Function `{Mname}`\n\n{odoc}'
+      elif isclass(o):
+        doc_tail += f'\n\n## Class `{Mname}`\n\n{odoc}'
+
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description':
       if field in dinfo:
@@ -293,6 +328,8 @@ class PyPI_Package(O):
       elif field == 'long_description':
         if doc_tail:
           dinfo[field] = doc_tail
+        if 'long_description_content_type' not in dinfo:
+          dinfo['long_description_content_type'] = 'text/markdown'
 
     dinfo['package_dir'] = {'': self.libdir}
 
