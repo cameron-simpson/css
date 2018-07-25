@@ -288,21 +288,17 @@ class PyPI_Package(O):
     else:
       doc_tail = doc_tail.lstrip()
 
-    from cs.x import X
     for Mname in sorted(dir(M)):
       if Mname == 'DISTINFO':
         continue
       if Mname.startswith('_'):
         continue
-      X("Mname %r ...", Mname)
       o = getattr(M, Mname, None)
       if not isfunction(o) and not isfunction(o):
-        X("SKIP Mname %r", Mname)
         continue
       odoc = o.__doc__
       if odoc is None:
         continue
-      X("raw odoc = %r", odoc)
       odoc = odoc.strip()
       odoclines = odoc.split('\n', 2)
       if len(odoclines) > 1:
@@ -310,7 +306,6 @@ class PyPI_Package(O):
         line1 = odoclines[1]
         line1a = line1.lstrip()
         line1indent = line1[:len(line1)-len(line1a)]
-        X("line1indent = %r", line1indent)
         odoc = line1indent + odoc
       odoc = dedent(odoc)
       if isfunction(o):
