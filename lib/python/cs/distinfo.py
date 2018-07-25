@@ -10,10 +10,11 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import getargspec, isfunction, isclass
+from inspect import cleandoc, getargspec, getcomments, isfunction, isclass
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
+from pprint import pprint
 from subprocess import Popen, PIPE
 import shutil
 import sys
@@ -108,10 +109,12 @@ def main(argv):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op in ("check", "distinfo", "register", "upload"):
+        if op in ("check", "register", "upload"):
           if argv:
             warning("extra arguments: %s", ' '.join(argv))
             badopts = True
+        elif op in ("distinfo",):
+          pass
         else:
           warning("unrecognised op")
           badopts = True
@@ -135,7 +138,18 @@ def main(argv):
     if op == 'check':
       PKG.check()
     elif op == 'distinfo':
-      print(PKG.distinfo)
+      dinfo = PKG.distinfo
+      if argv:
+        for arg in argv:
+          print(arg)
+          try:
+            value = dinfo[arg]
+          except KeyError:
+            print("None")
+          else:
+            pprint(value)
+      else:
+        pprint(dinfo)
     elif op == 'register':
       PKG.register()
     elif op == 'upload':
@@ -299,15 +313,7 @@ class PyPI_Package(O):
       odoc = o.__doc__
       if odoc is None:
         continue
-      odoc = odoc.strip().replace('\n','  \n')
-      odoclines = odoc.split('\n', 2)
-      if len(odoclines) > 1:
-        # stick the indent of the second line onto the front of the doc
-        line1 = odoclines[1]
-        line1a = line1.lstrip()
-        line1indent = line1[:len(line1)-len(line1a)]
-        odoc = line1indent + odoc
-      odoc = dedent(odoc)
+      odoc = cleandoc(odoc)
       if isfunction(o):
         args, varargs, keywords, defaults = getargspec(o)
         if defaults is None:

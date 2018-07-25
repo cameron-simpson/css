@@ -13,12 +13,11 @@ It is presented here in its own module for reuse.
 
 It normally writes directly to `sys.stderr` but accepts an optional
 keyword argument `file` to specify a different filelike object.
-
-Its behaviour may be tweaked with the globals `X_logger` or `X_via_tty`.
-If `file` is not None, write to it unconditionally.
-Otherwise, if X_logger then log a warning to that logger.
-Otherwise, if X_via_tty then open /dev/tty and write the message to it.
-Otherwise, write the message to sys.stderr.
+If `file` is not specified, its behaviour is further tweaked with
+the globals `X_logger` or `X_via_tty`:
+if X_logger then log a warning to that logger;
+otherwise, if X_via_tty then open /dev/tty and write the message to it;
+otherwise, write the message to sys.stderr.
 '''
 
 from __future__ import print_function
@@ -40,13 +39,15 @@ X_logger = None
 X_via_tty = False
 
 def X(msg, *args, **kw):
-  ''' Unconditionally write the message `msg` to sys.stderr.
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-      `file`: optional keyword argument specifying the output file.
-      If `file` is not None, write to it unconditionally.
-      Otherwise, if X_logger then log a warning to that logger.
-      Otherwise, if X_via_tty then open /dev/tty and write the message to it.
-      Otherwise, write the message to sys.stderr.
+  ''' Unconditionally write the message `msg`.
+
+      * `args`: if not empty, format `msg` using %-expansion with `args`.
+      * `file`: optional keyword argument specifying the output file.
+
+      If `file` is not None, write to it unconditionally;
+      otherwise, if X_logger then log a warning to that logger;
+      otherwise, if X_via_tty then open /dev/tty and write the message to it;
+      otherwise write the message to sys.stderr.
   '''
   fp = kw.pop('file', None)
   if kw:
