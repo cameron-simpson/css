@@ -10,7 +10,7 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import isfunction, isclass
+from inspect import getargspec, isfunction, isclass
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
@@ -309,7 +309,26 @@ class PyPI_Package(O):
         odoc = line1indent + odoc
       odoc = dedent(odoc)
       if isfunction(o):
-        doc_tail += f'\n\n## Function `{Mname}`\n\n{odoc}'
+        args, varargs, keywords, defaults = getargspec(o)
+        if defaults is None:
+          defaults = ()
+        arg_desc = ''
+        nreq = len(args) - len(defaults)
+        for i, arg in enumerate(args):
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += arg
+          if i >= nreq:
+            arg_desc += '=' + repr(defaults[i-nreq])
+        if varargs:
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += '*' + varargs
+        if keywords:
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += '**' + keywords
+        doc_tail += f'\n\n## Function `{Mname}({arg_desc})`\n\n{odoc}'
       elif isclass(o):
         doc_tail += f'\n\n## Class `{Mname}`\n\n{odoc}'
 
