@@ -51,7 +51,7 @@ def colourise(s, colour=None, uncolour='normal'):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
       `colour` names the desired ANSI colour.
       `uncolour` may be used to specify the colour-off colour;
-      the default is 'normal'.
+        the default is 'normal'.
   '''
   if colour is None:
     colour = DEFAULT_HIGHLIGHT
@@ -86,7 +86,7 @@ def make_pattern(pattern, default_colour=None):
   return colour, regexp
 
 def make_patterns(patterns, default_colour=None):
-  ''' Convert an iterable of pattern specifications into a list if (colour, regexp) tuples.
+  ''' Convert an iterable of pattern specifications into a list of (colour, regexp) tuples.
       Each pattern may be:
         a string of the form "[colour]:regexp"
         a string containing no colon, taken to be a regexp
