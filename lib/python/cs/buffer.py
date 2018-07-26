@@ -59,9 +59,10 @@ class CornuCopyBuffer(object):
       copy_offsets=None, copy_chunks=None
   ):
     ''' Prepare the buffer.
-        `input_data`: an iterator yielding data chunks; if your
-          data source is a file see the .from_file factory; if your
-          data source is a file descriptor see the .from_fd factory.
+        `input_data`: an iterable of data chunks (bytes instances);
+          if your data source is a file see the .from_file factory;
+          if your data source is a file descriptor see the .from_fd
+          factory.
         `buf`: if not None, the initial state of the parse buffer
         `offset`: logical offset of the start of the buffer, default 0
         `copy_offsets`: if not None, a callable for parsers to
@@ -76,7 +77,7 @@ class CornuCopyBuffer(object):
     self.offset = offset
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
-    self.input_data = input_data
+    self.input_data = iter(input_data)
     self.copy_offsets = copy_offsets
 
   @classmethod
@@ -159,6 +160,8 @@ class CornuCopyBuffer(object):
       chunk = next(self.input_data)
     self.offset += len(chunk)
     return chunk
+
+  next = __next__
 
   def at_eof(self):
     ''' Test whether the buffer is at end of input. (*)
