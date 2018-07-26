@@ -5,14 +5,13 @@
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
-''' Facilities to do with buffers, primarily CornuCopyBuffer.
+''' Facilities to do with buffers, primarily CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams.
 '''
 
 import os
 from cs.py3 import pread
 
 DISTINFO = {
-    'description': "CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams",
     'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -25,10 +24,14 @@ DISTINFO = {
 DEFAULT_READSIZE = 131072
 
 class CornuCopyBuffer(object):
-  ''' An automatically refilling buffer intended to support parsing of data streams.
+  ''' An automatically refilling buffer intended to support parsing
+      of data streams.
 
-      The attribute `.buf` is maintained with unparsed data from
-      the input, for direct inspection by parsers.
+      Attributes:
+      * `buf`: a buffer of unparsed data from the input, available
+        for direct inspection by parsers
+      * `offset`: the logical offset of the buffer; this excludes
+        unconsumed input data and `.buf`
 
       The primary methods supporting parsing of data streams are
       extend() and take(). Calling `.extend(min_size)` arranges
@@ -59,16 +62,18 @@ class CornuCopyBuffer(object):
       copy_offsets=None, copy_chunks=None
   ):
     ''' Prepare the buffer.
-        `input_data`: an iterable of data chunks (bytes instances);
+
+        Parameters:
+        * `input_data`: an iterable of data chunks (bytes instances);
           if your data source is a file see the .from_file factory;
           if your data source is a file descriptor see the .from_fd
           factory.
-        `buf`: if not None, the initial state of the parse buffer
-        `offset`: logical offset of the start of the buffer, default 0
-        `copy_offsets`: if not None, a callable for parsers to
+        * `buf`: if not None, the initial state of the parse buffer
+        * `offset`: logical offset of the start of the buffer, default 0
+        * `copy_offsets`: if not None, a callable for parsers to
           report pertinent offsets via the buffer's .report_offset
           method
-        `copy_chunks`: if not None, every fetched data chunk is
+        * `copy_chunks`: if not None, every fetched data chunk is
           copied to this callable
     '''
     if buf is None:
@@ -88,6 +93,14 @@ class CornuCopyBuffer(object):
         provides the iteration that CornuCopyBuffer consumes, but
         also seek support of the underlying file descriptor is
         seekable.
+
+        Parameters:
+        * `fd`: the operation system file descriptor
+        * `readsize`: an optional preferred read size
+        * `offset`: a starting position for the data; the file
+          descriptor will seek to this offset, and the buffer will
+          start with this offset
+        Other keyword arguments are passed to the buffer constructor.
     '''
     it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     return cls(it, offset=it.offset, **kw)
@@ -99,15 +112,31 @@ class CornuCopyBuffer(object):
         Internally this constructs a SeekableFileIterator, which
         provides the iteration that CornuCopyBuffer consumes, but
         also seek support of the underlying file is seekable.
+
+        Parameters:
+        * `fp`: the file like object
+        * `readsize`: an optional preferred read size
+        * `offset`: a starting position for the data; the file
+          will seek to this offset, and the buffer will start with this
+          offset
+        Other keyword arguments are passed to the buffer constructor.
     '''
     it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
-  def from_bytes(cls, bs, offset=0, length=None):
+  def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a CornuCopyBuffer fed from the supplied bytes `bs`.
 
-        This is handy for callers parsing used buffers but handed bytes.
+        This is handy for callers parsing using buffers but handed bytes.
+
+        Parameters:
+        * `bs`: the bytes
+        * `offset`: a starting position for the data; the input
+          data will start this far into the bytes
+        * `length`: the maximium number of bytes to use; the input
+          data will be cropped this far past the starting point
+        Other keyword arguments are passed to the buffer constructor.
     '''
     if offset < 0:
       raise ValueError("offset(%d) should be >= 0" % (offset,))
@@ -128,10 +157,10 @@ class CornuCopyBuffer(object):
             % (offset, length, len(bs)))
     if offset > 0 or end_offset < len(bs):
       bs = memoryview(bs)[offset:end_offset]
-    return cls([bs])
+    return cls([bs], **kw)
 
   def __str__(self):
-    return "CCB(offset:%d,buf:%d)" % (self.offset, len(self.buf))
+    return "%s(offset:%d,buf:%d)" % (type(self).__name__, self.offset, len(self.buf))
 
   def __len__(self):
     ''' The length is the length of the internal buffer: data available without a fetch.
@@ -164,9 +193,9 @@ class CornuCopyBuffer(object):
   next = __next__
 
   def at_eof(self):
-    ''' Test whether the buffer is at end of input. (*)
+    ''' Test whether the buffer is at end of input.
 
-        * Warning: this will fetch from the `input_data` if the buffer
+        *Warning*: this will fetch from the `input_data` if the buffer
         is empty and so it may block.
     '''
     self.extend(1, short_ok=True)
@@ -181,7 +210,8 @@ class CornuCopyBuffer(object):
 
   def extend(self, min_size, short_ok=False):
     ''' Extend the buffer to at least `min_size` bytes.
-        If there are insufficient data available then a ValueError
+
+        If there are insufficient data available then an EOFError
         will be raised unless `short_ok` is true (default false)
         in which case the updated buffer will be short.
     '''
@@ -220,16 +250,19 @@ class CornuCopyBuffer(object):
 
   def tail_extend(self, size):
     ''' Extend method for parsers reading "tail"-like chunk streams,
-        typically raw reads from a growing file. These may read 0 bytes
-        at EOF, but a future read may read more bytes if the file grows.
+        typically raw reads from a growing file.
+
+        This may read 0 bytes at EOF, but a future read may read
+        more bytes if the file grows.
         Such an iterator can be obtained from
-        cs.fileutils.read_from(..,tail_mode=True).
+        ``cs.fileutils.read_from(..,tail_mode=True)``.
     '''
     while size < len(self):
       self.extend(size, short_ok=True)
 
   def take(self, size, short_ok=False):
     ''' Return the next `size` bytes.
+
         Other arguments are as for extend().
     '''
     self.extend(size, short_ok=short_ok)
@@ -242,8 +275,11 @@ class CornuCopyBuffer(object):
 
   def read(self, size, one_fetch=False):
     ''' Compatibility method to allow using the buffer like a file.
-        `size`: the desired data size
-        `one_fetch`: do a single data fetch, default False
+
+        Parameters:
+        * `size`: the desired data size
+        * `one_fetch`: do a single data fetch, default False
+
         In `one_fetch` mode the read behaves like a POSIX file read,
         returning up to to `size` bytes from a single I/O operation.
     '''
@@ -267,11 +303,12 @@ class CornuCopyBuffer(object):
   def seek(self, offset, whence=None, short_ok=False):
     ''' Compatibility method to allow using the buffer like a file.
         This returns the resulting absolute offset.
+
         Parameters are as for io.seek except as noted below:
-        `whence`: (default os.SEEK_SET). This method only supports
+        * `whence`: (default os.SEEK_SET). This method only supports
           os.SEEK_SET and os.SEEK_CUR, and does not support seeking to a
           lower offset than the current buffer offset.
-        `short_ok`: (default False). If true, the seek may not reach
+        * `short_ok`: (default False). If true, the seek may not reach
           the target if there are insufficent `input_data` - the
           position will be the end of the `input_data`, and the
           `input_data` will have been consumed; the caller must check
@@ -297,13 +334,16 @@ class CornuCopyBuffer(object):
 
   def skipto(self, new_offset, copy_skip=None, short_ok=False):
     ''' Advance to position `new_offset`. Return the new offset.
-        `new_offset`: the target offset.
-        `copy_skip`: callable to receive skipped data.
-        `short_ok`: default False; f true then skipto may return before
+
+        Parameters:
+        * `new_offset`: the target offset.
+        * `copy_skip`: callable to receive skipped data.
+        * `short_ok`: default False; f true then skipto may return before
           `new_offset` if there are insufficient `input_data`.
+
         Return values:
-        `buf`: the new state of `buf`
-        `offset`: the final offset; this may be short if `short_ok`.
+        * `buf`: the new state of `buf`
+        * `offset`: the final offset; this may be short if `short_ok`.
     '''
     offset = self.offset
     if new_offset < offset:
@@ -312,13 +352,16 @@ class CornuCopyBuffer(object):
 
   def skip(self, toskip, copy_skip=None, short_ok=False):
     ''' Advance position by `skip_to`. Return the new offset.
-        `toskip`: the distance to advance
-        `copy_skip`: callable to receive skipped data.
-        `short_ok`: default False; if true then skip may return before
+
+        Parameters:
+        * `toskip`: the distance to advance
+        * `copy_skip`: callable to receive skipped data.
+        * `short_ok`: default False; if true then skip may return before
           `skipto` bytes if there are insufficient `input_data`.
+
         Return values:
-        `buf`: the new state of `buf`
-        `offset`: the final offset; this may be short if `short_ok`.
+        * `buf`: the new state of `buf`
+        * `offset`: the final offset; this may be short if `short_ok`.
     '''
     # consume any bytes in buf before new_offset
     buf = self.buf
