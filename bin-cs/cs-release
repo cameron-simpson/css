@@ -35,10 +35,10 @@ DISTINFO_DEFAULTS = {
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
 }
 
-USAGE = '''Usage: %s [-f] op [names...]
+USAGE = '''Usage: %s [-f] cs.module [op]
   -f  Force. Sanity checks that would stop some actions normally  will not prevent them.
-  With no op, report all pypi lastvalues.
-  op:
+  The default op is "status".
+  Supported ops:
     check       Check simple things about a module's DISTINFO map.
     last        Report last release issued.
     log         Changelog from last release to now.
@@ -58,6 +58,7 @@ def main(argv):
   setup_logging(cmd)
 
   force = False
+  op = None
 
   xit = 0
   badopts = False
@@ -65,122 +66,138 @@ def main(argv):
   if argv and argv[0] == '-f':
     argv.pop(0)
     force = True
+
   modules = Modules()
   LV = LastValues()
   VCS = VCS_Hg()
 
   if not argv:
-    error("missing op")
-    badopts = True
+    op = "status"
+    name = None
   else:
-    op = argv.pop(0)
-    with Pfx(op):
-      if argv:
-        names = argv
-      else:
-        # all the release tags starting with "cs."
-        names = [
-            name
-            for name in sorted(VCS.release_prefixes())
-            if name.startswith('cs.')
-        ]
-      for name in names:
-        if xit != 0:
-          break
-        with Pfx(name):
-          N = ReleaseName(name, modules, VCS, LV)
-          if op == 'check':
-            if name.startswith('cs.'):
-              if N.check():
-                print(name, 'OK')
-              else:
-                print(name, 'NOT OK')
-                xit = 1
+    name = argv.pop(0)
+    if name in ("ls", "status"):
+      op = name
+      name = None
+    elif not name.startswith('cs.'):
+      error("invalid module name, should start with 'cs.': %r", name)
+      badopts = True
+
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  if op is None:
+    if not argv:
+      op = 'status'
+    else:
+      op = argv.pop(0)
+
+  if name is None:
+    names = [
+        name
+        for name in sorted(VCS.release_prefixes())
+        if name.startswith('cs.')
+    ]
+  else:
+    names = (name,)
+
+  with Pfx(op):
+    for name in names:
+      with Pfx(name):
+        N = ReleaseName(name, modules, VCS, LV)
+        if op == 'check':
+          if name.startswith('cs.'):
+            if N.check():
+              print(name, 'OK')
             else:
-              warning('not a "cs." module name')
+              print(name, 'NOT OK')
               xit = 1
-          elif op == 'last':
-            print(name, N.last_suffix())
-          elif op == 'log':
-            first = True
-            for files, firstline in N.log_since():
-              if first:
-                print(name)
-                first = False
-              files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
-              print(' ', ' '.join(files)+':', firstline)
-          elif op == 'ls':
-            for k in sorted(LV.keys()):
-              if k.startswith("pypi-css-cs."):
-                print(k[9:], LV[k])
-            return 0
-          elif op == 'next':
-            print(name, N.next_suffix())
-          elif op == 'pypi':
-            # upload latest release to pypi
-            N.submit_pypi(force=force)
-          elif op == 'release':
-            # issue new release tag
-            print("new release for %s ..." % (name,))
-            outstanding = N.uncommitted()
-            if outstanding:
-              print("Uncommited changes exist for these files:")
-              for path in sorted(outstanding):
-                print(' ', path)
-              print("These changes will not be included in the release.")
-              if not ask("Proceed with release anyway"):
-                error("aborting release at user request")
-                return 1
-            changes = list(N.log_since())
-            if not changes:
-              error("no changes since last release, not making new release")
-              xit = 1
-            else:
-              print("Changes since the last release:")
-              for files, firstline in changes:
-                print(" ", ' '.join(files) + ': ' + firstline)
-              print()
-              with pipefrom('readdottext', keep_stdin=True) as dotfp:
-                release_message = dotfp.read().rstrip()
-              if not release_message:
-                error("empty release message, not making new release")
-                xit = 1
-              else:
-                next_tag = N.next_release_tag()
-                if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-                  error("aborting release at user request")
-                  xit = 1
-                else:
-                  rel_dir = os.path.join('release', next_tag)
-                  with Pfx("mkdir(%s)", rel_dir):
-                    os.mkdir(rel_dir)
-                  summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-                  with Pfx(summary_filename):
-                    with open(summary_filename, 'w') as sfp:
-                      print(release_message, file=sfp)
-                  changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-                  with Pfx(changes_filename):
-                    with open(changes_filename, 'w') as cfp:
-                      for files, firstline in changes:
-                        print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-                  VCS = N.vcs
-                  VCS.add_files(summary_filename, changes_filename)
-                  VCS.commit('Release information for %s.\nSummary:\n%s'
-                             % (next_tag, release_message),
-                             summary_filename, changes_filename)
-                  VCS.tag(next_tag)
-          elif op == 'status':
-            tagged = N.last_suffix()
-            result = [name, tagged]
-            for pypi_flavour in ('pypi',):
-              lvkey, last_upload = N.last_upload(pypi_flavour)
-              if last_upload != tagged:
-                result.append("%s:%s" % (pypi_flavour, last_upload))
-            print(*result)
           else:
-            warning("unrecognised op %r", op)
-            badopts = True
-            break
+            warning('not a "cs." module name')
+            xit = 1
+        elif op == 'last':
+          print(name, N.last_suffix())
+        elif op == 'log':
+          first = True
+          for files, firstline in N.log_since():
+            if first:
+              print(name)
+              first = False
+            files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
+            print(' ', ' '.join(files)+':', firstline)
+        elif op == 'ls':
+          for k in sorted(LV.keys()):
+            if k.startswith("pypi-css-cs."):
+              print(k[9:], LV[k])
+          return 0
+        elif op == 'next':
+          print(name, N.next_suffix())
+        elif op == 'pypi':
+          # upload latest release to pypi
+          N.submit_pypi(force=force)
+        elif op == 'release':
+          # issue new release tag
+          print("new release for %s ..." % (name,))
+          outstanding = N.uncommitted()
+          if outstanding:
+            print("Uncommited changes exist for these files:")
+            for path in sorted(outstanding):
+              print(' ', path)
+            print("These changes will not be included in the release.")
+            if not ask("Proceed with release anyway"):
+              error("aborting release at user request")
+              return 1
+          changes = list(N.log_since())
+          if not changes:
+            error("no changes since last release, not making new release")
+            xit = 1
+          else:
+            print("Changes since the last release:")
+            for files, firstline in changes:
+              print(" ", ' '.join(files) + ': ' + firstline)
+            print()
+            with pipefrom('readdottext', keep_stdin=True) as dotfp:
+              release_message = dotfp.read().rstrip()
+            if not release_message:
+              error("empty release message, not making new release")
+              xit = 1
+            else:
+              next_tag = N.next_release_tag()
+              if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+                error("aborting release at user request")
+                xit = 1
+              else:
+                rel_dir = os.path.join('release', next_tag)
+                with Pfx("mkdir(%s)", rel_dir):
+                  os.mkdir(rel_dir)
+                summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+                with Pfx(summary_filename):
+                  with open(summary_filename, 'w') as sfp:
+                    print(release_message, file=sfp)
+                changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+                with Pfx(changes_filename):
+                  with open(changes_filename, 'w') as cfp:
+                    for files, firstline in changes:
+                      print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+                VCS = N.vcs
+                VCS.add_files(summary_filename, changes_filename)
+                VCS.commit('Release information for %s.\nSummary:\n%s'
+                           % (next_tag, release_message),
+                           summary_filename, changes_filename)
+                VCS.tag(next_tag)
+        elif op == 'status':
+          tagged = N.last_suffix()
+          result = [name, tagged]
+          for pypi_flavour in ('pypi',):
+            lvkey, last_upload = N.last_upload(pypi_flavour)
+            if last_upload != tagged:
+              result.append("%s:%s" % (pypi_flavour, last_upload))
+          print(*result)
+        else:
+          warning("unrecognised op %r", op)
+          badopts = True
+
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
