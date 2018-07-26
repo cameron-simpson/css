@@ -1,3 +1,4 @@
+cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
 mappings: named tuple rows: omit columns with empty names - common in spreadsheet exports and breaks namedtuples
