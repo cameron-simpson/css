@@ -302,13 +302,13 @@ class PyPI_Package(O):
     else:
       doc_tail = doc_tail.lstrip()
 
-    for Mname in sorted(dir(M)):
+    for Mname in sorted(dir(M), key-lambda s: s.lower()):
       if Mname == 'DISTINFO':
         continue
       if Mname.startswith('_'):
         continue
       o = getattr(M, Mname, None)
-      if not isfunction(o) and not isfunction(o):
+      if not isclass(o) and not isfunction(o):
         continue
       odoc = o.__doc__
       if odoc is None:
