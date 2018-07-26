@@ -186,7 +186,7 @@ class CornuCopyBuffer(object):
         in which case the updated buffer will be short.
     '''
     if min_size < 1:
-      raise ValueError("min_size must be >= 1, got %r" % (min_size,))
+      raise ValueError("min_size(%r) must be >= 1" % (min_size,))
     length = len(self.buf)
     if length < min_size:
       bufs = [self.buf]
@@ -198,7 +198,7 @@ class CornuCopyBuffer(object):
           if short_ok:
             break
           raise EOFError(
-              "insufficient chunks, wanted %d but only found %d"
+              "insufficient input data, wanted %d bytes but only found %d"
               % (min_size, length)
           )
         if next_chunk:
