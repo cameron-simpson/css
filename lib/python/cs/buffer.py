@@ -545,12 +545,16 @@ class CopyingIterator(object):
     return item
 
 def chunky(bfr_func):
-  ''' Decorator for a function acceptig a leading CornuCopyBuffer parameter.
-      Returns a function accepting a leading data `chunks` parameter
-      and optional `offset` and 'copy_offsets` keywords parameters.
+  ''' Decorator for a function acceptig a leading CornuCopyBuffer
+      parameter.
+      Returns a function accepting a leading data chunks parameter
+      (bytes instances) and optional `offset` and 'copy_offsets`
+      keywords parameters.
 
-      @chunky
-      def func(bfr, ...):
+      Example::
+
+        @chunky
+        def func(bfr, ...):
   '''
   def chunks_func(chunks, *a, **kw):
     ''' Function accepting chunk iterator.
