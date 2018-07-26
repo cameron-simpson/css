@@ -545,7 +545,7 @@ class CopyingIterator(object):
     return item
 
 def chunky(bfr_func):
-  ''' Decorator for a function acceptig a leading CornuCopyBuffer
+  ''' Decorator for a function accepting a leading CornuCopyBuffer
       parameter.
       Returns a function accepting a leading data chunks parameter
       (bytes instances) and optional `offset` and 'copy_offsets`
