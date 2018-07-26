@@ -369,6 +369,123 @@ class CornuCopyBuffer(object):
     self.buf = buf
     self.offset = offset
 
+  def bounded(self, end_offset):
+    ''' Return a new CornuCopyBuffer operating on a bounded view
+        of this buffer.
+
+        `end_offset`: the ending offset of the new buffer. Note
+        that this is an absolute offset, not a length.
+
+        This supports parsing of the buffer contents without risk
+        of consuming past a certain point, such as the known end
+        of a packet structure.
+
+        The new buffer starts with the same offset as `self` and
+        use of the new buffer affects `self`. After a flush both
+        buffers will again have the same offset and the data consumed
+        via the new buffer will also have been consumed from `self`.
+
+        Here is an example.
+        * Make a buffer `bfr` with 9 bytes of data in 3 chunks.
+        * Consume 2 bytes, advancing the offset to 2.
+        * Make a new bounded buffer `subbfr` extending to offset
+          5. Its inital offset is also 2.
+        * Iterate over it, yielding the remaining single byte chunk
+          from ``b'abc'`` and then the first 2 bytes of ``b'def'``.
+          The new buffer's offset is now 5.
+        * Try to take 2 more bytes from the new buffer - this fails.
+        * Flush the new buffer, synchronising with the original.
+          The original's offset is now also 5.
+        * Take 2 bytes from the original buffer, which succeeds.
+
+          >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
+          >>> bfr.offset
+          0
+          >>> len(bfr.take(2))
+          2
+          >>> bfr.offset
+          2
+          >>> subbfr = bfr.bounded(5)
+          >>> subbfr.offset
+          2
+          >>> for bs in subbfr:
+          ...   print(len(bs))
+          ...
+          1
+          2
+          >>> subbfr.offset
+          5
+          >>> subbfr.take(2)
+          Traceback (most recent call last):
+              ...
+          EOFError: insufficient input data, wanted 2 bytes but only found 0
+          >>> subbfr.flush()
+          >>> bfr.offset
+          5
+          >>> len(bfr.take(2))
+          2
+
+        *WARNING*: if the bounded buffer is not completely consumed
+        then it is critical to call the new CornuCopyBuffer's `.flush`
+        method to push any unconsumed buffer back into this buffer.
+        Recommended practice is to always call `.flush` when finished
+        with the new buffer.
+
+        Also, because the new buffer may buffer some of the unconsumed
+        data from this buffer, use of the original buffer should
+        be suspended.
+    '''
+    bfr2 = CornuCopyBuffer(
+        _BoundedBufferIterator(self, end_offset),
+        offset=self.offset)
+    def flush():
+      ''' Flush the contents of bfr2.buf back into self.buf, adjusting
+          the latter's offset accordingly.
+      '''
+      buf = bfr2.buf
+      if buf:
+        self.buf = buf + self.buf
+        self.offset -= len(buf)
+        bfr2.buf = b''
+    bfr2.flush = flush
+    return bfr2
+
+class _BoundedBufferIterator(object):
+  ''' An iterator over the data from a CornuCopyBuffer with an end
+      offset bound.
+  '''
+
+  def __init__(self, bfr, end_offset):
+    if end_offset < bfr.offset:
+      raise ValueError(
+          "end_offset(%d) < bfr.offset(%d)"
+          % (end_offset, bfr.offset))
+    self.bfr = bfr
+    self.end_offset = end_offset
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    # WARNING: not thread safe at all!
+    bfr = self.bfr
+    limit = self.end_offset - bfr.offset
+    if limit <= 0:
+      raise StopIteration
+    # post: limit > 0
+    buf = next(bfr)
+    # post: bfr.buf now emtpy, can be modified
+    length = len(buf)
+    if length <= limit:
+      return buf
+    head = buf[:limit]
+    tail = buf[limit:]
+    bfr.buf = tail
+    bfr.offset -= len(tail)
+    return head
+
+  next = __next__
+
 class CopyingIterator(object):
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
