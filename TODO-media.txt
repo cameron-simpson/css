@@ -1,3 +1,4 @@
+CornuCopyBuffer.skipto: accept Ellipsis for the end_offset, skip to end of input - may need special casing for tail-like iterators
 BoxLIst subclass of list, checks additions are Boxes
 easy Box construction?
 iso14496: patch mode for Boxes: Box.patch(fp, new_box)
