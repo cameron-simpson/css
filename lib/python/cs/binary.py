@@ -66,6 +66,68 @@ def fixed_bytes_field(length, class_name=None):
   FixedBytesField.__name__ = class_name
   return FixedBytesField
 
+class BytesesField(PacketField):
+  ''' A field containing a list of bytes chunks.
+
+      The following attributes are defined:
+      .value        The gathered data as a list of bytes instances,
+                    or None if the field was gathered with
+                    `discard_data` true.
+      .offset       The starting offset of the data.
+      .end_offset   The ending offset of the data.
+  '''
+
+  def __str__(self):
+    return "%s(%d:%d:%s)" % (
+        type(self).__name__,
+        self.offset,
+        self.end_offset,
+        "None" if self.value is None else "bytes[%d]" % len(self.value))
+
+  @classmethod
+  def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
+    ''' Gather from `bfr` until `end_offset`.
+
+        `bfr`: the input buffer
+        `end_offset`: the ending buffer offset; if this is Ellipsis
+          then all the remaining data in `bfr` will be collection
+        `discard_data`: discard the data, keeping only the offset information
+        `short_ok`: if true, do not raise EOFError if there are
+          insufficient data; the field's .end_offset value will be
+          less than `end_offset`; the default is False
+    '''
+    if end_offset is None:
+      raise ValueError("missing end_offset")
+    offset0 = bfr.offset
+    if end_offset is Ellipsis:
+      # special case: gather up all the remaining data
+      if discard_data:
+        for _ in bfr:
+          pass
+        byteses = None
+      else:
+        byteses = list(bfr)
+    else:
+      # otherwise gather up a bounded range of bytes
+      if end_offset < bfr.offset:
+        raise ValueError("end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset))
+      byteses = None if discard_data else []
+      bfr.skipto(
+          end_offset,
+          copy_skip=( None if discard_data else byteses.append ),
+          short_ok=short_ok)
+    field = cls(byteses)
+    field.offset = offset0
+    field.end_offset = bfr.offset
+    return field
+
+  def transcribe(self):
+    ''' Transcribe the bytes instances.
+        Warning: this is raise an exception of the data have been discarded.
+    '''
+    for bs in self.value:
+      yield bs
+
 def struct_field(format, class_name=None):
   ''' Factory for PacketField subclasses built around a single struct format.
   '''
@@ -90,6 +152,11 @@ def struct_field(format, class_name=None):
   StructField.struct = struct
   StructField.format = format
   return StructField
+
+# various common values
+
+# an usigned 8 bit interger
+UInt8 = struct_field('B')
 
 # a big endian unsigned 32 bit integer
 UInt32 = struct_field('>L')
@@ -183,7 +250,6 @@ class Packet(PacketField):
       from_buffer = factory.from_buffer
     else:
       from_buffer = factory
-    X("add_from_buffer: from_buffer=%s", from_buffer)
     field = from_buffer(bfr, **kw)
     self.add_field(field_name, field)
     return field.value
