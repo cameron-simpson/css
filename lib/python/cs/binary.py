@@ -128,6 +128,54 @@ class BytesesField(PacketField):
     for bs in self.value:
       yield bs
 
+class BytesRunField(PacketField):
+  ''' A field containing a continuous run of a single bytes value.
+
+      The following attributes are defined:
+      * `length`: the length of the run
+      * `byte_value`: the repeated byte value, an int
+
+      The property `value` is computed on the fly on every reference.
+  '''
+
+  def __init__(self, length, byte_value):
+    if length < 0:
+      raise ValueError("invalid length(%r), should be >= 0" % (length,))
+    if not 0 <= byte_value <= 255:
+      raise ValueError(
+          "invalid byte_value(%r), should be 0 <= byte_value <= 255"
+          % (byte_value,))
+    self.length = length
+    self.byte_value = byte_value
+
+  @property
+  def value(self):
+    ''' The run of bytes, computed on the fly.
+    '''
+    return bytes(self.byte_value) * self.length
+
+  @classmethod
+  def from_buffer(cls, bfr, end_offset=None, byte_value=0):
+    ''' Parse a BytesRunField by just skipping the specified number of bytes.
+
+        Note: this *does not* check that the skipped bytes contain `byte_value`.
+    '''
+    if end_offset is None:
+      raise ValueError("missing end_offset")
+    offset0 = bfr.offset
+    if end_offset is Ellipsis:
+      for _ in bfr:
+        pass
+    else:
+      bfr.skipto(end_offset, discard_data=True)
+    field = cls(bfr.offset - offset0, byte_value)
+    return field
+
+  def transcribe(self):
+    ''' Transcribe the BytesRunField, which is just the computed `.value`.
+    '''
+    return self.value
+
 def struct_field(format, class_name=None):
   ''' Factory for PacketField subclasses built around a single struct format.
   '''
@@ -242,6 +290,8 @@ class Packet(PacketField):
         Additional keyword arguments are passed to the internal
         factory call.
     '''
+    from cs.x import X
+    X("%s.add_from_buffer...", type(self).__name__)
     assert isinstance(field_name, str), "field_name not a str: %r" % (field_name,)
     assert isinstance(bfr, CornuCopyBuffer), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if field_name in self.field_map:
