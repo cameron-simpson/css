@@ -16,7 +16,8 @@ from cs.buffer import CornuCopyBuffer
 if sys.hexversion < 0x03000000:
   print(
       "WARNING: module %r requires Python 3, but sys.hexversion=0x%x"
-      % (__name__, sys.hexversion))
+      % (__name__, sys.hexversion),
+      file=sys.stderr)
 
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of bytes instances.
