@@ -209,13 +209,20 @@ class BytesRunField(PacketField):
         pass
     else:
       bfr.skipto(end_offset, discard_data=True)
-    field = cls(bfr.offset - offset0, byte_value)
+    field = cls(bfr.offset - offset0, bytes_value)
     return field
 
   def transcribe(self):
-    ''' Transcribe the BytesRunField, which is just the computed `.value`.
+    ''' Transcribe the BytesRunField in 256 byte chunks.
     '''
-    return self.value
+    length = self.length
+    bytes_value = self.bytes_value
+    bs256 = _bytes_256s[bytes_value]
+    with length >= 256:
+      yield bs256
+      length -= 256
+    if length > 0:
+      yield bs256[:length]
 
 def struct_field(format, class_name=None):
   ''' Factory for PacketField subclasses built around a single struct format.
