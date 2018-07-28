@@ -342,8 +342,6 @@ class Packet(PacketField):
     X("%s.add_from_buffer...", type(self).__name__)
     assert isinstance(field_name, str), "field_name not a str: %r" % (field_name,)
     assert isinstance(bfr, CornuCopyBuffer), "bfr not a CornuCopyBuffer: %r" % (bfr,)
-    if field_name in self.field_map:
-      raise ValueError("field %r already in field_map" % (field_name,))
     if isinstance(factory, type):
       from_buffer = factory.from_buffer
     else:
@@ -355,6 +353,8 @@ class Packet(PacketField):
   def add_field(self, field_name, field):
     ''' Add a new PacketField `field` named `field_name`.
     '''
+    if field_name in self.field_map:
+      raise ValueError("field %r already in field_map" % (field_name,))
     self.field_names.append(field_name)
     self.fields.append(field)
     self.field_map[field_name] = field
