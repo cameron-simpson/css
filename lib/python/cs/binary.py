@@ -7,6 +7,8 @@
     - Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
+from __future__ import print_function
+from collections import defaultdict
 from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
@@ -136,40 +138,71 @@ class BytesesField(PacketField):
     for bs in self.value:
       yield bs
 
+# A cache of 256 length runs of assorted bytes values as memoryviews
+# as a mapping of bytes=>memoryview.
+# In normal use these will be based on single byte bytes values.
+_bytes_256s = defaultdict(lambda b: memoryview(b * 256))
+
 class BytesRunField(PacketField):
   ''' A field containing a continuous run of a single bytes value.
 
       The following attributes are defined:
       * `length`: the length of the run
-      * `byte_value`: the repeated byte value, an int
+      * `bytes_value`: the repeated bytes value
 
-      The property `value` is computed on the fly on every reference.
+      The property `value` is computed on the fly on every reference
+      and returns a value obeying the buffer protocol: a bytes or
+      memoryview object.
   '''
 
-  def __init__(self, length, byte_value):
+  def __init__(self, length, bytes_value):
     if length < 0:
       raise ValueError("invalid length(%r), should be >= 0" % (length,))
-    if not 0 <= byte_value <= 255:
+    if len(bytes_value) != 1:
       raise ValueError(
-          "invalid byte_value(%r), should be 0 <= byte_value <= 255"
-          % (byte_value,))
+          "only single byte bytes_value is supported, received: %r"
+          % (bytes_value,))
     self.length = length
-    self.byte_value = byte_value
+    self.bytes_value = bytes_value
 
   @property
   def value(self):
     ''' The run of bytes, computed on the fly.
+
+        Values where length <= 256 are cached.
     '''
-    return bytes(self.byte_value) * self.length
+    length = self.length
+    if length == 0:
+      return b''
+    bytes_value = self.bytes_value
+    if length == 1:
+      return bytes_value
+    if length <= 256:
+      bs = _bytes_256s[bytes_value]
+      if length < 256:
+        bs = bs[:length]
+      return bs
+    return bytes_value * length
 
   @classmethod
-  def from_buffer(cls, bfr, end_offset=None, byte_value=0):
+  def from_buffer(cls, bfr, end_offset=None, bytes_value=b'\0'):
     ''' Parse a BytesRunField by just skipping the specified number of bytes.
 
-        Note: this *does not* check that the skipped bytes contain `byte_value`.
+        Note: this *does not* check that the skipped bytes contain `bytes_value`.
+
+        Parameters:
+        * `bfr`: the buffer to scan
+        * `end_offset`: the end offset of the scan, which may be
+          an int or Ellipsis to indicate a scan to the end of the
+          buffer
+        * `bytes_value`: the bytes value to replicate, default
+          `b'\0'`; if this is an int then a single byte of that value
+          is used
     '''
     if end_offset is None:
       raise ValueError("missing end_offset")
+    if isinstance(bytes_value, int):
+      bytes_value = bytes((bytes_value,))
     offset0 = bfr.offset
     if end_offset is Ellipsis:
       for _ in bfr:
