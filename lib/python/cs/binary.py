@@ -1,12 +1,20 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 
 ''' Facilities associated with binary data.
+    Requires Python 3 because a Python 2 bytes object is too weak,
+    as is my cs.py.bytes hack class also.
     - Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
 from struct import Struct
+import sys
 from cs.buffer import CornuCopyBuffer
+
+if sys.hexversion < 0x03000000:
+  print(
+      "WARNING: module %r requires Python 3, but sys.hexversion=0x%x"
+      % (__name__, sys.hexversion))
 
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of bytes instances.
