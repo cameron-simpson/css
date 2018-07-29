@@ -8,7 +8,7 @@
 '''
 
 from __future__ import print_function
-from collections import defaultdict
+from collections import namedtuple
 from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
@@ -301,14 +301,59 @@ UInt32LE = struct_field('<L')
 UInt64BE = struct_field('>Q')
 UInt64LE = struct_field('<Q')
 
-# an usigned 8 bit interger
-UInt8 = struct_field('B')
+class ListField(PacketField):
 
-# a big endian unsigned 32 bit integer
-UInt32 = struct_field('>L')
+  def transcribe(self):
+    ''' Transcribe each item in the list.
+    '''
+    for item in self.value:
+      yield value.transcribe()
 
-# a big endian unsigned 64 bit integer
-UInt64 = struct_field('>Q')
+_multi_struct_fields = {}
+
+def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
+  ''' Factory for PacketField subclasses build around complex struct formats.
+
+      * `struct_format`: the struct format string
+      * `subvalue_names`: an optional namedtuple field name list;
+        if supplied then the field value will be a namedtuple with
+        these names
+  '''
+  key = (struct_format, subvalue_names, class_name)
+  MultiStructField = _struct_fields.get(key)
+  if not MultiStructField:
+    X("NEW MULTI STRUCT FIELD %r", struct_format)
+    struct = Struct(struct_format)
+    if subvalue_names:
+      subvalues_type = namedtuple("StructSubValues", subvalue_names)
+    class MultiStructField(PacketField):
+      ''' A struct field for a complex struct format.
+      '''
+      @classmethod
+      def from_buffer(cls, bfr):
+        bs = bfr.take(struct.size)
+        values = struct.unpack(bs)
+        if subvalue_names:
+          values = subvalues_type(*values)
+        return cls(values)
+      def transcribe(self):
+        return struct.pack(*self.value)
+    if class_name is not None:
+      MultiStructField.__name__ = class_name
+    MultiStructField.struct = struct
+    MultiStructField.format = struct_format
+    if subvalue_names:
+      MultiStructField.subvalue_names = subvalue_names
+    _multi_struct_fields[key] = MultiStructField
+  return MultiStructField
+
+def structtuple(class_name, struct_format, subvalue_names):
+  ''' Convenience wrapper for multi_struct_field.
+  '''
+  return multi_struct_field(
+      struct_format,
+      subvalue_names=subvalue_names,
+      class_name=class_name)
 
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
