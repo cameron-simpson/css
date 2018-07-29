@@ -87,6 +87,17 @@ def fixed_bytes_field(length, class_name=None):
   FixedBytesField.__name__ = class_name
   return FixedBytesField
 
+class BytesField(PacketField):
+  ''' A field of bytes.
+  '''
+  def __len__(self):
+    return len(self.value)
+  def transcribe(self):
+    ''' A BytesField is its own transcription.
+    '''
+    assert isinstance(self.value, (bytes, memoryview))
+    return self.value
+
 class BytesesField(PacketField):
   ''' A field containing a list of bytes chunks.
 
