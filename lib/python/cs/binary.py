@@ -163,11 +163,6 @@ class BytesesField(PacketField):
     for bs in self.value:
       yield bs
 
-# A cache of 256 length runs of assorted bytes values as memoryviews
-# as a mapping of bytes=>memoryview.
-# In normal use these will be based on single byte bytes values.
-_bytes_256s = defaultdict(lambda b: memoryview(b * 256))
-
 class BytesRunField(PacketField):
   ''' A field containing a continuous run of a single bytes value.
 
@@ -190,6 +185,18 @@ class BytesRunField(PacketField):
     self.length = length
     self.bytes_value = bytes_value
 
+  # A cache of 256 length runs of assorted bytes values as memoryviews
+  # as a mapping of bytes=>memoryview.
+  # In normal use these will be based on single byte bytes values.
+  _bytes_256s = {}
+
+  @staticmethod
+  def _bytes_256(bytes_value):
+    bs = BytesRunField._bytes_256s.get(bytes_value)
+    if bs is None:
+      bs = BytesRunField._bytes_256s[bytes_value] = bytes_value * 256
+    return bs
+
   @property
   def value(self):
     ''' The run of bytes, computed on the fly.
@@ -203,7 +210,7 @@ class BytesRunField(PacketField):
     if length == 1:
       return bytes_value
     if length <= 256:
-      bs = _bytes_256s[bytes_value]
+      bs = self._bytes_256(bytes_value)
       if length < 256:
         bs = bs[:length]
       return bs
@@ -242,7 +249,7 @@ class BytesRunField(PacketField):
     '''
     length = self.length
     bytes_value = self.bytes_value
-    bs256 = _bytes_256s[bytes_value]
+    bs256 = self._bytes_256(bytes_value)
     with length >= 256:
       yield bs256
       length -= 256
