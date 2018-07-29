@@ -289,6 +289,17 @@ def struct_field(struct_format, class_name=None):
   return StructField
 
 # various common values
+UInt8 = struct_field('B')
+Int16BE = struct_field('>h')
+Int16LE = struct_field('<h')
+Int32BE = struct_field('>l')
+Int32LE = struct_field('<l')
+UInt16BE = struct_field('>H')
+UInt16LE = struct_field('<H')
+UInt32BE = struct_field('>L')
+UInt32LE = struct_field('<L')
+UInt64BE = struct_field('>Q')
+UInt64LE = struct_field('<Q')
 
 # an usigned 8 bit interger
 UInt8 = struct_field('B')
