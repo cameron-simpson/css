@@ -116,6 +116,9 @@ class BytesesField(PacketField):
         self.end_offset,
         "None" if self.value is None else "bytes[%d]" % len(self.value))
 
+  def __len__(self):
+    return self.end_offset - offset
+
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
     ''' Gather from `bfr` until `end_offset`.
