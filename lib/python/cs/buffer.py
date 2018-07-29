@@ -5,7 +5,7 @@
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
-''' Facilities to do with buffers, primarily CornuCopyBuffer, an automatically refilling buffer intended to support parsing of data streams.
+''' Facilities to do with buffers, primarily CornuCopyBuffer, an automatically refilling buffer to support parsing of data streams.
 '''
 
 import os
@@ -199,7 +199,7 @@ class CornuCopyBuffer(object):
         is empty and so it may block.
     '''
     self.extend(1, short_ok=True)
-    return len(self) > 0
+    return len(self) == 0
 
   def report_offset(self, offset):
     ''' Report a pertinent offset.
