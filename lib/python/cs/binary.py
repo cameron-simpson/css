@@ -264,7 +264,6 @@ def struct_field(struct_format, class_name=None):
   key = (struct_format, class_name)
   StructField = _struct_fields.get(key)
   if not StructField:
-    X("NEW STRUCT FIELD %r", struct_format)
     struct = Struct(struct_format)
     class StructField(PacketField):
       ''' A PacketField subclass using a struct.Struct for parse and transcribe.
@@ -322,7 +321,6 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   key = (struct_format, subvalue_names, class_name)
   MultiStructField = _struct_fields.get(key)
   if not MultiStructField:
-    X("NEW MULTI STRUCT FIELD %r", struct_format)
     struct = Struct(struct_format)
     if subvalue_names:
       subvalues_type = namedtuple("StructSubValues", subvalue_names)
@@ -425,19 +423,27 @@ class Packet(PacketField):
         Updates the internal field records.
         Returns the new PacketField's .value.
 
-        `field_name`: the name for the new field; it must be new.
-        `bfr`: a CornuCopyBuffer from which to parse the field data.
-        `factory`: a factory for parsing the field data, returning
+        * `field_name`: the name for the new field; it must be new.
+        * `bfr`: a CornuCopyBuffer from which to parse the field data.
+        * `factory`: a factory for parsing the field data, returning
           a PacketField. If `factory` is a class then its .from_buffer
           method is called, otherwise the factory is called directly.
+
         Additional keyword arguments are passed to the internal
         factory call.
+
+        For convenience, `factory` may also be a str in which case
+        it is taken to be a single struct format specifier.
+        Alternatively, `factory` may be an integer in which case
+        it is taken to be a fixed length bytes field.
     '''
-    from cs.x import X
-    X("%s.add_from_buffer...", type(self).__name__)
     assert isinstance(field_name, str), "field_name not a str: %r" % (field_name,)
     assert isinstance(bfr, CornuCopyBuffer), "bfr not a CornuCopyBuffer: %r" % (bfr,)
-    if isinstance(factory, type):
+    if isinstance(factory, str):
+      from_buffer = struct_field(factory).from_buffer
+    elif isinstance(factory, int):
+      from_buffer = fixed_bytes_field(factory).from_buffer
+    elif isinstance(factory, type):
       from_buffer = factory.from_buffer
     else:
       from_buffer = factory
