@@ -44,6 +44,8 @@ class PacketField(object):
 
   @property
   def value_s(self):
+    ''' The preferred string representation of the value.
+    '''
     return str(self.value)
 
   def __str__(self):
@@ -117,7 +119,7 @@ class BytesesField(PacketField):
         "None" if self.value is None else "bytes[%d]" % len(self.value))
 
   def __len__(self):
-    return self.end_offset - offset
+    return self.end_offset - self.offset
 
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
@@ -301,12 +303,14 @@ UInt64BE = struct_field('>Q')
 UInt64LE = struct_field('<Q')
 
 class ListField(PacketField):
+  ''' A field which is a list of other fields.
+  '''
 
   def transcribe(self):
     ''' Transcribe each item in the list.
     '''
     for item in self.value:
-      yield value.transcribe()
+      yield item.transcribe()
 
 _multi_struct_fields = {}
 
@@ -329,12 +333,17 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       '''
       @classmethod
       def from_buffer(cls, bfr):
+        ''' Parse via struct.unpack.
+        '''
         bs = bfr.take(struct.size)
         values = struct.unpack(bs)
         if subvalue_names:
+          # promote into a namedtuple
           values = subvalues_type(*values)
         return cls(values)
       def transcribe(self):
+        ''' Transcribe via struct.pack.
+        '''
         return struct.pack(*self.value)
     if class_name is not None:
       MultiStructField.__name__ = class_name
