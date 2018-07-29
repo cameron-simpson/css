@@ -42,8 +42,12 @@ class PacketField(object):
   def __init__(self, value):
     self.value = value
 
+  @property
+  def value_s(self):
+    return str(self.value)
+
   def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.value)
+    return "%s(%s)" % (type(self).__name__, self.value_s)
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
@@ -63,6 +67,12 @@ def fixed_bytes_field(length, class_name=None):
   class FixedBytesField(PacketField):
     ''' A field whose value is simply a fixed length bytes chunk.
     '''
+    @property
+    def value_s(self):
+      bs = self.value
+      if not isinstance(bs, bytes):
+        bs = bytes(bs)
+      return repr(bs)
     @classmethod
     def from_buffer(cls, bfr):
       ''' Obtain fixed bytes from the buffer.
