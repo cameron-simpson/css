@@ -256,29 +256,36 @@ class BytesRunField(PacketField):
     if length > 0:
       yield bs256[:length]
 
-def struct_field(format, class_name=None):
+_struct_fields = {}
+
+def struct_field(struct_format, class_name=None):
   ''' Factory for PacketField subclasses built around a single struct format.
   '''
-  struct = Struct(format)
-  class StructField(PacketField):
-    ''' A PacketField subclass using a struct.Struct for parse and transcribe.
-    '''
-    @classmethod
-    def from_buffer(cls, bfr):
-      ''' Parse a value from the bytes `bs` at `offset`, default 0.
-          Return a PacketField instance and the new offset.
+  key = (struct_format, class_name)
+  StructField = _struct_fields.get(key)
+  if not StructField:
+    X("NEW STRUCT FIELD %r", struct_format)
+    struct = Struct(struct_format)
+    class StructField(PacketField):
+      ''' A PacketField subclass using a struct.Struct for parse and transcribe.
       '''
-      bs = bfr.take(struct.size)
-      value, = struct.unpack(bs)
-      return cls(value)
-    def transcribe(self):
-      ''' Transcribe the value back into bytes.
-      '''
-      return struct.pack(self.value)
-  if class_name is not None:
-    StructField.__name__ = class_name
-  StructField.struct = struct
-  StructField.format = format
+      @classmethod
+      def from_buffer(cls, bfr):
+        ''' Parse a value from the bytes `bs` at `offset`, default 0.
+            Return a PacketField instance and the new offset.
+        '''
+        bs = bfr.take(struct.size)
+        value, = struct.unpack(bs)
+        return cls(value)
+      def transcribe(self):
+        ''' Transcribe the value back into bytes.
+        '''
+        return struct.pack(self.value)
+    if class_name is not None:
+      StructField.__name__ = class_name
+    StructField.struct = struct
+    StructField.format = struct_format
+    _struct_fields[key] = StructField
   return StructField
 
 # various common values
