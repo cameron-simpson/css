@@ -58,13 +58,24 @@ class PacketField(object):
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
-    ''' Factory to return an PacketField instance from bytes.
-        This relies on the class' from_bfr(CornuCopyBuffer) method.
+    ''' Factory to return a PacketField instance from bytes.
+        This relies on the class' from_buffer(CornuCopyBuffer) method.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
     field = cls.from_buffer(bfr)
     post_offset = offset + bfr.offset
     return field, post_offset
+
+  @classmethod
+  def from_buffer(cls, bfr, **kw):
+    ''' Factory to return a PacketField instance from a CornuCopyBuffer.
+    '''
+    raise NotImplementedError("no from_buffer method")
+
+  def transcribe(self):
+    ''' Return or yield the bytes transcription of this field.
+    '''
+    raise NotImplementedError("no transcribe method")
 
 def fixed_bytes_field(length, class_name=None):
   ''' Factory for PacketField subclasses built off fixed length byte strings.
