@@ -454,6 +454,9 @@ class Packet(PacketField):
       return None
     return field.value
 
+  def __getitem__(self, field_name):
+    return self.field_map[field_name]
+
   def transcribe(self):
     ''' Yield a sequence of bytes objects for this instance.
     '''
