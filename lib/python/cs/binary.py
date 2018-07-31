@@ -313,6 +313,8 @@ def struct_field(struct_format, class_name=None):
     class StructField(PacketField):
       ''' A PacketField subclass using a struct.Struct for parse and transcribe.
       '''
+      def __str__(self):
+        return str(self.value)
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse a value from the bytes `bs` at `offset`, default 0.
@@ -349,6 +351,16 @@ class ListField(PacketField):
   ''' A field which is a list of other fields.
   '''
 
+  def __str__(self):
+    value = self.value
+    length = len(value)
+    if length > 16:
+      suffix = ',...'
+      value = value[:16]
+    else:
+      suffix = ''
+    return '[' + str(length) + ':' + ','.join(str(o) for o in value) + suffix + ']'
+
   def transcribe(self):
     ''' Transcribe each item in the list.
     '''
@@ -370,10 +382,15 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   if not MultiStructField:
     struct = Struct(struct_format)
     if subvalue_names:
-      subvalues_type = namedtuple("StructSubValues", subvalue_names)
+      subvalues_type = namedtuple(
+          class_name or "StructSubValues",
+          subvalue_names)
     class MultiStructField(PacketField):
       ''' A struct field for a complex struct format.
       '''
+      if subvalue_names:
+        def __str__(self):
+          return str(self.value)
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse via struct.unpack.
