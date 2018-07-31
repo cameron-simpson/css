@@ -263,7 +263,7 @@ class Box(Packet):
 
   @classmethod
   def from_buffer(cls, bfr, discard_data=False, default_type=None, copy_boxes=None):
-    ''' Decode a Box from `bfr`.
+    ''' Decode a Box from `bfr` and return it.
 
         Parameters:
         * `bfr`: the input CornuCopyBuffer
@@ -384,6 +384,8 @@ class Box(Packet):
 
   @property
   def user_type(self):
+    ''' The header user_type.
+    '''
     return self.header.user_type
 
   # NB: a @property instead of @prop to preserve AttributeError
@@ -553,6 +555,8 @@ class FullBoxBody(BoxBody):
 
   @property
   def flags(self):
+    ''' The flags value, computed from the 3 flag bytes.
+    '''
     return (self.flags0<<16) | (self.flags1<<8) | self.flags2
 
 add_body_subclass(BoxBody, 'mdat', '8.1.1.1', 'Media Data')
@@ -565,6 +569,8 @@ class FREEBoxBody(BoxBody):
   BOX_TYPES = (b'free', b'skip')
 
   def parse_buffer(self, bfr, end_offset=None, **kw):
+    ''' Gather the `padding` field.
+    '''
     super().parse_buffer(bfr, **kw)
     offset0 = bfr.offset
     self.add_from_buffer('padding', BytesRunField, end_offset=end_offset)
@@ -578,6 +584,8 @@ class FTYPBoxBody(BoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `major_brand`, `minor_version` and `brand_bs` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('major_brand', bfr, 4)
     self.add_from_buffer('minor_version', bfr, UInt32BE)
@@ -586,6 +594,8 @@ class FTYPBoxBody(BoxBody):
 
   @property
   def compatible_brands(self):
+    ''' The compatible brands as a list of 4 bytes bytes instances.
+    '''
     return [
         self.brands_bs[offset:offset+4]
         for offset in range(0, len(self.brands_bs), 4)
@@ -593,22 +603,21 @@ class FTYPBoxBody(BoxBody):
 
 add_body_class(FTYPBoxBody)
 
-# field names for the tuples in a PDINBoxBody
-PDInfo = structtuple('PDInfo', '>LL', 'rate initial_delay')
-
 class PDINBoxBody(FullBoxBody):
   ''' An 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
-      Decode the (rate, initial_delay) pairs of the data section.
   '''
 
-  ATTRIBUTES = (('pdinfo', '%r'),)
+  # field names for the tuples in a PDINBoxBody
+  PDInfo = structtuple('PDInfo', '>LL', 'rate initial_delay')
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the (rate, initial_delay) pairs of the data section as the `pdinfo` field.
+    '''
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     pdinfo = []
     while not bfr.at_eof():
-      pdinfo.append(PDInfo.from_buffer(bfr))
+      pdinfo.append(PDINBoxBody.PDInfo.from_buffer(bfr))
     self.add_field('pdinfo', ListField(pdinfo))
 
 add_body_class(PDINBoxBody)
@@ -618,18 +627,10 @@ class ContainerBoxBody(BoxBody):
   '''
 
   def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
+    ''' Gather the `boxes` field.
+    '''
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     boxes = self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=Ellipsis, parent=self.box)
-
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(self.__class__.__name__)
-    fp.write('\n')
-    indent += '  '
-    for B in self.boxes:
-      B.dump(indent, fp)
 
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
@@ -685,22 +686,6 @@ add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 class TKHDBoxBody(FullBoxBody):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
-
-  ATTRIBUTES = ( 'track_enabled',
-                 'track_in_movie',
-                 'track_in_preview',
-                 'track_size_is_aspect_ratio',
-                 'creation_time',
-                 'modification_time',
-                 'track_id',
-                 'duration',
-                 'layer',
-                 'alternate_group',
-                 'volume',
-                 ('matrix', '%r'),
-                 'width',
-                 'height',
-               )
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
@@ -889,16 +874,6 @@ class _SampleTableContainerBoxBody(FullBoxBody):
       raise ValueError(
           "expected %d contained Boxes but parsed %d"
           % (entry_count, len(boxes)))
-
-  def dump(self, indent='', fp=None):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    fp.write(self.__class__.__name__)
-    fp.write('\n')
-    indent += '  '
-    for B in self.boxes:
-      B.dump(indent, fp)
 
 add_body_subclass(_SampleTableContainerBoxBody, b'stsd', '8.5.2', 'Sample Description')
 
@@ -1264,7 +1239,8 @@ def parse_file(fp, **kw):
   return parse_buffer(CornuCopyBuffer.from_file(fp), **kw)
 
 def parse_chunks(chunks, **kw):
-  ''' Parse an ISO14496 stream from the iterabor of data `chunks`, yield top level Boxes.
+  ''' Parse an ISO14496 stream from the iterator of data `chunks`, yield top level Boxes.
+
       `chunks`: an iterator yielding bytes objects
       `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive BoxBody offsets
