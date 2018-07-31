@@ -125,6 +125,9 @@ class UTF8NULField(PacketField):
       utf8 = ''
     else:
       utf8_bs = bfr.take(nul_pos)
+      if not isinstance(utf8_bs, bytes):
+        # transmute memoryview to real bytes object
+        utf8_bs = utf8_bs.tobytes()
       utf8 = utf8_bs.decode('utf-8')
     bfr.take(1)
     return cls(utf8)
