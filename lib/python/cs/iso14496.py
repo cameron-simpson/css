@@ -7,8 +7,8 @@ the basis for several things including MP4.
 - Cameron Simpson <cs@cskk.id.au> 26mar2016
 
 ISO make the standard available here:
-  http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html
-  http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip
+* [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html)
+* [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
 from __future__ import print_function
@@ -207,6 +207,13 @@ class BoxHeader(Packet):
 
 class Box(Packet):
   ''' Base class for all boxes - ISO14496 section 4.2.
+
+      This has the following PacketFields:
+      * `header`: a BoxHeader
+      * `body`: a BoxBody instance, usually a specific subclass
+      * `unparsed`: if there are unconsumed bytes from the Box they
+        are stored as here as a BytesesField; note that this field
+        is not present if there were no unparsed bytes
   '''
 
   def __str__(self):
@@ -253,12 +260,18 @@ class Box(Packet):
   def from_buffer(cls, bfr, discard_data=False, default_type=None, copy_boxes=None):
     ''' Decode a Box from `bfr`.
 
-        `discard_data`: if false (default), keep the unparsed data portion as
+        Parameters:
+        * `bfr`: the input CornuCopyBuffer
+        * `discard_data`: if false (default), keep the unparsed data portion as
           a list of data chunks in the field .unparsed; if true, discard the
           unparsed data
-        `default_type`: default Box body type if no class is
+        * `default_type`: default Box body type if no class is
           registered for the header box type.
-        `copy_boxes`: optional callable for reporting new Box instances
+        * `copy_boxes`: optional callable for reporting new Box instances
+
+        This provides the Packet.from_buffer method, but offloads
+        the actual parse to the method `parse_buffer`, which is
+        overridden by subclasses.
     '''
     B = cls()
     B.offset = bfr.offset
@@ -273,6 +286,21 @@ class Box(Packet):
     return B
 
   def parse_buffer(self, bfr, discard_data=False, default_type=None, copy_boxes=None):
+    ''' Parse the Box from `bfr`.
+
+        Parameters:
+        * `bfr`: the input CornuCopyBuffer
+        * `discard_data`: if false (default), keep the unparsed data portion as
+          a list of data chunks in the field .unparsed; if true, discard the
+          unparsed data
+        * `default_type`: default Box body type if no class is
+          registered for the header box type.
+        * `copy_boxes`: optional callable for reporting new Box instances
+
+        This method should be overridden by subclasses (if any,
+        since the actual subclassing happens with the BoxBody base
+        class).
+    '''
     header = self.add_from_buffer('header', bfr, BoxHeader)
     bfr.report_offset(self.offset)
     length = header.length
@@ -307,15 +335,22 @@ class Box(Packet):
 
   @property
   def length(self):
+    ''' The Box length, computed as `self.end_offset - self.offset`.
+    '''
     return self.end_offset - self.offset
 
   @property
   def box_type(self):
+    ''' The Box header type.
+    '''
     return self.header.type
 
   @property
   def box_type_s(self):
-    ''' The box type as a string.
+    ''' The Box header type as a string.
+
+        If the header type bytes decode as ASCII, return that,
+        otherwise the header bytes' repr().
     '''
     box_type_b = bytes(self.box_type)
     try:
