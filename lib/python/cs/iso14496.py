@@ -393,27 +393,6 @@ class Box(Packet):
     '''
     return type(self).boxbody_type_from_klass()
 
-  def attribute_summary(self):
-    ''' Comma separator list of attribute values honouring format strings.
-    '''
-    strs = []
-    for attr in self.ATTRIBUTES:
-      # use str(self.attr)
-      if isinstance(attr, str):
-        value = getattr(self, attr)
-        s = str(value)
-      else:
-        # an (attr, fmt) tuple
-        attr, fmt = attr
-        value = getattr(self, attr)
-        if isinstance(fmt, str):
-          s = fmt % (value,)
-        else:
-          # should be a callable
-          s = fmt(value)
-      strs.append(attr + '=' + s)
-    return ','.join(strs)
-
   def dump(self, indent='', fp=None, crop_length=170):
     if fp is None:
       fp = sys.stdout
