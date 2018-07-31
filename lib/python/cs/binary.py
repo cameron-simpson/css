@@ -440,8 +440,8 @@ class Packet(PacketField):
         .add_from_buffer call.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    field = self.add_from_buffer(field_name, bfr, factory, **kw)
-    return field, offset + bfr.offset
+    value = self.add_from_buffer(field_name, bfr, factory, **kw)
+    return value, offset + bfr.offset
 
   def add_from_buffer(self, field_name, bfr, factory, **kw):
     ''' Add a new PacketField named `field_name` parsed from `bfr` using `factory`.
