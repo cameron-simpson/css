@@ -747,6 +747,8 @@ class TREFBoxBody(ContainerBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Arrange that `default_type=TrackReferenceTypeBoxBody` in `TREFBoxBody` parses.
+    '''
     super().parse_buffer(bfr, default_type=TrackReferenceTypeBoxBody, **kw)
 
 add_body_class(TREFBoxBody)
@@ -758,6 +760,8 @@ class TrackReferenceTypeBoxBody(BoxBody):
   BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `track_ids` field.
+    '''
     super().parse_buffer(bfr, **kw)
     track_bs = b''.join(self._skip_data(bfr))
     track_ids = []
@@ -769,13 +773,15 @@ add_body_class(TrackReferenceTypeBoxBody)
 add_body_subclass(ContainerBoxBody, 'trgr', '8.3.4', 'Track Group')
 
 class TrackGroupTypeBoxBody(FullBoxBody):
-  ''' A TrackGroupTypeBoxBody contains track group id types - ISO14496 section 8.3.3.2.
+  ''' A TrackGroupTypeBoxBody contains a track group id - ISO14496 section 8.3.3.2.
   '''
 
   def __init__(self, box_type, box_data):
     FullBoxBody.__init__(self, box_type, box_data)
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `track_group_id` field.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('track_group_id', bfr, UInt32BE)
 
@@ -787,6 +793,9 @@ class MDHDBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `creation_time`, `modification_time`, `timescale`,
+        `duration` and `language_short` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
@@ -823,6 +832,8 @@ class HDLRBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `handler_type_long` and `name` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     # NB: handler_type is supposed to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
     self.add_from_buffer('pre_defined', bfr, UInt32BE)
@@ -847,6 +858,8 @@ class ELNGBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `extended_language` field.
+    '''
     super().parse_buffer(bfr, **kw)
     # extended language based on RFC4646
     self.add_from_buffer('extended_language', bfr, UTF8NULField)
@@ -861,6 +874,8 @@ class _SampleTableContainerBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
+    ''' Gather the `entry_count` and `boxes`.
+    '''
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     # obtain box data after version and flags decode
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
@@ -882,6 +897,8 @@ class _SampleEntry(BoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `data_reference_inde` field.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('reserved', bfr, fixed_bytes_field(6))
     self.add_from_buffer('data_reference_index', bfr, UInt16BE)
@@ -891,6 +908,8 @@ class BTRTBoxBody(BoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `bufferSizeDB`, `maxBitrate` and `avgBitrate` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('bufferSizeDB', bfr, UInt32BE)
     self.add_from_buffer('maxBitrate', bfr, UInt32BE)
