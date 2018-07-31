@@ -53,6 +53,9 @@ class PacketField(object):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.value_s)
 
+  def __bytes__(self):
+    return b''.join(flatten(self.transcribe()))
+
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
     ''' Factory to return an PacketField instance from bytes.
