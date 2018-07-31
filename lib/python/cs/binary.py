@@ -118,12 +118,15 @@ class UTF8NULField(PacketField):
     while True:
       bfr.extend(bs_length)
       nul_pos = bs_length - 1
-      if bfr[nul_pos] == b'\0':
+      if bfr[nul_pos] == 0:
         break
       bs_length += 1
-    utf8_bs = bfr.take(nul_pos)
+    if nul_pos == 0:
+      utf8 = ''
+    else:
+      utf8_bs = bfr.take(nul_pos)
+      utf8 = utf8_bs.decode('utf-8')
     bfr.take(1)
-    utf8 = utf8_bs.decode('utf-8')
     return cls(utf8)
 
   def transcribe(self):
