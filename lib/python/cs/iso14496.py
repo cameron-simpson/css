@@ -280,7 +280,7 @@ class Box(Packet):
     '''
     B = cls()
     B.offset = bfr.offset
-    with Pfx("Box %s: parse_buffer", type(B).__name__):
+    with Pfx("%s.parse_buffer", type(B).__name__):
       try:
         B.parse_buffer(bfr, discard_data=discard_data)
       except EOFError as e:
