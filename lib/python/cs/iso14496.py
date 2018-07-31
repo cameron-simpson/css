@@ -216,6 +216,10 @@ class Box(Packet):
         is not present if there were no unparsed bytes
   '''
 
+  def __init__(self, parent=None):
+    super().__init__()
+    self.parent = parent
+
   def __str__(self):
     type_name = type(self).__name__
     try:
@@ -314,7 +318,7 @@ class Box(Packet):
     body_class = pick_box_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
       self.add_from_buffer(
-          'body', bfr_tail, body_class,
+          'body', bfr_tail, body_class, box=self,
           discard_data=discard_data, copy_boxes=copy_boxes)
       # advance over the remaining data, optionally keeping it
       self.unparsed_offset = bfr_tail.offset
@@ -513,7 +517,7 @@ class BoxBody(Packet):
   '''
 
   @classmethod
-  def from_buffer(cls, bfr, **kw):
+  def from_buffer(cls, bfr, box=None, **kw):
     ''' Create a BoxBody and fill it in via its `parse_buffer` method.
 
         Note that this function is expected to be called from
@@ -524,6 +528,7 @@ class BoxBody(Packet):
         eye on some unsupplied "end offset" value.
     '''
     B = cls()
+    B.box = box
     B.parse_buffer(bfr, **kw)
     return B
 
@@ -627,7 +632,7 @@ class ContainerBoxBody(BoxBody):
 
   def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
-    boxes = self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=Ellipsis, parent=self)
+    boxes = self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=Ellipsis, parent=self.box)
 
   def dump(self, indent='', fp=None):
     if fp is None:
@@ -891,7 +896,7 @@ class _SampleTableContainerBoxBody(FullBoxBody):
         'boxes', bfr, SubBoxesField,
         end_offset=Ellipsis,
         max_boxes=entry_count,
-        parent=self,
+        parent=self.box,
         copy_boxes=copy_boxes)
     if len(boxes) != entry_count:
       raise ValueError(
@@ -1192,7 +1197,7 @@ class DREFBoxBody(FullBoxBody):
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     boxes = self.add_from_buffer(
         'boxes', bfr, SubBoxesField,
-        end_offset=Ellipsis, max_boxes=entry_count, parent=self,
+        end_offset=Ellipsis, max_boxes=entry_count, parent=self.box,
         copy_boxes=copy_boxes)
 
 add_body_class(DREFBoxBody)
@@ -1206,10 +1211,10 @@ class METABoxBody(FullBoxBody):
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     theHandler = self.add_field('theHandler', Box.from_buffer(bfr))
-    theHandler.parent = self
+    theHandler.parent = self.box
     self.add_from_buffer(
         'boxes', bfr, SubBoxesField,
-        end_offset=Ellipsis, parent=self,
+        end_offset=Ellipsis, parent=self.box,
         copy_boxes=copy_boxes)
 
 add_body_class(METABoxBody)
