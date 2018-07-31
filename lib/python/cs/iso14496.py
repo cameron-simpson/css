@@ -763,11 +763,10 @@ class TrackReferenceTypeBoxBody(BoxBody):
     ''' Gather the `track_ids` field.
     '''
     super().parse_buffer(bfr, **kw)
-    track_bs = b''.join(self._skip_data(bfr))
     track_ids = []
     while not bfr.at_eof():
       track_ids.append(UInt32BE.from_buffer(bfr))
-    self.add_field('track_id', ListField(track_ids))
+    self.add_field('track_ids', ListField(track_ids))
 
 add_body_class(TrackReferenceTypeBoxBody)
 add_body_subclass(ContainerBoxBody, 'trgr', '8.3.4', 'Track Group')
@@ -863,8 +862,6 @@ class ELNGBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # extended language based on RFC4646
     self.add_from_buffer('extended_language', bfr, UTF8NULField)
-    ##lang_bs = b''.join(bfr)
-    ##self.add_field('extended_language', BytesField(lang_bs))
 
 add_body_class(ELNGBoxBody)
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
