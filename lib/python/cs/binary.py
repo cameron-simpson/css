@@ -22,11 +22,13 @@ if sys.hexversion < 0x03000000:
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of bytes instances.
       This exists to allow subclass methods to easily return ASCII
-      strings or bytes or iterables, in turn allowing them to
-      simply return their superclass' chunks iterators directly
-      instead of having to unpack them.
+      strings or bytes or iterables or even None, in turn allowing
+      them to simply return their superclass' chunks iterators
+      directly instead of having to unpack them.
   '''
-  if isinstance(chunks, bytes):
+  if chunks is None:
+    pass
+  elif isinstance(chunks, bytes):
     yield chunks
   elif isinstance(chunks, str):
     yield chunks.encode('ascii')
