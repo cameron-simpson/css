@@ -234,26 +234,32 @@ class Box(Packet):
     '''
     # sanity check the supplied box_type
     # against the box types this class supports
-    box_type = self.header.type
-    try:
-      BOX_TYPE = self.BOX_TYPE
-    except AttributeError:
+    with Pfx("%s", self):
+      box_type = self.header.type
       try:
-        BOX_TYPES = self.BOX_TYPES
+        BOX_TYPE = self.BOX_TYPE
       except AttributeError:
-        if type(self) is not Box:
-          raise RuntimeError(
-              "no box_type check in %s, box_type=%r"
-              % (self.__class__, box_type))
-        pass
+        try:
+          BOX_TYPES = self.BOX_TYPES
+        except AttributeError:
+          if type(self) is not Box:
+            raise RuntimeError(
+                "no BOX_TYPE or BOX_TYPES to check in class %r"
+                % (type(self),))
+          pass
+        else:
+          if box_type not in BOX_TYPES:
+            warning(
+                "box_type should be in %r but got %r",
+                BOX_TYPES, bytes(box_type))
       else:
-        if box_type not in BOX_TYPES:
+        if box_type != BOX_TYPE:
           warning(
-              "box_type should be in %r but got %r",
-              BOX_TYPES, bytes(box_type))
-    else:
-      if box_type != BOX_TYPE:
-        warning("box_type should be %r but got %r", BOX_TYPE, box_type)
+              "box_type should be %r but got %r",
+              BOX_TYPE, box_type)
+    parent = self.parent
+    if parent is not None and not isinstance(parent, Box):
+      warning( "parent should be a Box, but is %r", type(self))
 
   @classmethod
   def from_buffer(cls, bfr, discard_data=False, default_type=None, copy_boxes=None):
@@ -280,6 +286,7 @@ class Box(Packet):
       except EOFError as e:
         error("EOF parsing buffer: %s", e)
     B.end_offset = bfr.offset
+    B.self_check()
     if copy_boxes:
       copy_boxes(B)
     return B
