@@ -2,9 +2,11 @@
 #
 
 ''' Facilities associated with binary data.
+
     Requires Python 3 because a Python 2 bytes object is too weak,
-    as is my cs.py.bytes hack class also.
-    - Cameron Simpson <cs@cskk.id.au> 22jul2018
+    as also is my cs.py.bytes hack class.
+
+    * Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
 from __future__ import print_function
@@ -21,6 +23,7 @@ if sys.hexversion < 0x03000000:
 
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of bytes instances.
+
       This exists to allow subclass methods to easily return ASCII
       strings or bytes or iterables or even None, in turn allowing
       them to simply return their superclass' chunks iterators
@@ -59,6 +62,7 @@ class PacketField(object):
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
     ''' Factory to return a PacketField instance from bytes.
+
         This relies on the class' from_buffer(CornuCopyBuffer) method.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
@@ -87,6 +91,8 @@ def fixed_bytes_field(length, class_name=None):
     '''
     @property
     def value_s(self):
+      ''' The repr() of the bytes.
+      '''
       bs = self.value
       if not isinstance(bs, bytes):
         bs = bytes(bs)
@@ -153,11 +159,10 @@ class BytesesField(PacketField):
   ''' A field containing a list of bytes chunks.
 
       The following attributes are defined:
-      .value        The gathered data as a list of bytes instances,
-                    or None if the field was gathered with
-                    `discard_data` true.
-      .offset       The starting offset of the data.
-      .end_offset   The ending offset of the data.
+      * `value`: the gathered data as a list of bytes instances,
+        or None if the field was gathered with `discard_data` true.
+      * `offset`: the starting offset of the data.
+      * `end_offset`: the ending offset of the data.
   '''
 
   def __str__(self):
@@ -174,11 +179,12 @@ class BytesesField(PacketField):
   def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
     ''' Gather from `bfr` until `end_offset`.
 
-        `bfr`: the input buffer
-        `end_offset`: the ending buffer offset; if this is Ellipsis
+        Parameters:
+        * `bfr`: the input buffer
+        * `end_offset`: the ending buffer offset; if this is Ellipsis
           then all the remaining data in `bfr` will be collection
-        `discard_data`: discard the data, keeping only the offset information
-        `short_ok`: if true, do not raise EOFError if there are
+        * `discard_data`: discard the data, keeping only the offset information
+        * `short_ok`: if true, do not raise EOFError if there are
           insufficient data; the field's .end_offset value will be
           less than `end_offset`; the default is False
     '''
@@ -209,7 +215,8 @@ class BytesesField(PacketField):
 
   def transcribe(self):
     ''' Transcribe the bytes instances.
-        Warning: this is raise an exception of the data have been discarded.
+
+        *Warning*: this is raise an exception if the data have been discarded.
     '''
     for bs in self.value:
       yield bs
@@ -378,10 +385,12 @@ _multi_struct_fields = {}
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   ''' Factory for PacketField subclasses build around complex struct formats.
 
+      Paramaters:
       * `struct_format`: the struct format string
       * `subvalue_names`: an optional namedtuple field name list;
         if supplied then the field value will be a namedtuple with
         these names
+      * `class_name`: option name for the generated class
   '''
   key = (struct_format, subvalue_names, class_name)
   MultiStructField = _struct_fields.get(key)
@@ -478,19 +487,21 @@ class Packet(PacketField):
         Returns the new PacketField's .value and the new parse
         offset within `bs`.
 
-        `field_name`: the name for the new field; it must be new.
-        `bs`: the bytes containing the field data; a CornuCopyBuffer
+        Parameters:
+        * `field_name`: the name for the new field; it must be new.
+        * `bs`: the bytes containing the field data; a CornuCopyBuffer
           is made from this for the parse.
-        `factory`: a factory for parsing the field data, returning
+        * `factory`: a factory for parsing the field data, returning
           a PacketField. If `factory` is a class then its .from_buffer
           method is called, otherwise the factory is called directly.
-        `offset`: optional start offset of the field data within
+        * `offset`: optional start offset of the field data within
           `bs`, default 0.
-        `length`: optional maximum number of bytes from `bs` to
+        * `length`: optional maximum number of bytes from `bs` to
           make available for the parse, default None meaning that
           everything from `offset` onwards is available.
+
         Additional keyword arguments are passed to the internal
-        .add_from_buffer call.
+        `.add_from_buffer` call.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
     value = self.add_from_buffer(field_name, bfr, factory, **kw)
@@ -501,6 +512,7 @@ class Packet(PacketField):
         Updates the internal field records.
         Returns the new PacketField's .value.
 
+        Paramaters:
         * `field_name`: the name for the new field; it must be new.
         * `bfr`: a CornuCopyBuffer from which to parse the field data.
         * `factory`: a factory for parsing the field data, returning
