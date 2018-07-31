@@ -428,41 +428,6 @@ class Box(Packet):
           for subbox in field.value:
             subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
 
-class SubBoxesField(ListField):
-
-  def _take_tail(self, bfr):
-    ''' Take the remaining bytes of the Box data and return them.
-    '''
-    return bfr.take(self.end_offset-bfr.offset)
-
-  def _skip_data(self, bfr, discard_data=False):
-    ''' Consume any remaining Box data input. Return the data.
-        `bfr`: a CornuCopyBuffer
-        Return values:
-        `data`: the data section as a list of chunks. None if `discard_data` is true.
-    '''
-    end_offset = self.end_offset
-    if end_offset is None:
-      raise RuntimeError(
-          "self.end_offset is None, cannot deduce Box end offset; remaining data starts: %r...",
-          bytes(bfr.take(128, short_ok=True)))
-    unparsed_data_chunks = None if discard_data else []
-    bfr.skipto(
-        end_offset,
-        copy_skip=( None if discard_data else unparsed_data_chunks.append ))
-    self.unparsed_data_chunks = unparsed_data_chunks
-    return unparsed_data_chunks
-
-  def write(self, fp):
-    ''' Transcribe this box to a file in serialised form.
-        This method uses transcribe, so it should not need overriding in subclasses.
-    '''
-    written = 0
-    for bs in self.transcribe():
-      fp.write(bs)
-      written += len(bs)
-    return written
-
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
