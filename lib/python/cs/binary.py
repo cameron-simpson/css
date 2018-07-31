@@ -105,6 +105,33 @@ def fixed_bytes_field(length, class_name=None):
   FixedBytesField.__name__ = class_name
   return FixedBytesField
 
+class UTF8NULField(PacketField):
+  ''' A NUL terminated UTF-8 string.
+  '''
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
+    '''
+    # probe for the terminating NUL
+    bs_length = 1
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 1
+      if bfr[nul_pos] == b'\0':
+        break
+      bs_length += 1
+    utf8_bs = bfr.take(nul_pos)
+    bfr.take(1)
+    utf8 = utf8_bs.decode('utf-8')
+    return cls(utf8)
+
+  def transcribe(self):
+    ''' Transcribe the `value` in UTF-8 with a terminating NUL.
+    '''
+    yield self.value.encode('utf-8')
+    yield b'\0'
+
 class BytesField(PacketField):
   ''' A field of bytes.
   '''
