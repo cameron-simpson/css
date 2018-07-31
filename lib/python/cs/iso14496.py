@@ -221,18 +221,13 @@ class Box(Packet):
     self.parent = parent
 
   def __str__(self):
-    type_name = type(self).__name__
+    type_name = self.box_type_path
     try:
-      box_type_s = self.box_type_s
+      body = self.body
     except AttributeError:
-      return "%s:UNKNOWN" % (type_name,)
+      return "%s:NO_BODY" % (type_name,)
     else:
-      try:
-        body = self.body
-      except AttributeError:
-        return "%s:%s:NO_BODY" % (type_name, box_type_s,)
-      else:
-        return "%s:%s:%s" % (type_name, box_type_s, body)
+      return "%s:%s" % (type_name, body)
 
   def self_check(self):
     ''' Sanity check this Box.
@@ -370,7 +365,13 @@ class Box(Packet):
     types = [self.box_type_s]
     box = self.parent
     while box is not None:
-      types.append(box.box_type_s)
+      try:
+        path_elem = box.box_type_s
+      except AttributeError as e:
+        raise RuntimeError(
+            "%s.box_type_path: no .box_type_s on %r: %s"
+            % (type(self).__name__, box, e))
+      types.append(path_elem)
       box = box.parent
     return '.'.join(reversed(types))
 
