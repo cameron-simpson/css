@@ -404,7 +404,7 @@ _multi_struct_fields = {}
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   ''' Factory for PacketField subclasses build around complex struct formats.
 
-      Paramaters:
+      Parameters:
       * `struct_format`: the struct format string
       * `subvalue_names`: an optional namedtuple field name list;
         if supplied then the field value will be a namedtuple with
@@ -425,6 +425,8 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       if subvalue_names:
         def __str__(self):
           return str(self.value)
+      def __len__(self):
+        return struct.size
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse via struct.unpack.
