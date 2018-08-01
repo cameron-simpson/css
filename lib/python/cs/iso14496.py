@@ -19,8 +19,9 @@ from os.path import basename
 import sys
 from cs.binary import (
     Packet, BytesesField, ListField,
-    UInt8, Int16BE, Int32BE, UInt16BE, UInt32BE, UInt64BE, UTF8NULField,
-    fixed_bytes_field, multi_struct_field, structtuple,
+    UInt8, Int16BE, Int32BE, UInt16BE, UInt32BE, UInt64BE,
+    UTF8NULField, BytesField,
+    multi_struct_field, structtuple,
 )
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import setup_logging, warning, error
@@ -586,7 +587,7 @@ class FTYPBoxBody(BoxBody):
     self.add_from_buffer('major_brand', bfr, 4)
     self.add_from_buffer('minor_version', bfr, UInt32BE)
     brands_bs = b''.join(bfr)
-    self.add_field('brands_bs', fixed_bytes_field(len(brands_bs))(brands_bs))
+    self.add_field('brands_bs', BytesField(brands_bs))
 
   @property
   def compatible_brands(self):
@@ -893,7 +894,7 @@ class _SampleEntry(BoxBody):
     ''' Gather the `data_reference_inde` field.
     '''
     super().parse_buffer(bfr, **kw)
-    self.add_from_buffer('reserved', bfr, fixed_bytes_field(6))
+    self.add_from_buffer('reserved', bfr, BytesField, length=6)
     self.add_from_buffer('data_reference_index', bfr, UInt16BE)
 
 class BTRTBoxBody(BoxBody):
@@ -1094,7 +1095,7 @@ class STZ2BoxBody(FullBoxBody):
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
-    self.add_field('reserved', fixed_bytes_field(3).from_buffer(bfr))
+    self.add_from_buffer('reserved', bfr, BytesField, length=3)
     field_size = self.add_from_buffer('field_size', bfr, UInt8)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
     entry_sizes = []
