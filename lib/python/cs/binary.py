@@ -507,6 +507,34 @@ class Packet(PacketField):
         )
     )
 
+  def self_check(self):
+    try:
+      fields_spec = self.PACKET_FIELDS
+    except AttributeError:
+      print("self_check: no PACKET_FIELDS for %s" % (self,), file=sys.stderr)
+      pass
+    else:
+      for field_name, field_spec in fields_spec.items():
+        if isinstance(field_spec, tuple):
+          required, basetype = field_spec
+        else:
+          required, basetype = True, field_spec
+        try:
+          field = self[field_name]
+        except KeyError:
+          if required:
+            raise ValueError("field %r missing" % (field_name,))
+        else:
+          if not isinstance(field, basetype):
+            raise ValueError(
+                "field %r should be an instance of %s but is %s"
+                % (field_name, basetype, type(field)))
+      for field_name in self.field_names:
+        if field_name not in fields_spec:
+          raise ValueError(
+              "field %r is present but is not defined in self.PACKET_FIELDS: %r"
+              % (field_name, fields_spec))
+
   def __getattr__(self, attr):
     ''' Unknown attributes may be field names; return their value.
     '''
