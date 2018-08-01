@@ -174,6 +174,20 @@ class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
   '''
 
+  PACKET_FIELDS = {
+    'box_size': UInt32BE,
+    'box_type': BytesField,
+    'length': (
+        True,
+        (
+            type(Ellipsis),
+            UInt64BE,
+            UInt32BE,
+            int
+        ),
+    ),
+  }
+
   @classmethod
   def from_buffer(cls, bfr):
     ''' Decode a box header from the CornuCopyBuffer `bfr`.
@@ -200,6 +214,7 @@ class BoxHeader(Packet):
     # note end of header
     header.end_offset = bfr.offset
     header.type = box_type
+    header.self_check()
     return header
 
 class BoxBody(Packet):
@@ -220,6 +235,7 @@ class BoxBody(Packet):
     B = cls()
     B.box = box
     B.parse_buffer(bfr, **kw)
+    B.self_check()
     return B
 
   def parse_buffer(self, bfr, discard_data=False, copy_boxes=None):
