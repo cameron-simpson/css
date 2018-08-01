@@ -120,6 +120,10 @@ def fixed_bytes_field(length, class_name=None):
   if class_name is None:
     class_name = FixedBytesField.__name__ + '_' + str(length)
   FixedBytesField.__name__ = class_name
+  FixedBytesField.__doc__ = (
+      'A PacketField which fetches and transcribes a fixed with bytes chunk of length %d.'
+      % (length,)
+  )
   return FixedBytesField
 
 class UTF8NULField(PacketField):
