@@ -202,6 +202,46 @@ class BoxHeader(Packet):
     header.type = box_type
     return header
 
+class BoxBody(Packet):
+  ''' Abstract basis for all Box bodies.
+  '''
+
+  @classmethod
+  def from_buffer(cls, bfr, box=None, **kw):
+    ''' Create a BoxBody and fill it in via its `parse_buffer` method.
+
+        Note that this function is expected to be called from
+        `Box.from_buffer` and therefore that `bfr` is expected to
+        be a bounded CornuCopyBuffer if the Box length is specified.
+        Various BoxBodies gather some data "until the end of the
+        Box", and we rely on this bound rather than keeping a close
+        eye on some unsupplied "end offset" value.
+    '''
+    B = cls()
+    B.box = box
+    B.parse_buffer(bfr, **kw)
+    return B
+
+  def parse_buffer(self, bfr, discard_data=False, copy_boxes=None):
+    ''' Gather the Box body fields from `bfr`.
+
+        A generic BoxBody has no additional fields. Subclasses call
+        their superclass' `parse_buffer` and then gather their
+        specific fields.
+    '''
+    pass
+
+  @classmethod
+  def boxbody_type_from_klass(klass):
+    ''' Compute the Box's 4 byte type field from the class name.
+    '''
+    klass_name = klass.__name__
+    if len(klass_name) == 11 and klass_name.endswith('BoxBody'):
+      klass_prefix = klass_name[:4]
+      if klass_prefix.rstrip('_').isupper():
+        return klass_prefix.replace('_', ' ').lower().encode('ascii')
+    raise AttributeError("no automatic box type for %s" % (klass,))
+
 class Box(Packet):
   ''' Base class for all boxes - ISO14496 section 4.2.
 
@@ -212,6 +252,12 @@ class Box(Packet):
         are stored as here as a BytesesField; note that this field
         is not present if there were no unparsed bytes
   '''
+
+  PACKET_FIELDS = {
+    'header': BoxHeader,
+    'body': BoxBody,
+    'unparsed': (False, BytesesField),
+  }
 
   def __init__(self, parent=None):
     super().__init__()
@@ -229,6 +275,7 @@ class Box(Packet):
   def self_check(self):
     ''' Sanity check this Box.
     '''
+    super().self_check()
     # sanity check the supplied box_type
     # against the box types this class supports
     with Pfx("%s", self):
@@ -497,46 +544,6 @@ class SubBoxesField(ListField):
           "contained Boxes overran end_offset:%d by %d bytes"
           % (end_offset, bfr.offset - end_offset))
     return boxes_field
-
-class BoxBody(Packet):
-  ''' Abstract basis for all Box bodies.
-  '''
-
-  @classmethod
-  def from_buffer(cls, bfr, box=None, **kw):
-    ''' Create a BoxBody and fill it in via its `parse_buffer` method.
-
-        Note that this function is expected to be called from
-        `Box.from_buffer` and therefore that `bfr` is expected to
-        be a bounded CornuCopyBuffer if the Box length is specified.
-        Various BoxBodies gather some data "until the end of the
-        Box", and we rely on this bound rather than keeping a close
-        eye on some unsupplied "end offset" value.
-    '''
-    B = cls()
-    B.box = box
-    B.parse_buffer(bfr, **kw)
-    return B
-
-  def parse_buffer(self, bfr, discard_data=False, copy_boxes=None):
-    ''' Gather the Box body fields from `bfr`.
-
-        A generic BoxBody has no additional fields. Subclasses call
-        their superclass' `parse_buffer` and then gather their
-        specific fields.
-    '''
-    pass
-
-  @classmethod
-  def boxbody_type_from_klass(klass):
-    ''' Compute the Box's 4 byte type field from the class name.
-    '''
-    klass_name = klass.__name__
-    if len(klass_name) == 11 and klass_name.endswith('BoxBody'):
-      klass_prefix = klass_name[:4]
-      if klass_prefix.rstrip('_').isupper():
-        return klass_prefix.replace('_', ' ').lower().encode('ascii')
-    raise AttributeError("no automatic box type for %s" % (klass,))
 
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic BoxBody, with a version and flags field.
