@@ -95,40 +95,6 @@ class PacketField(ABC):
     '''
     raise NotImplementedError("no transcribe method")
 
-def fixed_bytes_field(length, class_name=None):
-  ''' Factory for PacketField subclasses built off fixed length byte strings.
-  '''
-  if length < 1:
-    raise ValueError("length(%d) < 1" % (length,))
-  class FixedBytesField(PacketField):
-    ''' A field whose value is simply a fixed length bytes chunk.
-    '''
-    @property
-    def value_s(self):
-      ''' The repr() of the bytes.
-      '''
-      bs = self.value
-      if not isinstance(bs, bytes):
-        bs = bytes(bs)
-      return repr(bs)
-    @classmethod
-    def from_buffer(cls, bfr):
-      ''' Obtain fixed bytes from the buffer.
-      '''
-      return cls(bfr.take(length))
-    def transcribe(self):
-      ''' Transcribe the fixed bytes.
-      '''
-      return self.value
-  if class_name is None:
-    class_name = FixedBytesField.__name__ + '_' + str(length)
-  FixedBytesField.__name__ = class_name
-  FixedBytesField.__doc__ = (
-      'A PacketField which fetches and transcribes a fixed with bytes chunk of length %d.'
-      % (length,)
-  )
-  return FixedBytesField
-
 class UTF8NULField(PacketField):
   ''' A NUL terminated UTF-8 string.
   '''
@@ -170,7 +136,10 @@ class BytesField(PacketField):
   def value_s(self):
     ''' The repr() of the bytes.
     '''
-    return repr(self.value)
+    bs = self.value
+    if not isinstance(bs, bytes):
+      bs = bytes(bs)
+    return repr(bs)
 
   def __len__(self):
     return len(self.value)
@@ -188,6 +157,28 @@ class BytesField(PacketField):
     '''
     assert isinstance(self.value, (bytes, memoryview))
     return self.value
+
+def fixed_bytes_field(length, class_name=None):
+  ''' Factory for BytesField subclasses built from fixed length byte strings.
+  '''
+  if length < 1:
+    raise ValueError("length(%d) < 1" % (length,))
+  class FixedBytesField(BytesField):
+    ''' A field whose value is simply a fixed length bytes chunk.
+    '''
+    @classmethod
+    def from_buffer(cls, bfr):
+      ''' Obtain fixed bytes from the buffer.
+      '''
+      return BytesField.from_buffer(cls, bfr, length)
+  if class_name is None:
+    class_name = FixedBytesField.__name__ + '_' + str(length)
+  FixedBytesField.__name__ = class_name
+  FixedBytesField.__doc__ = (
+      'A PacketField which fetches and transcribes a fixed with bytes chunk of length %d.'
+      % (length,)
+  )
+  return FixedBytesField
 
 class BytesesField(PacketField):
   ''' A field containing a list of bytes chunks.
