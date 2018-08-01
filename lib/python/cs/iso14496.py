@@ -4,7 +4,7 @@
 '''
 Facilities for ISO14496 files - the ISO Base Media File Format,
 the basis for several things including MP4.
-- Cameron Simpson <cs@cskk.id.au> 26mar2016
+* Cameron Simpson <cs@cskk.id.au> 26mar2016
 
 ISO make the standard available here:
 * [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html)
@@ -16,20 +16,16 @@ from collections import namedtuple, defaultdict
 from functools import partial
 import os
 from os.path import basename
-from struct import Struct
 import sys
 from cs.binary import (
-    flatten as flatten_chunks,
-    Packet, PacketField, BytesField, BytesesField, ListField,
+    Packet, BytesesField, ListField,
     UInt8, Int16BE, Int32BE, UInt16BE, UInt32BE, UInt64BE, UTF8NULField,
     fixed_bytes_field, multi_struct_field, structtuple,
 )
 from cs.buffer import CornuCopyBuffer
-from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, error
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.py3 import bytes, pack, unpack, iter_unpack
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -949,11 +945,11 @@ def add_generic_sample_boxbody(
       self.has_inferred_entry_count = has_inferred_entry_count
       if has_inferred_entry_count:
         remaining = (self.end_offset - bfr.offset)
-        entry_count = remaining // S.size
-        remainder = remaining % S.size
+        entry_count = remaining // len(sample_type)
+        remainder = remaining % len(sample_type)
         if remainder != 0:
           warning("remaining length %d is not a multiple of len(%s), %d bytes left over",
-                  remaining, S.size, remainder)
+                  remaining, len(sample_type), remainder)
       else:
         entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
       samples = []
@@ -1059,8 +1055,8 @@ class URL_BoxBody(FullBoxBody):
   ''' An 'url ' Data Entry URL BoxBody - section 8.7.2.1.
   '''
 
-  def parse_data(self, bfr, **kw):
-    super().parse_data(bfr, **kw)
+  def parse_buffer(self, bfr, **kw):
+    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('location', bfr, UTF8NULField)
 
 add_body_class(URL_BoxBody)
@@ -1173,7 +1169,7 @@ class DREFBoxBody(FullBoxBody):
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    boxes = self.add_from_buffer(
+    self.add_from_buffer(
         'boxes', bfr, SubBoxesField,
         end_offset=Ellipsis, max_boxes=entry_count, parent=self.box,
         copy_boxes=copy_boxes)
