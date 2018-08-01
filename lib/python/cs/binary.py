@@ -165,8 +165,24 @@ class UTF8NULField(PacketField):
 class BytesField(PacketField):
   ''' A field of bytes.
   '''
+
+  @property
+  def value_s(self):
+    ''' The repr() of the bytes.
+    '''
+    return repr(self.value)
+
   def __len__(self):
     return len(self.value)
+
+  @classmethod
+  def from_buffer(cls, bfr, length):
+    ''' Parse a BytesField of length `length` from `bfr`.
+    '''
+    if length < 0:
+      raise ValueError("length(%d) < 0" % (length,))
+    return cls(bfr.take(length))
+
   def transcribe(self):
     ''' A BytesField is its own transcription.
     '''
