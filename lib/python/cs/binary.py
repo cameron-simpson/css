@@ -15,6 +15,17 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.buffer'],
+}
+
 if sys.hexversion < 0x03000000:
   print(
       "WARNING: module %r requires Python 3, but sys.hexversion=0x%x"
@@ -342,6 +353,10 @@ def struct_field(struct_format, class_name=None):
         return struct.pack(self.value)
     if class_name is not None:
       StructField.__name__ = class_name
+    StructField.__doc__ = (
+        'A PacketFiled which parses and transcribes the struct format %r.'
+        % (struct_format,)
+    )
     StructField.struct = struct
     StructField.format = struct_format
     _struct_fields[key] = StructField
@@ -422,6 +437,16 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
         return struct.pack(*self.value)
     if class_name is not None:
       MultiStructField.__name__ = class_name
+    if subvalue_names:
+      MultiStructField.__doc__ = (
+          'A PacketField which parses and transcribes the struct format %r, whose `.value` is a namedtuple with attributes %r.'
+          % (struct_format, subvalue_names)
+      )
+    else:
+      MultiStructField.__doc__ = (
+          'A PacketField which parses and transcribes the struct format %r, whose `.value` is a tuple of the struct values.'
+          % (struct_format,)
+      )
     MultiStructField.struct = struct
     MultiStructField.format = struct_format
     if subvalue_names:
