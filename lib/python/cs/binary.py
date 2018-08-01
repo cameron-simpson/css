@@ -10,6 +10,7 @@
 '''
 
 from __future__ import print_function
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from struct import Struct
 import sys
@@ -51,7 +52,7 @@ def flatten(chunks):
       for chunk in flatten(subchunk):
         yield chunk
 
-class PacketField(object):
+class PacketField(ABC):
   ''' A record for an individual packet field.
   '''
 
@@ -82,11 +83,13 @@ class PacketField(object):
     return field, post_offset
 
   @classmethod
+  @abstractmethod
   def from_buffer(cls, bfr, **kw):
     ''' Factory to return a PacketField instance from a CornuCopyBuffer.
     '''
     raise NotImplementedError("no from_buffer method")
 
+  @abstractmethod
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
     '''
@@ -392,6 +395,14 @@ class ListField(PacketField):
     else:
       suffix = ''
     return '[' + str(length) + ':' + ','.join(str(o) for o in value) + suffix + ']'
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' ListFields do not know enough to parse a buffer.
+    '''
+    raise NotImplementedError(
+        "%s cannot be parsd directly from a buffer"
+        % (cls,))
 
   def transcribe(self):
     ''' Transcribe each item in the list.
