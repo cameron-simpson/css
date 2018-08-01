@@ -170,7 +170,7 @@ def fixed_bytes_field(length, class_name=None):
     def from_buffer(cls, bfr):
       ''' Obtain fixed bytes from the buffer.
       '''
-      return BytesField.from_buffer(cls, bfr, length)
+      return BytesField.from_buffer(bfr, length)
   if class_name is None:
     class_name = FixedBytesField.__name__ + '_' + str(length)
   FixedBytesField.__name__ = class_name
