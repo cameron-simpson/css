@@ -358,7 +358,7 @@ def struct_field(struct_format, class_name=None):
     if class_name is not None:
       StructField.__name__ = class_name
     StructField.__doc__ = (
-        'A PacketFiled which parses and transcribes the struct format %r.'
+        'A PacketField which parses and transcribes the struct format `%r`.'
         % (struct_format,)
     )
     StructField.struct = struct
@@ -443,12 +443,12 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       MultiStructField.__name__ = class_name
     if subvalue_names:
       MultiStructField.__doc__ = (
-          'A PacketField which parses and transcribes the struct format %r, whose `.value` is a namedtuple with attributes %r.'
+          'A PacketField which parses and transcribes the struct format `%r`, whose `.value` is a namedtuple with attributes %r.'
           % (struct_format, subvalue_names)
       )
     else:
       MultiStructField.__doc__ = (
-          'A PacketField which parses and transcribes the struct format %r, whose `.value` is a tuple of the struct values.'
+          'A PacketField which parses and transcribes the struct format `%r`, whose `.value` is a tuple of the struct values.'
           % (struct_format,)
       )
     MultiStructField.struct = struct
