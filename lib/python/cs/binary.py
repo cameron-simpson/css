@@ -511,7 +511,7 @@ class Packet(PacketField):
     try:
       fields_spec = self.PACKET_FIELDS
     except AttributeError:
-      print("self_check: no PACKET_FIELDS for %s" % (self,), file=sys.stderr)
+      print("self_check: warning: no PACKET_FIELDS for %s" % (self,), file=sys.stderr)
       pass
     else:
       for field_name, field_spec in fields_spec.items():
@@ -520,15 +520,21 @@ class Packet(PacketField):
         else:
           required, basetype = True, field_spec
         try:
-          field = self[field_name]
+          field = self.field_map[field_name]
         except KeyError:
+          # Note: we fall back on getattr here instead of
+          # self.fiels[field_name] because sometimes an attribute might not
+          # always be a field.
+          # For an example see the length in a cs.iso14496.BoxHeader.
+          field = getattr(self, field_name, None)
+        if field is None:
           if required:
             raise ValueError("field %r missing" % (field_name,))
         else:
           if not isinstance(field, basetype):
             raise ValueError(
-                "field %r should be an instance of %s but is %s"
-                % (field_name, basetype, type(field)))
+                "field %r should be an instance of %s but is %s: %s"
+                % (field_name, basetype, type(field), field))
       for field_name in self.field_names:
         if field_name not in fields_spec:
           raise ValueError(
