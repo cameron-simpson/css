@@ -3,8 +3,11 @@
 
 ''' Facilities associated with binary data.
 
-    Requires Python 3 because a Python 2 bytes object is too weak,
-    as also is my cs.py.bytes hack class.
+    This module requires Python 3 and recommends Python 3.6+ because
+    it uses abc.ABC, because a Python 2 bytes object is too weak
+    (just a str) as also is my cs.py.bytes hack class and because
+    the keyword based Packet initiialisation benefits from keyword
+    argument ordering.
 
     * Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
@@ -27,10 +30,15 @@ DISTINFO = {
     'install_requires': ['cs.buffer'],
 }
 
-if sys.hexversion < 0x03000000:
+if sys.version_info[0] < 3:
   print(
-      "WARNING: module %r requires Python 3, but sys.hexversion=0x%x"
-      % (__name__, sys.hexversion),
+      "WARNING: module %r requires Python 3 and recommends 3.6, but version_info=%r"
+      % (__name__, sys.version_info),
+      file=sys.stderr)
+elif sys.version_info[1] < 6:
+  print(
+      "WARNING: module %r recommends Python 3.6, but version_info=%r"
+      % (__name__, sys.version_info),
       file=sys.stderr)
 
 def flatten(chunks):
@@ -514,13 +522,27 @@ class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
   '''
 
-  def __init__(self):
+  def __init__(self, **fields):
+    ''' Initialise the Packet.
+
+        A Packet is its own `.value`.
+
+        If any keyword arguments are provided, they are used as a
+        mapping of `field_name` to `Field` instance, supporting
+        direct construction of simple Packets. From Python 3.6
+        onwards keyword arguments preserve the calling order; in
+        Python versions earlier than this the caller should adjust
+        the `Packet.field_names` list to the correct order after
+        initialisation.
+    '''
     # Packets are their own value
     PacketField.__init__(self, self)
     # start with no fields
     self.field_names = []
     self.fields = []
     self.field_map = {}
+    for field_name, field in fields.items():
+      self.add_field(field_name, field)
 
   def __str__(self):
     return "%s(%s)" % (
