@@ -554,6 +554,52 @@ class Packet(PacketField):
     )
 
   def self_check(self):
+    ''' Internal self check.
+
+        If the Packet has a `PACKET_FIELDS` attribute, normally a
+        class attribute, then check the fields against it. The
+        `PACKET_FIELDS` attribute is a mapping of `field_name` to
+        a specification of `required` and `types`. The specification
+        may take one of 2 forms:
+        * a tuple of `(required, types)`
+        * a single `type`; this is equivalent to `(True, (type,))`
+        Their meanings are as follows:
+        * `required`: a Boolean. If true, the field must be present
+          in the packet `field_map`, otherwise it need not be present.
+        * `types`: a tuple of acceptable field types
+
+        There are some special semantics involved here.
+
+        An implementation of a `Packet` may choose to make some
+        fields plain instance attributes instead of `Field`s in the
+        `field_map` mapping, particularly variable packets such as
+        a `cs.iso14496.BoxHeader`, whose `.length` may be parsed
+        directly from its binary form or computed from other fields
+        depending on the `box_size` value. Therefore, checking for
+        a field is first done via the `field_map` mapping, then by
+        `getattr`, and as such the acceptable `types` may include
+        non-`PacketField` types such as `int`.
+
+        Here is the `BoxHeader.PACKET_FIELDS` definition as an example:
+
+          PACKET_FIELDS = {
+            'box_size': UInt32BE,
+            'box_type': BytesField,
+            'length': (
+                True,
+                (
+                    type(Ellipsis),
+                    UInt64BE,
+                    UInt32BE,
+                    int
+                ),
+            ),
+          }
+
+        Note that `length` includes some non-`PacketField` types,
+        and that it is written as a tuple of `(True, types)` because
+        it has more than one acceptable type.
+    '''
     try:
       fields_spec = self.PACKET_FIELDS
     except AttributeError:
