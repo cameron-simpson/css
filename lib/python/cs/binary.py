@@ -71,6 +71,11 @@ class PacketField(ABC):
   def __bytes__(self):
     return b''.join(flatten(self.transcribe()))
 
+  def __len__(self):
+    ''' Compute the length by running a transcription and measuring it.
+    '''
+    return sum(len(bs) for bs in flatten(self.transcribe()))
+
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
     ''' Factory to return a PacketField instance from bytes.
@@ -141,9 +146,6 @@ class BytesField(PacketField):
       bs = bytes(bs)
     return repr(bs)
 
-  def __len__(self):
-    return len(self.value)
-
   @classmethod
   def from_buffer(cls, bfr, length):
     ''' Parse a BytesField of length `length` from `bfr`.
@@ -188,6 +190,10 @@ class BytesesField(PacketField):
         or None if the field was gathered with `discard_data` true.
       * `offset`: the starting offset of the data.
       * `end_offset`: the ending offset of the data.
+
+      The `offset` and `end_offset` values are recorded during the
+      parse, and may become irrelevant if the field's contents are
+      changed.
   '''
 
   def __str__(self):
@@ -196,9 +202,6 @@ class BytesesField(PacketField):
         self.offset,
         self.end_offset,
         "None" if self.value is None else "bytes[%d]" % len(self.value))
-
-  def __len__(self):
-    return self.end_offset - self.offset
 
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
@@ -466,8 +469,6 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       if subvalue_names:
         def __str__(self):
           return str(self.value)
-      def __len__(self):
-        return struct.size
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse via struct.unpack.
@@ -546,7 +547,7 @@ class Packet(PacketField):
           field = self.field_map[field_name]
         except KeyError:
           # Note: we fall back on getattr here instead of
-          # self.fiels[field_name] because sometimes an attribute might not
+          # self.fields[field_name] because sometimes an attribute might not
           # always be a field.
           # For an example see the length in a cs.iso14496.BoxHeader.
           field = getattr(self, field_name, None)
