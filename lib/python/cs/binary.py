@@ -341,8 +341,30 @@ class BytesRunField(PacketField):
 
 _struct_fields = {}
 
-def struct_field(struct_format, class_name=None):
+def struct_field(struct_format, class_name):
   ''' Factory for PacketField subclasses built around a single struct format.
+
+      Parameters:
+      * `struct_format`: the struct format string, specifying a
+        single struct field
+      * `class_name`: the class name for the generated class
+
+      Example:
+
+        >>> UInt16BE = struct_field('>H', class_name='UInt16BE')
+        >>> UInt16BE.__name__
+        'UInt16BE'
+        >>> UInt16BE.format
+        '>H'
+        >>> UInt16BE.struct   #doctest: +ELLIPSIS
+        <Struct object at ...>
+        >>> field, offset = UInt16BE.from_bytes(bytes((2,3,4)))
+        >>> field
+        UInt16BE(515)
+        >>> offset
+        2
+        >>> field.value
+        515
   '''
   key = (struct_format, class_name)
   StructField = _struct_fields.get(key)
@@ -353,6 +375,8 @@ def struct_field(struct_format, class_name=None):
       '''
       def __str__(self):
         return str(self.value)
+      def __repr__(self):
+        return "%s(%r)" % (type(self).__name__, self.value)
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse a value from the bytes `bs` at `offset`, default 0.
@@ -365,8 +389,7 @@ def struct_field(struct_format, class_name=None):
         ''' Transcribe the value back into bytes.
         '''
         return struct.pack(self.value)
-    if class_name is not None:
-      StructField.__name__ = class_name
+    StructField.__name__ = class_name
     StructField.__doc__ = (
         'A PacketField which parses and transcribes the struct format `%r`.'
         % (struct_format,)
@@ -377,17 +400,17 @@ def struct_field(struct_format, class_name=None):
   return StructField
 
 # various common values
-UInt8 = struct_field('B')
-Int16BE = struct_field('>h')
-Int16LE = struct_field('<h')
-Int32BE = struct_field('>l')
-Int32LE = struct_field('<l')
-UInt16BE = struct_field('>H')
-UInt16LE = struct_field('<H')
-UInt32BE = struct_field('>L')
-UInt32LE = struct_field('<L')
-UInt64BE = struct_field('>Q')
-UInt64LE = struct_field('<Q')
+UInt8 = struct_field('B', 'UInt8')
+Int16BE = struct_field('>h', 'Int16BE')
+Int16LE = struct_field('<h', 'Int16LE')
+Int32BE = struct_field('>l', 'Int32BE')
+Int32LE = struct_field('<l', 'Int32LE')
+UInt16BE = struct_field('>H', 'UInt16BE')
+UInt16LE = struct_field('<H', 'UInt16LE')
+UInt32BE = struct_field('>L', 'UInt32BE')
+UInt32LE = struct_field('<L', 'UInt32LE')
+UInt64BE = struct_field('>Q', 'UInt64BE')
+UInt64LE = struct_field('<Q', 'UInt64LE')
 
 class ListField(PacketField):
   ''' A field which is a list of other fields.
