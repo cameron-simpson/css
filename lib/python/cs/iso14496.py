@@ -951,7 +951,7 @@ class HDLRBoxBody(FullBoxBody):
   def handler_type(self):
     ''' The handler_type as an ASCII string, its usual form.
     '''
-    return bytes(self.fields['handler_type_long']).decode('ascii')
+    return bytes(self.handler_type_long).decode('ascii')
 
 add_body_class(HDLRBoxBody)
 add_body_subclass(ContainerBoxBody, b'minf', '8.4.4', 'Media Information')
