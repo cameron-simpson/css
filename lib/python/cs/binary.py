@@ -556,8 +556,14 @@ class Packet(PacketField):
         else:
           if not isinstance(field, basetype):
             raise ValueError(
-                "field %r should be an instance of %s but is %s: %s"
-                % (field_name, basetype, type(field), field))
+                "field %r should be an instance of %s:%s but is %s:%s: %s"
+                % (
+                    field_name,
+                    'tuple' if isinstance(basetype, tuple) else basetype.__name__,
+                    basetype,
+                    type(field).__name__,
+                    type(field),
+                    field))
       for field_name in self.field_names:
         if field_name not in fields_spec:
           raise ValueError(
