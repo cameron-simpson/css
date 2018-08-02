@@ -150,11 +150,11 @@ class CornuCopyBuffer(object):
       # sanity check supplied length
       if length < 1:
         raise ValueError("length(%d) < 1" % (length,))
-      end_offset = offset + length
-      if end_offset > len(bs):
-        raise ValueError(
-            "offset(%d)+length(%d) > len(bs):%d"
-            % (offset, length, len(bs)))
+    end_offset = offset + length
+    if end_offset > len(bs):
+      raise ValueError(
+          "offset(%d)+length(%d) > len(bs):%d"
+          % (offset, length, len(bs)))
     if offset > 0 or end_offset < len(bs):
       bs = memoryview(bs)[offset:end_offset]
     return cls([bs], **kw)
