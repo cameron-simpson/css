@@ -18,9 +18,9 @@ import os
 from os.path import basename
 import sys
 from cs.binary import (
-    Packet, BytesesField, ListField,
+    Packet, PacketField, BytesesField, ListField,
     UInt8, Int16BE, Int32BE, UInt16BE, UInt32BE, UInt64BE,
-    UTF8NULField, BytesField,
+    UTF8NULField, BytesField, BytesRunField,
     multi_struct_field, structtuple,
 )
 from cs.buffer import CornuCopyBuffer
@@ -220,6 +220,8 @@ class BoxHeader(Packet):
 class BoxBody(Packet):
   ''' Abstract basis for all Box bodies.
   '''
+
+  PACKET_FIELDS = {}
 
   @classmethod
   def from_buffer(cls, bfr, box=None, **kw):
@@ -566,6 +568,14 @@ class FullBoxBody(BoxBody):
       ISO14496 section 4.2.
   '''
 
+  PACKET_FIELDS = dict(
+      BoxBody.PACKET_FIELDS,
+      version=UInt8,
+      flags0=UInt8,
+      flags1=UInt8,
+      flags2=UInt8,
+  )
+
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
     self.add_field('version', UInt8.from_buffer(bfr))
@@ -586,6 +596,11 @@ class FREEBoxBody(BoxBody):
       Note the length and discard the data portion.
   '''
 
+  PACKET_FIELDS = dict(
+      BoxBody.PACKET_FIELDS,
+      padding=BytesRunField,
+  )
+
   BOX_TYPES = (b'free', b'skip')
 
   def parse_buffer(self, bfr, end_offset=None, **kw):
@@ -602,6 +617,13 @@ class FTYPBoxBody(BoxBody):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
       Decode the major_brand, minor_version and compatible_brands.
   '''
+
+  PACKET_FIELDS = dict(
+      BoxBody.PACKET_FIELDS,
+      major_brand=BytesField,
+      minor_version=UInt32BE,
+      brands_bs=BytesField,
+  )
 
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `major_brand`, `minor_version` and `brand_bs` fields.
@@ -627,6 +649,11 @@ class PDINBoxBody(FullBoxBody):
   ''' An 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      pdinfo=ListField,
+  )
+
   # field names for the tuples in a PDINBoxBody
   PDInfo = structtuple('PDInfo', '>LL', 'rate initial_delay')
 
@@ -646,6 +673,11 @@ class ContainerBoxBody(BoxBody):
   ''' A base class for pure container boxes.
   '''
 
+  PACKET_FIELDS = dict(
+      BoxBody.PACKET_FIELDS,
+      boxes=SubBoxesField,
+  )
+
   def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
     ''' Gather the `boxes` field.
     '''
@@ -662,6 +694,20 @@ add_body_class(MOOVBoxBody)
 class MVHDBoxBody(FullBoxBody):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      creation_time=(True, (UInt32BE, UInt64BE)),
+      modification_time=(True, (UInt32BE, UInt64BE)),
+      timescale=UInt32BE,
+      duration=(True, (UInt32BE, UInt64BE)),
+      rate_long=Int32BE,
+      volume_short=Int16BE,
+      reserved1=BytesField,
+      matrix=PacketField,
+      predefined1=BytesField,
+      next_track_id=UInt32BE,
+  )
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
@@ -706,6 +752,25 @@ add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 class TKHDBoxBody(FullBoxBody):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
+  TKHDMatrix = multi_struct_field('>lllllllll', class_name='TKHDMatrix')
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      creation_time=(True, (UInt32BE, UInt64BE)),
+      modification_time=(True, (UInt32BE, UInt64BE)),
+      track_id=UInt32BE,
+      reserved1=UInt32BE,
+      duration=(True, (UInt32BE, UInt64BE)),
+      reserved2=UInt32BE,
+      reserved3=UInt32BE,
+      layer=Int16BE,
+      alternate_group=Int16BE,
+      volume=Int16BE,
+      reserved4=UInt16BE,
+      matrix=TKHDMatrix,
+      width=UInt32BE,
+      height=UInt32BE,
+  )
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
@@ -730,7 +795,7 @@ class TKHDBoxBody(FullBoxBody):
     self.add_from_buffer('alternate_group', bfr, Int16BE)
     self.add_from_buffer('volume', bfr, Int16BE)
     self.add_from_buffer('reserved4', bfr, UInt16BE)
-    self.add_from_buffer('matrix', bfr, multi_struct_field('>lllllllll'))
+    self.add_from_buffer('matrix', bfr, TKHDBoxBody.TKHDMatrix)
     self.add_from_buffer('width', bfr, UInt32BE)
     self.add_from_buffer('height', bfr, UInt32BE)
 
@@ -811,6 +876,16 @@ class MDHDBoxBody(FullBoxBody):
   ''' A MDHDBoxBody is a Media Header box - ISO14496 section 8.4.2.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      creation_time=(True, (UInt32BE, UInt64BE)),
+      modification_time=(True, (UInt32BE, UInt64BE)),
+      timescale=UInt32BE,
+      duration=(True, (UInt32BE, UInt64BE)),
+      language_short=UInt16BE,
+      pre_defined=UInt16BE,
+  )
+
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `creation_time`, `modification_time`, `timescale`,
         `duration` and `language_short` fields.
@@ -850,6 +925,16 @@ class HDLRBoxBody(FullBoxBody):
   ''' A HDLRBoxBody is a Handler Reference box - ISO14496 section 8.4.3.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      pre_defined=UInt32BE,
+      handler_type_long=UInt32BE,
+      reserved1=UInt32BE,
+      reserved2=UInt32BE,
+      reserved3=UInt32BE,
+      name=UTF8NULField,
+  )
+
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `handler_type_long` and `name` fields.
     '''
@@ -876,6 +961,11 @@ class ELNGBoxBody(FullBoxBody):
   ''' A ELNGBoxBody is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      extended_language=UTF8NULField,
+  )
+
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `extended_language` field.
     '''
@@ -889,6 +979,12 @@ add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 class _SampleTableContainerBoxBody(FullBoxBody):
   ''' An intermediate FullBoxBody subclass which contains more boxes.
   '''
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      boxes=SubBoxesField,
+  )
 
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     ''' Gather the `entry_count` and `boxes`.
@@ -957,6 +1053,11 @@ def add_generic_sample_boxbody(
   class SpecificSampleBoxBody(FullBoxBody):
     ''' Time to Sample box - section 8.6.1.
     '''
+    PACKET_FIELDS = dict(
+        FullBoxBody.PACKET_FIELDS,
+        entry_count=(False, UInt32BE),
+        samples=ListField,
+    )
     def parse_buffer(self, bfr, **kw):
       super().parse_buffer(bfr, **kw)
       if self.version == 0:
@@ -1100,6 +1201,13 @@ class STSZBoxBody(FullBoxBody):
   ''' A 'stsz' Sample Size box - section 8.7.3.2.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      sample_size=UInt32BE,
+      sample_count=UInt32BE,
+      entry_sizes=(False, ListField),
+  )
+
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
     sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
@@ -1146,6 +1254,12 @@ class STSCBoxBody(FullBoxBody):
   ''' 'stsc' (Sample Table box - section 8.7.4.1.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      entries=ListField,
+  )
+
   STSCEntry = structtuple('STSCEntry', '>LLL', 'first_chunk samples_per_chunk sample_description_index')
 
   def parse_buffer(self, bfr, **kw):
@@ -1160,6 +1274,12 @@ add_body_class(STSCBoxBody)
 
 class STCOBoxBody(FullBoxBody):
   ''' A 'stco' Chunk Offset box - section 8.7.5.
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      chunk_offsets=ListField,
+  )
   '''
 
   def parse_buffer(self, bfr, **kw):
@@ -1175,6 +1295,12 @@ add_body_class(STCOBoxBody)
 class CO64BoxBody(FullBoxBody):
   ''' A 'c064' Chunk Offset box - section 8.7.5.
   '''
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      chunk_offsets=ListField,
+  )
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
@@ -1206,6 +1332,12 @@ class METABoxBody(FullBoxBody):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      theHandler=Box,
+      boxes=SubBoxesField,
+  )
+
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     theHandler = self.add_field('theHandler', Box.from_buffer(bfr))
@@ -1223,6 +1355,12 @@ class VMHDBoxBody(FullBoxBody):
 
   OpColor = multi_struct_field('>HHH', class_name='OpColor')
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      graphicsmode=UInt16BE,
+      opcolor=OpColor,
+  )
+
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('graphicsmode', bfr, UInt16BE)
@@ -1233,6 +1371,12 @@ add_body_class(VMHDBoxBody)
 class SMHDBoxBody(FullBoxBody):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
   '''
+
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      balance=Int16BE,
+      reserved=UInt16BE,
+  )
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
