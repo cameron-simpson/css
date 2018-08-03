@@ -461,6 +461,20 @@ class Box(Packet):
       if bfr_tail is not bfr:
         bfr_tail.flush()
 
+  def __getattr__(self, attr):
+    # .TYPE - the sole item in self.boxes matching b'type'
+    if len(attr) == 4 and all(c.isupper() for c in attr):
+      box, = getattr(self, attr + 's')
+      return box
+    # .TYPEs - all items of self.boxes matching b'type'
+    if len(attr) == 5 and attr.endswith('s'):
+      attr4 = attr[:4]
+      if all(c.isupper() for c in attr4):
+        box_type = attr4.lower().encode('ascii')
+        boxes = [ box for box in self.boxes if box.box_type == box_type ]
+        return boxes
+    return super().__getattr__(attr)
+
   @property
   def box_type(self):
     ''' The Box header type.
