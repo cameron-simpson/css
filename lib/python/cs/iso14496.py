@@ -346,9 +346,9 @@ class Box(Packet):
           warning(
               "box_type should be %r but got %r",
               BOX_TYPE, box_type)
-    parent = self.parent
-    if parent is not None and not isinstance(parent, Box):
-      warning( "parent should be a Box, but is %r", type(self))
+      parent = self.parent
+      if parent is not None and not isinstance(parent, Box):
+        warning( "parent should be a Box, but is %r", type(self))
 
   @classmethod
   def from_buffer(cls, bfr, discard_data=False, default_type=None, copy_boxes=None):
