@@ -230,6 +230,9 @@ class BytesesField(PacketField):
         self.end_offset,
         "None" if self.value is None else "bytes[%d]" % len(self.value))
 
+  def __len__(self):
+    return self.length
+
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, discard_data=False, short_ok=False):
     ''' Gather from `bfr` until `end_offset`.
@@ -249,21 +252,25 @@ class BytesesField(PacketField):
     if end_offset is Ellipsis:
       # special case: gather up all the remaining data
       if discard_data:
-        for _ in bfr:
-          pass
         byteses = None
+        length = 0
+        for bs in bfr:
+          length += len(bs)
       else:
         byteses = list(bfr)
+        length = sum( len(bs) for bs in byteses )
     else:
       # otherwise gather up a bounded range of bytes
-      if end_offset < bfr.offset:
+      if end_offset < offset0:
         raise ValueError("end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset))
       byteses = None if discard_data else []
       bfr.skipto(
           end_offset,
           copy_skip=( None if discard_data else byteses.append ),
           short_ok=short_ok)
+      length = end_offset - offset0
     field = cls(byteses)
+    field.length = length
     field.offset = offset0
     field.end_offset = bfr.offset
     return field
@@ -271,7 +278,7 @@ class BytesesField(PacketField):
   def transcribe(self):
     ''' Transcribe the bytes instances.
 
-        *Warning*: this is raise an exception if the data have been discarded.
+        *Warning*: this will raise an exception if the data have been discarded.
     '''
     for bs in self.value:
       yield bs
