@@ -108,6 +108,25 @@ class PacketField(ABC):
     '''
     raise NotImplementedError("no transcribe method")
 
+class EmptyPacketField(PacketField):
+  ''' An empty data field, used as a placeholder for optional
+      fields when they are not present.
+
+      The singleton EmptyField is a predefined instance.
+  '''
+
+  def __init__(self):
+    super().__init__(None)
+
+  def from_buffer(cls, bfr):
+    return cls()
+
+  def transcribe(self):
+    pass
+
+# singleton empty field
+EmptyField = EmptyPacketField()
+
 class UTF8NULField(PacketField):
   ''' A NUL terminated UTF-8 string.
   '''
