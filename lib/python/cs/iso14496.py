@@ -275,9 +275,13 @@ class Box(Packet):
     try:
       body = self.body
     except AttributeError:
-      return "%s:NO_BODY" % (type_name,)
+      s = "%s:NO_BODY" % (type_name,)
     else:
-      return "%s:%s" % (type_name, body)
+      s = "%s:%s" % (type_name, body)
+    unparsed = self.unparsed
+    if unparsed:
+      s += ":unparsed=%d" % (len(unparsed,))
+    return s
 
   def transcribe(self):
     ''' Transcribe the Box.
