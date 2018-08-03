@@ -66,10 +66,8 @@ def main(argv):
             parsee = sys.stdin.fileno()
           else:
             parsee = spec
-          nboxes = 0
-          for B in parse(parsee, discard_data=True):
-            nboxes += 1
-            B.dump()
+          over_box = parse(parsee, discard_data=True)
+          over_box.dump()
     elif op == 'extract':
       skip_header = False
       if argv and argv[0] == '-H':
@@ -94,11 +92,11 @@ def main(argv):
         warning("extra argments after boxref: %s", ' '.join(argv))
         badopts = True
       if not badopts:
-        BX = Boxes()
-        BX.load(filename)
-        for B in BX:
-          B.dump()
-        B = BX[boxref][0]
+        over_box = parse(filename)
+        over_box.dump()
+        B = over_box
+        for box_type_s in boxref.split('.'):
+          B = getattr(B, box_type_s.upper())
         with Pfx(filename):
           fd = os.open(filename, os.O_RDONLY)
           fdout = sys.stdout.fileno()
@@ -128,42 +126,6 @@ def main(argv):
     print(usage, file=sys.stderr)
     return 2
   return 0
-
-class Boxes(list):
-
-  def __init__(self):
-    self.boxes = []
-    self.by_type = defaultdict(list)
-    self.by_path = defaultdict(list)
-
-  def append(self, box):
-    ''' Store a Box, indexing it by sequence and box_type_s and box_type_path.
-    '''
-    self.boxes.append(box)
-    self.by_type[box.box_type_s].append(box)
-    self.by_path[box.box_type_path].append(box)
-
-  def __getitem__(self, key):
-    if isinstance(key, str):
-      if '.' in key:
-        mapping = self.by_path
-      else:
-        mapping = self.by_type
-      if key not in mapping:
-        raise KeyError(key)
-      return mapping[key]
-    return self.boxes[key]
-
-  def __iter__(self):
-    return iter(self.boxes)
-
-  def load(self, o):
-    ''' Load the boxes from `o`.
-    '''
-    def copy_boxes(box):
-      self.append(box)
-    for box in parse(o, discard_data=True, copy_boxes=copy_boxes):
-      pass
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -525,31 +487,8 @@ class Box(Packet):
     '''
     return type(self).boxbody_type_from_klass()
 
-  def dump(self, indent='', fp=None, crop_length=170):
-    if fp is None:
-      fp = sys.stdout
-    fp.write(indent)
-    summary = str(self)
-    if len(summary) > crop_length - len(indent):
-      summary = summary[:crop_length - len(indent) - 4] + '...)'
-    fp.write(summary)
-    fp.write('\n')
-    try:
-      body = self.body
-    except AttributeError:
-      fp.write(indent)
-      fp.write("NO BODY?")
-      fp.write('\n')
-    else:
-      for field_name in body.field_names:
-        field = body[field_name]
-        if isinstance(field, SubBoxesField):
-          fp.write(indent)
-          fp.write('  ')
-          fp.write(field_name)
-          fp.write(':\n')
-          for subbox in field.value:
-            subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
+  def dump(self, **kw):
+    return dump_box(self, **kw)
 
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
@@ -610,7 +549,8 @@ class SubBoxesField(ListField):
       end_offset=None, max_boxes=None,
       default_type=None,
       copy_boxes=None,
-      parent=None):
+      parent=None,
+      **kw):
     ''' Read Boxes from `bfr`, return a new SubBoxesField instance.
 
         Parameters:
@@ -632,7 +572,7 @@ class SubBoxesField(ListField):
         and (end_offset is Ellipsis or bfr.offset < end_offset)
         and not bfr.at_eof()
     ):
-      B = Box.from_buffer(bfr, default_type=default_type, copy_boxes=copy_boxes)
+      B = Box.from_buffer(bfr, default_type=default_type, copy_boxes=copy_boxes, **kw)
       B.parent = parent
       boxes.append(B)
     if end_offset is not Ellipsis and bfr.offset > end_offset:
@@ -640,6 +580,31 @@ class SubBoxesField(ListField):
           "contained Boxes overran end_offset:%d by %d bytes"
           % (end_offset, bfr.offset - end_offset))
     return boxes_field
+
+class OverBox(Packet):
+  ''' A fictitious Box encompassing all the Boxes in an input buffer.
+  '''
+
+  PACKET_FIELDS = {
+    'boxes': SubBoxesField,
+  }
+
+  @classmethod
+  def from_buffer(cls, bfr, end_offset=None, **kw):
+    ''' Parse all the Boxes from the input `bfr`.
+
+        Parameters:
+        * `end_offset`: optional ending offset for the parse
+    '''
+    if end_offset is None:
+      end_offset=Ellipsis
+    box = cls()
+    box.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=end_offset, **kw)
+    box.self_check()
+    return box
+
+  def dump(self, **kw):
+    return dump_box(self, **kw)
 
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic BoxBody, with a version and flags field.
@@ -1464,21 +1429,21 @@ class SMHDBoxBody(FullBoxBody):
 add_body_class(SMHDBoxBody)
 
 def parse(o, **kw):
-  ''' Yield top level Boxes from a source (str, int, file).
+  ''' Return an OverBox source (str, int, file).
   '''
   close = None
   with Pfx("parse(%r)", o):
     if isinstance(o, str):
       fd = os.open(o, os.O_RDONLY)
-      parser = parse_fd(fd, **kw)
+      over_box = parse_fd(fd, **kw)
       close = partial(os.close, fd)
     elif isinstance(o, int):
-      parser = parse_fd(o, **kw)
+      over_box = parse_fd(o, **kw)
     else:
-      parser = parse_file(o, **kw)
-    yield from parser
+      over_box = parse_file(o, **kw)
     if close:
       close()
+    return over_box
 
 def parse_fd(fd, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
@@ -1513,8 +1478,42 @@ def parse_buffer(bfr, copy_offsets=None, **kw):
   '''
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
-  while not bfr.at_eof():
-    yield Box.from_buffer(bfr, **kw)
+  return OverBox.from_buffer(bfr, **kw)
+
+def dump_box(B, indent='', fp=None, crop_length=170):
+  if fp is None:
+    fp = sys.stdout
+  fp.write(indent)
+  summary = str(B)
+  if len(summary) > crop_length - len(indent):
+    summary = summary[:crop_length - len(indent) - 4] + '...)'
+  fp.write(summary)
+  fp.write('\n')
+  try:
+    body = B.body
+  except AttributeError:
+    fp.write(indent)
+    fp.write("NO BODY?")
+    fp.write('\n')
+  else:
+    for field_name in body.field_names:
+      field = body[field_name]
+      if isinstance(field, SubBoxesField):
+        fp.write(indent)
+        fp.write('  ')
+        fp.write(field_name)
+        fp.write(':\n')
+        for subbox in field.value:
+          subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
+  try:
+    boxes = B.boxes
+  except AttributeError:
+    pass
+  else:
+    fp.write(indent)
+    fp.write('  boxes\n')
+    for subbox in boxes:
+      subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
