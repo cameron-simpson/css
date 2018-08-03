@@ -615,11 +615,10 @@ class SubBoxesField(ListField):
 
         Parameters:
         * `bfr`: the buffer
-        * `end_offset`: the ending offset of the input data, should
-          be an offset or `Ellipsis` indicating "consume to end of
-          the buffer"
+        * `end_offset`: the ending offset of the input data, be an offset or
+          `Ellipsis` indicating "consume to end of buffer"
         * `max_boxes`: optional maximum number of Boxes to parse
-        * `default`: a default Box subclass for bx_types without a
+        * `default`: a default Box subclass for box_types without a
           registered subclass
         * `copy_boxes`: optional callable to receive parsed Boxes
         * `parent`: optional parent Box to record against parsed Boxes
