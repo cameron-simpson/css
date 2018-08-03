@@ -579,6 +579,24 @@ class Packet(PacketField):
         )
     )
 
+  def get_field(self, field_name):
+    ''' Return the field named `field_name`.
+    '''
+    try:
+      return self.field_map[field_name]
+    except KeyError:
+      raise ValueError("unknown field %r" % (field_name,))
+
+  def set_field(self, field_name, new_field):
+    ''' Replace the field named `field_name`.
+
+        Note that this replaces the field, not its value.
+    '''
+    if field_name in self.field_map:
+      self.field_name[new_field]
+    else:
+      raise ValueError("unknown field %r" % (field_name,))
+
   def self_check(self):
     ''' Internal self check.
 
