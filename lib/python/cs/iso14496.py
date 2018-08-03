@@ -301,7 +301,7 @@ class Box(Packet):
   PACKET_FIELDS = {
     'header': BoxHeader,
     'body': BoxBody,
-    'unparsed': (False, BytesesField),
+    'unparsed': (True, (BytesesField, EmptyPacketField)),
   }
 
   def __init__(self, parent=None):
@@ -316,6 +316,37 @@ class Box(Packet):
       return "%s:NO_BODY" % (type_name,)
     else:
       return "%s:%s" % (type_name, body)
+
+  def transcribe(self):
+    ''' Transcribe the Box.
+
+        Before transcribing the data, we compute the length from the
+        lengths of the current header, body and unparsed components,
+        then set the header length if that has changed. Since setting
+        the header length can change its representation we compute
+        the length again and abort if it isn't stable. Otherwise
+        we proceeed with a regular transcription.
+    '''
+    header = self.header
+    length = header.length
+    if length is Ellipsis:
+      body = self.body
+      unparsed = self.unparsed
+      # Recompute the length from the header, body and unparsed
+      # components, then set it on the header to get the prepare
+      # transcription.
+      new_length = len(header) + len(body) + len(unparsed)
+      # set the header and then check that it matches
+      header.length = new_length
+      if new_length != len(header) + len(body) + len(unparsed):
+        # the header has changed size because we changed the length, try again
+        new_length = len(header) + len(body) + len(unparsed)
+        # set the header and then check that it matches
+        header.length = new_length
+        if new_length != len(header) + len(body) + len(unparsed):
+          # the header has changed size again, unstable, need better algorithm
+          raise RuntimeError("header size unstable, maybe we need a header mode to force the representation")
+    return super().transcribe()
 
   def self_check(self):
     ''' Sanity check this Box.
@@ -419,20 +450,16 @@ class Box(Packet):
           else end_offset > bfr_tail.offset
       ):
         # there are unparsed data, stash it away and emit a warning
-        unparsed = self.add_from_buffer(
+        self.add_from_buffer(
             'unparsed', bfr_tail, BytesesField,
             end_offset=end_offset, discard_data=discard_data)
         warning(
             "%s:%s: unparsed data: %d bytes",
             type(self).__name__, self.box_type_s, len(self['unparsed']))
+      else:
+        self.add_field('unparsed', EmptyField)
       if bfr_tail is not bfr:
         bfr_tail.flush()
-
-  @property
-  def length(self):
-    ''' The Box length, computed as `self.end_offset - self.offset`.
-    '''
-    return self.end_offset - self.offset
 
   @property
   def box_type(self):
