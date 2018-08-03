@@ -612,6 +612,17 @@ class SubBoxesField(ListField):
       copy_boxes=None,
       parent=None):
     ''' Read Boxes from `bfr`, return a new SubBoxesField instance.
+
+        Parameters:
+        * `bfr`: the buffer
+        * `end_offset`: the ending offset of the input data, should
+          be an offset or `Ellipsis` indicating "consume to end of
+          the buffer"
+        * `max_boxes`: optional maximum number of Boxes to parse
+        * `default`: a default Box subclass for bx_types without a
+          registered subclass
+        * `copy_boxes`: optional callable to receive parsed Boxes
+        * `parent`: optional parent Box to record against parsed Boxes
     '''
     if end_offset is None:
       raise ValueError("missing end_offset")
