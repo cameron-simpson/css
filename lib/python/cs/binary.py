@@ -51,7 +51,7 @@ def flatten(chunks):
   '''
   if chunks is None:
     pass
-  elif isinstance(chunks, bytes):
+  elif isinstance(chunks, (bytes, memoryview)):
     yield chunks
   elif isinstance(chunks, str):
     yield chunks.encode('ascii')
