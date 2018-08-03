@@ -1,3 +1,4 @@
+Box .TYPE and .TYPEs to descend Box hierarchy via the .boxes field
 add Container box and mandatory checks to Box.self_check
 BytesField to UTF8NULField subclass: consider padding, maxlen etc before bothering
 CornuCopyBuffer.skipto: accept Ellipsis for the end_offset, skip to end of input - may need special casing for tail-like iterators
