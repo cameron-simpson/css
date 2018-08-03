@@ -21,6 +21,7 @@ from cs.binary import (
     Packet, PacketField, BytesesField, ListField,
     UInt8, Int16BE, Int32BE, UInt16BE, UInt32BE, UInt64BE,
     UTF8NULField, BytesField, BytesRunField,
+    EmptyField, EmptyPacketField,
     multi_struct_field, structtuple,
 )
 from cs.buffer import CornuCopyBuffer
@@ -174,16 +175,18 @@ class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
   '''
 
+  # speculative max size that will fit in the UInt32BE box_size
+  # with room for bigger sizes in the optional UInt64BE length field
+  MAX_BOX_SIZE_32 = 2^32 -8
+
   PACKET_FIELDS = {
     'box_size': UInt32BE,
     'box_type': BytesField,
     'length': (
         True,
         (
-            type(Ellipsis),
             UInt64BE,
-            UInt32BE,
-            int
+            EmptyPacketField,
         ),
     ),
   }
@@ -199,13 +202,15 @@ class BoxHeader(Packet):
     box_type = header.add_from_buffer('box_type', bfr, 4)
     if box_size == 0:
       # box extends to end of data/file
-      header.length = Ellipsis
+      header._length = Ellipsis
+      header.add_field('length', EmptyField)
     elif box_size == 1:
       # 64 bit length
-      length = header.add_from_buffer('length', bfr, UInt64BE)
+      header._length = header.add_from_buffer('length', bfr, UInt64BE)
     else:
       # other box_size values are the length
-      header.length = box_size
+      header._length = box_size
+      header.add_field('length', EmptyField)
     if box_type == b'uuid':
       # user supplied 16 byte type
       user_type = header.add_from_buffer('user_type', bfr, 16)
@@ -216,6 +221,28 @@ class BoxHeader(Packet):
     header.type = box_type
     header.self_check()
     return header
+
+  @property
+  def length(self):
+    return self._length
+
+  @length.setter
+  def length(self, new_length):
+    ''' Set a new length value, and configure the associated
+        PacketFields to match.
+    '''
+    if new_length is Ellipsis:
+      self.set_field('box_size', UInt32BE(0))
+      self.set_field('length', EmptyField)
+    elif new_length > self.MAX_BOX_SIZE_32:
+      self.set_field('box_size', UInt32BE(new_length))
+      self.set_field('length', EmptyField)
+    elif new_length >= 1:
+      self.set_field('box_size', UInt32BE(1))
+      self.set_field('length', UInt64BE(new_length))
+    else:
+      raise ValueError("invalid new_length %r" % (new_length,))
+    self._length = new_length
 
 class BoxBody(Packet):
   ''' Abstract basis for all Box bodies.
