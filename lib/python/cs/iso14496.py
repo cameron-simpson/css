@@ -33,10 +33,11 @@ from cs.py.func import prop
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 4 - Beta",
+        "Development Status :: 3 - Alpha",
         "Environment :: Console",
-        "Programming Language :: Python",
+        "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
+        "Topic :: Multimedia :: Video",
     ],
     'install_requires': [],
 }
