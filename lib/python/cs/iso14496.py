@@ -1321,13 +1321,13 @@ add_body_class(STSCBoxBody)
 
 class STCOBoxBody(FullBoxBody):
   ''' A 'stco' Chunk Offset box - section 8.7.5.
+  '''
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
       chunk_offsets=ListField,
   )
-  '''
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
