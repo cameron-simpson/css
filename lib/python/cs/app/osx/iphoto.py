@@ -26,7 +26,7 @@ from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
-from cs.mediaino import EpisodeInfo
+from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
@@ -237,7 +237,7 @@ def cmd_rename(I, argv):
     elif obclass in ('people', 'faces'):
       table = I.person_table
     else:
-      raise GetoptError("known class")
+      raise GetoptError("unknown class %r" % (obclass,))
     items = list(table)
     all_names = set(item.name for item in items)
     X("%d items: %r", len(items), all_names)
