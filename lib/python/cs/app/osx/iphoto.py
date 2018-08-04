@@ -322,10 +322,14 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  ''' Add or remove tags from selected images.
+      Usage: tag criteria... [--] {+tag|-tag}...
+  '''
   xit = 0
   badopts = False
   if not argv:
     raise GetoptError("missing selector")
+  # collect criteria
   selectors = []
   unknown = False
   while argv:
@@ -350,6 +354,7 @@ def cmd_tag(I, argv):
     return 1
   if not argv:
     raise GetoptError("missing tags")
+  # collect tag changes
   tagging = []
   for arg in argv:
     try:
