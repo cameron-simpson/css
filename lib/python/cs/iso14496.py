@@ -1,10 +1,11 @@
 #!/usr/bin/python
 #
+# ISO14496 parser. - Cameron Simpson <cs@cskk.id.au> 26mar2016
+#
 
 '''
 Facilities for ISO14496 files - the ISO Base Media File Format,
-the basis for several things including MP4.
-* Cameron Simpson <cs@cskk.id.au> 26mar2016
+the basis for several things including MP4 and MOV.
 
 ISO make the standard available here:
 * [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html)
