@@ -404,7 +404,7 @@ class Box(Packet):
     else:
       end_offset = self.offset + length
       bfr_tail = bfr.bounded(end_offset)
-    body_class = pick_box_class(header.type, default_type=default_type)
+    body_class = pick_boxbody_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
       self.add_from_buffer(
           'body', bfr_tail, body_class, box=self,
@@ -515,8 +515,8 @@ def add_body_class(klass):
       KNOWN_BOXBODY_CLASSES[box_type] = klass
 
 def add_body_subclass(superclass, box_type, section, desc):
-  ''' Create and register a new Box class that is simply a subclass of another.
-      Returns the new class.
+  ''' Create and register a new BoxBody class that is simply a subclass of
+      another.  Returns the new class.
   '''
   if isinstance(box_type, bytes):
     classname = box_type.decode('ascii').upper() + 'BoxBody'
@@ -531,12 +531,12 @@ def add_body_subclass(superclass, box_type, section, desc):
   add_body_class(K)
   return K
 
-def pick_box_class(box_type, default_type=None):
-  ''' Infer the Python Box subclass from the bytes `box_type`.
+def pick_boxbody_class(box_type, default_type=None):
+  ''' Infer a Python BoxBody subclass from the bytes `box_type`.
 
       * `box_type`: the 4 byte box type
-      * `default_type`: the default Box subclass, default None; if
-        None, use Box.
+      * `default_type`: the default BoxBody subclass if there is no
+        specific mapping, default None; if None, use BoxBody.
   '''
   global KNOWN_BOXBODY_CLASSES
   if default_type is None:
