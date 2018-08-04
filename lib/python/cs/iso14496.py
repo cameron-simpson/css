@@ -1123,6 +1123,12 @@ def add_generic_sample_boxbody(
       samples = []
       with Pfx("gather samples of type %s", sample_type):
         while entry_count is Ellipsis or entry_count > 0:
+          if bfr.at_eof():
+            if entry_count is not Ellipsis:
+              error(
+                  "expected %d more %r samples",
+                  entry_count, sample_type.__name__)
+            break
           try:
             samples.append(sample_type.from_buffer(bfr))
           except EOFError as e:
