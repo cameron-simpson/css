@@ -225,6 +225,7 @@ class BoxBody(Packet):
     '''
     B = cls()
     B.box = box
+    B.start_offset = bfr.offset
     B.parse_buffer(bfr, **kw)
     B.self_check()
     return B
@@ -1116,17 +1117,19 @@ def add_generic_sample_boxbody(
         sample_type = self.sample_type = sample_type_v1
       self.has_inferred_entry_count = has_inferred_entry_count
       if has_inferred_entry_count:
-        remaining = (self.end_offset - bfr.offset)
-        entry_count = remaining // len(sample_type)
-        remainder = remaining % len(sample_type)
-        if remainder != 0:
-          warning("remaining length %d is not a multiple of len(%s), %d bytes left over",
-                  remaining, len(sample_type), remainder)
+        entry_count = Ellipsis
       else:
         entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
       samples = []
-      for _ in range(entry_count):
-        samples.append(sample_type.from_buffer(bfr))
+      with Pfx("gather samples of type %s", sample_type):
+        while entry_count is Ellipsis or entry_count > 0:
+          try:
+            samples.append(sample_type.from_buffer(bfr))
+          except EOFError as e:
+            error("incomplete %r samples", sample_type.__name__)
+            break
+          if entry_count is not Ellipsis:
+            entry_count -= 1
       self.add_field('samples', ListField(samples))
   SpecificSampleBoxBody.__name__ = class_name
   SpecificSampleBoxBody. __doc__ = (
