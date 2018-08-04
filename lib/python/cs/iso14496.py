@@ -637,7 +637,24 @@ class FullBoxBody(BoxBody):
     '''
     return (self.flags0<<16) | (self.flags1<<8) | self.flags2
 
-add_body_subclass(BoxBody, 'mdat', '8.1.1.1', 'Media Data')
+class MDATBoxBody(BoxBody):
+  ''' A Media Data Box - ISO14496 section 8.1.1.
+  '''
+
+  PACKET_FIELDS = dict(
+      BoxBody.PACKET_FIELDS,
+      data=BytesesField,
+  )
+
+  def parse_buffer(self, bfr, end_offset=Ellipsis, discard_data=False, **kw):
+    ''' Gather all data to the end of the field.
+    '''
+    super().parse_buffer(bfr, **kw)
+    self.add_from_buffer(
+        'data', bfr, BytesesField,
+        end_offset=end_offset, discard_data=discard_data)
+
+add_body_class(MDATBoxBody)
 
 class FREEBoxBody(BoxBody):
   ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
