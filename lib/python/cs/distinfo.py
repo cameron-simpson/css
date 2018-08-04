@@ -300,9 +300,9 @@ class PyPI_Package(O):
     else:
       doc = ''
     try:
-      doc_line1, doc_tail = doc.split('\n', 1)
+      doc_head, doc_tail = doc.split('\n\n', 1)
     except ValueError:
-      doc_line1 = doc
+      doc_head = doc
       doc_tail = ''
     else:
       doc_tail = doc_tail.lstrip()
@@ -344,11 +344,11 @@ class PyPI_Package(O):
       if field in dinfo:
         continue
       if field == 'description':
-        if doc_line1:
-          dinfo[field] = doc_line1
+        if doc_head:
+          dinfo[field] = doc_head.replace('\n', ' ')
       elif field == 'long_description':
         if doc_tail:
-          dinfo[field] = doc_tail
+          dinfo[field] = doc_head + '\n\n' + doc_tail
         if 'long_description_content_type' not in dinfo:
           dinfo['long_description_content_type'] = 'text/markdown'
 
