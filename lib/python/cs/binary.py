@@ -305,6 +305,13 @@ class BytesRunField(PacketField):
     self.length = length
     self.bytes_value = bytes_value
 
+  def __str__(self):
+    return "%s(%d*%r)" % (
+        type(self).__name__,
+        self.length,
+        self.bytes_value
+    )
+
   # A cache of 256 length runs of assorted bytes values as memoryviews
   # as a mapping of bytes=>memoryview.
   # In normal use these will be based on single byte bytes values.
