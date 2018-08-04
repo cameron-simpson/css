@@ -228,7 +228,7 @@ class BytesesField(PacketField):
         type(self).__name__,
         self.offset,
         self.end_offset,
-        "None" if self.value is None else "bytes[%d]" % len(self.value))
+        "NO_DATA" if self.value is None else "bytes[%d]" % len(self.value))
 
   def __len__(self):
     return self.length
