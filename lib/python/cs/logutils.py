@@ -16,6 +16,11 @@ On terminals warnings and errors get ANSI colouring.
 
 A mode is available that uses cs.upd.
 
+Note: importing this module sets builtins.X to a nop-op function.
+The setup_logging function can set builtins.X to cs.x.X. This enables
+lightweight debugging without constantly fiddling a module's import
+list.
+
 Some examples:
 --------------
 
@@ -59,6 +64,7 @@ from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import upd_for
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -73,9 +79,18 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.py.func',
-        'cs.upd'
+        'cs.upd',
+        'cs.x'
     ],
 }
+
+try:
+  import builtins
+except ImportError:
+  pass
+else:
+  if not hasattr(builtins, 'X'):
+    builtins.X = lambda msg, *a: None
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
@@ -92,33 +107,45 @@ def ifdebug():
 
 def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None, verbose=None):
   ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
-      Sets cs.pfx.cmd to `cmd_name`; default from sys.argv[0].
-      If `main_log` is None, the main log will go to sys.stderr; if
-      `main_log` is a string, is it used as a filename to open in append
-      mode; otherwise main_log should be a stream suitable for use
-      with logging.StreamHandler().
-      if `format` is None, use DEFAULT_PFX_FORMAT_TTY when main_log is a tty
-      or FIFO, otherwise DEFAULT_PFX_FORMAT.
-      If `level` is None, infer a level from the environment using
-      infer_logging_level().
-      If `flags` is None, infer the flags from the environment using
-      infer_logging_level().
-      If `upd_mode` is None, set it to True if flags contains 'UPD',
-      otherwise to False if flags contains 'NOUPD', otherwise set
-      it to False (was from main_log.isatty()).
-      A true value causes the root logger to use cs.upd for logging.
-      If `ansi_mode` is None, set it from main_log.isatty().
+      `cmd_name`: program ame, default from basename(sys.argv[0]).
+        Side-effect: sets cs.pfx.cmd to this value.
+      `main_log`: default logging system. If None, the main log will go to
+        sys.stderr; if `main_log` is a string, is it used as a filename to
+        open in append mode; otherwise main_log should be a stream suitable
+        for use with logging.StreamHandler().
+        The resulting log handler is added to the logging root logger.
+      `format`: the message format for `main_log`. If None, use
+        DEFAULT_PFX_FORMAT_TTY when `main_log` is a tty or FIFO,
+        otherwise DEFAULT_PFX_FORMAT.
+      `level`: `main_log` logging level. If None, infer a level
+        from the environment using infer_logging_level().
+      `flags`: a string containing debugging flags separated by
+        commas. If None, infer the flags from the environment using
+        infer_logging_level().
+        The following flags have meaning:
+          D: set cs.logutils.D_mode to True
+          TDUMP: attach a signal handler to SIGHUP to do a thread stack dump
+          TRACE: enable various noisy tracing facilities
+          UPD, NOUPD: set the default for `upd_mode` to True or False respectively.
+          X: set builtins.X to cs.x.X
+      `upd_mode`: a Boolean to activate cs.upd as the `main_log`
+        method; if None, set it to True if `flags` contains 'UPD',
+        otherwise to False if `flags` contains 'NOUPD', otherwise set
+        it to False (was from main_log.isatty()).
+        A true value causes the root logger to use cs.upd for logging.
+      `ansi_mode`: if None, set it from main_log.isatty().
         A true value causes the root logger to colour certain logging levels
         using ANSI terminal sequences (currently only if cs.upd is used).
-      If `trace_mode` is None, set it according to the presence of
-        'TRACE' in flags. Otherwisef trace_mode is true, set the
-        global trace_level to logging_level; otherwise it defaults
-        to logging.DEBUG.
-      If `verbose` is None, then if stderr is a tty then the log
+      `trace_mode`: if None, set it according to the presence of
+        'TRACE' in flags. Otherwise if `trace_mode` is true, set the
+        global `trace_level` to `logging_level`; otherwise it defaults
+        to `logging.DEBUG`.
+      `verbose`: if None, then if stderr is a tty then the log
         level is INFO otherwise WARNING. Otherwise, if `verbose` is
         true then the log level is INFO otherwise WARNING.
   '''
   global logging_level, trace_level, D_mode, loginfo
+  import cs.pfx
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level(verbose=verbose)
@@ -137,7 +164,6 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  import cs.pfx
   cs.pfx.cmd = cmd_name
   loginfo.cmd = cmd_name
 
@@ -168,6 +194,10 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if 'D' in flags:
     D_mode = True
+
+  if 'X' in flags:
+    from cs.x import X
+    builtins.X = X
 
   if upd_mode is None:
     if 'UPD' in flags:

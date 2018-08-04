@@ -10,13 +10,16 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
+from inspect import cleandoc, getargspec, getcomments, isfunction, isclass
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
+from pprint import pprint
 from subprocess import Popen, PIPE
 import shutil
 import sys
 from tempfile import mkdtemp
+from textwrap import dedent
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
@@ -55,6 +58,7 @@ USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-ar
   @tag  Use the specified VCS tag. Default: the last release tag for pkgname.
   Operations:
     check       Run setup.py check on the resulting package.
+    distinfo    Recite the distinfo map for the package.
     register    Register/update the package description and version.
     upload      Upload the package source distribution.'''
 
@@ -109,6 +113,8 @@ def main(argv):
           if argv:
             warning("extra arguments: %s", ' '.join(argv))
             badopts = True
+        elif op in ("distinfo",):
+          pass
         else:
           warning("unrecognised op")
           badopts = True
@@ -131,6 +137,19 @@ def main(argv):
   with Pfx(op):
     if op == 'check':
       PKG.check()
+    elif op == 'distinfo':
+      dinfo = PKG.distinfo
+      if argv:
+        for arg in argv:
+          print(arg)
+          try:
+            value = dinfo[arg]
+          except KeyError:
+            print("None")
+          else:
+            pprint(value)
+      else:
+        pprint(dinfo)
     elif op == 'register':
       PKG.register()
     elif op == 'upload':
@@ -283,6 +302,42 @@ class PyPI_Package(O):
     else:
       doc_tail = doc_tail.lstrip()
 
+    for Mname in sorted(dir(M)):
+      if Mname == 'DISTINFO':
+        continue
+      if Mname.startswith('_'):
+        continue
+      o = getattr(M, Mname, None)
+      if not isfunction(o) and not isfunction(o):
+        continue
+      odoc = o.__doc__
+      if odoc is None:
+        continue
+      odoc = cleandoc(odoc)
+      if isfunction(o):
+        args, varargs, keywords, defaults = getargspec(o)
+        if defaults is None:
+          defaults = ()
+        arg_desc = ''
+        nreq = len(args) - len(defaults)
+        for i, arg in enumerate(args):
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += arg
+          if i >= nreq:
+            arg_desc += '=' + repr(defaults[i-nreq])
+        if varargs:
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += '*' + varargs
+        if keywords:
+          if arg_desc:
+            arg_desc += ', '
+          arg_desc += '**' + keywords
+        doc_tail += f'\n\n## Function `{Mname}({arg_desc})`\n\n{odoc}'
+      elif isclass(o):
+        doc_tail += f'\n\n## Class `{Mname}`\n\n{odoc}'
+
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description':
       if field in dinfo:
@@ -293,6 +348,8 @@ class PyPI_Package(O):
       elif field == 'long_description':
         if doc_tail:
           dinfo[field] = doc_tail
+        if 'long_description_content_type' not in dinfo:
+          dinfo['long_description_content_type'] = 'text/markdown'
 
     dinfo['package_dir'] = {'': self.libdir}
 

@@ -47,8 +47,8 @@ class _QueueIterator(MultiOpenMixin):
     MultiOpenMixin.__init__(self, finalise_later=True)
     self.q = q
     self.name = name
-    self._item_count = 0    # count of non-sentinel values on the queue
-    self._item_count_previous = 0
+    # count of non-sentinel items
+    self._item_count = 0
 
   def __str__(self):
     return "<%s:opens=%d>" % (self.name, self._opens)
@@ -65,13 +65,12 @@ class _QueueIterator(MultiOpenMixin):
       raise ClosedError("_QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
+    self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
     ''' Direct call to self.q.put() with no checks.
     '''
-    if item is not self.sentinel:
-      self._item_count += 1
     return self.q.put(item, *args, **kw)
 
   def startup(self):
@@ -101,17 +100,12 @@ class _QueueIterator(MultiOpenMixin):
       self.finalise()
       raise StopIteration("Queue_Empty: %s", e)
     if item is self.sentinel:
+      # sentinel consumed (clients won't see it, so we must)
+      self.q.task_done()
       # put the sentinel back for other iterators
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
     self._item_count -= 1
-    if self._item_count < 0:
-      if cs.logutils.D_mode:
-        raise RuntimeError("_item_count < 0")
-      else:
-        if self._item_count_previous != self._item_count:
-          warning("_item_count < 0 (%d)", self._item_count)
-          self._item_count_previous = self._item_count
     return item
 
   next = __next__
@@ -125,7 +119,19 @@ class _QueueIterator(MultiOpenMixin):
       raise Queue_Empty("got StopIteration from %s" % (self,))
 
   def empty(self):
+    ''' Test if the queue is empty.
+    '''
     return self._item_count == 0
+
+  def task_done(self):
+    ''' Report that an item has been processed.
+    '''
+    self.q.task_done()
+
+  def join(self):
+    ''' Wait for the Queue items to complete.
+    '''
+    self.q.join()
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):

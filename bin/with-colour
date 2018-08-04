@@ -1,8 +1,10 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Perform command with output in particular colour.
 # - Cameron Simpson <cs@cskk.id.au> 08jul2007
 #
+
+set -ue
 
 : ${WITH_COLOUR_ON:=''}
 
@@ -48,12 +50,12 @@ case $colour in
   cyan)     on=`tput setaf 6 || tput setaf 6 0 0 || tput setf 3` ;;
   white)    on=`tput setaf 7 || tput setaf 7 0 0 || tput setf 7` ;;
   *)        echo "$cmd: warning: unsupported colour: $colour" >&2 ;;
-esac
+esac || on=
 exec 2>&3 3>&-
 
-# no sequence? just run the command
+# no "on" sequence? just run the command
 [ -n "$on" ] || exec "$@"
-# no $off? restore original colour pair
+# no "off"? restore original colour pair
 [ -n "$off" ] || off=`tput op`
 
 xit=0

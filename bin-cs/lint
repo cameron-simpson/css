@@ -9,6 +9,10 @@ set -ue
 trace=
 [ -t 2 ] && trace=set-x
 
+pep8_ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503
+pylint_disable=bad-whitespace,invalid-name
+pylintrc=$(findup .pylintrc || echo $HOME/.pylintrc)
+
 cmd=$0
 usage="Usage: $cmd filenames..."
 
@@ -45,7 +49,8 @@ do
   then
     case "$magic" in
       *'perl script'*)          type=pl ;;
-      *'python script'*)        type=py ;;
+      *'python script'* | *'python3 script'* )
+                                type=py ;;
       *'POSIX shell script'*)   type=sh ;;
     esac
   fi
@@ -67,18 +72,24 @@ do
       } || xit=1
       ;;
     py)
-      { $trace python3 -m py_compile "$lintfile" \
-        && $trace pyflakes "$lintfile" \
-        && $trace pep8 --ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
-        && $trace pylint --disable=bad-whitespace,invalid-name "$lintfile"
-      } || xit=1
+      if $trace python3 -m py_compile "$lintfile"
+      then
+        $trace pyflakes "$lintfile" || xit=1
+        $trace pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        $trace pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+      else
+        xit=1
+      fi
       ;;
     py2)
-      { $trace python -m py_compile "$lintfile" \
-        && $trace pyflakes "$lintfile" \
-        && $trace pep8 --ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503 "$lintfile" \
-        && $trace pylint --disable=bad-whitespace,invalid-name "$lintfile"
-      } || xit=1
+      if $trace python -m py_compile "$lintfile"
+      then
+        $trace pyflakes "$lintfile" || xit=1
+        $trace pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        $trace pylint "--disable=$pylint_disable" "$lintfile" || xit=1
+      else
+        xit=1
+      fi
       ;;
     sh)
       $trace shellcheck -s sh "$lintfile" || xit=1

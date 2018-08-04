@@ -109,6 +109,7 @@ class _PfxThreadState(threading.local):
   '''
 
   def __init__(self):
+    threading.local.__init__(self)
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
@@ -175,6 +176,10 @@ def gen(func):
     while True:
       try:
         value = next(g)
+      except StopIteration:
+        # clean up and reraise
+        stack[height:] = []
+        return
       except:
         # clean up and reraise
         stack[height:] = []
@@ -291,7 +296,11 @@ class Pfx(object):
           mark = unicode(mark)
       u = mark
       if self.mark_args:
-        u = u % self.mark_args
+        try:
+          u = u % self.mark_args
+        except TypeError as e:
+          X("FORMAT CONVERSION: %s: %r %% %r", e, u, self.mark_args)
+          u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
 
@@ -339,7 +348,7 @@ class Pfx(object):
       try:
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
-        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s", self._state.prefix, L, msg, args, kwargs, e, file=sys.stderr)
+        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" % (self._state.prefix, L, msg, args, kwargs, e), file=sys.stderr)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):

@@ -65,6 +65,8 @@ class TestAll(unittest.TestCase):
           D.add(E)
           self._round_trip_Dirent(D)
           self._round_trip_Dirent(E)
+          D.snapshot()
+          self._round_trip_Dirent(D)
         # check that all nodes are listed as expected
         entries = dirnodes + filenodes
         shuffle(entries)

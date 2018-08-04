@@ -231,12 +231,14 @@ class Portfwd(FlaggedMixin):
     self.verbose = verbose
     self.target = target
     self.svcd_name = 'portfwd-' + target
+    self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
     def on_reap():
       self.flag_connected = False
     self.svcd = SvcD(
         self.ssh_argv,
         name=self.svcd_name,
+        group_name=self.group_name,
         flags=self.flags,
         trace=trace,
         sig_func=self.sig_func,
@@ -282,9 +284,10 @@ class Portfwd(FlaggedMixin):
     ''' Shell command for ssh to invoke on connection ready.
     '''
     setflag_argv = [ 'flag', '-w', self.flagname_connected, '1' ]
-    alert_title = 'PORTFWD ' + self.target.upper()
+    alert_group = self.group_name
+    alert_title = self.target.upper()
     alert_message = 'CONNECTED: ' + self.target
-    alert_argv = [ 'alert', '-t', alert_title, alert_message ]
+    alert_argv = [ 'alert', '-g', alert_group, '-t', alert_title, '--', alert_message ]
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
 
@@ -307,9 +310,14 @@ class Portfwd(FlaggedMixin):
   def test_func(self):
     for condition in self.conditions:
       if not condition.probe():
+        if self.verbose:
+          info('failed precondition: %s', condition)
         return False
     if self.test_shcmd:
-      return os.system(self.test_shcmd) == 0
+      shcmd_ok = os.system(self.test_shcmd) == 0
+      if not shcmd_ok:
+        info('failed shell command: %r', self.test_shcmd)
+        return False
     return True
 
 class Portfwds(object):

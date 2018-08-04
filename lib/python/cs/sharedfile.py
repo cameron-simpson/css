@@ -4,16 +4,8 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
-DISTINFO = {
-    'description': "facilities for shared access to files",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.logutils', 'cs.range', 'cs.timeutils'],
-}
+''' Facilities for shared access to files.
+'''
 
 from contextlib import contextmanager
 import csv
@@ -31,6 +23,17 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.range import Range
 from cs.timeutils import TimeoutError
+
+DISTINFO = {
+    'description': "facilities for shared access to files",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.filestate', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.range', 'cs.timeutils'],
+}
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
@@ -157,6 +160,7 @@ class SharedAppendFile(object):
       else:
         o_flags = O_RDWR | O_APPEND
       self._fd = os.open(self.pathname, o_flags)
+      self._rfp = None
       self._read_offset = 0
       self._read_skip = Range()
       self._readlock = RLock()
@@ -349,6 +353,8 @@ class SharedCSVFile(SharedAppendLines):
 
   @contextmanager
   def writer(self):
+    ''' Context manager for appending to a CSV file.
+    '''
     with self.open() as wfp:
       yield csv.writer(wfp, dialect=self.dialect, **self.fmtparams)
 

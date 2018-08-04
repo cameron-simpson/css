@@ -13,9 +13,9 @@ from io import StringIO
 import sys
 from uuid import UUID
 from cs.lex import get_identifier, is_identifier, \
-                   get_decimal_value, get_qstr
+                   get_decimal_value, get_qstr, \
+                   texthexify
 from cs.pfx import Pfx
-from cs.x import X
 
 class Transcriber(ABC):
   ''' Abstract base class for objects which can be used with the Transcribe class.
@@ -79,6 +79,7 @@ class Transcribe:
         int: str,
         str: repr,
         bool: lambda v: '1' if v else '0',
+        bytes: texthexify,
         UUID: lambda u: 'U{' + str(u) + '}',
     }
     self.register(UUIDTranscriber, 'U')
@@ -140,7 +141,6 @@ class Transcribe:
       if baseclass is not None:
         if not isinstance(o, baseclass):
           raise ValueError("type(o)=%s, not an instanceof(%r)" % (type(o), baseclass))
-      ##X("transcribe %r ...", o)
       fp.write(prefix)
       fp.write('{')
       o.transcribe_inner(self, fp)
@@ -194,7 +194,7 @@ class Transcribe:
     # prefix{....}
     prefix, offset = get_identifier(s, offset)
     if not prefix:
-      raise ValueError("no prefix at offset %d" % (offset,))
+      raise ValueError("no type prefix at offset %d" % (offset,))
     with Pfx("prefix %r", prefix):
       if offset >= len(s) or s[offset] != '{':
         raise ValueError("missing opening '{' at offset %d" % (offset,))
@@ -324,7 +324,6 @@ def transcribe_mapping(m, fp, T=None):
       `T`: the transcibe context, default _TRANSCRIBE
       The keys of the mapping must be identifiers.
   '''
-  X("transcribe_mapping %r", m)
   global _TRANSCRIBE
   if T is None:
     T = _TRANSCRIBE

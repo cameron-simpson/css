@@ -698,7 +698,7 @@ class Meta(dict, Transcriber):
     return True
 
   def stat(self):
-    ''' Return a stat object computed from this Meta data.
+    ''' Return a Stat object computed from this Meta data.
     '''
     E = self.E
     st_uid, st_gid, st_mode = self.unix_perms

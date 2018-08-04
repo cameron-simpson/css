@@ -9,11 +9,11 @@ import sys
 import unittest
 from random import randint
 from cs.fileutils import BackedFile, BackedFile_TestMethods
-from . import defaults
-from .dir import Dir
-from .vtfuse import mount
-from .store import MappingStore
 from cs.logutils import X
+from cs.vt import defaults
+from cs.vt.dir import Dir
+from cs.vt.vtfuse import mount
+from cs.vt.store import MappingStore
 
 TESTDIR = 'vtfuse_testdir'
 

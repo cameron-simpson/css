@@ -19,11 +19,26 @@ set -ue
 
 probe_timeout=10        # timeout for probe failure
 probe_interval=11       # sleep time between probes
+kill_sig_opt=-15        # default signal SIGTERM
 
 cmd=$0
-usage="Usage: $cmd ifname probe_ip probe_port"
+usage="Usage: $cmd [-signum] ifname probe_ip probe_port"
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[1-9]*)
+        kill_sig_opt=$1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -72,12 +87,15 @@ do
       ) | read ssh_greeting
     )
   } || {
-    date
-    echo "RESTARTING $* ..."
-    while kill "$dhpid"
+    colour_echo white `date`
+    echo "RESTARTING $* .."
+    necho "kill $dhpid .."
+    while kill "$kill_sig_opt" "$dhpid" 2>/dev/null
     do
+      necho .
       sleep 1
     done
+    echo
     sleep 2
     ( set -x; exec "$@" ) &
     dhpid=$!

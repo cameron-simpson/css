@@ -35,14 +35,14 @@ DISTINFO_DEFAULTS = {
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
 }
 
-USAGE = '''Usage: %s [-f] [op [names...]]
-  -f  Force. Sanity checks that would stop some actions will not prevent them.
-  With no op, report all pypi lastvalues.
-  op:
+USAGE = '''Usage: %s [-f] cs.module [op]
+  -f  Force. Sanity checks that would stop some actions normally  will not prevent them.
+  The default op is "status".
+  Supported ops:
     check       Check simple things about a module's DISTINFO map.
     last        Report last release issued.
     log         Changelog from last release to now.
-    ls          List all release prefixes in use.
+    ls          List latest release prefixes.
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
@@ -58,6 +58,7 @@ def main(argv):
   setup_logging(cmd)
 
   force = False
+  op = None
 
   xit = 0
   badopts = False
@@ -65,30 +66,44 @@ def main(argv):
   if argv and argv[0] == '-f':
     argv.pop(0)
     force = True
+
   modules = Modules()
   LV = LastValues()
   VCS = VCS_Hg()
 
   if not argv:
-    for k in sorted(LV.keys()):
-      if k.startswith("pypi-css-cs."):
-        print(k[9:], LV[k])
-    return 0
+    op = "status"
+    name = None
+  else:
+    name = argv.pop(0)
+    if name in ("ls", "status"):
+      op = name
+      name = None
+    elif not name.startswith('cs.'):
+      error("invalid module name, should start with 'cs.': %r", name)
+      badopts = True
 
-  op = argv.pop(0)
-  with Pfx(op):
-    if argv:
-      names = argv
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  if op is None:
+    if not argv:
+      op = 'status'
     else:
-      # all the release tags starting with "cs."
-      names = [
-          name
-          for name in sorted(VCS.release_prefixes())
-          if name.startswith('cs.')
-      ]
+      op = argv.pop(0)
+
+  if name is None:
+    names = [
+        name
+        for name in sorted(VCS.release_prefixes())
+        if name.startswith('cs.')
+    ]
+  else:
+    names = (name,)
+
+  with Pfx(op):
     for name in names:
-      if xit != 0:
-        break
       with Pfx(name):
         N = ReleaseName(name, modules, VCS, LV)
         if op == 'check':
@@ -112,8 +127,10 @@ def main(argv):
             files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
             print(' ', ' '.join(files)+':', firstline)
         elif op == 'ls':
-          for suffix in sorted(N.release_suffixes()):
-            print(name, suffix)
+          for k in sorted(LV.keys()):
+            if k.startswith("pypi-css-cs."):
+              print(k[9:], LV[k])
+          return 0
         elif op == 'next':
           print(name, N.next_suffix())
         elif op == 'pypi':
@@ -180,7 +197,7 @@ def main(argv):
         else:
           warning("unrecognised op %r", op)
           badopts = True
-          break
+
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
