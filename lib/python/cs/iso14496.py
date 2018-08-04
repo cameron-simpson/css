@@ -651,12 +651,12 @@ class FREEBoxBody(BoxBody):
 
   BOX_TYPES = (b'free', b'skip')
 
-  def parse_buffer(self, bfr, end_offset=None, **kw):
+  def parse_buffer(self, bfr, end_offset=Ellipsis, **kw):
     ''' Gather the `padding` field.
     '''
     super().parse_buffer(bfr, **kw)
     offset0 = bfr.offset
-    self.add_from_buffer('padding', BytesRunField, end_offset=end_offset)
+    self.add_from_buffer('padding', bfr, BytesRunField, end_offset=end_offset)
     self.free_size = bfr.offset - offset0
 
 add_body_class(FREEBoxBody)
