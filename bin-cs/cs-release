@@ -377,7 +377,11 @@ class Module(object):
     for name in sorted(self.imports):
       if not name.startswith('cs.'):
         continue
+      if name == pkg_name:
+        # tests usually import the package - this is not a dependency
+        continue
       if pkg_prefix and name.startswith(pkg_prefix):
+        # package components are not a dependency
         continue
       if name not in install_requires:
         silent or warning("import %r not mentioned in install_requires", name)
