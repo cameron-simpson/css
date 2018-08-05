@@ -13,7 +13,7 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from functools import partial
 import os
 from os.path import basename
@@ -242,15 +242,15 @@ class BoxBody(Packet):
     pass
 
   @classmethod
-  def boxbody_type_from_klass(klass):
+  def boxbody_type_from_klass(cls):
     ''' Compute the Box's 4 byte type field from the class name.
     '''
-    klass_name = klass.__name__
-    if len(klass_name) == 11 and klass_name.endswith('BoxBody'):
-      klass_prefix = klass_name[:4]
-      if klass_prefix.rstrip('_').isupper():
-        return klass_prefix.replace('_', ' ').lower().encode('ascii')
-    raise AttributeError("no automatic box type for %s" % (klass,))
+    class_name = cls.__name__
+    if len(class_name) == 11 and class_name.endswith('BoxBody'):
+      class_prefix = class_name[:4]
+      if class_prefix.rstrip('_').isupper():
+        return class_prefix.replace('_', ' ').lower().encode('ascii')
+    raise AttributeError("no automatic box type for %s" % (cls,))
 
 class Box(Packet):
   ''' Base class for all boxes - ISO14496 section 4.2.
@@ -331,11 +331,10 @@ class Box(Packet):
         try:
           BOX_TYPES = self.BOX_TYPES
         except AttributeError:
-          if type(self) is not Box:
+          if not isinstance(self, Box):
             raise RuntimeError(
                 "no BOX_TYPE or BOX_TYPES to check in class %r"
                 % (type(self),))
-          pass
         else:
           if box_type not in BOX_TYPES:
             warning(
@@ -495,6 +494,8 @@ class Box(Packet):
     return type(self).boxbody_type_from_klass()
 
   def dump(self, **kw):
+    ''' Dump this Box.
+    '''
     return dump_box(self, **kw)
 
 # mapping of known box subclasses for use by factories
@@ -563,7 +564,7 @@ class SubBoxesField(ListField):
         Parameters:
         * `bfr`: the buffer
         * `end_offset`: the ending offset of the input data, be an offset or
-          `Ellipsis` indicating "consume to end of buffer"
+          `Ellipsis` indicating "consume to end of buffer"; default: Ellipsis
         * `max_boxes`: optional maximum number of Boxes to parse
         * `default`: a default Box subclass for box_types without a
           registered subclass
@@ -571,7 +572,7 @@ class SubBoxesField(ListField):
         * `parent`: optional parent Box to record against parsed Boxes
     '''
     if end_offset is None:
-      raise ValueError("missing end_offset")
+      raise ValueError("SubBoxesField.from_buffer: missing end_offset")
     boxes = []
     boxes_field = cls(boxes)
     while (
@@ -611,6 +612,8 @@ class OverBox(Packet):
     return box
 
   def dump(self, **kw):
+    ''' Dump this OverBox.
+    '''
     return dump_box(self, **kw)
 
 class FullBoxBody(BoxBody):
@@ -1151,7 +1154,7 @@ def add_generic_sample_boxbody(
           try:
             samples.append(sample_type.from_buffer(bfr))
           except EOFError as e:
-            error("incomplete %r samples", sample_type.__name__)
+            error("incomplete %r samples: %s", sample_type.__name__, e)
             break
           if entry_count is not Ellipsis:
             entry_count -= 1
@@ -1189,6 +1192,10 @@ class CSLGBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the compositionToDTSShift`, `leastDecodeToDisplayDelta`,
+        `greatestDecodeToDisplayDelta`, `compositionStartTime` and
+        `compositionEndTime` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     if self.version == 0:
       struct_format = '>lllll'
@@ -1209,22 +1216,32 @@ class CSLGBoxBody(FullBoxBody):
 
   @property
   def compositionToDTSShift(self):
+    ''' Obtain the composition to DTSS shift.
+    '''
     return self.fields.compositionToDTSShift
 
   @property
   def leastDecodeToDisplayDelta(self):
+    ''' Obtain the least decode to display delta.
+    '''
     return self.fields.leastDecodeToDisplayDelta
 
   @property
   def greatestDecodeToDisplayDelta(self):
+    ''' Obtain the greatest decode to display delta.
+    '''
     return self.fields.greatestDecodeToDisplayDelta
 
   @property
   def compositionStartTime(self):
+    ''' Obtain the composition start time.
+    '''
     return self.fields.compositionStartTime
 
   @property
   def compositionEndTime(self):
+    ''' Obtain the composition end time.
+    '''
     return self.fields.compositionEndTime
 
 add_body_class(CSLGBoxBody)
@@ -1259,6 +1276,8 @@ class DINFBoxBody(BoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' A DINF BoxBody may contain further Boxes.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=end_offset, **kw)
 
@@ -1269,6 +1288,8 @@ class URL_BoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `location` field.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('location', bfr, UTF8NULField)
 
@@ -1279,6 +1300,8 @@ class URN_BoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `name` and `location` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('name', bfr, UTF8NULField)
     self.add_from_buffer('location', bfr, UTF8NULField)
@@ -1297,6 +1320,8 @@ class STSZBoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `sample_size`, `sample_count`, and `entry_sizes` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
@@ -1313,6 +1338,8 @@ class STZ2BoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `field_size`, `sample_count` and `entry_sizes` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('reserved', bfr, BytesField, length=3)
     field_size = self.add_from_buffer('field_size', bfr, UInt8)
@@ -1351,6 +1378,8 @@ class STSCBoxBody(FullBoxBody):
   STSCEntry = structtuple('STSCEntry', '>LLL', 'first_chunk samples_per_chunk sample_description_index')
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `entry_count` and `entries` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     entries = []
@@ -1371,6 +1400,8 @@ class STCOBoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `entry_count` and `chunk_offsets` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     chunk_offsets = []
@@ -1391,6 +1422,8 @@ class CO64BoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `entry_count` and `chunk_offsets` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     chunk_offsets = []
@@ -1405,6 +1438,8 @@ class DREFBoxBody(FullBoxBody):
   '''
 
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
+    ''' Gather the `entry_count` and `boxes` fields.
+    '''
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     self.add_from_buffer(
@@ -1427,6 +1462,8 @@ class METABoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
+    ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
+    '''
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     theHandler = self.add_field('theHandler', Box.from_buffer(bfr))
     theHandler.parent = self.box
@@ -1450,6 +1487,8 @@ class VMHDBoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `graphicsmode` and `opcolor` fields.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('graphicsmode', bfr, UInt16BE)
     self.add_from_buffer('opcolor', bfr, VMHDBoxBody.OpColor)
@@ -1467,6 +1506,8 @@ class SMHDBoxBody(FullBoxBody):
   )
 
   def parse_buffer(self, bfr, **kw):
+    ''' Gather the `balance` field.
+    '''
     super().parse_buffer(bfr, **kw)
     self.add_from_buffer('balance', bfr, Int16BE)
     self.add_from_buffer('reserved', bfr, UInt16BE)
@@ -1526,6 +1567,8 @@ def parse_buffer(bfr, copy_offsets=None, **kw):
   return OverBox.from_buffer(bfr, **kw)
 
 def dump_box(B, indent='', fp=None, crop_length=170):
+  ''' Recursively dump a Box.
+  '''
   if fp is None:
     fp = sys.stdout
   fp.write(indent)
