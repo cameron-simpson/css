@@ -430,7 +430,7 @@ class Box(Packet):
         # there are unparsed data, stash it away and emit a warning
         self.add_from_buffer(
             'unparsed', bfr_tail, BytesesField,
-            end_offset=end_offset, discard_data=discard_data)
+            end_offset=Ellipsis, **kw)
         warning(
             "%s:%s: unparsed data: %d bytes",
             type(self).__name__, self.box_type_s, len(self['unparsed']))
