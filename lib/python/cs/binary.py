@@ -396,20 +396,20 @@ def struct_field(struct_format, class_name):
 
       Example:
 
-        >>> UInt16BE = struct_field('>H', class_name='UInt16BE')
-        >>> UInt16BE.__name__
-        'UInt16BE'
-        >>> UInt16BE.format
-        '>H'
-        >>> UInt16BE.struct   #doctest: +ELLIPSIS
-        <Struct object at ...>
-        >>> field, offset = UInt16BE.from_bytes(bytes((2,3,4)))
-        >>> field
-        UInt16BE(515)
-        >>> offset
-        2
-        >>> field.value
-        515
+          >>> UInt16BE = struct_field('>H', class_name='UInt16BE')
+          >>> UInt16BE.__name__
+          'UInt16BE'
+          >>> UInt16BE.format
+          '>H'
+          >>> UInt16BE.struct   #doctest: +ELLIPSIS
+          <Struct object at ...>
+          >>> field, offset = UInt16BE.from_bytes(bytes((2,3,4)))
+          >>> field
+          UInt16BE(515)
+          >>> offset
+          2
+          >>> field.value
+          515
   '''
   key = (struct_format, class_name)
   StructField = _struct_fields.get(key)
