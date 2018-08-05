@@ -10,7 +10,12 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import cleandoc, getargspec, getcomments, isfunction, isclass
+from inspect import (
+    cleandoc,
+    getmodule,
+    isfunction, isclass,
+    signature
+)
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
@@ -295,47 +300,43 @@ class PyPI_Package(O):
     else:
       doc = ''
     try:
-      doc_line1, doc_tail = doc.split('\n', 1)
+      doc_head, doc_tail = doc.split('\n\n', 1)
     except ValueError:
-      doc_line1 = doc
+      doc_head = doc
       doc_tail = ''
     else:
       doc_tail = doc_tail.lstrip()
 
-    for Mname in sorted(dir(M)):
+    Mname_prefix = M.__name__ + '.'
+    for Mname in sorted(dir(M), key=lambda s: s.lower()):
       if Mname == 'DISTINFO':
         continue
       if Mname.startswith('_'):
         continue
       o = getattr(M, Mname, None)
-      if not isfunction(o) and not isfunction(o):
+      if getmodule(o) is not M:
+        # name imported from another module
+        continue
+      if not isclass(o) and not isfunction(o):
         continue
       odoc = o.__doc__
       if odoc is None:
         continue
       odoc = cleandoc(odoc)
       if isfunction(o):
-        args, varargs, keywords, defaults = getargspec(o)
-        if defaults is None:
-          defaults = ()
-        arg_desc = ''
-        nreq = len(args) - len(defaults)
-        for i, arg in enumerate(args):
-          if arg_desc:
-            arg_desc += ', '
-          arg_desc += arg
-          if i >= nreq:
-            arg_desc += '=' + repr(defaults[i-nreq])
-        if varargs:
-          if arg_desc:
-            arg_desc += ', '
-          arg_desc += '*' + varargs
-        if keywords:
-          if arg_desc:
-            arg_desc += ', '
-          arg_desc += '**' + keywords
-        doc_tail += f'\n\n## Function `{Mname}({arg_desc})`\n\n{odoc}'
+        sig = signature(o)
+        doc_tail += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
       elif isclass(o):
+        mro_names = []
+        for superclass in o.__mro__:
+          if superclass is not object and superclass is not o:
+            name = superclass.__name__
+            supermod = getmodule(superclass)
+            if supermod is not M:
+              name = supermod.__name__ + '.' + name
+            mro_names.append('`' + name + '`')
+        if mro_names:
+          odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
         doc_tail += f'\n\n## Class `{Mname}`\n\n{odoc}'
 
     # fill in some missing info if it can be inferred
@@ -343,11 +344,11 @@ class PyPI_Package(O):
       if field in dinfo:
         continue
       if field == 'description':
-        if doc_line1:
-          dinfo[field] = doc_line1
+        if doc_head:
+          dinfo[field] = doc_head.replace('\n', ' ')
       elif field == 'long_description':
         if doc_tail:
-          dinfo[field] = doc_tail
+          dinfo[field] = doc_head + '\n\n' + doc_tail
         if 'long_description_content_type' not in dinfo:
           dinfo['long_description_content_type'] = 'text/markdown'
 
