@@ -51,6 +51,8 @@ USAGE = '''Usage:
   %s test   Run unit tests.'''
 
 def main(argv):
+  ''' Module main programme.
+  '''
   cmd = basename(argv.pop(0))
   usage = USAGE % (cmd, cmd, cmd)
   setup_logging(cmd)
@@ -101,7 +103,6 @@ def main(argv):
           B = getattr(B, box_type_s.upper())
         with Pfx(filename):
           fd = os.open(filename, os.O_RDONLY)
-          fdout = sys.stdout.fileno()
           bfr = CornuCopyBuffer.from_fd(fd)
           offset = B.offset
           need = B.length
@@ -141,18 +142,18 @@ class BoxHeader(Packet):
 
   # speculative max size that will fit in the UInt32BE box_size
   # with room for bigger sizes in the optional UInt64BE length field
-  MAX_BOX_SIZE_32 = 2^32 -8
+  MAX_BOX_SIZE_32 = 2 ^ 32 -8
 
   PACKET_FIELDS = {
-    'box_size': UInt32BE,
-    'box_type': BytesField,
-    'length': (
-        True,
-        (
-            UInt64BE,
-            EmptyPacketField,
-        ),
-    ),
+      'box_size': UInt32BE,
+      'box_type': BytesField,
+      'length': (
+          True,
+          (
+              UInt64BE,
+              EmptyPacketField,
+          ),
+      ),
   }
 
   @classmethod
@@ -177,7 +178,7 @@ class BoxHeader(Packet):
       header.add_field('length', EmptyField)
     if box_type == b'uuid':
       # user supplied 16 byte type
-      user_type = header.add_from_buffer('user_type', bfr, 16)
+      header.add_from_buffer('user_type', bfr, 16)
     else:
       header.user_type = None
     # note end of header
@@ -188,6 +189,8 @@ class BoxHeader(Packet):
 
   @property
   def length(self):
+    ''' The overall packet length.
+    '''
     return self._length
 
   @length.setter
@@ -234,7 +237,8 @@ class BoxBody(Packet):
 
   def parse_buffer(
       self, bfr, end_offset=None,
-      discard_data=False, copy_boxes=None, **kw):
+      discard_data=False, copy_boxes=None, **kw
+  ):
     ''' Gather the Box body fields from `bfr`.
 
         A generic BoxBody has no additional fields. Subclasses call
@@ -267,9 +271,9 @@ class Box(Packet):
   '''
 
   PACKET_FIELDS = {
-    'header': BoxHeader,
-    'body': BoxBody,
-    'unparsed': (True, (BytesesField, EmptyPacketField)),
+      'header': BoxHeader,
+      'body': BoxBody,
+      'unparsed': (True, (BytesesField, EmptyPacketField)),
   }
 
   def __init__(self, parent=None):
@@ -317,7 +321,8 @@ class Box(Packet):
         header.length = new_length
         if new_length != len(header) + len(body) + len(unparsed):
           # the header has changed size again, unstable, need better algorithm
-          raise RuntimeError("header size unstable, maybe we need a header mode to force the representation")
+          raise RuntimeError(
+              "header size unstable, maybe we need a header mode to force the representation")
     return super().transcribe()
 
   def self_check(self):
@@ -373,7 +378,7 @@ class Box(Packet):
     B.offset = bfr.offset
     with Pfx("%s.parse_buffer", type(B).__name__):
       try:
-        B.parse_buffer(bfr, discard_data=discard_data)
+        B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
       except EOFError as e:
         error("EOF parsing buffer: %s", e)
     B.end_offset = bfr.offset
@@ -385,7 +390,8 @@ class Box(Packet):
   def parse_buffer(
       self, bfr,
       default_type=None, copy_boxes=None,
-      **kw):
+      **kw
+  ):
     ''' Parse the Box from `bfr`.
 
         Parameters:
@@ -405,7 +411,7 @@ class Box(Packet):
     length = header.length
     if length is Ellipsis:
       end_offset = Ellipsis
-      bfr_tail= bfr
+      bfr_tail = bfr
       warning("Box.parse_buffer: Box %s has no length", header)
     else:
       end_offset = self.offset + length
@@ -568,7 +574,8 @@ class SubBoxesField(ListField):
       default_type=None,
       copy_boxes=None,
       parent=None,
-      **kw):
+      **kw
+  ):
     ''' Read Boxes from `bfr`, return a new SubBoxesField instance.
 
         Parameters:
@@ -604,7 +611,7 @@ class OverBox(Packet):
   '''
 
   PACKET_FIELDS = {
-    'boxes': SubBoxesField,
+      'boxes': SubBoxesField,
   }
 
   @classmethod
@@ -615,7 +622,7 @@ class OverBox(Packet):
         * `end_offset`: optional ending offset for the parse
     '''
     if end_offset is None:
-      end_offset=Ellipsis
+      end_offset = Ellipsis
     box = cls()
     box.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=end_offset, **kw)
     box.self_check()
@@ -721,7 +728,7 @@ class FTYPBoxBody(BoxBody):
     return [
         self.brands_bs[offset:offset+4]
         for offset in range(0, len(self.brands_bs), 4)
-     ]
+    ]
 
 add_body_class(FTYPBoxBody)
 
@@ -1021,7 +1028,9 @@ class HDLRBoxBody(FullBoxBody):
     ''' Gather the `handler_type_long` and `name` fields.
     '''
     super().parse_buffer(bfr, **kw)
-    # NB: handler_type is supposed to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
+    # NB: handler_type is supposed to be an unsigned long, but in
+    # practice seems to be 4 ASCII bytes, so we load it as a string
+    # for readability
     self.add_from_buffer('pre_defined', bfr, UInt32BE)
     self.add_from_buffer('handler_type_long', bfr, UInt32BE)
     self.add_from_buffer('reserved1', bfr, UInt32BE)
@@ -1129,9 +1138,9 @@ def add_generic_sample_boxbody(
   class_name = box_type.decode('ascii').upper() + 'BoxBody'
   sample_class_name = class_name + 'Sample'
   sample_type_v0 = structtuple(
-      sample_class_name+ 'V0', struct_format_v0, sample_fields)
+      sample_class_name + 'V0', struct_format_v0, sample_fields)
   sample_type_v1 = structtuple(
-      sample_class_name+ 'V1', struct_format_v1, sample_fields)
+      sample_class_name + 'V1', struct_format_v1, sample_fields)
   class SpecificSampleBoxBody(FullBoxBody):
     ''' Time to Sample box - section 8.6.1.
     '''
@@ -1216,7 +1225,8 @@ class CSLGBoxBody(FullBoxBody):
     else:
       warning("unsupported version %d, treating like version 1")
       struct_format = '>qqqqq'
-    self.add_field('fields',
+    self.add_field(
+        'fields',
         multi_struct_field(
             struct_format,
             (   'compositionToDTSShift',
@@ -1387,7 +1397,9 @@ class STSCBoxBody(FullBoxBody):
       entries=ListField,
   )
 
-  STSCEntry = structtuple('STSCEntry', '>LLL', 'first_chunk samples_per_chunk sample_description_index')
+  STSCEntry = structtuple(
+      'STSCEntry', '>LLL',
+      'first_chunk samples_per_chunk sample_description_index')
 
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `entry_count` and `entries` fields.
