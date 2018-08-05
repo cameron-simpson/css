@@ -118,6 +118,7 @@ class EmptyPacketField(PacketField):
   def __init__(self):
     super().__init__(None)
 
+  @classmethod
   def from_buffer(cls, bfr):
     return cls()
 
@@ -528,12 +529,17 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       MultiStructField.__name__ = class_name
     if subvalue_names:
       MultiStructField.__doc__ = (
-          'A PacketField which parses and transcribes the struct format `%r`, whose `.value` is a namedtuple with attributes %r.'
+          ''' A PacketField which parses and transcribes the struct
+              format `%r`, whose `.value` is a namedtuple with
+              attributes %r.
+          '''
           % (struct_format, subvalue_names)
       )
     else:
       MultiStructField.__doc__ = (
-          'A PacketField which parses and transcribes the struct format `%r`, whose `.value` is a tuple of the struct values.'
+          ''' A PacketField which parses and transcribes the struct
+              format `%r`, whose `.value` is a tuple of the struct values.
+          '''
           % (struct_format,)
       )
     MultiStructField.struct = struct
@@ -600,7 +606,7 @@ class Packet(PacketField):
         Note that this replaces the field, not its value.
     '''
     if field_name in self.field_map:
-      self.field_name[new_field]
+      self.field_name[new_field] = new_field
     else:
       raise ValueError("unknown field %r" % (field_name,))
 
@@ -655,7 +661,6 @@ class Packet(PacketField):
       fields_spec = self.PACKET_FIELDS
     except AttributeError:
       print("self_check: warning: no PACKET_FIELDS for %s" % (self,), file=sys.stderr)
-      pass
     else:
       for field_name, field_spec in fields_spec.items():
         if isinstance(field_spec, tuple):
@@ -762,7 +767,7 @@ class Packet(PacketField):
     assert isinstance(field_name, str), "field_name not a str: %r" % (field_name,)
     assert isinstance(bfr, CornuCopyBuffer), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if isinstance(factory, str):
-      from_buffer = struct_field(factory).from_buffer
+      from_buffer = struct_field(factory, 'struct_field').from_buffer
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).from_buffer
     elif isinstance(factory, type):
