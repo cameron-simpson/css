@@ -752,7 +752,9 @@ class ContainerBoxBody(BoxBody):
     ''' Gather the `boxes` field.
     '''
     super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
-    boxes = self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=Ellipsis, parent=self.box)
+    self.add_from_buffer(
+        'boxes', bfr, SubBoxesField,
+        end_offset=Ellipsis, default_type=default_type, parent=self.box)
 
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
@@ -1272,14 +1274,14 @@ class DINFBoxBody(BoxBody):
 
   PACKET_FIELDS = dict(
       BoxBody.PACKET_FIELDS,
-      boxes=SubBoxesField,
+      ##boxes=SubBoxesField,
   )
 
   def parse_buffer(self, bfr, **kw):
     ''' A DINF BoxBody may contain further Boxes.
     '''
     super().parse_buffer(bfr, **kw)
-    self.add_from_buffer('boxes', bfr, SubBoxesField, end_offset=end_offset, **kw)
+    ##self.add_from_buffer('boxes', bfr, SubBoxesField, **kw)
 
 add_body_class(DINFBoxBody)
 
