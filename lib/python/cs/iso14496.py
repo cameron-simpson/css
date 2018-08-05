@@ -407,9 +407,14 @@ class Box(Packet):
       bfr_tail = bfr.bounded(end_offset)
     body_class = pick_boxbody_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
-      self.add_from_buffer(
-          'body', bfr_tail, body_class, box=self,
-          discard_data=discard_data, copy_boxes=copy_boxes)
+      try:
+        self.add_from_buffer(
+            'body', bfr_tail, body_class,
+            box=self, copy_boxes=copy_boxes, end_offset=Ellipsis, **kw)
+      except EOFError as e:
+        # TODO: recover the data already collected but lost
+        error("EOFError parsing %s: %s", body_class, e)
+        self.add_field('body', EmptyField)
       # advance over the remaining data, optionally keeping it
       self.unparsed_offset = bfr_tail.offset
       if (
