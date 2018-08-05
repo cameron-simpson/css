@@ -232,14 +232,17 @@ class BoxBody(Packet):
     B.self_check()
     return B
 
-  def parse_buffer(self, bfr, discard_data=False, copy_boxes=None):
+  def parse_buffer(
+      self, bfr, end_offset=None,
+      discard_data=False, copy_boxes=None, **kw):
     ''' Gather the Box body fields from `bfr`.
 
         A generic BoxBody has no additional fields. Subclasses call
         their superclass' `parse_buffer` and then gather their
         specific fields.
     '''
-    pass
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
 
   @classmethod
   def boxbody_type_from_klass(cls):
@@ -379,17 +382,19 @@ class Box(Packet):
       copy_boxes(B)
     return B
 
-  def parse_buffer(self, bfr, discard_data=False, default_type=None, copy_boxes=None):
+  def parse_buffer(
+      self, bfr,
+      default_type=None, copy_boxes=None,
+      **kw):
     ''' Parse the Box from `bfr`.
 
         Parameters:
         * `bfr`: the input CornuCopyBuffer
-        * `discard_data`: if false (default), keep the unparsed data portion as
-          a list of data chunks in the field .unparsed; if true, discard the
           unparsed data
         * `default_type`: default Box body type if no class is
           registered for the header box type.
         * `copy_boxes`: optional callable for reporting new Box instances
+        Other parameters are passed to the inner parse calls.
 
         This method should be overridden by subclasses (if any,
         since the actual subclassing happens with the BoxBody base
