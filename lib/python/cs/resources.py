@@ -4,12 +4,16 @@
 #       - Cameron Simpson <cs@cskk.id.au> 11sep2014
 #
 
+''' Resource management classes and functions.
+'''
+
+from __future__ import print_function
 from contextlib import contextmanager
 import sys
 from threading import Condition, RLock, Lock
 import time
 from cs.logutils import error, warning
-from cs.obj import O, Proxy, TrackedClassMixin
+from cs.obj import O, Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
@@ -25,19 +29,24 @@ DISTINFO = {
 }
 
 class ClosedError(Exception):
+  ''' Exception for operations invalid when something is closed.
+  '''
   pass
 
 def not_closed(func):
   ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
+    ''' Wrapper function to check that this instance is not closed.
+    '''
     if self.closed:
       raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
+## debug: TrackedClassMixin
+class MultiOpenMixin(O):
   ''' A mixin to count open and close calls, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
@@ -75,6 +84,8 @@ class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
     self._finalise = None
 
   def tcm_get_state(self):
+    ''' Support method for TrackedClassMixin.
+    '''
     return {'opened': self.opened, 'opens': self._opens}
 
   def __enter__(self):
@@ -157,6 +168,9 @@ class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
 
   @property
   def closed(self):
+    ''' Whether this object has been closed.
+        Note: false if never opened.
+    '''
     if self._opens > 0:
       return False
     ##if self._opens < 0:
@@ -183,6 +197,8 @@ class MultiOpenMixin(O):    ## debug: TrackedClassMixin):
     ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise if the object is not yet open.
     '''
     def is_opened_wrapper(self, *a, **kw):
+      ''' Wrapper method which checks that the instance is open.
+      '''
       if self.closed:
         raise RuntimeError(
             "%s: %s: already closed from %s"
@@ -207,6 +223,8 @@ class _SubOpen(Proxy):
     self.closed = False
 
   def close(self):
+    ''' Close the proxy.
+    '''
     if self.closed:
       raise RuntimeError("already closed")
     self._proxied.close()
@@ -330,6 +348,7 @@ class RunState(object):
   '''
 
   def __init__(self):
+    self._started_from = None
     # core state
     self._running = False
     self.cancelled = False
@@ -418,12 +437,14 @@ class RunState(object):
         A change in status triggers the time measurements.
     '''
     if self._running:
+      # running -> not running
       if not status:
         self.stop_time = time.time()
         self.total_time += self.run_time
         for notify in self.notify_end:
           notify(self)
     elif status:
+      # not running -> running
       self.start_time = time.time()
       for notify in self.notify_start:
         notify(self)

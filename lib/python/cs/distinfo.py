@@ -10,13 +10,21 @@ from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
+from inspect import (
+    cleandoc,
+    getmodule,
+    isfunction, isclass,
+    signature
+)
 import os
 import os.path
 from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
+from pprint import pprint
 from subprocess import Popen, PIPE
 import shutil
 import sys
 from tempfile import mkdtemp
+from textwrap import dedent
 from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
@@ -55,6 +63,7 @@ USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-ar
   @tag  Use the specified VCS tag. Default: the last release tag for pkgname.
   Operations:
     check       Run setup.py check on the resulting package.
+    distinfo    Recite the distinfo map for the package.
     register    Register/update the package description and version.
     upload      Upload the package source distribution.'''
 
@@ -109,6 +118,8 @@ def main(argv):
           if argv:
             warning("extra arguments: %s", ' '.join(argv))
             badopts = True
+        elif op in ("distinfo",):
+          pass
         else:
           warning("unrecognised op")
           badopts = True
@@ -131,6 +142,19 @@ def main(argv):
   with Pfx(op):
     if op == 'check':
       PKG.check()
+    elif op == 'distinfo':
+      dinfo = PKG.distinfo
+      if argv:
+        for arg in argv:
+          print(arg)
+          try:
+            value = dinfo[arg]
+          except KeyError:
+            print("None")
+          else:
+            pprint(value)
+      else:
+        pprint(dinfo)
     elif op == 'register':
       PKG.register()
     elif op == 'upload':
@@ -276,23 +300,57 @@ class PyPI_Package(O):
     else:
       doc = ''
     try:
-      doc_line1, doc_tail = doc.split('\n', 1)
+      doc_head, doc_tail = doc.split('\n\n', 1)
     except ValueError:
-      doc_line1 = doc
+      doc_head = doc
       doc_tail = ''
     else:
       doc_tail = doc_tail.lstrip()
+
+    Mname_prefix = M.__name__ + '.'
+    for Mname in sorted(dir(M), key=lambda s: s.lower()):
+      if Mname == 'DISTINFO':
+        continue
+      if Mname.startswith('_'):
+        continue
+      o = getattr(M, Mname, None)
+      if getmodule(o) is not M:
+        # name imported from another module
+        continue
+      if not isclass(o) and not isfunction(o):
+        continue
+      odoc = o.__doc__
+      if odoc is None:
+        continue
+      odoc = cleandoc(odoc)
+      if isfunction(o):
+        sig = signature(o)
+        doc_tail += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
+      elif isclass(o):
+        mro_names = []
+        for superclass in o.__mro__:
+          if superclass is not object and superclass is not o:
+            name = superclass.__name__
+            supermod = getmodule(superclass)
+            if supermod is not M:
+              name = supermod.__name__ + '.' + name
+            mro_names.append('`' + name + '`')
+        if mro_names:
+          odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
+        doc_tail += f'\n\n## Class `{Mname}`\n\n{odoc}'
 
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description':
       if field in dinfo:
         continue
       if field == 'description':
-        if doc_line1:
-          dinfo[field] = doc_line1
+        if doc_head:
+          dinfo[field] = doc_head.replace('\n', ' ')
       elif field == 'long_description':
         if doc_tail:
-          dinfo[field] = doc_tail
+          dinfo[field] = doc_head + '\n\n' + doc_tail
+        if 'long_description_content_type' not in dinfo:
+          dinfo['long_description_content_type'] = 'text/markdown'
 
     dinfo['package_dir'] = {'': self.libdir}
 
