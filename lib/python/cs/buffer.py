@@ -5,10 +5,12 @@
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
 
-''' Facilities to do with buffers, primarily CornuCopyBuffer, an automatically refilling buffer to support parsing of data streams.
+''' Facilities to do with buffers, particularly CornuCopyBuffer,
+    an automatically refilling buffer to support parsing of data streams.
 '''
 
 import os
+from os import SEEK_SET, SEEK_CUR, SEEK_END
 from cs.py3 import pread
 
 DISTINFO = {
@@ -22,6 +24,8 @@ DISTINFO = {
 }
 
 DEFAULT_READSIZE = 131072
+
+MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE     # tweak if this gets larger
 
 class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing
@@ -208,6 +212,17 @@ class CornuCopyBuffer(object):
     if copy_offsets is not None:
       copy_offsets(offset)
 
+  def hint(self, size):
+    ''' Hint that the caller is seeking at least `size` bytes.
+
+        If the input_data iterator has a `hint` method, this is
+        passed to it.
+    '''
+    try:
+      self.input_data.hint(size)
+    except AttributeError:
+      pass
+
   def extend(self, min_size, short_ok=False):
     ''' Extend the buffer to at least `min_size` bytes.
 
@@ -219,6 +234,7 @@ class CornuCopyBuffer(object):
       raise ValueError("min_size(%r) must be >= 1" % (min_size,))
     length = len(self.buf)
     if length < min_size:
+      self.hint(min_size - length)
       bufs = [self.buf]
       chunks = self.input_data
       while length < min_size:
@@ -242,11 +258,14 @@ class CornuCopyBuffer(object):
           break
       if not bufs:
         newbuf = b''
-      elif len(bufs) == 1:
-        newbuf = bufs[0]
       else:
-        newbuf = b''.join(bufs)
-      self.buf = memoryview(newbuf)
+        if len(bufs) == 1:
+          newbuf = bufs[0]
+        else:
+          newbuf = b''.join(bufs)
+        if len(newbuf) > MEMORYVIEW_THRESHOLD and isinstance(newbuf, bytes):
+          newbuf = memoryview(newbuf)
+      self.buf = newbuf
 
   def tail_extend(self, size):
     ''' Extend method for parsers reading "tail"-like chunk streams,
@@ -317,17 +336,19 @@ class CornuCopyBuffer(object):
           `input_data` will still have been consumed.
     '''
     if whence is None:
-      whence = os.SEEK_SET
-    elif whence == os.SEEK_SET:
+      whence = SEEK_SET
+    elif whence == SEEK_SET:
       pass
-    elif whence == os.SEEK_CUR:
+    elif whence == SEEK_CUR:
       offset += self.offset
     else:
-      raise ValueError("seek: unsupported whence value %s, must be os.SEEK_SET or os.SEEK_CUR"
-                       % (whence,))
+      raise ValueError(
+          "seek: unsupported whence value %s, must be os.SEEK_SET or os.SEEK_CUR"
+          % (whence,))
     if offset < self.offset:
-      raise ValueError("seek: target offset %s < buffer offset %s; may not seek backwards"
-                       % (offset, self.offset))
+      raise ValueError(
+          "seek: target offset %s < buffer offset %s; may not seek backwards"
+          % (offset, self.offset))
     if offset > self.offset:
       self.skipto(offset, short_ok=short_ok)
     return self.offset
@@ -400,8 +421,8 @@ class CornuCopyBuffer(object):
                 % (new_offset, offset)
             )
           # TODO: an empty chunk from input_data indicates "not
-          #   yet" from a nonblocking tailing file - some kind of delay needs
-          #   to occur to avoid a spin.
+          #   yet" from a nonblocking tailing file - some kind of
+          #   delay needs to occur to avoid a spin.
           bufskip = min(len(buf), toskip)
           if bufskip > 0:
             if copy_skip:
@@ -441,32 +462,34 @@ class CornuCopyBuffer(object):
           The original's offset is now also 5.
         * Take 2 bytes from the original buffer, which succeeds.
 
-          >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
-          >>> bfr.offset
-          0
-          >>> len(bfr.take(2))
-          2
-          >>> bfr.offset
-          2
-          >>> subbfr = bfr.bounded(5)
-          >>> subbfr.offset
-          2
-          >>> for bs in subbfr:
-          ...   print(len(bs))
-          ...
-          1
-          2
-          >>> subbfr.offset
-          5
-          >>> subbfr.take(2)
-          Traceback (most recent call last):
-              ...
-          EOFError: insufficient input data, wanted 2 bytes but only found 0
-          >>> subbfr.flush()
-          >>> bfr.offset
-          5
-          >>> len(bfr.take(2))
-          2
+        Example:
+
+            >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
+            >>> bfr.offset
+            0
+            >>> len(bfr.take(2))
+            2
+            >>> bfr.offset
+            2
+            >>> subbfr = bfr.bounded(5)
+            >>> subbfr.offset
+            2
+            >>> for bs in subbfr:
+            ...   print(len(bs))
+            ...
+            1
+            2
+            >>> subbfr.offset
+            5
+            >>> subbfr.take(2)
+            Traceback (most recent call last):
+                ...
+            EOFError: insufficient input data, wanted 2 bytes but only found 0
+            >>> subbfr.flush()
+            >>> bfr.offset
+            5
+            >>> len(bfr.take(2))
+            2
 
         *WARNING*: if the bounded buffer is not completely consumed
         then it is critical to call the new CornuCopyBuffer's `.flush`
@@ -565,69 +588,154 @@ def chunky(bfr_func):
     return bfr_func(bfr, *a, **kw)
   return chunks_func
 
-class SeekableFDIterator(object):
-  ''' An iterator over the data of a file descriptor.
+class SeekableIterator(object):
+  ''' A base class for iterators over seekable things.
   '''
-  def __init__(self, fd, readsize=None, offset=None):
+
+  def __init__(self, offset=0, readsize=None, align=False):
+    ''' Initialise the SeekableIterator.
+
+        Parameters:
+        * `offset`: the initial logical offset, kept up to date by
+          iteration; default 0.
+        * `readsize`: a preferred read/fetch size for iterators
+          where that may be meaningful; if omitted then `DEFAULT_READSIZE`
+          will be stored
+        * `align`: whther to align reads/fetches by default: an
+          iterator may choose to align fetches with multiples of
+          `readsize`, doing a short fetch to bring the `offset`
+          into alignment; the default is False
+    '''
     if readsize is None:
       readsize = DEFAULT_READSIZE
     elif readsize < 1:
       raise ValueError("readsize must be >=1, got: %r" % (readsize,))
-    if offset is None:
-      offset = os.lseek(fd, 0, os.SEEK_CUR)
-    elif offset < 0:
+    if offset < 0:
       raise ValueError("offset must be >=0, got: %r" % (offset,))
-    self.fd = fd
-    self.readsize = readsize
     self.offset = offset
+    self.readsize = readsize
+    self.align = align
+    self.next_hint = None
+
+  def _fetch(self, readsize):
+    raise NotImplementedError("no _fetch method in class %s" % (type(self),))
+
   def __iter__(self):
     return self
-  def __next__(self):
-    data = pread(self.fd, self.readsize, self.offset)
-    if not data:
-      raise StopIteration("EOF, empty data from fd %s" % (self.fd,))
-    self.offset += len(data)
-    return data
-  def seek(self, new_offset, mode=os.SEEK_SET):
-    ''' Move the logical file pointer. WARNING: moves the underlying file descriptor's pointer.
+
+  def hint(self, size):
+    ''' Hint that the next iteration is involved in obtaining at
+        least `size` bytes.
+
+        Some sources may take this into account when fetching their
+        next data chunk. Users should keep in mind that the source
+        may need to allocate at least this much memory if it chooses
+        to satisfy the hint in full.
     '''
-    if mode == os.SEEK_CUR:
+    self.next_hint = size
+
+  def __next__(self):
+    ''' Obtain more data from the iterator, honouring readsize, align and hint.
+    '''
+    readsize = self.readsize
+    hint = self.next_hint
+    if hint is None:
+      if self.align:
+        # trim the read to reach the next alignment point
+        readsize -= self.offset % self.readsize
+    else:
+      # pad the read to the size of the hint
+      readsize = max(readsize, hint)
+    data = self._fetch(readsize)
+    if not data:
+      raise StopIteration("EOF, empty data received from fetch/read")
+    length = len(data)
+    self.offset += length
+    if hint is not None:
+      if hint > length:
+        # trim the hint down
+        hint -= length
+      else:
+        # hint consumed, clear it
+        hint = None
+      self.next_hint = hint
+    return data
+
+class SeekableFDIterator(SeekableIterator):
+  ''' An iterator over the data of a seekable file descriptor.
+  '''
+
+  def __init__(self, fd, offset=None, readsize=None, align=True):
+    ''' Initialise the iterator.
+
+        Parameters:
+        * `offset`: the initial logical offset, kept up to date by
+          iteration; the default is the current file position.
+        * `readsize`: a preferred read size; if omitted then
+          `DEFAULT_READSIZE` will be stored
+        * `align`: whther to align reads by default: if true then
+          the iterator will do a short read to bring the `offset`
+          into alignment with `readsize`; the default is True
+    '''
+    if offset is None:
+      offset = os.lseek(fd, 0, SEEK_CUR)
+    SeekableIterator.__init__(
+        self,
+        offset=offset, readsize=readsize, align=align)
+    self.fd = fd
+
+  def _fetch(self, readsize):
+    return pread(self.fd, readsize, self.offset)
+
+  def seek(self, new_offset, mode=SEEK_SET):
+    ''' Move the logical file pointer.
+    '''
+    if mode == SEEK_SET:
+      pass
+    elif mode == SEEK_CUR:
       new_offset += self.offset
-    elif mode == os.SEEK_END:
-      new_offset += os.lseek(self.fd, 0, os.SEEK_END)
+    elif mode == SEEK_END:
+      new_offset += os.fstat(self.fd).st_size
     self.offset = new_offset
     return new_offset
 
-class SeekableFileIterator(object):
+class SeekableFileIterator(SeekableIterator):
   ''' An iterator over the data of a file object.
   '''
-  def __init__(self, fp, readsize=None, offset=None):
-    if readsize is None:
-      readsize = DEFAULT_READSIZE
-    elif readsize < 1:
-      raise ValueError("readsize must be >=1, got: %r" % (readsize,))
+
+  def __init__(self, fp, offset=None, readsize=None, align=False):
+    ''' Initialise the iterator.
+
+        Parameters:
+        * `offset`: the initial logical offset, kept up to date by
+          iteration; the default is the current file position.
+        * `readsize`: a preferred read size; if omitted then
+          `DEFAULT_READSIZE` will be stored
+        * `align`: whther to align reads by default: if true then
+          the iterator will do a short read to bring the `offset`
+          into alignment with `readsize`; the default is False
+    '''
     if offset is None:
       offset = fp.tell()
-    elif offset < 0:
-      raise ValueError("offset must be >=0, got: %r" % (offset,))
+    SeekableIterator.__init__(
+        self,
+        offset=offset, readsize=readsize, align=align)
     self.fp = fp
-    self.readsize = readsize
-    self.offset = offset
-    # presume a file-like object
+    # try to use the frugal read method if available
     try:
       read1 = fp.read1
     except AttributeError:
       read1 = fp.read
     self.read1 = read1
-  def __iter__(self):
-    return self
-  def __next__(self):
-    data = self.fp.read1(self.readsize)
-    if not data:
-      raise StopIteration("EOF, empty data from fp %s" % (self.fp,))
-    self.offset += len(data)
-    return data
-  def seek(self, new_offset, mode=os.SEEK_SET):
-    ''' Move the logical file pointer. WARNING: moves the underlying file's pointer.
+
+  def _fetch(self, readsize):
+    return self.read1(readsize)
+
+  def seek(self, new_offset, mode=SEEK_SET):
+    ''' Move the logical file pointer.
+
+        WARNING: moves the underlying file's pointer.
     '''
-    return self.fp.seek(new_offset, mode)
+    new_offset = self.fp.seek(new_offset, mode)
+    self.offset = new_offset
+    return new_offset
