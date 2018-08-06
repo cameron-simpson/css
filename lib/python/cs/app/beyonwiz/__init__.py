@@ -118,11 +118,11 @@ class _Recording(ABC):
 
   PATH_FIELDS = (
       'series_name',
+      'start_dt_iso',
       'episode_info_part',
       'episode_name',
       'tags_part',
       'source_name',
-      'start_dt_iso',
       'description'
   )
 
