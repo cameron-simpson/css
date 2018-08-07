@@ -250,30 +250,42 @@ class BytesesField(PacketField):
     if end_offset is None:
       raise ValueError("missing end_offset")
     offset0 = bfr.offset
+    byteses = None if discard_data else []
     if end_offset is Ellipsis:
       # special case: gather up all the remaining data
+      bfr_end_offset = bfr.end_offset
       if discard_data:
-        byteses = None
-        length = 0
-        for bs in bfr:
-          length += len(bs)
+        if bfr_end_offset is not None:
+          # we can skip to the end
+          bfr.skipto(bfr_end_offset)
+        else:
+          # TODO: try hinting in increasing powers of 2?
+          for _ in bfr:
+            pass
       else:
-        byteses = list(bfr)
-        length = sum( len(bs) for bs in byteses )
+        # gather up all the data left in the buffer
+        bfr.hint(bfr_end_offset - bfr.offset)
+        byteses.extend(bfr)
     else:
       # otherwise gather up a bounded range of bytes
       if end_offset < offset0:
-        raise ValueError("end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset))
-      byteses = None if discard_data else []
+        raise ValueError(
+            "end_offset(%d) < bfr.offset(%d)"
+            % (end_offset, bfr.offset))
       bfr.skipto(
           end_offset,
           copy_skip=( None if discard_data else byteses.append ),
           short_ok=short_ok)
-      length = end_offset - offset0
+    offset = bfr.offset
+    if end_offset is not Ellipsis and offset < end_offset and not short_ok:
+      raise EOFError(
+          "%s.from_buffer: insufficient input data: end_offset=%d"
+          " but final bfr.offset=%d"
+          % (cls, end_offset, bfr.offset))
     field = cls(byteses)
-    field.length = length
     field.offset = offset0
-    field.end_offset = bfr.offset
+    field.end_offset = offset
+    field.length = offset - offset0
     return field
 
   def transcribe(self):
