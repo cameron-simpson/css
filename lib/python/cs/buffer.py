@@ -629,9 +629,6 @@ class SeekableIterator(object):
   def _fetch(self, readsize):
     raise NotImplementedError("no _fetch method in class %s" % (type(self),))
 
-  def __iter__(self):
-    return self
-
   def hint(self, size):
     ''' Hint that the next iteration is involved in obtaining at
         least `size` bytes.
@@ -642,6 +639,9 @@ class SeekableIterator(object):
         to satisfy the hint in full.
     '''
     self.next_hint = size
+
+  def __iter__(self):
+    return self
 
   def __next__(self):
     ''' Obtain more data from the iterator, honouring readsize, align and hint.
