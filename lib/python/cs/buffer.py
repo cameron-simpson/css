@@ -11,6 +11,7 @@
 
 import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END
+import mmap
 from cs.py3 import pread
 
 DISTINFO = {
@@ -620,6 +621,11 @@ class SeekableIterator(object):
   def __del__(self):
     self.close()
 
+  def close(self):
+    ''' Close the iterator; required by subclasses.
+    '''
+    raise NotImplementedError("missing close method")
+
   def _fetch(self, readsize):
     raise NotImplementedError("no _fetch method in class %s" % (type(self),))
 
@@ -764,5 +770,60 @@ class SeekableFileIterator(SeekableIterator):
         WARNING: moves the underlying file's pointer.
     '''
     new_offset = self.fp.seek(new_offset, mode)
+    self.offset = new_offset
+    return new_offset
+
+class SeekableMMapIterator(SeekableIterator):
+  ''' An iterator over the data of a mappable file descriptor.
+
+      *Note*: the iterator works with an mmap of an os.dup() of the
+      file descriptor so that it can close it with impunity; this
+      requires the caller to close their descriptor.
+  '''
+
+  def __init__(self, fd, offset=None, readsize=None, align=True):
+    ''' Initialise the iterator.
+
+        Parameters:
+        * `offset`: the initial logical offset, kept up to date by
+          iteration; the default is the current file position.
+        * `readsize`: a preferred read size; if omitted then
+          `DEFAULT_READSIZE` will be stored
+        * `align`: whther to align reads by default: if true then
+          the iterator will do a short read to bring the `offset`
+          into alignment with `readsize`; the default is True
+    '''
+    if offset is None:
+      offset = os.lseek(fd, 0, SEEK_CUR)
+    SeekableIterator.__init__(
+        self,
+        offset=offset, readsize=readsize, align=align)
+    self.fd = os.dup(fd)
+    self.mmap = mmap.mmap(self.fd, 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ)
+    self.mv = memoryview(mmap)
+
+  def close(self):
+    ''' Detach from the file descriptor and mmap and close.
+    '''
+    if self.fd is not None:
+      self.mmap.close()
+      self.mmap = None
+      os.close(self.fd)
+      self.fd = None
+
+  def _fetch(self, readsize):
+    submv = self.mv[self.offset:self.offset + readsize]
+    self.offset += len(submv)
+    return submv
+
+  def seek(self, new_offset, mode=SEEK_SET):
+    ''' Move the logical file pointer.
+    '''
+    if mode == SEEK_SET:
+      pass
+    elif mode == SEEK_CUR:
+      new_offset += self.offset
+    elif mode == SEEK_END:
+      new_offset += os.fstat(self.fd).st_size
     self.offset = new_offset
     return new_offset
