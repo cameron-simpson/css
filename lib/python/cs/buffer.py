@@ -80,6 +80,19 @@ class CornuCopyBuffer(object):
           method
         * `copy_chunks`: if not None, every fetched data chunk is
           copied to this callable
+
+        The `input_data` is an iterable whose iterator may have
+        some optional additional properties:
+        * `seek`: if present, this is a seek method after the fashion
+          of `file.seek`; the buffer's `seek`, `skip` and `skipto`
+          methods will take advantage of this if available.
+        * `offset`: the current byte offset of the iterator; this
+          is used during the buffer initialisation to compute
+          `input_data_displacement`, the difference between the
+          buffer's logical offset and the input data's logical offset;
+          if unavailable during initialisation this is presumed to
+          be 0.
+        * `end_offset`: the end offset of the iterator if known.
     '''
     if buf is None:
       buf = b''
@@ -87,8 +100,15 @@ class CornuCopyBuffer(object):
     self.offset = offset
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
-    self.input_data = iter(input_data)
     self.copy_offsets = copy_offsets
+    input_data = self.input_data = iter(input_data)
+    # Try to compute the displacement between the input_data byte
+    # offset and the buffer's logical offset.
+    # NOTE: if the input_data iterator does not have a .offset
+    # attribute then we assume the iterator byte offset is 0, purely
+    # to reduce the burden on iterator implementors.
+    input_offset = getattr(input_data, 'offset', 0)
+    self.input_offset_displacement = input_offset - offset
 
   @classmethod
   def from_fd(cls, fd, readsize=None, offset=None, **kw):
@@ -96,7 +116,7 @@ class CornuCopyBuffer(object):
 
         Internally this constructs a SeekableFDIterator, which
         provides the iteration that CornuCopyBuffer consumes, but
-        also seek support of the underlying file descriptor is
+        also seek support if the underlying file descriptor is
         seekable.
 
         Parameters:
@@ -196,6 +216,23 @@ class CornuCopyBuffer(object):
     return chunk
 
   next = __next__
+
+  @property
+  def end_offset(self):
+    ''' Return the end offset of the input data (in buffer ordinates)
+        if known, otherwise None.
+
+        Note that this depends on the computation of the
+        `input_offset_displacement` which takes place at the buffer
+        initialisation, which in turn relies on the `input_data.offset`
+        attribute, which at initialisation is presumed to be 0 if missing.
+    '''
+    input_data = self.input_data
+    try:
+      input_offset = input_data.end_offset
+    except AttributeError:
+      return None
+    return input_offset - self.input_offset_displacement
 
   def at_eof(self):
     ''' Test whether the buffer is at end of input.
@@ -397,20 +434,21 @@ class CornuCopyBuffer(object):
       offset += bufskip
     if toskip > 0:
       # advance the rest of the way
-      new_offset = offset + toskip
-      seek = None
       chunks = self.input_data
+      # should we do a seek?
       if copy_skip is None:
-        try:
-          seek = chunks.seek
-        except AttributeError:
-          pass
-      if seek:
+        input_seek = getattr(chunks, 'seek', None)
+      else:
+        input_seek = None
+      if input_seek:
         # seek directly to new_offset
-        seek(new_offset)
+        new_offset = offset + toskip
+        input_offset = new_offset + self.input_offset_displacement
+        input_seek(input_offset)
         offset = new_offset
       else:
-        # no seek, consume chunks until new_offset
+        # no seek, consume sufficient chunks
+        self.hint(toskip)
         while toskip > 0:
           try:
             buf = next(chunks)
@@ -530,6 +568,12 @@ class _BoundedBufferIterator(object):
     self.bfr = bfr
     self.end_offset = end_offset
 
+  @property
+  def offset(self):
+    ''' The current iterator offset.
+    '''
+    return self.bfr.offset
+
   def __iter__(self):
     return self
 
@@ -541,7 +585,7 @@ class _BoundedBufferIterator(object):
       raise StopIteration
     # post: limit > 0
     buf = next(bfr)
-    # post: bfr.buf now emtpy, can be modified
+    # post: bfr.buf now empty, can be modified
     length = len(buf)
     if length <= limit:
       return buf
