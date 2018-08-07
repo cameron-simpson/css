@@ -119,6 +119,10 @@ class CornuCopyBuffer(object):
         also seek support if the underlying file descriptor is
         seekable.
 
+        *Note*: a SeekableFDIterator makes an `os.dup` of the
+        supplied file descriptor, so the caller is responsible for
+        closing the original.
+
         Parameters:
         * `fd`: the operation system file descriptor
         * `readsize`: an optional preferred read size
