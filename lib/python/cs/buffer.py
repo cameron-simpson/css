@@ -601,6 +601,26 @@ class _BoundedBufferIterator(object):
 
   next = __next__
 
+  def hint(self, size):
+    ''' Pass hints through to the underlying buffer.
+    '''
+    self.bfr.hint(size)
+
+  def seek(self, offset, whence=SEEK_SET):
+    ''' Do a seek on the underlying buffer, obeying the bounds.
+    '''
+    if whence == SEEK_SET:
+      pass
+    elif whence == SEEK_CUR:
+      offset += bfr.offset
+    elif whence == SEEK_END:
+      offset += self.end_offset
+    if not self.offset <= offset <= self.end_offset:
+      raise ValueError(
+        "invalid seek position(%d) < self.offset(%d) or > self.end_offset(%d)"
+        % (offset, self.offset, self.end_offset))
+    return self.bfr.seek(offset, SEEK_SET)
+
 class CopyingIterator(object):
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
