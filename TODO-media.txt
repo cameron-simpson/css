@@ -1,3 +1,4 @@
+CornuCopyBuffer.bound context manager wrapping .bounded
 beyonwiz mconvert to accept -D to move done source files to new subdir named after result file
 cs.buffer: mmap mode
 cs.buffer: a mode to store consumed bytes to storage eg after a failed parse
