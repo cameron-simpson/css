@@ -147,11 +147,6 @@ class CornuCopyBuffer(object):
         supplied file descriptor, so the caller is responsible for
         closing the original.
 
-        *Note*: most of the returned items are memoryviews of the
-        underlying mmap, so they will become invalid if the mmap
-        is closed. Callers must take copies if they need the data
-        after releasing this buffer.
-
         Parameters:
         * `fd`: the operation system file descriptor
         * `readsize`: an optional preferred read size
@@ -164,7 +159,7 @@ class CornuCopyBuffer(object):
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
-  def from_file(cls, fp, readsize=None, offset=None, no_mmap=False, **kw):
+  def from_file(cls, fp, readsize=None, offset=None, **kw):
     ''' Return a new CornuCopyBuffer attached to an open file.
 
         Internally this constructs a SeekableFileIterator, which
@@ -643,13 +638,13 @@ class _BoundedBufferIterator(object):
     if whence == SEEK_SET:
       pass
     elif whence == SEEK_CUR:
-      offset += bfr.offset
+      offset += self.bfr.offset
     elif whence == SEEK_END:
       offset += self.end_offset
     if not self.offset <= offset <= self.end_offset:
       raise ValueError(
-        "invalid seek position(%d) < self.offset(%d) or > self.end_offset(%d)"
-        % (offset, self.offset, self.end_offset))
+          "invalid seek position(%d) < self.offset(%d) or > self.end_offset(%d)"
+          % (offset, self.offset, self.end_offset))
     return self.bfr.seek(offset, SEEK_SET)
 
 class CopyingIterator(object):
@@ -919,7 +914,7 @@ class SeekableMMapIterator(SeekableIterator):
     if self.fd is not None:
       try:
         self.mmap.close()
-      except BufferError as e:
+      except BufferError:
         pass
       else:
         self.mmap = None
