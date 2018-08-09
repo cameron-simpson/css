@@ -135,7 +135,36 @@ class CornuCopyBuffer(object):
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
-  def from_file(cls, fp, readsize=None, offset=None, **kw):
+  def from_mmap(cls, fd, readsize=None, offset=None, **kw):
+    ''' Return a new CornuCopyBuffer attached to an mmap of an open
+        file descriptor.
+
+        Internally this constructs a SeekableMMapIterator, which
+        provides the iteration that CornuCopyBuffer consumes, but
+        also seek support.
+
+        *Note*: a SeekableMMapIterator makes an `os.dup` of the
+        supplied file descriptor, so the caller is responsible for
+        closing the original.
+
+        *Note*: most of the returned items are memoryviews of the
+        underlying mmap, so they will become invalid if the mmap
+        is closed. Callers must take copies if they need the data
+        after releasing this buffer.
+
+        Parameters:
+        * `fd`: the operation system file descriptor
+        * `readsize`: an optional preferred read size
+        * `offset`: a starting position for the data; the file
+          descriptor will seek to this offset, and the buffer will
+          start with this offset
+        Other keyword arguments are passed to the buffer constructor.
+    '''
+    it = SeekableMMapIterator(fd, readsize=readsize, offset=offset)
+    return cls(it, offset=it.offset, **kw)
+
+  @classmethod
+  def from_file(cls, fp, readsize=None, offset=None, no_mmap=False, **kw):
     ''' Return a new CornuCopyBuffer attached to an open file.
 
         Internally this constructs a SeekableFileIterator, which
