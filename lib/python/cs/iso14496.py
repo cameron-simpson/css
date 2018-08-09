@@ -17,6 +17,7 @@ from collections import namedtuple
 from functools import partial
 import os
 from os.path import basename
+import stat
 import sys
 from cs.binary import (
     Packet, PacketField, BytesesField, ListField,
@@ -70,7 +71,7 @@ def main(argv):
             parsee = sys.stdin.fileno()
           else:
             parsee = spec
-          over_box = parse(parsee, discard_data=True)
+          over_box = parse(parsee)
           over_box.dump()
     elif op == 'extract':
       skip_header = False
@@ -376,11 +377,10 @@ class Box(Packet):
     '''
     B = cls()
     B.offset = bfr.offset
-    with Pfx("%s.parse_buffer", type(B).__name__):
-      try:
-        B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
-      except EOFError as e:
-        error("EOF parsing buffer: %s", e)
+    try:
+      B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
+    except EOFError as e:
+      error("%s.parse_buffer: EOF parsing buffer: %s", type(B), e)
     B.end_offset = bfr.offset
     B.self_check()
     if copy_boxes:
@@ -1542,26 +1542,31 @@ def parse(o, **kw):
   ''' Return an OverBox source (str, int, file).
   '''
   close = None
-  with Pfx("parse(%r)", o):
-    if isinstance(o, str):
-      fd = os.open(o, os.O_RDONLY)
-      over_box = parse_fd(fd, **kw)
-      close = partial(os.close, fd)
-    elif isinstance(o, int):
-      over_box = parse_fd(o, **kw)
-    else:
-      over_box = parse_file(o, **kw)
-    if close:
-      close()
-    return over_box
+  if isinstance(o, str):
+    fd = os.open(o, os.O_RDONLY)
+    over_box = parse_fd(fd, **kw)
+    close = partial(os.close, fd)
+  elif isinstance(o, int):
+    over_box = parse_fd(o, **kw)
+  else:
+    over_box = parse_file(o, **kw)
+  if close:
+    close()
+  return over_box
 
-def parse_fd(fd, **kw):
+def parse_fd(fd, discard_data=False, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
       `fd`: a file descriptor open for read
       `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive BoxBody offsets
   '''
-  return parse_buffer(CornuCopyBuffer.from_fd(fd), **kw)
+  if not discard_data and stat.S_ISREG(os.fstat(fd).st_mode):
+    return parse_buffer(
+        CornuCopyBuffer.from_mmap(fd),
+        discard_data=False, **kw)
+  return parse_buffer(
+      CornuCopyBuffer.from_fd(fd),
+      discard_data=discard_data, **kw)
 
 def parse_file(fp, **kw):
   ''' Parse an ISO14496 stream from the file `fp`, yield top level Boxes.
