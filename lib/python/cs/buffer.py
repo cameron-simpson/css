@@ -740,6 +740,24 @@ class SeekableIterator(object):
       self.next_hint = hint
     return data
 
+  def seek(self, new_offset, mode=SEEK_SET):
+    ''' Move the logical offset.
+    '''
+    if mode == SEEK_SET:
+      pass
+    elif mode == SEEK_CUR:
+      new_offset += self.offset
+    elif mode == SEEK_END:
+      try:
+        end_offset = self.end_offset
+      except AttributeError as e:
+        raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
+      new_offset += end_offset
+    else:
+      raise ValueError("unknown mode %d" % (mode,))
+    self.offset = new_offset
+    return new_offset
+
 class SeekableFDIterator(SeekableIterator):
   ''' An iterator over the data of a seekable file descriptor.
 
@@ -776,20 +794,14 @@ class SeekableFDIterator(SeekableIterator):
       os.close(self.fd)
       self.fd = None
 
+  @property
+  def end_offset(self):
+    ''' The end offset of the file.
+    '''
+    return os.fstat(self.fd).st_size
+
   def _fetch(self, readsize):
     return pread(self.fd, readsize, self.offset)
-
-  def seek(self, new_offset, mode=SEEK_SET):
-    ''' Move the logical file pointer.
-    '''
-    if mode == SEEK_SET:
-      pass
-    elif mode == SEEK_CUR:
-      new_offset += self.offset
-    elif mode == SEEK_END:
-      new_offset += os.fstat(self.fd).st_size
-    self.offset = new_offset
-    return new_offset
 
 class SeekableFileIterator(SeekableIterator):
   ''' An iterator over the data of a file object.
@@ -840,8 +852,7 @@ class SeekableFileIterator(SeekableIterator):
         WARNING: moves the underlying file's pointer.
     '''
     new_offset = self.fp.seek(new_offset, mode)
-    self.offset = new_offset
-    return new_offset
+    return super().seek(new_offset, SEEK_SET)
 
 class SeekableMMapIterator(SeekableIterator):
   ''' An iterator over the data of a mappable file descriptor.
