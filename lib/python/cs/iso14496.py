@@ -17,6 +17,7 @@ from collections import namedtuple
 from functools import partial
 import os
 from os.path import basename
+import stat
 import sys
 from cs.binary import (
     Packet, PacketField, BytesesField, ListField,
@@ -70,7 +71,7 @@ def main(argv):
             parsee = sys.stdin.fileno()
           else:
             parsee = spec
-          over_box = parse(parsee, discard_data=True)
+          over_box = parse(parsee)
           over_box.dump()
     elif op == 'extract':
       skip_header = False
@@ -1555,13 +1556,19 @@ def parse(o, **kw):
       close()
     return over_box
 
-def parse_fd(fd, **kw):
+def parse_fd(fd, discard_data=False, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
       `fd`: a file descriptor open for read
       `discard_data`: whether to discard unparsed data, default False
       `copy_offsets`: callable to receive BoxBody offsets
   '''
-  return parse_buffer(CornuCopyBuffer.from_fd(fd), **kw)
+  if not discard_data and stat.S_ISREG(os.fstat(fd).st_mode):
+    return parse_buffer(
+        CornuCopyBuffer.from_mmap(fd),
+        discard_data=False, **kw)
+  return parse_buffer(
+      CornuCopyBuffer.from_fd(fd),
+      discard_data=discard_data, **kw)
 
 def parse_file(fp, **kw):
   ''' Parse an ISO14496 stream from the file `fp`, yield top level Boxes.
