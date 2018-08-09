@@ -582,10 +582,11 @@ class _BoundedBufferIterator(object):
     return self
 
   def __next__(self):
-    # WARNING: not thread safe at all!
     bfr = self.bfr
     limit = self.end_offset - bfr.offset
     if limit <= 0:
+      if limit < 0:
+        raise RuntimeError("limit:%d < 0" % (limit,))
       raise StopIteration
     # post: limit > 0
     buf = next(bfr)
@@ -593,6 +594,7 @@ class _BoundedBufferIterator(object):
     length = len(buf)
     if length <= limit:
       return buf
+    # return just the head, pushing the tail back into bfr.buf
     head = buf[:limit]
     tail = buf[limit:]
     bfr.buf = tail
