@@ -880,31 +880,30 @@ class SeekableMMapIterator(SeekableIterator):
         self,
         offset=offset, readsize=readsize, align=align)
     self.fd = os.dup(fd)
+    self.base_offset = 0
     self.mmap = mmap.mmap(self.fd, 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ)
-    self.mv = memoryview(mmap)
+    self.mv = memoryview(self.mmap)
 
   def close(self):
     ''' Detach from the file descriptor and mmap and close.
     '''
     if self.fd is not None:
-      self.mmap.close()
-      self.mmap = None
-      os.close(self.fd)
-      self.fd = None
+      try:
+        self.mmap.close()
+      except BufferError as e:
+        pass
+      else:
+        self.mmap = None
+        os.close(self.fd)
+        self.fd = None
+
+  @property
+  def end_offset(self):
+    ''' The end offset of the mmap memoryview.
+    '''
+    return self.base_offset + len(self.mv)
 
   def _fetch(self, readsize):
-    submv = self.mv[self.offset:self.offset + readsize]
-    self.offset += len(submv)
-    return submv
-
-  def seek(self, new_offset, mode=SEEK_SET):
-    ''' Move the logical file pointer.
-    '''
-    if mode == SEEK_SET:
-      pass
-    elif mode == SEEK_CUR:
-      new_offset += self.offset
-    elif mode == SEEK_END:
-      new_offset += os.fstat(self.fd).st_size
-    self.offset = new_offset
-    return new_offset
+    if readsize < 1:
+      raise ValueError("readsize=%d" % (readsize,))
+    return self.mv[self.offset:self.offset + readsize]
