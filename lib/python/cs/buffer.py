@@ -233,10 +233,10 @@ class CornuCopyBuffer(object):
     '''
     input_data = self.input_data
     try:
-      input_offset = input_data.end_offset
+      input_end_offset = input_data.end_offset
     except AttributeError:
       return None
-    return input_offset - self.input_offset_displacement
+    return input_end_offset - self.input_offset_displacement
 
   def at_eof(self):
     ''' Test whether the buffer is at end of input.
@@ -551,10 +551,10 @@ class CornuCopyBuffer(object):
       ''' Flush the contents of bfr2.buf back into self.buf, adjusting
           the latter's offset accordingly.
       '''
-      buf = bfr2.buf
-      if buf:
-        self.buf = buf + self.buf
-        self.offset -= len(buf)
+      buf2 = bfr2.buf
+      if buf2:
+        self.buf = buf2 + self.buf
+        self.offset -= len(buf2)
         bfr2.buf = b''
     bfr2.flush = flush
     return bfr2
