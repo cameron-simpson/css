@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 
-''' Facilities associated with binary data.
+''' Facilities associated with binary data parsing and transcription.
 
     Note: this module requires Python 3 and recommends Python 3.6+
     because it uses abc.ABC, because a Python 2 bytes object is too
