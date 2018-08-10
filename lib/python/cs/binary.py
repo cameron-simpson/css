@@ -21,34 +21,41 @@
     * `PacketField`: an abstract class for a binary field, with a
       factory method to parse it, a transcription method to transcribe
       it back out in binary form and usually a `.value` attribute
-      holding the parsed value
+      holding the parsed value.
     * several presupplied subclasses for common basic types such
-      as `UInt32BE` (an unsigned 32 bit big endian integer)
+      as `UInt32BE` (an unsigned 32 bit big endian integer).
     * `struct_field`: a factory for making PacketField classes for
       `struct` formats with a single value field.
     * `multi_struct_field` and `structtuple`: factories for making
-      fieldscketField`s` from `struct` formats with multiple value
+      `PacketField`s` from `struct` formats with multiple value
       fields;
       `structtuple` makes `PacketFields` which are also `namedtuple`s,
       supporting trivial access to the parsed values.
     * `Packet`: a `PacketField` subclass for parsing multiple
-      `PacketFields` into a larger structure.
+      `PacketFields` into a larger structure with ordered named
+      fields.
 
-    Each `PacketField` subclass has the following
-    methods:
-    * `transcribe`: return a binary transcription of this field's
-      binary data, either directly as a chunk (or for convenience,
-      also None or an ASCII str) or by yielding successive binary
-      data
-    * `from_buffer`: parse this field from a `cs.buffer.CornuCopyBuffer`
-    * `from_bytes`: parse this field from a chunk with an optional starting
-      offset; this is a convenience wrapper for `from_buffer`.
+    You don't need to make fields only from binary data; because
+    `PacketField.__init__` takes a post parse value, you can also
+    construct `PacketField`s from scratch with their values and
+    transcribe the resulting binary form.
+
+    Each `PacketField` subclass has the following methods:
+    * `transcribe`: easily return the binary transcription of this field,
+      either directly as a chunk (or for convenience, also None or
+      an ASCII str) or by yielding successive binary data.
+    * `from_buffer`: a factory to parse this field from a
+      `cs.buffer.CornuCopyBuffer`.
+    * `from_bytes`: a factory to parse this field from a chunk with
+      an optional starting offset; this is a convenience wrapper for
+      `from_buffer`.
 
     That may sound a little arcane, but we also supply:
     * `flatten`: a recursive function to take the return from any
       `transcribe` method and yield chunks, so copying a packet to
       a file or elsewhere can always be done by iterating over
-      `flatten(field.transcribe())`.
+      `flatten(field.transcribe())` or via the convenience
+      `field.transcribe_flat()` method which calls `flatten` itself.
     * a `CornuCopyBuffer` is an easy to use wrapper for parsing any
       iterable of chunks, which may come from almost any source.  
       It has a bunch of convenient factories including:
@@ -56,9 +63,9 @@
       `from_fd`, make a buffer from a file descriptor;
       `from_file`, make a buffer from a file-like object;
       `from_mmap`, make a buffer from a file descriptor using a
-      memory map (mmap module) of the file, so that chunks can use
-      the file itself as backing store instead of allocating and
-      copying memory.  
+      memory map (the `mmap` module) of the file, so that chunks
+      can use the file itself as backing store instead of allocating
+      and copying memory.  
       See the `cs.buffer` module for further detail.
 
     Cameron Simpson <cs@cskk.id.au> 22jul2018
@@ -156,14 +163,31 @@ class PacketField(ABC):
   @abstractmethod
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
+
+        This may directly return:
+        * a `bytes` or `memryview` holding the binary data
+        * `None`: indicating no binary data
+        * `str`: indicating the ASCII encoding of the string
+          * an iterable of these things (including further iterables)
+          to support trivially transcribing via other fields'
+          `transcribe` methods
+
+        Callers will usually call `flatten` on the output of this
+        method, or use the convenience `transcribe_flat` method
+        which calls `flatten` for them.
     '''
     raise NotImplementedError("no transcribe method")
+
+  def transcribe_flat(self):
+    ''' Return a flat iterable of chunks transcribing this field.
+    '''
+    return flatten(self.transcribe())
 
 class EmptyPacketField(PacketField):
   ''' An empty data field, used as a placeholder for optional
       fields when they are not present.
 
-      The singleton EmptyField is a predefined instance.
+      The singleton `EmptyField` is a predefined instance.
   '''
 
   def __init__(self):
