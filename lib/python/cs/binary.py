@@ -3,13 +3,72 @@
 
 ''' Facilities associated with binary data.
 
-    This module requires Python 3 and recommends Python 3.6+ because
-    it uses abc.ABC, because a Python 2 bytes object is too weak
-    (just a str) as also is my cs.py.bytes hack class and because
-    the keyword based Packet initiialisation benefits from keyword
-    argument ordering.
+    Note: this module requires Python 3 and recommends Python 3.6+
+    because it uses abc.ABC, because a Python 2 bytes object is too
+    weak (just a str) as also is my cs.py3.bytes hack class and
+    because the keyword based Packet initiialisation benefits from
+    keyword argument ordering.
 
-    * Cameron Simpson <cs@cskk.id.au> 22jul2018
+    In the description below I use the word "chunk" to mean a piece
+    of binary data obeying the buffer protocol, almost always a
+    `bytes` instance or a `memoryview`, but in principle also things
+    like `bytearray`.
+
+    The classes in this module support easy parsing of binary data
+    structures.
+
+    The functions and classes in this module include:
+    * `PacketField`: an abstract class for a binary field, with a
+      factory method to parse it, a transcription method to transcribe
+      it back out in binary form and usually a `.value` attribute
+      holding the parsed value.
+    * several presupplied subclasses for common basic types such
+      as `UInt32BE` (an unsigned 32 bit big endian integer).
+    * `struct_field`: a factory for making PacketField classes for
+      `struct` formats with a single value field.
+    * `multi_struct_field` and `structtuple`: factories for making
+      `PacketField`s` from `struct` formats with multiple value
+      fields;
+      `structtuple` makes `PacketFields` which are also `namedtuple`s,
+      supporting trivial access to the parsed values.
+    * `Packet`: a `PacketField` subclass for parsing multiple
+      `PacketFields` into a larger structure with ordered named
+      fields.
+
+    You don't need to make fields only from binary data; because
+    `PacketField.__init__` takes a post parse value, you can also
+    construct `PacketField`s from scratch with their values and
+    transcribe the resulting binary form.
+
+    Each `PacketField` subclass has the following methods:
+    * `transcribe`: easily return the binary transcription of this field,
+      either directly as a chunk (or for convenience, also None or
+      an ASCII str) or by yielding successive binary data.
+    * `from_buffer`: a factory to parse this field from a
+      `cs.buffer.CornuCopyBuffer`.
+    * `from_bytes`: a factory to parse this field from a chunk with
+      an optional starting offset; this is a convenience wrapper for
+      `from_buffer`.
+
+    That may sound a little arcane, but we also supply:
+    * `flatten`: a recursive function to take the return from any
+      `transcribe` method and yield chunks, so copying a packet to
+      a file or elsewhere can always be done by iterating over
+      `flatten(field.transcribe())` or via the convenience
+      `field.transcribe_flat()` method which calls `flatten` itself.
+    * a `CornuCopyBuffer` is an easy to use wrapper for parsing any
+      iterable of chunks, which may come from almost any source.  
+      It has a bunch of convenient factories including:
+      `from_bytes`, make a buffer from a chunk;
+      `from_fd`, make a buffer from a file descriptor;
+      `from_file`, make a buffer from a file-like object;
+      `from_mmap`, make a buffer from a file descriptor using a
+      memory map (the `mmap` module) of the file, so that chunks
+      can use the file itself as backing store instead of allocating
+      and copying memory.  
+      See the `cs.buffer` module for further detail.
+
+    Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
 from __future__ import print_function
@@ -24,7 +83,6 @@ DISTINFO = {
     'classifiers': [
         "Development Status :: 4 - Beta",
         "Environment :: Console",
-        "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.buffer'],
@@ -105,14 +163,31 @@ class PacketField(ABC):
   @abstractmethod
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
+
+        This may directly return:
+        * a `bytes` or `memryview` holding the binary data
+        * `None`: indicating no binary data
+        * `str`: indicating the ASCII encoding of the string
+          * an iterable of these things (including further iterables)
+          to support trivially transcribing via other fields'
+          `transcribe` methods
+
+        Callers will usually call `flatten` on the output of this
+        method, or use the convenience `transcribe_flat` method
+        which calls `flatten` for them.
     '''
     raise NotImplementedError("no transcribe method")
+
+  def transcribe_flat(self):
+    ''' Return a flat iterable of chunks transcribing this field.
+    '''
+    return flatten(self.transcribe())
 
 class EmptyPacketField(PacketField):
   ''' An empty data field, used as a placeholder for optional
       fields when they are not present.
 
-      The singleton EmptyField is a predefined instance.
+      The singleton `EmptyField` is a predefined instance.
   '''
 
   def __init__(self):
