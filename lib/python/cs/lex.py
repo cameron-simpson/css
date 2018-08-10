@@ -59,6 +59,7 @@ from functools import partial
 import os
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
+from textwrap import dedent
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
 DISTINFO = {
@@ -272,6 +273,22 @@ def skipwhite(s, offset=0):
   '''
   _, offset = get_white(s, offset=offset)
   return offset
+
+def stripped_dedent(s):
+  ''' Slightly smarter dedent.
+
+      Strip the supplied string `s`. Pull off the leading line.
+      Dedent the rest. Put back the leading line.
+  '''
+  s = s.strip()
+  lines = s.split('\n')
+  if not lines:
+    return ''
+  line1 = lines.pop(0)
+  if not lines:
+    return line1
+  adjusted = dedent('\n'.join(lines))
+  return line1 + '\n' + adjusted
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
