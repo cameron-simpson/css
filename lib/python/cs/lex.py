@@ -3,55 +3,12 @@
 r'''
 Lexical analysis functions, tokenisers.
 
-An assortment of lexcial and tokenisation functions useful for writing recursive descent parsers, of which I have several.
+An arbitrary assortment of lexical and tokenisation functions useful
+for writing recursive descent parsers, of which I have several.
 
-Generally the get_* functions accept a source string and an offset (often optional, default 0) and return a token and the new offset, raising ValueError on failed tokenisation.
-
-* as_lines(chunks, partials=None): parse text chunks, yield complete individual lines
-
-* get_chars(s, offset, gochars): collect adjacent characters from `gochars`
-
-* get_decimal(s, offset): collect decimal characters (0-9, string.digits)
-
-* get_delimited(s, offset, delim): collect text up to the first ocurrence of the character `delim`.
-
-* get_envvar(s, offset=0, environ=None, default=None, specials=None): parse an environment variable reference such as $foo
-
-* get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'): parse an identifier
-
-* get_nonwhite(s, offset=0): collect nonwhitespace characters
-
-* get_other_chars(s, offset=0, stopchars=None): collect adjacent characters not from `stopchars`
-
-* get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None): collect a quoted string, honouring slosh escapes and optionally expanding environment variable references
-
-* get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None): collect some slosh escaped text with optional special tokens (such as '$' introducing '$foo')
-
-* get_tokens(s, offset, getters): collect a sequence of tokens specified in `getters`
-
-* match_tokens(s, offset, getters): wrapper for get_tokens which catches ValueError and returns None instead
-
-* get_uc_identifier(s, offset=0, number=digits, extras='_'): collect an UPPERCASE identifier
-
-* get_white(s, offset=0): collect whitespace characters
-
-* isUC_(s): test if a string looks like an upper case identifier
-
-* htmlify(s,nbsp=False): transcribe text in HTML safe form, using &lt; for "<", etc
-
-* htmlquote(s): transcribe text as HTML quoted string suitable for HTML tag attribute values
-
-* jsquote(s): transcribe text as JSON quoted string; essentially like htmlquote without its htmlify step
-
-* parseUC_sAttr(attr): parse FOO or FOOs (or FOOes) and return (FOO, is_plural)
-
-* slosh_mapper(c, charmap=SLOSH_CHARMAP): return a string to replace \c; the default charmap matches Python slosh escapes
-
-* texthexify(bs, shiftin='[', shiftout=']', whitelist=None): a function like binascii.hexlify but also supporting embedded "printable text" subsequences for compactness and human readbility in the result; initial use case was for transcription of binary data with frequent text, specificly directory entry data
-
-* untexthexify(s, shiftin='[', shiftout=']'): the inverse of texthexify()
-
-* unctrl(s,tabsize=8): transcribe text removing control characters
+Generally the get_* functions accept a source string and an offset
+(often optional, default 0) and return a token and the new offset,
+raising ValueError on failed tokenisation.
 '''
 
 import binascii
@@ -83,6 +40,9 @@ else:
 ord_space = ord(' ')
 
 def unctrl(s, tabsize=8):
+  ''' Return the string `s` with TABs expanded and control characters
+      replaced with printably representations.
+  '''
   s2 = ''
   sofar = 0
   for i, ch in enumerate(s):
@@ -139,6 +99,12 @@ def lastlinelen(s):
   return len(s) - s.rfind('\n') - 1
 
 def htmlify(s, nbsp=False):
+  ''' Convert a string for safe transcription in HTML.
+
+      Parameters:
+      * `s`: the string
+      * `nbsp`: replaces spaces with "&nbsp;" to prevent word folding, default `False`.
+  '''
   s = s.replace("&", "&amp;")
   s = s.replace("<", "&lt;")
   s = s.replace(">", "&gt;")
@@ -174,6 +140,7 @@ _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
+
       `whitelist`: a bytes or string object indicating byte values
         which may be represented directly in text; string objects are
         converted to hexify() and texthexify() output strings may be
@@ -224,6 +191,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
 
 def untexthexify(s, shiftin='[', shiftout=']'):
   ''' Decode a textual representation of binary data into binary data.
+
       Outside of the `shiftin`/`shiftout` markers the binary data
       are represented as hexadecimal. Within the markers the bytes
       have the values of the ordinals of the characters.
@@ -263,13 +231,15 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace starting at `offset` (default 0).
+  ''' Scan the string `s` for characters in string.whitespace
+      starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_chars(s, offset, whitespace)
 
 def skipwhite(s, offset=0):
-  ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
+  ''' Convenience routine for skipping past whitespace;
+      returns offset of next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
@@ -291,7 +261,8 @@ def stripped_dedent(s):
   return line1 + '\n' + adjusted
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace starting at `offset` (default 0).
+  ''' Scan the string `s` for characters not in string.whitespace
+      starting at `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
@@ -321,8 +292,11 @@ def get_hexadecimal_value(s, offset=0):
   return int('0x' + value_s), offset
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) starting at `offset` (default 0).
+  ''' Scan the string `s` for an identifier (by default an ASCII
+      letter or underscore followed by letters, digits or underscores)
+      starting at `offset` (default 0).
       Return (match, new_offset).
+
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
@@ -346,8 +320,12 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
-  ''' Scan the string `s` for a dotted identifier (by default an ASCII letter or underscore followed by letters, digits or underscores) with optional trailing dot and another dotted identifier, starting at `offset` (default 0).
+  ''' Scan the string `s` for a dotted identifier (by default an
+      ASCII letter or underscore followed by letters, digits or
+      underscores) with optional trailing dot and another dotted
+      identifier, starting at `offset` (default 0).
       Return (match, new_offset).
+
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
@@ -394,7 +372,11 @@ def slosh_mapper(c, charmap=SLOSH_CHARMAP):
   return charmap.get(c)
 
 def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
-  ''' Collect slosh escaped text from the string `s` from position `offset` (default 0) and return the decoded unicode string and the offset of the completed parse.
+  ''' Collect slosh escaped text from the string `s` from position
+      `offset` (default 0) and return the decoded unicode string and
+      the offset of the completed parse.
+
+      Parameters:
       `delim`: end of string delimiter, such as a single or double quote.
       `offset`: starting offset within `s`, default 0.
       `slosh`: escape character, default a slosh ('\\').
@@ -409,6 +391,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         The parse functions accept
         `s` and the offset of the special character. They return
         the decoded string and the offset past the parse.
+
       The escape character `slosh` introduces an encoding of some
       replacement text whose value depends on the following character.
       If the following character is:
@@ -533,13 +516,16 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
   return u''.join(ustr(chunk) for chunk in chunks), offset
 
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
-  ''' Parse a simple environment variable reference to $varname or $x where "x" is a special character.
-      `s`: the string with the variable reference
-      `offset`: the starting point for the reference
-      `default`: default value for missing environment variables;
+  ''' Parse a simple environment variable reference to $varname or
+      $x where "x" is a special character.
+
+      Paramaters:
+      * `s`: the string with the variable reference
+      * `offset`: the starting point for the reference
+      * `default`: default value for missing environment variables;
          if None (the default) a ValueError is raised
-      `environ`: the environment mapping, default os.environ
-      `specials`: the mapping of special single character variables
+      * `environ`: the environment mapping, default os.environ
+      * `specials`: the mapping of special single character variables
   '''
   if environ is None:
     environ = os.environ
@@ -683,7 +669,9 @@ def parseUC_sAttr(attr):
   return None, False
 
 def as_lines(chunks, partials=None):
-  ''' Generator yielding complete lines from arbitrary pieces text from the iterable `chunks`.
+  ''' Generator yielding complete lines from arbitrary pieces text
+      from the iterable `chunks`.
+
       After completion, any remaining newline-free chunks remain
       in the partials list; this will be unavailable to the caller
       unless the list is presupplied.
