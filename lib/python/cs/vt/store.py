@@ -353,17 +353,23 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self._blockmapdir = dirpath
 
-  def pushto(self, S2, capacity=1024, block_progress=None, bytes_progress=None):
+  def pushto(
+      self, S2,
+      capacity=1024, block_progress=None, bytes_progress=None
+  ):
     ''' Allocate a Queue for Blocks to push from this Store to another Store `S2`.
-        `S2`: the secondary Store to receive Blocks.
-        `capacity`: the Queue capacity, arbitrary default 1024.
-        `block_progress`: an optional Progress counting submitted and completed Blocks.
-        `bytes_progress`: an optional Progress counting submitted and completed data bytes.
         Return (Q, T) where `Q` is the new Queue and `T` is the
-        Thread processing thw Queue.  The caller can then .put
-        Blocks onto the Queue. When finished, call Q.close() to
-        indicate end of Blocks and T.join() to wait for the processing
-        completion.
+        Thread processing the Queue.
+
+        Parameters:
+        * `S2`: the secondary Store to receive Blocks.
+        * `capacity`: the Queue capacity, arbitrary default 1024.
+        * `block_progress`: an optional Progress counting submitted and completed Blocks.
+        * `bytes_progress`: an optional Progress counting submitted and completed data bytes.
+
+        Once called, the caller can then .put Blocks onto the Queue.
+        When finished, call Q.close() to indicate end of Blocks and
+        T.join() to wait for the processing completion.
     '''
     if capacity < 1:
       raise ValueError("capacity must be >= 1, got: %r" % (capacity,))
