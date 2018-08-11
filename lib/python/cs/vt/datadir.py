@@ -92,10 +92,13 @@ def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
 
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file in use by a files based data dir.
+
       Attributes:
-      `datadir`: the _FilesDir tracking this state
-      `filename`: out path relative to the _FilesDir's data directory
-      `indexed_to`: the maximum amount of data scanned and indexed so far
+      * `datadir`: the _FilesDir tracking this state.
+      * `filename`: out path relative to the _FilesDir's data
+        directory>
+      * `indexed_to`: the maximum amount of data scanned and indexed
+        so far.
   '''
 
   def __init__(self, datadir, filenum, filename, indexed_to=0, scanned_to=None) -> None:
@@ -146,8 +149,11 @@ class DataFileState(SimpleNamespace):
     return S.st_size
 
   def scanfrom(self, offset=0, **kw):
-    ''' Scan this datafile from the supplied `offset` (default 0) yielding (offset, flags, data, post_offset).
-        We use the DataDir's .scan method because it knows the format of the file.
+    ''' Scan this datafile from the supplied `offset` (default 0)
+        yielding (offset, flags, data, post_offset).
+
+        We use the DataDir's .scanfrom method because it knows the
+        format of the file.
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
 
@@ -174,25 +180,26 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       runstate=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
-        `statedirpath`: a directory containing state information
-            about the DataFiles; this is the index-state.csv file and
-            the associated index dbm-ish files.
-        `datadirpath`: the directory containing the DataFiles.
-            If this is shared by other clients then it should be
-            different from the `statedirpath`.
-            If None, default to "statedirpath/data", which might be
-            a symlink to a shared area such as a NAS.
-        `hashclass`: the hash class used to index chunk contents.
-        `indexclass`: the IndexClass providing the index to chunks
-            in the DataFiles. If not specified, a supported index
-            class with an existing index file will be chosen, otherwise
-            the most favoured indexclass available will be chosen.
-        `create_statedir`: os.mkdir the state directory if missing
-        `create_datadir`: os.mkdir the data directory if missing
-        `flags`: optional Flags object for control; if specified
-            then `flag_prefix` is also required
-        `flag_prefix`: prefix for control flag names
-        `runstate`: optional RunState, passed to RunStateMixin.__init__
+
+        Parameters:
+        * `statedirpath`: a directory containing state information about the
+          DataFiles; this is the index-state.csv file and the associated
+          index dbm-ish files.
+        * `datadirpath`: the directory containing the DataFiles.  If this is
+          shared by other clients then it should be different from the
+          `statedirpath`.  If None, default to "statedirpath/data", which
+          might be a symlink to a shared area such as a NAS.
+        * `hashclass`: the hash class used to index chunk contents.
+        * `indexclass`: the IndexClass providing the index to chunks in the
+          DataFiles. If not specified, a supported index class with an
+          existing index file will be chosen, otherwise the most favoured
+          indexclass available will be chosen.
+        * `create_statedir`: os.mkdir the state directory if missing
+        * `create_datadir`: os.mkdir the data directory if missing
+        * `flags`: optional Flags object for control; if specified then
+          `flag_prefix` is also required
+        * `flag_prefix`: prefix for control flag names
+        * `runstate`: optional RunState, passed to RunStateMixin.__init__
     '''
     MultiOpenMixin.__init__(self, lock=RLock())
     RunStateMixin.__init__(self, runstate=runstate)
@@ -464,8 +471,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.set_state('current', new_filenum)
 
   def _add_datafile(self, filename):
-    ''' Add the specified data file named `filename` to the filemap, returning the filenum.
-        `filename`: the filename relative to the data directory
+    ''' Add the specified data file named `filename` to the filemap,
+        returning the filenum.
+
+        * `filename`: the filename relative to the data directory.
     '''
     DFstate = DataFileState(self, None, filename, indexed_to=0)
     return self._add_datafilestate(DFstate)
@@ -502,7 +511,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return filenum
 
   def _del_datafilestate(self, DFstate):
-    ''' Delete references to the specified DataFileState, leaving a None placeholder behind.
+    ''' Delete references to the specified DataFileState,
+        leaving a None placeholder behind.
     '''
     filename = DFstate.filename
     filenum = DFstate.filenum
@@ -594,10 +604,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return len(self.index)
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
-    ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
-        `start_hashcode`: the first hashcode; if missing or None, iteration
-                          starts with the first key in the index
-        `reverse`: iterate backwards if true, otherwise forwards
+    ''' Generator yielding the hashcodes from the database in order
+        starting with optional `start_hashcode`.
+
+        Parameters:
+        * `start_hashcode`: the first hashcode; if missing or None,
+          iteration starts with the first key in the index
+        * `reverse`: iterate backwards if true, otherwise forwards.
     '''
     unindexed = set(self._unindexed)
     indexed = self.index.hashcodes_from(start_hashcode=start_hashcode,
@@ -665,7 +678,9 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
 
 class DataDir(_FilesDir):
   ''' Maintenance of a collection of DataFiles in a directory.
+
       A DataDir may be used as the Mapping for a MappingStore.
+
       NB: _not_ thread safe; callers must arrange that.
 
       The directory may be maintained by multiple instances of this
@@ -684,24 +699,26 @@ class DataDir(_FilesDir):
       **kw
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
-        `statedirpath`: a directory containing state information
-            about the DataFiles; this is the index-state.csv file and
-            the associated index dbm-ish files.
-        `datadirpath`: the directory containing the DataFiles.
-            If this is shared by other clients then it should be
-            different from the `statedirpath`.
-            If None, default to "statedirpath/data", which might be
-            a symlink to a shared area such as a NAS.
-        `hashclass`: the hash class used to index chunk contents.
-        `indexclass`: the IndexClass providing the index to chunks
-            in the DataFiles. If not specified, a supported index
-            class with an existing index file will be chosen, otherwise
-            the most favoured indexclass available will be chosen.
-        `rollover`: data file roll over size; if a data file grows
-            beyond this a new datafile is commenced for new blocks.
-            Default: DEFAULT_ROLLOVER
-        `create_statedir`: os.mkdir the state directory if missing
-        `create_datadir`: os.mkdir the data directory if missing
+
+        Parameters:
+        * `statedirpath`: a directory containing state information about the
+          DataFiles; this is the index-state.csv file and the associated
+          index dbm-ish files.
+        * `datadirpath`: the directory containing the DataFiles.
+          If this is shared by other clients then it should be different from
+          the `statedirpath`.
+          If None, default to "statedirpath/data", which might be a symlink
+          to a shared area such as a NAS.
+        * `hashclass`: the hash class used to index chunk contents.
+        * `indexclass`: the IndexClass providing the index to chunks in the
+          DataFiles. If not specified, a supported index class with an
+          existing index file will be chosen, otherwise the most favoured
+          indexclass available will be chosen.
+        * `rollover`: data file roll over size; if a data file grows beyond
+          this a new datafile is commenced for new blocks.  Default:
+          `DEFAULT_ROLLOVER`.
+        * `create_statedir`: os.mkdir the state directory if missing.
+        * `create_datadir`: os.mkdir the data directory if missing.
     '''
     super().__init__(statedirpath, datadirpath, hashclass, **kw)
     if rollover is None:
@@ -748,6 +765,7 @@ class DataDir(_FilesDir):
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
+
         This is what supports shared use of the data area. Other clients
         may write to their onw datafiles and this thread sees new files
         and new data in existing files and scans it, adding the index
@@ -822,8 +840,8 @@ class DataDir(_FilesDir):
       time.sleep(1)
 
   def add(self, data):
-    ''' Add the supplied data chunk to the current DataFile, return the hashcode.
-        Roll the internal state over to a new file if the current
+    ''' Add the supplied data chunk to the current DataFile, return the
+        hashcode.  Roll the internal state over to a new file if the current
         datafile has reached the rollover threshold.
     '''
     # save the data in the current datafile, record the file number and offset
@@ -930,9 +948,13 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
     return data
 
 class PlatonicDir(_FilesDir):
-  ''' Presentation of a block map based on a raw directory tree of files such a preexisting media server.
+  ''' Presentation of a block map based on a raw directory tree of
+      files such as a preexisting media server.
+
       A PlatonicDir may be used as the Mapping for a MappingStore.
+
       NB: _not_ thread safe; callers must arrange that.
+
       A PlatonicDir is read-only. Data blocks are fetched directly
       from the files in the backing directory tree.
   '''
@@ -948,29 +970,32 @@ class PlatonicDir(_FilesDir):
       **kw
   ):
     ''' Initialise the PlatonicDir with `statedirpath` and `datadirpath`.
-        `statedirpath`: a directory containing state information
-            about the DataFiles; this is the index-state.csv file and
-            the associated index dbm-ish files.
-        `datadirpath`: the directory containing the DataFiles.
-            If this is shared by other clients then it should be
-            different from the `statedirpath`.
-            If None, default to "statedirpath/data", which might be
-            a symlink to a shared area such as a NAS.
-        `hashclass`: the hash class used to index chunk contents.
-        `exclude_dir`: optional function to test a directory path for
+
+        Parameters:
+        * `statedirpath`: a directory containing state information about the
+          DataFiles; this is the index-state.csv file and the associated
+          index dbm-ish files.
+        * `datadirpath`: the directory containing the DataFiles.  If this is
+          shared by other clients then it should be different from the
+          `statedirpath`.  If None, default to "statedirpath/data", which
+          might be a symlink to a shared area such as a NAS.
+        * `hashclass`: the hash class used to index chunk contents.
+        * `exclude_dir`: optional function to test a directory path for
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
-        `exclude_file`: optional function to test a file path for
+        * `exclude_file`: optional function to test a file path for
           exclusion from monitoring; default is to exclude directories
           whose basename commences with a dot.
-        `follow_symlinks`: follow symbolic links, default False.
-        `meta_store`: an optional Store used to maintain a Dir
+        * `follow_symlinks`: follow symbolic links, default False.
+        * `meta_store`: an optional Store used to maintain a Dir
           representing the ideal directory; unhashed data blocks
           encountered during scans which are promoted to HashCodeBlocks
           are also stored here
-        `archive`: optional Archive ducktype instance with a
+        * `archive`: optional Archive ducktype instance with a
           .update(Dirent[,when]) method
+
         Other keyword arguments are passed to _FilesDir.__init__.
+
         The directory and file paths tested are relative to the
         data directory path.
     '''
