@@ -36,11 +36,13 @@ OFF_STRUCT = Struct('<L')
 
 _MapEntry = namedtuple('MapEntry', 'index offset span hashcode')
 class MapEntry(_MapEntry):
+
   @prop
   def leaf(self):
     ''' Return the leaf block for this entry.
     '''
     return HashCodeBlock(hashcode=self.hashcode, span=self.span)
+
   @prop
   def data(self):
     ''' Return the data from this leaf block.
@@ -342,7 +344,6 @@ class BlockMap(RunStateMixin):
             h = leaf.hashcode
           except AttributeError:
             # make a conventional HashCodeBlock and index that
-            from .block import HashCodeBlock
             data = leaf.data
             if len(data) >= 65536:
               warning("promoting %d bytes from %s to a new HashCodeBlock", len(data), leaf)
