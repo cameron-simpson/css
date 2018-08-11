@@ -1,4 +1,3 @@
-Dir.transcribe: drop name if dot or empty, check that parse supports this
 vt.stream: give the _connect method some hysteresis
 DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
 general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
@@ -87,10 +86,7 @@ vtfuse close file should not block, but update mtime and queue sync with callbac
 SIGINT clean shutdown of mount
 make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
     NULBlock trite factory for RLEBlock(b'\0', length)
-cs.buffer.CornuCopyBuffer: automatically upgrade iterables to iterators?
-    probe for __next__ ?
 salt entries for Dirs,
-text serialisation: all human readable, regular syntax
 stats in new vs existing blocks when adding blocks
 scanners:
   mbox look for nn and rnrn
