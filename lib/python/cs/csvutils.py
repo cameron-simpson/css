@@ -14,7 +14,7 @@
 ''' Utility functions for CSV files.
 '''
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 import csv
 import sys
 from cs.deco import strable
@@ -89,9 +89,10 @@ def csv_import(
     column_names=None,
     computed=None,
     preprocess=None,
+    mixin=None,
     **kw):
-  ''' Read CSV data where the first row contains column headers,
-      yield named tuples for subsequent rows.
+  ''' Read CSV data where the first row contains column headers.
+      Returns a row namedtuple factory and an iterable of instances.
 
       `fp`: a file object containing CSV data, or the name of such a file
       `class_name`: optional class name for the namedtuple subclass
@@ -106,19 +107,84 @@ def csv_import(
         to modify CSV rows before they are converted into the namedtuple.
         It receives a context object an the data row. It may return
         the row (possibly modified), or None to drop the row.
+      `mixin`: an optional mixin class for the generated namedtuple subclass
+        to provide extra methods or properties
 
       All other keyword paramaters are passed to csv_reader(). This
       is a very thin shim around cs.mappings.named_column_tuples.
 
-      Example:
-        >>> list(csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB'))   #doctest: +ELLIPSIS
-        [<function named_row_tuple.<locals>.factory at ...>, Example_AB(a='1', b='2'), Example_AB(a='3', b='4')]
-        >>> list(csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G ']))   #doctest: +ELLIPSIS
-        [<function named_row_tuple.<locals>.factory at ...>, Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
+      Examples:
+
+        >>> cls, rows = csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB')
+        >>> cls     #doctest: +ELLIPSIS
+        <function named_row_tuple.<locals>.factory at ...>
+        >>> list(rows)
+        [Example_AB(a='1', b='2'), Example_AB(a='3', b='4')]
+
+        >>> cls, rows = csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G '])
+        >>> list(rows)
+        [Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
   '''
   return named_column_tuples(
       csv_reader(fp, **kw),
       class_name=class_name,
       column_names=column_names,
       computed=computed,
-      preprocess=preprocess)
+      preprocess=preprocess,
+      mixin=mixin)
+
+def xl_import(
+    workbook, sheet_name,
+    skip_rows=0,
+    **kw):
+  ''' Read the named `sheet_name` from the Excel XLSX file named
+      `filename` as for csv_import. Returns a row namedtuple factory
+      and an iterable of instances.
+
+      `workbook`: Excel work book from which to load the sheet; if
+        this is a str then the work book is obtained from
+        openpyxl.load_workbook()
+      `sheet_name`: the name of the work book sheet whose data should be imported
+      Other keyword parameters are as for cs.mappings.named_column_tuples.
+
+      NOTE: this function requires the openpyxl module to be available.
+  '''
+  if isinstance(workbook, str):
+    from openpyxl import load_workbook
+    filename = workbook
+    with Pfx(filename):
+      workbook = load_workbook(filename=filename, read_only=True)
+      return xl_import(workbook, sheet_name, skip_rows=skip_rows, **kw)
+  else:
+    return named_column_tuples(
+        (
+            [ cell.value for cell in row ]
+            for ri, row in enumerate(workbook[sheet_name])
+            if ri >= skip_rows
+        ),
+        **kw )
+
+if __name__ == '__main__':
+  args = sys.argv[1:]
+  if not args:
+    raise ValueError("missing filename")
+  for filename in args:
+    print(filename)
+    with Pfx(filename):
+      if filename.endswith('.csv'):
+        with open(filename, 'r') as csvfp:
+          cls, rows = csv_import(csvfp)
+          for rownum, row in enumerate(rows, 1):
+            print(filename, rownum, row)
+      elif filename.endswith('.xlsx'):
+        from openpyxl import load_workbook
+        workbook = load_workbook(filename=filename, read_only=True)
+        for sheet_name in workbook.get_sheet_names():
+          with Pfx(sheet_name):
+            # presume row 1 in some kind of title and column names are row 2
+            cls, rows = xl_import(workbook, sheet_name, skip_rows=1)
+            for rownum, row in enumerate(rows, 1):
+              print(filename, sheet_name, rownum, row)
+      else:
+        raise ValueError('not a .csv or .xlsx file')
+    print()

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Convenience wrapper for iTerm2 opterations.
+# Convenience wrapper for some iTerm2 operations.
 #       - Cameron Simpson <cs@cskk.id.au> 26apr2014
 #
 
@@ -12,6 +12,8 @@ cmd=$0
 usage="Usage: $cmd [-x] op [op-args...]
   Ops:
     badge-format format...
+    colour scheme
+    img imgfiles...
     open command [args...]
         Open new terminal window runnong command.
     setvar varname value...
@@ -76,6 +78,13 @@ else
 X
       }
       ;;
+    img)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing imgfiles" >&2
+        badopts=1
+      fi
+      ;;
     open)
       if [ $# = 0 ]
       then
@@ -110,10 +119,47 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# tmux requires unrecognized OSC sequences to be wrapped with DCS tmux;
+# <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
+# only accepts ESC backslash for ST. We use TERM instead of TMUX because TERM
+# gets passed through ssh.
+function print_osc() {
+  case "$TERM" in
+    screen*)  printf "\033Ptmux;\033\033]" ;;
+    *)        printf "\033]" ;;
+  esac
+}
+
+# More of the tmux workaround described above.
+function print_st() {
+  case "$TERM" in
+    screen*)    printf "\a\033\\" ;;
+    *)          printf "\a" ;;
+  esac
+}
+
 case "$op" in
   badge-format)
     format64=$( printf '%s' "$*" | base64 )
     printf '\e]1337;SetBadgeFormat=%s\a' "$format64"
+    ;;
+  img)
+    xit=0
+    for imgfile
+    do
+      [ -s "$imgfile" ] || {
+        echo "$cmd: not a file: $imgfile" >&2
+        xit=1
+        continue
+      }
+      echo "$imgfile"
+      imgcontent=$( base64 <"$imgfile" )
+      print_osc
+      printf "1337;File=inline=1:$imgcontent"
+      print_st
+      echo
+    done
+    exit $xit
     ;;
   open)
     shcmd=$( shqstr "$@" )

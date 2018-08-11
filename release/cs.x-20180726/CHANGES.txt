@@ -1,0 +1,8 @@
+  lib/python/cs/README-x.rst lib/python/cs/x.py: cs.x: move README into module docstring
+  lib/python/cs/README-x.rst: merge pypi ==> default
+  lib/python/cs/README-x.rst: merge default ==> beyonwiz
+  lib/python/cs/README-x.rst: merge default ==> iphoto
+  lib/python/cs/README-x.rst: merge default ==> venti
+  lib/python/cs/README-x.rst: merge later ==> pilfer
+  lib/python/cs/x.py: cs.x: lint
+  lib/python/cs/x.py: cs.x: docstring improvements
