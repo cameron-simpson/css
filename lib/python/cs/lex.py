@@ -32,6 +32,8 @@ DISTINFO = {
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
   def hexify(bs):
+    ''' A Python 2 flavour of binascii.hexlify.
+    '''
     return binascii.hexlify(bs).decode()
 else:
   hexify = binascii.hexlify
@@ -76,6 +78,8 @@ def unctrl(s, tabsize=8):
   return s2.expandtabs(tabsize)
 
 def tabpadding(padlen, tabsize=8, offset=0):
+  ''' Compute some spaces to use a tab padding at an offfset.
+  '''
   pad = ''
   nexttab = tabsize - offset % tabsize
   while nexttab <= padlen:
@@ -89,6 +93,8 @@ def tabpadding(padlen, tabsize=8, offset=0):
   return pad
 
 def strlist(ary, sep=", "):
+  ''' Convert an iterable to strings and join with ", ".
+  '''
   return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
@@ -112,6 +118,8 @@ def htmlify(s, nbsp=False):
   return s
 
 def htmlquote(s):
+  ''' Quote a string for use in HTML.
+  '''
   s = htmlify(s)
   s = s.replace("\"", "&dquot;")
   return "\"" + s + "\""
@@ -190,10 +198,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         inwhite = False
         if offset - offset0 > inout_len:
           # gather up whitelist span if long enough to bother
-          chunk = (shiftin
-                   + ''.join(chr(bs[o]) for o in range(offset0, offset))
-                   + shiftout
-                   )
+          chunk = (
+              shiftin
+              + ''.join(chr(bs[o]) for o in range(offset0, offset))
+              + shiftout
+          )
         else:
           # transcribe as hex anyway - too short
           chunk = hexify(bs[offset0:offset])
@@ -208,10 +217,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
-      chunk = (shiftin
-               + ''.join(chr(bs[o]) for o in range(offset0, offset))
-               + shiftout
-               )
+      chunk = (
+          shiftin
+          + ''.join(chr(bs[o]) for o in range(offset0, offset))
+          + shiftout
+      )
     else:
       chunk = hexify(bs[offset0:offset])
     chunks.append(chunk)
@@ -219,7 +229,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
 
 def untexthexify(s, shiftin='[', shiftout=']'):
   ''' Decode a textual representation of binary data into binary data.
-      
+
       This is the reverse of the `texthexify` function.
 
       Outside of the `shiftin`/`shiftout` markers the binary data
@@ -443,9 +453,11 @@ SLOSH_CHARMAP = {
     'v': '\v',
 }
 
-def slosh_mapper(c, charmap=SLOSH_CHARMAP):
+def slosh_mapper(c, charmap=None):
   ''' Return a string to replace backslash-`c`, or None.
   '''
+  if charmap is None:
+    charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
 def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
@@ -693,6 +705,9 @@ def get_tokens(s, offset, getters):
       func = getter
     elif isinstance(getter, StringTypes):
       def func(s, offset):
+        ''' Wrapper for a literal string: require the string to be
+            present at the current offset.
+        '''
         if s.startswith(getter, offset):
           return getter, offset + len(getter)
         raise ValueError("string %r not found at offset %d" % (getter, offset))
@@ -700,6 +715,8 @@ def get_tokens(s, offset, getters):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
       def func(s, offset):
+        ''' Wrapper for a getter with a .match method, such as a regular expression.
+        '''
         m = getter.match(s, offset)
         if m:
           return m, m.end()
@@ -767,7 +784,7 @@ def as_lines(chunks, partials=None):
   if partials is None:
     partials = []
   if any(['\n' in p for p in partials]):
-    raise ValueError("newline in partials: %r", partials)
+    raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
     nl_pos = chunk.find('\n', pos)
