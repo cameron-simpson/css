@@ -42,7 +42,7 @@ ord_space = ord(' ')
 
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with TABs expanded and control characters
-      replaced with printably representations.
+      replaced with printable representations.
   '''
   s2 = ''
   sofar = 0
