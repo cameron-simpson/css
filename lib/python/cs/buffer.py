@@ -671,8 +671,8 @@ def chunky(bfr_func):
 
       Example::
 
-        @chunky
-        def func(bfr, ...):
+          @chunky
+          def func(bfr, ...):
   '''
   def chunks_func(chunks, *a, **kw):
     ''' Function accepting chunk iterator.
