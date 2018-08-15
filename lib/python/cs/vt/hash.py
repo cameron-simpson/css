@@ -15,6 +15,15 @@ from cs.x import X
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
+class MissingHashcodeError(KeyError):
+  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
+  '''
+  def __init__(self, hashcode):
+    KeyError.__init__(self, str(hashcode))
+    self.hashcode = hashcode
+  def __str__(self):
+    return "missing hashcode: %s" % (self.hashcode,)
+
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
 

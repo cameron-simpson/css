@@ -15,13 +15,14 @@ import sys
 from cs.excutils import logexc
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.py.func import prop
+from cs.resources import ClosedError
 from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bss
 from cs.stream import PacketConnection
 from cs.threads import locked
+from cs.x import X
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 from .pushpull import missing_hashcodes_by_checksum
-from .store import BasicStoreSync
+from .store import StoreError, BasicStoreSync
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -80,7 +81,7 @@ class StreamStore(BasicStoreSync):
         raise ValueError("connect is not None and one of send_fp or recv_fp is not None")
       self.connect = connect
 
-  @prop
+  @property
   def local_store(self):
     ''' The current local Store.
     '''
@@ -129,7 +130,7 @@ class StreamStore(BasicStoreSync):
       try:
         send_fp, recv_fp = self.connect()
       except Exception as e:
-        raise AttributeError("%r: connect fails: %s" % (attr, e)) from e
+        raise AttributeError("%r: connect fails: %s: %s" % (attr, type(e).__name__, e)) from e
       else:
         conn = self._conn = self._packet_connection(send_fp, recv_fp)
         return conn
@@ -159,6 +160,24 @@ class StreamStore(BasicStoreSync):
     ''' Wait for the PacketConnection to shut down.
     '''
     self._conn.join()
+
+  def do(self, rqtype, flags, data):
+    ''' Wrapper for self._conn.do to catch and report failed autoconnection.
+    '''
+    with Pfx(
+        "%s.do(rqtype=%s,flags=0x%02x,data=%d-bytes)",
+        self, rqtype, flags, len(data)
+    ):
+      try:
+        conn = self._conn
+      except AttributeError as e:
+        raise StoreError("no connection: %s" % (e,)) from e
+      else:
+        try:
+          return conn.do(rqtype, flags, data)
+        except ClosedError as e:
+          del self._conn
+          raise StoreError("connection closed: %s" % (e,)) from e
 
   @logexc
   def _handle_request(self, rq_type, flags, payload):
@@ -233,17 +252,18 @@ class StreamStore(BasicStoreSync):
   def add(self, data):
     hashclass = self.hashclass
     h = hashclass.from_chunk(data)
+    X("ADD %s => %s", h, self.name)
     if self.mode_addif:
       if self.contains(h):
         return h
-    ok, flags, payload = self._conn.do(RqType.ADD, 0, data)
+    ok, flags, payload = self.do(RqType.ADD, 0, data)
     if not ok:
-      raise ValueError(
-          "NOT OK response from add(data=%r): flags=0x%0x, payload=%r"
-          % (data, flags, payload))
+      raise StoreError(
+          "NOT OK response from add(data=%d bytes): flags=0x%0x, payload=%r"
+          % (len(data), flags, payload))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
-      raise ValueError("extra payload data after hashcode: %r" % (payload[offset:],))
+      raise StoreError("extra payload data after hashcode: %r" % (payload[offset:],))
     assert flags == 0
     if h != h2:
       raise RuntimeError(
@@ -252,16 +272,17 @@ class StreamStore(BasicStoreSync):
     return h
 
   def get(self, h):
-    ok, flags, payload = self._conn.do(RqType.GET, 0, h.encode())
+    X("GET %s <= %s", h, self.name)
+    ok, flags, payload = self.do(RqType.GET, 0, h.encode())
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
           % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if found:
       return payload
     if payload:
@@ -271,7 +292,8 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a Result for collection.
     '''
-    ok, flags, payload = self._conn.do(RqType.CONTAINS, 0, h.encode())
+    X("IN? %s => %s", h, self.name)
+    ok, flags, payload = self.do(RqType.CONTAINS, 0, h.encode())
     if not ok:
       raise ValueError(
           "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
@@ -280,13 +302,13 @@ class StreamStore(BasicStoreSync):
     if found:
       flags &= ~0x01
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     if payload:
-      raise ValueError("unexpected payload: %r" % (payload,))
+      raise StoreError("unexpected payload: %r" % (payload,))
     return found
 
   def flush(self):
-    _, flags, payload = self._conn.do(RqType.FLUSH, 0, b'')
+    _, flags, payload = self.do(RqType.FLUSH, 0, b'')
     assert flags == 0
     assert not payload
     local_store = self.local_store
@@ -317,13 +339,13 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(RqType.HASHCODES, flags, payload)
+    ok, flags, payload = self.do(RqType.HASHCODES, flags, payload)
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
           % (start_hashcode, flags, payload))
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     offset = 0
     hashary = []
     while offset < len(payload):
@@ -387,20 +409,20 @@ class StreamStore(BasicStoreSync):
         + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode())
         + put_bs(length if length else 0)
     )
-    ok, flags, payload = self._conn.do(RqType.HASHCODES_HASH, flags, payload)
+    ok, flags, payload = self.do(RqType.HASHCODES_HASH, flags, payload)
     if not ok:
-      raise ValueError(
+      raise StoreError(
           "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
           % (flags, payload))
     if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+      raise StoreError("unexpected flags: 0x%02x" % (flags,))
     hashcode, offset = hash_decode(payload, 0)
     if offset == len(payload):
       h_final = None
     else:
       h_final, offset = hash_decode(payload, offset)
       if offset < len(payload):
-        raise ValueError(
+        raise StoreError(
             "after hashcode (%s) and h_final (%s), extra bytes: %r"
             % (hashcode, h_final, payload[offset:]))
     return hashcode, h_final

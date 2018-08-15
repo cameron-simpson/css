@@ -7,7 +7,7 @@ An arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
 
 Generally the get_* functions accept a source string and an offset
-(often optional, default 0) and return a token and the new offset,
+(usually optional, default 0) and return a token and the new offset,
 raising ValueError on failed tokenisation.
 '''
 
@@ -20,7 +20,6 @@ from textwrap import dedent
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
 DISTINFO = {
-    'description': "lexical analysis, tokenisers",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -33,6 +32,8 @@ DISTINFO = {
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
   def hexify(bs):
+    ''' A Python 2 flavour of binascii.hexlify.
+    '''
     return binascii.hexlify(bs).decode()
 else:
   hexify = binascii.hexlify
@@ -41,7 +42,7 @@ ord_space = ord(' ')
 
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with TABs expanded and control characters
-      replaced with printably representations.
+      replaced with printable representations.
   '''
   s2 = ''
   sofar = 0
@@ -77,6 +78,8 @@ def unctrl(s, tabsize=8):
   return s2.expandtabs(tabsize)
 
 def tabpadding(padlen, tabsize=8, offset=0):
+  ''' Compute some spaces to use a tab padding at an offfset.
+  '''
   pad = ''
   nexttab = tabsize - offset % tabsize
   while nexttab <= padlen:
@@ -90,6 +93,8 @@ def tabpadding(padlen, tabsize=8, offset=0):
   return pad
 
 def strlist(ary, sep=", "):
+  ''' Convert an iterable to strings and join with ", ".
+  '''
   return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
@@ -113,6 +118,8 @@ def htmlify(s, nbsp=False):
   return s
 
 def htmlquote(s):
+  ''' Quote a string for use in HTML.
+  '''
   s = htmlify(s)
   s = s.replace("\"", "&dquot;")
   return "\"" + s + "\""
@@ -139,12 +146,41 @@ def phpquote(s):
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
-  ''' Transcribe the bytes `bs` to text.
+  ''' Transcribe the bytes `bs` to text using compact text runs for
+      some common text values.
 
-      `whitelist`: a bytes or string object indicating byte values
-        which may be represented directly in text; string objects are
-        converted to hexify() and texthexify() output strings may be
-        freely concatenated and decoded with untexthexify().
+      This can be reversed with the `untexthexify` function.
+
+      This is an ah doc format devised to be compact but also to
+      expose "text" embedded within to the eye. The original use
+      case was transcribing a binary directory entry format, where
+      the filename parts would be somewhat visible in the transcription.
+
+      The output is a string of hexadecimal digits for the encoded
+      bytes except for runs of values from the whitelist, which are
+      enclosed in the shiftin and shiftout markers and transcribed
+      as is. The default whitelist is values of the ASCII letters,
+      the decimal digits and the punctuation characters '_-+.,'.
+      The default shiftin and shiftout markers are '[' and ']'.
+
+      Example:
+
+          >>> texthexify(b'&^%&^%abcdefghi)(*)(*')
+          '265e25265e25[abcdefghi]29282a29282a'
+
+      Parameters:
+      * `bs`: the bytes to transcribe
+      * `shiftin`: Optional. The marker string used to indicate a shift to
+        direct textual transcription of the bytes, default: `'['`.
+      * `shiftout`: Optional. The marker string used to indicate a
+        shift from text mode back into hexadecimal transcription,
+        default `']'`.
+      * `whitelist`: an optional bytes or string object indicating byte
+        values which may be represented directly in text; string objects are
+        converted to hexify() and texthexify() output strings may be freely
+        concatenated and decoded with untexthexify().
+        The default value is the ASCII letters, the decimal digits
+        and the punctuation characters '_-+.,'.
   '''
   if whitelist is None:
     whitelist = _texthexify_white_chars
@@ -162,10 +198,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         inwhite = False
         if offset - offset0 > inout_len:
           # gather up whitelist span if long enough to bother
-          chunk = (shiftin
-                   + ''.join(chr(bs[o]) for o in range(offset0, offset))
-                   + shiftout
-                   )
+          chunk = (
+              shiftin
+              + ''.join(chr(bs[o]) for o in range(offset0, offset))
+              + shiftout
+          )
         else:
           # transcribe as hex anyway - too short
           chunk = hexify(bs[offset0:offset])
@@ -180,10 +217,11 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
-      chunk = (shiftin
-               + ''.join(chr(bs[o]) for o in range(offset0, offset))
-               + shiftout
-               )
+      chunk = (
+          shiftin
+          + ''.join(chr(bs[o]) for o in range(offset0, offset))
+          + shiftout
+      )
     else:
       chunk = hexify(bs[offset0:offset])
     chunks.append(chunk)
@@ -192,9 +230,23 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
 def untexthexify(s, shiftin='[', shiftout=']'):
   ''' Decode a textual representation of binary data into binary data.
 
+      This is the reverse of the `texthexify` function.
+
       Outside of the `shiftin`/`shiftout` markers the binary data
       are represented as hexadecimal. Within the markers the bytes
       have the values of the ordinals of the characters.
+
+      Example:
+
+          >>> untexthexify('265e25265e25[abcdefghi]29282a29282a')
+          b'&^%&^%abcdefghi)(*)(*'
+
+      Parameters:
+      * `s`: the string containing the text representation.
+      * `shiftin`: Optional. The marker string commencing a sequence
+        of direct text transcription, default `'['`.
+      * `shiftout`: Optional. The marker string ending a sequence
+        of direct text transcription, default `']'`.
   '''
   chunks = []
   while s:
@@ -239,16 +291,31 @@ def get_white(s, offset=0):
 
 def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace;
-      returns offset of next nonwhitespace character.
+      returns the offset of the next nonwhitespace character.
   '''
   _, offset = get_white(s, offset=offset)
   return offset
 
 def stripped_dedent(s):
-  ''' Slightly smarter dedent.
+  ''' Slightly smarter dedent which ignores a string's opening indent.
 
       Strip the supplied string `s`. Pull off the leading line.
       Dedent the rest. Put back the leading line.
+
+      Example:
+
+          >>> def func(s):
+          ...   """ Slightly smarter dedent which ignores a string's opening indent.
+          ...       Strip the supplied string `s`. Pull off the leading line.
+          ...       Dedent the rest. Put back the leading line.
+          ...   """
+          ...   pass
+          ...
+          >>> from cs.lex import stripped_dedent
+          >>> print(stripped_dedent(func.__doc__))
+          Slightly smarter dedent which ignores a string's opening indent.
+          Strip the supplied string `s`. Pull off the leading line.
+          Dedent the rest. Put back the leading line.
   '''
   s = s.strip()
   lines = s.split('\n')
@@ -269,11 +336,14 @@ def get_nonwhite(s, offset=0):
 
 def get_decimal(s, offset=0):
   ''' Scan the string `s` for decimal characters starting at `offset`.
-      Return dec_string, new_offset.
+      Return (dec_string, new_offset).
   '''
   return get_chars(s, offset, digits)
 
 def get_decimal_value(s, offset=0):
+  ''' Scan the string `s` for a decimal value starting at `offset`.
+      Return (value, new_offset).
+  '''
   value_s, offset = get_decimal(s, offset)
   if not value_s:
     raise ValueError("expected decimal value")
@@ -286,6 +356,9 @@ def get_hexadecimal(s, offset=0):
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_hexadecimal_value(s, offset=0):
+  ''' Scan the string `s` for a hexadecimal value starting at `offset`.
+      Return (value, new_offset).
+  '''
   value_s, offset = get_hexadecimal(s, offset)
   if not value_s:
     raise ValueError("expected hexadecimal value")
@@ -297,8 +370,18 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
       starting at `offset` (default 0).
       Return (match, new_offset).
 
-      The empty string and an unchanged offset will be returned if
+      Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
+
+      Parameters:
+      * `s`: the string to scan
+      * `offset`: the starting offset, default 0.
+      * `alpha`: the characters considered alphabetic,
+        default `string.ascii_letters`.
+      * `number`: the characters considered numeric,
+        default `string.digits`.
+      * `extras`: extra characters considered part of an identifier,
+        default `'_'`.
   '''
   if offset >= len(s):
     return '', offset
@@ -315,9 +398,13 @@ def is_identifier(s, offset=0, **kw):
   return s2 and offset2 == len(s)
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
+  ''' Scan the string `s` for an identifier as for get_identifier(),
+      but require the letters to be uppercase.
   '''
-  return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
+  return get_identifier(
+      s,
+      offset=offset,
+      alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
@@ -326,7 +413,7 @@ def get_dotted_identifier(s, offset=0, **kw):
       identifier, starting at `offset` (default 0).
       Return (match, new_offset).
 
-      The empty string and an unchanged offset will be returned if
+      Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
   offset0 = offset
@@ -366,9 +453,11 @@ SLOSH_CHARMAP = {
     'v': '\v',
 }
 
-def slosh_mapper(c, charmap=SLOSH_CHARMAP):
+def slosh_mapper(c, charmap=None):
   ''' Return a string to replace backslash-`c`, or None.
   '''
+  if charmap is None:
+    charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
 def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
@@ -377,14 +466,14 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       the offset of the completed parse.
 
       Parameters:
-      `delim`: end of string delimiter, such as a single or double quote.
-      `offset`: starting offset within `s`, default 0.
-      `slosh`: escape character, default a slosh ('\\').
-      `mapper`: a mapping function which accepts a single character
-        and returns a replacement string or None; this is used the
+      * `delim`: end of string delimiter, such as a single or double quote.
+      * `offset`: starting offset within `s`, default 0.
+      * `slosh`: escape character, default a slosh ('\\').
+      * `mapper`: a mapping function which accepts a single character
+        and returns a replacement string or `None`; this is used the
         replace things such as '\\t' or '\\n'. The default is the
-        slosh_mapper function, whose default mapping is SLOSH_CHARMAP.
-      `specials`: a mapping of other special character sequences and parse
+        `slosh_mapper` function, whose default mapping is `SLOSH_CHARMAP`.
+      * `specials`: a mapping of other special character sequences and parse
         functions for gathering them up. When one of the special
         character sequences is found in the string, the parse
         function is called to parse at that point.
@@ -395,15 +484,15 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       The escape character `slosh` introduces an encoding of some
       replacement text whose value depends on the following character.
       If the following character is:
-        - the escape character `slosh`, insert the escape character.
-        - the string delimiter `delim`, insert the delimiter.
-        - the character 'x', insert the character with code from
-          the following 2 hexadecimal digits.
-        - the character 'u', insert the character with code from
-          the following 4 hexadecimal digits.
-        - the character 'U', insert the character with code from
-          the following 8 hexadecimal digits.
-        - a character from the keys of mapper
+      * the escape character `slosh`, insert the escape character.
+      * the string delimiter `delim`, insert the delimiter.
+      * the character 'x', insert the character with code from the following
+        2 hexadecimal digits.
+      * the character 'u', insert the character with code from the following
+        4 hexadecimal digits.
+      * the character 'U', insert the character with code from the following
+        8 hexadecimal digits.
+      * a character from the keys of `mapper`
   '''
   if specials is not None:
     # gather up starting character of special keys and a list of
@@ -551,12 +640,14 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
 
 def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   ''' Get quoted text with slosh escapes and optional environment substitution.
-      `s`: the string containg the quoted text.
-      `offset`: the starting point, default 0.
-      `q`: the quote character, default '"'. If `q` is set to None,
+
+      Parameters:
+      * `s`: the string containg the quoted text.
+      * `offset`: the starting point, default 0.
+      * `q`: the quote character, default `'"'`. If `q` is set to `None`,
         do not expect the string to be delimited by quote marks.
-      `environ`: if not None, also parse and expand $envvar references.
-      `default`: passed to get_envvar
+      * `environ`: if not `None`, also parse and expand $envvar references.
+      * `default`: passed to `get_envvar`
   '''
   if environ is None and default is not None:
     raise ValueError(
@@ -577,7 +668,9 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   return get_sloshed_text(s, delim, offset, specials={'$': getvar})
 
 def get_delimited(s, offset, delim):
-  ''' Collect text from the string `s` from position `offset` up to the first occurence of delimiter `delim`; return the text excluding the delimiter and the offset after the delimiter.
+  ''' Collect text from the string `s` from position `offset` up
+      to the first occurence of delimiter `delim`; return the text
+      excluding the delimiter and the offset after the delimiter.
   '''
   pos = s.find(delim, offset)
   if pos < offset:
@@ -586,16 +679,21 @@ def get_delimited(s, offset, delim):
   return s[offset:pos], pos + len(delim)
 
 def get_tokens(s, offset, getters):
-  ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
-      `s`: the string to parse.
-      `offset`: the starting position for the parse.
-      `getters`: an iterable of tokeniser specifications.
+  ''' Parse the string `s` from position `offset` using the supplied
+      tokenise functions `getters`; return the list of tokens matched
+      and the final offset.
+
+      Parameters:
+      * `s`: the string to parse.
+      * `offset`: the starting position for the parse.
+      * `getters`: an iterable of tokeniser specifications.
+
       Each tokeniser specification is either:
-      - a callable expecting (s, offset) and returning (token, new_offset)
-      - a literal string, to be matched exactly
-      - a tuple or list with values (func, args, kwargs);
+      * a callable expecting (s, offset) and returning (token, new_offset)
+      * a literal string, to be matched exactly
+      * a tuple or list with values (func, args, kwargs);
         call func(s, offset, *args, **kwargs)
-      - an object with a .match method such as a regex;
+      * an object with a .match method such as a regex;
         call getter.match(s, offset) and return a match object with
         a .end() method returning the offset of the end of the match
   '''
@@ -607,6 +705,9 @@ def get_tokens(s, offset, getters):
       func = getter
     elif isinstance(getter, StringTypes):
       def func(s, offset):
+        ''' Wrapper for a literal string: require the string to be
+            present at the current offset.
+        '''
         if s.startswith(getter, offset):
           return getter, offset + len(getter)
         raise ValueError("string %r not found at offset %d" % (getter, offset))
@@ -614,6 +715,8 @@ def get_tokens(s, offset, getters):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
       def func(s, offset):
+        ''' Wrapper for a getter with a .match method, such as a regular expression.
+        '''
         m = getter.match(s, offset)
         if m:
           return m, m.end()
@@ -625,7 +728,8 @@ def get_tokens(s, offset, getters):
   return tokens, offset
 
 def match_tokens(s, offset, getters):
-  ''' Wrapper for get_tokens which catches ValueError exceptions and returns (None, offset).
+  ''' Wrapper for get_tokens which catches ValueError exceptions
+      and returns (None, offset).
   '''
   try:
     tokens, offset2 = get_tokens(s, offset, getters)
@@ -649,9 +753,10 @@ def isUC_(s):
   return True
 
 def parseUC_sAttr(attr):
-  ''' Take an attribute name and return (key, isplural).
-      FOO returns (FOO, False).
-      FOOs or FOOes returns (FOO, True).
+  ''' Take an attribute name and return (key, is_plural).
+
+      FOO returns (FOO, False).  
+      FOOs or FOOes returns (FOO, True).  
       Otherwise return (None, False).
   '''
   if len(attr) > 1:
@@ -669,8 +774,8 @@ def parseUC_sAttr(attr):
   return None, False
 
 def as_lines(chunks, partials=None):
-  ''' Generator yielding complete lines from arbitrary pieces text
-      from the iterable `chunks`.
+  ''' Generator yielding complete lines from arbitrary pieces of text from
+      the iterable `chunks`.
 
       After completion, any remaining newline-free chunks remain
       in the partials list; this will be unavailable to the caller
@@ -679,7 +784,7 @@ def as_lines(chunks, partials=None):
   if partials is None:
     partials = []
   if any(['\n' in p for p in partials]):
-    raise ValueError("newline in partials: %r", partials)
+    raise ValueError("newline in partials: %r" % (partials,))
   for chunk in chunks:
     pos = 0
     nl_pos = chunk.find('\n', pos)

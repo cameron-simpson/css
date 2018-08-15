@@ -40,7 +40,7 @@ from .block import Block, IndirectBlock, decodeBlock
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
-from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
+from .datadir import DataDir, DataDirIndexEntry
 from .datafile import DataFile, DataFlag, decompress
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
@@ -49,10 +49,9 @@ from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
 from .parsers import scanner_from_filename
 from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
-from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .server import serve_tcp, serve_socket
 from .smuggling import import_dir, import_file
-from .store import ProgressStore, DataDirStore, ProxyStore
+from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
 def main(argv):
@@ -136,7 +135,7 @@ class VTCmd:
     try:
       opts, args = getopt(args, 'C:S:f:qv')
     except GetoptError as e:
-      error("unrecognised option: %s: %s"% (e.opt, e.msg))
+      error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
       opts, args = [], []
 
@@ -235,11 +234,15 @@ class VTCmd:
         raise GetoptError("no $VT_STORE and no -S option")
       try:
         S = Store(self.store_spec, self.config)
+      except ValueError as e:
+        raise GetoptError("unusable Store specification: %s: %s" % (self.store_spec, e))
       except Exception as e:
-        exception("can't open store %r: %s", self.store_spec, e)
+        exception("UNEXPECTED EXCEPTION: can't open store %r: %s", self.store_spec, e)
         raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
       defaults.push_Ss(S)
-      if self.cache_store_spec is not None:
+      if self.cache_store_spec is None:
+        cacheS = None
+      else:
         try:
           cacheS = Store(self.cache_store_spec, self.config)
         except Exception as e:
@@ -347,9 +350,10 @@ class VTCmd:
     for path in args:
       if path.endswith('.vtd'):
         print(path)
-        with open(path, 'rb') as fp:
+        DF = DataFile(path)
+        with DF:
           try:
-            for offset, flags, data, offset2 in DataFile.scan_records(fp, do_decompress=True):
+            for offset, flags, data, offset2 in DF.scanfrom(0, do_decompress=True):
               hashcode = hashclass(data)
               leadin = '%9d %16.16s' % (offset, hashcode)
               dump_chunk(data, leadin, max_width, one_line)
@@ -559,6 +563,7 @@ class VTCmd:
     try:
       special = args.pop(0)
     except IndexError:
+      special = None
       error("missing special")
       badopts = True
     else:
@@ -884,6 +889,8 @@ class VTCmd:
     return 0
 
   def cmd_test(self, args):
+    ''' Test various facilites.
+    '''
     if not args:
       raise GetoptError("missing test subcommand")
     subcmd = args.pop(0)

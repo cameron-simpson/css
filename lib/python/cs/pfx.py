@@ -253,6 +253,7 @@ class Pfx(object):
           return prefix \
               + ': ' \
               + ustr(text, errors='replace').replace('\n', '\n' + prefix)
+        did_prefix = False
         for attr in 'args', 'message', 'msg', 'reason':
           try:
             value = getattr(exc_value, attr)
@@ -265,9 +266,10 @@ class Pfx(object):
               try:
                 vlen = len(value)
               except TypeError:
-                print("warning: %s: %s.%s: " % (prefix, exc_value, attr),
-                      prefixify("do not know how to prefixify: %r" % (value,)),
-                      file=sys.stderr)
+                print(
+                    "warning: %s: %s.%s: " % (prefix, exc_value, attr),
+                    prefixify("do not know how to prefixify: %r" % (value,)),
+                    file=sys.stderr)
                 continue
               else:
                 if vlen < 1:
@@ -275,7 +277,13 @@ class Pfx(object):
                 else:
                   value = [ prefixify(value[0]) ] + list(value[1:])
             setattr(exc_value, attr, value)
+            did_prefix = True
             break
+        if not did_prefix:
+          print(
+              "warning: %s: %s:%s: message not prefixed"
+              % (prefix, type(exc_value).__name__, exc_value),
+              file=sys.stderr)
     _state.pop()
     if _state.trace:
       _state.trace(_state.prefix)
