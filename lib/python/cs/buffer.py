@@ -10,8 +10,10 @@
 '''
 
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END
+from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
+from stat import S_ISREG
+import sys
 from cs.py3 import pread
 
 DISTINFO = {
@@ -63,7 +65,7 @@ class CornuCopyBuffer(object):
 
   def __init__(
       self, input_data,
-      buf=None, offset=0,
+      buf=None, offset=0, seekable=None,
       copy_offsets=None, copy_chunks=None
   ):
     ''' Prepare the buffer.
@@ -75,6 +77,9 @@ class CornuCopyBuffer(object):
           factory.
         * `buf`: if not None, the initial state of the parse buffer
         * `offset`: logical offset of the start of the buffer, default 0
+        * `seekable`: whether `input_data` has a working `.seek` method;
+          the default is None meaning that it will be attempted on
+          the first skip or seek
         * `copy_offsets`: if not None, a callable for parsers to
           report pertinent offsets via the buffer's .report_offset
           method
@@ -98,10 +103,11 @@ class CornuCopyBuffer(object):
       buf = b''
     self.buf = buf
     self.offset = offset
+    self.seekable = seekable
+    input_data = self.input_data = iter(input_data)
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
     self.copy_offsets = copy_offsets
-    input_data = self.input_data = iter(input_data)
     # Try to compute the displacement between the input_data byte
     # offset and the buffer's logical offset.
     # NOTE: if the input_data iterator does not have a .offset
@@ -114,10 +120,10 @@ class CornuCopyBuffer(object):
   def from_fd(cls, fd, readsize=None, offset=None, **kw):
     ''' Return a new CornuCopyBuffer attached to an open file descriptor.
 
-        Internally this constructs a SeekableFDIterator, which
-        provides the iteration that CornuCopyBuffer consumes, but
-        also seek support if the underlying file descriptor is
-        seekable.
+        Internally this constructs a SeekableFDIterator for regular
+        files or an FDIterator for other files, which provides the
+        iteration that CornuCopyBuffer consumes, but also seek
+        support if the underlying file descriptor is seekable.
 
         *Note*: a SeekableFDIterator makes an `os.dup` of the
         supplied file descriptor, so the caller is responsible for
@@ -131,7 +137,10 @@ class CornuCopyBuffer(object):
           start with this offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
+    if S_ISREG(fstat(fd).st_mode):
+      it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
+    else:
+      it = FDIterator(fd, readsize=readsize, offset=offset)
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
@@ -174,7 +183,12 @@ class CornuCopyBuffer(object):
           offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
+    try:
+      _ = fp.tell
+    except AttributeError:
+      it = FileIterator(fp, readsize=readsize, offset=offset)
+    else:
+      it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
@@ -350,6 +364,8 @@ class CornuCopyBuffer(object):
 
         Other arguments are as for extend().
     '''
+    if size == 0:
+      return b''
     self.extend(size, short_ok=short_ok)
     buf = self.buf
     taken = buf[:size]
@@ -463,18 +479,36 @@ class CornuCopyBuffer(object):
     if toskip > 0:
       # advance the rest of the way
       chunks = self.input_data
-      # should we do a seek?
-      if copy_skip is None:
-        input_seek = getattr(chunks, 'seek', None)
-      else:
-        input_seek = None
-      if input_seek:
-        # seek directly to new_offset
+      new_offset = None
+      seekable = self.seekable
+      if seekable is None or seekable:
+        # should we do a seek?
+        try:
+          input_seek = chunks.seek
+        except AttributeError:
+          if seekable is not None:
+            print(
+                "%s.skip: warning: seekable=%r but no input_data.seek method,"
+                " resetting seekable to False"
+                % (self, seekable), file=sys.stderr)
+          seekable = self.seekable = False
+        else:
+          # input_data has a seek method, try to use it
+          seekable = True
+      if seekable:
+        # try to seek directly to the new offset
         new_offset = offset + toskip
         input_offset = new_offset + self.input_offset_displacement
-        input_seek(input_offset)
-        offset = new_offset
-      else:
+        try:
+          input_seek(input_offset)
+        except OSError as e:
+          print(
+              "%s.skip: warning: input_data.seek(%r): %s, resetting seekable to False"
+              % (self, input_offset, e), file=sys.stderr)
+          seekable = self.seekable = False
+        else:
+          offset = new_offset
+      if not seekable:
         # no seek, consume sufficient chunks
         self.hint(toskip)
         while toskip > 0:
@@ -497,6 +531,8 @@ class CornuCopyBuffer(object):
             buf = buf[bufskip:]
             toskip -= bufskip
             offset += bufskip
+      else:
+        offset = new_offset
     self.buf = buf
     self.offset = offset
 
@@ -661,6 +697,9 @@ class CopyingIterator(object):
     item = next(self.I)
     self.copy_to(item)
     return item
+  def __getattr__(self, attr):
+    # proxy other attributes from the base iterator
+    return getattr(self.I, attr)
 
 def chunky(bfr_func):
   ''' Decorator for a function accepting a leading CornuCopyBuffer
@@ -683,7 +722,7 @@ def chunky(bfr_func):
     return bfr_func(bfr, *a, **kw)
   return chunks_func
 
-class SeekableIterator(object):
+class _Iterator(object):
   ''' A base class for iterators over seekable things.
   '''
 
@@ -764,6 +803,10 @@ class SeekableIterator(object):
       self.next_hint = hint
     return data
 
+class SeekableIteratorMixin(object):
+  ''' Mixin supplying a logical with a `seek` method.
+  '''
+
   def seek(self, new_offset, mode=SEEK_SET):
     ''' Move the logical offset.
     '''
@@ -782,8 +825,8 @@ class SeekableIterator(object):
     self.offset = new_offset
     return new_offset
 
-class SeekableFDIterator(SeekableIterator):
-  ''' An iterator over the data of a seekable file descriptor.
+class FDIterator(_Iterator):
+  ''' An iterator over the data of a file descriptor.
 
       *Note*: the iterator works with an os.dup() of the file
       descriptor so that it can close it with impunity; this requires
@@ -804,8 +847,8 @@ class SeekableFDIterator(SeekableIterator):
           into alignment with `readsize`; the default is True
     '''
     if offset is None:
-      offset = os.lseek(fd, 0, SEEK_CUR)
-    SeekableIterator.__init__(
+      offset = 0
+    _Iterator.__init__(
         self,
         offset=offset, readsize=readsize, align=align)
     # dup the fd so that we can close it with impunity
@@ -818,16 +861,32 @@ class SeekableFDIterator(SeekableIterator):
       os.close(self.fd)
       self.fd = None
 
+  def _fetch(self, readsize):
+    return os.read(self.fd, readsize)
+
+class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
+  ''' An iterator over the data of a seekable file descriptor.
+
+      *Note*: the iterator works with an os.dup() of the file
+      descriptor so that it can close it with impunity; this requires
+      the caller to close their descriptor.
+  '''
+
+  def __init__(self, fd, offset=None, **kw):
+    if offset is None:
+      offset = os.lseek(fd, 0, SEEK_CUR)
+    FDIterator.__init__(self, fd, offset=offset, **kw)
+
+  def _fetch(self, readsize):
+    return pread(self.fd, readsize, self.offset)
+
   @property
   def end_offset(self):
     ''' The end offset of the file.
     '''
     return os.fstat(self.fd).st_size
 
-  def _fetch(self, readsize):
-    return pread(self.fd, readsize, self.offset)
-
-class SeekableFileIterator(SeekableIterator):
+class FileIterator(_Iterator, SeekableIteratorMixin):
   ''' An iterator over the data of a file object.
 
       *Note*: the iterator closes the file on __del__ or if its
@@ -840,16 +899,16 @@ class SeekableFileIterator(SeekableIterator):
         Parameters:
         * `fp`: file object
         * `offset`: the initial logical offset, kept up to date by
-          iteration; the default is the current file position.
+          iteration; the default is 0.
         * `readsize`: a preferred read size; if omitted then
           `DEFAULT_READSIZE` will be stored
-        * `align`: whther to align reads by default: if true then
+        * `align`: whether to align reads by default: if true then
           the iterator will do a short read to bring the `offset`
           into alignment with `readsize`; the default is False
     '''
     if offset is None:
-      offset = fp.tell()
-    SeekableIterator.__init__(
+      offset = 0
+    _Iterator.__init__(
         self,
         offset=offset, readsize=readsize, align=align)
     self.fp = fp
@@ -870,6 +929,33 @@ class SeekableFileIterator(SeekableIterator):
   def _fetch(self, readsize):
     return self.read1(readsize)
 
+class SeekableFileIterator(FileIterator, SeekableIteratorMixin):
+  ''' An iterator over the data of a seekable file object.
+
+      *Note*: the iterator closes the file on __del__ or if its
+      .close method is called.
+  '''
+
+  def __init__(self, fp, offset=None, **kw):
+    ''' Initialise the iterator.
+
+        Parameters:
+        * `fp`: file object
+        * `offset`: the initial logical offset, kept up to date by
+          iteration; the default is the current file position.
+        * `readsize`: a preferred read size; if omitted then
+          `DEFAULT_READSIZE` will be stored
+        * `align`: whether to align reads by default: if true then
+          the iterator will do a short read to bring the `offset`
+          into alignment with `readsize`; the default is False
+    '''
+    if offset is None:
+      offset = fp.tell()
+    FileIterator.__init__(
+        self,
+        fp=fp,
+        offset=offset, **kw)
+
   def seek(self, new_offset, mode=SEEK_SET):
     ''' Move the logical file pointer.
 
@@ -878,7 +964,7 @@ class SeekableFileIterator(SeekableIterator):
     new_offset = self.fp.seek(new_offset, mode)
     return super().seek(new_offset, SEEK_SET)
 
-class SeekableMMapIterator(SeekableIterator):
+class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
   ''' An iterator over the data of a mappable file descriptor.
 
       *Note*: the iterator works with an mmap of an os.dup() of the
@@ -900,7 +986,7 @@ class SeekableMMapIterator(SeekableIterator):
     '''
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
-    SeekableIterator.__init__(
+    _Iterator.__init__(
         self,
         offset=offset, readsize=readsize, align=align)
     self.fd = os.dup(fd)
