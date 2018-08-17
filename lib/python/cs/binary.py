@@ -871,8 +871,7 @@ class Packet(PacketField):
     '''
     for field in self.fields:
       if field is not None:
-        for bs in flatten(field.transcribe()):
-          yield bs
+        yield field.transcribe()
 
   def add_from_bytes(self, field_name, bs, factory, offset=0, length=None, **kw):
     ''' Add a new PacketField named `field_name` parsed from the
