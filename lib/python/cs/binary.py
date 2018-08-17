@@ -544,6 +544,76 @@ UInt32LE = struct_field('<L', 'UInt32LE')
 UInt64BE = struct_field('>Q', 'UInt64BE')
 UInt64LE = struct_field('<Q', 'UInt64LE')
 
+class BSUInt(PacketField):
+  ''' A binary serialsed unsigned int.
+
+      This uses a big endian byte encoding where continuation octets
+      have their high bit set. The bits contributing to the value
+      are in the low order 7 bits.
+  '''
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse an extensible byte serialised unsigned int from a buffer.
+
+        This is the go for reading from a stream. If you already have
+        a bare bytes instance then `cs.serialise.get_uint` may be better.
+    '''
+    return cls(cls.raw_from_buffer(bfr))
+
+  def transcribe(self):
+    ''' Return the serialised value.
+    '''
+    yield self.raw_transcribe(self.value)
+
+  @staticmethod
+  def raw_from_buffer(bfr):
+    ''' The raw deserialisation.
+
+        Continuation octets have their high bit set.
+        The value is big-endian.
+    '''
+    n = 0
+    b = 0x80
+    while b & 0x80:
+      bs = bfr.take(1)
+      b = bs[0]
+      n = (n << 7) | (b & 0x7f)
+    return n
+
+  @staticmethod
+  def raw_transcribe(n):
+    ''' Encode an unsigned int as an entensible byte serialised octet
+        sequence for decode. Return the bytes object.
+    '''
+    bs = [ n & 0x7f ]
+    n >>= 7
+    while n > 0:
+      bs.append( 0x80 | (n & 0x7f) )
+      n >>= 7
+    return bytes(reversed(bs))
+
+class BSData(PacketField):
+  ''' A run length encoded data chunk, with the length encoded as a BSUInt.
+  '''
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse the payload from the buffer.
+    '''
+    return cls(cls.raw_from_buffer(bfr))
+
+  @staticmethod
+  def raw_from_buffer(bfr):
+    return bfr.take(BSUInt.raw_from_buffer(bfr))
+
+  def transcribe(self):
+    ''' Transcribe the payload length and then the payload.
+    '''
+    payload = self.value
+    yield BSUInt.raw_transcribe(len(payload))
+    yield payload
+
 class ListField(PacketField):
   ''' A field which is a list of other fields.
   '''
