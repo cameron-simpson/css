@@ -15,7 +15,7 @@ import unittest
 from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.socketutils import bind_next_port, OpenSocket
-from .stream import Packet, PacketConnection
+from .packetstream import Packet, PacketConnection
 
 class TestPacket(unittest.TestCase):
 
