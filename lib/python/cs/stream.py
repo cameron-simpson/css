@@ -19,7 +19,6 @@ from cs.later import Later
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, PfxThread as Thread
 from cs.predicate import post_condition
-from cs.py3 import BytesFile, unicode
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.result import Result
@@ -27,6 +26,8 @@ from cs.seq import seq, Seq
 from cs.threads import locked
 
 class Packet(PacketField):
+  ''' A protocol packet.
+  '''
 
   def __init__(self, is_request, channel, tag, flags, rq_type, payload):
     assert isinstance(is_request, bool)
