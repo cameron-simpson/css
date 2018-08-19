@@ -159,6 +159,19 @@ class PacketField(ABC):
     return field, post_offset
 
   @classmethod
+  def value_from_bytes(cls, bs, offset=0, length=None):
+    ''' Return a value parsed from the bytes `bs` starting at `offset`.
+        Returns the new value and the post parse offset.
+
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_bytes` method for the parse.
+    '''
+    field, offset = cls.from_bytes(bs, offset=offset, length=length)
+    return field.value, offset
+
+  @classmethod
   def from_buffer(cls, bfr, **kw):
     ''' Factory to return a PacketField instance from a CornuCopyBuffer.
 
