@@ -639,6 +639,10 @@ class BSData(PacketField):
     yield BSUInt.transcribe_value(len(payload))
     yield payload
 
+  @classmethod
+  def transcribe_value(cls, data):
+    return b''.join(cls(data).transcribe())
+
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
@@ -661,16 +665,9 @@ class BSString(PacketField):
       bs = bs.tobytes()
     return bs.decode(encoding=encoding, errors=errors)
 
-  def transcribe(self):
-    ''' Transcribe the payload length and then the payload.
-    '''
-    payload = self.value.encode(self.encoding)
-    yield BSUInt.transcribe_value(len(payload))
-    yield payload
-
   @staticmethod
   def transcribe_value(s, encoding='utf-8'):
-    payload = self.value.encode(self.encoding)
+    payload = s.encode(encoding)
     return b''.join( (
         BSUInt.transcribe_value(len(payload)),
         payload
