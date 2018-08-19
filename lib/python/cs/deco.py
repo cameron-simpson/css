@@ -5,10 +5,7 @@
 #
 
 r'''
-Some decorator functions: @decorator, @cached.
-
-* @decorator: decorator for decorators to imbue them with optional keyword arguments.
-* @cache: decorator for functions to cache their return value subject to some change detection.
+Assorted decorator functions.
 '''
 
 import time
