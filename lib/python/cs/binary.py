@@ -668,6 +668,14 @@ class BSString(PacketField):
     yield BSUInt.transcribe_value(len(payload))
     yield payload
 
+  @staticmethod
+  def transcribe_value(s, encoding='utf-8'):
+    payload = self.value.encode(self.encoding)
+    return b''.join( (
+        BSUInt.transcribe_value(len(payload)),
+        payload
+    ) )
+
 class ListField(PacketField):
   ''' A field which is a list of other fields.
   '''
