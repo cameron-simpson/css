@@ -144,9 +144,14 @@ class PacketField(ABC):
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
-    ''' Factory to return a `PacketField` instance from bytes.
+    ''' Factory to return a `PacketField` instance parsed from the
+        bytes `bs` starting at `offset`.
+        Returns the new `PacketField` and the post parse offset.
 
-        This relies on the class' `from_buffer(CornuCopyBuffer)` method.
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_buffer` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
     field = cls.from_buffer(bfr)
@@ -185,8 +190,8 @@ class PacketField(ABC):
         method, or use the convenience `transcribe_flat` method
         which calls `flatten` for them.
 
-        This default implementation just calls
-        `self.transcribe_value(self.value)`.
+        This default implementation is for single value fields and
+        just calls `self.transcribe_value(self.value)`.
     '''
     yield self.transcribe_value(self.value)
 
