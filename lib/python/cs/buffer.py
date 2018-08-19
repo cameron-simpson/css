@@ -193,7 +193,8 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
-    ''' Return a CornuCopyBuffer fed from the supplied bytes `bs`.
+    ''' Return a CornuCopyBuffer fed from the supplied bytes `bs`
+        starting at `offset` and ending after `length`.
 
         This is handy for callers parsing using buffers but handed bytes.
 
@@ -202,7 +203,8 @@ class CornuCopyBuffer(object):
         * `offset`: a starting position for the data; the input
           data will start this far into the bytes
         * `length`: the maximium number of bytes to use; the input
-          data will be cropped this far past the starting point
+          data will be cropped this far past the starting point;
+          default: the number of bytes in `bs` after `offset`
         Other keyword arguments are passed to the buffer constructor.
     '''
     if offset < 0:
