@@ -1,29 +1,114 @@
 #!/usr/bin/python
 #
 # Convenience facilities for streams.
-#       - Cameron Simpson <cs@cskk.id.au> 21aug2015
+# - Cameron Simpson <cs@cskk.id.au> 21aug2015
 #
 
 ''' A general purpose bidirectional packet stream connection.
 '''
 
-import sys
-import errno
 from collections import namedtuple
+import errno
+import os
+import sys
 from threading import Lock
-from cs.result import Result
+from cs.binary import PacketField, BSUInt, BSData
+from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
 from cs.pfx import Pfx, PrePfx, PfxThread as Thread
 from cs.predicate import post_condition
-from cs.py3 import BytesFile, unicode
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
+from cs.result import Result
 from cs.seq import seq, Seq
-from cs.serialise import Packet, read_Packet, write_Packet, put_bs, get_bs
 from cs.threads import locked
-from cs.x import X
+
+class Packet(PacketField):
+  ''' A protocol packet.
+  '''
+
+  def __init__(self, is_request, channel, tag, flags, rq_type, payload):
+    assert isinstance(is_request, bool)
+    assert isinstance(channel, int)
+    assert isinstance(tag, int)
+    assert isinstance(flags, int)
+    assert isinstance(rq_type, int) if is_request else rq_type is None
+    self.is_request = is_request
+    self.channel = channel
+    self.tag = tag
+    self.flags = flags
+    self.rq_type = rq_type
+    self.payload = payload
+
+  def __str__(self):
+    payload = self.payload
+    if len(payload) > 16:
+      payload_s = repr(payload[:16]) + '...'
+    else:
+      payload_s = repr(payload)
+    return (
+        "%s(is_request=%s,channel=%s,tag=%s,flags=0x%02x,payload=%s)"
+        % (
+            type(self).__name__,
+            self.is_request,
+            self.channel,
+            self.tag,
+            self.flags,
+            payload_s))
+
+  def __eq__(self, other):
+    return (
+        bool(self.is_request) == bool(other.is_request)
+        and self.channel == other.channel
+        and self.tag == other.tag
+        and self.flags == other.flags
+        and self.rq_type == other.rq_type
+        and self.payload == other.payload
+    )
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse a packet from a buffer.
+    '''
+    raw_payload = BSData.value_from_buffer(bfr)
+    pkt_bfr = CornuCopyBuffer([raw_payload])
+    tag = BSUInt.value_from_buffer(pkt_bfr)
+    flags = BSUInt.value_from_buffer(pkt_bfr)
+    has_channel = ( flags & 0x01 ) != 0
+    is_request = ( flags & 0x02 ) != 0
+    flags >>= 2
+    if has_channel:
+      channel = BSUInt.value_from_buffer(pkt_bfr)
+    else:
+      channel = 0
+    if is_request:
+      rq_type = BSUInt.value_from_buffer(pkt_bfr)
+    else:
+      rq_type = None
+    payload = b''.join(pkt_bfr)
+    return cls(is_request, channel, tag, flags, rq_type, payload)
+
+  def transcribe(self):
+    ''' Transcribe this packet.
+    '''
+    is_request = self.is_request
+    channel = self.channel
+    bss = [
+        BSUInt.transcribe_value(self.tag),
+        BSUInt.transcribe_value(
+            ( self.flags << 2 )
+            | ( 0x01 if channel != 0 else 0x00 )
+            | ( 0x02 if is_request else 0x00 )
+        ),
+        BSUInt.transcribe_value(channel) if channel != 0 else b'',
+        BSUInt.transcribe_value(self.rq_type) if is_request else b'',
+        self.payload
+    ]
+    length = sum( len(bs) for bs in bss )
+    yield BSUInt.transcribe_value(length)
+    yield bss
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
@@ -31,38 +116,60 @@ class PacketConnection(object):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
 
-  def __init__(self, recv_fp, send_fp, request_handler=None, name=None):
+  # special packet indicating end of stream
+  EOF_Packet = Packet(True, 0, 0, 0, 0, b'')
+
+  def __init__(self, recv, send, request_handler=None, name=None):
     ''' Initialise the PacketConnection.
-        `recv_fp`: inbound binary stream
-        `send_fp`: outbound binary stream
-        `request_handler`: if supplied and not None, should be a
-            callable accepting (request_type, ok, flags, payload)
-        The request_handler may return one of 5 values on success:
-          None  Response will be 0 flags and an empty payload.
-          int   Flags only. Response will be the flags and an empty payload.
-          bytes Payload only. Response will be 0 flags and the payload.
-          str   Payload only. Response will be 0 flags and the str
-                encoded as bytes using UTF-8.
-          (int, bytes) Specify flags and payload for response.
-        An unsuccessful request should raise an exception, which
-        will cause a failure response packet.
+
+        Parameters:
+        * `recv`: inbound binary stream.
+          If this is an `int` it is taken to be an OS file descriptor,
+          otherwise it should be a `cs.buffer.CornuCopyBuffer`
+          or a file like object with a `read1` or `read` method.
+        * `send`: outbound binary stream.
+          If this is an `int` it is taken to be an OS file descriptor,
+          otherwise it should be a file like object with `.write(bytes)`
+          and `.flush()` methods.
+          For a file descriptor sending is done via an os.dup() of
+          the supplied descriptor, so the caller remains responsible
+          for closing the original descriptor.
+        * `request_handler`: an optional callable accepting
+          (`rq_type`, `flags`, `payload`).  
+          The request_handler may return one of 5 values on success:
+          * `None`: response will be 0 flags and an empty payload.
+          * `int`: flags only. Response will be the flags and an empty payload.
+          * `bytes`: payload only. Response will be 0 flags and the payload.
+          * `str`: payload only. Response will be 0 flags and the str
+                  encoded as bytes using UTF-8.
+          * `(int, bytes)`: Specify flags and payload for response.
+          An unsuccessful request should raise an exception, which
+          will cause a failure response packet.
     '''
     if name is None:
       name = str(seq())
     self.name = name
-    self._recv_fp = BytesFile(recv_fp)
-    self.notify_recv_eof = set()
-    self._send_fp = BytesFile(send_fp)
-    self.notify_send_eof = set()
+    if isinstance(recv, int):
+      self._recv = CornuCopyBuffer.from_fd(recv)
+    elif isinstance(recv, CornuCopyBuffer):
+      self._recv = recv
+    else:
+      self._recv = CornuCopyBuffer.from_file(recv)
+    if isinstance(send, int):
+      self._send = os.fdopen(os.dup(send), 'wb')
+    else:
+      self._send = send
     self.request_handler = request_handler
     # tags of requests in play against the local system
     self._channel_request_tags = {0: set()}
+    self.notify_recv_eof = set()
+    self.notify_send_eof = set()
     # LateFunctions for the requests we are performing for the remote system
     self._running = set()
     # requests we have outstanding against the remote system
     self._pending = {0: {}}
     # sequence of tag numbers
-    # TODO: later, reuse old tags to prevent montonic growth of tag field
+    # TODO: later, reuse old tags to prevent monotonic growth of tag field
     self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
@@ -72,13 +179,16 @@ class PacketConnection(object):
     self._lock = Lock()
     self.closed = False
     # dispatch Thread to process received packets
-    self._recv_thread = Thread(target=self._receive, name="%s[_receive]" % (self.name,))
+    self._recv_thread = Thread(
+        target=self._receive_loop,
+        name="%s[_receive_loop]" % (self.name,))
     self._recv_thread.daemon = True
     self._recv_thread.start()
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
-    # otherwise we might just send synchronously
-    self._send_thread = Thread(target=self._send, name="%s[_send]" % (self.name,))
+    self._send_thread = Thread(
+        target=self._send_loop,
+        name="%s[_send]" % (self.name,))
     self._send_thread.daemon = True
     self._send_thread.start()
     # debugging: check for reuse of (channel,tag) etc
@@ -189,33 +299,39 @@ class PacketConnection(object):
     error("rejecting request: " + str(payload))
     if isinstance(payload, unicode):
       payload = payload.encode('utf-8')
-    P = Packet(channel, tag, False, 0, payload)
-    self._queue_packet(P)
+    self._queue_packet(
+        Packet(False, channel, tag, 0, None, payload))
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
         Tack a 1 (ok) flag onto the flags and dispatch.
     '''
     flags = (flags<<1) | 1
-    P = Packet(channel, tag, False, flags, payload)
-    self._queue_packet(P)
+    self._queue_packet(
+        Packet(False, channel, tag, flags, None, payload))
 
   @not_closed
-  def request(self, rq_type, flags, payload, decode_response=None, channel=0):
-    ''' Compose and dispatch a new request.
+  def request(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
+    ''' Compose and dispatch a new request, returns a `Result`.
+
         Allocates a new tag, a Result to deliver the response, and
         records the response decode function for use when the
         response arrives.
-        `rq_type`: request type code, an int
-        `flags`: flags to accompany the request, an int
-        `payload`: a bytes-like object to accompany the request
-        `decode_response`: optional callable accepting (response_flags,
+
+        Parameters:
+        * `rq_type`: request type code, an int
+        * `flags`: optional flags to accompany the request, an int;
+          default `0`.
+        * `payload`: optional bytes-like object to accompany the request;
+          default `b''`
+        * `decode_response`: optional callable accepting (response_flags,
           response_payload_bytes) and returning the decoded response payload
           value; if unspecified, the response payload bytes are used
-        The Result will yield an (ok, flags, payload) tuple, where:
-        `ok`: where the request was successful
-        `flags`: the response flags
-        `payload`: the response payload, decoded by decode_response
+
+        The Result will yield an `(ok, flags, payload)` tuple, where:
+        * `ok`: whether the request was successful
+        * `flags`: the response flags
+        * `payload`: the response payload, decoded by decode_response
           if specified
     '''
     if rq_type < 0:
@@ -225,20 +341,15 @@ class PacketConnection(object):
     tag = self._new_tag()
     R = Result()
     self._pending_add(channel, tag, Request_State(decode_response, R))
-    self._send_request(channel, tag, rq_type, flags, payload)
+    self._queue_packet(
+        Packet(True, channel, tag, flags, rq_type, payload))
     return R
 
   @not_closed
   def do(self, *a, **kw):
-    ''' Synchronous request. Calls the Result returned from the request.
+    ''' Synchronous request. Calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
-
-  def _send_request(self, channel, tag, rq_type, flags, payload):
-    ''' Issue a request.
-    '''
-    P = Packet(channel, tag, True, flags, put_bs(rq_type) + payload)
-    self._queue_packet(P)
 
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
@@ -269,17 +380,17 @@ class PacketConnection(object):
       self._channel_request_tags[channel].remove(tag)
 
   @logexc
-  def _receive(self):
+  def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    ##with Pfx("%s._receive", self):
     with PrePfx("_RECEIVE [%s]", self):
-      with post_condition( ("_recp_fp is None", lambda: self._recv_fp is None) ):
+      with post_condition( ("_recv is None", lambda: self._recv is None) ):
         while True:
           try:
-            packet = read_Packet(self._recv_fp)
+            packet = Packet.from_buffer(self._recv)
           except EOFError:
-            X("EOF, leaving _receive loop")
+            break
+          if packet == self.EOF_Packet:
             break
           channel = packet.channel
           tag = packet.tag
@@ -304,27 +415,21 @@ class PacketConnection(object):
                       "channel %d: tag already in use: %d" % (channel, tag))
                 else:
                   # payload for requests is the request enum and data
-                  try:
-                    rq_type, offset = get_bs(payload)
-                  except IndexError as e:
-                    error("invalid request: truncated request type, payload=%r", payload)
-                    self._reject(
-                        channel, tag,
-                        "truncated request type, payload=%r" % (payload,))
-                  else:
-                    if rq_type == 0:
-                      # catch magic EOF request: rq_type 0
-                      break
-                    else:
-                      # hide magic request type 0
-                      rq_type -= 1
-                      requests[channel].add(tag)
-                      # queue the work function and track it
-                      LF = self._later.defer(self._run_request,
-                                             channel, tag, self.request_handler,
-                                             rq_type, flags, payload[offset:])
-                      self._running.add(LF)
-                      LF.notify(lambda LF: self._running.remove(LF))
+                  rq_type = packet.rq_type
+                  if rq_type == 0:
+                    # magic EOF rq_type - must be malformed (!=EOF_Packet)
+                    error("malformed EOF packet received: %s", packet)
+                    break
+                  # normalise rq_type
+                  rq_type -= 1
+                  requests[channel].add(tag)
+                  # queue the work function and track it
+                  LF = self._later.defer(
+                      self._run_request,
+                      channel, tag, self.request_handler,
+                      rq_type, flags, payload)
+                  self._running.add(LF)
+                  LF.notify(lambda LF: self._running.remove(LF))
           else:
             with Pfx("response[%d:%d]", channel, tag):
               # response: get state of matching pending request, remove state
@@ -361,24 +466,19 @@ class PacketConnection(object):
         # alert any listeners of receive EOF
         for notify in self.notify_recv_eof:
           notify(self)
-        with Pfx("_recv_fp.close"):
-          try:
-            self._recv_fp.close()
-          except OSError as e:
-            warning("%s.close: %s", self._recv_fp, e)
-        self._recv_fp = None
+        self._recv = None
         self.shutdown()
 
   @logexc
-  def _send(self):
+  def _send_loop(self):
     ''' Send packets upstream.
-        Write every packet directly to self._send_fp.
+        Write every packet directly to self._send.
         Flush whenever the queue is empty.
     '''
     ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
-      with post_condition( ("_send_fp is None", lambda: self._send_fp is None) ):
-        fp = self._send_fp
+      with post_condition( ("_send is None", lambda: self._send is None) ):
+        fp = self._send
         Q = self._sendQ
         for P in Q:
           sig = (P.channel, P.tag, P.is_request)
@@ -386,7 +486,8 @@ class PacketConnection(object):
             raise RuntimeError("second send of %s" % (P,))
           self.__sent.add(sig)
           try:
-            write_Packet(fp, P)
+            for bs in P.transcribe_flat():
+              fp.write(bs)
             if Q.empty():
               fp.flush()
           except OSError as e:
@@ -394,13 +495,12 @@ class PacketConnection(object):
               warning("remote end closed")
               break
             raise
-        eof_packet = Packet(0, 0, True, 0, put_bs(0))
         try:
-          write_Packet(fp, eof_packet)
+          for bs in self.EOF_Packet.transcribe_flat():
+            fp.write(bs)
           fp.close()
         except (OSError, IOError) as e:
           if e.errno == errno.EPIPE:
-            X("REMOTE CLOSED")
             debug("remote end closed: %s", e)
           elif e.errno == errno.EBADF:
             warning("local end closed: %s", e)
@@ -409,7 +509,7 @@ class PacketConnection(object):
         except Exception as e:
           error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
           raise
-        self._send_fp = None
+        self._send = None
 
 if __name__ == '__main__':
   from cs.debug import selftest
