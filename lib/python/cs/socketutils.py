@@ -62,7 +62,7 @@ class OpenSocket(object):
     '''
     with Pfx("%s.close", self):
       if self._sock is None:
-        warning("close when _sock=None")
+        ##warning("close when _sock=None")
         return
       if self._for_write:
         shut_mode = socket.SHUT_WR
