@@ -20,12 +20,7 @@ def bind_next_port(sock, host, base_port):
   while True:
     try:
       sock.bind( (host, base_port) )
-    except socket.error as e:
-      if e.errno == errno.EADDRINUSE:
-        base_port += 1
-      else:
-        raise
-    except OSError as e:
+    except (OSError, socket.error) as e:
       if e.errno == errno.EADDRINUSE:
         base_port += 1
       else:
@@ -56,11 +51,6 @@ class OpenSocket(object):
     ''' Write to the socket.
     '''
     return self._fp.write(data)
-
-  def read(self, size=None):
-    ''' Read from the socket.
-    '''
-    return self.read(size)
 
   def flush(self):
     ''' Flush any buffered data to the socket.
