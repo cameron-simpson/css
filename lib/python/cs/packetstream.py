@@ -311,8 +311,8 @@ class PacketConnection(object):
         Packet(False, channel, tag, flags, None, payload))
 
   @not_closed
-  def request(self, rq_type, flags, payload, decode_response=None, channel=0):
-    ''' Compose and dispatch a new request.
+  def request(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
+    ''' Compose and dispatch a new request, returns a `Result`.
 
         Allocates a new tag, a Result to deliver the response, and
         records the response decode function for use when the
@@ -320,14 +320,16 @@ class PacketConnection(object):
 
         Parameters:
         * `rq_type`: request type code, an int
-        * `flags`: flags to accompany the request, an int
-        * `payload`: a bytes-like object to accompany the request
+        * `flags`: optional flags to accompany the request, an int;
+          default `0`.
+        * `payload`: optional bytes-like object to accompany the request;
+          default `b''`
         * `decode_response`: optional callable accepting (response_flags,
           response_payload_bytes) and returning the decoded response payload
           value; if unspecified, the response payload bytes are used
 
-        The Result will yield an (ok, flags, payload) tuple, where:
-        * `ok`: where the request was successful
+        The Result will yield an `(ok, flags, payload)` tuple, where:
+        * `ok`: whether the request was successful
         * `flags`: the response flags
         * `payload`: the response payload, decoded by decode_response
           if specified
@@ -345,7 +347,7 @@ class PacketConnection(object):
 
   @not_closed
   def do(self, *a, **kw):
-    ''' Synchronous request. Calls the Result returned from the request.
+    ''' Synchronous request. Calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
 
