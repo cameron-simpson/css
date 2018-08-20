@@ -72,7 +72,7 @@
 '''
 
 from __future__ import print_function
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import namedtuple
 from struct import Struct
 import sys
