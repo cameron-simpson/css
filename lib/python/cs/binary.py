@@ -231,6 +231,10 @@ class EmptyPacketField(PacketField):
       The singleton `EmptyField` is a predefined instance.
   '''
 
+  TEST_CASES = (
+    b'',
+  )
+
   def __init__(self):
     super().__init__(None)
 
