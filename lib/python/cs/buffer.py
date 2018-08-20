@@ -209,7 +209,7 @@ class CornuCopyBuffer(object):
     '''
     if offset < 0:
       raise ValueError("offset(%d) should be >= 0" % (offset,))
-    if offset >= len(bs):
+    if offset > len(bs):
       raise ValueError(
           "offset(%d) beyond end of bs (%d bytes)"
           % (offset, len(bs)))
