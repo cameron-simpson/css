@@ -134,6 +134,9 @@ class PacketField(ABC):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.value_s)
 
+  def __eq__(self, other):
+    return type(self) is type(other) and self.value == other.value
+
   def __bytes__(self):
     return b''.join(flatten(self.transcribe()))
 
@@ -295,7 +298,7 @@ class BytesField(PacketField):
     return repr(bs)
 
   @classmethod
-  def value_from_buffer(cls, bfr, length):
+  def value_from_buffer(cls, bfr, length=None):
     ''' Parse a BytesField of length `length` from `bfr`.
     '''
     if length < 0:
@@ -510,7 +513,7 @@ class BytesRunField(PacketField):
     length = self.length
     bytes_value = self.bytes_value
     bs256 = self._bytes_256(bytes_value)
-    with length >= 256:
+    while length >= 256:
       yield bs256
       length -= 256
     if length > 0:
