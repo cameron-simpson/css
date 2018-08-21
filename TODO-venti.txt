@@ -1,3 +1,7 @@
+vt.stream: give the _connect method some hysteresis
+DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
+general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
+DataDir: compute current on open as the newest data file less than maxsize-maxblocksize, drop from state CSV - what to do about shared append to the file?
 vt.fs: does Inodes._hardlinked need to exist?
 vt.fs.FileSystem: make the modes into a set, simplify the initialiser
 Dir.D_*_T values to be IntEnums
@@ -82,10 +86,7 @@ vtfuse close file should not block, but update mtime and queue sync with callbac
 SIGINT clean shutdown of mount
 make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
     NULBlock trite factory for RLEBlock(b'\0', length)
-cs.buffer.CornuCopyBuffer: automatically upgrade iterables to iterators?
-    probe for __next__ ?
 salt entries for Dirs,
-text serialisation: all human readable, regular syntax
 stats in new vs existing blocks when adding blocks
 scanners:
   mbox look for nn and rnrn

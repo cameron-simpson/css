@@ -28,7 +28,7 @@ class TestLex(unittest.TestCase):
     self.assertEqual(b'', untexthexify(''))
     self.assertEqual(b'A', untexthexify('41'))
     self.assertEqual(b'ABC', untexthexify('41[BC]'))
-    self.assertRaises(TypeError, untexthexify, 'a')
+    self.assertRaises(ValueError, untexthexify, 'a')
 
   def test01texthexify(self):
     self.assertEqual('', texthexify(b''))

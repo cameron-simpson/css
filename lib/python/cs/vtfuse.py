@@ -43,7 +43,7 @@ XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
-def mount(mnt, E, S, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
+def mount(mnt, E, S, *, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
       `mnt`: mount point
       `E`: Dirent of root Store directory
@@ -175,7 +175,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     S = self._vt_core.S
     if fsname is None:
-      fsname = str(S).replace(',', ':')
+      fsname = str(S)
+    # llfuse reads additional mount options from the fsname :-(
+    fsname = fsname.replace(',', ':')
     with S:
       defaults.push_Ss(S)
       opts = set(self._vt_llf_opts)

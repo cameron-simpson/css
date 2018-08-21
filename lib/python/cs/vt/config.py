@@ -12,9 +12,8 @@ import os
 from os.path import abspath, isabs as isabspath, join as joinpath
 from threading import Lock
 from cs.configutils import ConfigWatcher
-from cs.env import envsub
 from cs.fileutils import shortpath, longpath
-from cs.logutils import debug, warning
+from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
 from . import defaults
@@ -26,11 +25,9 @@ from .convert import get_integer, \
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 
-def Store(spec, config=None):
+def Store(spec, config):
   ''' Factory to construct Stores from string specifications.
   '''
-  if config is None:
-    config = Config()
   return config.Store_from_spec(spec)
 
 class Config:
@@ -364,6 +361,7 @@ class Config:
       type_=None,
       save=None,
       read=None,
+      save2=None,
       read2=None,
       runstate=None,
   ):
@@ -386,6 +384,13 @@ class Config:
       read_stores = self.Stores_from_spec(read)
     else:
       read_stores = read
+    if save2 is None:
+      save2_stores = []
+    else:
+      if isinstance(save2, str):
+        save2_stores = self.Stores_from_spec(save2)
+      else:
+        save2_stores = save2
     if read2 is None:
       read2_stores = []
     elif isinstance(read2, str):
@@ -394,7 +399,11 @@ class Config:
       read2_stores = read2
     if runstate is None:
       runstate = self.runstate
-    S = ProxyStore(store_name, save_stores, read_stores, read2_stores, runstate=runstate)
+    S = ProxyStore(
+        store_name,
+        save_stores, read_stores,
+        save2=save2_stores, read2=read2_stores,
+        runstate=runstate)
     S.readonly = readonly
     return S
 

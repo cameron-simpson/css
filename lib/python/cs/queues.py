@@ -170,7 +170,7 @@ class Channel(object):
         self.__writable.release()
       else:
         state = "get blocked waiting for put"
-    return "<cs.threads.Channel %s>" % (state,)
+    return "%s[%s]" % (type(self).__name__, state)
 
   def __call__(self, *a):
     ''' Call the Channel.

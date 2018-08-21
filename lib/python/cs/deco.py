@@ -28,16 +28,18 @@ DISTINFO = {
 
 def decorator(deco, *da, **dkw):
   ''' Wrapper for decorator functions to support optional keyword arguments.
+
       Examples:
-        @decorator
-        def dec(func, **dkw):
-          ...
-        @dec
-        def func1(...):
-          ...
-        @dec(foo='bah')
-        def func2(...):
-          ...
+
+          @decorator
+          def dec(func, **dkw):
+            ...
+          @dec
+          def func1(...):
+            ...
+          @dec(foo='bah')
+          def func2(...):
+            ...
   '''
   def overdeco(*da, **dkw):
     if not da:
@@ -59,26 +61,29 @@ def cached(func, **dkw):
 
       This decorator may be used in 2 modes.
       Directly:
-        @cached
-        def method(self, ...)
+
+          @cached
+          def method(self, ...)
+
       or indirectly:
-        @cached(poll_delay=0.25)
-        def method(self, ...)
+
+          @cached(poll_delay=0.25)
+          def method(self, ...)
 
       Optional keyword arguments:
-      `attr_name`: the basis name for the supporting attributes.
+      * `attr_name`: the basis name for the supporting attributes.
         Default: the name of the method.
-      `poll_delay`: minimum time between polls; after the first
+      * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
         Default: None, meaning no poll delay.
-      `sig_func`: a signature function, which should be significantly
+      * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
         expected the instance (self) as its first parameter.
         Default: None, meaning no signature function. The first
         computed value will be kept and never updated.
-      `unset_value`: the value to return before the method has been
+      * `unset_value`: the value to return before the method has been
         called successfully.
         Default: None.
 
@@ -160,28 +165,31 @@ def cached(func, **dkw):
 @decorator
 def strable(func, open_func=None):
   ''' Decorator for functions which may accept a str instead of their core type.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `open_func`: the "open" factory to produce the core type form
+        the string if a string is provided; the default is the builtin
+        "open" function
+
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
       be called with a filename. If the first argument is a str
       then that file is opened and the function called with the
       open file.
-      `func`: the function to docorate
-      `open_func`: the "open" factory to produce the core type form
-        the string if a string is provided; the default is the builtin
-        "open" function
 
       Examples:
 
-        @strable
-        def count_lines(f):
-          return len(line for line in f)
+          @strable
+          def count_lines(f):
+            return len(line for line in f)
 
-        class Recording:
-          "Class representing a video recording."
-          ...
-        @strable
-        def process_video(r, open_func=Recording):
-          ... do stuff with `r` as a Recording instance ...
+          class Recording:
+            "Class representing a video recording."
+            ...
+          @strable
+          def process_video(r, open_func=Recording):
+            ... do stuff with `r` as a Recording instance ...
   '''
   if open_func is None:
     open_func = open

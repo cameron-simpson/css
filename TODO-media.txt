@@ -1,3 +1,8 @@
-BoxLIst subclass of list, checks additions are Boxes
-easy Box construction?
+CornuCopyBuffer.bound context manager wrapping .bounded
+beyonwiz mconvert to accept -D to move done source files to new subdir named after result file
+cs.buffer: mmap mode
+cs.buffer: a mode to store consumed bytes to storage eg after a failed parse
+add Container box and mandatory checks to Box.self_check
+CornuCopyBuffer.skipto: accept Ellipsis for the end_offset, skip to end of input - may need special casing for tail-like iterators
+BoxList subclass of list, checks additions are Boxes
 iso14496: patch mode for Boxes: Box.patch(fp, new_box)

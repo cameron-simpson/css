@@ -395,7 +395,6 @@ class Target(Result):
     '''
 
     Result.__init__(self, name=name, lock=RLock())
-    self._O_omit.extend(['actions', 'maker', 'namespaces'])
     self.maker = maker
     self.context = context
     self.shell = SHELL

@@ -6,16 +6,18 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Implementation of DataFile: a file containing Block records.
+'''
+
 from enum import IntFlag
+from fcntl import flock, LOCK_EX, LOCK_UN
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END, \
+from os import SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
 from threading import Lock
-import time
 from zlib import compress, decompress
 from cs.fileutils import ReadMixin, datafrom_fd
-from cs.logutils import info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
@@ -24,6 +26,9 @@ DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
+  ''' Flag values for DataFile records.
+      COMPRESSED: the data are compressed using zlib.compress.
+  '''
   COMPRESSED = 0x01
 
 class DataFile(MultiOpenMixin, ReadMixin):
@@ -48,32 +53,33 @@ class DataFile(MultiOpenMixin, ReadMixin):
     if do_create:
       fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
       os.close(fd)
+    self._rfd = None
+    self._rlock = None
+    self._wfd = None
+    self._wlock = None
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
   def startup(self):
+    ''' Start up the DataFile: open the read and write file descriptors.
+    '''
     with Pfx("%s.startup: open(%r)", self, self.pathname):
       rfd = os.open(self.pathname, O_RDONLY)
       self._rfd = rfd
       self._rlock = Lock()
       if self.readwrite:
         self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
-        os.lseek(self._wfd, 0, SEEK_END)
         self._wlock = Lock()
 
   def shutdown(self):
+    ''' Shut down the DataFIle: close read and write file descriptors.
+    '''
     if self.readwrite:
       os.close(self._wfd)
-      del self._wfd
+      self._wfd = None
     os.close(self._rfd)
-    del self._rfd
-
-  def tell(self):
-    return lseek(self._rfd, 0, SEEK_CUR)
-
-  def seek(self, offset):
-    return lseek(self._rfd, offset, how=SEEK_SET)
+    self._rfd = None
 
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
@@ -127,30 +133,43 @@ class DataFile(MultiOpenMixin, ReadMixin):
     return data
 
   @staticmethod
-  def scan_records(fp, do_decompress=False):
-    ''' Generator yielding (flags, data, post_offset) from a data file from its current offset.
+  def scanbuffer(bfr, do_decompress=False):
+    ''' Generator yielding (flags, data, post_offset) from a CornuCOpyBuffer attached to a data file.
+        `bfr`: the buffer
         `do_decompress`: decompress the scanned data, default False
     '''
+    read_record = DataFile.read_record
     while True:
-      yield read_record(fp, do_decompress=do_decompress)
+      yield read_record(bfr, do_decompress=do_decompress)
 
   def scanfrom(self, offset, do_decompress=False):
     ''' Generator yielding (flags, data, post_offset) from the DataFile.
         `offset`: the starting offset for the scan
         `do_decompress`: decompress the scanned data, default False
     '''
-    return self.scan_records(datafrom(offset), do_decompress=do_decompress)
+    return self.scanbuffer(self.bufferfrom(offset), do_decompress=do_decompress)
 
   def add(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store start and end offsets.
+        The fcntl.flock function is used to hold an OS level lock
+        for the duration of the write to support shared use of the
+        file.
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
     bs = self.data_record(data, no_compress=no_compress)
     wfd = self._wfd
     with self._wlock:
-      offset = os.lseek(wfd, 0, SEEK_CUR)
+      try:
+        flock(wfd, LOCK_EX)
+      except OSError:
+        is_locked = False
+      else:
+        is_locked = True
+      offset = os.lseek(wfd, 0, SEEK_END)
       os.write(wfd, bs)
+      if is_locked:
+        flock(wfd, LOCK_UN)
     return offset, offset + len(bs)
 
 if __name__ == '__main__':
