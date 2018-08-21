@@ -84,7 +84,6 @@ def get_store_spec(s, offset):
     store_type = 'config'
     offset = skipwhite(s, offset + 1)
     clause_name, offset = get_qstr_or_identifier(s, offset)
-    X("clause_name=%r, offset=%d", clause_name, offset)
     offset = skipwhite(s, offset)
     if offset >= len(s) or s[offset] != ']':
       raise ValueError("offset %d: missing closing ']'" % (offset,))
