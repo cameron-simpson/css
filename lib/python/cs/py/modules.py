@@ -16,6 +16,7 @@ DISTINFO = {
 }
 
 import importlib
+from inspect import getmodule
 import os.path
 import sys
 
@@ -58,3 +59,13 @@ def module_files(M):
     for filename in filenames:
       if filename.endswith('.py'):
         yield os.path.join(dirpath, filename)
+
+def module_names(M):
+  ''' Generator yielding the names of objects from a module which were
+      defined in the module.
+  '''
+  for Mname in dir(M):
+    o = getattr(M, Mname, None)
+    if getmodule(o) is not M:
+      continue
+    yield Mname
