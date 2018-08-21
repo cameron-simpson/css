@@ -896,6 +896,22 @@ def structtuple(class_name, struct_format, subvalue_names):
       subvalue_names=subvalue_names,
       class_name=class_name)
 
+_TestStructTuple = structtuple(
+    '_TestStructTuple',
+    '>hHlLqQ',
+    'short ushort long ulong quad uquad')
+_TestStructTuple.TEST_CASES = (
+    b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+    ( (-1, 2, -2, 4, -3, 8), ),
+##    ({  'short': -1,
+##        'ushort': 2,
+##        'long': -2,
+##        'ulong': 4,
+##        'quad': -3,
+##        'uquad': 8,
+##    },),
+)
+
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
   '''
