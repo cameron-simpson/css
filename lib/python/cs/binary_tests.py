@@ -14,15 +14,13 @@ import unittest
 import cs.binary
 from cs.binary import PacketField
 from cs.py.modules import module_names
+import cs.x
+cs.x.X_via_tty = True
+from cs.x import X
 
-class TestBinary(unittest.TestCase):
+class _TestPacketFields(object):
   ''' Unit tests for the cs.binary module.
   '''
-
-  def setUp(self):
-    ''' Do any set up.
-    '''
-    pass
 
   def tearDown(self):
     ''' Tear down any setup.
@@ -70,7 +68,7 @@ class TestBinary(unittest.TestCase):
   def test_PacketField_round_trip(self):
     ''' Perform round trip tests of the PacketFields for which we have test cases.
     '''
-    M = cs.binary
+    M = self.module
     for Mname in sorted(module_names(M)):
       o = getattr(M, Mname, None)
       if isclass(o):
@@ -89,6 +87,11 @@ class TestBinary(unittest.TestCase):
                     self.roundtrip_constructor(cls, test_case)
                   else:
                     raise ValueError("unhandled test case: %r" % (test_case,))
+
+class TestCSBinaryPacketFields(_TestPacketFields, unittest.TestCase):
+
+  def setUp(self):
+    self.module = cs.binary
 
 def selftest(argv):
   ''' Run the unit tests.
