@@ -297,7 +297,7 @@ class PacketConnection(object):
     ''' Issue a rejection of the specified request.
     '''
     error("rejecting request: " + str(payload))
-    if isinstance(payload, unicode):
+    if isinstance(payload, str):
       payload = payload.encode('utf-8')
     self._queue_packet(
         Packet(False, channel, tag, 0, None, payload))
