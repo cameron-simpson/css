@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Tests for StreamStores.
+'''
+
 import os
 import sys
 import unittest
@@ -38,10 +41,14 @@ def make_stream_store(hashclass, addif):
   return S, remote_S
 
 class TestStreamStore(TestStore, unittest.TestCase):
+  ''' Test a stream in non-addif mode.
+  '''
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=False)
 
 class TestStreamStoreAddIf(TestStore, unittest.TestCase):
+  ''' test a stream in addif mode.
+  '''
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=True)
 
@@ -67,6 +74,8 @@ class TestHashCodeUtilsStreamStoreAddIf(TestHashCodeUtilsStreamStore):
   ADDIF_MODE = True
 
 def selftest(argv):
+  ''' Run the unit tests.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
