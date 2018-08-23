@@ -926,15 +926,18 @@ def verify_block(B, recurse=False, S=None):
     if hashcode not in S:
       yield str(B), "hashcode not in %s" % (S,)
     else:
-      data = B.data
+      if B.indirect:
+        hashdata = B.superblock.data
+      else:
+        hashdata = B.data
       # hash the data using the matching hash function
-      data_hashcode = hashcode.hashfunc(data)
+      data_hashcode = hashcode.hashfunc(hashdata)
       if hashcode != data_hashcode:
         yield str(B), "hashcode(%s) does not match hashfunc of data(%s)" \
                  % (hashcode, data_hashcode)
       Sdata = S[hashcode]
-      if Sdata != data:
-        yield str(B), "B.data != S[%s]" % (hashcode,)
+      if Sdata != hashdata:
+        yield str(B), "Block hashdata != S[%s]" % (hashcode,)
   if B.indirect:
     if recurse:
       for subB in B.subblocks:
