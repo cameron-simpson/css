@@ -227,6 +227,12 @@ class PacketField(ABC):
     '''
     return flatten(self.transcribe())
 
+  @classmethod
+  def transcribe_value_flat(cls, value):
+    ''' Return a flat iterable of chunks transcribing `value`.
+    '''
+    return flatten(cls.transcribe_value(value))
+
 class EmptyPacketField(PacketField):
   ''' An empty data field, used as a placeholder for optional
       fields when they are not present.
