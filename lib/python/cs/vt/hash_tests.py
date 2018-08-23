@@ -4,28 +4,41 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-import sys
-import random
-if sys.hexversion >= 0x02050000:
-  from hashlib import sha1
-else:
-  from sha import new as sha1
-import unittest
-from itertools import accumulate
-import cs.logutils
-cs.logutils.X_via_tty = True
-from cs.randutils import rand0, randbool, randblock
-from . import _TestAdditionsMixin
-from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
-from .transcribe import Transcriber, transcribe_s, parse
+''' Hash tests.
+'''
 
-class TestHashing(unittest.TestCase):
+from hashlib import sha1
+from itertools import accumulate
+import random
+import sys
+import unittest
+from cs.binary_tests import _TestPacketFields
+from cs.randutils import rand0, randbool, randblock
+from . import _TestAdditionsMixin, hash as hash_module
+from .hash import Hash_SHA1, decode as decode_hash, HashUtilDict
+from .transcribe import Transcriber, parse
+
+class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Hook to test the hash PacketFields.
+  '''
 
   def setUp(self):
+    ''' Test the hash module PacketField classes.
+    '''
+    self.module = hash_module
+
+class TestHashing(unittest.TestCase):
+  ''' Tests for the hashcode facility.
+  '''
+
+  def setUp(self):
+    ''' Initialise the pseudorandom number generator.
+    '''
     random.seed()
 
   def testSHA1(self):
-    import random
+    ''' Test the SHA1 hash function.
+    '''
     for _ in range(10):
       rs = bytes( random.randint(0, 255) for _ in range(100) )
       H = Hash_SHA1.from_chunk(rs)
@@ -37,20 +50,23 @@ class TestHashing(unittest.TestCase):
       self.assertEqual(H, H2)
       # bytes(hash_num + hash_bytes)
       Hencode = H.encode()
-      H2, offset = decode(Hencode)
+      H2, offset = decode_hash(Hencode)
       self.assertEqual(offset, len(Hencode))
       self.assertEqual(H, H2)
 
-class _TestHashCodeUtils(_TestAdditionsMixin):
+class _TestHashCodeUtils(_TestAdditionsMixin, unittest.TestCase):
+  ''' Test for the hashcodeutilities.
+  '''
 
-  MAP_FACTORY = None
+  MAP_FACTORY = lambda _: None
 
   def setUp(self):
-    if self.MAP_FACTORY is None:
-      raise unittest.SkipTest("no MAP_FACTORY, skipping test")
+    ''' Prepare for testing using the specified map factory.
+    '''
     self.maxDiff = 16384
-    MF = self.MAP_FACTORY
     self.map1 = self.MAP_FACTORY()
+    if self.map1 is None:
+      raise unittest.SkipTest("no MAP_FACTORY, skipping test")
     self.map1.open()
     self.keys1 = set()
     try:
@@ -59,16 +75,20 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       self.has_keys = False
     else:
       try:
-        ks = keys_method()
+        _ = keys_method()
       except NotImplementedError:
         self.has_keys = False
       else:
         self.has_keys = True
 
   def tearDown(self):
+    ''' Close map1.
+    '''
     self.map1.close()
 
   def test00first(self):
+    ''' Trivial test adding 2 blocks.
+    '''
     with self.subTest(map_type=type(self.map1)):
       M1 = self.map1
       KS1 = self.keys1
@@ -79,24 +99,22 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       h = M1.add(data)
       KS1.add(h)
       self.assertLen(M1, 1)
-      MS = sorted(M1.hashcodes())
-      KS = sorted(KS1)
       self.assertEqual(set(M1.hashcodes()), KS1)
       # add another block
       data2 = randblock(rand0(8193))
       h2 = M1.add(data2)
       KS1.add(h2)
       self.assertLen(M1, 2)
-      MS = sorted(M1.hashcodes())
-      KS = sorted(KS1)
       self.assertEqual(set(M1.hashcodes()), KS1)
 
   def test01test_hashcodes_from(self):
+    ''' Test the hashcodes_from method.
+    '''
     with self.subTest(map_type=type(self.map1)):
       # fill map1 with 16 random data blocks
       M1 = self.map1
       KS1 = self.keys1
-      for n in range(16):
+      for _ in range(16):
         data = randblock(rand0(8193))
         h = M1.add(data)
         KS1.add(h)
@@ -124,6 +142,8 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
             self.assertEqual(hs, hs2)
 
   def test02hashcodes(self):
+    ''' Various tests.
+    '''
     with self.subTest(map_type=type(self.map1)):
       M1 = self.map1
       KS1 = self.keys1
@@ -146,7 +166,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       # fetch the leading n hashcodes from the map, with and without `after`
       for after in False, True:
         with self.subTest(after=after):
-          for n in range(1,16):
+          for n in range(1, 16):
             if after:
               start_hashcode = None
               for mincode in accumulate(iter(M1), min):
@@ -169,15 +189,20 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           seen = set()
           while keys_offset < len(sorted_keys):
             if step_size is None:
-              n = random.randint(1,7)
+              n = random.randint(1, 7)
             else:
               n = step_size
-            with self.subTest(start_hashcode=start_hashcode, keys_offset=keys_offset, n=n):
+            with self.subTest(
+                start_hashcode=start_hashcode,
+                keys_offset=keys_offset, n=n,
+            ):
               after = start_hashcode is not None
-              hs = list(M1.hashcodes(start_hashcode=start_hashcode,
-                                     length=n,
-                                     reverse=False,
-                                     after=after))
+              hs = list(
+                  M1.hashcodes(
+                      start_hashcode=start_hashcode,
+                      length=n,
+                      reverse=False,
+                      after=after))
               # verify that no key has been seen before
               for h in hs:
                 self.assertNotIn(h, seen)
@@ -199,17 +224,19 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           self.assertEqual(sorted_keys, sorted(seen))
 
   def test03hashcodes_missing(self):
+    ''' Test the hashcodes_missing function.
+    '''
     with self.subTest(map_type=type(self.map1)):
       M1 = self.map1
       KS1 = self.keys1
-      for n in range(16):
+      for _ in range(16):
         data = randblock(rand0(8193))
         h = M1.add(data)
         KS1.add(h)
       with self.MAP_FACTORY() as M2:
         KS2 = set()
         # construct M2 as a mix of M1 and random new blocks
-        for n in range(16):
+        for _ in range(16):
           if randbool():
             data = randblock(rand0(8193))
             h = M2.add(data)
@@ -231,9 +258,14 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           self.assertEqual(M2missing, KS2missing)
 
 class TestHashCodeUtils(_TestHashCodeUtils, unittest.TestCase):
+  ''' Test the HashCodeUtils facilities via a HashUitlDict.
+  '''
+
   MAP_FACTORY = HashUtilDict
 
 def selftest(argv):
+  ''' Run the unit tests.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
