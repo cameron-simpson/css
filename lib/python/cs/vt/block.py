@@ -39,6 +39,11 @@ from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
 from threading import RLock
+from cs.binary import (
+    PacketField, BSUInt, BSData,
+    flatten as flatten_transcription
+)
+from cs.buffer import CornuCopyBuffer
 from cs.lex import texthexify, untexthexify, get_decimal_value
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -47,7 +52,10 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext
-from .hash import decode as hash_decode
+from .hash import (
+    HashCode, HashCodeField,
+    decode as hash_decode,
+)
 from .transcribe import Transcriber, register as register_transcriber, parse
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
@@ -207,6 +215,124 @@ def encodeBlock(B):
       put_bs(len(B.encode())) + B.encode()
   '''
   return b''.join(encodeBlocks((B,)))
+
+class BlockRecord(PacketField):
+
+  TEST_CASES = (
+      # zero length hashcode block
+      # note that the hashcode doesn't match that of b''
+      b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+  )
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    ''' Decode a Block reference from a buffer.
+
+        Format is:
+
+            BS(length)
+            BS(flags)
+              0x01 indirect blockref
+              0x02 typed: type follows, otherwise BT_HASHCODE
+              0x04 type flags: per type flags follow type
+            BS(span)
+            [BS(type)]
+            [BS(type_flags)]
+            union {
+              type BT_HASHCODE: hash
+              type BT_RLE: octet-value (repeat span times to get data)
+              type BT_LITERAL: raw-data (span bytes)
+              type BT_SUBBLOCK: suboffset, super block
+            }
+
+        Even though this is all decodable without the leading length
+        we use a leading length so that future encodings do not
+        prevent parsing any following data.
+    '''
+    raw_encoding = BSData.value_from_buffer(bfr)
+    blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
+    flags = BSUInt.value_from_buffer(blockref_bfr)
+    is_indirect = bool(flags & F_BLOCK_INDIRECT)
+    is_typed = bool(flags & F_BLOCK_TYPED)
+    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
+    unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_TYPED|F_BLOCK_TYPE_FLAGS)
+    if unknown_flags:
+      raise ValueError(
+          "unexpected flags value (0x%02x) with unsupported flags=0x%02x"
+          % (flags, unknown_flags))
+    span = BSUInt.value_from_buffer(blockref_bfr)
+    if is_indirect:
+      # With indirect blocks, the span is of the implied data, not
+      # the referenced block's data. Therefore we build the referenced
+      # block with a span of None and store the span in the indirect
+      # block.
+      ispan = span
+      span = None
+    # block type, default BT_HASHCODE
+    if is_typed:
+      block_type = BlockType(BSUInt.value_from_buffer(blockref_bfr))
+    else:
+      block_type = BlockType.BT_HASHCODE
+    if has_type_flags:
+      type_flags = BSUInt.value_from_buffer(blockref_bfr)
+      if type_flags:
+        warning("nonzero type_flags: 0x%02x", type_flags)
+    else:
+      type_flags = 0x00
+    # instantiate type specific block ref
+    if block_type == BlockType.BT_HASHCODE:
+      hashcode = HashCode.from_buffer(blockref_bfr)
+      B = HashCodeBlock(hashcode=hashcode, span=span)
+    elif block_type == BlockType.BT_RLE:
+      octet = blockref_bfr.take(1)
+      B = RLEBlock(span, octet)
+    elif block_type == BlockType.BT_LITERAL:
+      data = blockref_bfr.take(span)
+      B = LiteralBlock(data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      suboffset = BSUInt.value_from_buffer(blockref_bfr)
+      superB = BlockRecord.value_from_buffer(blockref_bfr)
+      # wrap inner Block in subspan
+      B = SubBlock(superB, suboffset, span)
+    else:
+      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
+    if is_indirect:
+      B = _IndirectBlock(B, span=ispan)
+    if not blockref_bfr.at_eof():
+      warning(
+          "unparsed data (%d bytes) follow Block %s",
+          length - blockref_bfr.offset, B)
+    return B
+
+  @staticmethod
+  def transcribe_value(B):
+    ''' Transcribe this Block, the inverse of value_from_buffer.
+    '''
+    transcription = []
+    block_type = B.type
+    block_typed = block_type != BlockType.BT_HASHCODE
+    flags = (
+        ( F_BLOCK_INDIRECT if B.indirect else 0 )
+        | ( F_BLOCK_TYPED if block_typed else 0 )
+        | 0     # no F_BLOCK_TYPE_FLAGS
+    )
+    transcription.append(BSUInt.transcribe_value(flags))
+    transcription.append(BSUInt.transcribe_value(B.span))
+    if block_typed:
+      transcription.append(BSUInt.transcribe_value(block_type))
+    # no block_type_flags
+    if block_type == BlockType.BT_HASHCODE:
+      transcription.append(B.hashcode.transcribe_b())
+    elif block_type == BlockType.BT_RLE:
+      transcription.append(B.octet)
+    elif block_type == BlockType.BT_LITERAL:
+      transcription.append(B.data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      transcription.append(BSUInt.transcribe_value(B.suboffset))
+      transcription.append(BlockRecord.transcribe_value(B.superblock))
+    else:
+      raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
+    return BSData(b''.join(flatten_transcription(transcription))).transcribe()
 
 class _Block(Transcriber, ABC):
 
