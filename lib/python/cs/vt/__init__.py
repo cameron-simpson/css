@@ -128,9 +128,7 @@ class _TestAdditionsMixin:
     try:
       olen = len(o)
     except TypeError:
-      from cs.x import X
-      X("no len(0) for o=%s:%r", type(o), o)
-      ##pass
+      pass
     else:
       self.assertEqual(olen, length, *a, **kw)
 

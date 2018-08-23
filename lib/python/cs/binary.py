@@ -134,6 +134,9 @@ class PacketField(ABC):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.value_s)
 
+  def __eq__(self, other):
+    return type(self) is type(other) and self.value == other.value
+
   def __bytes__(self):
     return b''.join(flatten(self.transcribe()))
 
@@ -231,6 +234,11 @@ class EmptyPacketField(PacketField):
       The singleton `EmptyField` is a predefined instance.
   '''
 
+  TEST_CASES = (
+    b'',
+    ({}, b''),
+  )
+
   def __init__(self):
     super().__init__(None)
 
@@ -247,6 +255,11 @@ EmptyField = EmptyPacketField()
 class UTF8NULField(PacketField):
   ''' A NUL terminated UTF-8 string.
   '''
+
+  TEST_CASES = (
+      b'123\0',
+      ('123', {}, b'123\0'),
+  )
 
   @classmethod
   def value_from_buffer(cls, bfr):
@@ -281,6 +294,10 @@ class BytesField(PacketField):
   ''' A field of bytes.
   '''
 
+  TEST_CASES = (
+      ##(b'1234', {'length': 4}, b'1234'),
+  )
+
   @property
   def value_s(self):
     ''' The repr() of the bytes.
@@ -291,7 +308,7 @@ class BytesField(PacketField):
     return repr(bs)
 
   @classmethod
-  def value_from_buffer(cls, bfr, length):
+  def value_from_buffer(cls, bfr, length=None):
     ''' Parse a BytesField of length `length` from `bfr`.
     '''
     if length < 0:
@@ -506,7 +523,7 @@ class BytesRunField(PacketField):
     length = self.length
     bytes_value = self.bytes_value
     bs256 = self._bytes_256(bytes_value)
-    with length >= 256:
+    while length >= 256:
       yield bs256
       length -= 256
     if length > 0:
@@ -575,16 +592,102 @@ def struct_field(struct_format, class_name):
 
 # various common values
 UInt8 = struct_field('B', 'UInt8')
+UInt8.TEST_CASES = (
+    (0, b'\0'),
+    (65, b'A'),
+)
 Int16BE = struct_field('>h', 'Int16BE')
+Int16BE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\0\1'),
+    (32767, b'\x7f\xff'),
+    (-1, b'\xff\xff'),
+    (-32768, b'\x80\x00'),
+)
 Int16LE = struct_field('<h', 'Int16LE')
+Int16LE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\1\0'),
+    (32767, b'\xff\x7f'),
+    (-1, b'\xff\xff'),
+    (-32768, b'\x00\x80'),
+)
 Int32BE = struct_field('>l', 'Int32BE')
+Int32BE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\0\0\0\1'),
+    (2147483647, b'\x7f\xff\xff\xff'),
+    (-1, b'\xff\xff\xff\xff'),
+    (-2147483648, b'\x80\x00\x00\x00'),
+)
 Int32LE = struct_field('<l', 'Int32LE')
+Int32LE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\1\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f'),
+    (-1, b'\xff\xff\xff\xff'),
+    (-2147483648, b'\x00\x00\x00\x80'),
+)
 UInt16BE = struct_field('>H', 'UInt16BE')
+UInt16BE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\0\1'),
+    (32767, b'\x7f\xff'),
+    (32768, b'\x80\x00'),
+    (65535, b'\xff\xff'),
+)
 UInt16LE = struct_field('<H', 'UInt16LE')
+UInt16LE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\1\0'),
+    (32767, b'\xff\x7f'),
+    (32768, b'\x00\x80'),
+    (65535, b'\xff\xff'),
+)
 UInt32BE = struct_field('>L', 'UInt32BE')
+UInt32BE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\0\0\0\1'),
+    (2147483647, b'\x7f\xff\xff\xff'),
+    (2147483648, b'\x80\x00\x00\x00'),
+    (4294967294, b'\xff\xff\xff\xfe'),
+    (4294967295, b'\xff\xff\xff\xff'),
+)
 UInt32LE = struct_field('<L', 'UInt32LE')
+UInt32LE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\1\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f'),
+    (2147483648, b'\x00\x00\x00\x80'),
+    (4294967294, b'\xfe\xff\xff\xff'),
+    (4294967295, b'\xff\xff\xff\xff'),
+)
 UInt64BE = struct_field('>Q', 'UInt64BE')
+UInt64BE.TEST_CASES = (
+    (0, b'\0\0\0\0\0\0\0\0'),
+    (1, b'\0\0\0\0\0\0\0\1'),
+    (2147483647, b'\0\0\0\0\x7f\xff\xff\xff'),
+    (2147483648, b'\0\0\0\0\x80\x00\x00\x00'),
+    (4294967295, b'\0\0\0\0\xff\xff\xff\xff'),
+    (4294967296, b'\0\0\0\1\x00\x00\x00\x00'),
+    (9223372036854775807, b'\x7f\xff\xff\xff\xff\xff\xff\xff'),
+    (9223372036854775808, b'\x80\x00\x00\x00\x00\x00\x00\x00'),
+    (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
+    (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
+)
 UInt64LE = struct_field('<Q', 'UInt64LE')
+UInt64LE.TEST_CASES = (
+    (0, b'\0\0\0\0\0\0\0\0'),
+    (1, b'\1\0\0\0\0\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f\0\0\0\0'),
+    (2147483648, b'\0\0\0\x80\0\0\0\0'),
+    (4294967295, b'\xff\xff\xff\xff\0\0\0\0'),
+    (4294967296, b'\0\0\0\0\1\0\0\0'),
+    (9223372036854775807, b'\xff\xff\xff\xff\xff\xff\xff\x7f'),
+    (9223372036854775808, b'\x00\x00\x00\x00\x00\x00\x00\x80'),
+    (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
+    (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
+)
 
 class BSUInt(PacketField):
   ''' A binary serialsed unsigned int.
@@ -593,6 +696,16 @@ class BSUInt(PacketField):
       have their high bit set. The bits contributing to the value
       are in the low order 7 bits.
   '''
+
+  TEST_CASES = (
+      (0, b'\0'),
+      (1, b'\1'),
+      (127, b'\x7f'),
+      (128, b'\x81\00'),
+      (255, b'\x81\x7f'),
+      (16383, b'\xff\x7f'),
+      (16384, b'\x81\x80\x00'),
+  )
 
   @staticmethod
   def value_from_buffer(bfr):
@@ -628,6 +741,11 @@ class BSData(PacketField):
   ''' A run length encoded data chunk, with the length encoded as a BSUInt.
   '''
 
+  TEST_CASES = (
+      (b'', b'\x00'),
+      (b'A', b'\x01A'),
+  )
+
   @staticmethod
   def value_from_buffer(bfr):
     return bfr.take(BSUInt.value_from_buffer(bfr))
@@ -646,6 +764,11 @@ class BSData(PacketField):
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
+
+  TEST_CASES = (
+      ('', b'\x00'),
+      ('A', b'\x01A'),
+  )
 
   def __init__(self, s, encoding='utf-8'):
     super().__init__(s)
@@ -772,6 +895,22 @@ def structtuple(class_name, struct_format, subvalue_names):
       struct_format,
       subvalue_names=subvalue_names,
       class_name=class_name)
+
+_TestStructTuple = structtuple(
+    '_TestStructTuple',
+    '>hHlLqQ',
+    'short ushort long ulong quad uquad')
+_TestStructTuple.TEST_CASES = (
+    b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+    ( (-1, 2, -2, 4, -3, 8), ),
+##    ({  'short': -1,
+##        'ushort': 2,
+##        'long': -2,
+##        'ulong': 4,
+##        'quad': -3,
+##        'uquad': 8,
+##    },),
+)
 
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.

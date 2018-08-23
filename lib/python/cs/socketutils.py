@@ -12,7 +12,6 @@ import errno
 import socket
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.x import X
 
 def bind_next_port(sock, host, base_port):
   ''' Bind a the socket `sock` to the first free (`host`, port); return the port.
@@ -21,12 +20,7 @@ def bind_next_port(sock, host, base_port):
   while True:
     try:
       sock.bind( (host, base_port) )
-    except socket.error as e:
-      if e.errno == errno.EADDRINUSE:
-        base_port += 1
-      else:
-        raise
-    except OSError as e:
+    except (OSError, socket.error) as e:
       if e.errno == errno.EADDRINUSE:
         base_port += 1
       else:
@@ -39,13 +33,16 @@ class OpenSocket(object):
   '''
 
   def __init__(self, sock, for_write):
-    X("OpenSocket: sock=%s, for_write=%s", sock, for_write)
     self._for_write = for_write
     self._sock = sock
     self._fd0 = self._sock.fileno()
     self._fd = os.dup(self._fd0)
     self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
-    X("OpenSocket init done")
+    try:
+      read = self._fp.read1
+    except AttributeError:
+      read = self._fp.read
+    self.read = read
 
   def __str__(self):
     return "%s[fd=%d,fd0=%d]" % (type(self).__name__, self._fd, self._fd0)
@@ -54,11 +51,6 @@ class OpenSocket(object):
     ''' Write to the socket.
     '''
     return self._fp.write(data)
-
-  def read(self, size=None):
-    ''' Read from the socket.
-    '''
-    return self._fp.read(size)
 
   def flush(self):
     ''' Flush any buffered data to the socket.
@@ -70,7 +62,7 @@ class OpenSocket(object):
     '''
     with Pfx("%s.close", self):
       if self._sock is None:
-        warning("close when _sock=None")
+        ##warning("close when _sock=None")
         return
       if self._for_write:
         shut_mode = socket.SHUT_WR
@@ -90,10 +82,10 @@ class OpenSocket(object):
           elif e.errno == errno.EBADF:
             warning("closed: %s", e)
           else:
-            X("UNEXPECTED ERROR 1: %s:%r", type(e), e)
+            warning("UNEXPECTED ERROR 1: %s:%r", type(e), e)
             raise
         except Exception as e:
-          X("UNEXPECTED ERROR 2: %s:%r", type(e), e)
+          warning("UNEXPECTED ERROR 2: %s:%r", type(e), e)
         self._close()
 
   def __del__(self):

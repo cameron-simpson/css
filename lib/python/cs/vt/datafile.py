@@ -17,19 +17,82 @@ from os import SEEK_END, \
 import sys
 from threading import Lock
 from zlib import compress, decompress
+from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.pfx import Pfx
+from cs.randutils import rand0, randblock
 from cs.resources import MultiOpenMixin
-from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
   ''' Flag values for DataFile records.
-      COMPRESSED: the data are compressed using zlib.compress.
+
+      `COMPRESSED`: the data are compressed using zlib.compress.
   '''
   COMPRESSED = 0x01
+
+class DataRecord(PacketField):
+  ''' A data chunk file record.
+  '''
+
+  TEST_CASES = (
+      (b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),
+  )
+
+  def __init__(self, data, is_compressed=False):
+    self._data = data
+    self._is_compressed = is_compressed
+
+  def __str__(self):
+    return "%s(%d-bytes,%s)" % (
+        type(self).__name__,
+        len(self._data),
+        "compressed" if self._is_compressed else "raw",
+    )
+
+  def __eq__(self, other):
+    return self.data == other.data
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse a DataRecord from a buffer.
+    '''
+    flags = BSUInt.value_from_buffer(bfr)
+    data = BSData.value_from_buffer(bfr)
+    is_compressed = (flags & DataFlag.COMPRESSED) != 0
+    flags &= ~DataFlag.COMPRESSED
+    if flags:
+      raise ValueError("unsupported flags: 0x%02x" % (flags,))
+    return cls(data, is_compressed=is_compressed)
+
+  def transcribe(self, uncompressed=False):
+    ''' Transcribe this data chunk as a data record.
+    '''
+    data = self._data
+    is_compressed = self._is_compressed
+    if uncompressed:
+      flags = 0x00
+      if is_compressed:
+        data = decompress(data)
+    else:
+      flags = DataFlag.COMPRESSED
+      if not is_compressed:
+        data = compress(data)
+    yield BSUInt.transcribe_value(flags)
+    yield BSData.transcribe_value(data)
+
+  @property
+  def data(self):
+    ''' The uncompressed data.
+    '''
+    raw_data = self._data
+    if self._is_compressed:
+      raw_data = decompress(raw_data)
+      self._data = raw_data
+      self._is_compressed = False
+    return raw_data
 
 class DataFile(MultiOpenMixin, ReadMixin):
   ''' A data file, storing data chunks in compressed form.
@@ -93,71 +156,49 @@ class DataFile(MultiOpenMixin, ReadMixin):
       readsize = 2048
     return datafrom_fd(self._rfd, offset, readsize)
 
-  @staticmethod
-  def data_record(data, no_compress=False):
-    ''' Compose a data record for transcription to a DataFile.
+  def fetch_record(self, offset):
+    ''' Fetch a DataRecord from the supplied `offset`.
     '''
-    flags = DataFlag(0)
-    if not no_compress:
-      data2 = compress(data)
-      if len(data2) < len(data):
-        data = data2
-        flags |= DataFlag.COMPRESSED
-    return put_bs(flags) + put_bsdata(data)
-
-  @staticmethod
-  def read_record(fp, do_decompress=False):
-    ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
-        If do_decompress is true and flags&DataFlag.COMPRESSED, strip that
-        flag and decompress the data before return.
-        Raises EOFError on premature end of file.
-    '''
-    flags = DataFlag(read_bs(fp))
-    data = read_bsdata(fp)
-    post_offset = fp.tell()
-    if do_decompress and (flags & DataFlag.COMPRESSED):
-      data = decompress(data)
-      flags &= ~DataFlag.COMPRESSED
-    return flags, data, post_offset
-
-  def fetch_record(self, offset, do_decompress=False):
-    ''' Fetch a record from the supplied `offset`. Return (flags, data, new_offset).
-    '''
-    return self.read_record(self.bufferfrom(offset), do_decompress=do_decompress)
+    return DataRecord.from_buffer(self.bufferfrom(offset))
 
   def fetch(self, offset):
     ''' Fetch the nucompressed data at `offset`.
     '''
-    flags, data, _ = self.fetch_record(offset, do_decompress=True)
-    assert flags == 0
-    return data
+    return self.fetch_record(offset).data
 
   @staticmethod
-  def scanbuffer(bfr, do_decompress=False):
-    ''' Generator yielding (flags, data, post_offset) from a CornuCOpyBuffer attached to a data file.
-        `bfr`: the buffer
-        `do_decompress`: decompress the scanned data, default False
-    '''
-    read_record = DataFile.read_record
-    while True:
-      yield read_record(bfr, do_decompress=do_decompress)
+  def scanbuffer(bfr):
+    ''' Generator yielding DataRecords and end offsets from a DataFile.
 
-  def scanfrom(self, offset, do_decompress=False):
+        Parameters:
+        * `bfr`: the buffer.
+        * `do_decompress`: decompress the scanned data, default False.
+    '''
+    while True:
+      try:
+        record = DataRecord.from_buffer(bfr)
+      except EOFError:
+        break
+      yield record, bfr.offset
+
+  def scanfrom(self, offset):
     ''' Generator yielding (flags, data, post_offset) from the DataFile.
         `offset`: the starting offset for the scan
         `do_decompress`: decompress the scanned data, default False
     '''
-    return self.scanbuffer(self.bufferfrom(offset), do_decompress=do_decompress)
+    return self.scanbuffer(self.bufferfrom(offset))
 
-  def add(self, data, no_compress=False):
-    ''' Append a chunk of data to the file, return the store start and end offsets.
+  def add(self, data):
+    ''' Append a chunk of data to the file, return the store start
+        and end offsets.
+
         The fcntl.flock function is used to hold an OS level lock
         for the duration of the write to support shared use of the
         file.
     '''
     if not self.readwrite:
       raise RuntimeError("%s: not readwrite" % (self,))
-    bs = self.data_record(data, no_compress=no_compress)
+    bs = bytes(DataRecord(data))
     wfd = self._wfd
     with self._wlock:
       try:

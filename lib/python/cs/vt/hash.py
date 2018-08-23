@@ -38,8 +38,19 @@ def decode(bs, offset=0):
     raise ValueError("unsupported hashenum %d", hashenum)
   return hashcls._decode(bs, offset)
 
+def decode_buffer(bfr):
+  ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
+  '''
+  hashenum = BSUInt.value_from_buffer(bfr)
+  if hashenum == HASH_SHA1_T:
+    hashcls = Hash_SHA1
+  else:
+    raise ValueError("unsupported hashenum %d", hashenum)
+  return hashcls.from_buffer(bfr)
+
 def hash_of_byteses(bss):
-  ''' Compute a Hash_SHA1 from the bytes of the supplied `hashcodes`.
+  ''' Compute a `Hash_SHA1` from the bytes of the supplied `hashcodes`.
+
       This underlies the mechanism for comparing remote Stores.
   '''
   H = sha1()
@@ -99,6 +110,13 @@ class _Hash(bytes, Transcriber):
     ''' Factory function returning a _Hash object from a data block.
     '''
     hashbytes = cls.HASHFUNC(chunk).digest()
+    return cls.from_hashbytes(hashbytes)
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse a hashcode of known class from a buffer.
+    '''
+    hashbytes = bfr.take(cls.HASHLEN)
     return cls.from_hashbytes(hashbytes)
 
   @property

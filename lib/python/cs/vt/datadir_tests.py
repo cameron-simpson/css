@@ -62,7 +62,7 @@ class TestDataDir(unittest.TestCase):
     self.datadir = DataDir(self.indexdirpath,
                            self.datadirpath,
                            self.hashclass,
-                           self.indexclass,
+                           indexclass=self.indexclass,
                            rollover=self.rollover)
     random.seed()
     self.datadir.open()

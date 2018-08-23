@@ -12,10 +12,17 @@ import random
 import socket
 from threading import Thread
 import unittest
+from cs.binary_tests import _TestPacketFields
 from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.socketutils import bind_next_port, OpenSocket
+from . import packetstream
 from .packetstream import Packet, PacketConnection
+
+class TestPacketStreamPacketFields(_TestPacketFields, unittest.TestCase):
+
+  def setUp(self):
+    self.module = packetstream
 
 class TestPacket(unittest.TestCase):
 
