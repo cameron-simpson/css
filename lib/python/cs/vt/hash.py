@@ -40,7 +40,7 @@ class HashCodeField(PacketField):
       hashcls = Hash_SHA1
     else:
       raise ValueError("unsupported hashenum %d" % (hashenum,))
-    return hashcls.from_buffer(bfr)
+    return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
 
   @staticmethod
   def transcribe_value(hashcode):
@@ -62,7 +62,7 @@ def hash_of_byteses(bss):
     H.update(bs)
   return Hash_SHA1.from_chunk(H.digest())
 
-class _Hash(bytes, Transcriber):
+class HashCode(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
   '''
 
@@ -82,9 +82,21 @@ class _Hash(bytes, Transcriber):
   def __hash__(self):
     return bytes.__hash__(self)
 
+  @staticmethod
+  def from_buffer(bfr):
+    ''' Decode a hash from a buffer.
+    '''
+    return HashCodeField.value_from_buffer(bfr)
+
+  def transcribe_b(self):
+    ''' Binary transcription of this hash via `cs.binary.PacketField.transcribe_value`.
+    '''
+    return HashCodeField.transcribe_value(self)
+
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
-        If we ever have a variable length hash function, hash bytes will include that information.
+        If we ever have a variable length hash function,
+        hash bytes will have to include that information.
     '''
     return bytes(HashCodeField(self))
 
@@ -100,16 +112,9 @@ class _Hash(bytes, Transcriber):
 
   @classmethod
   def from_chunk(cls, chunk):
-    ''' Factory function returning a _Hash object from a data block.
+    ''' Factory function returning a HashCode object from a data block.
     '''
     hashbytes = cls.HASHFUNC(chunk).digest()
-    return cls.from_hashbytes(hashbytes)
-
-  @classmethod
-  def from_buffer(cls, bfr):
-    ''' Parse a hashcode of known class from a buffer.
-    '''
-    hashbytes = bfr.take(cls.HASHLEN)
     return cls.from_hashbytes(hashbytes)
 
   @property
@@ -132,7 +137,7 @@ class _Hash(bytes, Transcriber):
   @staticmethod
   def parse_inner(T, s, offset, stopchar, prefix):
     ''' Parse hashname:hashhextext from `s` at offset `offset`.
-        Return _Hash instance and new offset.
+        Return HashCode instance and new offset.
     '''
     hashname, offset = get_identifier(s, offset)
     if not hashname:
@@ -150,9 +155,9 @@ class _Hash(bytes, Transcriber):
     H = hashclass.from_hashbytes(bs)
     return H, offset
 
-register_transcriber(_Hash)
+register_transcriber(HashCode)
 
-class Hash_SHA1(_Hash):
+class Hash_SHA1(HashCode):
   ''' A hash class for SHA1.
   '''
   __slots__ = ()
