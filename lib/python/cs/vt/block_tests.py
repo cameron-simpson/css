@@ -8,11 +8,9 @@ import sys
 from random import choice
 import unittest
 from unittest import skip
-from cs.pfx import Pfx
+from cs.binary_tests import _TestPacketFields
 from cs.randutils import rand0, randblock
-import cs.x; cs.x.X_via_tty=True
-from cs.x import X
-from . import totext
+from . import totext, block as block_module
 from .block import Block, \
     IndirectBlock, \
     RLEBlock, LiteralBlock, SubBlock, \
@@ -21,65 +19,85 @@ from .block import Block, \
 from .debug import dump_Block
 from .store import MappingStore
 
+import cs.x; cs.x.X_via_tty=True
+from cs.x import X
+
+class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Hook to test the hash PacketFields.
+  '''
+
+  def setUp(self):
+    ''' Test the block module PacketField classes.
+    '''
+    self.module = block_module
+
 class TestAll(unittest.TestCase):
 
   def setUp(self):
     self.S = MappingStore("TestAll", {})
 
   def _verify_block(self, B, **kw):
-    errs = list(verify_block(B, **kw))
-    for err in errs:
-      X("VERIFY(%s): %s", B, err)
-    self.assertEqual(errs, [])
+    with self.subTest(task="_verify_block", block=B, **kw):
+      errs = list(verify_block(B, **kw))
+      self.assertEqual(errs, [])
 
   def _make_random_Block(self, block_type=None, size=None, leaf_only=False):
-    if block_type is None:
-      choices = [
-        BlockType.BT_HASHCODE,
-        BlockType.BT_RLE,
-        BlockType.BT_LITERAL,
-      ]
-      if not leaf_only:
-        choices.append(BlockType.BT_SUBBLOCK)
-        choices.append(BlockType.BT_INDIRECT)
-      block_type = choice(choices)
-    if size is None:
-      size = rand0(16385)
-    with Pfx("_make_random_Block(block_type=%s,size=%d)", block_type, size):
-      if block_type == BlockType.BT_INDIRECT:
-        subblocks = [self._make_random_Block() for _ in range(rand0(8))]
-        B = IndirectBlock(subblocks, force=True)
-      elif block_type == BlockType.BT_HASHCODE:
-        rs = randblock(size)
-        B = Block(data=rs)
-        # we can get a literal block back - this is acceptable
-        if B.type == BlockType.BT_LITERAL:
-          block_type = BlockType.BT_LITERAL
-      elif block_type == BlockType.BT_RLE:
-        rb = bytes((rand0(256),))
-        B = RLEBlock(size, rb)
-      elif block_type == BlockType.BT_LITERAL:
-        rs = randblock(size)
-        B = LiteralBlock(data=rs)
-      elif block_type == BlockType.BT_SUBBLOCK:
-        B2 = self._make_random_Block()
-        self._verify_block(B2)
-        if len(B2) == 0:
-          suboffset = 0
-          subspan = 0
+    with self.subTest(
+        task="_make_random_Block",
+        block_type=block_type, size=size, leaf_only=leaf_only
+    ):
+      if block_type is None:
+        choices = [
+          BlockType.BT_HASHCODE,
+          BlockType.BT_RLE,
+          BlockType.BT_LITERAL,
+        ]
+        if not leaf_only:
+          choices.append(BlockType.BT_SUBBLOCK)
+          choices.append(BlockType.BT_INDIRECT)
+        block_type = choice(choices)
+      if size is None:
+        size = rand0(16385)
+      with self.subTest(
+          subtask="instantiate", 
+          block_type=block_type, size=size,
+      ):
+        if block_type == BlockType.BT_INDIRECT:
+          subblocks = [self._make_random_Block() for _ in range(rand0(8))]
+          B = IndirectBlock(subblocks, force=True)
+        elif block_type == BlockType.BT_HASHCODE:
+          rs = randblock(size)
+          B = Block(data=rs)
+          # we can get a literal block back - this is acceptable
+          if B.type == BlockType.BT_LITERAL:
+            block_type = BlockType.BT_LITERAL
+        elif block_type == BlockType.BT_RLE:
+          rb = bytes((rand0(256),))
+          B = RLEBlock(size, rb)
+        elif block_type == BlockType.BT_LITERAL:
+          rs = randblock(size)
+          B = LiteralBlock(data=rs)
+        elif block_type == BlockType.BT_SUBBLOCK:
+          B2 = self._make_random_Block()
+          self._verify_block(B2)
+          if len(B2) == 0:
+            suboffset = 0
+            subspan = 0
+          else:
+            suboffset = rand0(B2.span)
+            subspan = rand0(B2.span - suboffset)
+          B = SubBlock(B2, suboffset, subspan)
+          # SubBlock returns an empty literal for an empty subblock
+          if subspan == 0:
+            block_type = BlockType.BT_LITERAL
         else:
-          suboffset = rand0(B2.span)
-          subspan = rand0(B2.span - suboffset)
-        B = SubBlock(B2, suboffset, subspan)
-        # SubBlock returns an empty literal for an empty subblock
-        if subspan == 0:
-          block_type = BlockType.BT_LITERAL
-      else:
-        raise ValueError("unknow block type")
-      if B.type != block_type:
-        raise RuntimeError("new Block is wrong type: %r, should be %r" % (B.type, block_type,))
-      self._verify_block(B)
-    return B
+          raise ValueError("unknow block type")
+        self.assertEqual(
+            B.type, block_type,
+            "new Block is wrong type: %r, should be %r"
+            % (B.type, block_type,))
+        self._verify_block(B)
+      return B
 
   def test00Block(self):
     # make some random blocks, check size and content
@@ -170,11 +188,12 @@ class TestAll(unittest.TestCase):
             elif Btype == BlockType.BT_RLE:
               self.assertEqual(B2.data, B2.octet * B2.span)
             elif Btype == BlockType.BT_LITERAL:
-              X("no specific test for LiteralBlock")
+              raise unittest.SkipTest("no specific test for LiteralBlock")
             elif Btype == BlockType.BT_SUBBLOCK:
               self._verify_block(B2.superblock)
             else:
-              X("no type specific tests for Block type %r" % (block_type,))
+              raise unittest.SkipTest(
+                  "no type specific tests for Block type %r" % (block_type,))
 
 def selftest(argv):
   ''' Run the unit tests.
