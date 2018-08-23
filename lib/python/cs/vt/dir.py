@@ -773,10 +773,13 @@ class Dir(_Dirent):
   @locked
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
+
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      X("Dir(%r): recompute block (_block=%s,changed=%s) ...", self.name, self._block, self.changed)
+      _block = self._block
+      changed = self.changed
+      X("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...", id(self), self.name, self._block, self.changed)
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
