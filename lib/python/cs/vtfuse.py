@@ -22,6 +22,7 @@ from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.vt import defaults
+from cs.vt.debug import dump_Dirent
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent
 from cs.vt.fs import FileHandle, FileSystem
 from cs.vt.store import MissingHashcodeError
@@ -70,6 +71,9 @@ def mount(mnt, E, S, *, archive=None, subpath=None, readonly=None, append_only=F
   log_formatter = LogFormatter(DEFAULT_BASE_FORMAT)
   log_handler.setFormatter(log_formatter)
   log.addHandler(log_handler)
+  X("mount: S=%s", S)
+  X("mount: E=%s", E)
+  dump_Dirent(E, recurse=True)
   FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=True)
   return FS._vt_runfuse(mnt, fsname=fsname)
 
