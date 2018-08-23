@@ -11,12 +11,9 @@ from __future__ import absolute_import
 from inspect import isclass
 import sys
 import unittest
-import cs.binary
-from cs.binary import PacketField
-from cs.py.modules import module_names
-import cs.x
-cs.x.X_via_tty = True
-from cs.x import X
+from cs.py.modules import module_attributes
+from . import binary as binary_module
+from .binary import PacketField
 
 class _TestPacketFields(object):
   ''' Unit tests for the cs.binary module.
@@ -28,6 +25,8 @@ class _TestPacketFields(object):
     pass
 
   def roundtrip_from_bytes(self, cls, bs):
+    ''' Perform a bytes => instance => bytes round trip test.
+    '''
     # bytes -> field -> bytes
     P, offset = cls.from_bytes(bs)
     self.assertEqual(
@@ -40,6 +39,8 @@ class _TestPacketFields(object):
         "bytes->%s->bytes fails" % (P,))
 
   def roundtrip_constructor(self, cls, test_case):
+    ''' Perform a cls(args) => bytes => instance round trip test.
+    '''
     # *args[, kwargs[, bytes]]
     args = list(test_case)
     kwargs = {}
@@ -69,16 +70,17 @@ class _TestPacketFields(object):
     ''' Perform round trip tests of the PacketFields for which we have test cases.
     '''
     M = self.module
-    for Mname in sorted(module_names(M)):
-      o = getattr(M, Mname, None)
-      if isclass(o):
-        if PacketField in o.__mro__:
-          with self.subTest(class_name=Mname):
-            cls = o
+    for attr, value in sorted(module_attributes(M)):
+      if isclass(value):
+        if PacketField in value.__mro__:
+          with self.subTest(class_name=attr):
+            cls = value
             test_cases = getattr(cls, 'TEST_CASES', None)
             if test_cases is not None:
               for test_case in test_cases:
                 with self.subTest(test_case=test_case):
+                  ##print("test %s vs %r" % (attr, test_case),
+                  ##  file=open('/dev/tty', 'w'), flush=True)
                   if isinstance(test_case, bytes):
                     # bytes -> field -> bytes
                     self.roundtrip_from_bytes(cls, test_case)
@@ -91,7 +93,9 @@ class _TestPacketFields(object):
 class TestCSBinaryPacketFields(_TestPacketFields, unittest.TestCase):
 
   def setUp(self):
-    self.module = cs.binary
+    ''' We're testing the cs.binary module.
+    '''
+    self.module = binary_module
 
 def selftest(argv):
   ''' Run the unit tests.
