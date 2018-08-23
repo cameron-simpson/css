@@ -306,6 +306,10 @@ class PacketConnection(object):
     ''' Issue a valid response.
         Tack a 1 (ok) flag onto the flags and dispatch.
     '''
+    assert isinstance(channel, int)
+    assert isinstance(tag, int)
+    assert isinstance(flags, int)
+    assert isinstance(payload, bytes)
     flags = (flags<<1) | 1
     self._queue_packet(
         Packet(False, channel, tag, flags, None, payload))
@@ -351,6 +355,7 @@ class PacketConnection(object):
     '''
     return self.request(*a, **kw)()
 
+  @logexc
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
     '''
