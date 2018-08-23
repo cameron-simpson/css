@@ -60,12 +60,18 @@ def module_files(M):
       if filename.endswith('.py'):
         yield os.path.join(dirpath, filename)
 
+def module_attributes(M):
+  ''' Generator yielding the names and values of attributes from a module
+      which were defined in the module.
+  '''
+  for attr in dir(M):
+    value = getattr(M, attr, None)
+    if getmodule(value) is not M:
+      continue
+    yield attr, value
+
 def module_names(M):
-  ''' Generator yielding the names of objects from a module which were
+  ''' Return a list of the names of attributes from a module which were
       defined in the module.
   '''
-  for Mname in dir(M):
-    o = getattr(M, Mname, None)
-    if getmodule(o) is not M:
-      continue
-    yield Mname
+  return [ attr for attr, value in module_attributes(M) ]
