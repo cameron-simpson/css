@@ -7,6 +7,7 @@ if sys.hexversion < 0x02060000:
   bytes = str
 from binascii import unhexlify
 from bisect import bisect_left, bisect_right
+from cs.binary import PacketField, BSUInt
 from cs.lex import hexify, get_identifier
 from cs.logutils import D
 from cs.resources import MultiOpenMixin
@@ -27,26 +28,26 @@ class MissingHashcodeError(KeyError):
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
 
-def decode(bs, offset=0):
-  ''' Decode a serialised hash.
-      Return the hash object and new offset.
-  '''
-  hashenum, offset = get_bs(bs, offset)
-  if hashenum == HASH_SHA1_T:
-    hashcls = Hash_SHA1
-  else:
-    raise ValueError("unsupported hashenum %d", hashenum)
-  return hashcls._decode(bs, offset)
+class HashCodeField(PacketField):
 
-def decode_buffer(bfr):
-  ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
-  '''
-  hashenum = BSUInt.value_from_buffer(bfr)
-  if hashenum == HASH_SHA1_T:
-    hashcls = Hash_SHA1
-  else:
-    raise ValueError("unsupported hashenum %d", hashenum)
-  return hashcls.from_buffer(bfr)
+  @staticmethod
+  def value_from_buffer(bfr):
+    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
+    '''
+    hashenum = BSUInt.value_from_buffer(bfr)
+    if hashenum == HASH_SHA1_T:
+      hashcls = Hash_SHA1
+    else:
+      raise ValueError("unsupported hashenum %d", hashenum)
+    return hashcls.from_buffer(bfr)
+
+  @staticmethod
+  def transcribe_value(hashcode):
+    yield BSUInt.transcribe_value(hashcode.HASHENUM)
+    yield hashcode
+
+decode_buffer = HashCodeField.value_from_buffer
+decode = HashCodeField.value_from_bytes
 
 def hash_of_byteses(bss):
   ''' Compute a `Hash_SHA1` from the bytes of the supplied `hashcodes`.
@@ -82,20 +83,7 @@ class _Hash(bytes, Transcriber):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
         If we ever have a variable length hash function, hash bytes will include that information.
     '''
-    # no hashenum and raw hash
-    return self.HASHENUM_BS + self
-
-  @classmethod
-  def _decode(cls, encdata, offset=0):
-    ''' Pull off the encoded hash from the start of the encdata.
-        Return Hash_* object and new offset.
-        NOTE: this happens _after_ the hash type signature prefixed by .encode.
-    '''
-    hashbytes = encdata[offset:offset+cls.HASHLEN]
-    if len(hashbytes) != cls.HASHLEN:
-      raise ValueError("short data? got %d bytes, expected %d: %r"
-                       % (len(hashbytes), cls.HASHLEN, encdata[offset:offset+cls.HASHLEN]))
-    return cls.from_hashbytes(hashbytes), offset+len(hashbytes)
+    return bytes(HashCodeField(self))
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
