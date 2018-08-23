@@ -442,6 +442,8 @@ class GetRequest(VTPacket):
     return 1, data
 
 class ContainsRequest(VTPacket):
+  ''' A request to test for the presence of a hashcode.
+  '''
 
   RQTYPE = RqType.CONTAINS
 
@@ -466,6 +468,8 @@ class ContainsRequest(VTPacket):
     return 1 if hashcode in local_store else 0
 
 class FlushRequest(VTPacket):
+  ''' A flush request.
+  '''
 
   RQTYPE = RqType.FLUSH
 
@@ -488,6 +492,8 @@ class FlushRequest(VTPacket):
     local_store.flush()
 
 class HashCodesRequest(Packet):
+  ''' A request for remote hashcodes.
+  '''
 
   RQTYPE = RqType.HASHCODES
 
@@ -546,7 +552,7 @@ class HashCodesRequest(Packet):
       if type(start_hashcode) is not hashclass:
         raise ValueError(
             "request hashclass %s does not match start_hashcode class %s"
-            % (rq.hashclass, type(start_hashcode)))
+            % (hashclass, type(start_hashcode)))
     else:
       start_hashcode = None
     length = BSUInt.value_from_buffer(bfr)
@@ -574,7 +580,7 @@ class HashCodesRequest(Packet):
             length=length))
 
 class HashOfHashCodesRequest(HashCodesRequest):
-  ''' A request for a hashcode of 
+  ''' A request for a hashcode of remote hashcodes.
   '''
 
   RQTYPE = RqType.HASHCODES_HASH
