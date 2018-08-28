@@ -23,12 +23,15 @@ class Params(object):
 
   def __init__(self, style):
     ''' Initialise the parameter manager.
-        `style`: the TableSpace parameter style:
-          '?': use '?' as the placeholder
-          '%s': use '%s' as the placeholder
-          TODO:
-          '$n': PostgreSQL style numbered parameters.
-          ':name_n': MySQL style :name_n numbered and named parameters.
+
+        Parameters:
+        * `style`: the TableSpace parameter style:
+          * '?': use '?' as the placeholder
+          * '%s': use '%s' as the placeholder
+
+        TODO:
+        * '$n': PostgreSQL style numbered parameters.
+        * ':name_n': MySQL style :name_n numbered and named parameters.
     '''
     self.style = style
     self.counts = defaultdict(int)
@@ -79,6 +82,8 @@ class TableSpace(object):
     return Params(self.param_style)
 
   def __getattr__(self, attr):
+    ''' Fetch a virtual attribute.
+    '''
     if not attr.startswith('_'):
       if attr.endswith('s'):
         if '_' not in attr:
@@ -142,14 +147,15 @@ class Table(object):
       lock=None, row_class=None,
       column_names=None, id_column=None, name_column=None,
   ):
-    ''' Initialise a new Table.
-        `db`: the database (TableSpace) containing this Table
-        `table_name`: the Table's name
-        `lock`: optional Lock; if omitted or None use `db._lock`
-        `row_class`: factory to construct a Row from a query result
-        `column_names`: Table column names
-        `id_column`: the Table primary key column
-        `name_column`: optional Table name column, contains an identifying string
+    ''' Initialise a new Table:
+        * `db`: the database (TableSpace) containing this Table
+        * `table_name`: the Table's name
+        * `lock`: optional Lock; if omitted or None use `db._lock`
+        * `row_class`: factory to construct a Row from a query result
+        * `column_names`: Table column names
+        * `id_column`: the Table primary key column
+        * `name_column`: optional Table name column, contains an
+          identifying string
     '''
     if lock is None:
       lock = db._lock
@@ -777,7 +783,9 @@ where_index_result = namedtuple(
 def where_index(column, index):
   ''' Return a where clause and any associated parameters for a
       single column index such as may be accepted by __getitem__.
+
       This handles integers, strings, slicelike objects and bounded iterables.
+
       Returns a namedtuple with fields (is_scalar, where, params).
   '''
   try:
