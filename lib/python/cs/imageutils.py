@@ -16,7 +16,7 @@ class ThumbnailCache(object):
   ''' A class to manage a collection of thumbnail images.
   '''
 
-  DEFAULT_CACHEDIR = '~/var/im/thumbnails'
+  DEFAULT_CACHEDIR = '~/var/cache/im/thumbnails'
   DEFAULT_HASHTYPE = 'sha1'
   DEFAULT_MIN_SIZE = 16
   DEFAULT_SCALE_STEP = 2.0
@@ -50,11 +50,9 @@ class ThumbnailCache(object):
     ''' Compute thumbnail size from target dimensions.
     '''
     target = max(dx, dy)
-    X("thumb_scale: target = max(%d,%d) = %d", dx, dy, target)
     scale = float(self.min_size)
     while int(scale) < target:
       scale *= self.scale_step
-    X("  chosen scale = %g", scale)
     return int(scale)
 
   def thumb_for_path(self, dx, dy, image_path):
@@ -73,34 +71,27 @@ class ThumbnailCache(object):
 
         Thumbnail paths are named after the SHA1 digest of their file content.
     '''
-    X("thumb_for_path(%d,%d,%r)...", dx, dy, image_path)
     with Pfx("thumb_for_path(%d,%d,%r)", dx, dy, image_path):
       image_info = iminfo(image_path)
       max_edge = self.thumb_scale(dx, dy)
-      X("  max_edge=%g", max_edge)
       thumb_path = joinpath(self.cachedir, image_info.thumbpath(max_edge))
-      X("  thumb_path=%r", thumb_path)
       if isfile(thumb_path):
-        X("  path exists, return directly")
         return thumb_path
-      X("  create thumbnail...")
+      X("create thumbnail %r", thumb_path)
       # create the thumbnail
       image = Image.open(image_path)
       im_dx, im_dy = image.size
       if max_edge >= im_dx and max_edge >= im_dy:
         # thumbnail better served by original image
-        X("  max_edge=%d, im_dx=%d, im_dy=%d", max_edge, im_dx, im_dy)
         return image_path
       # create the thumbnail
       scale_down = max(im_dx / max_edge, im_dy / max_edge)
       thumb_size = int(im_dx / scale_down), int(im_dy / scale_down)
-      X("  scale_down=%g, resize to %r", scale_down, thumb_size)
       thumbnail = image.resize(thumb_size)
       thumbdir = dirname(thumb_path)
       if not isdir(thumbdir):
         os.makedirs(thumbdir)
       thumbnail.save(thumb_path)
-      X("  ==> %r", thumb_path)
       return thumb_path
 
 def iminfo(image_path):
