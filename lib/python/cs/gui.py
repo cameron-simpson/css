@@ -75,7 +75,6 @@ class _Element(object):
     self.fgcolor = fgcolor
     if size is not None:
       self.size = size
-    X("NEW %s %s", self.size, self.widget)
 
   def show(self):
     ''' Show the widget.
@@ -126,11 +125,6 @@ class _Element(object):
     new_size = Size(*new_size)
     self._size = new_size
     position = self.position
-    X("SET GEOM => @%d,%d %dx%d",
-        position.left,
-        position.top,
-        new_size.width,
-        new_size.height)
     self.widget.setGeometry(
         position.left,
         position.top,
@@ -247,7 +241,7 @@ class Grid(_Layout):
     assert isinstance(y, int)
     assert isinstance(element, _Element)
     self.grid[x][y] = element
-    self.layout.addWidget(element.widget, x, y)
+    self.layout.addWidget(element.widget, y, x)
 
 class TabSet(_Element):
   ''' A tab set, showing one of a set of Elements.
@@ -325,7 +319,6 @@ class Image(_Element):
   def expose(self):
     ''' Ensure the label pixmap is set.
     '''
-    X("setPixmap from %r", self.image_path)
     self.widget.setPixmap(self.pixmap)
 
 class Thumbnail(Image):
