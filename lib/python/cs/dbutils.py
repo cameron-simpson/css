@@ -312,13 +312,28 @@ class Table(object):
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, sqlargs)
 
+  def insert1(self, **kw):
+    ''' Insert a single row.
+    '''
+    column_names = []
+    values = []
+    for column_name, value in kw.items():
+      column_names.append(column_name)
+      values.append(value)
+    X("insert1: column_names=%r, values=%r", column_names, values)
+    return self.insert(column_names, (values,))
+
   def insert(self, column_names, valueses, ignore=False):
-    ''' Insert new rows.
+    ''' Insert new rows. Return the last row id value.
     '''
     ins_cmd = 'insert or ignore' if ignore else 'insert'
     sql = ins_cmd + (
-        ' into %s(%s) values '
-        % (self.table_name, ','.join(column_names))
+        ' into `%s`(%s) values '
+        % (
+            self.table_name,
+            ','.join(
+                '`%s`' % (column_name,)
+                for column_name in column_names))
     )
     sqlargs = []
     tuple_param = '(%s)' % ( ','.join( '?' for _ in column_names ), )
@@ -332,8 +347,10 @@ class Table(object):
     ##if sqlargs: info("  args = %r", sqlargs)
     with Pfx("SQL %r: %r", sql, sqlargs):
       C.execute(sql, sqlargs)
+      last_id = C.lastrowid
     self.conn.commit()
     C.close()
+    return last_id
 
   def update_columns(self, update_columns, update_argv, where, *where_argv):
     ''' Update specific row columns.
