@@ -166,7 +166,7 @@ class Table(object):
       row_class = Row
     self.db = db
     self.table_name = table_name
-    self.column_names = column_names
+    self.column_names = tuple(column_names)
     self.id_column = id_column
     self.id_index = column_names.index(id_column) if id_column else None
     self.name_column = name_column
@@ -227,7 +227,10 @@ class Table(object):
     P = self.new_params()
     conditions = []
     for column_name, value in zip(column_names, values):
-      if isinstance(value, (list, tuple, set)):
+      if value is None:
+        conditions.append(
+            '`%s` IS NULL' % (column_name,))
+      elif isinstance(value, (list, tuple, set)):
         conditions.append(
             '`%s` in (%s)'
             % (column_name, ','.join(P.vadd(column_name, value))))
