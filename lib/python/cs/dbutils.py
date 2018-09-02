@@ -168,9 +168,12 @@ class Table(object):
     self.table_name = table_name
     self.column_names = column_names
     self.id_column = id_column
+    self.id_index = column_names.index(id_column) if id_column else None
     self.name_column = name_column
-    self.row_tuple = namedtuple('%s_Row' % (table_name,), column_names)
+    self.row_tuple_class = namedtuple(table_name.title() + 'RowTuple', column_names)
     self.row_class = row_class
+    self._row_cache = {}            # id => row
+    self._row_cache_unique = {}     # ((k1,v1),(k2,v2),...) => row
     self.relations = {}
     self._lock = lock
 
@@ -190,13 +193,28 @@ class Table(object):
     '''
     return iter(self.rows())
 
+  def _cached_row(self, raw_row):
+    id_index = self.id_index
+    row_class = self.row_class
+    if id_index is None:
+      row = row_class(self, raw_row)
+    else:
+      id_value = raw_row[id_index]
+      cached = self._row_cache.get(id_value)
+      if cached:
+        row = cached
+      else:
+        row = self._row_cache[id_value] = row_class(self, raw_row)
+    return row
+
   def rows(self, where=None, *where_argv):
     ''' Return a list of row_class instances.
     '''
     row_class = self.row_class
+    cache_row = self._cached_row
     return list(
-        row_class(self, row)
-        for row in self.select(where, *where_argv))
+        cache_row(row)
+        for row in self.select(*where_argv, where=where))
 
   def rows_by_value(self, column_names, *values):
     ''' Return rows which the specified column values.
@@ -218,6 +236,42 @@ class Table(object):
             '`%s` = %s' % (column_name, P.add(column_name, value)))
     where_clause = ' AND '.join(conditions)
     return self.rows(where_clause, *P.values)
+
+  def unique_row_where(self, **kw):
+    ''' Fetch a row uniquely identified by the keyword paramaters
+        using a cache.
+
+        This makes things like repeated graph traversal more efficient
+        as the edge is defined as starting at one row's id and have
+        some additional criteria.
+
+        This method should only be used when the parameters identify
+        a unique row, or no row.
+    '''
+    key = tuple(sorted(kw.items()))
+    cache = self._row_cache_unique
+    row = cache.get(key)
+    if row:
+      # return cache value
+      return row
+    rows = self.rows_where(**kw)
+    if rows:
+      # should be a single row - cache and return
+      row, = rows
+      cache[key] = row
+      return row
+    # no match
+    return None
+
+  def rows_where(self, **kw):
+    ''' Keyword based form of `rows_by_value`.
+    '''
+    column_names = []
+    values = []
+    for column_name, value in kw.items():
+      column_names.append(column_name)
+      values.append(value)
+    return self.rows_by_value(column_names, *values)
 
   @prop
   def qual_name(self):
@@ -341,18 +395,36 @@ class Table(object):
         IndexError.
         Otherwise return a list of row_class instances.
     '''
+    cache = self._row_cache
+    if id_value is None or isinstance(id_value, int):
+      # direct lookup, return single row
+      row = cache.get(id_value)
+      if row is not None:
+        return row
+      row, = self.rows_where(**{self.id_column: id_value})
+      return row
     if isinstance(id_value, str):
       return self.named_row(id_value, fuzzy=True)
-    if isinstance(id_value, (list, set, tuple)) and len(id_value) >= 1024:
-      # too many parameters
-      if not isinstance(id_value, set):
-        id_value = set(id_value)
-      rows = list( row for row in self if row[self.id_column] in id_value )
-    else:
-      condition = where_index(self.id_column, id_value)
-      rows = self.rows(condition.where, *condition.params)
-      if condition.is_scalar:
-        return the(rows)
+    if isinstance(id_value, (list, set, tuple)):
+      cached = {k: cache.get(k) for k in id_value}
+      rows = list(filter(None, cached.values()))
+      id_value = [ row for k, row in cached.items() if not row ]
+      # id_value now a unique list of row keys
+      if id_value:
+        if len(id_value) >= 1024:
+          id_value = sorted(id_value)
+          offset = 0
+          while offset < len(id_value):
+            rows.extend(id_value[offset:offset+1024])
+            offset += 1024
+        else:
+          condition = where_index(self.id_column, id_value)
+          rows.extend(self.rows(condition.where, *condition.params))
+      return rows
+    condition = where_index(self.id_column, id_value)
+    rows = self.rows(condition.where, *condition.params)
+    if condition.is_scalar:
+      return the(rows)
     return rows
 
   def get(self, id_value, default=None):
@@ -458,7 +530,7 @@ class Row(object):
     if lock is None:
       lock = table._lock
     self._table = table
-    self._row = table.row_tuple(*values)
+    self._row = table.row_tuple_class(*values)
     self._lock = lock
 
   def __str__(self):
