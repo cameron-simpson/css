@@ -73,7 +73,8 @@ class TableSpace(object):
       lock = RLock()
     self.db_name = db_name
     self._tables = {}
-    self.table_class = table_class
+    self.table_by_nickname = {}
+    self.default_table_class = table_class
     self._lock = lock
 
   def new_params(self):
@@ -129,12 +130,14 @@ class TableSpace(object):
         % (type(self).__name__, attr,))
 
   @locked
-  def table(self, name):
+  def table(self, name, table_class=None, row_class=None):
     ''' Return the Table named `name`.
     '''
+    if table_class is None:
+      table_class = self.default_table_class
     T = self._tables.get(name)
     if T is None:
-      T = self._tables[name] = self.table_class(self, name)
+      T = self._tables[name] = table_class(self, name, row_class=row_class)
     return T
 
 class Table(object):
@@ -159,6 +162,8 @@ class Table(object):
     '''
     if lock is None:
       lock = db._lock
+    if row_class is None:
+      row_class = Row
     self.db = db
     self.table_name = table_name
     self.column_names = column_names
