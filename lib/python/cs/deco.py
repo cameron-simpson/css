@@ -55,7 +55,7 @@ def decorator(deco, *da, **dkw):
   return overdeco
 
 @decorator
-def cached(func, **dkw):
+def cached(func, attr_name=None, poll_delay=None, sig_func=None, unsert_value=None):
   ''' Decorator to cache the result of a method and keep a revision counter for changes.
       The revision supports the @revised decorator.
 
@@ -97,14 +97,8 @@ def cached(func, **dkw):
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
-  attr_name = dkw.pop('attr_name', None)
-  poll_delay = dkw.pop('poll_delay', None)
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
-  sig_func = dkw.pop('sig_func', None)
-  unset_value = dkw.pop('unset_value', None)
-  if dkw:
-    raise ValueError("unexpected keyword arguments: %r" % (dkw,))
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("invalid poll_delay, should be >0, got: %r" % (poll_delay,))
 
