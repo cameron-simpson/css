@@ -289,11 +289,15 @@ class Table(object):
     '''
     return self.db.conn
 
-  def select(self, where=None, *where_argv):
+  def select(self, *where_argv, column_names=None, where=None):
     ''' Select raw SQL data from the table.
 
         It is generally better to use .rows instead, which returns typed rows.
     '''
+    if column_names is None:
+      column_names = self.column_names
+    elif isinstance(column_names, str):
+      column_names = (column_names,)
     sql = 'select %s from %s' % (','.join(self.column_names), self.table_name)
     sqlargs = []
     if where:
