@@ -875,7 +875,7 @@ def where_index(column, index):
   except AttributeError:
     # not a slice or slicelike object
     if index is None:
-      return where_index_result(True, 'ISNULL(`%s`)' % (column,), ())
+      return where_index_result(True, '`%s` IS NULL' % (column,), ())
     if isinstance(index, str):
       # strings are scalars
       return where_index_result(True, '`%s` = ?' % (column,), (index,))
