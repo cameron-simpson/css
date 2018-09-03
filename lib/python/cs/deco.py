@@ -55,8 +55,9 @@ def decorator(deco, *da, **dkw):
   return overdeco
 
 @decorator
-def cached(func, attr_name=None, poll_delay=None, sig_func=None, unsert_value=None):
-  ''' Decorator to cache the result of a method and keep a revision counter for changes.
+def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
+  ''' Decorator to cache the result of a method and keep a revision
+      counter for changes.
       The revision supports the @revised decorator.
 
       This decorator may be used in 2 modes.
@@ -114,45 +115,47 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unsert_value=No
     setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
     # see if we should use the cached value
-    try:
-      if poll_delay is not None and not first:
-        # too early to check the signature function?
-        now = time.time()
-        lastpoll = getattr(self, lastpoll_attr, None)
-        if (
-            value0 is not unset_value
-            and lastpoll is not None
-            and now - lastpoll < poll_delay
-        ):
-          return value0
-        setattr(self, lastpoll_attr, now)
-      if sig_func is not None:
-        # see if the signature is unchanged
-        sig0 = getattr(self, sig_attr, None)
-        sig = sig_func(self)
-        if sig0 is not None and sig0 == sig:
-          return value0
-      if value0 is not unset_value:
+    if poll_delay is not None and not first:
+      # too early to check the signature function?
+      now = time.time()
+      lastpoll = getattr(self, lastpoll_attr, None)
+      if (
+          value0 is not unset_value
+          and lastpoll is not None
+          and now - lastpoll < poll_delay
+      ):
         return value0
-      # compute the current value
-      value = func(self, *a, **kw)
-      setattr(self, val_attr, value)
-      if sig_func is not None:
-        setattr(self, sig_attr, sig)
-      # bump revision if the value changes
-      # noncomparable values are always presumed changed
+      setattr(self, lastpoll_attr, now)
+    if sig_func is not None:
+      # see if the signature is unchanged
+      sig0 = getattr(self, sig_attr, None)
       try:
-        changed = value != value0
-      except TypeError:
-        changed = True
-      if changed:
-        setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
-      return value
+        sig = sig_func(self)
+      except Exception as e:
+        from cs.logutils import exception
+        exception("%s.%s: sig func %s(self): %s", self, attr, sig_func, e)
+        return value0
+      if sig0 is not None and sig0 == sig:
+        return value0
+    # compute the current value
+    try:
+      value = func(self, *a, **kw)
     except Exception as e:
-      from cs.logutils import exception, setup_logging
-      setup_logging("foo")
-      exception("%s.%s: %s", self, attr, e)
+      from cs.logutils import exception
+      exception("%s.%s: value func %s(*%r,**%r): %s", self, attr, func, a, kw, e)
       return value0
+    setattr(self, val_attr, value)
+    if sig_func is not None:
+      setattr(self, sig_attr, sig)
+    # bump revision if the value changes
+    # noncomparable values are always presumed changed
+    try:
+      changed = value0 is unset_value or value != value0
+    except TypeError:
+      changed = True
+    if changed:
+      setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
+    return value
 
   return wrapper
 
