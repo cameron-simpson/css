@@ -69,162 +69,6 @@ class BlockType(IntEnum):
   BT_LITERAL = 2            # span raw-data
   BT_SUBBLOCK = 3           # a SubBlock of another Block
 
-def decodeBlocks(bs, offset=0):
-  ''' Process the bytes `bs` from the supplied `offset` (default 0).
-      Yield Blocks.
-  '''
-  while offset < len(bs):
-    B, offset = decodeBlock(bs, offset)
-    yield B
-
-def encoded_Block_fields(flags, span, block_type, type_flags=0, chunks=()):
-  ''' Transcribe a Block reference given its fields, yielding bytes objects.
-  '''
-  if flags & ~(F_BLOCK_INDIRECT|F_BLOCK_TYPED|F_BLOCK_TYPE_FLAGS):
-    raise ValueError("unexpected flags: 0x%02x" % (flags,))
-  if span < 0:
-    raise ValueError("expected span >= 1, got: %s" % (span,))
-  if not isinstance(block_type, BlockType):
-    block_type = BlockType(block_type)
-  if block_type is BlockType.BT_HASHCODE:
-    flags &= ~F_BLOCK_TYPED
-  else:
-    flags |= F_BLOCK_TYPED
-  if type_flags == 0:
-    flags &= ~F_BLOCK_TYPE_FLAGS
-  else:
-    flags |= F_BLOCK_TYPE_FLAGS
-  yield put_bs(flags)
-  yield put_bs(span)
-  if flags & F_BLOCK_TYPED:
-    yield put_bs(block_type)
-  if flags & F_BLOCK_TYPE_FLAGS:
-    yield put_bs(type_flags)
-  for chunk in chunks:
-    yield chunk
-
-def decodeBlock(bs, offset=0, length=None):
-  ''' Decode a Block reference from the bytes `bs` at offset `offset`.
-      Return the Block and the new offset.
-
-      If `length` is None, expect a leading BS(reflen) run length indicating
-        the length of the block record that follows.
-
-      Format is:
-
-          [BS(reflen)]  # length of following data
-          BS(flags)
-            0x01 indirect blockref
-            0x02 typed: type follows
-            0x04 type flags: per type flags follow type
-          BS(span)
-          [BS(type)]
-          [BS(type_flags)]
-          union { type 0: hash
-                  type 1: octet-value (repeat span times to get data)
-                  type 2: raw-data (span bytes)
-                  type 3: suboffset, super block
-                }
-  '''
-  with Pfx('decodeBlock(bs=%r,offset=%d,length=%s)',
-           bs[offset:offset+16], offset, length):
-    if length is None:
-      length, offset = get_bs(bs, offset)
-      return decodeBlock(bs, offset, length)
-    if length > len(bs) - offset:
-      raise ValueError("length(%d) > len(bs[%d:]):%d"
-                       % (length, offset, len(bs) - offset))
-    bs0 = bs
-    offset0 = offset
-    # Note offset after length field, used to sanity check decoding.
-    # This is also used by SubBlocks to compute the length to pass
-    # to the decode of the inner Block record.
-    offset0a = offset
-    # gather flags
-    flags, offset = get_bs(bs, offset)
-    is_indirect = bool(flags & F_BLOCK_INDIRECT)
-    is_typed = bool(flags & F_BLOCK_TYPED)
-    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
-    unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_TYPED|F_BLOCK_TYPE_FLAGS)
-    if unknown_flags:
-      raise ValueError(
-          "unexpected flags value (0x%02x) with unsupported flags=0x%02x,"
-          " bs[offset=%d:]=%r"
-          % (flags, unknown_flags, offset0, bs0[offset0:]))
-    # gather span
-    span, offset = get_bs(bs, offset)
-    if is_indirect:
-      # With indirect blocks, the span is of the implied data, not
-      # the referenced block's data. Therefore we build the referenced
-      # block with a span of None and store the span in the indirect
-      # block.
-      ispan = span
-      span = None
-    # block type, default BT_HASHCODE
-    if is_typed:
-      block_type, offset = get_bs(bs, offset)
-      block_type = BlockType(block_type)
-    else:
-      block_type = BlockType.BT_HASHCODE
-    with Pfx("block_type=%s", block_type):
-      # gather type flags
-      if has_type_flags:
-        type_flags, offset = get_bs(bs, offset)
-        if type_flags:
-          warning("nonzero type_flags: 0x%02x", type_flags)
-      else:
-        type_flags = 0x00
-      # instantiate type specific block ref
-      if block_type == BlockType.BT_HASHCODE:
-        hashcode, offset = hash_decode(bs, offset)
-        B = HashCodeBlock(hashcode=hashcode, span=span)
-      elif block_type == BlockType.BT_RLE:
-        octet = bs[offset]
-        offset += 1
-        B = RLEBlock(span, octet)
-      elif block_type == BlockType.BT_LITERAL:
-        offset1 = offset + span
-        data = bs[offset:offset1]
-        if len(data) != span:
-          raise ValueError("expected %d literal bytes, got %d" % (span, len(data)))
-        offset = offset1
-        B = LiteralBlock(data)
-      elif block_type == BlockType.BT_SUBBLOCK:
-        suboffset, offset = get_bs(bs, offset)
-        superB, offset = decodeBlock(bs, offset, length=length-(offset-offset0a))
-        # wrap inner Block in subspan
-        B = SubBlock(superB, suboffset, span)
-      else:
-        raise ValueError("unsupported Block type 0x%02x" % (block_type,))
-      # check that we decoded the correct number of bytes
-      if offset - offset0a > length:
-        raise ValueError(
-            "overflow decoding Block: length should be %d,"
-            " but decoded %d bytes"
-            % (length, offset - offset0))
-      if offset - offset0a < length:
-        raise ValueError(
-            "underflow decoding Block: length should be %d,"
-            " but decoded %d bytes"
-            % (length, offset - offset0))
-      if is_indirect:
-        B = _IndirectBlock(B, span=ispan)
-      return B, offset
-
-def encodeBlocks(blocks):
-  ''' Generator yielding byte chunks encoding Blocks; inverse of decodeBlocks.
-  '''
-  for B in blocks:
-    enc = B.encode()
-    yield put_bs(len(enc))
-    yield enc
-
-def encodeBlock(B):
-  ''' Return a bytes object containing the run length encoding from a Block.
-      put_bs(len(B.encode())) + B.encode()
-  '''
-  return b''.join(encodeBlocks((B,)))
-
 class BlockRecord(PacketField):
   ''' PacketField support binary parsing and transcription of blockrefs.
   '''
@@ -353,6 +197,18 @@ class BlockRecord(PacketField):
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     return BSData(b''.join(flatten_transcription(transcription))).transcribe()
 
+def Block_from_bytes(bs, offset=0):
+  B, offset = BlockRecord.value_from_bytes(bs, offset=offset)
+  return B, offset
+
+def Blocks_from_bytes(bs, offset=0):
+  ''' Process the bytes `bs` from the supplied `offset` (default 0).
+      Yield Blocks.
+  '''
+  while offset < len(bs):
+    B, offset = Block_from_bytes(bs, offset)
+    yield B
+
 class _Block(Transcriber, ABC):
 
   def __init__(self, block_type, span):
@@ -455,12 +311,10 @@ class _Block(Transcriber, ABC):
     # data are identical if we have consumed all of leaves1 an all of leaves2
     return leaf2 is None
 
-  def _encode(self, flags, span, block_type, block_type_flags, chunks):
-    ''' Return the bytes encoding for this Block, sans run length.
+  def encode(self):
+    ''' Binary transcription of this Block via BlockRecord.
     '''
-    if span is None:
-      span = self.span
-    return b''.join(encoded_Block_fields(flags, span, block_type, block_type_flags, chunks))
+    return b''.join(BlockRecord.transcribe_value_flat(self))
 
   def __getattr__(self, attr):
     if attr == 'data':
@@ -538,7 +392,6 @@ class _Block(Transcriber, ABC):
 
         The iterator may end early if the span exceeds the Block data.
     '''
-    ##X("slices %s ...", self)
     if start is None:
       start = 0
     elif start < 0:
@@ -547,17 +400,15 @@ class _Block(Transcriber, ABC):
       end = len(self)
     elif end < start:
       raise ValueError("end must be >= start(%r), received: %r" % (start, end))
+    assert end <= len(self)
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
         blockmap = self.blockmap
         if blockmap:
-          X("_Block.slices: yield from blockmap.slices[%d:%d] ...", start, end)
           yield from blockmap.slices(start, end - start)
           return
-        X("_Block:%s.slices: no BlockMap (%r), fall through", self, blockmap)
       offset = 0
-      X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:
         sublen = len(B)
         if start <= offset + sublen:
@@ -771,13 +622,6 @@ class HashCodeBlock(_Block):
           "%s: span=%d but len(bs)=%d" % (self, self.span, len(bs)))
     return bs
 
-  def encode(self, flags=0, span=None):
-    ''' Return the bytes encoding of this HashCodeBlock.
-    '''
-    hashcode = self.hashcode
-    return self._encode(flags, span, BlockType.BT_HASHCODE, 0,
-                        ( hashcode.encode(), ))
-
   def transcribe_inner(self, T, fp):
     m = {'hash': self.hashcode}
     if self._span is not None:
@@ -832,13 +676,16 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
       hashcode; the data of that Block can be decoded to obtain the
       reference Blocks for this IndirectBlock.
 
-      As an optimisation, unless `force` is true, if `subblocks`
-      is empty a direct Block for b'' is returned or if `subblocks`
+      As an optimisation, unless `force` is true: if `subblocks`
+      is empty a direct Block for b'' is returned; if `subblocks`
       has just one element then that element is returned.
 
       TODO: allow data= initialisation, to decode raw iblock data.
-  '''
 
+  '''
+  ## TODO: A direct or single byte Block should be an RLEBlock;
+  ##   this breaks our implementation of .hashcode - need to see if we
+  ##   can not require it - check use cases.
   if subblocks is None:
     # hashcode specified
     if hashcode is None:
@@ -868,7 +715,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
         return Block(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
-    superBdata = b''.join(encodeBlocks(subblocks))
+    superBdata = b''.join(subB.encode() for subB in subblocks)
     B = HashCodeBlock(data=superBdata)
   return _IndirectBlock(B, span=span)
 
@@ -877,6 +724,8 @@ class _IndirectBlock(_Block):
   transcribe_prefix = 'I'
 
   def __init__(self, superB, span=None):
+    if superB.indirect:
+      raise ValueError("superB may not be indirect: superB=%s" % (superB,))
     super().__init__(BlockType.BT_INDIRECT, 0)
     self.indirect = True
     self.superblock = superB
@@ -890,7 +739,7 @@ class _IndirectBlock(_Block):
       with self._lock:
         if 'subblocks' not in self.__dict__:
           idata = self.superblock.data
-          self.subblocks = tuple(decodeBlocks(idata))
+          self.subblocks = tuple(Blocks_from_bytes(idata))
       return self.subblocks
     return super().__getattr__(attr)
 
@@ -898,11 +747,6 @@ class _IndirectBlock(_Block):
     ''' Return the concatenation of all the leaf data.
     '''
     return b''.join(leaf.data for leaf in self.leaves)
-
-  def encode(self):
-    ''' Serialise this Block to bytes.
-    '''
-    return self.superblock.encode(F_BLOCK_INDIRECT, span=self.span)
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe "span:Block".
@@ -946,11 +790,6 @@ class RLEBlock(_Block):
     '''
     return self.octet * self.span
 
-  def encode(self, flags=0, span=None):
-    ''' Return the binary transcription of an RLEBlock.
-    '''
-    return self._encode(flags, span, BlockType.BT_RLE, 0, ( self.octet, ))
-
   def transcribe_inner(self, T, fp):
     return T.transcribe_mapping({'span': self.span, 'octet': self.octet}, fp)
 
@@ -974,12 +813,6 @@ class LiteralBlock(_Block):
   def __init__(self, data, **kw):
     _Block.__init__(self, BlockType.BT_LITERAL, span=len(data), **kw)
     self.data = data
-
-  def encode(self, flags=0, span=None):
-    ''' Return the binary transcription of a LiteralBlock.
-    '''
-    return self._encode(flags, span, BlockType.BT_LITERAL, 0,
-                        ( self.data, ))
 
   def transcribe_inner(self, T, fp):
     fp.write(texthexify(self.data))
@@ -1048,14 +881,6 @@ class _SubBlock(_Block):
           % (self, self.span, self.offset, self.offset, self.span,
              self.offset + self.span, len(bs)))
     return bs
-
-  def encode(self, flags=0, span=None):
-    ''' Return the binary transcription of a SubBlock.
-    '''
-    return self._encode(flags, span, BlockType.BT_SUBBLOCK, 0,
-                        ( put_bs(self.offset),
-                          self.superblock.encode(),
-                        ))
 
   def __getitem__(self, index):
     if isinstance(index, slice):
