@@ -320,15 +320,22 @@ class BlockRecord(PacketField):
     ''' Transcribe this Block, the inverse of value_from_buffer.
     '''
     transcription = []
+    is_indirect = B.indirect
+    span = B.span
+    if is_indirect:
+      # aside from the span, everything else comes from the superblock
+      ##X("INDIRECT: B(%s) => B.superblock(%s)", B, B.superblock)
+      B = B.superblock
     block_type = B.type
+    assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
     block_typed = block_type != BlockType.BT_HASHCODE
     flags = (
-        ( F_BLOCK_INDIRECT if B.indirect else 0 )
+        ( F_BLOCK_INDIRECT if is_indirect else 0 )
         | ( F_BLOCK_TYPED if block_typed else 0 )
         | 0     # no F_BLOCK_TYPE_FLAGS
     )
     transcription.append(BSUInt.transcribe_value(flags))
-    transcription.append(BSUInt.transcribe_value(B.span))
+    transcription.append(BSUInt.transcribe_value(span))
     if block_typed:
       transcription.append(BSUInt.transcribe_value(block_type))
     # no block_type_flags
@@ -339,7 +346,8 @@ class BlockRecord(PacketField):
     elif block_type == BlockType.BT_LITERAL:
       transcription.append(B.data)
     elif block_type == BlockType.BT_SUBBLOCK:
-      transcription.append(BSUInt.transcribe_value(B.suboffset))
+      ##X("TRANSCRIBE: B=%r", B)
+      transcription.append(BSUInt.transcribe_value(B.offset))
       transcription.append(BlockRecord.transcribe_value(B.superblock))
     else:
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
