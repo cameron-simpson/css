@@ -28,7 +28,7 @@ from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bs
 from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, PATHSEP, defaults
-from .block import Block, decodeBlock, encodeBlock, _Block
+from .block import Block, Block_from_bytes, _Block
 from .file import File
 from .meta import Meta, rwx
 from .paths import path_split, resolve
@@ -160,9 +160,9 @@ class _Dirent(Transcriber):
     if flags & F_NOBLOCK:
       block = None
     else:
-      block, offset = decodeBlock(data, offset)
+      block, offset = Block_from_bytes(data, offset)
     if flags & F_PREVDIRENT:
-      prev_dirent_blockref, offset = decodeBlock(data, offset)
+      prev_dirent_blockref, offset = Block_from_bytes(data, offset)
     else:
       prev_dirent_blockref = None
     try:
@@ -218,7 +218,7 @@ class _Dirent(Transcriber):
       flags |= F_NOBLOCK
       blockref = b''
     else:
-      blockref = encodeBlock(block)
+      blockref = block.encode()
     uu = self.uuid
     if uu is None:
       uubs = b''
@@ -231,7 +231,7 @@ class _Dirent(Transcriber):
     else:
       assert isinstance(prev_dirent_blockref, _Block)
       flags |= F_PREVDIRENT
-      prev_dirent_bs = encodeBlock(prev_dirent_blockref)
+      prev_dirent_bs = prev_dirent_blockref.encode()
     return (
         put_bs(self.type)
         + put_bs(flags)
