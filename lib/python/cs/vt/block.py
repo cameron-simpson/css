@@ -48,11 +48,10 @@ from cs.lex import texthexify, untexthexify, get_decimal_value
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext
-from .hash import HashCode, decode as hash_decode
+from .hash import HashCode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
@@ -197,9 +196,7 @@ class BlockRecord(PacketField):
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     return BSData(b''.join(flatten_transcription(transcription))).transcribe()
 
-def Block_from_bytes(bs, offset=0):
-  B, offset = BlockRecord.value_from_bytes(bs, offset=offset)
-  return B, offset
+Block_from_bytes = BlockRecord.value_from_bytes
 
 def Blocks_from_bytes(bs, offset=0):
   ''' Process the bytes `bs` from the supplied `offset` (default 0).
