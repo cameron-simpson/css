@@ -36,7 +36,7 @@ import cs.x
 from cs.x import X
 from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
-from .block import Block, IndirectBlock, decodeBlock
+from .block import Block, IndirectBlock, Block_from_bytes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
@@ -390,7 +390,7 @@ class VTCmd:
     for blockref in args:
       with Pfx(blockref):
         blockref_bs = fromtext(blockref)
-        B, offset = decodeBlock(blockref_bs)
+        B, offset = Block_from_bytes(blockref_bs)
         if offset < len(blockref_bs):
           raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
         if not fsck_Block(B):
