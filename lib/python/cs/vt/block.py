@@ -371,24 +371,25 @@ class _Block(Transcriber, ABC):
     if self.span != oblock.span:
       # different lengths, no match
       return False
+    # see if we can compare hashes
+    h1 = getattr(self, 'hashcode', None)
+    h2 = getattr(oblock, 'hashcode', None)
+    if h1 is not None and h2 is not None and h1 == h2:
+      if (
+          self.indirect and oblock.indirect
+          or not self.indirect and not oblock.indirect
+      ):
+        # same hashes and indirectness: same data content
+        return True
     # see if both blocks are direct blocks
     if not self.indirect and not oblock.indirect:
-      # directly compare hashcodes if available
-      try:
-        h1 = self.hashcode
-      except AttributeError:
-        pass
-      else:
-        try:
-          h2 = oblock.hashcode
-        except AttributeError:
-          pass
-        else:
-          return h1 == h2
       # directly compare data otherwise
-      # TODO: can be memory expensive - consider iterative leaf chunk comparison
+      # TODO: this may be expensive for some Block types?
       return self.data == oblock.data
-    # indirect: walk both blocks comparing leaves
+    # one of the blocks is indirect: walk both blocks comparing leaves
+    # we could do this by stuffing one into a buffer but we still
+    # want to do direct leaf comparisons when the leaves are aligned,
+    # as that may skip a data fetch
     leaves1 = self.leaves
     leaves2 = oblock.leaves
     offset = 0      # amount already compared
@@ -396,7 +397,11 @@ class _Block(Transcriber, ABC):
     offset2 = 0     # offset of start of leaf2
     leaf2 = None
     for leaf1 in leaves1:
-      end1 = offset1 + len(leaf1)
+      # skip empty leaves
+      leaf1len = len(leaf1)
+      if leaf1len == 0:
+        continue
+      end1 = offset1 + leaf1len
       while offset < end1:
         # still more bytes in leaf1 needing comparison
         # fetch leaf2 if required
@@ -443,7 +448,7 @@ class _Block(Transcriber, ABC):
       try:
         leaf2 = next(leaves2)
       except StopIteration:
-        pass
+        break
       else:
         if len(leaf2) == 0:
           leaf2 = None
