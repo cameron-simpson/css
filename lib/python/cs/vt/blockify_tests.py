@@ -17,7 +17,7 @@ from cs.logutils import warning
 from cs.randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
-                      blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE, \
+                      MIN_BLOCKSIZE, MAX_BLOCKSIZE, \
                       DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
