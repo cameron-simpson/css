@@ -167,6 +167,9 @@ case "$op" in
     printf '\e]1337;SetBadgeFormat=%s\a' "$format64"
     ;;
   bgimg)
+    case "$imgpath" in
+      /*) ;; *) imgpath=$(pwd)/$imgpath ;;
+    esac
     imgpath64=$( printf '%s' "$imgpath" | $base64 )
     printf '\e]1337;SetBackgroundImageFile=%s\a' "$imgpath64"
     ;;
