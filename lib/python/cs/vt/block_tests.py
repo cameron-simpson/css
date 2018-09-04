@@ -15,7 +15,8 @@ from .block import Block, \
     IndirectBlock, \
     RLEBlock, LiteralBlock, SubBlock, \
     verify_block, BlockType, \
-    encodeBlock, decodeBlock
+    Block_from_bytes, \
+    BlockRecord
 from .debug import dump_Block
 from .store import MappingStore
 
@@ -38,6 +39,10 @@ class TestAll(unittest.TestCase):
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):
+      BR = BlockRecord(B)
+      BRbs = bytes(BR)
+      BR2, offset = BlockRecord.from_bytes(BRbs)
+      self.assertEqual(BR, BR2)
       errs = list(verify_block(B, **kw))
       self.assertEqual(errs, [])
 
@@ -118,44 +123,46 @@ class TestAll(unittest.TestCase):
     S = self.S
     with S:
       for _ in range(64):
-        # construct various randomly defined IndirectBlocks and test
-        chunks = []
-        subblocks = []
-        total_length = 0
-        for _ in range(rand0(16)):
-          B = self._make_random_Block()
-          subblocks.append(B)
-          total_length += B.span
-          chunks.append(B.data)
-        fullblock = b''.join(chunks)
-        IB = IndirectBlock(subblocks=subblocks, force=True)
-        self._verify_block(IB, recurse=True)
-        IBspan = IB.span
-        self.assertEqual(
-            IBspan, total_length,
-            "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
-        IBH = IB.superblock.hashcode
-        IBdata = IB.data
-        self.assertEqual(len(IBdata), total_length)
-        self.assertEqual(IBdata, fullblock)
-        # refetch block by hashcode
-        IB2 = IndirectBlock(hashcode=IBH, span=len(IBdata))
-        self._verify_block(IB2, recurse=True)
-        IB2data = IB2.data
-        self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
-        for _ in range(32):
-          start = rand0(len(IB) + 1)
-          length = rand0(len(IB) - start + 1) if start < len(IB) else 0
-          end = start + length
-          with self.subTest(start=start, end=end):
-            chunk1 = IB[start:end]
-            self.assertEqual(len(chunk1), length)
-            chunk1a = fullblock[start:end]
-            self.assertEqual(len(chunk1a), length)
-            self.assertEqual(chunk1, chunk1a, "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end))
-            chunk2 = IB2[start:end]
-            self.assertEqual(len(chunk2), length)
-            self.assertEqual(chunk1, chunk2, "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end))
+        with self.subTest(loop=_):
+          # construct various randomly defined IndirectBlocks and test
+          chunks = []
+          subblocks = []
+          total_length = 0
+          for _ in range(rand0(16)):
+            B = self._make_random_Block()
+            subblocks.append(B)
+            total_length += B.span
+            chunks.append(B.data)
+          fullblock = b''.join(chunks)
+          IB = IndirectBlock(subblocks=subblocks, force=True)
+          self._verify_block(IB, recurse=True)
+          IBspan = IB.span
+          self.assertEqual(
+              IBspan, total_length,
+              "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
+          IBH = IB.superblock.hashcode
+          IBdata = IB.data
+          self.assertEqual(len(IBdata), total_length)
+          self.assertEqual(IBdata, fullblock)
+          # refetch block by hashcode
+          IB2 = IndirectBlock(hashcode=IBH, span=len(IBdata))
+          self._verify_block(IB2, recurse=True)
+          IB2data = IB2.data
+          self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
+          for _ in range(32):
+            with self.subTest(loop2=_):
+              start = rand0(len(IB) + 1)
+              length = rand0(len(IB) - start + 1) if start < len(IB) else 0
+              end = start + length
+              with self.subTest(start=start, end=end):
+                chunk1 = IB[start:end]
+                self.assertEqual(len(chunk1), length)
+                chunk1a = fullblock[start:end]
+                self.assertEqual(len(chunk1a), length)
+                self.assertEqual(chunk1, chunk1a, "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end))
+                chunk2 = IB2[start:end]
+                self.assertEqual(len(chunk2), length)
+                self.assertEqual(chunk1, chunk2, "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end))
 
   def test02RoundTripSingleBlock(self):
     S = self.S
@@ -166,9 +173,8 @@ class TestAll(unittest.TestCase):
         size = rand0(16385)
         with self.subTest(type=block_type, size=size):
           B = self._make_random_Block(block_type=block_type)
-          Bserial = encodeBlock(B)
-          B2, offset = decodeBlock(Bserial, 0)
-          Btype = B2.type
+          Bserial = B.encode()
+          B2, offset = BlockRecord.value_from_bytes(Bserial)
           self.assertEqual(
               offset, len(Bserial),
               "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial)))
@@ -178,11 +184,13 @@ class TestAll(unittest.TestCase):
             self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
           self.assertEqual(B.span, B2.span, "span lengths differ")
           self.assertEqual(B.data, B2.data, "spanned data differ")
+          Btype = B2.type
           if Btype == BlockType.BT_INDIRECT:
             self.assertTrue(B.indirect)
             self._verify_block(B2.superblock)
           else:
             self.assertFalse(B.indirect)
+            self.assertEqual(B.span, len(B.data))
             if Btype == BlockType.BT_HASHCODE:
               self.assertEqual(B.hashcode, B2.hashcode)
             elif Btype == BlockType.BT_RLE:
