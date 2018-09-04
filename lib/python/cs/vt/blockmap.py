@@ -388,6 +388,8 @@ class BlockMap(RunStateMixin):
     '''
     for leaf, start, end in self.slices(offset, span):
       assert start < end
+      assert start >= 0
+      assert end <= len(leaf)
       yield leaf[start:end]
 
   def slices(self, offset, span=None):
