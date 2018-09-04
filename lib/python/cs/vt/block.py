@@ -547,7 +547,7 @@ class _Block(Transcriber, ABC):
       X("_Block:%s.slices: iterate over subblocks...", self)
       for B in self.subblocks:
         sublen = len(B)
-        if start <= offset:
+        if start <= offset + sublen:
           substart = max(0, start - offset)
           subend = min(sublen, end - offset)
           yield from B.slices(substart, subend)
