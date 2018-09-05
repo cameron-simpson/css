@@ -36,6 +36,8 @@ OFF_STRUCT = Struct('<L')
 
 _MapEntry = namedtuple('MapEntry', 'index offset span hashcode')
 class MapEntry(_MapEntry):
+  ''' A blockmap entry (index, offset, span, hashcode) and related properties.
+  '''
 
   @prop
   def leaf(self):
@@ -113,7 +115,7 @@ class MappedFD:
     if offset < 0 or offset >= OFFSET_SCALE:
       raise ValueError("offset(%s) out of range 0:%s" % (offset, OFFSET_SCALE))
     i = bisect_right(self, offset)
-    assert i > 0 and i <= len(self)
+    assert 0 < i <= len(self)
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
@@ -354,7 +356,9 @@ class BlockMap(RunStateMixin):
           offset += leaf.span
           nleaves += 1
           if nleaves % 4096 == 0:
-            X("LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves, runstate.run_time, nleaves // runstate.run_time)
+            X(
+                "LOAD MAPS: processed %d leaves in %gs (%d leaves/s)",
+                nleaves, runstate.run_time, nleaves // runstate.run_time)
       X("LOAD MAPS: leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
@@ -432,7 +436,7 @@ class BlockMap(RunStateMixin):
       submap_base = submap_index * mapsize
       while span > 0 and entry:
         entry_offset = submap_base + entry.offset
-        assert entry_offset <= offset and entry_offset + entry.span > offset
+        assert entry_offset <= offset < entry_offset + entry.span
         leaf = entry.leaf
         leaf_start = offset - entry_offset
         leaf_subspan = min(entry.span - leaf_start, span)
