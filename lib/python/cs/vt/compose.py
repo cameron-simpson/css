@@ -4,12 +4,13 @@
 #   - Cameron Simpson <cs@cskk.id.au> 20dec2016
 #
 
-import os
-from stat import S_ISDIR, S_ISSOCK
+''' Composition of Stores from text specifications.
+'''
+
+from os.path import isdir
 from subprocess import Popen, PIPE
 from cs.lex import skipwhite, get_identifier, get_qstr
 from cs.pfx import Pfx
-from cs.x import X
 from .convert import get_integer
 from .stream import StreamStore
 
@@ -34,7 +35,8 @@ def parse_store_specs(s, offset=0):
     return store_specs
 
 def get_store_spec(s, offset):
-  ''' Get a single Store specification from a string. Return the text, store type, params and the new offset.
+  ''' Get a single Store specification from a string. Return the
+      text, store type, params and the new offset.
 
         "text"          Quoted store spec, needed to enclose some of
                         the following syntaxes if they do not consume the
@@ -101,7 +103,7 @@ def get_store_spec(s, offset):
     else:
       raise ValueError(
           "%r: not a directory or a socket"
-          % (path, S.st_mode))
+          % (path,))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
