@@ -111,7 +111,7 @@ def spliced_blocks(B, new_blocks):
   if upto < len(B):
     yield from B.top_blocks(upto, len(B))
 
-class _PendingBuffer(object):
+class _PendingBuffer:
   ''' Class to manage the unbound chunks accrued by blocked_chunks_of below.
   '''
 
@@ -155,24 +155,29 @@ def blocked_chunks_of(
     scanner=None,
     min_block=None, max_block=None,
     histogram=None,
-    ):
-  ''' Generator which connects to a scanner of a chunk stream in order to emit low level edge aligned data chunks.
-      `chunks`: a source iterable of data chunks, handed to `scanner`
-      `scanner`: optional callable accepting a CornuCopyBuffer and
+):
+  ''' Generator which connects to a scanner of a chunk stream in
+      order to emit low level edge aligned data chunks.
+
+      Parameters:
+      * `chunks`: a source iterable of data chunks, handed to `scanner`
+      * `scanner`: optional callable accepting a CornuCopyBuffer and
         returning an iterable of ints, such as a generator. `scanner`
         may be None, in which case only the rolling hash is used
         to locate boundaries.
-      `min_block`: the smallest amount of data that will be used
+      * `min_block`: the smallest amount of data that will be used
         to create a Block, default MIN_BLOCKSIZE
-      `max_block`: the largest amount of data that will be used to
+      * `max_block`: the largest amount of data that will be used to
         create a Block, default MAX_BLOCKSIZE
-      `histogram`: if not None, a defaultdict(int) to collate counts.
+      * `histogram`: if not None, a defaultdict(int) to collate counts.
         Integer indices count block sizes and string indices are used
         for 'bytes_total' and 'bytes_hash_scanned'.
 
       The iterable returned from `scanner(chunks)` yields ints which are
       considered desirable block boundaries.
   '''
+  # pylint: disable=too-many-nested-blocks,too-many-statements
+  # pylint: disable=too-many-branches,too-many-locals
   with Pfx("blocked_chunks_of"):
     if min_block is None:
       min_block = MIN_BLOCKSIZE
@@ -211,6 +216,7 @@ def blocked_chunks_of(
         ''' Thread body to run the supplied scanner against the input data.
         '''
         bfr = CornuCopyBuffer(chunk_iter)
+        # pylint: disable=broad-except
         try:
           for offset in scanner(bfr):
             # the scanner should yield only offsets, not chunks and offsets
