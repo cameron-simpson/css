@@ -67,7 +67,7 @@ class BlockFile(RawIOBase, ReadMixin):
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       X("BlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
-    for B, Bstart, Bend in backing_block.slices(span.start, span.end):
+    for B, Bstart, Bend in backing_block.slices(start=offset):
       yield B[Bstart:Bend]
 
 class File(MultiOpenMixin, LockableMixin, ReadMixin):
