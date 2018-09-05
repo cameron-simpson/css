@@ -737,14 +737,21 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
 @strable(open_func=partial(open, mode='rb'))
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
-      NOTE: this function may move the file pointer.
-      `f`: the file from which to read data; if a string, the file
+
+      *NOTE*: this function may move the file pointer.
+
+      Parameters:
+      * `f`: the file from which to read data; if a string, the file
         is opened with mode="rb"; if an int, treated as an OS file
-        descriptor; otherwise presumed to be a file-like object
-      `offset`: starting offset for the data
-      `readsize`: read size, default DEFAULT_READSIZE.
+        descriptor; otherwise presumed to be a file-like object.
+        If that object has a `.fileno()` method, treat that as an
+        OS file descriptor and use it.
+      * `offset`: starting offset for the data
+      * `readsize`: read size, default DEFAULT_READSIZE.
+
       For file-like objects, the read1 method is used in preference
-      to read if available.
+      to read if available. The file pointer is briefly moved during
+      fetches.
   '''
   if readsize is None:
     readsize = DEFAULT_READSIZE
@@ -752,6 +759,16 @@ def datafrom(f, offset, readsize=None):
     # operating system file descriptor
     for data in datafrom_fd(f, offset, readsize=readsize):
       yield data
+  # see if the file has a fileno
+  try:
+    get_fileno = f.fileno
+  except AttributeError:
+    pass
+  else:
+    fd = get_fileno()
+    if stat.S_ISREG(os.fstat(fd).st_mode):
+      for data in datafrom_fd(fd, offset, readsize=readsize):
+        yield data
   # presume a file-like object
   try:
     read1 = f.read1
@@ -955,16 +972,17 @@ class BackedFile(ReadMixin):
   def datafrom(self, offset):
     ''' Generator yielding natural chunks from the file commencing at offset.
     '''
+    global_datafrom = globals()['datafrom']
     front_file = self.front_file
     try:
       front_datafrom = front_file.datafrom
     except AttributeError:
-      front_datafrom = partial(ReadMixin.datafrom, front_file)
+      front_datafrom = partial(global_datafrom, front_file)
     back_file = self.back_file
     try:
       back_datafrom = back_file.datafrom
     except AttributeError:
-      back_datafrom = partial(ReadMixin.datafrom, back_file)
+      back_datafrom = partial(global_datafrom, back_file)
     for in_front, span in self.front_range.slices(offset, len(self)):
       consume = len(span)
       if in_front:
