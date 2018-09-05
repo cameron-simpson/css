@@ -69,6 +69,8 @@ class FileCacheStore(BasicStoreSync):
 
   @property
   def backend(self):
+    ''' Return the current backend Store.
+    '''
     return self._backend
 
   @backend.setter
