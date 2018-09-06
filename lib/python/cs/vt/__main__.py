@@ -815,9 +815,8 @@ class VTCmd:
         filepath = arg
         DF = DataFile(filepath)
         with DF:
-          for offset, flags, data in DF.scan():
-            if flags & DataFlag.COMPRESSED:
-              data = decompress(data)
+          for record, offset in DF.scanfrom():
+            data = record.data
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
     return 0
 
