@@ -370,17 +370,15 @@ class DataSet(object):
             row[i] = v
         return row
       with open(csvfile) as csvfp:
-        csvd = csv_import(
+        row_class, row_data = csv_import(
             csvfp,
             computed={
                 'unixtime':
                     lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
             },
             preprocess=preprocess)
-        row_class = next(csvd)
-        X("hdrs=%s", row_class._names)
-        X("attrs=%s", row_class._attributes)
-        self.data.extend(csvd)
+        X("row_class=%s", row_class)
+        self.data.extend(row_data)
     self.data.sort(key=lambda row: row['unixtime'])
 
   def pathto(self, filebase):
