@@ -152,7 +152,6 @@ class Inodes(object):
 
   def __init__(self, fs, inodes_datatext=None):
     self.fs = fs                # main filesystem
-    self.krefcount = {}         # kernel inode reference counts
     self._allocated = Range()   # range of allocated inode numbers
     # mapping from inum->Inode record,
     # for all inodes which have been accessed
