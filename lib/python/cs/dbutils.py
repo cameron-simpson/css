@@ -312,8 +312,15 @@ class Table(object):
     with Pfx("SQL %r: %r", sql, sqlargs):
       return self.conn.cursor().execute(sql, sqlargs)
 
+  def new_row(self, **kw):
+    ''' Insert a new row and then fetch it for return.
+    '''
+    with Pfx("new_row(%r)", kw):
+      row_id = self.insert1(**kw)
+      return self[row_id]
+
   def insert1(self, **kw):
-    ''' Insert a single row.
+    ''' Insert a single row, return the new row id.
     '''
     column_names = []
     values = []
