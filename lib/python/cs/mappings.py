@@ -127,6 +127,7 @@ def named_row_tuple(*column_names, **kw):
         attr_of_[name] = attr
         name_of_[attr] = name
         index_of_[name] = i
+        i += 1
     del i, name, attr
     index_of_.update( (s, i) for i, s in enumerate(attributes_) )
 
@@ -143,6 +144,7 @@ def named_row_tuple(*column_names, **kw):
             func = self.computed_.get(key)
             if func is not None:
               return func(self)
+            raise RuntimeError("no method or func for key %r" % (key,))
           else:
             return method()
       else:

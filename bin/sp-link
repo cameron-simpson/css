@@ -45,7 +45,7 @@ USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
     Directory for RRD file data.
     Default: {basedir}/{site}
   Ops:
-    graph csvfiles...
+    graph [days] csvfiles...
         Graph the data from the RRD files corresponding to the specified CSVs.
     import csvfiles...
         Import data from the specified CSVs into RRD files.
@@ -253,6 +253,17 @@ def cmd_graph(argv, cfg):
   ''' Run the "graph" command, generating graphs of RRD files associated with CSV data.
   '''
   xit = 0
+  days = None
+  if argv:
+    try:
+      days = int(argv[0])
+    except ValueError:
+      pass
+    else:
+      if days > 0:
+        argv.pop(0)
+      else:
+        days = None
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
@@ -262,7 +273,7 @@ def cmd_graph(argv, cfg):
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
-      dataset.gen_graphs()
+      dataset.gen_graphs(days=days)
   return xit
 
 def cmd_import(argv, cfg):
@@ -359,17 +370,15 @@ class DataSet(object):
             row[i] = v
         return row
       with open(csvfile) as csvfp:
-        csvd = csv_import(
+        row_class, row_data = csv_import(
             csvfp,
             computed={
                 'unixtime':
                     lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
             },
             preprocess=preprocess)
-        row_class = next(csvd)
-        X("hdrs=%s", row_class._names)
-        X("attrs=%s", row_class._attributes)
-        self.data.extend(csvd)
+        X("row_class=%s", row_class)
+        self.data.extend(row_data)
     self.data.sort(key=lambda row: row['unixtime'])
 
   def pathto(self, filebase):
@@ -472,12 +481,16 @@ class DataSet(object):
       rrd_argv.extend(graph_argv)
       self.run_argv(rrd_argv, [])
 
-  def gen_graphs(self):
+  def gen_graphs(self, days=None):
     ''' Generate the various graphs defined for this DataSet.
     '''
+    if days is None:
+      days = GRAPH_DAYS
+    time_period = days * 24 * 3600
     ##start = int(self.data[0]['unixtime'])
-    end = int(self.data[-1]['unixtime'])
-    start = end - GRAPH_DAYS
+    ##end = int(self.data[-1]['unixtime'])
+    end_spec = 'now'
+    start_spec = 'end-%ds' % (time_period,)
     for graph_name, graph_spec in self.graphs.items():
       graph_argv = []
       for spec in graph_spec:
@@ -491,24 +504,24 @@ class DataSet(object):
             fields[0] = fields[0] + '1'
           spec = ':'.join(fields)
           graph_argv.append(spec)
-      self.rrdgraph(graph_name, graph_argv)
+      self.rrdgraph(graph_name, graph_argv, start=start_spec, end=end_spec)
     graph_argv = []
     for rrd_spec in self.rrd_specs():
       if 'kwh' in rrd_spec.csv_hdr.lower():
         graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
-    self.rrdgraph('kwh', graph_argv)
+    self.rrdgraph('kwh', graph_argv, start=start_spec, end=end_spec)
     graph_argv = []
     for rrd_spec in self.rrd_specs():
       if 'kw' in rrd_spec.csv_hdr.lower() and 'kwh' not in rrd_spec.csv_hdr.lower():
         graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
-    self.rrdgraph('kw', graph_argv)
-    if False:
+    self.rrdgraph('kw', graph_argv, start=start_spec, end=end_spec)
+    if True:
       # debugging graphs for various parameters
       for rrd_spec in self.rrd_specs():
         self.rrdgraph(f'ds_{rrd_spec.ds_name}', [
             f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
             f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
-        ])
+        ], start=start_spec, end=end_spec)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
