@@ -93,21 +93,15 @@ def rwx(mode):
       + ( 'x' if mode&1 else '-' )
   )
 
-class AC(object):
-  __slots__ = ('prefix', 'allow', 'deny')
-
-  def __init__(self, prefix, allow, deny):
-    ''' Initialise AC with `allow` and `deny` permission strings.
-    '''
-    self.prefix = prefix
-    self.allow = allow
-    self.deny = deny
+class AC(namedtuple('AccessControl', 'audience allow deny')):
+  ''' An Access Control.
+  '''
 
   def __repr__(self):
     return ':'.join( (self.__class__.__name__, self.textencode()) )
 
   def textencode(self):
-    return self.prefix + ':' + self.allow + '-' + self.deny
+    return self.audience + ':' + self.allow + '-' + self.deny
 
   def __call__(self, M, accesses):
     ''' Call the AC with the Meta `M` and the required permissions `accesses`.
@@ -175,12 +169,12 @@ _AC_prefix_map = {
 def decodeAC(ac_text):
   ''' Factory function to return a new AC from an encoded AC.
   '''
-  prefix, allow_deny = ac_text.split(':', 1)
+  audience, allow_deny = ac_text.split(':', 1)
   allow, deny = allow_deny.split('-', 1)
   try:
-    ac_class = _AC_prefix_map[prefix]
+    ac_class = _AC_prefix_map[audience]
   except KeyError:
-    raise ValueError("invalid prefix %r from %r" % (prefix, ac_text))
+    raise ValueError("invalid audience %r from %r" % (audience, ac_text))
   return ac_class(allow, deny)
 
 def decodeACL(acl_text):
@@ -539,7 +533,7 @@ class Meta(dict, Transcriber):
     self.acl = [ AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ),
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
-               ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
+               ] + [ ac for ac in self.acl if ac.audience not in ('o', 'g', '*') ]
 
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
@@ -559,11 +553,11 @@ class Meta(dict, Transcriber):
     '''
     perms = self.unix_typemode
     for ac in self.acl:
-      if ac.prefix == 'o':
+      if ac.audience == 'o':
         perms |= ac.unixmode << 6
-      elif ac.prefix == 'g':
+      elif ac.audience == 'g':
         perms |= ac.unixmode << 3
-      elif ac.prefix == '*':
+      elif ac.audience == '*':
         perms |= ac.unixmode
       else:
         warning("Meta.unix_perms: ignoring ACL element %s", ac.extencode)
