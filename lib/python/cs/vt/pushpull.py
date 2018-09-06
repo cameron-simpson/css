@@ -115,6 +115,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
                            % (h_final1, h_final2))
       # this chunk matches, fetch the next
       start_hashcode = h_final1
+      after = True
       continue
     # mismatch, try smaller window
     if window_size >= 32:
@@ -156,6 +157,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
     for hashcode in hashcodes2:
       yield hashcode
     start_hashcode = hashcodes2[-1]
+    after = True
 
 if __name__ == '__main__':
   from .pushpull_tests import selftest
