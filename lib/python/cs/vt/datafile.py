@@ -181,10 +181,9 @@ class DataFile(MultiOpenMixin, ReadMixin):
         break
       yield record, bfr.offset
 
-  def scanfrom(self, offset):
-    ''' Generator yielding (flags, data, post_offset) from the DataFile.
-        `offset`: the starting offset for the scan
-        `do_decompress`: decompress the scanned data, default False
+  def scanfrom(self, offset=0):
+    ''' Generator yielding (DataRecord, post_offset) from the
+        DataFile starting from `offset`, default 0.
     '''
     return self.scanbuffer(self.bufferfrom(offset))
 
