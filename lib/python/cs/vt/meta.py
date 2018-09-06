@@ -149,44 +149,16 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
         warning("AC.unixmode: ignoring unsupported permission %r", a)
     return mode
 
-class AC_Owner(AC):
-  def __init__(self, allow, deny):
-    AC.__init__(self, 'o', allow, deny)
-  def __call__(self, M, accesses, owner):
-    Mowner = M.get('u')
-    if Mowner is None or Mowner != owner:
-      return None
-    return AC.__call__(self, M, accesses)
-
-class AC_Group(AC):
-  def __init__(self, allow, deny):
-    AC.__init__(self, 'g', allow, deny)
-  def __call__(self, M, accesses, group):
-    Mgroup = M.get('g')
-    if Mgroup is None or Mgroup != group:
-      return None
-    return AC.__call__(self, M, accesses)
-
-class AC_Other(AC):
-  def __init__(self, allow, deny):
-    AC.__init__(self, '*', allow, deny)
-
-_AC_prefix_map = {
-    'o': AC_Owner,
-    'g': AC_Group,
-    '*': AC_Other,
-}
+AC_Owner = lambda allow, deny: AC('o', allow, deny)
+AC_Group = lambda allow, deny: AC('g', allow, deny)
+AC_Other = lambda allow, deny: AC('*', allow, deny)
 
 def decodeAC(ac_text):
   ''' Factory function to return a new AC from an encoded AC.
   '''
   audience, allow_deny = ac_text.split(':', 1)
   allow, deny = allow_deny.split('-', 1)
-  try:
-    ac_class = _AC_prefix_map[audience]
-  except KeyError:
-    raise ValueError("invalid audience %r from %r" % (audience, ac_text))
-  return ac_class(allow, deny)
+  return AC(audience, allow, deny)
 
 def decodeACL(acl_text):
   ''' Return a list of ACs from the encoded list `acl_text`.
