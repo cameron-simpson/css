@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import errno
+from functools import lru_cache
 import json
 import os
 import stat
@@ -24,84 +25,49 @@ DEFAULT_FILE_ACL = 'o:rw-x'
 NOUSERID = -1
 NOGROUPID = -1
 
-user_map = {}
-group_map = {}
-
+@lru_cache(maxsize=64)
 def username(uid):
   ''' Look up the login name associated with the supplied `uid`.
       Return None if unknown. Caches results, including lookup failure.
   '''
-  global user_map
   try:
-    username = user_map[uid]
+    pw = getpwuid(uid)
   except KeyError:
-    try:
-      pw = getpwuid(uid)
-    except KeyError:
-      username = None
-    else:
-      username = pw.pw_name
-    user_map[uid] = username
-    if username not in user_map:
-      user_map[username] = uid
-  return username
+    return None
+  return pw.pw_name
 
+@lru_cache(maxsize=64)
 def userid(username):
   ''' Look up the user id associated with the supplied `username`.
       Return None if unknown. Caches results, including lookup failure.
   '''
-  global user_map
   try:
-    uid = user_map[username]
+    pw = getpwnam(username)
   except KeyError:
-    try:
-      pw = getpwnam(username)
-    except KeyError:
-      uid = None
-    else:
-      uid = pw.pw_uid
-    user_map[username] = uid
-    if uid not in user_map:
-      user_map[uid] = username
-  return uid
+    return None
+  return pw.pw_uid
 
+@lru_cache(maxsize=64)
 def groupname(gid):
   ''' Look up the group name associated with the supplied `gid`.
       Return None if unknown. Caches results, including lookup failure.
   '''
-  global group_map
   try:
-    groupname = group_map[gid]
+    gr = getgrgid(gid)
   except KeyError:
-    try:
-      gr = getgrgid(gid)
-    except KeyError:
-      groupname = None
-    else:
-      groupname = gr.gr_name
-    group_map[gid] = groupname
-    if groupname not in group_map:
-      group_map[groupname] = gid
-  return groupname
+    return None
+  return gr.gr_name
 
+@lru_cache(maxsize=64)
 def groupid(groupname):
   ''' Look up the group id associated with the supplied `groupname`.
       Return None if unknown. Caches results, including lookup failure.
   '''
-  global group_map
   try:
-    gid = group_map[groupname]
+    gr = getgrnam(groupname)
   except KeyError:
-    try:
-      gr = getgrnam(groupname)
-    except KeyError:
-      gid = None
-    else:
-      gid = gr.gr_gid
-    group_map[groupname] = gid
-    if gid not in group_map:
-      group_map[gid] = groupname
-  return gid
+    return None
+  return gr.gr_gid
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
