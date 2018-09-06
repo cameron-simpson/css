@@ -101,7 +101,18 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
     return ':'.join( (self.__class__.__name__, self.textencode()) )
 
   def textencode(self):
-    return self.audience + ':' + self.allow + '-' + self.deny
+    ''' Encode this access control as text.
+    '''
+    audience, allow, deny = self
+    if ':' in audience:
+      raise ValueError(
+          "invalid audience, may not contain a colon: %r"
+          % (audience,))
+    if '-' in allow:
+      raise ValueError(
+          "invalid allow, may not contain a dash: %r"
+          % (allow,))
+    return audience + ':' + allow + '-' + deny
 
   def __call__(self, M, accesses):
     ''' Call the AC with the Meta `M` and the required permissions `accesses`.
