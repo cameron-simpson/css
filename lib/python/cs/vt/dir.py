@@ -322,10 +322,18 @@ class _Dirent(Transcriber):
     ''' Set the previous Dirent.
     '''
     assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
-    self._prev_dirent = None
-    Ebs = E.encode()
-    self._prev_dirent_blockref = Block(data=Ebs)
-    self.changed = True
+    if E is None:
+      if self._prev_dirent_blockref is not None:
+        blockref = None
+        self.changed = True
+    elif E == self:
+      warning(
+          "%r.prev_dirent=%s: ignore setting previous to our own state",
+          self, E)
+    else:
+      Ebs = E.encode()
+      self._prev_dirent_blockref = Block(data=Ebs)
+      self.changed = True
 
   def snapshot(self):
     ''' Update the Dirent's previous block state if missing or changed.
