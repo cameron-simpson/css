@@ -495,7 +495,7 @@ class _Block(Transcriber, ABC):
       from .file import RWBlockFile
       return RWBlockFile(backing_block=self)
     raise ValueError(
-        "unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
+        "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,))
 
   def pushto(self, S2, Q=None, runstate=None):
     ''' Push this Block and any implied subblocks to the Store `S2`.
