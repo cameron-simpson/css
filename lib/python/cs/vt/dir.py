@@ -730,15 +730,6 @@ class Dir(_Dirent):
     for notifier in notifiers:
       notifier(self)
 
-  @prop
-  def path(self):
-    parts = [self.name]
-    D = self
-    while D.parent is not None:
-      D = D.parent
-      parts.append(D.name)
-    return os.sep.join(reversed(parts))
-
   @property
   @locked
   def entries(self):
