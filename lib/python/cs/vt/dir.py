@@ -224,8 +224,12 @@ class _Dirent(Transcriber):
   def from_bytes(data, offset=0):
     return DirentRecord.value_from_bytes(data, offset=offset)
 
-  def encode(self):
+  def __bytes__(self):
+    ''' Serialisethis Dirent to bytes.
+    '''
     return bytes(DirentRecord(self))
+
+  encode = __bytes__
 
   def __hash__(self):
     ''' Allows collecting _Dirents in a set.
