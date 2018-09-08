@@ -519,44 +519,44 @@ class FileDirent(_Dirent, MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
-    self._open_file = None
+    self.open_file = None
     self._block = block
     self._check()
 
   @locked
   def startup(self):
-    ''' Set up ._open_file on first open.
+    ''' Set up .open_file on first open.
     '''
     self._check()
-    if self._open_file is not None:
-      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self.open_file is not None:
+      raise RuntimeError("first open, but .open_file is not None: %r" % (self.open_file,))
     if self._block is None:
       raise RuntimeError("first open, but ._block is None")
-    self._open_file = RWBlockFile(self._block)
+    self.open_file = RWBlockFile(self._block)
     self._block = None
     self._check()
 
   @locked
   def shutdown(self):
-    ''' On final close, close ._open_file and save result as ._block.
+    ''' On final close, close .open_file and save result as ._block.
     '''
     self._check()
     if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
-    Eopen = self._open_file
-    Eopen.filename = self.name
-    self._block = Eopen.close(enforce_final_close=True)
-    self._open_file = None
+      error("final close, but ._block is not None; replacing with self.open_file.close(), was: %s", self._block)
+    f = self.open_file
+    f.filename = self.name
+    self._block = f.close(enforce_final_close=True)
+    self.open_file = None
     self._check()
 
   def _check(self):
-    # TODO: check ._block and ._open_file against MultiOpenMixin open count
+    # TODO: check ._block and .open_file against MultiOpenMixin open count
     if self._block is None:
-      if self._open_file is None:
-        raise ValueError("both ._block and ._open_file are None")
+      if self.open_file is None:
+        raise ValueError("both ._block and .open_file are None")
     ## both are allowed to be set
-    ##elif self._open_file is not None:
-    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
+    ##elif self.open_file is not None:
+    ##  raise ValueError("._block is %s and .open_file is %r" % (self._block, self.open_file))
 
   @property
   @locked
@@ -567,14 +567,14 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
     ##X("access FileDirent.block from:")
     ##stack_dump(indent=2)
-    if self._open_file is None:
+    if self.open_file is None:
       return self._block
-    return self._open_file.sync()
+    return self.open_file.sync()
 
   @block.setter
   @locked
   def block(self, B):
-    if self._open_file is not None:
+    if self.open_file is not None:
       raise RuntimeError("tried to set .block directly while open")
     self._block = B
 
@@ -586,16 +586,16 @@ class FileDirent(_Dirent, MultiOpenMixin):
         Otherwise get the length of the top Block.
     '''
     self._check()
-    if self._open_file is None:
+    if self.open_file is None:
       sz = len(self.block)
     else:
-      sz = len(self._open_file)
+      sz = len(self.open_file)
     return sz
 
   def flush(self, scanner=None):
     ''' Flush the contents of the file.
     '''
-    return self._open_file.flush(scanner)
+    return self.open_file.flush(scanner)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -603,7 +603,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     Esize = self.size
     if Esize != length:
       with self:
-        return self._open_file.truncate(length)
+        return self.open_file.truncate(length)
     return None
 
   # TODO: move into distinctfile utilities class with rsync-like stuff etc

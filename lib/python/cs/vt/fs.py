@@ -36,11 +36,11 @@ class FileHandle:
       lock = Lock()
     self.fs = fs
     self.E = E
-    self.Eopen = E.open()
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
     self._lock = lock
+    E.open()
 
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
@@ -49,15 +49,15 @@ class FileHandle:
   def write(self, data, offset):
     ''' Write data to the file.
     '''
-    fp = self.Eopen._open_file
-    with fp:
+    f = self.E.open_file
+    with f:
       with self._lock:
-        if self.for_append and offset != len(fp):
+        if self.for_append and offset != len(f):
           error("%s: file open for append but offset(%s) != length(%s)",
-                fp, offset, len(fp))
+                f, offset, len(f))
           raise OSError(errno.EFAULT)
-        fp.seek(offset)
-        written = fp.write(data)
+        f.seek(offset)
+        written = f.write(data)
     self.E.touch()
     return written
 
@@ -66,15 +66,15 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    ##fp = self.Eopen._open_file
-    ##X("fp = %s %s", type(fp), fp)
-    ##X("fp.read = %s %s", type(fp.read), fp.read)
-    return self.Eopen._open_file.read(size, offset=offset, longread=True)
+    ##f = self.E.open_file
+    ##X("f = %s %s", type(f), f)
+    ##X("f.read = %s %s", type(f.read), f.read)
+    return self.E.open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
     ''' Truncate the file, mark it as modified.
     '''
-    self.Eopen._open_file.truncate(length)
+    self.E.open_file.truncate(length)
     self.E.touch()
 
   def flush(self):
@@ -91,14 +91,14 @@ class FileHandle:
     if scanner is None:
       X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
-    self.Eopen.flush(scanner)
+    self.E.flush(scanner)
     ## no touch, already done by any writes
     X("FileHandle.Flush DONE")
 
   def close(self):
     ''' Close the file, mark its parent directory as changed.
     '''
-    self.Eopen.close()
+    self.E.close()
     self.E.parent.changed = True
 
 class Inode(NS):
