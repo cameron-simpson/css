@@ -508,9 +508,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
   transcribe_prefix = 'F'
 
-  def __init__(self, name, block=None, **kw):
+  def __init__(self, name, block=None, lock=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
-    MultiOpenMixin.__init__(self)
+    MultiOpenMixin.__init__(self, lock=lock)
     if block is None:
       block = Block(data=b'')
     self.open_file = None
