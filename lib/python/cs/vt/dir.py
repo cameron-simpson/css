@@ -722,6 +722,7 @@ class Dir(_Dirent):
       self._entries = None
     self._unhandled_dirent_chunks = None
     self._changed = False
+    self._change_notifiers = None
     self._lock = RLock()
 
   @prop
@@ -748,20 +749,18 @@ class Dir(_Dirent):
   def on_change(self, notifier):
     ''' Record the callable `notifier` to fire when .changed is set.
     '''
-    # This is so that unmonitored Dirs have no additional cost.
-    notifiers = getattr(self, 'notify_change', None)
+    notifiers = self._change_notifiers
     if notifiers is None:
-      self.notify_change = notifiers = set()
+      self._change_notifiers = notifiers = set()
     notifiers.add(notifier)
 
   def _notify_change(self):
     ''' Call each recorded notifier with this Dir.
     '''
-    notifiers = getattr(self, 'notify_change', None)
-    if notifiers is None:
-      return
-    for notifier in notifiers:
-      notifier(self)
+    notifiers = self._change_notifiers
+    if notifiers:
+      for notifier in notifiers:
+        notifier(self)
 
   @property
   @locked
