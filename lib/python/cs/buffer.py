@@ -284,6 +284,8 @@ class CornuCopyBuffer(object):
         *Warning*: this will fetch from the `input_data` if the buffer
         is empty and so it may block.
     '''
+    if self.buf:
+      return False
     self.extend(1, short_ok=True)
     return len(self) == 0
 
