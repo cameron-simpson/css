@@ -26,7 +26,7 @@ from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
 # arbitrary threshold to generate blockmaps
 AUTO_BLOCKMAP_THRESHOLD = 1024 * 1024
 
-class BlockFile(RawIOBase, ReadMixin):
+class ROBlockFile(RawIOBase, ReadMixin):
   ''' A read-only file interface to a Block based on io.RawIOBase.
   '''
 
@@ -65,20 +65,20 @@ class BlockFile(RawIOBase, ReadMixin):
     # data from the backing block
     backing_block = self.block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      X("BlockFile.datafrom: get_blockmap...")
+      X("ROBlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
     for B, Bstart, Bend in backing_block.slices(start=offset):
       yield B[Bstart:Bend]
 
-class File(MultiOpenMixin, LockableMixin, ReadMixin):
+class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
-      Note that a File starts open and must be closed.
+      Note that a RWBlockFile starts open and must be closed.
   '''
 
   def __init__(self, backing_block=None):
-    ''' Initialise File with optional backing Block `backing_block`.
+    ''' Initialise RWBlockFile with optional backing Block `backing_block`.
     '''
     if backing_block is None:
       backing_block = Block(data=b'')
@@ -93,7 +93,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     self.flush_count = 0
 
   def __str__(self):
-    return "File(backing_block=%s)" % (self._backing_block,)
+    return "RWBlockFile(backing_block=%s)" % (self._backing_block,)
 
   def _reset(self, new_backing_block):
     old_backing_block = self._backing_block
@@ -103,7 +103,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
       except AttributeError:
         pass
       self._backing_block = new_backing_block
-      self._file = BackedFile(BlockFile(new_backing_block))
+      self._file = BackedFile(ROBlockFile(new_backing_block))
       self._file.flush = self.flush
 
   def startup(self):
@@ -112,7 +112,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     pass
 
   def shutdown(self):
-    ''' Close the File, return the top Block.
+    ''' Close the RWBlockFile, return the top Block.
     '''
     B = self.sync()
     return B
@@ -196,7 +196,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
 
   @locked
   def truncate(self, length):
-    ''' Truncate the File to the specified `length`.
+    ''' Truncate the RWBlockFile to the specified `length`.
     '''
     if length < 0:
       raise ValueError("length must be >= 0, received %s" % (length,))
@@ -237,7 +237,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
     return self._file.seek(offset, whence=whence)
 
   def write(self, data):
-    ''' Write `data` to the File.
+    ''' Write `data` to the RWBlockFile.
     '''
     return self._file.write(data)
 
@@ -275,7 +275,7 @@ class File(MultiOpenMixin, LockableMixin, ReadMixin):
   ):
     ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
     '''
-    with Pfx("File.high_level_blocks(%s..%s)", start, end):
+    with Pfx("RWBlockFile.high_level_blocks(%s..%s)", start, end):
       if start is None:
         start = 0
       if end is None:

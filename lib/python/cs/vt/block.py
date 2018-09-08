@@ -489,11 +489,11 @@ class _Block(Transcriber, ABC):
     ''' Open the block as a file.
     '''
     if mode == 'rb':
-      from .file import BlockFile
-      return BlockFile(self)
+      from .file import ROBlockFile
+      return ROBlockFile(self)
     if mode == 'w+b':
-      from .file import File
-      return File(backing_block=self)
+      from .file import RWBlockFile
+      return RWBlockFile(backing_block=self)
     raise ValueError(
         "unsupported open mode, expected 'rb' or 'w+b', got: %s" % (mode,))
 

@@ -30,7 +30,7 @@ from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, PATHSEP, defaults
 from .block import Block, Block_from_bytes, _Block
-from .file import File
+from .file import RWBlockFile
 from .meta import Meta, rwx
 from .paths import path_split, resolve
 from .transcribe import Transcriber, parse as parse_transcription, \
@@ -532,7 +532,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
     if self._block is None:
       raise RuntimeError("first open, but ._block is None")
-    self._open_file = File(self._block)
+    self._open_file = RWBlockFile(self._block)
     self._block = None
     self._check()
 
