@@ -222,10 +222,13 @@ class _Dirent(Transcriber):
 
   @staticmethod
   def from_bytes(data, offset=0):
+    ''' Factory to extract a Dirent from binary data at `offset` (default 0).
+        Returns the Dirent and the new offset.
+    '''
     return DirentRecord.value_from_bytes(data, offset=offset)
 
   def __bytes__(self):
-    ''' Serialisethis Dirent to bytes.
+    ''' Serialise this Dirent to bytes.
     '''
     return bytes(DirentRecord(self))
 
@@ -237,6 +240,8 @@ class _Dirent(Transcriber):
     return id(self)
 
   def transcribe_inner(self, T, fp, attrs):
+    ''' Transcribe the inner components of the Dirent as text.
+    '''
     if self.name and self.name != '.':
       T.transcribe(self.name, fp=fp)
       fp.write(':')
@@ -253,7 +258,8 @@ class _Dirent(Transcriber):
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
-    ''' Parse [name:]attrs from `s` at offset `offset`. Return _Dirent instance and new offset.
+    ''' Parse [name:]attrs from `s` at offset `offset`.
+        Return _Dirent instance and new offset.
     '''
     name, offset2 = T.parse_qs(s, offset, optional=True)
     if name is None:
@@ -427,7 +433,8 @@ class InvalidDirent(_Dirent):
   transcribe_prefix = 'INVALIDDirent'
 
   def __init__(self, name, *, chunk=None, **kw):
-    ''' An invalid Dirent. Record the original data chunk for regurgitation later.
+    ''' An invalid Dirent.
+        Record the original data chunk for regurgitation later.
     '''
     _Dirent.__init__(
         self,
@@ -473,16 +480,23 @@ class SymlinkDirent(_Dirent):
     return self.meta.pathref
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components for a SymlinkDirent.
+    '''
     return super().transcribe_inner(T, fp, {})
 
 class HardlinkDirent(_Dirent):
   ''' A hard link.
+
       Unlike the regular UNIX filesystem, in a vt filesystem a
       hard link is a wrapper for an ordinary Dirent; this wrapper references
       a persistent inode number and the source Dirent. Most attributes
       are proxied from the wrapped Dirent.
+
       In a normal Dirent .inum is a local attribute and not preserved;
       in a HardlinkDirent it is a proxy for the local .meta.inum.
+
+      TODO: replace HardlinkDirent with a general IndirectDirent
+      with a ref count on the destination.
   '''
 
   transcribe_prefix = 'HardLink'
@@ -499,6 +513,9 @@ class HardlinkDirent(_Dirent):
   def inum(self):
     ''' On a HardlinkDirent the .inum accesses the meta['iref'] field.
         It is set at initialisation, so there is no .setter.
+
+        TODO: inum to be part of FileSystem state, move this property
+        to there.
     '''
     return self.meta.inum
 
@@ -507,15 +524,19 @@ class HardlinkDirent(_Dirent):
     return cls(name, {'iref': str(inum)})
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of a HardlinkDirent.
+    '''
     return super().transcribe_inner(T, fp, {})
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
+
       If closed, ._block refers to the file content.
-      If open, ._open_file refers to the content.
-      NOTE: multiple opens return the _same_ backing file, with a
-      shared read/write offset. File systems must share this, and
-      maintain their own offsets in their file handle objects.
+      If open, .open_file refers to the content.
+
+      NOTE: multiple opens initialise the _same_ backing file, with a shared
+      read/write offset. File systems must share this, and maintain their own
+      offsets in their file handle objects.
   '''
 
   transcribe_prefix = 'F'
@@ -556,6 +577,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
 
   def _check(self):
+    ''' Internal consistency check.
+    '''
     # TODO: check ._block and .open_file against MultiOpenMixin open count
     if self._block is None:
       if self.open_file is None:
@@ -580,6 +603,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
   @block.setter
   @locked
   def block(self, B):
+    ''' Update the Block for this FileDirent.
+        The Dirent is expected to be closed.
+    '''
     if self.open_file is not None:
       raise RuntimeError("tried to set .block directly while open")
     self._block = B
@@ -600,6 +626,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
   def flush(self, scanner=None):
     ''' Flush the contents of the file.
+        Presumes the Dirent is open.
     '''
     return self.open_file.flush(scanner)
 
@@ -656,10 +683,13 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
   def pushto(self, S2, Q=None, runstate=None):
     ''' Push the Block with the file contents to the Store `S2`.
-        `S2`: the secondary Store to receive Blocks
-        `Q`: optional preexisting Queue, which itself should have
+
+        Parameters:
+        * `S2`: the secondary Store to receive Blocks
+        * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
-        `runstate`: optional RunState used to cancel operation
+        * `runstate`: optional RunState used to cancel operation
+
         Semantics are as for cs.vt.block.Block.pushto.
     '''
     return self.block.pushto(S2, Q=Q, runstate=runstate)
@@ -677,9 +707,11 @@ class Dir(_Dirent):
 
   def __init__(self, name, block=None, **kw):
     ''' Initialise this directory.
-        `meta`: meta information
-        `parent`: parent Dir
-        `block`: pre-existing Block with initial Dir content
+
+        Parameters:
+        * `meta`: meta information
+        * `parent`: parent Dir
+        * `block`: pre-existing Block with initial Dir content
     '''
     super().__init__(DirentType.DIR, name, **kw)
     if block is None:
@@ -701,7 +733,8 @@ class Dir(_Dirent):
   @changed.setter
   @locked
   def changed(self, status):
-    ''' Mark this dirent as changed; propagate to parent Dir if present.
+    ''' Mark this dirent as changed or not changed;
+        propagate truth to parent Dir if present.
     '''
     if not status:
       raise ValueError("cannot clear .changed")
@@ -713,7 +746,7 @@ class Dir(_Dirent):
 
   @locked
   def on_change(self, notifier):
-    ''' Record `notifier` to fire when .changed is set.
+    ''' Record the callable `notifier` to fire when .changed is set.
     '''
     # This is so that unmonitored Dirs have no additional cost.
     notifiers = getattr(self, 'notify_change', None)
@@ -1010,10 +1043,13 @@ class Dir(_Dirent):
 
   def pushto(self, S2, Q=None, runstate=None):
     ''' Push the Dir Blocks to the Store `S2`.
-        `S2`: the secondary Store to receive Blocks
-        `Q`: optional preexisting Queue, which itself should have
+
+        Parameters:
+        * `S2`: the secondary Store to receive Blocks
+        * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
-        `runstate`: optional RunState used to cancel operation
+        * `runstate`: optional RunState used to cancel operation
+
         This pushes the Dir's Block encoding to `S2` and then
         recursively pushes each Dirent's Block data to `S2`.
     '''
@@ -1037,7 +1073,9 @@ class Dir(_Dirent):
       T.join()
 
 class DirFTP(Cmd):
-  ''' Class for FTP-like access to a Dir.
+  ''' Class for FTP-like interactive access to a Dir.
+
+      TODO: move into some utility module.
   '''
 
   def __init__(self, D, prompt=None):
