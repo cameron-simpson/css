@@ -19,6 +19,7 @@ import sys
 from threading import RLock
 import time
 from uuid import UUID, uuid4
+from cs.binary import PacketField, BSUInt, BSString
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
@@ -29,7 +30,7 @@ from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bs
 from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, PATHSEP, defaults
-from .block import Block, Block_from_bytes, _Block
+from .block import Block, Block_from_bytes, _Block, BlockRecord
 from .file import RWBlockFile
 from .meta import Meta, rwx
 from .paths import path_split, resolve
@@ -48,21 +49,102 @@ class DirentType(IntEnum):
   SYM = 2
   HARD = 3
 
-class DirentFlag(IntFlag):
+class DirentFlags(IntFlag):
   HASMETA = 0x01        # has metadata
   HASNAME = 0x02        # has a name
   NOBLOCK = 0x04        # has no Block reference
   HASUUID = 0x08        # has a UUID
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
 
-def Dirents_from_data(data, offset=0):
+def Dirents_from_data(data):
   ''' Decode Dirents from `data`, yield each in turn.
-      `data`: the data to decode.
-      `offset`: the starting offset within the data, default 0.
   '''
-  while offset < len(data):
-    E, offset = _Dirent.from_bytes(data, offset)
-    yield E
+  bfr = CornuCopyBuffer.from_bytes(data)
+  while not bfr.at_eof():
+    yield DirentRecord.value_from_buffer(bfr)
+
+class DirentRecord(PacketField):
+  ''' PacketField subclass to parsing and transcribing Dirents in binary form.
+
+      The serialisation format is:
+
+            BSUint(type)
+            BSUint(flags)
+            [BSString(name)]
+            [BSString(str(meta))]
+            [uuid:16]
+            blockref
+            [blockref(pref_dirent)]
+  '''
+
+  @classmethod
+  def value_from_buffer(cls, bfr):
+    ''' Unserialise a serialised Dirent.
+    '''
+    type_ = BSUInt.value_from_buffer(bfr)
+    flags = DirentFlags(BSUInt.value_from_buffer(bfr))
+    if flags & DirentFlags.HASNAME:
+      name = BSString.value_from_buffer(bfr)
+    else:
+      name = ""
+    if flags & DirentFlags.HASMETA:
+      metatext = BSString.value_from_buffer(bfr)
+    else:
+      metatext = None
+    uu = None
+    if flags & DirentFlags.HASUUID:
+      uu = UUID(bytes=bfr.take(16))
+    if flags & DirentFlags.NOBLOCK:
+      block = None
+    else:
+      block = BlockRecord.value_from_buffer(bfr)
+    if flags & DirentFlags.HASPREVDIRENT:
+      prev_dirent_blockref = BlockRecord.value_from_buffer(bfr)
+    else:
+      prev_dirent_blockref = None
+    try:
+      E = _Dirent.from_components(type_, name, meta=metatext, uuid=uu, block=block)
+    except ValueError as e:
+      warning("%r: invalid Dirent components, marking Dirent as invalid: %s",
+              name, e)
+      E = InvalidDirent(
+          type_, name,
+          chunk=data[offset0:offset],
+          meta=metatext, uuid=uu, block=block)
+    E._prev_dirent_blockref = prev_dirent_blockref
+    return E
+
+  @staticmethod
+  def transcribe_value(E):
+    ''' Serialise to binary format.
+    '''
+    flags = 0
+    if E.name:
+      flags |= DirentFlags.HASNAME
+    if E.meta:
+      flags |= DirentFlags.HASMETA
+    if E.uuid:
+      flags |= DirentFlags.HASUUID
+    if E.block is None:
+      flags |= DirentFlags.NOBLOCK
+    if E._prev_dirent_blockref is not None:
+      flags |= DirentFlags.HASPREVDIRENT
+    yield BSUInt.transcribe_value(E.type)
+    yield BSUInt.transcribe_value(flags)
+    if flags & DirentFlags.HASNAME:
+      yield BSString.transcribe_value(E.name)
+    if flags & DirentFlags.HASMETA:
+      yield BSString.transcribe_value(E.meta.textencode())
+    if flags & DirentFlags.HASUUID:
+      bs = E.uuid.bytes
+      if len(bs) != 16:
+        raise RuntimeError("len(E.uuid.bytes) != 16: %r" % (bs,))
+      yield bs
+    if not(flags & DirentFlags.NOBLOCK):
+      yield BlockRecord.transcribe_value(E.block)
+    if flags & DirentFlags.HASPREVDIRENT:
+      assert isinstance(E._prev_dirent_blockref, _Block)
+      yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
 
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
@@ -122,52 +204,6 @@ class _Dirent(Transcriber):
           % (cls, type(E), offset, s))
     return E, offset2
 
-  @classmethod
-  def from_bytes(cls, data, offset=0):
-    ''' Unserialise a serialised Dirent, return (Dirent, offset).
-        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta][uuid:16]blockref[blockref(pref_dirent)]
-    '''
-    offset0 = offset
-    type_, offset = get_bs(data, offset)
-    flags, offset = get_bs(data, offset)
-    if flags & DirentFlag.HASNAME:
-      namedata, offset = get_bsdata(data, offset)
-      name = bytes(namedata).decode()
-    else:
-      name = ""
-    if flags & DirentFlag.HASMETA:
-      metatext, offset = get_bss(data, offset)
-    else:
-      metatext = None
-    uu = None
-    if flags & DirentFlag.HASUUID:
-      uubs = data[:16]
-      offset += 16
-      if offset > len(data):
-        raise ValueError(
-            "needed 16 bytes for UUID, only got %d bytes (%r)"
-            % (len(uubs), uubs))
-      uu = UUID(bytes=uubs)
-    if flags & DirentFlag.NOBLOCK:
-      block = None
-    else:
-      block, offset = Block_from_bytes(data, offset)
-    if flags & DirentFlag.HASPREVDIRENT:
-      prev_dirent_blockref, offset = Block_from_bytes(data, offset)
-    else:
-      prev_dirent_blockref = None
-    try:
-      E = cls.from_components(type_, name, meta=metatext, uuid=uu, block=block)
-    except ValueError as e:
-      warning("%r: invalid Dirent components, marking Dirent as invalid: %s",
-              name, e)
-      E = InvalidDirent(
-          type_, name,
-          chunk=data[offset0:offset],
-          meta=metatext, uuid=uu, block=block)
-    E._prev_dirent_blockref = prev_dirent_blockref
-    return E, offset
-
   @staticmethod
   def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
@@ -184,54 +220,12 @@ class _Dirent(Transcriber):
       cls = InvalidDirent
     return cls(name, **kw)
 
+  @staticmethod
+  def from_bytes(data, offset=0):
+    return DirentRecord.value_from_bytes(data, offset=offset)
+
   def encode(self):
-    ''' Serialise to binary format.
-        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)][uuid]blockref
-    '''
-    flags = 0
-    name = self.name
-    if name:
-      flags |= DirentFlag.HASNAME
-      namedata = put_bsdata(name.encode())
-    else:
-      namedata = b''
-    meta = self.meta
-    if meta:
-      flags |= DirentFlag.HASMETA
-      if isinstance(meta, str):
-        metadata = put_bss(meta)
-      else:
-        metadata = put_bss(meta.textencode())
-    else:
-      metadata = b''
-    block = self.block
-    if block is None:
-      flags |= DirentFlag.NOBLOCK
-      blockref = b''
-    else:
-      blockref = block.encode()
-    uu = self.uuid
-    if uu is None:
-      uubs = b''
-    else:
-      flags |= DirentFlag.HASUUID
-      uubs = uu.bytes
-    prev_dirent_blockref = self._prev_dirent_blockref
-    if prev_dirent_blockref is None:
-      prev_dirent_bs = b''
-    else:
-      assert isinstance(prev_dirent_blockref, _Block)
-      flags |= DirentFlag.HASPREVDIRENT
-      prev_dirent_bs = prev_dirent_blockref.encode()
-    return (
-        put_bs(self.type)
-        + put_bs(flags)
-        + namedata
-        + metadata
-        + uubs
-        + blockref
-        + prev_dirent_bs
-    )
+    return bytes(DirentRecord(self))
 
   def __hash__(self):
     ''' Allows collecting _Dirents in a set.
