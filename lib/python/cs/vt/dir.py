@@ -8,6 +8,7 @@ import os
 import os.path
 from cmd import Cmd
 from collections import OrderedDict
+from enum import IntEnum, IntFlag
 import errno
 from getopt import GetoptError
 import grp
@@ -40,29 +41,19 @@ gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (_Dirent).
 
-D_INVALID_T = -1
-D_FILE_T = 0
-D_DIR_T = 1
-D_SYM_T = 2
-D_HARD_T = 3
-def D_type2str(type_):
-  ''' Convert a numeric Dirent type value to a string.
-  '''
-  if type_ == D_FILE_T:
-    return "D_FILE_T"
-  if type_ == D_DIR_T:
-    return "D_DIR_T"
-  if type_ == D_SYM_T:
-    return "D_SYM_T"
-  if type_ == D_HARD_T:
-    return "D_HARD_T"
-  return str(type_)
+class DirentType(IntEnum):
+  INVALID = -1
+  FILE = 0
+  DIR = 1
+  SYM = 2
+  HARD = 3
 
-F_HASMETA = 0x01        # has metadata
-F_HASNAME = 0x02        # has a name
-F_NOBLOCK = 0x04        # has no Block reference
-F_HASUUID = 0x08        # has a UUID
-F_PREVDIRENT = 0x10     # has reference to serialised previous Dirent
+class DirentFlag(IntFlag):
+  HASMETA = 0x01        # has metadata
+  HASNAME = 0x02        # has a name
+  NOBLOCK = 0x04        # has no Block reference
+  HASUUID = 0x08        # has a UUID
+  HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
 
 def Dirents_from_data(data, offset=0):
   ''' Decode Dirents from `data`, yield each in turn.
@@ -112,10 +103,10 @@ class _Dirent(Transcriber):
     self.parent = parent
 
   def __repr__(self):
-    return "%s:%d(%s,%s,%s)" % (
+    return "%s:%s(%s,%s,%s)" % (
         self.__class__.__name__,
         id(self),
-        D_type2str(self.type),
+        self.type,
         self.name,
         self.meta
     )
@@ -139,17 +130,17 @@ class _Dirent(Transcriber):
     offset0 = offset
     type_, offset = get_bs(data, offset)
     flags, offset = get_bs(data, offset)
-    if flags & F_HASNAME:
+    if flags & DirentFlag.HASNAME:
       namedata, offset = get_bsdata(data, offset)
       name = bytes(namedata).decode()
     else:
       name = ""
-    if flags & F_HASMETA:
+    if flags & DirentFlag.HASMETA:
       metatext, offset = get_bss(data, offset)
     else:
       metatext = None
     uu = None
-    if flags & F_HASUUID:
+    if flags & DirentFlag.HASUUID:
       uubs = data[:16]
       offset += 16
       if offset > len(data):
@@ -157,11 +148,11 @@ class _Dirent(Transcriber):
             "needed 16 bytes for UUID, only got %d bytes (%r)"
             % (len(uubs), uubs))
       uu = UUID(bytes=uubs)
-    if flags & F_NOBLOCK:
+    if flags & DirentFlag.NOBLOCK:
       block = None
     else:
       block, offset = Block_from_bytes(data, offset)
-    if flags & F_PREVDIRENT:
+    if flags & DirentFlag.HASPREVDIRENT:
       prev_dirent_blockref, offset = Block_from_bytes(data, offset)
     else:
       prev_dirent_blockref = None
@@ -181,13 +172,13 @@ class _Dirent(Transcriber):
   def from_components(type_, name, **kw):
     ''' Factory returning a _Dirent instance.
     '''
-    if type_ == D_DIR_T:
+    if type_ == DirentType.DIR:
       cls = Dir
-    elif type_ == D_FILE_T:
+    elif type_ == DirentType.FILE:
       cls = FileDirent
-    elif type_ == D_SYM_T:
+    elif type_ == DirentType.SYM:
       cls = SymlinkDirent
-    elif type_ == D_HARD_T:
+    elif type_ == DirentType.HARD:
       cls = HardlinkDirent
     else:
       cls = InvalidDirent
@@ -200,13 +191,13 @@ class _Dirent(Transcriber):
     flags = 0
     name = self.name
     if name:
-      flags |= F_HASNAME
+      flags |= DirentFlag.HASNAME
       namedata = put_bsdata(name.encode())
     else:
       namedata = b''
     meta = self.meta
     if meta:
-      flags |= F_HASMETA
+      flags |= DirentFlag.HASMETA
       if isinstance(meta, str):
         metadata = put_bss(meta)
       else:
@@ -215,7 +206,7 @@ class _Dirent(Transcriber):
       metadata = b''
     block = self.block
     if block is None:
-      flags |= F_NOBLOCK
+      flags |= DirentFlag.NOBLOCK
       blockref = b''
     else:
       blockref = block.encode()
@@ -223,14 +214,14 @@ class _Dirent(Transcriber):
     if uu is None:
       uubs = b''
     else:
-      flags |= F_HASUUID
+      flags |= DirentFlag.HASUUID
       uubs = uu.bytes
     prev_dirent_blockref = self._prev_dirent_blockref
     if prev_dirent_blockref is None:
       prev_dirent_bs = b''
     else:
       assert isinstance(prev_dirent_blockref, _Block)
-      flags |= F_PREVDIRENT
+      flags |= DirentFlag.HASPREVDIRENT
       prev_dirent_bs = prev_dirent_blockref.encode()
     return (
         put_bs(self.type)
@@ -275,10 +266,10 @@ class _Dirent(Transcriber):
       offset = offset2 + 1
     attrs, offset = T.parse_mapping(s, offset, stopchar)
     type_ = {
-        'F': D_FILE_T,
-        'D': D_DIR_T,
-        'SymLink': D_SYM_T,
-        'HardLink': D_HARD_T,
+        'F': DirentType.FILE,
+        'D': DirentType.DIR,
+        'SymLink': DirentType.SYM,
+        'HardLink': DirentType.HARD,
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
 
@@ -349,25 +340,25 @@ class _Dirent(Transcriber):
   def isfile(self):
     ''' Is this a file _Dirent?
     '''
-    return self.type == D_FILE_T
+    return self.type == DirentType.FILE
 
   @property
   def isdir(self):
     ''' Is this a directory _Dirent?
     '''
-    return self.type == D_DIR_T
+    return self.type == DirentType.DIR
 
   @property
   def issym(self):
     ''' Is this a symbolic link _Dirent?
     '''
-    return self.type == D_SYM_T
+    return self.type == DirentType.SYM
 
   @property
   def ishardlink(self):
     ''' Is this a hard link _Dirent?
     '''
-    return self.type == D_HARD_T
+    return self.type == DirentType.HARD
 
   def textencode(self):
     ''' Serialise the dirent as text.
@@ -434,7 +425,7 @@ class InvalidDirent(_Dirent):
     '''
     _Dirent.__init__(
         self,
-        D_INVALID_T,
+        DirentType.INVALID,
         name,
         block=None,
         **kw)
@@ -463,7 +454,7 @@ class SymlinkDirent(_Dirent):
   transcribe_prefix = 'SymLink'
 
   def __init__(self, name, pathref, *, block=None, **kw):
-    super().__init__(D_SYM_T, name, **kw)
+    super().__init__(DirentType.SYM, name, **kw)
     if block is not None:
       raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
@@ -491,7 +482,7 @@ class HardlinkDirent(_Dirent):
   transcribe_prefix = 'HardLink'
 
   def __init__(self, name, meta, block=None):
-    _Dirent.__init__(self, D_HARD_T, name, meta=meta)
+    _Dirent.__init__(self, DirentType.HARD, name, meta=meta)
     if block is not None:
       raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
@@ -524,7 +515,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
   transcribe_prefix = 'F'
 
   def __init__(self, name, block=None, **kw):
-    _Dirent.__init__(self, D_FILE_T, name, **kw)
+    _Dirent.__init__(self, DirentType.FILE, name, **kw)
     MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
@@ -684,7 +675,7 @@ class Dir(_Dirent):
         `parent`: parent Dir
         `block`: pre-existing Block with initial Dir content
     '''
-    super().__init__(D_DIR_T, name, **kw)
+    super().__init__(DirentType.DIR, name, **kw)
     if block is None:
       self._block = None
       self._entries = {}
