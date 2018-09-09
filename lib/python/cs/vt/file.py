@@ -72,9 +72,11 @@ class ROBlockFile(RawIOBase, ReadMixin):
 
 class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
+
       An initial Block is supplied for use as the backing data.
       The .flush and .close methods return a new Block representing the commited data.
-      Note that a RWBlockFile starts open and must be closed.
+
+      *Note*: a RWBlockFile starts open and must be closed.
   '''
 
   def __init__(self, backing_block=None):
@@ -124,7 +126,8 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   @locked
   def backing_block(self):
     ''' Return the current backing block.
-        The backing block may be out of date with respect to any
+
+        Note: the backing block may be out of date with respect to any
         pending flushes; call .sync() to obtain an up to date flushed
         block.
     '''
@@ -133,8 +136,12 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   @locked
   def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
+
         We dispatch the sync in the background within a lock.
-        `scanner`: optional scanner for new file data to locate preferred block boundaries.
+
+        Parameters:
+        * `scanner`: optional scanner for new file data to locate
+          preferred block boundaries.
     '''
     flushnum = self.flush_count
     self.flush_count += 1
