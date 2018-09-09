@@ -293,7 +293,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if name in P:
       warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
               parent_inode, P, name)
-    fhndx = core.open2(P, name, flags|O_CREAT, ctx)
+    fhndx = core.open2(P, name, flags|O_CREAT)
     E = core._fh(fhndx).E
     E.meta.chmod(mode)
     P[name] = E
@@ -534,7 +534,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     for_append = (flags & O_APPEND) == O_APPEND
     if (for_write or for_append) and self._vt_core.readonly:
       raise FuseOSError(errno.EROFS)
-    fhndx = self._vt_core.open(E, flags, ctx)
+    fhndx = self._vt_core.open(E, flags)
     if for_write or for_append:
       E.changed = True
     return fhndx

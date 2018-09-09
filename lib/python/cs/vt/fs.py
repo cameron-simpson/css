@@ -486,8 +486,8 @@ class FileSystem(object):
       E2 = E
     return E2.meta.stat()
 
-  def open2(self, P, name, flags, ctx):
-    ''' Open a regular file given `P` parent Dir and `name`,
+  def open2(self, P, name, flags):
+    ''' Open a regular file given parent Dir `P` and `name`,
         allocate FileHandle, return FileHandle index.
 
         Increments the kernel reference count.
@@ -505,9 +505,9 @@ class FileSystem(object):
     else:
       E = FileDirent(name)
       P[name] = E
-    return self.open(E, flags, ctx)
+    return self.open(E, flags)
 
-  def open(self, E, flags, ctx):
+  def open(self, E, flags):
     ''' Open a regular file `E`, allocate FileHandle, return FileHandle index.
         Increments the kernel reference count.
     '''
