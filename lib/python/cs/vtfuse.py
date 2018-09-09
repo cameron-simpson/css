@@ -561,7 +561,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     FH = self._vt_core._fh(fhndx)
     chunks = []
     while size > 0:
-      data = FH.read(off, size)
+      data = FH.read(size, off)
       if not data:
         break
       chunks.append(data)

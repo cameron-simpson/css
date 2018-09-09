@@ -61,7 +61,7 @@ class FileHandle:
     self.E.touch()
     return written
 
-  def read(self, offset, size):
+  def read(self, size, offset):
     ''' Read data from the file.
     '''
     if size < 1:
