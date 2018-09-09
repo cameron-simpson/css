@@ -46,13 +46,17 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
 def mount(mnt, E, S, *, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
-      `mnt`: mount point
-      `E`: Dirent of root Store directory
-      `S`: backing Store
-      `archive`: if not None, an Archive or similar, with a .update(Dirent[,when]) method
-      `subpath`: relative path from `E` to the directory to attach to the mountpoint
-      `readonly`: forbid data modification operations
-      `append_only`: files may not be truncated or overwritten
+
+      Parameters:
+      * `mnt`: mount point
+      * `E`: Dirent of root Store directory
+      * `S`: backing Store
+      * `archive`: if not None, an Archive or similar, with a
+        `.update(Dirent[,when])` method
+      * `subpath`: relative path from `E` to the directory to attach
+        to the mountpoint
+      * `readonly`: forbid data modification operations
+      * `append_only`: files may not be truncated or overwritten
   '''
   if readonly is None:
     readonly = S.readonly
@@ -84,7 +88,8 @@ def umount(mnt):
 
 def handler(method):
   ''' Decorator for FUSE handlers.
-      Prefixes exceptions with the method name, associated with the
+
+      Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
   def handle(self, *a, **kw):

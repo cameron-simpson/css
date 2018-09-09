@@ -116,13 +116,18 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
 
   def __call__(self, M, accesses):
     ''' Call the AC with the Meta `M` and the required permissions `accesses`.
+
+        *Note*: this does _not_ check the audience and presumes
+        that the access control is applicable.
+
         Returns False if any access is in .deny, otherwise returns True if
         all accesses are in .allow.
-        Subclasses override this method and check the AC for
-        applicability before deferring to this method to test access;
-        they return None if the AC is not applicable, for example
-        an AC_Owner when the Meta has no owner or the Meta owner
-        does not match the caller owner.
+
+        Subclasses override this method and check the access control
+        audience for applicability before deferring to this method
+        to test access; they return None if the access control is
+        not applicable, for example an AC_Owner when the Meta has
+        no owner or the Meta owner does not match the caller owner.
     '''
     allow = self.allow
     deny = self.deny
@@ -197,18 +202,17 @@ class Meta(dict, Transcriber):
   ''' Inode metadata: times, permissions, ownership etc.
 
       This is a dictionary with the following keys:
-
-      'u': owner
-      'g': group owner
-      'a': ACL
-      'iref': inode number (hard links)
-      'c': st_ctime, last change to inode/metadata
-      'm': modification time, a float
-      'n': number of hardlinks
-      'su': setuid
-      'sg': setgid
-      'pathref': pathname component for symlinks (and, later, hard links)
-      'x': xattrs
+      * `'u'`: owner
+      * `'g'`: group owner
+      * `'a'`: ACL
+      * `'iref'`: inode number (hard links)
+      * `'c'`: st_ctime, last change to inode/metadata
+      * `'m'`: modification time, a float
+      * `'n'`: number of hardlinks
+      * `'su'`: setuid
+      * `'sg'`: setgid
+      * `'pathref'`: pathname component for symlinks (and, later, hard links)
+      * `'x'`: xattrs
   '''
 
   transcribe_prefix = 'M'
