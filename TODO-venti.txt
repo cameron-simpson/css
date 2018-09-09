@@ -1,3 +1,4 @@
+vt.dir: FileSystem state: a mapping of UUID->Dirent for the indirect dirents - where to keep this context at runtime for indirection?
 vt.dir: new IndirectDirent pointing to another Dirent by UUID
 vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
 vt.stream: give the _connect method some hysteresis
