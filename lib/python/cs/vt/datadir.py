@@ -174,7 +174,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def __init__(
       self,
-      statedirpath, datadirpath, hashclass, indexclass=None,
+      statedirpath, datadirpath, hashclass,
+      *,
+      indexclass=None,
       create_statedir=None, create_datadir=None,
       flags=None, flag_prefix=None,
       runstate=None,
@@ -187,7 +189,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           index dbm-ish files.
         * `datadirpath`: the directory containing the DataFiles.  If this is
           shared by other clients then it should be different from the
-          `statedirpath`.  If None, default to "statedirpath/data", which
+          `statedirpath`.  If None, default to "{statedirpath}/data", which
           might be a symlink to a shared area such as a NAS.
         * `hashclass`: the hash class used to index chunk contents.
         * `indexclass`: the IndexClass providing the index to chunks in the
@@ -212,6 +214,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         raise ValueError("flags provided but no flag_prefix")
     FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
     self.statedirpath = statedirpath
+    if datadirpath is None:
+      datadirpath = joinpath(statedirpath, 'data')
+      X("datadirpath => %r", datadirpath)
+    self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
@@ -236,10 +242,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._monitor_Thread = None
     self._extra_state = {}
     self._load_state()
-    if datadirpath is not None:
-      self.datadirpath = datadirpath
-    else:
-      datadirpath = self.datadirpath
     # the "default" data dir may be created if the statedir exists
     if create_datadir is None:
       create_datadir = existspath(statedirpath) and not existspath(datadirpath)
@@ -437,23 +439,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         del self._extra_state[key]
     else:
       self._extra_state[key] = value
-
-  @property
-  def datadirpath(self):
-    ''' Return the full pathname of the data directory.
-    '''
-    path = longpath(self._extra_state.get('datadir', 'data'))
-    if not isabspath(path):
-      path = self.localpathto(path)
-    return path
-
-  @datadirpath.setter
-  def datadirpath(self, newpath):
-    ''' Set the full pathname of the data directory.
-    '''
-    if isabspath(newpath) and newpath.startswith(self.statedirpath + '/'):
-      newpath = relpath(newpath, self.statedirpath)
-    self.set_state('datadir', shortpath(newpath))
 
   @property
   def current_save_filenum(self):
@@ -694,7 +679,8 @@ class DataDir(_FilesDir):
 
   def __init__(
       self,
-      statedirpath, datadirpath, hashclass, *,
+      statedirpath, datadirpath, hashclass,
+      *,
       rollover=None,
       **kw
   ):
