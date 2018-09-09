@@ -95,30 +95,37 @@ def handler(method):
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
-    ##X("OP %s %r %r ...", method.__name__, a, kw)
-    try:
-      with Pfx(method.__name__):
+    arg_desc = [ repr(arg) for arg in a ]
+    arg_desc.extend(
+        "%s=%r" % (kw_name, kw_value)
+        for kw_name, kw_value in kw.items
+    )
+    with Pfx(
+        "%s.%s(%s)",
+        type(self).__name__, method.__name__, ','.join(arg_desc)
+    ):
+      try:
         with self._vt_core.S:
           result = method(self, *a, **kw)
-          ##X("OP %s %r %r => %r", method.__name__, a, kw, result)
+          ## XP(" result = %r", result)
           return result
-    except FuseOSError:
-      raise
-    except MissingHashcodeError as e:
-      error("raising IOError from missing hashcode: %s", e)
-      raise FuseOSError(errno.EIO) from e
-    except OSError as e:
-      error("raising FuseOSError from OSError: %s", e)
-      raise FuseOSError(e.errno) from e
-    except Exception as e:
-      exception(
-          "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
-          method.__name__, a, kw, type(e), e)
-      raise FuseOSError(errno.EINVAL) from e
-    except BaseException as e:
-      error("UNCAUGHT EXCEPTION")
-      raise RuntimeError("UNCAUGHT EXCEPTION") from e
-  return handle
+      except FuseOSError:
+        raise
+      except MissingHashcodeError as e:
+        error("raising IOError from missing hashcode: %s", e)
+        raise FuseOSError(errno.EIO) from e
+      except OSError as e:
+        error("raising FuseOSError from OSError: %s", e)
+        raise FuseOSError(e.errno) from e
+      except Exception as e:
+        exception(
+            "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
+            method.__name__, a, kw, type(e), e)
+        raise FuseOSError(errno.EINVAL) from e
+      except BaseException as e:
+        error("UNCAUGHT EXCEPTION")
+        raise RuntimeError("UNCAUGHT EXCEPTION") from e
+    return handle
 
 class DirHandle:
   ''' An "open" Dir: keeps a list of the names from open time
