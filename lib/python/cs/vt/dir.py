@@ -20,17 +20,17 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString
+from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
-from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, PATHSEP, defaults
-from .block import Block, Block_from_bytes, _Block, BlockRecord
+from .block import Block, _Block, BlockRecord
 from .file import RWBlockFile
 from .meta import Meta, rwx
 from .paths import path_split, resolve
@@ -43,6 +43,8 @@ gid_nogroup = -1
 # Directories (Dir, a subclass of dict) and directory entries (_Dirent).
 
 class DirentType(IntEnum):
+  ''' Dirent type codes.
+  '''
   INVALID = -1
   FILE = 0
   DIR = 1
@@ -50,6 +52,8 @@ class DirentType(IntEnum):
   HARD = 3
 
 class DirentFlags(IntFlag):
+  ''' Flag values for the Dirent binary encoding.
+  '''
   HASMETA = 0x01        # has metadata
   HASNAME = 0x02        # has a name
   NOBLOCK = 0x04        # has no Block reference
@@ -102,15 +106,7 @@ class DirentRecord(PacketField):
       prev_dirent_blockref = BlockRecord.value_from_buffer(bfr)
     else:
       prev_dirent_blockref = None
-    try:
-      E = _Dirent.from_components(type_, name, meta=metatext, uuid=uu, block=block)
-    except ValueError as e:
-      warning("%r: invalid Dirent components, marking Dirent as invalid: %s",
-              name, e)
-      E = InvalidDirent(
-          type_, name,
-          chunk=data[offset0:offset],
-          meta=metatext, uuid=uu, block=block)
+    E = _Dirent.from_components(type_, name, meta=metatext, uuid=uu, block=block)
     E._prev_dirent_blockref = prev_dirent_blockref
     return E
 
@@ -140,7 +136,7 @@ class DirentRecord(PacketField):
       if len(bs) != 16:
         raise RuntimeError("len(E.uuid.bytes) != 16: %r" % (bs,))
       yield bs
-    if not(flags & DirentFlags.NOBLOCK):
+    if not flags & DirentFlags.NOBLOCK:
       yield BlockRecord.transcribe_value(E.block)
     if flags & DirentFlags.HASPREVDIRENT:
       assert isinstance(E._prev_dirent_blockref, _Block)
@@ -217,7 +213,7 @@ class _Dirent(Transcriber):
     elif type_ == DirentType.HARD:
       cls = HardlinkDirent
     else:
-      cls = InvalidDirent
+      cls = _Dirent
     return cls(name, **kw)
 
   @staticmethod
@@ -330,7 +326,6 @@ class _Dirent(Transcriber):
     assert isinstance(E, _Dirent), "set .prev_dirent: not a _Dirent: %s" % (E,)
     if E is None:
       if self._prev_dirent_blockref is not None:
-        blockref = None
         self.changed = True
     elif E == self:
       warning(
@@ -569,7 +564,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
     '''
     self._check()
     if self._block is not None:
-      error("final close, but ._block is not None; replacing with self.open_file.close(), was: %s", self._block)
+      error(
+          "final close, but ._block is not None;"
+          " replacing with self.open_file.close(), was: %s",
+          self._block)
     f = self.open_file
     f.filename = self.name
     self._block = f.close(enforce_final_close=True)
@@ -797,9 +795,8 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      _block = self._block
-      changed = self.changed
-      X("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...", id(self), self.name, self._block, self.changed)
+      X("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+        id(self), self.name, self._block, self.changed)
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
@@ -862,7 +859,7 @@ class Dir(_Dirent):
     return name in self.entries
 
   def __iter__(self):
-    return self.keys()
+    return iter(self.keys())
 
   def __getitem__(self, name):
     if name == '.':
@@ -939,9 +936,8 @@ class Dir(_Dirent):
     '''
     D = self
     for name in path.split(PATHSEP):
-      if len(name) == 0:
-        continue
-      D = D.chdir1(name)
+      if name:
+        D = D.chdir1(name)
     return D
 
   def makedirs(self, path, force=False):
@@ -1085,11 +1081,15 @@ class DirFTP(Cmd):
 
   @property
   def prompt(self):
+    ''' The interactive prompt.
+    '''
     prompt = self._prompt
-    pwd = PATHSEP + self.op_pwd()
-    return ( pwd if prompt is None else ":".join( (prompt, pwd) ) ) + '> '
+    wd_path = PATHSEP + self.op_pwd()
+    return ( wd_path if prompt is None else ":".join( (prompt, wd_path) ) ) + '> '
 
   def emptyline(self):
+    ''' Empty line handler.
+    '''
     pass
 
   def do_EOF(self, args):
@@ -1221,6 +1221,8 @@ class DirFTP(Cmd):
 
   @docmd
   def do_mkdir(self, args):
+    ''' Make a directory.
+    '''
     argv = shlex.split(args)
     if not argv:
       raise GetoptError("missing arguments")
@@ -1239,7 +1241,6 @@ class DirFTP(Cmd):
             error("%r exists", subname)
           else:
             E.mkdir(subname)
-        self.cwd
 
 if __name__ == '__main__':
   from .dir_tests import selftest
