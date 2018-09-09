@@ -1,3 +1,4 @@
+vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
 vt.stream: give the _connect method some hysteresis
 DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
 general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
