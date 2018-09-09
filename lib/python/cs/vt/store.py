@@ -820,13 +820,16 @@ class DataDirStore(MappingStore):
   def __init__(
       self,
       name,
-      statedirpath, datadirpath=None,
+      statedirpath,
+      *,
+      datadirpath=None,
       hashclass=None, indexclass=None,
-      rollover=None, runstate=None, **kw
+      rollover=None, runstate=None,
+      **kw
   ):
     datadir = DataDir(
-        statedirpath, datadirpath,
-        hashclass, indexclass=indexclass,
+        statedirpath, datadirpath, hashclass,
+        indexclass=indexclass,
         rollover=rollover, runstate=runstate)
     MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
     self._datadir = datadir
