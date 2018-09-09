@@ -276,7 +276,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.access
     '''
     E = self._vt_i2E(inode)
-    return self._vt_core._Eaccess(E, mode, ctx)
+    return self._vt_core.access(E, mode, uid=ctx.uid, gid=ctx.gid)
 
   @handler
   def create(self, parent_inode, name_b, mode, flags, ctx):
@@ -717,10 +717,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
     Psrc = self._vt_core.i2E(parent_inode_old)
     if name_old not in Psrc:
       raise FuseOSError(errno.ENOENT)
-    if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
+    if not self._vt_core.access(Psrc, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     Pdst = self._vt_core.i2E(parent_inode_new)
-    if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK, ctx):
+    if not self._vt_core.access(Pdst, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     E = Psrc[name_old]
     del Psrc[name_old]
@@ -736,7 +736,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     P = self._vt_core.i2E(parent_inode)
-    if not self._vt_core._Eaccess(P, os.X_OK|os.W_OK, ctx):
+    if not self._vt_core.access(P, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]

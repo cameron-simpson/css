@@ -576,9 +576,10 @@ class FileSystem(object):
     fhs.append(file_handle)
     return len(fhs) - 1
 
-  def _Eaccess(self, E, amode, ctx):
-    with Pfx("_Eaccess(E=%r,amode=%s,ctx=%r)", E, amode, ctx):
-      uid, gid = ctx.uid, ctx.gid
+  def access(self, E, amode, uid=None, gid=None):
+    ''' Check access mode `amode` against Dirent `E`.
+    '''
+    with Pfx("access(E=%r,amode=%s,uid=%r,gid=%d)", E, amode, uid, gid):
       if E.ishardlink:
         E2 = self._inodes.dirent(E.inum)
         warning("map hardlink %s => %s", E, E2)
