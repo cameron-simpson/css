@@ -273,6 +273,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def access(self, inode, mode, ctx):
     ''' Check if the requesting process has `mode` rights on `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.access
     '''
     E = self._vt_i2E(inode)
@@ -281,6 +282,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def create(self, parent_inode, name_b, mode, flags, ctx):
     ''' Create a new file and open it. Return file handle index and EntryAttributes.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.create
     '''
     if self._vt_core.readonly:
@@ -302,6 +304,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def destroy(self):
     ''' Cleanup operations, called when llfuse.close has been called, just before the filesystem is unmounted.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.destroy
     '''
     # TODO: call self.forget with all kreffed inums?
@@ -312,6 +315,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def flush(self, fh):
     ''' Handle close() system call.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.flush
     '''
     FH = self._vt_core._fh(fh)
@@ -320,6 +324,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def forget(self, ideltae):
     ''' Decrease lookup counts for indoes in `ideltae`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.forget
     '''
     core = self._vt_core
@@ -330,14 +335,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def fsync(self, fh, datasync):
     ''' Flush buffers for open file `fh`.
-        http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.fsync
+
         `datasync`: if true, only flush the data contents, not the metadata.
+
+        http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.fsync
     '''
     self._vt_core._fh(fh).flush()
 
   @handler
   def fsyncdir(self, fh, datasync):
     ''' Flush the buffers for open directory `fh`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.fsyncdir
     '''
     # TODO: commit dir? implies flushing the whole tree
@@ -346,6 +354,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def getattr(self, inode, ctx):
     ''' Get EntryAttributes from `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.getattr
     '''
     E = self._vt_core.i2E(inode)
@@ -354,6 +363,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def getxattr(self, inode, xattr_name, ctx):
     ''' Return extended attribute `xattr_name` from `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.getxattr
     '''
     # TODO: test for permission to access inode?
@@ -368,6 +378,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def link(self, inode, new_parent_inode, new_name_b, ctx):
     ''' Link `inode` to new name `new_name_b` in `new_parent_inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.link
     '''
     if self._vt_core.readonly:
@@ -415,6 +426,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def listxattr(self, inode, ctx):
     ''' Return list of extended attributes of `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.listxattr
     '''
     # TODO: ctx allows to access inode?
@@ -426,6 +438,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def lookup(self, parent_inode, name_b, ctx):
     ''' Look up `name_b` in `parent_inode`, return EntryAttributes.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.lookup
     '''
     core = self._vt_core
@@ -472,6 +485,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def mkdir(self, parent_inode, name_b, mode, ctx):
     ''' Create new directory named `name_b` in `parent_inode`, return EntryAttributes.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.mkdir
     '''
     if self._vt_core.readonly:
@@ -496,6 +510,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def mknod(self, parent_inode, name_b, mode, rdev, ctx):
     ''' Create file named `named_b` in `parent_inode`, possibly special.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.mknod
     '''
     if self._vt_core.readonly:
@@ -523,6 +538,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def open(self, inode, flags, ctx):
     ''' Open an existing file, return file handle index.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.open
     '''
     E = self._vt_i2E(inode)
@@ -542,6 +558,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def opendir(self, inode, ctx):
     ''' Open directory `inode`, return directory handle `fhndx`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.opendir
     '''
     # TODO: check for permission to read
@@ -555,6 +572,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def read(self, fhndx, off, size):
     ''' Read `size` bytes from open file handle `fhndx` at offset `off`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
     ##X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
@@ -572,6 +590,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def readdir(self, fhndx, off):
     ''' Read entries in open directory file handle `fhndx` from offset `off`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readdir
     '''
     # TODO: if rootdir, generate '..' for parent of mount
@@ -662,6 +681,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def readlink(self, inode, ctx):
     ''' Read the reference from symbolic link `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readlink
     '''
     # TODO: check for permission to read the link?
@@ -673,6 +693,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def release(self, fhndx):
     ''' Release open file handle `fhndx`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.release
     '''
     with Pfx("_fh_close(fhndx=%d)", fhndx):
@@ -681,6 +702,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def releasedir(self, fhndx):
     ''' Release open directory file handle `fhndx`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.releasedir
     '''
     self._vt_core._fh_remove(fhndx)
@@ -688,6 +710,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def removexattr(self, inode, xattr_name, ctx):
     ''' Remove extended attribute `xattr_name` from `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.removexattr
     '''
     if self._vt_core.readonly:
@@ -708,6 +731,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
     ''' Rename an entry `name_old_b` from `parent_inode_old` to `name_new_b` in `parent_inode_new`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.rename
     '''
     if self._vt_core.readonly:
@@ -730,6 +754,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def rmdir(self, parent_inode, name_b, ctx):
     ''' Remove the directory named `name_b` from `parent_inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.rmdir
     '''
     if self._vt_core.readonly:
@@ -752,6 +777,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def setattr(self, inode, attr, fields, fhndx, ctx):
     ''' Change attributes of `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.setattr
     '''
     # TODO: test CTX for permission to chmod/chown/whatever
@@ -789,7 +815,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
     ''' Set the extended attribute `xattr_name` to `value` on `inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.setxattr
+
         TODO: x-vt-* control/query psuedo attributes.
     '''
     if self._vt_core.readonly:
@@ -804,10 +832,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def statfs(self, ctx):
     ''' Implement statfs(2).
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.statfs
+
         Currently bodges by reporting on the filesystem containing
         the current working directory, should really report on the
-        filesystem holding the Store. That requires a Stiore.statfs
+        filesystem holding the Store. That requires a Store.statfs
         method of some kind (TODO).
     '''
     # TODO: get free space from the current Store
@@ -830,6 +860,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def symlink(self, parent_inode, name_b, target_b, ctx):
     ''' Create symlink named `name_b` in `parent_inode`, referencing `target_b`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.symlink
     '''
     if self._vt_core.readonly:
@@ -856,6 +887,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def unlink(self, parent_inode, name_b, ctx):
     ''' Unlink the name `name_b` from `parent_inode`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.unlink
     '''
     if self._vt_core.readonly:
@@ -873,6 +905,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
   @handler
   def write(self, fhndx, off, buf):
     ''' Write data `buf` to the file handle `FH` at offset `off`.
+
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.write
     '''
     if self._vt_core.readonly:
