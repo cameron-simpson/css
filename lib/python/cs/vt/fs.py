@@ -26,7 +26,7 @@ from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 
 class FileHandle:
-  ''' Filesystem state for open files.
+  ''' Filesystem state for an open file.
   '''
 
   def __init__(self, fs, E, for_read, for_write, for_append, lock=None):
@@ -170,8 +170,10 @@ class Inodes(object):
   @staticmethod
   def decode_inode_data(idatatext, allocated):
     ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
-        `idatatext`: text embodying the allocated Inode range and the Inode Dirent
-        `allocated`: the existing allocated Range
+
+        Parameters:
+        * `idatatext`: text embodying the allocated Inode range and the Inode Dirent
+        * `allocated`: the existing allocated Range
     '''
     idata = untexthexify(idatatext)
     # load the allocated hardlinked inode values
@@ -322,9 +324,13 @@ class Inodes(object):
       return self[inum].E
 
 class FileSystem(object):
-  ''' The core filesystem functionality supporting FUSE operations.
-      The StoreFS_LLFUSE class subclasses the appropriate FUSE
-      module and presents shims that call the logic here.
+  ''' The core filesystem functionality supporting FUSE operations
+      and in principle other filesystem-like access.
+
+      See the cs.vtfuse module for the StoreFS_LLFUSE class (aliased
+      as StoreFS) and associated mount function which presents a
+      FileSystem as a FUSE mount.
+
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
       or the like.
@@ -340,14 +346,17 @@ class FileSystem(object):
       show_prev_dirent=False
   ):
     ''' Initialise a new FUSE mountpoint.
-        `E`: the root directory reference
-        `S`: the backing Store
-        `archive`: if not None, an Archive or similar, with a .update(Dirent[,when]) method
-        `subpath`: relative path to mount Dir
-        `readonly`: forbid data modification
-        `append_only`: append only mode: files may only grow,
+
+        Parameters:
+        * `E`: the root directory reference
+        * `S`: the backing Store
+        * `archive`: if not None, an Archive or similar, with a
+          `.update(Dirent[,when])` method
+        * `subpath`: relative path to mount Dir
+        * `readonly`: forbid data modification
+        * `append_only`: append only mode: files may only grow,
           filenames may not be changed or deleted
-        `show_prev_dirent`: show Dir revision as the '...' entry
+        * `show_prev_dirent`: show previous Dir revision as the '...' entry
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
@@ -451,6 +460,7 @@ class FileSystem(object):
   @locked
   def E2i(self, E):
     ''' Compute the inode number for a Dirent.
+
         HardlinkDirents have a persistent .inum mapping to the Meta['iref'] field.
         Others do not and keep a private ._inum, not preserved after umount.
     '''
@@ -477,7 +487,9 @@ class FileSystem(object):
     return E2.meta.stat()
 
   def open2(self, P, name, flags, ctx):
-    ''' Open a regular file given `P` parent Dir and `name`, allocate FileHandle, return FileHandle index.
+    ''' Open a regular file given `P` parent Dir and `name`,
+        allocate FileHandle, return FileHandle index.
+
         Increments the kernel reference count.
         Wraps self.open.
     '''
