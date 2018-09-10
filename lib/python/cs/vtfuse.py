@@ -44,19 +44,26 @@ XATTR_NAME_BLOCKREF = b'x-vt-blockref'
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
-def mount(mnt, E, S, *, archive=None, subpath=None, readonly=None, append_only=False, fsname=None):
+def mount(
+    mnt, E,
+    *,
+    S=None,
+    archive=None, subpath=None, readonly=None, append_only=False,
+    fsname=None
+):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
 
       Parameters:
       * `mnt`: mount point
       * `E`: Dirent of root Store directory
-      * `S`: backing Store
+      * `S`: optional backing Store, default from defaults.S
       * `archive`: if not None, an Archive or similar, with a
         `.update(Dirent[,when])` method
       * `subpath`: relative path from `E` to the directory to attach
         to the mountpoint
       * `readonly`: forbid data modification operations
       * `append_only`: files may not be truncated or overwritten
+      * `fsname`: optional filesystem name for use by llfuse
   '''
   if readonly is None:
     readonly = S.readonly
@@ -78,7 +85,10 @@ def mount(mnt, E, S, *, archive=None, subpath=None, readonly=None, append_only=F
   X("mount: S=%s", S)
   X("mount: E=%s", E)
   dump_Dirent(E, recurse=True)
-  FS = StoreFS(E, S, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=True)
+  FS = StoreFS(
+      E,
+      S=S, archive=archive, subpath=subpath,
+      readonly=readonly, append_only=append_only, show_prev_dirent=True)
   return FS._vt_runfuse(mnt, fsname=fsname)
 
 def umount(mnt):
@@ -141,12 +151,18 @@ class StoreFS_LLFUSE(llfuse.Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False, show_prev_dirent=False):
+  def __init__(
+      self,
+      E,
+      *,
+      S=None, archive=None, subpath=None,
+      options=None, readonly=None, append_only=False, show_prev_dirent=False
+  ):
     ''' Initialise a new FUSE mountpoint.
 
         Parameters:
         * `E`: the root directory reference
-        * `S`: the backing Store
+        * `S`: optional backing Store, default from defaults.S
         * `archive`: if not None, an Archive or similar, with a
           .update(Dirent[,when]) method
         * `subpath`: relative path to mount Dir
@@ -158,8 +174,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if readonly is None:
       readonly = S.readonly
     self._vtfs = FileSystem(
-        E, S,
-        archive=archive, subpath=subpath,
+        E,
+        S=S, archive=archive, subpath=subpath,
         readonly=readonly, append_only=append_only,
         show_prev_dirent=show_prev_dirent)
     llf_opts = set(llfuse.default_options)

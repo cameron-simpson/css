@@ -337,14 +337,16 @@ class FileSystem(object):
   '''
 
   def __init__(
-      self, E, S,
+      self, E,
+      *,
+      S=None,
       archive=None,
       subpath=None,
       readonly=None,
       append_only=False,
       show_prev_dirent=False
   ):
-    ''' Initialise a new FUSE mountpoint.
+    ''' Initialise a new mountpoint.
 
         Parameters:
         * `E`: the root directory reference
@@ -359,6 +361,9 @@ class FileSystem(object):
     '''
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
+    if S is None:
+      S = defaults.S
+    S.open()
     if readonly is None:
       readonly = S.readonly
     self.E = E
@@ -393,9 +398,10 @@ class FileSystem(object):
     self._inodes._add_Dirent(self.mnt_inum, self.mntE)
 
   def close(self):
-    ''' Close the _StoreFS_core.
+    ''' Close the FileSystem.
     '''
     self._sync()
+    self.S.close()
 
   def __str__(self):
     if self.subpath:
