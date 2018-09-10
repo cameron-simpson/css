@@ -212,26 +212,20 @@ class Config:
       basedir = self.get_default('basedir')
     if path is None:
       path = clause_name
-      debug("path from clausename: %r", path)
     path = longpath(path)
-    debug("longpath(path) ==> %r", path)
     if not isabspath(path):
       if path.startswith('./'):
         path = abspath(path)
-        debug("abspath ==> %r", path)
       else:
-        debug("basedir=%r", basedir)
         if basedir is None:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
-        debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
-        debug("path ==> %r", path)
     if data is not None:
       data = longpath(data)
     if runstate is None:
       runstate = self.runstate
-    return DataDirStore(store_name, path, data, None, None, runstate=runstate)
+    return DataDirStore(store_name, path, datadirpath=data, runstate=runstate)
 
   def filecache_Store(
       self,
