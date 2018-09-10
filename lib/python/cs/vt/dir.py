@@ -48,7 +48,7 @@ class DirentType(IntEnum):
   INVALID = -1
   FILE = 0
   DIR = 1
-  SYM = 2
+  SYMBOLIC = 2
   HARD = 3
 
 class DirentFlags(IntFlag):
@@ -208,7 +208,7 @@ class _Dirent(Transcriber):
       cls = Dir
     elif type_ == DirentType.FILE:
       cls = FileDirent
-    elif type_ == DirentType.SYM:
+    elif type_ == DirentType.SYMBOLIC:
       cls = SymlinkDirent
     elif type_ == DirentType.HARD:
       cls = HardlinkDirent
@@ -268,7 +268,7 @@ class _Dirent(Transcriber):
     type_ = {
         'F': DirentType.FILE,
         'D': DirentType.DIR,
-        'SymLink': DirentType.SYM,
+        'SymLink': DirentType.SYMBOLIC,
         'HardLink': DirentType.HARD,
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
@@ -359,7 +359,7 @@ class _Dirent(Transcriber):
   def issym(self):
     ''' Is this a symbolic link _Dirent?
     '''
-    return self.type == DirentType.SYM
+    return self.type == DirentType.SYMBOLIC
 
   @property
   def ishardlink(self):
@@ -462,7 +462,7 @@ class SymlinkDirent(_Dirent):
   transcribe_prefix = 'SymLink'
 
   def __init__(self, name, pathref, *, block=None, **kw):
-    super().__init__(DirentType.SYM, name, **kw)
+    super().__init__(DirentType.SYMBOLIC, name, **kw)
     if block is not None:
       raise ValueError("block must be None, received: %s" % (block,))
     self.block = None
