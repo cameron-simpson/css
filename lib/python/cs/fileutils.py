@@ -796,7 +796,8 @@ class ReadMixin(object):
   '''
 
   def datafrom(self, offset, readsize=None):
-    ''' Yield data from the specified `offset` onward in some approximation of the "natural" chunk size.
+    ''' Yield data from the specified `offset` onward in some
+        approximation of the "natural" chunk size.
 
         NOTE: UNLIKE the global datafrom() function, this method
         MUST NOT move the logical file position. Implementors may need
@@ -807,6 +808,7 @@ class ReadMixin(object):
         The aspiration here is to read data with only a single call
         to the underlying storage, and to return the chunks in
         natural sizes instead of some default read size.
+
         Classes using this mixin must implement this method.
     '''
     raise NotImplementedError("return an iterator which does not change the file offset")
@@ -820,12 +822,13 @@ class ReadMixin(object):
     ''' Read up to `size` bytes, honouring the "single system call"
         spirit unless `longread` is true.
 
-        `size`: the number of bytes requested. A size of -1 requests
+        Parameters:
+        * `size`: the number of bytes requested. A size of -1 requests
           all bytes to the end of the file.
-        `offset`: the starting point of the read; if None, use the
+        * `offset`: the starting point of the read; if None, use the
           current file position; if not None, seek to this position
           before reading, even if `size` == 0.
-        `longread`: switch from "single system call" to "as many
+        * `longread`: switch from "single system call" to "as many
           as required to obtain `size` bytes"; short data will still
           be returned if the file is too short.
     '''
