@@ -144,19 +144,25 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   def __init__(self, E, S, archive=None, subpath=None, options=None, readonly=None, append_only=False, show_prev_dirent=False):
     ''' Initialise a new FUSE mountpoint.
-        `E`: the root directory reference
-        `S`: the backing Store
-        `archive`: if not None, an Archive or similar, with a
+
+        Parameters:
+        * `E`: the root directory reference
+        * `S`: the backing Store
+        * `archive`: if not None, an Archive or similar, with a
           .update(Dirent[,when]) method
-        `subpath`: relative path to mount Dir
-        `readonly`: forbid data modification; if omitted or None,
+        * `subpath`: relative path to mount Dir
+        * `readonly`: forbid data modification; if omitted or None,
           infer from S.readonly
-        `append_only`: forbid truncation or overwrite of file data
-        `show_prev_dirent`: show previous Dir revision as '...'
+        * `append_only`: forbid truncation or overwrite of file data
+        * `show_prev_dirent`: show previous Dir revision as '...'
     '''
     if readonly is None:
       readonly = S.readonly
-    self._vt_core = FileSystem(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=show_prev_dirent)
+    self._vt_core = FileSystem(
+        E, S, oserror=FuseOSError,
+        archive=archive, subpath=subpath,
+        readonly=readonly, append_only=append_only,
+        show_prev_dirent=show_prev_dirent)
     llf_opts = set(llfuse.default_options)
     if os.uname().sysname == 'Darwin' and 'nonempty' in llf_opts:
       # Not available on OSX.
