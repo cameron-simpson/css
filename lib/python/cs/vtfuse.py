@@ -111,12 +111,11 @@ def handler(method):
           return result
       except FuseOSError:
         raise
+      except OSError as e:
+        raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
-      except OSError as e:
-        error("raising FuseOSError from OSError: %s", e)
-        raise FuseOSError(e.errno) from e
       except Exception as e:
         exception(
             "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
@@ -159,7 +158,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if readonly is None:
       readonly = S.readonly
     self._vtfs = FileSystem(
-        E, S, oserror=FuseOSError,
+        E, S,
         archive=archive, subpath=subpath,
         readonly=readonly, append_only=append_only,
         show_prev_dirent=show_prev_dirent)

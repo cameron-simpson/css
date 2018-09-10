@@ -338,7 +338,6 @@ class FileSystem(object):
 
   def __init__(
       self, E, S,
-      oserror=None,
       archive=None,
       subpath=None,
       readonly=None,
@@ -366,7 +365,6 @@ class FileSystem(object):
     self.S = S
     if oserror is None:
       oserror = OSError
-    self.oserror = oserror
     self.archive = archive
     if archive is None:
       self._last_sync_state = None
@@ -448,7 +446,7 @@ class FileSystem(object):
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      raise self.oserror(errno.ENOENT)
+      raise OSError(errno.ENOENT)
     return E, P
 
   def _namei(self, path):
@@ -495,13 +493,13 @@ class FileSystem(object):
     '''
     if not P.isdir:
       error("parent (name=%r) not a directory, raising ENOTDIR", P.name)
-      raise self.oserror(errno.ENOTDIR)
+      raise OSError(errno.ENOTDIR)
     if name in P:
       if flags & O_EXCL:
-        raise self.oserror(errno.EEXIST)
+        raise OSError(errno.EEXIST)
       E = P[name]
     elif not flags & O_CREAT:
-      raise self.oserror(errno.ENOENT)
+      raise OSError(errno.ENOENT)
     else:
       E = FileDirent(name)
       P[name] = E
@@ -519,19 +517,19 @@ class FileSystem(object):
           for_read, for_write, for_append)
     if for_trunc and not for_write:
       error("O_TRUNC requires O_WRONLY or O_RDWR")
-      raise self.oserror(errno.EINVAL)
+      raise OSError(errno.EINVAL)
     if for_append and not for_write:
       error("O_APPEND requires O_WRONLY or O_RDWR")
-      raise self.oserror(errno.EINVAL)
+      raise OSError(errno.EINVAL)
     if (for_write and not for_append) and self.append_only:
       error("fs is append_only but no O_APPEND")
-      raise self.oserror(errno.EINVAL)
+      raise OSError(errno.EINVAL)
     if for_trunc and self.append_only:
       error("fs is append_only but O_TRUNC")
-      raise self.oserror(errno.EINVAL)
+      raise OSError(errno.EINVAL)
     if (for_write or for_append) and self.readonly:
       error("fs is readonly")
-      raise self.oserror(errno.EROFS)
+      raise OSError(errno.EROFS)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     inum = self.E2i(E)
     I = self._inodes[inum]
