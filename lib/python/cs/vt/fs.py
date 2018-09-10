@@ -395,9 +395,6 @@ class FileSystem(object):
     self._path_files = {}
     self._file_handles = []
     self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
-    # preassign inode 1, llfuse seems to presume it :-(
-    self.mnt_inum = 1
-    self._inodes._add_Dirent(self.mnt_inum, self.mntE)
 
   def close(self):
     ''' Close the FileSystem.

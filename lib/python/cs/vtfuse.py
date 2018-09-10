@@ -173,11 +173,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     if readonly is None:
       readonly = S.readonly
-    self._vtfs = FileSystem(
+    fs = self._vtfs = FileSystem(
         E,
         S=S, archive=archive, subpath=subpath,
         readonly=readonly, append_only=append_only,
         show_prev_dirent=show_prev_dirent)
+    # llfuse requires the mount point inode the be 1
+    fs[1] = fs.mntE
     llf_opts = set(llfuse.default_options)
     if os.uname().sysname == 'Darwin' and 'nonempty' in llf_opts:
       # Not available on OSX.
@@ -471,28 +473,27 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     fs = self._vtfs
     I = fs[parent_inode]
+    X("lookup: I=%s", I)
     I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search parent_inode
-    if parent_inode == fs.mnt_inum:
-      P = fs.mntE
-    else:
-      P = fs.i2E(parent_inode)
+    X("lookup2: I=%s", I)
+    P = I.E
     EA = None
     if name == '.':
       E = P
     elif name == '..':
-      if E is self._vtfs.mntE:
+      if E is fs.mntE:
         # directly stat the directory above the mountpoint
         try:
-          st = os.stat(dirname(self._vtfs.mnt_path))
+          st = os.stat(dirname(fs.mnt_path))
         except OSError as e:
           raise FuseOSError(e.errno)
         EA = self._stat_EntryAttributes(st)
       else:
         # otherwise use the parent with the FS
         E = P.parent
-    elif name == PREV_DIRENT_NAME and self._vtfs.show_prev_dirent:
+    elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
       E = P.prev_dirent
     else:
       try:
