@@ -98,7 +98,7 @@ def handler(method):
     arg_desc = [ repr(arg) for arg in a ]
     arg_desc.extend(
         "%s=%r" % (kw_name, kw_value)
-        for kw_name, kw_value in kw.items
+        for kw_name, kw_value in kw.items()
     )
     with Pfx(
         "%s.%s(%s)",
@@ -125,7 +125,7 @@ def handler(method):
       except BaseException as e:
         error("UNCAUGHT EXCEPTION")
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
-    return handle
+  return handle
 
 class DirHandle:
   ''' An "open" Dir: keeps a list of the names from open time
