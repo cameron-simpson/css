@@ -105,7 +105,7 @@ def handler(method):
         type(self).__name__, method.__name__, ','.join(arg_desc)
     ):
       try:
-        with self._vt_core.S:
+        with self._vtfs.S:
           result = method(self, *a, **kw)
           ## XP(" result = %r", result)
           return result
@@ -158,7 +158,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     if readonly is None:
       readonly = S.readonly
-    self._vt_core = FileSystem(
+    self._vtfs = FileSystem(
         E, S, oserror=FuseOSError,
         archive=archive, subpath=subpath,
         readonly=readonly, append_only=append_only,
@@ -189,12 +189,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return attrfunc
 
   def __str__(self):
-    return "<%s %s>" % (self.__class__.__name__, self._vt_core)
+    return "<%s %s>" % (self.__class__.__name__, self._vtfs)
 
   def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
     '''
-    S = self._vt_core.S
+    S = self._vtfs.S
     if fsname is None:
       fsname = str(S)
     # llfuse reads additional mount options from the fsname :-(
@@ -206,7 +206,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
-      self._vt_core.mnt_path = abspath(mnt)
+      self._vtfs.mnt_path = abspath(mnt)
       @logexc
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
@@ -223,7 +223,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   def _vt_i2E(self, inode):
     try:
-      E = self._vt_core.i2E(inode)
+      E = self._vtfs.i2E(inode)
     except ValueError as e:
       warning("access(inode=%d): %s", inode, e)
       raise FuseOSError(errno.EINVAL)
@@ -232,9 +232,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def _vt_EntryAttributes(self, E):
     ''' Compute an llfuse.EntryAttributes object from `E`.meta.
     '''
-    st = self._vt_core._Estat(E)
+    fs = self._vtfs
+    st = fs._Estat(E)
     EA = llfuse.EntryAttributes()
-    EA.st_ino = self._vt_core.E2i(E)
+    EA.st_ino = fs.E2i(E)
     ## EA.generation
     ## EA.entry_timeout
     ## EA.attr_timeout
@@ -242,10 +243,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
     EA.st_nlink = st.st_nlink
     uid = st.st_uid
     if uid is None or uid < 0:
-      uid = self._vt_core._fs_uid
+      uid = fs._fs_uid
     gid = st.st_gid
     if gid is None or gid < 0:
-      gid = self._vt_core._fs_gid
+      gid = fs._fs_gid
     EA.st_uid = uid
     EA.st_gid = gid
     ## EA.st_rdev
@@ -289,7 +290,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.access
     '''
     E = self._vt_i2E(inode)
-    return self._vt_core.access(E, mode, uid=ctx.uid, gid=ctx.gid)
+    return self._vtfs.access(E, mode, uid=ctx.uid, gid=ctx.gid)
 
   @handler
   def create(self, parent_inode, name_b, mode, flags, ctx):
@@ -297,18 +298,18 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.create
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    core = self._vt_core
-    I = core[parent_inode]
+    I = fs[parent_inode]
     I += 1
     name = self._vt_str(name_b)
     P = self._vt_i2E(parent_inode)
     if name in P:
       warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
               parent_inode, P, name)
-    fhndx = core.open2(P, name, flags|O_CREAT)
-    E = core._fh(fhndx).E
+    fhndx = fs.open2(P, name, flags|O_CREAT)
+    E = fs._fh(fhndx).E
     E.meta.chmod(mode)
     P[name] = E
     return fhndx, self._vt_EntryAttributes(E)
@@ -321,7 +322,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     # TODO: call self.forget with all kreffed inums?
     X("%s.destroy...", self)
-    self._vt_core.close()
+    self._vtfs.close()
     X("%s.destroy COMPLETE", self)
 
   @handler
@@ -330,7 +331,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.flush
     '''
-    FH = self._vt_core._fh(fh)
+    FH = self._vtfs._fh(fh)
     FH.flush()
 
   @handler
@@ -339,9 +340,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.forget
     '''
-    core = self._vt_core
+    fs = self._vtfs
     for inum, nlookup in ideltae:
-      I = core[inum]
+      I = fs[inum]
       I -= nlookup
 
   @handler
@@ -352,7 +353,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.fsync
     '''
-    self._vt_core._fh(fh).flush()
+    self._vtfs._fh(fh).flush()
 
   @handler
   def fsyncdir(self, fh, datasync):
@@ -369,7 +370,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.getattr
     '''
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     return self._vt_EntryAttributes(E)
 
   @handler
@@ -379,7 +380,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.getxattr
     '''
     # TODO: test for permission to access inode?
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     if xattr_name == XATTR_NAME_BLOCKREF:
       return E.block.encode()
     # bit of a hack: pretend all attributes exist, empty if missing
@@ -393,17 +394,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.link
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    core = self._vt_core
-    I = core[inode]
+    I = fs[inode]
     I += 1
     new_name = self._vt_str(new_name_b)
     # TODO: test for write access to new_parent_inode
-    Esrc = core.i2E(inode)
+    Esrc = fs.i2E(inode)
     if not Esrc.isfile and not Esrc.ishardlink:
       raise FuseOSError(errno.EPERM)
-    Pdst = core.i2E(new_parent_inode)
+    Pdst = fs.i2E(new_parent_inode)
     if new_name in Pdst:
       raise FuseOSError(errno.EEXIST)
     # the final component must be a directory in order to create the new link
@@ -412,15 +413,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if Esrc.ishardlink:
       # point Esrc at the master Dirent in ._inodes
       inum = Esrc.inum
-      Esrc = core.i2E(inum)
+      Esrc = fs.i2E(inum)
     else:
       # new hardlink, update the source
       # keep Esrc as the master
       # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
       # put EsrcLink into the enclosing Dir, replacing Esrc
       src_name = Esrc.name
-      inum0 = core.E2i(Esrc)
-      EsrcLink = core.hardlink_for(Esrc)
+      inum0 = fs.E2i(Esrc)
+      EsrcLink = fs.hardlink_for(Esrc)
       Esrc.parent[src_name] = EsrcLink
       inum = EsrcLink.inum
       if inum != inum0:
@@ -442,7 +443,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.listxattr
     '''
     # TODO: ctx allows to access inode?
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     xattrs = set(E.meta.listxattrs())
     xattrs.add(XATTR_NAME_BLOCKREF)
     return list(xattrs)
@@ -453,30 +454,30 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.lookup
     '''
-    core = self._vt_core
-    I = core[parent_inode]
+    fs = self._vtfs
+    I = fs[parent_inode]
     I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search parent_inode
-    if parent_inode == core.mnt_inum:
-      P = core.mntE
+    if parent_inode == fs.mnt_inum:
+      P = fs.mntE
     else:
-      P = core.i2E(parent_inode)
+      P = fs.i2E(parent_inode)
     EA = None
     if name == '.':
       E = P
     elif name == '..':
-      if E is self._vt_core.mntE:
+      if E is self._vtfs.mntE:
         # directly stat the directory above the mountpoint
         try:
-          st = os.stat(dirname(self._vt_core.mnt_path))
+          st = os.stat(dirname(self._vtfs.mnt_path))
         except OSError as e:
           raise FuseOSError(e.errno)
         EA = self._stat_EntryAttributes(st)
       else:
         # otherwise use the parent with the FS
         E = P.parent
-    elif name == PREV_DIRENT_NAME and self._vt_core.show_prev_dirent:
+    elif name == PREV_DIRENT_NAME and self._vtfs.show_prev_dirent:
       E = P.prev_dirent
     else:
       try:
@@ -500,14 +501,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.mkdir
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    core = self._vt_core
-    I = core[parent_inode]
+    I = fs[parent_inode]
     I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search and write parent_inode
-    P = core.i2E(parent_inode)
+    P = fs.i2E(parent_inode)
     if not P.isdir:
       error("parent (%r) not a directory, raising ENOTDIR", P.name)
       raise FuseOSError(errno.ENOTDIR)
@@ -525,13 +526,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.mknod
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    core = self._vt_core
-    I = core[parent_inode]
+    I = fs[parent_inode]
     I += 1
     name = self._vt_str(name_b)
-    P = core.i2E(parent_inode)
+    P = fs.i2E(parent_inode)
     if not P.isdir:
       error("parent (%r) not a directory, raising ENOTDIR", P.name)
       raise FuseOSError(errno.ENOTDIR)
@@ -560,9 +561,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
       flags &= ~(O_CREAT|O_EXCL)
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
-    if (for_write or for_append) and self._vt_core.readonly:
+    if (for_write or for_append) and self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
-    fhndx = self._vt_core.open(E, flags)
+    fhndx = self._vtfs.open(E, flags)
     if for_write or for_append:
       E.changed = True
     return fhndx
@@ -574,10 +575,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.opendir
     '''
     # TODO: check for permission to read
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     if not E.isdir:
       raise FuseOSError(errno.ENOTDIR)
-    fs = self._vt_core
+    fs = self._vtfs
     OD = DirHandle(fs, E)
     return fs._new_file_handle_index(OD)
 
@@ -588,7 +589,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
     ##X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
-    FH = self._vt_core._fh(fhndx)
+    FH = self._vtfs._fh(fhndx)
     chunks = []
     while size > 0:
       data = FH.read(size, off)
@@ -606,14 +607,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readdir
     '''
     # TODO: if rootdir, generate '..' for parent of mount
-    FH = self._vt_core._fh(fhndx)
+    FH = self._vtfs._fh(fhndx)
     def entries():
       ''' Generator to yield directory entries.
       '''
       o = off
       D = FH.D
       fs = FH.fs
-      S = self._vt_core.S
+      S = self._vtfs.S
       names = FH.names
       while True:
         try:
@@ -625,11 +626,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
               E = D[name]
           elif o == 1:
             name = '..'
-            if D is self._vt_core.mntE:
+            if D is self._vtfs.mntE:
               try:
-                st = os.stat(dirname(self._vt_core.mnt_path))
+                st = os.stat(dirname(self._vtfs.mnt_path))
               except OSError as e:
-                warning("os.stat(%r): %s", dirname(self._vt_core.mnt_path), e)
+                warning("os.stat(%r): %s", dirname(self._vtfs.mnt_path), e)
               else:
                 EA = self._stat_EntryAttributes(st)
             else:
@@ -697,7 +698,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.readlink
     '''
     # TODO: check for permission to read the link?
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     if not E.issym:
       raise FuseOSError(errno.EINVAL)
     return self._vt_bytes(E.pathref)
@@ -709,7 +710,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.release
     '''
     with Pfx("_fh_close(fhndx=%d)", fhndx):
-      self._vt_core._fh_close(fhndx)
+      self._vtfs._fh_close(fhndx)
 
   @handler
   def releasedir(self, fhndx):
@@ -717,7 +718,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.releasedir
     '''
-    self._vt_core._fh_remove(fhndx)
+    self._vtfs._fh_remove(fhndx)
 
   @handler
   def removexattr(self, inode, xattr_name, ctx):
@@ -725,7 +726,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.removexattr
     '''
-    if self._vt_core.readonly:
+    if self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
     # TODO: test for inode ownership?
     if xattr_name == XATTR_NAME_BLOCKREF:
@@ -733,7 +734,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       # feels like that would be a bug workaround
       X("removexattr(inode=%s,xattr_name=%r)", inode, xattr_name)
       raise FuseOSError(errno.EINVAL)
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     meta = E.meta
     try:
       meta.delxattr(xattr_name)
@@ -746,17 +747,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.rename
     '''
-    if self._vt_core.readonly:
+    if self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
     name_old = self._vt_str(name_old_b)
     name_new = self._vt_str(name_new_b)
-    Psrc = self._vt_core.i2E(parent_inode_old)
+    Psrc = self._vtfs.i2E(parent_inode_old)
     if name_old not in Psrc:
       raise FuseOSError(errno.ENOENT)
-    if not self._vt_core.access(Psrc, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    if not self._vtfs.access(Psrc, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
-    Pdst = self._vt_core.i2E(parent_inode_new)
-    if not self._vt_core.access(Pdst, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    Pdst = self._vtfs.i2E(parent_inode_new)
+    if not self._vtfs.access(Pdst, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     E = Psrc[name_old]
     del Psrc[name_old]
@@ -769,11 +770,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.rmdir
     '''
-    if self._vt_core.readonly:
+    if self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
-    P = self._vt_core.i2E(parent_inode)
-    if not self._vt_core.access(P, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    P = self._vtfs.i2E(parent_inode)
+    if not self._vtfs.access(P, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]
@@ -794,9 +795,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     # TODO: test CTX for permission to chmod/chown/whatever
     # TODO: sanity check fields for other update_* flags?
-    if self._vt_core.readonly:
+    if self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     with Pfx(E):
       M = E.meta
       if fields.update_atime:
@@ -832,13 +833,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         TODO: x-vt-* control/query psuedo attributes.
     '''
-    if self._vt_core.readonly:
+    if self._vtfs.readonly:
       raise FuseOSError(errno.EROFS)
     # TODO: check perms (ownership?)
     if xattr_name == XATTR_NAME_BLOCKREF:
       # TODO: support this as a "switch out the content action"?
       raise FuseOSError(errno.EINVAL)
-    E = self._vt_core.i2E(inode)
+    E = self._vtfs.i2E(inode)
     E.meta.setxattr(xattr_name, value)
 
   @handler
@@ -875,19 +876,19 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.symlink
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
     with Pfx(
         "SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r",
         parent_inode, name_b, target_b, ctx
     ):
-      core = self._vt_core
-      I = core[parent_inode]
+      I = fs[parent_inode]
       I += 1
       name = self._vt_str(name_b)
       target = self._vt_str(target_b)
       # TODO: check search/write on P
-      P = core.i2E(parent_inode)
+      P = fs.i2E(parent_inode)
       if not P.isdir:
         raise FuseOSError(errno.ENOTDIR)
       if name in P:
@@ -902,11 +903,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.unlink
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     # TODO: check search/write on P
-    P = self._vt_core.i2E(parent_inode)
+    P = fs.i2E(parent_inode)
     if not P.isdir:
       raise FuseOSError(errno.ENOTDIR)
     try:
@@ -920,9 +922,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.write
     '''
-    if self._vt_core.readonly:
+    fs = self._vtfs
+    if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    FH = self._vt_core._fh(fhndx)
+    FH = fs._fh(fhndx)
     written = FH.write(buf, off)
     if written != len(buf):
       warning("only %d bytes written, %d supplied", written, len(buf))
