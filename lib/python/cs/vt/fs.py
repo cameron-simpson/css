@@ -416,7 +416,15 @@ class FileSystem(object):
   def __getitem__(self, inum):
     ''' Lookup inode numbers.
     '''
-    return self._inodes[inum]
+    I = self._inodes[inum]
+    X("__getitem__(%d)=>%s", inum, I)
+    return I
+
+  def __setitem__(self, inum, E):
+    ''' Associate a specific inode number with a Dirent.
+    '''
+    X("__setitem__(%d,%s)", inum, E)
+    self._inodes._add_Dirent(inum, E)
 
   def _sync(self):
     with Pfx("_sync"):
