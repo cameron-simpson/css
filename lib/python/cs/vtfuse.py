@@ -158,10 +158,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
       readonly = S.readonly
     self._vt_core = FileSystem(E, S, oserror=FuseOSError, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, show_prev_dirent=show_prev_dirent)
     llf_opts = set(llfuse.default_options)
-    # Not available on OSX.
-    # TODO: detect 'darwin' and make conditional
-    if 'nonempty' in llf_opts:
-      warning("llf_opts=%r: drop 'nonempty' option, not available on OSX",
+    if os.uname().sysname == 'Darwin' and 'nonempty' in llf_opts:
+      # Not available on OSX.
+      warning("llf_opts=%r: drop 'nonempty' option, not available on Darwin",
               sorted(llf_opts))
       llf_opts.discard('nonempty')
     if options is not None:
