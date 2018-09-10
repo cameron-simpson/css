@@ -127,6 +127,7 @@ class Inode(NS):
           "Inode.__iadd__(%d, delta=%s): expected delta >= 1"
           % (self.inum, delta))
     self.krefcount += delta
+    return self
 
   def __isub__(self, delta):
     ''' Decrement krefcount.
@@ -145,6 +146,7 @@ class Inode(NS):
       ##    % (self.inum, delta, self.krefcount))
     else:
       self.krefcount -= delta
+    return self
 
 class Inodes(object):
   ''' Inode information for a filesystem.
