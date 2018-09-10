@@ -363,8 +363,6 @@ class FileSystem(object):
       readonly = S.readonly
     self.E = E
     self.S = S
-    if oserror is None:
-      oserror = OSError
     self.archive = archive
     if archive is None:
       self._last_sync_state = None
@@ -442,7 +440,7 @@ class FileSystem(object):
     return resolve(self.mntE, path)
 
   def _namei2(self, path):
-    ''' Look up path. Raise oserror(ENOENT) if missing. Return Dirent, parent.
+    ''' Look up path. Raise OSError(ENOENT) if missing. Return Dirent, parent.
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
@@ -450,7 +448,7 @@ class FileSystem(object):
     return E, P
 
   def _namei(self, path):
-    ''' Look up path. Raise oserror(ENOENT) if missing. Return Dirent.
+    ''' Look up path. Raise OSError(ENOENT) if missing. Return Dirent.
     '''
     E, _ = self._namei2(path)
     return E
