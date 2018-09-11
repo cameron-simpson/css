@@ -35,6 +35,14 @@ class Config:
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
       It is modelled on a .ini file, with named clauses each containing named values.
+
+      Parameters:
+      * `config_map`: either a mapping of mappings: `{clause_name: {param: value}}`
+        or the filename of a file in `.ini` format
+      * `environ`: optional environment mapp for `$varname` substitution.
+        Default: `os.environ`
+      * `runstate`: a optional `cs.resources.RunState` to share
+        with the various Stores
   '''
 
   def __init__(self, config_map, environ=None, runstate=None):
