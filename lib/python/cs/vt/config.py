@@ -121,7 +121,8 @@ class Config:
       return ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
 
   def Stores_from_spec(self, store_spec):
-    ''' Parse a colon separated list of Store specifications, return a list of Stores.
+    ''' Parse a colon separated list of Store specifications,
+        return a list of Stores.
     '''
     store_specs = list(parse_store_specs(store_spec))
     if not store_specs:
