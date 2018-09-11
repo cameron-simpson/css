@@ -21,6 +21,7 @@ import threading
 from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
+from cs.mappings import StackableValues
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.seq import isordered
@@ -33,59 +34,60 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-class _Defaults(threading.local):
-  ''' Per-thread default store stack.
+class _Defaults(threading.local, StackableValues):
+  ''' Per-thread default context stack.
+
       A Store's __enter__/__exit__ methods push/pop that store
-      from the default.
+      from the `.S` attribute.
   '''
+
   _Ss = []  # global stack of fallback Store values
+
   def __init__(self):
     threading.local.__init__(self)
-    self.Ss = []
+    StackableValues.__init__(self)
     self.runstate = RunState()
-  @prop
-  @logexc
-  def S(self):
-    ''' The topmost per-Thread Store, or the topmost global Store.
+
+  def _fallback(self, key):
+    ''' Fallback function for empty stack.
     '''
-    Ss = self.Ss
-    if Ss:
-      return Ss[-1]
-    warning("no per-Thread Store stack, using the global stack")
-    stack_dump()
-    Ss = self._Ss
-    if Ss:
-      return Ss[-1]
-    error("%s: no per-Thread defaults.S and no global stack, returning None", self)
-    return None
+    if key == 'S':
+      warning("no per-Thread Store stack, using the global stack")
+      stack_dump()
+      Ss = self._Ss
+      if Ss:
+        return Ss[-1]
+      error("%s: no per-Thread defaults.S and no global stack, returning None", self)
+      return None
+    raise ValueError("no fallback for %r" % (key,))
+
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
     newS.open()
-    self.Ss.append(newS)
+    self.push('S', newS)
+
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
-    oldS = self.Ss.pop()
+    oldS = self.pop('S')
     oldS.close()
     return oldS
+
   def push_Ss(self, newS):
     ''' Push a new Store onto the global stack.
     '''
     self._Ss.append(newS)
+
   def pop_Ss(self):
     ''' Pop and return the topmost Store from the global stack.
     '''
     return self._Ss.pop()
 
-  @contextmanager
   def push_runstate(self, new_runstate):
     ''' Context manager to push a new RunState instance onto the per-Thread stack.
     '''
-    old_runstate = self.runstate
-    self.runstate = new_runstate
-    yield new_runstate
-    self.runstate = old_runstate
+    return self.stack('runstate', new_runstate)
 
 defaults = _Defaults()
 
