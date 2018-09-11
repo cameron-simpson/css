@@ -149,11 +149,26 @@ class _Dirent(Transcriber):
   def __init__(
       self,
       type_, name,
+      *,
       meta=None,
       uuid=None,
       parent=None,
       prevblock=None
   ):
+    ''' Initialise a _Dirent.
+
+        Parameters:
+        * `type_`: the DirentType enum
+        * `name`: the Dirent's name
+        * `meta`: optional metadata
+        * `uuid`: optional identifying UUID;
+          *note*: for IndirectBlocks this is a reference to another Dirent's
+          UUID.
+        * `parent`: optional parent Dirent
+        * `prevblock`: optional Block whose contents are the binary
+          transcription of this Dirent's previous state - another
+          Dirent
+    '''
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
