@@ -59,6 +59,7 @@ class DirentFlags(IntFlag):
   NOBLOCK = 0x04        # has no Block reference
   HASUUID = 0x08        # has a UUID
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
+  EXTENDED = 0x20       # extended BSData field
 
 def Dirents_from_data(data):
   ''' Decode Dirents from `data`, yield each in turn.
@@ -79,6 +80,10 @@ class DirentRecord(PacketField):
             [uuid:16]
             blockref
             [blockref(pref_dirent)]
+            [BSData(extended_data)]
+
+      Note that all additional future implementation detail needs
+      to go in the metadata or the optional extended_data.
   '''
 
   @classmethod
@@ -88,26 +93,41 @@ class DirentRecord(PacketField):
     type_ = BSUInt.value_from_buffer(bfr)
     flags = DirentFlags(BSUInt.value_from_buffer(bfr))
     if flags & DirentFlags.HASNAME:
+      flags ^= DirentFlags.HASNAME
       name = BSString.value_from_buffer(bfr)
     else:
       name = ""
     if flags & DirentFlags.HASMETA:
+      flags ^= DirentFlags.HASMETA
       metatext = BSString.value_from_buffer(bfr)
     else:
       metatext = None
     uu = None
     if flags & DirentFlags.HASUUID:
+      flags ^= DirentFlags.HASUUID
       uu = UUID(bytes=bfr.take(16))
     if flags & DirentFlags.NOBLOCK:
+      flags ^= DirentFlags.NOBLOCK
       block = None
     else:
       block = BlockRecord.value_from_buffer(bfr)
     if flags & DirentFlags.HASPREVDIRENT:
+      flags ^= DirentFlags.HASPREVDIRENT
       prev_dirent_blockref = BlockRecord.value_from_buffer(bfr)
     else:
       prev_dirent_blockref = None
+    if flags & DirentFlags.EXTENDED:
+      flags ^= DirentFlags.EXTENDED
+      extended_data = BSData.value_from_buffer(bfr)
+    else:
+      extended_data = None
+    if flags:
+      warning(
+          "%s.value_from_buffer: unexpected extra flags: 0x%02x",
+          cls.__name__, flags)
     E = _Dirent.from_components(type_, name, meta=metatext, uuid=uu, block=block)
     E._prev_dirent_blockref = prev_dirent_blockref
+    E.ingest_extended_data(extended_data)
     return E
 
   @staticmethod
@@ -125,6 +145,9 @@ class DirentRecord(PacketField):
       flags |= DirentFlags.NOBLOCK
     if E._prev_dirent_blockref is not None:
       flags |= DirentFlags.HASPREVDIRENT
+    extended_data = E.get_extended_data()
+    if extended_data:
+      flags |= DirentFlags.EXTEND
     yield BSUInt.transcribe_value(E.type)
     yield BSUInt.transcribe_value(flags)
     if flags & DirentFlags.HASNAME:
@@ -141,6 +164,8 @@ class DirentRecord(PacketField):
     if flags & DirentFlags.HASPREVDIRENT:
       assert isinstance(E._prev_dirent_blockref, _Block)
       yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
+    if flags & DirentFlags.EXTEND:
+      yield extended_data
 
 class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
@@ -237,6 +262,19 @@ class _Dirent(Transcriber):
         Returns the Dirent and the new offset.
     '''
     return DirentRecord.value_from_bytes(data, offset=offset)
+
+  def ingest_extended_data(self, extended_data):
+    ''' The basic _Dirent subclasses do not use extended data.
+    '''
+    if extended_data:
+      raise ValueError(
+          "expected extended_data to be None or empty, got: %r",
+          extended_data)
+
+  def get_extended_data(self):
+    ''' The basic _Dirent subclasses do not use extended data.
+    '''
+    return None
 
   def __bytes__(self):
     ''' Serialise this Dirent to bytes.
