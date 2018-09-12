@@ -150,15 +150,18 @@ class Inode(NS):
 
 class Inodes(object):
   ''' Inode information for a filesystem.
+
+      This consists of:
+      - a Range denoting allocated inode numbers
+      - a mapping of inode numbers to Dirents
+      - a mapping of UUIDs to Dirents
   '''
 
   def __init__(self, fs, inodes_datatext=None):
     self.fs = fs                # main filesystem
     self._allocated = Range()   # range of allocated inode numbers
-    # mapping from inum->Inode record,
-    # for all inodes which have been accessed
-    # or instantiated
-    self._inode_map = {}
+    self._by_inum = {}
+    self._by_uuid = {}
     if inodes_datatext is None:
       # initialise an empty Dir
       self._hardlinks_dir, self._hardlinked = Dir('inodes'), Range()
@@ -229,11 +232,11 @@ class Inodes(object):
     if inum in self._allocated:
       raise ValueError("inum {inum} already allocated")
     try:
-      E = self._inode_map[inum]
+      E = self._by_inum[inum]
     except KeyError:
       I = Inode(inum, E)
       self._allocated.add(inum)
-      self._inode_map[inum] = I
+      self._by_inum[inum] = I
       return I
     raise ValueError(f"inum {inum} already in _inode_map (but not in _allocated?)")
 
@@ -269,18 +272,18 @@ class Inodes(object):
   def inode(self, inum):
     ''' The inum->Inode mapping, computed on demand.
     '''
-    I = self._inode_map.get(inum)
+    I = self._by_inum.get(inum)
     if I is None:
       # not in the cache, must be in the hardlink tree
       E = self._get_hardlink_Dirent(inum)
       I = Inode(inum, E)
-      self._inode_map[inum] = I
+      self._by_inum[inum] = I
     return I
 
   __getitem__ = inode
 
   def __contains__(self, inum):
-    return inum in self._inode_map
+    return inum in self._by_inum
 
   def hardlink_for(self, E):
     ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
@@ -297,7 +300,7 @@ class Inodes(object):
     self._add_hardlink_Dirent(inum, E)
     self._hardlinked.add(inum)
     H = HardlinkDirent.to_inum(inum, E.name)
-    self._inode_map[inum] = Inode(inum, E)
+    self._by_inum[inum] = Inode(inum, E)
     E.meta.nlink = 1
     return H
 
