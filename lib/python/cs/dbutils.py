@@ -38,6 +38,11 @@ class Params(object):
     self.params = []
     self.values = []
 
+  def __len__(self):
+    ''' The length of a Params is the number of paramaters.
+    '''
+    return len(self.params)
+
   def add(self, name, value):
     ''' Add a value with a name basis; return the parameter placeholder.
     '''
@@ -217,7 +222,7 @@ class Table(object):
         for row in self.select(*where_argv, where=where))
 
   def rows_by_value(self, column_names, *values):
-    ''' Return rows which the specified column values.
+    ''' Return rows which have the specified column values.
     '''
     if isinstance(column_names, str):
       column_names = (column_names,)
@@ -237,8 +242,79 @@ class Table(object):
       else:
         conditions.append(
             '`%s` = %s' % (column_name, P.add(column_name, value)))
-    where_clause = ' AND '.join(conditions)
-    return self.rows(where_clause, *P.values)
+    if len(P) < 900:
+      # arbitrary limit based on SQLite3 default limit of 999
+      where_clause = ' AND '.join(conditions)
+      return self.rows(where_clause, *P.values)
+    # perform a series of SQL queries and set intersections
+    id_set = None
+    # partition the conditions into scalars and vectors
+    scalar_criteria = []
+    vector_criteria = []
+    for column_name, value in zip(column_names, values):
+      if isinstance(value, (list, tuple, set)):
+        vector_criteria.append( (column_name, value) )
+      else:
+        scalar_criteria.append( (column_name, value) )
+    # run the scalar criteria first
+    if scalar_criteria:
+      P = self.new_params()
+      conditions = []
+      for column_name, value in scalar_criteria:
+        if value is None:
+          conditions.append(
+              '`%s` IS NULL' % (column_name,))
+        else:
+          conditions.append(
+              '`%s` = %s' % (column_name, P.add(column_name, value)))
+      where_clause = ' AND '.join(conditions)
+      row_ids = [
+          row[0]
+          for row in self.select(
+              *P.values,
+              column_names=(self.id_column,),
+              where=where_clause)
+      ]
+      if not row_ids:
+        # no matches
+        return ()
+      id_set = set(row_ids)
+    else:
+      id_set = None
+    for column_name, value in vector_criteria:
+      if isinstance(value, set):
+        value = list(value)
+      all_row_ids = []
+      for offset in range(0, len(value), 900):
+        values = value[offset:offset+900]
+        P = self.new_params()
+        P.vadd(column_name, values)
+        all_row_ids.extend(
+            row[0]
+            for row in self.select(
+                *P.values,
+                column_names=(self.id_column,),
+                where='`%s` in (%s)' % (column_name, ','.join(P.params)))
+        )
+      if not all_row_ids:
+        # no matches
+        return ()
+      all_row_ids = set(all_row_ids)
+      if id_set is None:
+        id_set = all_row_ids
+      else:
+        id_set &= all_row_ids
+        if not id_set:
+          return ()
+    row_ids = sorted(id_set)
+    rows = []
+    for offset in range(0, len(row_ids), 900):
+      values = value[offset:offset+900]
+      P = self.new_params()
+      P.vadd(column_name, values)
+      where_clause = '`%s` in (%s)' % (self.id_column, ','.join(P.params))
+      rows.extend(self.rows(where_clause, *P.values))
+    return rows
 
   def unique_row_where(self, **kw):
     ''' Fetch a row uniquely identified by the keyword paramaters
