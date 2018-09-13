@@ -735,12 +735,15 @@ class iPhoto(O):
     kw = self.keyword_table.get(lc_kwname)
     if kw:
       return kw,
-    kws = []
-    for kw in self.keywords:
-      words = kw.name.split()
-      if words and lc_kwname == words[0].lower():
-        kws.append(kw)
-    return kws
+    for sep in None, '/', '.':
+      kws = []
+      for kw in self.keywords:
+        words = kw.name.split(sep)
+        if words and lc_kwname == words[0].lower():
+          kws.append(kw)
+      if kws:
+        return kws
+    return ()
 
   def keyword(self, kwname):
     ''' Try to match a single keyword.
