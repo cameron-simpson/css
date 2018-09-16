@@ -221,11 +221,12 @@ class _Dirent(Transcriber):
     self.parent = parent
 
   def __repr__(self):
-    return "%s:%s(%s,%s,%s)" % (
+    return "%s:%s:%s(%s:%s,%s)" % (
         self.__class__.__name__,
         id(self),
         self.type,
         self.name,
+        self.uuid,
         self.meta
     )
 
@@ -332,6 +333,9 @@ class _Dirent(Transcriber):
     u = self.uuid
     if u is None:
       u = self.uuid = uuid4()
+      parent = self.parent
+      if parent:
+        parent.changed = True
     return u
 
   def pathto(self, R=None):
