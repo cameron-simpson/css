@@ -358,7 +358,8 @@ class FileSystem(object):
         raise ValueError("subpath %r is not a directory" % (subpath,))
       self.mntE = mntE
     else:
-      self.mntE = E
+      mntE = E
+    self.mntE = mntE
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
