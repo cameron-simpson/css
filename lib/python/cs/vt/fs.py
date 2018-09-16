@@ -12,6 +12,7 @@ import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
+from uuid import UUID
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
@@ -103,49 +104,34 @@ class FileHandle:
 
 class Inode(NS):
   ''' An Inode associates an inode number and a Dirent.
+
+      Attributes:
+      * `inum`: the inode number
+      * `E`: the primary Dirent
+      * `refcount`: the number of _indirect_ references to this Dirent;
+        if this is >0 the uuid->Dirent mapping must be persisted across mounts
   '''
 
   def __init__(self, inum, E):
     NS.__init__(self)
     self.inum = inum
-    try:
-      Einum = E.inum
-    except AttributeError:
-      E.inum = inum
-    else:
-      raise AttributeError(
-          "Inode.__init__(inum=%d,...): Dirent %s already has a .inum: %d"
-          % (inum, E, Einum))
     self.E = E
-    self.krefcount = 0
+    self.refcount = 0
 
-  def __iadd__(self, delta):
-    ''' Increment krefcount.
+  def __iadd__(self, incr):
+    ''' Advance the reference count.
     '''
-    if delta < 1:
-      raise ValueError(
-          "Inode.__iadd__(%d, delta=%s): expected delta >= 1"
-          % (self.inum, delta))
-    self.krefcount += delta
+    if incr <= 0:
+      raise ValueError("increments must be positive: %s" % (incr,))
+    self.refcount += incr
     return self
 
-  def __isub__(self, delta):
-    ''' Decrement krefcount.
+  def __isub__(self, decr):
+    ''' Retard the reference count.
     '''
-    if delta < 1:
-      raise ValueError(
-          "Inode.__isub__(%d, delta=%s): expected delta >= 1"
-          % (self.inum, delta))
-    if self.krefcount < delta:
-      error(
-          "Inode%d.__isub__(delta=%s): krefcount(%d) < delta"
-          % (self.inum, delta, self.krefcount))
-      self.krefcount = 0
-      ##raise ValueError(
-      ##    "Inode.__isub__(%d, delta=%s): krefcount(%d) < delta"
-      ##    % (self.inum, delta, self.krefcount))
-    else:
-      self.krefcount -= delta
+    if decr <= 0:
+      raise ValueError("decrements must be positive: %s" % (incr,))
+    self.refcount -= incr
     return self
 
 class Inodes(object):
@@ -153,8 +139,16 @@ class Inodes(object):
 
       This consists of:
       - a Range denoting allocated inode numbers
-      - a mapping of inode numbers to Dirents
-      - a mapping of UUIDs to Dirents
+      - a mapping of inode numbers to Inodes
+      - a mapping of UUIDs to Inodes
+      - a mapping of Dirents to Inodes
+
+      Once an Inode is allocated it will have a reference by inum
+      and Dirent. Since a Dirent need not have a UUID, it may not
+      be mapped by UUID. The UUID map will be updated if `.add` is
+      called later when the Dirent has a UUID, and clients should
+      call `.add` to ensure that mapping if they rely on a Dirent's
+      UUID, such as when making an IndirectDirent.
   '''
 
   def __init__(self, fs, inodes_datatext=None):
@@ -162,6 +156,7 @@ class Inodes(object):
     self._allocated = Range()   # range of allocated inode numbers
     self._by_inum = {}
     self._by_uuid = {}
+    self._by_dirent = {}
     if inodes_datatext is None:
       # initialise an empty Dir
       self._hardlinks_dir, self._hardlinked = Dir('inodes'), Range()
@@ -171,6 +166,90 @@ class Inodes(object):
       self._hardlinks_dir, self._hardlinked \
           = self.decode_inode_data(inodes_datatext, self._allocated)
     self._lock = RLock()
+
+  def persist(self):
+    ''' Generator yielding the Inodes which should be persisted
+        across mounts.
+
+        This consists of those Inodes with a refcount > 0, as there
+        are IndirectDirents referring to these Inodes.
+    '''
+    for I in self._by_inum.values():
+      if I.refcount > 0:
+        yield I
+
+  def _new_inum(self):
+    ''' Allocate a new Inode number.
+    '''
+    allocated = self._allocated
+    if allocated:
+      span0 = allocated.span0
+      inum = span0.end
+    else:
+      inum = 1
+    allocated.add(inum)
+    X("ALLOCATED INUM %d, allocated=%s", inum, allocated)
+    return inum
+
+  def add(self, E, inum=None):
+    ''' Add the Dirent `E` to the Inodes, return the new Inode.
+        It is not an error to add the same Dirent more than once.
+    '''
+    with Pfx("Inodes.add(E=%s)", E):
+      if E.isindirect:
+        raise ValueError("indirect Dirents may not become Inodes")
+      if inum is not None and inum < 1:
+        raise ValueError("inum must be >= 1, got: %d" % (inum,))
+      uu = E.uuid
+      I = self._by_dirent.get(E)
+      if I:
+        assert I.E is E
+        if inum is not None and I.inum != inum:
+          raise ValueError(
+              "inum=%d: Dirent already has an Inode with a different inum: %s"
+              % (inum, I))
+        if uu:
+          # opportunisticly update UUID mapping
+          # in case the Dirent has acquired a UUID
+          I2 = self._by_uuid.get(uu)
+          if I2:
+            assert I2.E is E
+          else:
+            self._by_uuid[uu] = E
+        return I
+      # unknown Dirent, create new Inode
+      if inum is None:
+        inum = self._new_inum()
+      else:
+        I = self._by_inum.get(inum)
+        if I:
+          raise ValueError("inum %d already allocated: %s" % (inum, I))
+      I = Inode(inum, E)
+      self._by_dirent[E] = I
+      self._by_inum[inum] = I
+      if uu:
+        self._by_uuid[uu] = I
+      return I
+
+  def __getitem__(self, ndx):
+    if isinstance(ndx, int):
+      try:
+        I = self._by_inum[ndx]
+      except KeyError as e:
+        raise IndexError("unknown inode number %d: %s" % (ndx, e))
+      return I
+    if isinstance(ndx, UUID):
+      return self._by_uuid[ndx]
+    if isinstance(ndx, _Dirent):
+      return self._by_dirent[ndx]
+    raise TypeError("cannot deference indices of type %r" % (type(ndx),))
+
+  def __contains__(self, inum):
+    try:
+      I = self[ndx]
+    except (KeyError, IndexError):
+      return False
+    return True
 
   @staticmethod
   def decode_inode_data(idatatext, allocated):
@@ -215,118 +294,6 @@ class Inodes(object):
     # this works because all leading bytes have a high bit, avoiding
     # collision with final bytes
     return [ str(b) for b in put_bs(inum) ]
-
-  def new(self, E):
-    ''' Allocate a new Inode for the supplied Dirent `E`; return the Inode.
-    '''
-    try:
-      Einum = E.inum
-    except AttributeError:
-      span0 = self._allocated.span0
-      next_inum = span0.end
-      return self._add_Dirent(next_inum, E)
-    raise ValueError("%s: already has .inum=%d" % (E, Einum))
-
-  @locked
-  def _add_Dirent(self, inum, E):
-    if inum in self._allocated:
-      raise ValueError("inum {inum} already allocated")
-    try:
-      E = self._by_inum[inum]
-    except KeyError:
-      I = Inode(inum, E)
-      self._allocated.add(inum)
-      self._by_inum[inum] = I
-      return I
-    raise ValueError(f"inum {inum} already in _inode_map (but not in _allocated?)")
-
-  def _get_hardlink_Dirent(self, inum):
-    ''' Retrieve the Dirent associated with `inum` from the hard link directory.
-        Raises KeyError if the lookup fails.
-    '''
-    D = self._hardlinks_dir
-    pathelems = self._ipathelems(inum)
-    lastelem = pathelems.pop()
-    for elem in pathelems:
-      D = D[elem]
-    return D[lastelem]
-
-  def _add_hardlink_Dirent(self, inum, E):
-    ''' Add the Dirent `E` to the hard link directory.
-    '''
-    if E.isdir:
-      raise RuntimeError("cannot save Dir to hard link tree: %s" % (E,))
-    D = self._hardlinks_dir
-    pathelems = self._ipathelems(inum)
-    lastelem = pathelems.pop()
-    for elem in pathelems:
-      try:
-        D = D.chdir(elem)
-      except KeyError:
-        D = D.mkdir(elem)
-    if lastelem in D:
-      raise RuntimeError(f"inum {inum} already in hard link dir")
-    D[lastelem] = E
-
-  @locked
-  def inode(self, inum):
-    ''' The inum->Inode mapping, computed on demand.
-    '''
-    I = self._by_inum.get(inum)
-    if I is None:
-      # not in the cache, must be in the hardlink tree
-      E = self._get_hardlink_Dirent(inum)
-      I = Inode(inum, E)
-      self._by_inum[inum] = I
-    return I
-
-  __getitem__ = inode
-
-  def __contains__(self, inum):
-    return inum in self._by_inum
-
-  def hardlink_for(self, E):
-    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
-    '''
-    if E.ishardlink:
-      raise RuntimeError("attempt to make hardlink for existing hardlink E=%s" % (E,))
-    if not E.isfile:
-      raise ValueError("may not hardlink Dirents of type %s" % (E.type,))
-    # use the inode number of the source Dirent
-    inum = self.fs.E2i(E)
-    if inum in self._hardlinked:
-      error("hardlink_for: inum %d of %s already in hardlinked: %s",
-            inum, E, self._hardlinked)
-    self._add_hardlink_Dirent(inum, E)
-    self._hardlinked.add(inum)
-    H = HardlinkDirent.to_inum(inum, E.name)
-    self._by_inum[inum] = Inode(inum, E)
-    E.meta.nlink = 1
-    return H
-
-  @locked
-  def inum_for_Dirent(self, E):
-    ''' Allocate a new inode number for Dirent `E` and return it.
-    '''
-    allocated = self._allocated
-    inum = None
-    for span in allocated.spans():
-      if span.start >= 2:
-        inum = span.start - 1
-        break
-    if inum is None:
-      inum = allocated.end
-    self._add_Dirent(inum, E)
-    allocated.add(inum)
-    return inum
-
-  @locked
-  def dirent(self, inum):
-    ''' Locate the Dirent for inode `inum`, return it.
-        Raises ValueError if the `inum` is unknown.
-    '''
-    with Pfx("dirent(%d)", inum):
-      return self[inum].E
 
 class FileSystem(object):
   ''' The core filesystem functionality supporting FUSE operations
@@ -397,7 +364,20 @@ class FileSystem(object):
     self._lock = S._lock
     self._path_files = {}
     self._file_handles = []
-    self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
+    inodes = self._inodes = Inodes(self)
+    self[1] = mntE
+    old_inodes = E.meta.get("fs_inode_dirents")
+    if old_inodes:
+      offset = 0
+      while offset < len(old_inodes):
+        if old_inodes[offset] == ',':
+          offset += 1
+          continue
+        IE, offset = _Dirent.from_str(old_inodes, offset)
+        I = inodes.add(IE)
+        X("added old inode %s", I)
+    X("FileSystem mntE:")
+    dump_Dirent(mntE)
 
   def close(self):
     ''' Close the FileSystem.
@@ -424,7 +404,7 @@ class FileSystem(object):
     ''' Associate a specific inode number with a Dirent.
     '''
     X("__setitem__(%d,%s)", inum, E)
-    self._inodes._add_Dirent(inum, E)
+    self._inodes.add(E, inum)
 
   def _sync(self):
     with Pfx("_sync"):
@@ -432,7 +412,9 @@ class FileSystem(object):
         raise RuntimeError("RUNTIME: defaults.S is None!")
       E = self.E
       # update the inode table state
-      E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
+      E.meta['fs_inode_dirents'] = ','.join(
+          str(I.E) for I in self._inodes.persist()
+      )
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:
@@ -476,17 +458,16 @@ class FileSystem(object):
         HardlinkDirents have a persistent .inum mapping to the Meta['iref'] field.
         Others do not and keep a private ._inum, not preserved after umount.
     '''
-    try:
-      inum = E.inum
-    except AttributeError:
-      I = self._inodes.new(E)
-      inum = I.inum
-    return inum
+    I = self._inodes.add(E)
+    X("E2i(%s) => %s", E, I)
+    return I.inum
 
   def i2E(self, inum):
     ''' Return the Dirent associated with the supplied `inum`.
     '''
-    return self._inodes.dirent(inum)
+    I = self._inodes[inum]
+    X("inum %s => %r", inum, I)
+    return I.E
 
   def _Estat(self, E):
     ''' Stat a Dirent.
