@@ -19,7 +19,7 @@ import sys
 from threading import RLock
 import time
 from uuid import UUID, uuid4
-from cs.binary import PacketField, BSUInt, BSString
+from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, warning, info
