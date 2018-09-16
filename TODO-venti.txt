@@ -1,3 +1,4 @@
+drop Meta.iref
 fs.__getitem__: int is inode number, str is relative path from mount, uuid is via the persistent Dirent uuid map
 vt.fs: inodes entirely on the fly, never saved - move to UUIDs for persistence
 vt.dir: FileSystem state: a mapping of UUID->Dirent for the indirect dirents - where to keep this context at runtime for indirection?
