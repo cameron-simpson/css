@@ -23,7 +23,7 @@ from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread
 from cs.vt import defaults
 from cs.vt.debug import dump_Dirent
-from cs.vt.dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent
+from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from cs.vt.fs import FileHandle, FileSystem
 from cs.vt.store import MissingHashcodeError
 from cs.x import X
@@ -84,7 +84,7 @@ def mount(
   log.addHandler(log_handler)
   X("mount: S=%s", S)
   X("mount: E=%s", E)
-  dump_Dirent(E, recurse=True)
+  ##dump_Dirent(E, recurse=True)
   FS = StoreFS(
       E,
       S=S, archive=archive, subpath=subpath,
@@ -178,7 +178,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         S=S, archive=archive, subpath=subpath,
         readonly=readonly, append_only=append_only,
         show_prev_dirent=show_prev_dirent)
-    # llfuse requires the mount point inode the be 1
+    # llfuse requires the mount point inode to be inode 1
     fs[1] = fs.mntE
     llf_opts = set(llfuse.default_options)
     if os.uname().sysname == 'Darwin' and 'nonempty' in llf_opts:
