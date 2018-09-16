@@ -400,7 +400,7 @@ class _Dirent(Transcriber):
     if E is None or E != self:
       self.prev_dirent = self
 
-  def reconcile(self, other):
+  def reconcile(self, other, force=False):
     ''' Reconcile 2 Dirents.
 
         It is expected that they are meant to be different revisions
