@@ -13,11 +13,9 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
-from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.range import Range
-from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
 from cs.x import X
 from . import defaults
@@ -250,50 +248,6 @@ class Inodes(object):
     except (KeyError, IndexError):
       return False
     return True
-
-  @staticmethod
-  def decode_inode_data(idatatext, allocated):
-    ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
-
-        Parameters:
-        * `idatatext`: text embodying the allocated Inode range and the Inode Dirent
-        * `allocated`: the existing allocated Range
-    '''
-    idata = untexthexify(idatatext)
-    # load the allocated hardlinked inode values
-    taken_data, offset1 = get_bsdata(idata)
-    offset = 0
-    hardlinked = Range()
-    while offset < len(taken_data):
-      start, offset = get_bs(taken_data, offset)
-      end, offset = get_bs(taken_data, offset)
-      # update the hardlinked range
-      hardlinked.add(start, end)
-      # update the filesystem inode range
-      allocated.add(start, end)
-    # load the Dir containing the hardlinked Dirents
-    hardlinked_dir, offset1 = _Dirent.from_bytes(idata, offset1)
-    if offset1 < len(idata):
-      warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
-    return hardlinked_dir, hardlinked
-
-  @locked
-  def encode(self):
-    ''' Transcribe the permanent inode numbers and the Dirent containing their Dirents.
-    '''
-    # record the spans of allocated inodes
-    taken = b''.join( put_bs(S.start) + put_bs(S.end)
-                      for S in self._hardlinked.spans() )
-    # ... and append the Dirent.
-    return put_bsdata(taken) + self._hardlinks_dir.encode()
-
-  @staticmethod
-  def _ipathelems(inum):
-    ''' Path to an inode's Dirent.
-    '''
-    # this works because all leading bytes have a high bit, avoiding
-    # collision with final bytes
-    return [ str(b) for b in put_bs(inum) ]
 
 class FileSystem(object):
   ''' The core filesystem functionality supporting FUSE operations
