@@ -50,6 +50,7 @@ class DirentType(IntEnum):
   DIR = 1
   SYMBOLIC = 2
   HARD = 3
+  INDIRECT = 4
 
 class DirentFlags(IntFlag):
   ''' Flag values for the Dirent binary encoding.
@@ -324,6 +325,7 @@ class _Dirent(Transcriber):
         'D': DirentType.DIR,
         'SymLink': DirentType.SYMBOLIC,
         'HardLink': DirentType.HARD,
+        'Indirect': DirentType.INDIRECT,
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
 
@@ -444,6 +446,12 @@ class _Dirent(Transcriber):
     '''
     return self.type == DirentType.HARD
 
+  @property
+  def isindirect(self):
+    ''' Is this an indirect _Dirent?
+    '''
+    return self.type == DirentType.INDIRECT
+
   def textencode(self):
     ''' Serialise the dirent as text.
     '''
@@ -494,6 +502,7 @@ register_transcriber(_Dirent, (
     'INVALIDDirent',
     'SymLink',
     'HardLink',
+    'Indirect',
     'D',
     'F',
 ))
@@ -594,6 +603,57 @@ class HardlinkDirent(_Dirent):
   @classmethod
   def to_inum(cls, inum, name):
     return cls(name, {'iref': str(inum)})
+
+  def transcribe_inner(self, T, fp):
+    ''' Transcribe the inner components of a HardlinkDirent.
+    '''
+    return super().transcribe_inner(T, fp, {})
+
+class IndirectDirent(_Dirent):
+  ''' An indirect Dirent, referring to another Dirent by UUID.
+
+      This is how a feature like a a hard link is implented in a vt filesystem.
+
+      *Note*: unlike other Dirents, IndirectDirents are considered
+      emphemeral, specificly in that their uuid attribute is a
+      reference to another persistent Direct. Obtaining the target
+      dirent requires dereferencing through a FileSystem.
+  '''
+
+  transcribe_prefix = 'Indirect'
+
+  def __init__(self, name, uuid, block=None):
+    if block is not None:
+      raise ValueError("block must be None, received: %s" % (block,))
+    _Dirent.__init__(self, DirentType.INDIRECT, name, uuid=uuid)
+    self.block = None
+
+  def deref(self, fs=None):
+    ''' Dereference this IndirectDirent's UUID via a FileSystem.
+    '''
+    if fs is None:
+      fs = defaults.fs
+      if not fs:
+        raise ValueError("no current FileSystem")
+    return fs[self.uuid]
+
+  @prop
+  def ref(self):
+    ''' The referenced Dirent via the default FileSystem.
+    '''
+    return self.deref()
+
+  @prop
+  def meta(self):
+    ''' The metadata of the referenced Dirent.
+    '''
+    return self.ref.meta
+
+  @prop
+  def block(self):
+    ''' The content block for the referenced Dirent.
+    '''
+    return self.ref.block
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe the inner components of a HardlinkDirent.
