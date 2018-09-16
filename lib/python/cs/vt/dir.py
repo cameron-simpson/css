@@ -400,6 +400,26 @@ class _Dirent(Transcriber):
     if E is None or E != self:
       self.prev_dirent = self
 
+  def reconcile(self, other):
+    ''' Reconcile 2 Dirents.
+
+        It is expected that they are meant to be different revisions
+        of the "same" object.
+        If they both have UUIDs, they should match.
+        They should be of the same type (both files, etc).
+    '''
+    with Pfx("%s.reconcile(%s)", self, other):
+      if self is other:
+        warning("tried to reconcile a _Dirent with itself")
+        return
+      uu1 = self.uuid
+      uu2 = other.uuid
+      if uu1 and uu2 and uu1 != uu2:
+        warning("different UUIDs: %s vs %s", uu1, uu2)
+        if not force:
+          raise ValueError("not reconciling Dirents with different UUIDs")
+      warning("NOT IMPLEMENTED YET")
+
   @property
   def isfile(self):
     ''' Is this a file _Dirent?
