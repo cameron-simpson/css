@@ -359,7 +359,6 @@ class FileSystem(object):
   def __setitem__(self, inum, E):
     ''' Associate a specific inode number with a Dirent.
     '''
-    X("__setitem__(%d,%s)", inum, E)
     self._inodes.add(E, inum)
 
   def _sync(self):
