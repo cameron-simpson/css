@@ -464,8 +464,6 @@ class FileSystem(object):
       raise OSError(errno.EROFS)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     inum = self.E2i(E)
-    I = self._inodes[inum]
-    I += 1
     if flags & O_TRUNC:
       FH.truncate(0)
     return self._new_file_handle_index(FH)
