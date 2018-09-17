@@ -19,7 +19,7 @@ from cs.range import Range
 from cs.threads import locked
 from cs.x import X
 from . import defaults
-from .dir import _Dirent, Dir, FileDirent, HardlinkDirent
+from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
@@ -128,8 +128,8 @@ class Inode(NS):
     ''' Retard the reference count.
     '''
     if decr <= 0:
-      raise ValueError("decrements must be positive: %s" % (incr,))
-    self.refcount -= incr
+      raise ValueError("decrements must be positive: %s" % (decr,))
+    self.refcount -= decr
     return self
 
 class Inodes(object):
@@ -242,9 +242,9 @@ class Inodes(object):
       return self._by_dirent[ndx]
     raise TypeError("cannot deference indices of type %r" % (type(ndx),))
 
-  def __contains__(self, inum):
+  def __contains__(self, ndx):
     try:
-      I = self[ndx]
+      _ = self[ndx]
     except (KeyError, IndexError):
       return False
     return True
