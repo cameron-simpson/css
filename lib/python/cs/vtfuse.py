@@ -318,8 +318,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    I = fs[parent_inode]
-    I += 1
     name = self._vt_str(name_b)
     P = self._vt_i2E(parent_inode)
     if name in P:
@@ -356,11 +354,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
     ''' Decrease lookup counts for indoes in `ideltae`.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.forget
+
+        We do not bother with this as Inodes persist in memory for
+        the duration of the mount.
     '''
-    fs = self._vtfs
-    for inum, nlookup in ideltae:
-      I = fs[inum]
-      I -= nlookup
+    pass
 
   @handler
   def fsync(self, fh, datasync):
@@ -414,8 +412,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    I = fs[inode]
-    I += 1
+    # TODO: test for write access to new_parent_inode
     new_name = self._vt_str(new_name_b)
     # TODO: test for write access to new_parent_inode
     Esrc = fs.i2E(inode)
@@ -474,7 +471,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     I = fs[parent_inode]
     X("lookup: I=%s", I)
-    I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search parent_inode
     X("lookup2: I=%s", I)
