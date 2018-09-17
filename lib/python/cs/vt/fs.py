@@ -222,6 +222,7 @@ class Inodes(object):
         I = self._by_inum.get(inum)
         if I:
           raise ValueError("inum %d already allocated: %s" % (inum, I))
+        self._allocated.add(inum)
       I = Inode(inum, E)
       self._by_dirent[E] = I
       self._by_inum[inum] = I
