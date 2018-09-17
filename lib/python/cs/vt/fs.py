@@ -106,31 +106,13 @@ class Inode(NS):
       Attributes:
       * `inum`: the inode number
       * `E`: the primary Dirent
-      * `refcount`: the number of _indirect_ references to this Dirent;
-        if this is >0 the uuid->Dirent mapping must be persisted across mounts
   '''
 
   def __init__(self, inum, E):
     NS.__init__(self)
     self.inum = inum
     self.E = E
-    self.refcount = 0
-
-  def __iadd__(self, incr):
-    ''' Advance the reference count.
-    '''
-    if incr <= 0:
-      raise ValueError("increments must be positive: %s" % (incr,))
-    self.refcount += incr
-    return self
-
-  def __isub__(self, decr):
-    ''' Retard the reference count.
-    '''
-    if decr <= 0:
-      raise ValueError("decrements must be positive: %s" % (decr,))
-    self.refcount -= decr
-    return self
+    self.referenced = False
 
 class Inodes(object):
   ''' Inode information for a filesystem.
@@ -169,11 +151,10 @@ class Inodes(object):
     ''' Generator yielding the Inodes which should be persisted
         across mounts.
 
-        This consists of those Inodes with a refcount > 0, as there
-        are IndirectDirents referring to these Inodes.
+        This consists of those Inodes marked as referenced.
     '''
     for I in self._by_inum.values():
-      if I.refcount > 0:
+      if I.referenced:
         yield I
 
   def _new_inum(self):
@@ -331,6 +312,7 @@ class FileSystem(object):
           continue
         IE, offset = _Dirent.from_str(old_inodes, offset)
         I = inodes.add(IE)
+        I.referenced = True
         X("added old inode %s", I)
     X("FileSystem mntE:")
     dump_Dirent(mntE)
