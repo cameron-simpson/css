@@ -148,7 +148,7 @@ class DirentRecord(PacketField):
       flags |= DirentFlags.HASPREVDIRENT
     extended_data = E.get_extended_data()
     if extended_data:
-      flags |= DirentFlags.EXTEND
+      flags |= DirentFlags.EXTENDED
     yield BSUInt.transcribe_value(E.type)
     yield BSUInt.transcribe_value(flags)
     if flags & DirentFlags.HASNAME:
@@ -165,7 +165,7 @@ class DirentRecord(PacketField):
     if flags & DirentFlags.HASPREVDIRENT:
       assert isinstance(E._prev_dirent_blockref, _Block)
       yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
-    if flags & DirentFlags.EXTEND:
+    if flags & DirentFlags.EXTENDED:
       yield extended_data
 
 class _Dirent(Transcriber):
