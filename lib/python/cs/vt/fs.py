@@ -194,7 +194,7 @@ class Inodes(object):
           if I2:
             assert I2.E is E
           else:
-            self._by_uuid[uu] = E
+            self._by_uuid[uu] = I
         return I
       # unknown Dirent, create new Inode
       if inum is None:
