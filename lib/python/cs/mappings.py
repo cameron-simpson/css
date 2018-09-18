@@ -740,6 +740,8 @@ class StackableValues(object):
     return v
 
   def __setattr__(self, attr, value):
+    ''' For nonunderscore attributes, replace the top element of the stack.
+    '''
     if attr.startswith('_'):
       self.__dict__[attr] = value
     else:
