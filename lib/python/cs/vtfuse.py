@@ -213,7 +213,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
   def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
     '''
-    S = self._vtfs.S
+    fs = self._vtfs
+    S = fs.S
     if fsname is None:
       fsname = str(S)
     # llfuse reads additional mount options from the fsname :-(
@@ -225,14 +226,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
       llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
-      self._vtfs.mnt_path = abspath(mnt)
+      fs.mnt_path = abspath(mnt)
       @logexc
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with S:
-          llfuse.main()
-          llfuse.close()
+        with defaults.stack('fs', fs):
+          with S:
+            llfuse.main()
+            llfuse.close()
         S.close()
         defaults.pop_Ss()
       T = PfxThread(target=mainloop)
