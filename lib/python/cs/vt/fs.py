@@ -314,8 +314,9 @@ class FileSystem(object):
         I = inodes.add(IE)
         I.referenced = True
         X("added old inode %s", I)
-    X("FileSystem mntE:")
-    dump_Dirent(mntE)
+    with defaults.stack('fs', self):
+      X("FileSystem mntE:")
+      dump_Dirent(mntE)
 
   def close(self):
     ''' Close the FileSystem.
@@ -332,7 +333,7 @@ class FileSystem(object):
     return "<%s S=%s /=%s>" % (self.__class__.__name__, self.S, self.E)
 
   def __getitem__(self, inum):
-    ''' Lookup inode numbers.
+    ''' Lookup inode numbers or UUIDs.
     '''
     I = self._inodes[inum]
     X("__getitem__(%d)=>%s", inum, I)
@@ -395,8 +396,11 @@ class FileSystem(object):
         HardlinkDirents have a persistent .inum mapping to the Meta['iref'] field.
         Others do not and keep a private ._inum, not preserved after umount.
     '''
+    E0 = E
+    if E.isindirect:
+      E = E.ref
     I = self._inodes.add(E)
-    X("E2i(%s) => %s", E, I)
+    X("E2i(%s) => %s", E0, I)
     return I.inum
 
   def i2E(self, inum):
