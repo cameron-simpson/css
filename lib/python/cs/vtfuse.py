@@ -536,7 +536,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if EA is None:
       if E is None:
         raise FuseOSError(errno.ENOENT)
-      EA = self._vt_EntryAttributes(E)
+      try:
+        EA = self._vt_EntryAttributes(E)
+      except Exception as e:
+        warning("%r: %s", name, e)
+        raise FuseOSError(errno.ENOENT)
     return EA
 
   @handler
@@ -707,7 +711,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
             if E is not None:
               # yield name, attributes and next offset
               with S:
-                EA = self._vt_EntryAttributes(E)
+                try:
+                  EA = self._vt_EntryAttributes(E)
+                except Exception as e:
+                  warning("%r: %s", name, e)
+                  EA = None
           if EA is not None:
             yield self._vt_bytes(name), EA, o + 1
           o += 1
