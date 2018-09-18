@@ -413,6 +413,33 @@ class StoreFS_LLFUSE(llfuse.Operations):
     ''' Link `inode` to new name `new_name_b` in `new_parent_inode`.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.link
+
+        Links in a VT filesystem are not implemented in a typical
+        UNIX way; they are implemented using IndirectDirents,
+        which contain a reference to the primary Dirent's UUID.
+        Normal (non-indirect) Dirents are singletons for a given FileSystem
+        instance.
+        They are referred to in the FileSystem inodes table.
+
+        A fresh mount must be able to dereference an IndirectDirent
+        to obtain the primary Dirent.
+        Because FileSystems may be of arbitrary size, the file tree
+        is fetched/decoded on demand.
+        Therefore, Dirents with indirect references are stored
+        persistently in the FileSystem state and instantiated at
+        mount.
+
+        Because of this, a primary Dirent should exist _either_ in
+        a Dir _or_ in the persistent set of Inodes, otherwise there
+        can be multiple Dirents with the same UUID which would need
+        reconciling when encountered.
+        When a normal Dirent gets its first additional link it is
+        _replaced_ by an IndirectDirent and the primary moved solely
+        into the Inodes table.
+
+        TODO: this is a real problem if we attach foreign trees
+        that also have these UUIDs, so maybe reconciliation should
+        be a standard action.
     '''
     fs = self._vtfs
     if fs.readonly:
