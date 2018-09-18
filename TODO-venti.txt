@@ -1,3 +1,4 @@
+restore Inode.refcount but not += and -=, drop referenced - required for nlink stat count
 fs: save persistent Dirents as 8 level Dir with each level being 2 bytes of the UUID, hex encoded? seems sparse and if we're sucking them all in anyway, pointless? better idea needed for heavily hardlinked trees
 drop Meta.iref
 fs.__getitem__: int is inode number, str is relative path from mount, uuid is via the persistent Dirent uuid map
