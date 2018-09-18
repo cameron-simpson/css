@@ -237,7 +237,7 @@ def cmd_rename(I, argv):
     elif obclass in ('people', 'faces'):
       table = I.person_table
     else:
-      raise GetoptError("known class")
+      raise GetoptError("unknown class %r" % (obclass,))
     items = list(table)
     all_names = set(item.name for item in items)
     X("%d items: %r", len(items), all_names)
@@ -323,13 +323,14 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
-  ''' Usage: tag criteria... [--] {+tag|-tag}...
-      Add or remove tags from selected images.
+  ''' Add or remove tags from selected images.
+      Usage: tag criteria... [--] {+tag|-tag}...
   '''
   xit = 0
   badopts = False
   if not argv:
     raise GetoptError("missing selector")
+  # collect criteria
   selectors = []
   unknown = False
   while argv:
@@ -354,6 +355,7 @@ def cmd_tag(I, argv):
     return 1
   if not argv:
     raise GetoptError("missing tags")
+  # collect tag changes
   tagging = []
   for arg in argv:
     try:
@@ -733,12 +735,15 @@ class iPhoto(O):
     kw = self.keyword_table.get(lc_kwname)
     if kw:
       return kw,
-    kws = []
-    for kw in self.keywords:
-      words = kw.name.split()
-      if words and lc_kwname == words[0].lower():
-        kws.append(kw)
-    return kws
+    for sep in None, '/', '.':
+      kws = []
+      for kw in self.keywords:
+        words = kw.name.split(sep)
+        if words and lc_kwname == words[0].lower():
+          kws.append(kw)
+      if kws:
+        return kws
+    return ()
 
   def keyword(self, kwname):
     ''' Try to match a single keyword.

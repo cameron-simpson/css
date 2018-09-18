@@ -27,7 +27,7 @@
     * `struct_field`: a factory for making PacketField classes for
       `struct` formats with a single value field.
     * `multi_struct_field` and `structtuple`: factories for making
-      `PacketField`s` from `struct` formats with multiple value
+      `PacketField`s from `struct` formats with multiple value
       fields;
       `structtuple` makes `PacketFields` which are also `namedtuple`s,
       supporting trivial access to the parsed values.
