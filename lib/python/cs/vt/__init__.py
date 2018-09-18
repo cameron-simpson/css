@@ -46,7 +46,8 @@ class _Defaults(threading.local, StackableValues):
   def __init__(self):
     threading.local.__init__(self)
     StackableValues.__init__(self)
-    self.runstate = RunState()
+    self.push('runstate', RunState())
+    self.push('fs', None)
 
   def _fallback(self, key):
     ''' Fallback function for empty stack.
