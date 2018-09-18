@@ -441,46 +441,46 @@ class StoreFS_LLFUSE(llfuse.Operations):
         that also have these UUIDs, so maybe reconciliation should
         be a standard action.
     '''
+    # TODO: move almost all of this into cs.vt.fs
+    # once inode and new_parent_inode are deferenced
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
     # TODO: test for write access to new_parent_inode
     new_name = self._vt_str(new_name_b)
-    # TODO: test for write access to new_parent_inode
-    Esrc = fs.i2E(inode)
-    if not Esrc.isfile and not Esrc.ishardlink:
+    I = fs[inode]
+    E = I.E
+    if E.isindirect:
+      raise RuntimeError("tried to link IndirectDirent!")
+    # TODO: remove this check if we can avoid Dir loops
+    if E.isdir:
       raise FuseOSError(errno.EPERM)
-    Pdst = fs.i2E(new_parent_inode)
-    if new_name in Pdst:
-      raise FuseOSError(errno.EEXIST)
+    Pnew = fs.i2E(new_parent_inode)
     # the final component must be a directory in order to create the new link
-    if not Pdst.isdir:
+    if not Pnew.isdir:
       raise FuseOSError(errno.ENOTDIR)
-    if Esrc.ishardlink:
-      # point Esrc at the master Dirent in ._inodes
-      inum = Esrc.inum
-      Esrc = fs.i2E(inum)
-    else:
-      # new hardlink, update the source
-      # keep Esrc as the master
-      # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
-      # put EsrcLink into the enclosing Dir, replacing Esrc
-      src_name = Esrc.name
-      inum0 = fs.E2i(Esrc)
-      EsrcLink = fs.hardlink_for(Esrc)
-      Esrc.parent[src_name] = EsrcLink
-      inum = EsrcLink.inum
-      if inum != inum0:
-        raise RuntimeError("new hardlink: original inum %d != linked inum %d"
-                           % (inum0, inum))
-    # install the destination hardlink
-    # make a new hardlink object referencing the inode
-    # and attach it to the target directory
-    EdstLink = HardlinkDirent.to_inum(inum, new_name)
-    Pdst[new_name] = EdstLink
-    # increment link count on underlying Dirent
-    Esrc.meta.nlink += 1
-    return self._vt_EntryAttributes(Esrc)
+    if new_name in Pnew:
+      raise FuseOSError(errno.EEXIST)
+    uu = E.get_uuid()
+    Pnew[new_name] = IndirectDirent(new_name, uu)
+    I.referenced = True
+    Pold = E.parent
+    if Pold:
+      old_name = E.name
+      Eold = Pold[old_name]
+      if not Eold.isindirect:
+        if Eold is not E and Eold.uuid == uu:
+          warning("original link has the same UUID but is not the same object, reconciling")
+          E.reconcile(Eold)
+          Eold = E
+        if Eold is E:
+          Pold[old_name] = IndirectDirent(old_name, uu)
+        else:
+          warning("old parent already has a different Dirent for %r", old_name)
+    # utilise the latest parent and name for purposes
+    E.parent = Pnew
+    E.name = new_name
+    return self._vt_EntryAttributes(E)
 
   @handler
   def listxattr(self, inode, ctx):
