@@ -643,19 +643,33 @@ class IndirectDirent(_Dirent):
       fs = defaults.fs
       if not fs:
         raise ValueError("no current FileSystem")
-    return fs[self.uuid]
+    try:
+      I = fs[self.uuid]
+    except KeyError as e:
+      error("%s: no inode for UUID %s", fs, self.uuid)
+      raise
+    return I.E
 
   @prop
   def ref(self):
     ''' The referenced Dirent via the default FileSystem.
     '''
-    return self.deref()
+    try:
+      return self.deref()
+    except KeyError as e:
+      raise AttributeError('ref') from e
 
-  @prop
+  @property
   def meta(self):
     ''' The metadata of the referenced Dirent.
     '''
     return self.ref.meta
+
+  @meta.setter
+  def meta(self, new_meta):
+    ''' Setting the metadata acts on the referent.
+    '''
+    self.ref.meta = new_meta
 
   @prop
   def block(self):
