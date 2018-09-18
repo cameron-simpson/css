@@ -89,6 +89,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
     self._lock = lock
+    self.__mo_lock = Lock()
     self._finalise_later = finalise_later
     self._finalise = None
 
@@ -109,17 +110,17 @@ class MultiOpenMixin(O):
     ''' Increment the open count.
         On the first .open call self.startup().
     '''
-    if True:
+    if False:
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
       self._opened_from[frame_key] = self._opened_from.get(frame_key, 0) + 1
     self.opened = True
-    with self._lock:
+    with self.__mo_lock:
       self._opens += 1
       opens = self._opens
     if opens == 1:
-      self._finalise = Condition(self._lock)
+      self._finalise = Condition(self.__mo_lock)
       self.startup()
     return self
 
@@ -139,7 +140,7 @@ class MultiOpenMixin(O):
     if not self.opened:
       raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
-    with self._lock:
+    with self.__mo_lock:
       if self._opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
         error("  final close was from %s", self._final_close_from)
@@ -170,7 +171,7 @@ class MultiOpenMixin(O):
         Normally this is called automatically after .shutdown unless
         `finalise_later` was set to true during initialisation.
     '''
-    with self._lock:
+    with self.__mo_lock:
       finalise = self._finalise
       if finalise is None:
         raise RuntimeError("%s: finalised more than once" % (self,))
@@ -197,11 +198,11 @@ class MultiOpenMixin(O):
         Normally this is notified at the end of the shutdown procedure
         unless the object's `finalise_later` parameter was true.
     '''
-    self._lock.acquire()
+    self.__mo_lock.acquire()
     if self._finalise:
       self._finalise.wait()
     else:
-      self._lock.release()
+      self.__mo_lock.release()
 
   @staticmethod
   def is_opened(func):
