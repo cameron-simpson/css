@@ -31,13 +31,13 @@ def frames():
   '''
   return [ Frame(*f) for f in extract_stack()[:-1] ]
 
-def caller():
+def caller(frame_index = -3):
   ''' Return the frame of the caller's caller.
   '''
   # -1: caller, this function
   # -2: invoker, who wants to know the caller
   # -3: the calling function of the invoker
-  return Frame(*frames()[-3])
+  return Frame(*frames()[frame_index])
 
 def stack_dump(fp=None, indent=0, Fs=None):
   ''' Recite current or supplied stack to `fp`, default sys.stderr.
