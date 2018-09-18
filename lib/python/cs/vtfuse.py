@@ -327,6 +327,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if name in P:
       warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
               parent_inode, P, name)
+      del P[name]
     fhndx = fs.open2(P, name, flags|O_CREAT)
     E = fs._fh(fhndx).E
     E.meta.chmod(mode)
