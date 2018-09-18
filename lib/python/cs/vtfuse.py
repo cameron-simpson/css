@@ -114,11 +114,13 @@ def handler(method):
         "%s.%s(%s)",
         type(self).__name__, method.__name__, ','.join(arg_desc)
     ):
+      fs = self._vtfs
       try:
-        with self._vtfs.S:
-          result = method(self, *a, **kw)
-          ## XP(" result = %r", result)
-          return result
+        with defaults.stack('fs', fs):
+          with fs.S:
+            result = method(self, *a, **kw)
+            ## XP(" result = %r", result)
+            return result
       except FuseOSError:
         raise
       except OSError as e:
