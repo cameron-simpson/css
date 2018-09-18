@@ -955,16 +955,17 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.unlink
     '''
+    # TODO: move most of this into cs.vt.fs
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     # TODO: check search/write on P
-    P = fs.i2E(parent_inode)
+    P = fs[parent_inode].E
     if not P.isdir:
       raise FuseOSError(errno.ENOTDIR)
     try:
-      del P[name]
+      E = P.pop(name)
     except KeyError:
       raise FuseOSError(errno.ENOENT)
 
