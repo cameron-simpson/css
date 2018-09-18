@@ -136,32 +136,35 @@ class DirentRecord(PacketField):
     ''' Serialise to binary format.
     '''
     flags = 0
+    type_ = E.type
     if E.name:
       flags |= DirentFlags.HASNAME
-    if E.meta:
+    meta = None if E.isindirect else E.meta
+    if meta:
       flags |= DirentFlags.HASMETA
     if E.uuid:
       flags |= DirentFlags.HASUUID
-    if E.block is None:
+    block = None if type_ is DirentType.INDIRECT else E.block
+    if block is None:
       flags |= DirentFlags.NOBLOCK
     if E._prev_dirent_blockref is not None:
       flags |= DirentFlags.HASPREVDIRENT
     extended_data = E.get_extended_data()
     if extended_data:
       flags |= DirentFlags.EXTENDED
-    yield BSUInt.transcribe_value(E.type)
+    yield BSUInt.transcribe_value(type_)
     yield BSUInt.transcribe_value(flags)
     if flags & DirentFlags.HASNAME:
       yield BSString.transcribe_value(E.name)
     if flags & DirentFlags.HASMETA:
-      yield BSString.transcribe_value(E.meta.textencode())
+      yield BSString.transcribe_value(meta.textencode())
     if flags & DirentFlags.HASUUID:
       bs = E.uuid.bytes
       if len(bs) != 16:
         raise RuntimeError("len(E.uuid.bytes) != 16: %r" % (bs,))
       yield bs
     if not flags & DirentFlags.NOBLOCK:
-      yield BlockRecord.transcribe_value(E.block)
+      yield BlockRecord.transcribe_value(block)
     if flags & DirentFlags.HASPREVDIRENT:
       assert isinstance(E._prev_dirent_blockref, _Block)
       yield BlockRecord.transcribe_value(E._prev_dirent_blockref)
@@ -218,7 +221,8 @@ class _Dirent(Transcriber):
       else:
         raise ValueError("unsupported meta value: %r" % (meta,))
       meta = M
-    self.meta = meta
+    if type_ != DirentType.INDIRECT:
+      self.meta = meta
     self.parent = parent
 
   def __repr__(self):
@@ -254,6 +258,8 @@ class _Dirent(Transcriber):
       cls = SymlinkDirent
     elif type_ == DirentType.HARD:
       cls = HardlinkDirent
+    elif type_ == DirentType.INDIRECT:
+      cls = IndirectDirent
     else:
       cls = _Dirent
     return cls(name, **kw)
@@ -298,10 +304,11 @@ class _Dirent(Transcriber):
       fp.write(':')
     if self.uuid:
       attrs['uuid'] = self.uuid
-    if self.meta:
-      attrs['meta'] = self.meta
-    if self.block:
-      attrs['block'] = self.block
+    if self.type != DirentType.INDIRECT:
+      if self.meta:
+        attrs['meta'] = self.meta
+      if self.block:
+        attrs['block'] = self.block
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prevblock'] = prev_blockref
@@ -622,11 +629,12 @@ class IndirectDirent(_Dirent):
 
   transcribe_prefix = 'Indirect'
 
-  def __init__(self, name, uuid, block=None):
+  def __init__(self, name, uuid, meta=None, block=None):
     if block is not None:
-      raise ValueError("block must be None, received: %s" % (block,))
+      raise ValueError("IndirectDirent block should be None, got: %r" % (block,))
+    if meta is not None:
+      raise ValueError("IndirectDirent meta should be None, got: %r" % (meta,))
     _Dirent.__init__(self, DirentType.INDIRECT, name, uuid=uuid)
-    self.block = None
 
   def deref(self, fs=None):
     ''' Dereference this IndirectDirent's UUID via a FileSystem.
