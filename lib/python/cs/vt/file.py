@@ -179,8 +179,6 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         S.close()
         return B
       S = defaults.S
-      T = PfxThread(name="%s.flush(): update_store" % (self,),
-                    target=update_store)
       # push the current state as the backing file
       # and initiate a sync to the Store
       old_file.read_only = True
