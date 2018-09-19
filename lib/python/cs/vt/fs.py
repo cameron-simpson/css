@@ -410,16 +410,6 @@ class FileSystem(object):
     X("inum %s => %r", inum, I)
     return I.E
 
-  def _Estat(self, E):
-    ''' Stat a Dirent.
-    '''
-    inum = self.E2i(E)
-    if E.ishardlink:
-      E2 = self._inodes.dirent(inum)
-    else:
-      E2 = E
-    return E2.meta.stat()
-
   def open2(self, P, name, flags):
     ''' Open a regular file given parent Dir `P` and `name`,
         allocate FileHandle, return FileHandle index.
