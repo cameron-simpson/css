@@ -1,13 +1,15 @@
 #!/usr/bin/python
 
+''' Assorted debugging assistance functions.
+'''
+
 from binascii import hexlify
-from cs.lex import hexify, texthexify
 from cs.tty import ttysize
 from cs.x import X
-from .block import BlockType
-from .dir import InvalidDirent
 
 def dump_Block(block, indent=''):
+  ''' Dump a Block.
+  '''
   X("%s%s", indent, block)
   if block.indirect:
     indent += '  '
@@ -18,6 +20,8 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False, not_dir=False):
+  ''' Dump a Dirent.
+  '''
   X("%s%s", indent, E)
   if E.isdir and not not_dir:
     indent += '  '
@@ -26,8 +30,10 @@ def dump_Dirent(E, indent='', recurse=False, not_dir=False):
       dump_Dirent(E2, indent, recurse=recurse, not_dir=not recurse)
 
 def dump_chunk(data, leadin, max_width=None, one_line=False):
+  ''' Dump a data chunk.
+  '''
   if max_width is None:
-    rows, columns = ttysize(1)
+    _, columns = ttysize(1)
     if columns is None:
       columns = 80
     max_width = columns - 1

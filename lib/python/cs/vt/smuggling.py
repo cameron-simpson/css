@@ -11,7 +11,7 @@ from cs.fileutils import read_from
 from cs.logutils import debug, info, warning, error, loginfo
 from cs.pfx import Pfx, XP
 from cs.units import transcribe, TIME_SCALE, BINARY_BYTES_SCALE, DECIMAL_SCALE
-from .blockify import blocks_of, top_block_for
+from .blockify import blockify, top_block_for
 from .dir import Dir, FileDirent
 from .parsers import scanner_from_filename
 
@@ -88,7 +88,7 @@ def import_file(srcpath):
     start = time.time()
     with open(srcpath, 'rb') as fp:
       scanner = scanner_from_filename(srcpath)
-      blocks = blocks_of(read_from(fp), scanner)
+      blocks = blockify(read_from(fp), scanner)
       B = top_block_for(blocks)
       S = os.fstat(fp.fileno())
     end = time.time()

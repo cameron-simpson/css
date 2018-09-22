@@ -7,7 +7,12 @@
 
 set -ue
 
-exec 3>&1 1>&2
+wd=$( command pwd )
+trace="dateify 1,2 pfx $wd set-x"
+
+logdir=${LOGDIR:-$HOME/var/log}
+[ -d "$logdir" ] || $trace mkdir "$logdir"
+logfile=$logdir/ctags
 
 tags=
 
@@ -61,8 +66,8 @@ else
     [ -n "$tags" ] || {
       if tags=$( cd "$dirpath" && findup tags )
       then
-        echo "$tags" >&3
-        exec 3>&-
+        echo "$tags"
+        exec 1>&-
       else
         echo "$cmd: no tags found from $dirpath/" >&2
       fi
@@ -81,5 +86,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-lock -P "$tags" ctags -a -o "$tags" --tag-relative --links=no "$@" &
+exec 2>>"$logfile" 1>&2
+
+lock -P "$tags" $trace ctags -a -o "$tags" --tag-relative --links=no --extra=fq "$@" &
 exit 0

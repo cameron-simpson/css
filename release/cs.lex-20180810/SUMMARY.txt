@@ -1,0 +1,2 @@
+New get_decimal_value and get_hexadecimal_value functions.
+New stripped_dedent function, a slightly smarter textwrap.dedent.

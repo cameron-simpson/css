@@ -800,7 +800,9 @@ class ReadMixin(object):
     return CornuCopyBuffer(self.datafrom(offset), offset=offset)
 
   def read(self, size=-1, offset=None, longread=False):
-    ''' Read up to `size` bytes, honouring the "single system call" spirit unless `longread` is true.
+    ''' Read up to `size` bytes, honouring the "single system call"
+        spirit unless `longread` is true.
+
         `size`: the number of bytes requested. A size of -1 requests
           all bytes to the end of the file.
         `offset`: the starting point of the read; if None, use the
@@ -829,7 +831,7 @@ class ReadMixin(object):
         # We need to retest on each iteration because other reads
         # may be interleaved, interfering with the buffer.
         if bfr is None or bfr.offset != offset:
-          X("ReadMixin.read: new bfr from offset=%d (self.tell=%d, old bfr was %s)", offset, self.tell(), bfr)
+          X("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:

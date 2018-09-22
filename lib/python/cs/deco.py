@@ -28,16 +28,18 @@ DISTINFO = {
 
 def decorator(deco, *da, **dkw):
   ''' Wrapper for decorator functions to support optional keyword arguments.
+
       Examples:
-        @decorator
-        def dec(func, **dkw):
-          ...
-        @dec
-        def func1(...):
-          ...
-        @dec(foo='bah')
-        def func2(...):
-          ...
+
+          @decorator
+          def dec(func, **dkw):
+            ...
+          @dec
+          def func1(...):
+            ...
+          @dec(foo='bah')
+          def func2(...):
+            ...
   '''
   def overdeco(*da, **dkw):
     if not da:
@@ -53,32 +55,36 @@ def decorator(deco, *da, **dkw):
   return overdeco
 
 @decorator
-def cached(func, **dkw):
-  ''' Decorator to cache the result of a method and keep a revision counter for changes.
+def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
+  ''' Decorator to cache the result of a method and keep a revision
+      counter for changes.
       The revision supports the @revised decorator.
 
       This decorator may be used in 2 modes.
       Directly:
-        @cached
-        def method(self, ...)
+
+          @cached
+          def method(self, ...)
+
       or indirectly:
-        @cached(poll_delay=0.25)
-        def method(self, ...)
+
+          @cached(poll_delay=0.25)
+          def method(self, ...)
 
       Optional keyword arguments:
-      `attr_name`: the basis name for the supporting attributes.
+      * `attr_name`: the basis name for the supporting attributes.
         Default: the name of the method.
-      `poll_delay`: minimum time between polls; after the first
+      * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
         Default: None, meaning no poll delay.
-      `sig_func`: a signature function, which should be significantly
+      * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
         expected the instance (self) as its first parameter.
         Default: None, meaning no signature function. The first
         computed value will be kept and never updated.
-      `unset_value`: the value to return before the method has been
+      * `unset_value`: the value to return before the method has been
         called successfully.
         Default: None.
 
@@ -92,14 +98,8 @@ def cached(func, **dkw):
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
-  attr_name = dkw.pop('attr_name', None)
-  poll_delay = dkw.pop('poll_delay', None)
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
-  sig_func = dkw.pop('sig_func', None)
-  unset_value = dkw.pop('unset_value', None)
-  if dkw:
-    raise ValueError("unexpected keyword arguments: %r" % (dkw,))
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("invalid poll_delay, should be >0, got: %r" % (poll_delay,))
 
@@ -115,73 +115,78 @@ def cached(func, **dkw):
     setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
     # see if we should use the cached value
-    try:
-      if poll_delay is not None and not first:
-        # too early to check the signature function?
-        now = time.time()
-        lastpoll = getattr(self, lastpoll_attr, None)
-        if (
-            value0 is not unset_value
-            and lastpoll is not None
-            and now - lastpoll < poll_delay
-        ):
-          return value0
-        setattr(self, lastpoll_attr, now)
-      if sig_func is not None:
-        # see if the signature is unchanged
-        sig0 = getattr(self, sig_attr, None)
-        sig = sig_func(self)
-        if sig0 is not None and sig0 == sig:
-          return value0
-      if value0 is not unset_value:
+    if poll_delay is not None and not first:
+      # too early to check the signature function?
+      now = time.time()
+      lastpoll = getattr(self, lastpoll_attr, None)
+      if (
+          value0 is not unset_value
+          and lastpoll is not None
+          and now - lastpoll < poll_delay
+      ):
         return value0
-      # compute the current value
-      value = func(self, *a, **kw)
-      setattr(self, val_attr, value)
-      if sig_func is not None:
-        setattr(self, sig_attr, sig)
-      # bump revision if the value changes
-      # noncomparable values are always presumed changed
+      setattr(self, lastpoll_attr, now)
+    if sig_func is not None:
+      # see if the signature is unchanged
+      sig0 = getattr(self, sig_attr, None)
       try:
-        changed = value != value0
-      except TypeError:
-        changed = True
-      if changed:
-        setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
-      return value
+        sig = sig_func(self)
+      except Exception as e:
+        from cs.logutils import exception
+        exception("%s.%s: sig func %s(self): %s", self, attr, sig_func, e)
+        return value0
+      if sig0 is not None and sig0 == sig:
+        return value0
+    # compute the current value
+    try:
+      value = func(self, *a, **kw)
     except Exception as e:
-      from cs.logutils import exception, setup_logging
-      setup_logging("foo")
-      exception("%s.%s: %s", self, attr, e)
+      from cs.logutils import exception
+      exception("%s.%s: value func %s(*%r,**%r): %s", self, attr, func, a, kw, e)
       return value0
+    setattr(self, val_attr, value)
+    if sig_func is not None:
+      setattr(self, sig_attr, sig)
+    # bump revision if the value changes
+    # noncomparable values are always presumed changed
+    try:
+      changed = value0 is unset_value or value != value0
+    except TypeError:
+      changed = True
+    if changed:
+      setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
+    return value
 
   return wrapper
 
 @decorator
 def strable(func, open_func=None):
   ''' Decorator for functions which may accept a str instead of their core type.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `open_func`: the "open" factory to produce the core type form
+        the string if a string is provided; the default is the builtin
+        "open" function
+
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
       be called with a filename. If the first argument is a str
       then that file is opened and the function called with the
       open file.
-      `func`: the function to docorate
-      `open_func`: the "open" factory to produce the core type form
-        the string if a string is provided; the default is the builtin
-        "open" function
 
       Examples:
 
-        @strable
-        def count_lines(f):
-          return len(line for line in f)
+          @strable
+          def count_lines(f):
+            return len(line for line in f)
 
-        class Recording:
-          "Class representing a video recording."
-          ...
-        @strable
-        def process_video(r, open_func=Recording):
-          ... do stuff with `r` as a Recording instance ...
+          class Recording:
+            "Class representing a video recording."
+            ...
+          @strable
+          def process_video(r, open_func=Recording):
+            ... do stuff with `r` as a Recording instance ...
   '''
   if open_func is None:
     open_func = open

@@ -4,14 +4,18 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07dec2007
 #
 
+''' Caching Stores and associated data structures.
+'''
+
 from __future__ import with_statement
 from collections import namedtuple
 import sys
 from threading import Lock, Thread
 from cs.fileutils import RWFileBlockCache
+from cs.logutils import error
+from cs.queues import IterableQueue
 from cs.resources import RunStateMixin
 from cs.result import Result
-from cs.queues import IterableQueue
 from cs.x import X
 from . import MAX_FILE_SIZE
 from .store import BasicStoreSync, MappingStore
@@ -30,11 +34,12 @@ class FileCacheStore(BasicStoreSync):
   '''
 
   def __init__(
-    self,
-    name, backend, dirpath,
-    max_cachefile_size=None, max_cachefiles=None,
-    runstate=None,
-    **kw):
+      self,
+      name, backend, dirpath,
+      max_cachefile_size=None, max_cachefiles=None,
+      runstate=None,
+      **kw
+  ):
     ''' Initialise the FileCacheStore.
         `name`: the Store name
         `backend`: the backing Store; this may be None, and the
@@ -45,18 +50,19 @@ class FileCacheStore(BasicStoreSync):
     if backend is None:
       raise ValueError("backend=None")
     backend.open()
-    super().__init__(name, **kw)
+    super().__init__(name, runstate=runstate, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
         max_cachefiles=max_cachefiles,
-        runstate=runstate)
+        runstate=runstate,
+    )
     self._attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
-        )
+    )
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
@@ -86,9 +92,13 @@ class FileCacheStore(BasicStoreSync):
     super().shutdown()
 
   def flush(self):
+    ''' Dummy flush operation.
+    '''
     pass
 
   def sync(self):
+    ''' Dummy sync operation.
+    '''
     pass
 
   def keys(self):
@@ -118,7 +128,11 @@ class FileCacheStore(BasicStoreSync):
 
 _CachedData = namedtuple('CachedData', 'cachefile offset length')
 class CachedData(_CachedData):
+  ''' A CachedData record, with cachefile, offset, length and implied data.
+  '''
   def fetch(self):
+    ''' Fetch the data associated with this CachedData instance.
+    '''
     return self.cachefile.get(self.offset, self.length)
 
 class FileDataMappingProxy(RunStateMixin):
@@ -332,6 +346,8 @@ class MemoryCacheMapping:
     return data
 
   def get(self, hashcode, default=None):
+    ''' Get the data associated with `hashcode`, or `default`.
+    '''
     mapping = self.mapping
     with self._lock:
       try:

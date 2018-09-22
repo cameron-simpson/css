@@ -248,7 +248,7 @@ class _Dirent(Transcriber):
     return id(self)
 
   def transcribe_inner(self, T, fp, attrs):
-    if self.name:
+    if self.name and self.name != '.':
       T.transcribe(self.name, fp=fp)
       fp.write(':')
     if self.uuid:

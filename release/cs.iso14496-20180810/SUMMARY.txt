@@ -1,0 +1,2 @@
+parse_fd(): use a mmap to access the descriptor if a regular file and not discard_data;
+this lets us use the mmapped file as backing store for the data, a big win for the media sections.

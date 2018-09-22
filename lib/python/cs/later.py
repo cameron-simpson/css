@@ -212,7 +212,7 @@ class LateFunction(_PendingFunction):
             timeout for wait()
   '''
 
-  def __init__(self, later, func, name=None, final=None, retry_delay=None):
+  def __init__(self, later, func, name=None, retry_delay=None):
     ''' Initialise a LateFunction.
         `later` is the controlling Later instance.
         `func` is the callable for later execution.
@@ -220,7 +220,7 @@ class LateFunction(_PendingFunction):
         `retry_local`: time delay before retry of this function on RetryError.
             Default from `later.retry_delay`.
     '''
-    _PendingFunction.__init__(self, func, final=final)
+    _PendingFunction.__init__(self, func)
     if name is None:
       name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
     if retry_delay is None:

@@ -13,12 +13,13 @@ from os.path import basename, splitext, join as joinpath, exists as pathexists
 import re
 from subprocess import run
 import sys
-from cs.csvutils import csv_reader
+from cs.csvutils import csv_import, csv_reader
 from cs.env import envsub
 from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
 from cs.psutils import groupargv
 from cs.py.func import prop
+from cs.x import X
 
 ENV_BASEDIR = 'SP_LINK_BASEDIR'
 ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
@@ -44,7 +45,7 @@ USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
     Directory for RRD file data.
     Default: {basedir}/{site}
   Ops:
-    graph csvfiles...
+    graph [days] csvfiles...
         Graph the data from the RRD files corresponding to the specified CSVs.
     import csvfiles...
         Import data from the specified CSVs into RRD files.
@@ -252,6 +253,17 @@ def cmd_graph(argv, cfg):
   ''' Run the "graph" command, generating graphs of RRD files associated with CSV data.
   '''
   xit = 0
+  days = None
+  if argv:
+    try:
+      days = int(argv[0])
+    except ValueError:
+      pass
+    else:
+      if days > 0:
+        argv.pop(0)
+      else:
+        days = None
   if not argv:
     raise GetoptError("missing csvfiles")
   for csvfile in argv:
@@ -261,7 +273,7 @@ def cmd_graph(argv, cfg):
       except ValueError as e:
         warning("unhandled file: %s" % (e,))
         continue
-      dataset.gen_graphs()
+      dataset.gen_graphs(days=days)
   return xit
 
 def cmd_import(argv, cfg):
@@ -302,65 +314,6 @@ def cmd_parse(argv, cfg):
         print(' ', ndx, hdr)
       print(list(dataset.rrd_field_defns()))
 
-def load_csv(csvfp, no_headers=False):
-  ''' Load data from a CSV file, return header names and data rows.
-      If `no_headers` is true (default False) then the header names
-        will be None and the rows will be lists. Otherwise the header
-        names will be a list of strings and the rows will be dicts.
-  '''
-  if isinstance(csvfp, str):
-    csvfile = csvfp
-    with Pfx(csvfile):
-      with open(csvfile) as csvfp:
-        return load_csv(csvfp, no_headers=no_headers)
-  r = csv_reader(csvfp)
-  if no_headers:
-    hdrs = None
-    ts_index = None
-  else:
-    with Pfx("0"):
-      hdrs = next(r)
-    try:
-      ts_index = hdrs.index(KEY_TIMESTAMP_SECONDS)
-    except ValueError:
-      ts_index = None
-  nonzero = defaultdict(bool)
-  data = []
-  for rownum, row in enumerate(r, 1):
-    with Pfx("%d: %s", rownum, row[1]):
-      for i, v in enumerate(row):
-        hdr = hdrs[i-1]
-        with Pfx(hdr):
-          try:
-            v = int(v)
-          except ValueError:
-            try:
-              v = float(v)
-            except ValueError:
-              v = v.strip()
-              if hdr == 'Date/Time Stamp [Seconds From The Year 2001]':
-                pass
-              elif v == '':
-                v = 0.0
-              else:
-                warning("string value: %r", v)
-            else:
-              if v != 0.0:
-                nonzero[hdrs[i]] = True
-          else:
-            if v != 0:
-              nonzero[hdrs[i]] = True
-          row[i] = v
-      if hdrs:
-        row = dict(zip(hdrs, row))
-        if ts_index is not None:
-          row['unixtime'] = sp_unixtime(row[KEY_TIMESTAMP_SECONDS])
-      data.append(row)
-  for hdr, nz in sorted(nonzero.items()):
-    if not nz:
-      warning("%r: all zero or string", hdr)
-  return hdrs, data
-
 def sp_unixtime(sp_ts):
   ''' Take an SP LINK timestamp and produce a UNIX timestamp.
   '''
@@ -400,9 +353,33 @@ class DataSet(object):
         raise ValueError(
             "CSV mapping name %r does not match %s mapping name %r"
             % (mapping_name, type(self).__name__, self.mapping_name))
-      hdrs, data = load_csv(csvfile)
-      self.data.extend(data)
-      self.data.sort(key=lambda row: row['unixtime'])
+      def preprocess(context, row):
+        ''' Convert the CSV values, which are all strings, to numeric values.
+        '''
+        if context.index > 0:
+          for i, v in enumerate(row):
+            try:
+              v = int(v)
+            except ValueError:
+              try:
+                v = float(v)
+              except ValueError:
+                v = v.strip()
+                if v == '':
+                  v = 0.0
+            row[i] = v
+        return row
+      with open(csvfile) as csvfp:
+        row_class, row_data = csv_import(
+            csvfp,
+            computed={
+                'unixtime':
+                    lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
+            },
+            preprocess=preprocess)
+        X("row_class=%s", row_class)
+        self.data.extend(row_data)
+    self.data.sort(key=lambda row: row['unixtime'])
 
   def pathto(self, filebase):
     ''' Return the pathname of a file given its basename.
@@ -504,12 +481,16 @@ class DataSet(object):
       rrd_argv.extend(graph_argv)
       self.run_argv(rrd_argv, [])
 
-  def gen_graphs(self):
+  def gen_graphs(self, days=None):
     ''' Generate the various graphs defined for this DataSet.
     '''
+    if days is None:
+      days = GRAPH_DAYS
+    time_period = days * 24 * 3600
     ##start = int(self.data[0]['unixtime'])
-    end = int(self.data[-1]['unixtime'])
-    start = end - GRAPH_DAYS
+    ##end = int(self.data[-1]['unixtime'])
+    end_spec = 'now'
+    start_spec = 'end-%ds' % (time_period,)
     for graph_name, graph_spec in self.graphs.items():
       graph_argv = []
       for spec in graph_spec:
@@ -523,24 +504,24 @@ class DataSet(object):
             fields[0] = fields[0] + '1'
           spec = ':'.join(fields)
           graph_argv.append(spec)
-      self.rrdgraph(graph_name, graph_argv)
+      self.rrdgraph(graph_name, graph_argv, start=start_spec, end=end_spec)
     graph_argv = []
     for rrd_spec in self.rrd_specs():
       if 'kwh' in rrd_spec.csv_hdr.lower():
         graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
-    self.rrdgraph('kwh', graph_argv)
+    self.rrdgraph('kwh', graph_argv, start=start_spec, end=end_spec)
     graph_argv = []
     for rrd_spec in self.rrd_specs():
       if 'kw' in rrd_spec.csv_hdr.lower() and 'kwh' not in rrd_spec.csv_hdr.lower():
         graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
-    self.rrdgraph('kw', graph_argv)
-    if False:
+    self.rrdgraph('kw', graph_argv, start=start_spec, end=end_spec)
+    if True:
       # debugging graphs for various parameters
       for rrd_spec in self.rrd_specs():
         self.rrdgraph(f'ds_{rrd_spec.ds_name}', [
             f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
             f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
-        ])
+        ], start=start_spec, end=end_spec)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
