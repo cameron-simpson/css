@@ -429,6 +429,7 @@ def mapping_transcriber(
     cls, *, prefix=None, T=None,
     transcription_mapping=None,
     required=None, optional=None,
+    factory=None,
 ):
   ''' A class decorator to provide mapping style `parse_inner` and
       `transcribe_inner` methods and to register the class against
@@ -442,6 +443,9 @@ def mapping_transcriber(
       * `required`: optional list of keys required in the mapping
       * `optional`: optional list of keys which may be present in
         the mapping
+      * `factory`: a factory to construct an instance of `cls` given
+        keywords arguments supplied by the parsed mapping;
+        default: `cls`
 
       Example:
 
@@ -461,6 +465,8 @@ def mapping_transcriber(
   if transcription_mapping is None:
     raise ValueError(
         "missing transcription_mapping, expected a function of self")
+  if factory is None:
+    factory = cls
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, parsed_prefix):
     ''' Parse the inner section as a mapping.
@@ -472,12 +478,13 @@ def mapping_transcriber(
     m, offset = parse_mapping(
         s, offset, stopchar=stopchar, T=T,
         required=required, optional=optional)
-    return cls(m), offset
+    return factory(**m), offset
   cls.parse_inner = parse_inner
   def transcribe_inner(self, T, fp):
     return transcribe_mapping(transcription_mapping(self), fp, T=T)
   cls.transcribe_inner = transcribe_inner
   register(cls, prefix=prefix, T=T)
+  return cls
 
 if __name__ == '__main__':
   from .transcribe_tests import selftest
