@@ -36,19 +36,26 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ -s "$video" ]
-then
-  base=$( basename "$video" )
-  case "$base" in
-    *.*)    prefix=$( expr "x$base" : 'x\(.*\)\..*' ) ;;
-    *)      prefix=$base ;;
-  esac
-  case "$prefix" in
-    *%*)    prefix=$( printf '%s\n' "$prefix" | sed 's/%/&&/g' ) ;;
-  esac
-else
-  prefix=
-fi
+case "$video" in
+  -)  prefix=stdin ;;
+  *)  if [ -s "$video" ]
+      then
+        base=$( basename "$video" )
+        case "$base" in
+          *.*)  prefix=$( expr "x$base" : 'x\(.*\)\..*' ) ;;
+          *)    prefix=$base ;;
+        esac
+        case "$prefix" in
+          *%*)  prefix=$( printf '%s\n' "$prefix" | sed 's/%/&&/g' ) ;;
+        esac
+        case "$prefix" in
+          -*)   prefix="frame$prefix" ;;
+        esac
+      else
+        prefix=frame
+      fi
+      ;;
+esac
 
 set -x
 ##exec mplayer -nosound -vo png:z=9 -vf "framestep=$framestep" ${1+"$@"}
