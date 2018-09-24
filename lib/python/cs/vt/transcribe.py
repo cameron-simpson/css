@@ -34,7 +34,7 @@ import sys
 from uuid import UUID
 from cs.deco import decorator
 from cs.lex import get_identifier, is_identifier, \
-                   get_decimal_value, get_qstr, \
+                   get_decimal_or_float_value, get_qstr, \
                    texthexify
 from cs.pfx import Pfx
 
@@ -114,6 +114,7 @@ class Transcribe:
     self.class_map = {}         # baseclass -> prefix
     self.class_transcribers = {
         int: str,
+        float: lambda f: "%f" % f,
         str: repr,
         bool: lambda v: '1' if v else '0',
         bytes: texthexify,
@@ -233,7 +234,7 @@ class Transcribe:
       return value, offset2
     # decimal values
     if s[offset:offset+1].isdigit():
-      return get_decimal_value(s, offset)
+      return get_decimal_or_float_value(s, offset)
     # prefix{....}
     prefix, offset = get_identifier(s, offset)
     if not prefix:
@@ -311,7 +312,7 @@ class Transcribe:
       if c == stopchar:
         break
       if c != ',':
-        raise ValueError("offset %d: expected ','" % (offset,))
+        raise ValueError("offset %d: expected ',' but found: %r" % (offset, s[offset:]))
       offset += 1
     if required is None and optional is None:
       return d, offset
