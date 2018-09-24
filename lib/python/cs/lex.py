@@ -728,7 +728,8 @@ def get_tokens(s, offset, getters):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
       def func(s, offset):
-        ''' Wrapper for a getter with a .match method, such as a regular expression.
+        ''' Wrapper for a getter with a .match method, such as a regular
+            expression.
         '''
         m = getter.match(s, offset)
         if m:
@@ -756,7 +757,7 @@ def isUC_(s):
   '''
   if s.isalpha() and s.isupper():
     return True
-  if len(s) < 1:
+  if not s:
     return False
   if not s[0].isupper():
     return False
