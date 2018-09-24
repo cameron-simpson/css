@@ -364,6 +364,19 @@ def get_hexadecimal_value(s, offset=0):
     raise ValueError("expected hexadecimal value")
   return int('0x' + value_s), offset
 
+def get_decimal_or_float_value(s, offset=0):
+  ''' Fetch a decimal or basic float (nnn.nnn) value
+      from the str `s` at `offset`.
+      Return (value, new_offset).
+  '''
+  int_part, offset = get_decimal(s, offset)
+  if not int_part:
+    raise ValueError("expected decimal or basic float value")
+  if offset == len(s) or s[offset] != '.':
+    return int(int_part), offset
+  sub_part, offset = get_decimal(s, offset + 1)
+  return float('.'.join((int_part, sub_part))), offset
+
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
       letter or underscore followed by letters, digits or underscores)
