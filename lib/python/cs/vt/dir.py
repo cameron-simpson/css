@@ -27,6 +27,7 @@ from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
+from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked, locked_property
 from cs.x import X
@@ -655,11 +656,14 @@ class IndirectDirent(_Dirent):
     if fs is None:
       fs = defaults.fs
       if not fs:
+        exception("NO CURRENT FILESYSTEM")
+        stack_dump()
         raise ValueError("no current FileSystem")
     try:
       I = fs[self.uuid]
     except KeyError as e:
-      error("%s: no inode for UUID %s", fs, self.uuid)
+      error("%s: no inode for UUID %s: %s", fs, self.uuid, e)
+      stack_dump()
       raise
     return I.E
 
