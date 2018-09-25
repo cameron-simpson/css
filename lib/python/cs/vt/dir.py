@@ -4,14 +4,14 @@
 ''' Implementation of directories (Dir) and their entries (FileDirent, etc).
 '''
 
-import os
-import os.path
 from cmd import Cmd
 from collections import OrderedDict
 from enum import IntEnum, IntFlag
 import errno
 from getopt import GetoptError
 import grp
+import os
+import os.path
 import pwd
 import shlex
 import stat
@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
-from cs.logutils import debug, error, warning, info
+from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
