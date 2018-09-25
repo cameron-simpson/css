@@ -205,10 +205,8 @@ class Meta(dict, Transcriber):
       * `'u'`: owner
       * `'g'`: group owner
       * `'a'`: ACL
-      * `'iref'`: inode number (hard links)
       * `'c'`: st_ctime, last change to inode/metadata
       * `'m'`: modification time, a float
-      * `'n'`: number of hardlinks
       * `'su'`: setuid
       * `'sg'`: setgid
       * `'pathref'`: pathname component for symlinks (and, later, hard links)
@@ -217,13 +215,14 @@ class Meta(dict, Transcriber):
 
   transcribe_prefix = 'M'
 
-  def __init__(self, E):
+  def __init__(self, mapping=None):
     dict.__init__(self)
-    self.E = E
-    self._acl = None
+    self._lock = RLock()
     self._xattrs = {}
     self._ctime = 0
-    self._lock = RLock()
+    if mapping:
+      for k, v in mapping.items():
+        self[k] = v
 
   def __str__(self):
     return "Meta:" + self.textencode()
@@ -315,10 +314,10 @@ class Meta(dict, Transcriber):
     self._ctime = time.time()
 
   @classmethod
-  def from_text(cls, metatext, E=None):
+  def from_text(cls, metatext):
     ''' Construct a new Meta from `metatext`.
     '''
-    M = cls(E)
+    M = cls()
     M.update_from_text(metatext)
     return M
 
@@ -453,20 +452,11 @@ class Meta(dict, Transcriber):
     self['m'] = when
 
   @property
-  def dflt_acl_text(self):
-    return DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
-
-  @property
   @locked
   def acl(self):
     ''' Return the live list of AC instances, decoded at need.
     '''
-    _acl = self._acl
-    if _acl is None:
-      dflt_acl = DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
-      acl_text = self.get('a', dflt_acl)
-      _acl = self._acl = decodeACL(acl_text)
-    return _acl
+    return self['a']
 
   @acl.setter
   @locked
@@ -532,13 +522,16 @@ class Meta(dict, Transcriber):
     # TODO: setuid, setgid, sticky
 
   @property
-  def unix_perms(self):
-    ''' Return (user, group, unix-mode-bits).
-        The user and group are strings, not uid/gid.
-        For ACLs with more than one user or group this is only an approximation,
-        keeping the permissions for the frontmost user and group.
+  def unix_perm_bits(self, isdir=False):
+    ''' Return unix-mode-bits.
+        *Note*: excludes the type bits (S_IFREG etc).
+
+        For ACLs with more than one user or group this is only an
+        approximation.
     '''
-    perms = self.unix_typemode
+    perms = 0
+    X("UNIX PERM BITS: acl type %r", type(self.acl))
+    X("UNIX PERM BITS: acl=%r", self.acl)
     for ac in self.acl:
       if ac.audience == 'o':
         perms |= ac.unixmode << 6
@@ -547,56 +540,13 @@ class Meta(dict, Transcriber):
       elif ac.audience == '*':
         perms |= ac.unixmode
       else:
-        warning("Meta.unix_perms: ignoring ACL element %s", ac.extencode)
+        warning("Meta.unix_perms: ignoring ACL element %s", ac)
     # TODO: setuid, setgid, sticky
     if self.setuid:
       perms |= S_ISUID
     if self.setgid:
       perms |= S_ISUID
-    uid = self.uid
-    if uid is None:
-      uid = NOUSERID
-    gid = self.gid
-    if gid is None:
-      gid = NOGROUPID
-    return uid, gid, perms
-
-  @property
-  def unix_typemode(self):
-    ''' The portion of the mode bits defining the inode type.
-    '''
-    if self.E.isdir:
-      typemode = stat.S_IFDIR
-    elif self.E.isfile:
-      typemode = stat.S_IFREG
-    elif self.E.issym:
-      typemode = stat.S_IFLNK
-    elif self.E.ishardlink:
-      typemode = stat.S_IFREG
-    else:
-      warning("Meta.unix_typemode: neither a dir nor a file, pretending S_IFREG")
-      typemode = stat.S_IFREG
-    return typemode
-
-  @property
-  def inum(self):
-    try:
-      itxt = self['iref']
-    except KeyError:
-      raise AttributeError("inum: no 'iref' key")
-    return int(itxt)
-
-  @property
-  def nlink(self):
-    return self.get('n', 1)
-
-  @nlink.setter
-  def nlink(self, new_nlink):
-    self['n'] = new_nlink
-
-  @nlink.deleter
-  def nlink(self):
-    del self['n']
+    return perms
 
   @property
   def pathref(self):
@@ -654,7 +604,6 @@ class Meta(dict, Transcriber):
   def stat(self):
     ''' Return a Stat object computed from this Meta data.
     '''
-    E = self.E
     st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
