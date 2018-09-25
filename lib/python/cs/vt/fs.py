@@ -13,6 +13,7 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
+from cs.excutils import logexc
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.range import Range
@@ -158,31 +159,40 @@ class Inodes(object):
       UUID, such as when making an IndirectDirent.
   '''
 
-  def __init__(self, fs, inodes_datatext=None):
+  def __init__(self, fs):
     self.fs = fs                # main filesystem
     self._allocated = Range()   # range of allocated inode numbers
     self._by_inum = {}
     self._by_uuid = {}
     self._by_dirent = {}
-    if inodes_datatext is None:
-      # initialise an empty Dir
-      self._hardlinks_dir, self._hardlinked = Dir('inodes'), Range()
-    else:
-      # Access the inode information (a Range and a Dir).
-      # Return the Dir and update ._allocated.
-      self._hardlinks_dir, self._hardlinked \
-          = self.decode_inode_data(inodes_datatext, self._allocated)
     self._lock = RLock()
 
-  def persist(self):
-    ''' Generator yielding the Inodes which should be persisted
-        across mounts.
-
-        This consists of those Inodes marked as referenced.
+  def load_fs_inode_dirents(self, D):
+    ''' Load entries from an `fs_inode_dirents` Dir into the Inode table.
     '''
-    for I in self._by_inum.values():
-      if I.referenced:
-        yield I
+    X("LOAD FS INODE DIRENTS:")
+    dump_Dirent(D)
+    for name, E in D.entries.items():
+      X("  name=%r, E=%s", name, E)
+      with Pfx(name):
+        uuid_s, refcount_s = name.split(':')[:2]
+        I = self.add(E)
+        I.refcount = int(refcount_s)
+        X("  I=%s", I)
+
+  def get_fs_inode_dirents(self):
+    ''' Create an `fs_inode_dirents` Dir containing Inodes which
+        should be preserved across mounts.
+    '''
+    D = Dir('fs_inode_dirents')
+    for uuid, I in sorted(self._by_uuid.items()):
+      if I.refcount > 0:
+        D["%s:%d" % (uuid, I.refcount)] = I.E
+      else:
+        warning("refcount=%s, SKIP %s", I.refcount, I.E)
+    X("GET FS INODE DIRENTS:")
+    dump_Dirent(D)
+    return D
 
   def _new_inum(self):
     ''' Allocate a new Inode number.
@@ -323,6 +333,7 @@ class FileSystem(object):
     else:
       mntE = E
     self.mntE = mntE
+    self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
@@ -330,17 +341,18 @@ class FileSystem(object):
     self._file_handles = []
     inodes = self._inodes = Inodes(self)
     self[1] = mntE
-    old_inodes = E.meta.get("fs_inode_dirents")
-    if old_inodes:
-      offset = 0
-      while offset < len(old_inodes):
-        if old_inodes[offset] == ',':
-          offset += 1
-          continue
-        IE, offset = _Dirent.from_str(old_inodes, offset)
-        I = inodes.add(IE)
-        I.referenced = True
-        X("added old inode %s", I)
+    with Pfx("fs_inode_dirents"):
+      fs_inode_dirents = E.meta.get("fs_inode_dirents")
+      X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
+      if fs_inode_dirents:
+        inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
+        if offset < len(fs_inode_dirents):
+          warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
+        X("IMPORT INODES:")
+        dump_Dirent(inode_dir)
+        inodes.load_fs_inode_dirents(inode_dir)
+      else:
+        X("NO INODE IMPORT")
     with defaults.stack('fs', self):
       X("FileSystem mntE:")
       dump_Dirent(mntE)
@@ -371,22 +383,27 @@ class FileSystem(object):
     '''
     self._inodes.add(E, inum)
 
+  @logexc
   def _sync(self):
     with Pfx("_sync"):
       if defaults.S is None:
         raise RuntimeError("RUNTIME: defaults.S is None!")
-      E = self.E
-      # update the inode table state
-      E.meta['fs_inode_dirents'] = ','.join(
-          str(I.E) for I in self._inodes.persist()
-      )
       archive = self.archive
       if not self.readonly and archive is not None:
         with self._lock:
+          E = self.E
           updated = False
           X("snapshot %s ...", E)
           E.snapshot()
           X("snapshot: afterwards E=%s", E)
+          fs_inode_dirents = self._inodes.get_fs_inode_dirents()
+          X("_SYNC: FS_INODE_DIRENTS:")
+          dump_Dirent(fs_inode_dirents)
+          X("set meta.fs_inode_dirents")
+          if fs_inode_dirents.size > 0:
+            E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
+          else:
+            E.meta['fs_inode_dirents'] = ''
           new_state = archive.strfor_Dirent(E)
           if new_state != self._last_sync_state:
             archive.update(E)
@@ -395,7 +412,6 @@ class FileSystem(object):
         # debugging
         if updated:
           dump_Dirent(E, recurse=False)
-          dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
   def _resolve(self, path):
     ''' Call paths.resolve and return its result.
@@ -417,18 +433,13 @@ class FileSystem(object):
     return E
 
   @locked
-  def E2i(self, E):
-    ''' Compute the inode number for a Dirent.
-
-        HardlinkDirents have a persistent .inum mapping to the Meta['iref'] field.
-        Others do not and keep a private ._inum, not preserved after umount.
+  def E2inode(self, E):
+    ''' Return the Inode for the supplied Dirent `E`.
     '''
     E0 = E
     if E.isindirect:
       E = E.ref
-    I = self._inodes.add(E)
-    X("E2i(%s) => %s", E0, I)
-    return I.inum
+    return self._inodes.add(E)
 
   def i2E(self, inum):
     ''' Return the Dirent associated with the supplied `inum`.
@@ -484,15 +495,9 @@ class FileSystem(object):
       error("fs is readonly")
       raise OSError(errno.EROFS)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
-    inum = self.E2i(E)
     if flags & O_TRUNC:
       FH.truncate(0)
     return self._new_file_handle_index(FH)
-
-  def hardlink_for(self, E):
-    ''' Make a HardlinkDirent from `E`, return the new Dirent.
-    '''
-    return self._inodes.hardlink_for(E)
 
   @locked
   def _fh(self, fhndx):
@@ -529,12 +534,7 @@ class FileSystem(object):
     ''' Check access mode `amode` against Dirent `E`.
     '''
     with Pfx("access(E=%r,amode=%s,uid=%r,gid=%d)", E, amode, uid, gid):
-      if E.ishardlink:
-        E2 = self._inodes.dirent(E.inum)
-        warning("map hardlink %s => %s", E, E2)
-      else:
-        E2 = E
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
-      return E2.meta.access(amode, uid, gid,
+      return E.meta.access(amode, uid, gid,
                             default_uid=uid, default_gid=gid)
