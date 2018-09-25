@@ -49,8 +49,7 @@ class DirentType(IntEnum):
   FILE = 0
   DIR = 1
   SYMBOLIC = 2
-  HARD = 3
-  INDIRECT = 4
+  INDIRECT = 3
 
 class DirentFlags(IntFlag):
   ''' Flag values for the Dirent binary encoding.
@@ -256,8 +255,6 @@ class _Dirent(Transcriber):
       cls = FileDirent
     elif type_ == DirentType.SYMBOLIC:
       cls = SymlinkDirent
-    elif type_ == DirentType.HARD:
-      cls = HardlinkDirent
     elif type_ == DirentType.INDIRECT:
       cls = IndirectDirent
     else:
@@ -331,7 +328,6 @@ class _Dirent(Transcriber):
         'F': DirentType.FILE,
         'D': DirentType.DIR,
         'SymLink': DirentType.SYMBOLIC,
-        'HardLink': DirentType.HARD,
         'Indirect': DirentType.INDIRECT,
     }.get(prefix)
     return cls.from_components(type_, name, **attrs), offset
@@ -448,12 +444,6 @@ class _Dirent(Transcriber):
     return self.type == DirentType.SYMBOLIC
 
   @property
-  def ishardlink(self):
-    ''' Is this a hard link _Dirent?
-    '''
-    return self.type == DirentType.HARD
-
-  @property
   def isindirect(self):
     ''' Is this an indirect _Dirent?
     '''
@@ -508,7 +498,6 @@ class _Dirent(Transcriber):
 register_transcriber(_Dirent, (
     'INVALIDDirent',
     'SymLink',
-    'HardLink',
     'Indirect',
     'D',
     'F',
@@ -572,54 +561,10 @@ class SymlinkDirent(_Dirent):
     '''
     return super().transcribe_inner(T, fp, {})
 
-class HardlinkDirent(_Dirent):
-  ''' A hard link.
-
-      Unlike the regular UNIX filesystem, in a vt filesystem a
-      hard link is a wrapper for an ordinary Dirent; this wrapper references
-      a persistent inode number and the source Dirent. Most attributes
-      are proxied from the wrapped Dirent.
-
-      In a normal Dirent .inum is a local attribute and not preserved;
-      in a HardlinkDirent it is a proxy for the local .meta.inum.
-
-      TODO: replace HardlinkDirent with a general IndirectDirent
-      with a ref count on the destination.
-  '''
-
-  transcribe_prefix = 'HardLink'
-
-  def __init__(self, name, meta, block=None):
-    _Dirent.__init__(self, DirentType.HARD, name, meta=meta)
-    if block is not None:
-      raise ValueError("block must be None, received: %s" % (block,))
-    self.block = None
-    if not hasattr(self.meta, 'inum'):
-      raise ValueError("meta.inum required (no iref in meta=%r)" % (meta,))
-
-  @property
-  def inum(self):
-    ''' On a HardlinkDirent the .inum accesses the meta['iref'] field.
-        It is set at initialisation, so there is no .setter.
-
-        TODO: inum to be part of FileSystem state, move this property
-        to there.
-    '''
-    return self.meta.inum
-
-  @classmethod
-  def to_inum(cls, inum, name):
-    return cls(name, {'iref': str(inum)})
-
-  def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of a HardlinkDirent.
-    '''
-    return super().transcribe_inner(T, fp, {})
-
 class IndirectDirent(_Dirent):
   ''' An indirect Dirent, referring to another Dirent by UUID.
 
-      This is how a feature like a a hard link is implented in a vt filesystem.
+      This is how a feature like a hard link is implented in a vt filesystem.
 
       *Note*: unlike other Dirents, IndirectDirents are considered
       emphemeral, specificly in that their uuid attribute is a
@@ -678,7 +623,7 @@ class IndirectDirent(_Dirent):
     return self.ref.block
 
   def transcribe_inner(self, T, fp):
-    ''' Transcribe the inner components of a HardlinkDirent.
+    ''' Transcribe the inner components of an IndirectDirent.
     '''
     return super().transcribe_inner(T, fp, {})
 
