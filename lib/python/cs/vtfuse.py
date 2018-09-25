@@ -256,9 +256,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     ''' Compute an llfuse.EntryAttributes object from `E`.meta.
     '''
     fs = self._vtfs
-    st = fs._Estat(E)
+    st = E.stat(fs=fs)
     EA = llfuse.EntryAttributes()
-    EA.st_ino = fs.E2i(E)
+    EA.st_ino = st.st_ino
     ## EA.generation
     ## EA.entry_timeout
     ## EA.attr_timeout
