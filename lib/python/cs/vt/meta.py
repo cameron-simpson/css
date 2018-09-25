@@ -69,8 +69,6 @@ def groupid(groupname):
     return None
   return gr.gr_gid
 
-Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
-
 def permbits_to_allow_deny(bits):
   ''' Take a UNIX 3-bit permission value and return the ACL allow and deny strings.
       Example: 6 (110) => 'rw', 'x'
@@ -611,25 +609,6 @@ class Meta(dict, Transcriber):
       elif not ( perms & 1 ):
           return False
     return True
-
-  def stat(self):
-    ''' Return a Stat object computed from this Meta data.
-    '''
-    st_uid, st_gid, st_mode = self.unix_perms
-    st_ino = -1
-    st_dev = -1
-    st_nlink = self.nlink
-    try:
-      st_size = E.size
-    except AttributeError:
-      st_size = 0
-    else:
-      if st_size is None:
-        st_size = 0
-    st_atime = 0
-    st_mtime = self.mtime
-    st_ctime = 0
-    return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
 
   def apply_posix(self, ospath):
     ''' Apply this Meta to the POSIX OS object at `ospath`.
