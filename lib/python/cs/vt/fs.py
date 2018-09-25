@@ -23,6 +23,7 @@ from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
+from .transcribe import Transcriber, mapping_transcriber
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -100,7 +101,16 @@ class FileHandle:
     self.E.close()
     self.E.parent.changed = True
 
-class Inode(NS):
+@mapping_transcriber(
+    prefix="Ino",
+    transcription_mapping=lambda self: {
+        'refcount': self.refcount,
+        'E': self.E,
+    },
+    required=('refcount', 'E'),
+    optional=(),
+)
+class Inode(Transcriber, NS):
   ''' An Inode associates an inode number and a Dirent.
 
       Attributes:
@@ -108,11 +118,28 @@ class Inode(NS):
       * `E`: the primary Dirent
   '''
 
-  def __init__(self, inum, E):
+  transcribe_prefix = 'Ino'
+
+  def __init__(self, inum, E, refcount=0):
     NS.__init__(self)
     self.inum = inum
     self.E = E
-    self.referenced = False
+    self.refcount = refcount
+
+  def transcribe_inner(self, T, fp):
+    return transcribe_mapping({
+        'refcount': self.refcount,
+        'E': self.E,
+    }, fp, T=T)
+
+  @classmethod
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
+    if prefix != self.transcribe_prefix:
+      raise ValueError(
+          "expected prefix=%r, got: %r"
+          % (self.transcribe_prefix, prefix,))
+    m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
+    return cls(m), offset
 
 class Inodes(object):
   ''' Inode information for a filesystem.
