@@ -465,7 +465,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EEXIST)
     uu = E.get_uuid()
     Pnew[new_name] = IndirectDirent(new_name, uu)
-    I.referenced = True
+    I.refcount += 1
     Pold = E.parent
     if Pold:
       old_name = E.name
@@ -963,6 +963,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
       E = P.pop(name)
     except KeyError:
       raise FuseOSError(errno.ENOENT)
+    if E.isindirect:
+      I = fs.E2inode(E)
+      I.refcount -= 1
 
   @handler
   def write(self, fhndx, off, buf):
