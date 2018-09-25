@@ -233,8 +233,8 @@ class Meta(dict, Transcriber):
       for k, v in mapping.items():
         self[k] = v
 
-  def __str__(self):
-    return "Meta:" + self.textencode()
+  def __repr__(self):
+    return ':'.join( (type(self).__name__, str(self)) )
 
   def textencode(self):
     ''' Return the encoding of this Meta as text.
@@ -274,7 +274,9 @@ class Meta(dict, Transcriber):
     return transcribe_mapping(d, fp, T=T)
 
   @classmethod
-  def parse_inner(cls, T, s, offset, stopchar):
+  def parse_inner(cls, T, s, offset, stopchar, prefix):
+    if prefix != 'M':
+      raise ValueError("expected prefix='M', got: %r" % (prefix,))
     m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
     return cls(m), offset
 
