@@ -644,29 +644,47 @@ class Meta(dict, Transcriber):
 
   @staticmethod
   def _xattrify(xkv):
-    ''' Convert value `xkv` to bytes.
+    ''' Convert value `xkv` to str as though an ISO8859-1 encoding.
+
+        We keep a mapping of str->str for the JSON encoding.
     '''
-    if isinstance(xkv, bytes):
-      return xkv
+    if isinstance(xkv, (int, float)):
+      xkv = str(xkv)
     if isinstance(xkv, str):
       return xkv.encode('utf-8')
+    if isinstance(xkv, bytes):
+      return xkv.decode('iso8859-1')
     raise TypeError("cannot convert to bytes: %r" % (xkv,))
 
   def getxattr(self, xk, xv_default):
-    return self._xattrs.get(self._xattrify(xk), xv_default)
+    ''' Return the bytes value for key `kx`, or `xv_default` if missing.
+    '''
+    k = self._xattrify(xk)
+    try:
+      v = self._xattrs[k]
+    except KeyError:
+      return xv_default
+    # convert the str back into bytes
+    return v.encode('iso8859-1')
 
   def setxattr(self, xk, xv):
+    ''' Set the value for key `xk` to `xv`.
+        Accepted types include: bytes, str, int, float.
+    '''
     xk = self._xattrify(xk)
     xv = self._xattrify(xv)
     self._xattrs[xk] = xv
+    dict.__setitem__['x'] = self._xattrs
 
   def delxattr(self, xk):
+    ''' Delete the key `xk` if present.
+    '''
     xk = self._xattrify(xk)
     if xk in self._xattrs:
       del self._xattrs[xk]
 
   def listxattrs(self):
-    return self._xattrs.keys()
+    return [ xk.encode('iso8859-1') for xk in self._xattrs.keys() ]
 
   @property
   def mime_type(self):
