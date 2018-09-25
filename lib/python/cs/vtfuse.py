@@ -114,6 +114,8 @@ def handler(method):
         "%s.%s(%s)",
         type(self).__name__, method.__name__, ','.join(arg_desc)
     ):
+      if method.__name__ not in ('getxattr','statfs',):
+        X("CALL %s(*%r,**%r)", method.__name__, a, kw)
       fs = self._vtfs
       try:
         with defaults.stack('fs', fs):
