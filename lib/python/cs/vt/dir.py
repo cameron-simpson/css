@@ -33,7 +33,7 @@ from cs.x import X
 from . import totext, PATHSEP, defaults
 from .block import Block, _Block, BlockRecord
 from .file import RWBlockFile
-from .meta import Meta, rwx
+from .meta import Meta, rwx, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, resolve
 from .transcribe import Transcriber, parse as parse_transcription, \
                         register as register_transcriber
@@ -491,10 +491,67 @@ class _Dirent(Transcriber):
       when = time.time()
     self.mtime = when
 
-  def stat(self):
-    ''' Return this Dirent's meta.stat().
+  def stat(self, fs=None):
+    ''' Return this Dirent's POSIX stat structure.
     '''
-    return self.meta.stat()
+    if fs is None:
+      fs = defaults.fs
+    M = self.meta
+    I = fs.E2inode(self)
+    perm_bits = M.unix_perm_bits
+    if perm_bits is None:
+      if self.isdir:
+        perm_bits = 0o700
+      else:
+        perm_bits = 0o600
+    st_mode = self.unix_typemode | perm_bits
+    st_ino = I.inum
+    # TODO: dev from FileSystem
+    st_dev = fs.device_id
+    if self.isindirect:
+      st_nlink = I.refcount
+    else:
+      # TODO: should nlink for Dirs count its subdirs?
+      st_nlink = 1
+    st_uid = M.uid
+    st_gid = M.gid
+    st_size = self.size
+    st_atime = 0
+    st_mtime = M.mtime
+    st_ctime = 0
+    return os.stat_result( (
+        st_mode,
+        st_ino,
+        st_dev,
+        st_nlink,
+        st_uid, st_gid,
+        st_size,
+        st_atime, st_mtime, st_ctime,
+    ) )
+
+  @property
+  def unix_typemode(self):
+    ''' The portion of the mode bits defining the inode type.
+    '''
+    E = self
+    if E.isindirect:
+      E = E.ref
+      if E.isindirect:
+        raise ValueError(
+            "indirect %s refers to another indirect: %s"
+            % (self, E))
+    if E.isdir:
+      typemode = stat.S_IFDIR
+    elif E.isfile:
+      typemode = stat.S_IFREG
+    elif E.issym:
+      typemode = stat.S_IFLNK
+    else:
+      warning(
+          "%s.unix_typemode: unrecognised type %d, pretending S_IFREG"
+          % (type(self), self.type))
+      typemode = stat.S_IFREG
+    return typemode
 
   def complete(self, S2, recurse=False):
     ''' Complete this Dirent from alternative Store `S2`.
