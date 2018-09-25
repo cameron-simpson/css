@@ -712,12 +712,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with S:
-                try:
-                  EA = self._vt_EntryAttributes(E)
-                except Exception as e:
-                  warning("%r: %s", name, e)
-                  EA = None
+              with defaults.stack('fs', fs):
+                with S:
+                  try:
+                    EA = self._vt_EntryAttributes(E)
+                  except Exception as e:
+                    warning("%r: %s", name, e)
+                    EA = None
           if EA is not None:
             yield self._vt_bytes(name), EA, o + 1
           o += 1
@@ -861,14 +862,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
         M.mtime = attr.st_mtime_ns / 1000000000.0
       if fields.update_mode:
         M.chmod(attr.st_mode&0o7777)
-        extra_mode = attr.st_mode & ~0o7777
-        typemode = stat.S_IFMT(extra_mode)
-        extra_mode &= ~typemode
-        if typemode != M.unix_typemode:
-          warning("update_mode: E.meta.typemode 0o%o != attr.st_mode&S_IFMT 0o%o",
-                  M.unix_typemode, typemode)
-        if extra_mode != 0:
-          warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
       if fields.update_uid:
         M.uid = attr.st_uid
       if fields.update_gid:
