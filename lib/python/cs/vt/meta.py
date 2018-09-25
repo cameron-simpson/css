@@ -97,10 +97,7 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
   ''' An Access Control.
   '''
 
-  def __repr__(self):
-    return ':'.join( (self.__class__.__name__, self.textencode()) )
-
-  def textencode(self):
+  def __str__(self):
     ''' Encode this access control as text.
     '''
     audience, allow, deny = self
@@ -113,6 +110,19 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
           "invalid allow, may not contain a dash: %r"
           % (allow,))
     return audience + ':' + allow + '-' + deny
+
+  def __repr__(self):
+    return ':'.join( (type(self).__name__, str(self)) )
+
+  @classmethod
+  def from_str(cls, ac_text):
+    ''' Factory function to return a new AC from an encoded AC.
+    '''
+    audience, allow_deny = ac_text.split(':', 1)
+    if audience not in ('o', 'g', '*'):
+      raise ValueError("invalid audience %r from %r" % (audience, ac_text))
+    allow, deny = allow_deny.split('-', 1)
+    return cls(audience, allow, deny)
 
   def __call__(self, M, accesses):
     ''' Call the AC with the Meta `M` and the required permissions `accesses`.
@@ -158,31 +168,30 @@ AC_Owner = lambda allow, deny: AC('o', allow, deny)
 AC_Group = lambda allow, deny: AC('g', allow, deny)
 AC_Other = lambda allow, deny: AC('*', allow, deny)
 
-def decodeAC(ac_text):
-  ''' Factory function to return a new AC from an encoded AC.
-  '''
-  audience, allow_deny = ac_text.split(':', 1)
-  allow, deny = allow_deny.split('-', 1)
-  return AC(audience, allow, deny)
+class ACL(list):
 
-def decodeACL(acl_text):
-  ''' Return a list of ACs from the encoded list `acl_text`.
-  '''
-  acl = []
-  for ac_text in acl_text.split(','):
-    if ac_text:
-      try:
-        ac = decodeAC(ac_text)
-      except ValueError as e:
-        error("invalid ACL element ignored: %r: %s", ac_text, e)
-      else:
-        acl.append(ac)
-  return acl
+  def __str__(self):
+    ''' transcribe a list of AC instances as text.
+    '''
+    return ','.join( [ str(ac) for ac in self ] )
 
-def encodeACL(acl):
-  ''' Encode a list of AC instances as text.
-  '''
-  return ','.join( [ ac.textencode() for ac in acl ] )
+  @classmethod
+  def from_str(cls, acl_text):
+    ''' Return an ACL from the str `acl_text`.
+    '''
+    acl = cls()
+    for ac_text in acl_text.split(','):
+      if ac_text:
+        X("parse AC %r", ac_text)
+        try:
+          ac = AC.from_str(ac_text)
+        except ValueError as e:
+          error("invalid ACL element ignored: %r: %s", ac_text, e)
+          raise
+        else:
+          X("ACL.from_str: append(%r)", ac)
+          acl.append(ac)
+    return acl
 
 def xattrs_from_bytes(bs, offset=0):
   ''' Decode an XAttrs from some bytes, return the xattrs dictionary.
@@ -507,10 +516,12 @@ class Meta(dict, Transcriber):
       self.setgid = True
     else:
       self.setgid = False
-    self.acl = [ AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ),
-                 AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
-                 AC_Other( *permbits_to_allow_deny( mode&7 ) )
-               ] + [ ac for ac in self.acl if ac.audience not in ('o', 'g', '*') ]
+    acl = ACL()
+    acl.append(AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ))
+    acl.append(AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ))
+    acl.append(AC_Other( *permbits_to_allow_deny( mode&7 ) ))
+    acl.extend(ac for ac in self.acl if ac.audience not in ('o', 'g', '*'))
+    self.acl = acl
 
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
