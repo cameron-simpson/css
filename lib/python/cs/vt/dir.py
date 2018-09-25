@@ -8,6 +8,7 @@ from cmd import Cmd
 from collections import OrderedDict
 from enum import IntEnum, IntFlag
 import errno
+from functools import partial
 from getopt import GetoptError
 import grp
 import os
@@ -174,6 +175,8 @@ class _Dirent(Transcriber):
   ''' Incomplete base class for Dirent objects.
   '''
 
+  transcribe_prefix = 'DIRENT'
+
   def __init__(
       self,
       type_, name,
@@ -181,7 +184,9 @@ class _Dirent(Transcriber):
       meta=None,
       uuid=None,
       parent=None,
-      prevblock=None
+      prevblock=None,
+      block=None,
+      **kw,
   ):
     ''' Initialise a _Dirent.
 
@@ -197,32 +202,33 @@ class _Dirent(Transcriber):
           transcription of this Dirent's previous state - another
           Dirent
     '''
-    if not isinstance(type_, int):
-      raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
-    if name is not None and not isinstance(name, str):
-      raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
-    self.type = type_
-    self.name = name
-    self.uuid = uuid
-    assert prevblock is None or isinstance(prevblock, _Block), \
-        "not _Block: prevblock=%r" % (prevblock,)
-    self._prev_dirent_blockref = prevblock
-    if isinstance(meta, Meta):
-      if meta.E is not None and meta.E is not self:
-        warning("meta.E is %r, replacing with self %r", meta.E, self)
-      meta.E = self
-    else:
-      M = Meta(self)
-      if meta is None:
-        pass
-      elif isinstance(meta, str):
-        M.update_from_text(meta)
-      else:
-        raise ValueError("unsupported meta value: %r" % (meta,))
-      meta = M
-    if type_ != DirentType.INDIRECT:
-      self.meta = meta
-    self.parent = parent
+    with Pfx("_Dirent(type_=%s,name=%r,...)", type_, name):
+      if not isinstance(type_, int):
+        raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
+      if name is not None and not isinstance(name, str):
+        raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
+      if kw:
+        error("unsupported keyword arguments: %r", kw)
+      if block is not None:
+        raise ValueError("block is not None: %r", block)
+      self.type = type_
+      self.name = name
+      self.uuid = uuid
+      assert prevblock is None or isinstance(prevblock, _Block), \
+          "not _Block: prevblock=%r" % (prevblock,)
+      self._prev_dirent_blockref = prevblock
+      if not isinstance(meta, Meta):
+        M = Meta({'a': DEFAULT_DIR_ACL if self.isdir else DEFAULT_FILE_ACL})
+        if meta is None:
+          pass
+        elif isinstance(meta, str):
+          M.update_from_text(meta)
+        else:
+          raise ValueError("unsupported meta value: %r" % (meta,))
+        meta = M
+      if type_ != DirentType.INDIRECT:
+        self.meta = meta
+      self.parent = parent
 
   def __repr__(self):
     return "%s:%s:%s(%s:%s,%s)" % (
@@ -258,7 +264,9 @@ class _Dirent(Transcriber):
     elif type_ == DirentType.INDIRECT:
       cls = IndirectDirent
     else:
-      cls = _Dirent
+      X("from_components: UNSUPPORTED TYPE %r, using _Dirent", type_)
+      cls = partial(_Dirent, type_)
+    X("from_components: cls=%r, kw=%r", cls, kw)
     return cls(name, **kw)
 
   @staticmethod
@@ -293,18 +301,21 @@ class _Dirent(Transcriber):
     '''
     return id(self)
 
-  def transcribe_inner(self, T, fp, attrs):
+  def transcribe_inner(self, T, fp, attrs={}):
     ''' Transcribe the inner components of the Dirent as text.
     '''
     if self.name and self.name != '.':
       T.transcribe(self.name, fp=fp)
       fp.write(':')
+    if type(self) is _Dirent:
+      attrs['type'] = self.type
     if self.uuid:
       attrs['uuid'] = self.uuid
     if self.type != DirentType.INDIRECT:
       if self.meta:
         attrs['meta'] = self.meta
-      if self.block:
+      block = getattr(self, 'block', None)
+      if block:
         attrs['block'] = self.block
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
