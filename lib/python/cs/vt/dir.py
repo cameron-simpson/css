@@ -990,7 +990,9 @@ class Dir(_Dirent):
       warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
       E.parent = self
 
-  def __delitem__(self, name):
+  def pop(self, name):
+    ''' Delete `name` and return the Dirent.
+    '''
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
@@ -1000,6 +1002,9 @@ class Dir(_Dirent):
     E.parent = None
     self.touch()
     self.changed = True
+    return E
+
+  __delitem__ = pop
 
   def add(self, E):
     ''' Add a Dirent to this Dir.
