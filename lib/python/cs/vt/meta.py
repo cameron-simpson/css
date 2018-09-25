@@ -226,6 +226,8 @@ class Meta(dict, Transcriber):
     dict.__init__(self)
     self._lock = RLock()
     self._xattrs = {}
+    dict.__setitem__(self, 'x', self._xattrs)
+    self.acl = ACL()
     self._ctime = 0
     if mapping:
       for k, v in mapping.items():
@@ -237,87 +239,74 @@ class Meta(dict, Transcriber):
   def textencode(self):
     ''' Return the encoding of this Meta as text.
     '''
-    self._normalise()
-    if all(k in ('u', 'g', 'a', 'iref', 'c', 'm', 'n', 'su', 'sg') for k in self.keys()):
+    d = self._as_dict()
+    if all(k in ('u', 'g', 'a', 'c', 'm', 'su', 'sg') for k in d.keys()):
       # these are all "safe" fields - use the compact encoding
-      encoded = ';'.join( ':'.join( (k, str(self[k])) )
-                          for k in sorted(self.keys())
-                        )
+      encoded = ';'.join(
+          ':'.join((
+              k,
+              "%f" % v if isinstance(v, float) else str(v)
+          ))
+          for k, v in sorted(d.items())
+      )
     else:
       # use the more verbose safe JSON encoding
-      d = dict(self)
-      try:
-        encoded = json.dumps(d, separators=(',', ':'))
-      except Exception as e:
-        exception("json.dumps: %s: d=%r", e, d)
-        raise
+      encoded = json.dumps(d, separators=(',', ':'))
     return encoded
 
+  def _as_dict(self):
+    ''' A dictionary usable for JSON or the compact transcription.
+    '''
+    d = dict(self)
+    # drop xattrs if empty
+    xa = d.get('x', {})
+    if not xa and 'x' in d:
+      del d['x']
+    # convert ACL to str, leave other types alone
+    d = dict(
+        (k, (str(v) if isinstance(v, ACL) else v))
+        for k, v in sorted(d.items())
+    )
+    return d
+
   def transcribe_inner(self, T, fp):
-    return transcribe_mapping(dict(self), fp, T=T)
+    d = self._as_dict()
+    return transcribe_mapping(d, fp, T=T)
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar):
     m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
     return cls(m), offset
 
-  def _normalise(self):
-    ''' Update some entries from their unpacked forms.
-    '''
-    # update 'a' if necessary
-    _acl = self._acl
-    if _acl is None:
-      if 'a' in self:
-        del self['a']
-    else:
-      self['a'] = encodeACL(_acl)
-    # update 'x' if necessary
-    _xattrs = self._xattrs
-    if _xattrs:
-      x = {}
-      for xk, xv in self._xattrs.items():
-        x[xk.decode('iso8859-1')] = xv.decode('iso8859-1')
-      self['x'] = x
-    elif 'x' in self:
-      del self['x']
-
   def __getitem__(self, k):
-    if k == 'a':
-      _acl = self._acl
-      if _acl is None:
-        raise KeyError(k)
-      return encodeACL(_acl)
     if k == 'c':
       return self._ctime
     return dict.__getitem__(self, k)
 
   def __setitem__(self, k, v):
-    if k == 'a':
-      if isinstance(v, str):
-        self._acl = decodeACL(v)
-      else:
-        warning("%s: non-str 'a': %r", self, v)
-    elif k == 'c':
+    # intercept some keys
+    if k == 'c':
       v = float(v)
       self._ctime = v
-    elif k in ('m',):
-      v = float(v)
-      dict.__setattr__(self, k, v)
-    elif k == 'n':
-      v = int(v)
-      dict.__setattr__(self, k, v)
-    elif k == 'x':
+      return
+    if k == 'x':
       for xk, xv in v.items():
         self.setxattr(xk, xv)
-    else:
-      dict.__setattr__(self, k, v)
+      return
+    if k == 'a':
+      X("set %r from %r", k, v)
+      if isinstance(v, str):
+        v = ACL.from_str(v)
+      elif not isinstance(v, ACL):
+        raise ValueError("not an ACL: %r", v)
+      X("set %r: %r %r", k, type(v), v)
+    elif k in ('m',):
+      v = float(v)
+    dict.__setitem__(self, k, v)
     self._ctime = time.time()
 
   def __delitem__(self, k):
-    if k == 'a':
-      self._acl = None
-    else:
-      dict.__delitem__(self, k)
+    dict.__delitem__(self, k)
     self._ctime = time.time()
 
   @classmethod
@@ -350,7 +339,12 @@ class Meta(dict, Transcriber):
         else:
           kvs.append((k, v))
     for k, v in kvs:
-      self[k] = v
+      if k == 'x':
+        # update the xattrs from `v`, which should be a dict
+        for xk, xv in v.items():
+          self.setxattr(xk.decode('iso8859-1'), xv.decode('iso8859-1'))
+      else:
+        self[k] = v
 
   @property
   def user(self):
@@ -470,8 +464,8 @@ class Meta(dict, Transcriber):
   def acl(self, ac_L):
     ''' Rewrite the ACL with a list of AC instances.
     '''
-    self['a'] = encodeACL(ac_L)
-    self._acl = None
+    X("set M.acl = %r", ac_L)
+    self['a'] = ac_L
 
   @property
   def setuid(self):
