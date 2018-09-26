@@ -509,11 +509,11 @@ class _Dirent(Transcriber):
     st_ino = I.inum
     # TODO: dev from FileSystem
     st_dev = fs.device_id
-    if self.isindirect:
-      st_nlink = I.refcount
-    else:
+    if self.isdir:
       # TODO: should nlink for Dirs count its subdirs?
       st_nlink = 1
+    else:
+      st_nlink = I.refcount
     st_uid = M.uid
     st_gid = M.gid
     st_size = self.size
