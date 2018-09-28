@@ -344,7 +344,7 @@ class Meta(dict, Transcriber):
       if k == 'x':
         # update the xattrs from `v`, which should be a dict
         for xk, xv in v.items():
-          self.setxattr(xk.decode('iso8859-1'), xv.decode('iso8859-1'))
+          self.setxattr(xk, xv)
       else:
         self[k] = v
 
