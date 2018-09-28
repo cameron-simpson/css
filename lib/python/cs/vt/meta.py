@@ -240,7 +240,7 @@ class Meta(dict, Transcriber):
     ''' Return the encoding of this Meta as text.
     '''
     d = self._as_dict()
-    if all(k in ('u', 'g', 'a', 'c', 'm', 'su', 'sg') for k in d.keys()):
+    if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in d.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join(
           ':'.join((
