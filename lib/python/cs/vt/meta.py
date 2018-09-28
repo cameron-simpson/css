@@ -180,14 +180,12 @@ class ACL(list):
     acl = cls()
     for ac_text in acl_text.split(','):
       if ac_text:
-        X("parse AC %r", ac_text)
         try:
           ac = AC.from_str(ac_text)
         except ValueError as e:
           error("invalid ACL element ignored: %r: %s", ac_text, e)
           raise
         else:
-          X("ACL.from_str: append(%r)", ac)
           acl.append(ac)
     return acl
 
@@ -296,12 +294,10 @@ class Meta(dict, Transcriber):
         self.setxattr(xk, xv)
       return
     if k == 'a':
-      X("set %r from %r", k, v)
       if isinstance(v, str):
         v = ACL.from_str(v)
       elif not isinstance(v, ACL):
         raise ValueError("not an ACL: %r", v)
-      X("set %r: %r %r", k, type(v), v)
     elif k in ('m',):
       v = float(v)
     dict.__setitem__(self, k, v)
@@ -466,7 +462,6 @@ class Meta(dict, Transcriber):
   def acl(self, ac_L):
     ''' Rewrite the ACL with a list of AC instances.
     '''
-    X("set M.acl = %r", ac_L)
     self['a'] = ac_L
 
   @property
@@ -535,8 +530,6 @@ class Meta(dict, Transcriber):
         approximation.
     '''
     perms = 0
-    X("UNIX PERM BITS: acl type %r", type(self.acl))
-    X("UNIX PERM BITS: acl=%r", self.acl)
     for ac in self.acl:
       if ac.audience == 'o':
         perms |= ac.unixmode << 6
