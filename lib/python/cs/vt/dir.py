@@ -226,6 +226,8 @@ class _Dirent(Transcriber):
           M.update_from_text(meta)
         else:
           raise ValueError("unsupported meta value: %r" % (meta,))
+        if 'm' not in M:
+          M['m'] = time.time()
         meta = M
       if type_ != DirentType.INDIRECT:
         self.meta = meta
