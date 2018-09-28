@@ -506,7 +506,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     # TODO: ctx allows to access inode?
     E = self._vtfs.i2E(inode)
     xattrs = set(E.meta.listxattrs())
-    xattrs.add(XATTR_NAME_BLOCKREF)
+    ## conceal some special/dynamic xattrs: available on get but
+    ## not shown in list
+    ## xattrs.add(XATTR_NAME_BLOCKREF)
     return list(xattrs)
 
   @handler
@@ -793,10 +795,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EROFS)
     # TODO: test for inode ownership?
     if xattr_name == XATTR_NAME_BLOCKREF:
-      # TODO: should we support this as "force recompute"?
-      # feels like that would be a bug workaround
-      X("removexattr(inode=%s,xattr_name=%r)", inode, xattr_name)
-      raise FuseOSError(errno.EINVAL)
+      # removing the x-vt-blockref xattr is a no-op
+      return
     E = self._vtfs.i2E(inode)
     meta = E.meta
     try:
