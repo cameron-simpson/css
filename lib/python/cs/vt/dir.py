@@ -871,10 +871,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
 class Dir(_Dirent):
   ''' A directory.
 
-      .changed  Starts False, becomes true if this or any subdirectory
-                gets changed or has a file opened; stays True from then on.
-                This accepts an ongoing compute cost for .block to avoid
-                setting the flag on every file.write etc.
+      Special attributes:
+      * `changed`:
+        Starts False, becomes true if this or any subdirectory gets changed
+        or has a file opened; stays True from then on.
+        This accepts an ongoing compute cost for .block to avoid
+        setting the flag on every file.write etc.
   '''
 
   transcribe_prefix = 'D'
