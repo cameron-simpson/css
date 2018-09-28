@@ -469,6 +469,8 @@ class _Dirent(Transcriber):
   @property
   def size(self):
     ''' Return this Dirent's length: its Block's span length.
+
+        Note that Dirents with a None Block return None.
     '''
     block = self.block
     return None if block is None else len(block)
@@ -516,7 +518,15 @@ class _Dirent(Transcriber):
       st_nlink = I.refcount
     st_uid = M.uid
     st_gid = M.gid
-    st_size = self.size
+    if self.issym:
+      pathref = self.pathref
+      if pathref is None:
+        warning("no pathref for %s", self)
+        st_size = 0
+      else:
+        st_size = len(pathref)
+    else:
+      st_size = self.size
     st_atime = 0
     st_mtime = M.mtime
     st_ctime = 0
