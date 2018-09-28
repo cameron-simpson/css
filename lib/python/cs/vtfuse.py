@@ -502,12 +502,11 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.lookup
     '''
+    name = self._vt_str(name_b)
     fs = self._vtfs
     I = fs[parent_inode]
     X("lookup: I=%s", I)
-    name = self._vt_str(name_b)
     # TODO: test for permission to search parent_inode
-    X("lookup2: I=%s", I)
     P = I.E
     EA = None
     if name == '.':
