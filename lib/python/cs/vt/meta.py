@@ -581,7 +581,9 @@ class Meta(dict, Transcriber):
         * `default_uid`: the reference uid to use if this Meta.uid == NOUSERID.
         * `default_gid`: the reference gid to use if this Meta.gid == NOGROUPID.
     '''
-    u, g, perms = self.unix_perms
+    u = self.uid
+    g = self.gid
+    perms = self.unix_perm_bits
     if u == NOUSERID and default_uid is not None:
       u = default_uid
     if g == NOGROUPID and default_gid is not None:
@@ -685,7 +687,7 @@ class Meta(dict, Transcriber):
     xk = self._xattrify(xk)
     xv = self._xattrify(xv)
     self._xattrs[xk] = xv
-    dict.__setitem__['x'] = self._xattrs
+    dict.__setitem__(self, 'x', self._xattrs)
 
   def delxattr(self, xk):
     ''' Delete the key `xk` if present.
