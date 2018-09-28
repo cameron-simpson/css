@@ -622,12 +622,16 @@ class SymlinkDirent(_Dirent):
 
   transcribe_prefix = 'SymLink'
 
-  def __init__(self, name, pathref, *, block=None, **kw):
-    super().__init__(DirentType.SYMBOLIC, name, **kw)
+  def __init__(self, name, *, block=None, target=None, **kw):
     if block is not None:
       raise ValueError("block must be None, received: %s" % (block,))
+    super().__init__(DirentType.SYMBOLIC, name, **kw)
     self.block = None
-    self.meta.pathref = pathref
+    if target is None:
+      if self.meta.pathref is None:
+        raise ValueError("missing target")
+    else:
+      self.meta.pathref = target
 
   @property
   def pathref(self):
