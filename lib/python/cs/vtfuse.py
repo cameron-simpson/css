@@ -946,7 +946,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         raise FuseOSError(errno.ENOTDIR)
       if name in P:
         raise FuseOSError(errno.EEXIST)
-      E = SymlinkDirent(name, target)
+      E = SymlinkDirent(name, target=target)
       P[name] = E
       return self._vt_EntryAttributes(E)
 
