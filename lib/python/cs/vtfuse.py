@@ -464,23 +464,36 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if new_name in Pnew:
       raise FuseOSError(errno.EEXIST)
     uu = E.get_uuid()
-    Pnew[new_name] = IndirectDirent(new_name, uu)
+    EI = Pnew[new_name] = IndirectDirent(new_name, uu)
     I.refcount += 1
+    # need to promote the old Dir entry to an IndirectDirent
+    # TODO: standard operation in fs.py
     Pold = E.parent
     if Pold:
-      old_name = E.name
-      Eold = Pold[old_name]
-      if not Eold.isindirect:
-        if Eold is not E and Eold.uuid == uu:
-          warning("original link has the same UUID but is not the same object, reconciling")
-          E.reconcile(Eold)
-          Eold = E
-        if Eold is E:
-          Pold[old_name] = IndirectDirent(old_name, uu)
-        else:
-          warning("old parent already has a different Dirent for %r", old_name)
+      if Pold.isindirect:
+        if Pold.uuid != uu:
+          warning(
+              "E.parent's UUID (%r) does not make E.uuid (%r)",
+              Pold.uuid, uu)
+      else:
+        old_name = E.name
+        Eold = Pold[old_name]
+        if not Eold.isindirect:
+          if Eold is E:
+            # replace with IndirectLink to E.uuid
+            Pold[old_name] = IndirectDirent(old_name, uu)
+          else:
+            # not the same Dirent:
+            # the expected scenario is that it has the same UUID
+            # and a different history
+            if Eold.uuid == uu:
+              warning("original link has the same UUID but is not the same object, reconciling")
+              E.reconcile(Eold)
+              Eold = E
+            else:
+              warning("old parent already has a different Dirent for %r", old_name)
     # utilise the latest parent and name for purposes
-    E.parent = Pnew
+    E.parent = EI
     E.name = new_name
     return self._vt_EntryAttributes(E)
 
