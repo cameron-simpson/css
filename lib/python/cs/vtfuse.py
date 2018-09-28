@@ -554,8 +554,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    I = fs[parent_inode]
-    I += 1
     name = self._vt_str(name_b)
     # TODO: test for permission to search and write parent_inode
     P = fs.i2E(parent_inode)
@@ -579,8 +577,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    I = fs[parent_inode]
-    I += 1
     name = self._vt_str(name_b)
     P = fs.i2E(parent_inode)
     if not P.isdir:
@@ -930,8 +926,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
         "SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r",
         parent_inode, name_b, target_b, ctx
     ):
-      I = fs[parent_inode]
-      I += 1
       name = self._vt_str(name_b)
       target = self._vt_str(target_b)
       # TODO: check search/write on P
