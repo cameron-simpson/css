@@ -216,7 +216,7 @@ class Meta(dict, Transcriber):
       * `'m'`: modification time, a float
       * `'su'`: setuid
       * `'sg'`: setgid
-      * `'pathref'`: pathname component for symlinks (and, later, hard links)
+      * `'pathref'`: pathname component for symlinks
       * `'x'`: xattrs
   '''
 
@@ -555,7 +555,16 @@ class Meta(dict, Transcriber):
 
   @property
   def pathref(self):
-    return self['pathref']
+    ''' Return the `pathref`, the path used by SymlinkDirents.
+        Returns None if there is no pathref.
+    '''
+    return self.get('pathref')
+
+  @pathref.setter
+  def pathref(self, newref):
+    ''' Set the `pathref` on a SymlinkDirent.
+    '''
+    self['pathref'] = newref
 
   def access(
       self, access_mode,
