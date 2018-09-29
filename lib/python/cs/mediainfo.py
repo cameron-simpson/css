@@ -122,7 +122,8 @@ class EpisodeInfo(NS):
           value, offset = defn.parse(s, offset)
         except ValueError:
           pass
-        fields[defn.name] = value
+        else:
+          fields[defn.name] = value
       return fields, offset
 
   @prop
