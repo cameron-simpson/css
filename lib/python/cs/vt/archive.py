@@ -22,13 +22,14 @@ import time
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import warning, error, exception
+from cs.logutils import warning, error, exception, debug
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
 from .dir import _Dirent, FileDirent, DirFTP
 from .file import filedata
+from .meta import NOUSERID, NOGROUPID
 from .paths import resolve, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
@@ -105,14 +106,17 @@ class _Archive(object):
         raise
 
   def update(self, E, when=None, previous=None, force=False, source=None):
-    ''' Save the supplied Dirent `E` with timestamp `when` (default now). Return the Dirent transcription.
-        `E`: the Dirent to save.
-        `when`: the POSIX timestamp for the save, default now.
-        `previous`: optional previous Dirent transcription; defaults
+    ''' Save the supplied Dirent `E` with timestamp `when`.
+        Return the Dirent transcription.
+
+        Parameters:
+        * `E`: the Dirent to save.
+        * `when`: the POSIX timestamp for the save, default now.
+        * `previous`: optional previous Dirent transcription; defaults
           to the latest Transcription from of the Archive
-        `force`: append an entry even if the previous entry has the
+        * `force`: append an entry even if the previous entry has the
           same transcription as `previous`, default False
-        `source`: optional source indicator for the update, default None
+        * `source`: optional source indicator for the update, default None
     '''
     assert isinstance(E, _Dirent), "expected E<%s> to be a _Dirent" % (type(E),)
     etc = E.name
@@ -303,10 +307,10 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
             log("file     %s", relfilename)
             try:
               copy_in_file(fileE, filepath, modes)
-            except OSError as e:
+            except IOError as e:
               error(str(e))
               continue
-            except IOError as e:
+            except OSError as e:
               error(str(e))
               continue
 
@@ -332,7 +336,8 @@ def copy_in_file(E, filepath, modes):
     E.meta.update_from_stat(st)
 
 def _blockify_file(fp, E):
-  ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
+  ''' Read data from the file `fp` and compare with the FileDirect
+      `E`, yielding leaf Blocks for a new file.
       This underpins copy_in_file().
   '''
   # read file data in chunks matching the existing leaves
@@ -407,6 +412,7 @@ def copy_out_file(E, ospath, modes=None, log=None):
     raise ValueError("expected FileDirent, got: %r" % (E,))
   try:
     # TODO: should this be os.stat if we don't support symlinks?
+    # (but we do support symlinks)
     st = os.lstat(ospath)
   except OSError:
     st = None
@@ -443,7 +449,6 @@ def apply_posix_stat(src_st, ospath):
   '''
   with Pfx("apply_posix_stat(%r)", ospath):
     path_st = os.stat(ospath)
-    src_st = self.stat()
     if src_st.st_uid == NOUSERID or src_st.st_uid == path_st.st_uid:
       uid = -1
     else:
@@ -454,7 +459,9 @@ def apply_posix_stat(src_st, ospath):
       gid = src_st.st_gid
     if uid != -1 or gid != -1:
       with Pfx("chown(uid=%d,gid=%d)", uid, gid):
-        debug("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, path_st.st_uid, path_st.st_gid)
+        debug(
+            "chown(%r,%d,%d) from %d:%d",
+            ospath, uid, gid, path_st.st_uid, path_st.st_gid)
         try:
           os.chown(ospath, uid, gid)
         except OSError as e:
@@ -473,10 +480,14 @@ def apply_posix_stat(src_st, ospath):
       st_mtime = path_st.st_mtime
       if mst_mtime != st_mtime:
         with Pfx("chmod(0o%04o)", mst_perms):
-          debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, path_st.st_atime, mst_mtime, st_mtime)
+          debug(
+              "utime(%r,atime=%s,mtime=%s) from mtime=%s",
+              ospath, path_st.st_atime, mst_mtime, st_mtime)
           os.utime(ospath, (path_st.st_atime, mst_mtime))
 
 class ArchiveFTP(DirFTP):
+  ''' Initial sketch for FTP interface to an Archive.
+  '''
 
   def __init__(self, arpath, prompt=None):
     self.path = arpath
@@ -488,5 +499,7 @@ class ArchiveFTP(DirFTP):
     super().__init__(rootD, prompt=prompt)
 
   def postloop(self):
+    ''' Sync the Archive at the end of the FTP session.
+    '''
     super().postloop()
     self.archive.update(self.rootD)
