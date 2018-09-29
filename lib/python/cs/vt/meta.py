@@ -610,44 +610,6 @@ class Meta(dict, Transcriber):
           return False
     return True
 
-  def apply_posix(self, ospath):
-    ''' Apply this Meta to the POSIX OS object at `ospath`.
-    '''
-    with Pfx("Meta.apply_os(%r)", ospath):
-      st = os.lstat(ospath)
-      mst = self.stat()
-      if mst.st_uid == NOUSERID or mst.st_uid == st.st_uid:
-        uid = -1
-      else:
-        uid = mst.st_uid
-      if mst.st_gid == NOGROUPID or mst.st_gid == st.st_gid:
-        gid = -1
-      else:
-        gid = mst.st_gid
-      if uid != -1 or gid != -1:
-        with Pfx("chown(uid=%d,gid=%d)", uid, gid):
-          debug("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, st.st_uid, st.st_gid)
-          try:
-            os.chown(ospath, uid, gid)
-          except OSError as e:
-            if e.errno == errno.EPERM:
-              warning("%s", e)
-            else:
-              raise
-      st_perms = st.st_mode & 0o7777
-      mst_perms = mst.st_mode & 0o7777
-      if st_perms != mst_perms:
-        with Pfx("chmod(0o%04o)", mst_perms):
-          debug("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
-          os.chmod(ospath, mst_perms)
-      mst_mtime = mst.st_mtime
-      if mst_mtime > 0:
-        st_mtime = st.st_mtime
-        if mst_mtime != st_mtime:
-          with Pfx("chmod(0o%04o)", mst_perms):
-            debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
-            os.utime(ospath, (st.st_atime, mst_mtime))
-
   @staticmethod
   def _xattrify(xkv):
     ''' Convert value `xkv` to str as though an ISO8859-1 encoding.

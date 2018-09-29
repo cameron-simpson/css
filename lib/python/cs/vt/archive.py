@@ -386,7 +386,7 @@ def copy_out_dir(rootD, rootpath, modes=None, log=None):
             files[:] = ()
             continue
         # apply the metadata now in case of setgid etc
-        thisD.meta.apply_posix(dirpath)
+        apply_posix_stat(thisD.stat(), dirpath)
         for filename in sorted(files):
           with Pfx(filename):
             E = thisD[filename]
@@ -396,7 +396,7 @@ def copy_out_dir(rootD, rootpath, modes=None, log=None):
             filepath = os.path.join(dirpath, filename)
             copy_out_file(E, filepath, modes, log=log)
         # apply the metadata again
-        thisD.meta.apply_posix(dirpath)
+        apply_posix_stat(thisD.stat(), dirpath)
 
 def copy_out_file(E, ospath, modes=None, log=None):
   ''' Update the OS file `ospath` from the FileDirent `E` according to `modes`.
@@ -436,7 +436,45 @@ def copy_out_file(E, ospath, modes=None, log=None):
         wrote += len(chunk)
     if Blen != wrote:
       error("Block len = %d, wrote %d", Blen, wrote)
-    M.apply_posix(ospath)
+    apply_posix_stat(E.stat(), ospath)
+
+def apply_posix_stat(src_st, ospath):
+  ''' Apply a stat object to the POSIX OS object at `ospath`.
+  '''
+  with Pfx("apply_posix_stat(%r)", ospath):
+    path_st = os.stat(ospath)
+    src_st = self.stat()
+    if src_st.st_uid == NOUSERID or src_st.st_uid == path_st.st_uid:
+      uid = -1
+    else:
+      uid = src_st.st_uid
+    if src_st.st_gid == NOGROUPID or src_st.st_gid == path_st.st_gid:
+      gid = -1
+    else:
+      gid = src_st.st_gid
+    if uid != -1 or gid != -1:
+      with Pfx("chown(uid=%d,gid=%d)", uid, gid):
+        debug("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, path_st.st_uid, path_st.st_gid)
+        try:
+          os.chown(ospath, uid, gid)
+        except OSError as e:
+          if e.errno == errno.EPERM:
+            warning("%s", e)
+          else:
+            raise
+    st_perms = path_st.st_mode & 0o7777
+    mst_perms = src_st.st_mode & 0o7777
+    if st_perms != mst_perms:
+      with Pfx("chmod(0o%04o)", mst_perms):
+        debug("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
+        os.chmod(ospath, mst_perms)
+    mst_mtime = src_st.st_mtime
+    if mst_mtime > 0:
+      st_mtime = path_st.st_mtime
+      if mst_mtime != st_mtime:
+        with Pfx("chmod(0o%04o)", mst_perms):
+          debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, path_st.st_atime, mst_mtime, st_mtime)
+          os.utime(ospath, (path_st.st_atime, mst_mtime))
 
 class ArchiveFTP(DirFTP):
 
