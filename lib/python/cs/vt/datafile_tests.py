@@ -13,8 +13,10 @@ try:
   import kyotocabinet
 except ImportError:
   kyotocabinet = None
+from cs.binary_tests import _TestPacketFields
 ##from cs.debug import thread_dump
 from cs.randutils import rand0, randblock
+from . import datafile
 from .datafile import DataFile
 # from .hash_tests import _TestHashCodeUtils
 # TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
@@ -22,6 +24,11 @@ from .datafile import DataFile
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
+
+class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
+
+  def setUp(self):
+    self.module = datafile
 
 class TestDataFile(unittest.TestCase):
 
@@ -78,10 +85,12 @@ def multitest_suite(testcase_class, *a, **kw):
   return suite
 
 def selftest(argv):
-  suite = unittest.TestSuite()
-  suite.addTest(multitest_suite(TestDataFile))
-  runner = unittest.TextTestRunner(failfast=True, verbosity=2)
-  runner.run(suite)
+  unittest.main(__name__, None, argv)
+  ##suite = unittest.TestSuite()
+  ##suite.addTest(multitest_suite(TestDataFile))
+  ##suite.addTest(TestDataFilePacketFields())
+  ##runner = unittest.TextTestRunner(failfast=True, verbosity=2)
+  ##runner.run(suite)
   ##if False:
   ##  import cProfile
   ##  cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())

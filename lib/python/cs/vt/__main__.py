@@ -36,7 +36,7 @@ import cs.x
 from cs.x import X
 from . import fromtext, defaults
 from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
-from .block import Block, IndirectBlock, decodeBlock
+from .block import Block, IndirectBlock, Block_from_bytes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
@@ -390,7 +390,7 @@ class VTCmd:
     for blockref in args:
       with Pfx(blockref):
         blockref_bs = fromtext(blockref)
-        B, offset = decodeBlock(blockref_bs)
+        B, offset = Block_from_bytes(blockref_bs)
         if offset < len(blockref_bs):
           raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
         if not fsck_Block(B):
@@ -701,7 +701,11 @@ class VTCmd:
             else:
               raise
         try:
-          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, fsname=fsname)
+          T = mount(
+              mountpoint, E,
+              S=mount_store, archive=archive, subpath=subpath,
+              readonly=readonly, append_only=append_only,
+              fsname=fsname)
           cs.x.X_via_tty = True
           T.join()
         except KeyboardInterrupt as e:
@@ -815,9 +819,8 @@ class VTCmd:
         filepath = arg
         DF = DataFile(filepath)
         with DF:
-          for offset, flags, data in DF.scan():
-            if flags & DataFlag.COMPRESSED:
-              data = decompress(data)
+          for record, offset in DF.scanfrom():
+            data = record.data
             print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
     return 0
 

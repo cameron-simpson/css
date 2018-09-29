@@ -35,6 +35,14 @@ class Config:
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
       It is modelled on a .ini file, with named clauses each containing named values.
+
+      Parameters:
+      * `config_map`: either a mapping of mappings: `{clause_name: {param: value}}`
+        or the filename of a file in `.ini` format
+      * `environ`: optional environment mapp for `$varname` substitution.
+        Default: `os.environ`
+      * `runstate`: a optional `cs.resources.RunState` to share
+        with the various Stores
   '''
 
   def __init__(self, config_map, environ=None, runstate=None):
@@ -113,7 +121,8 @@ class Config:
       return ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
 
   def Stores_from_spec(self, store_spec):
-    ''' Parse a colon separated list of Store specifications, return a list of Stores.
+    ''' Parse a colon separated list of Store specifications,
+        return a list of Stores.
     '''
     store_specs = list(parse_store_specs(store_spec))
     if not store_specs:
@@ -212,26 +221,20 @@ class Config:
       basedir = self.get_default('basedir')
     if path is None:
       path = clause_name
-      debug("path from clausename: %r", path)
     path = longpath(path)
-    debug("longpath(path) ==> %r", path)
     if not isabspath(path):
       if path.startswith('./'):
         path = abspath(path)
-        debug("abspath ==> %r", path)
       else:
-        debug("basedir=%r", basedir)
         if basedir is None:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
-        debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
-        debug("path ==> %r", path)
     if data is not None:
       data = longpath(data)
     if runstate is None:
       runstate = self.runstate
-    return DataDirStore(store_name, path, data, None, None, runstate=runstate)
+    return DataDirStore(store_name, path, datadirpath=data, runstate=runstate)
 
   def filecache_Store(
       self,

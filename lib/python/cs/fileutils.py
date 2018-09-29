@@ -737,14 +737,21 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
 @strable(open_func=partial(open, mode='rb'))
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
-      NOTE: this function may move the file pointer.
-      `f`: the file from which to read data; if a string, the file
+
+      *NOTE*: this function may move the file pointer.
+
+      Parameters:
+      * `f`: the file from which to read data; if a string, the file
         is opened with mode="rb"; if an int, treated as an OS file
-        descriptor; otherwise presumed to be a file-like object
-      `offset`: starting offset for the data
-      `readsize`: read size, default DEFAULT_READSIZE.
+        descriptor; otherwise presumed to be a file-like object.
+        If that object has a `.fileno()` method, treat that as an
+        OS file descriptor and use it.
+      * `offset`: starting offset for the data
+      * `readsize`: read size, default DEFAULT_READSIZE.
+
       For file-like objects, the read1 method is used in preference
-      to read if available.
+      to read if available. The file pointer is briefly moved during
+      fetches.
   '''
   if readsize is None:
     readsize = DEFAULT_READSIZE
@@ -752,6 +759,16 @@ def datafrom(f, offset, readsize=None):
     # operating system file descriptor
     for data in datafrom_fd(f, offset, readsize=readsize):
       yield data
+  # see if the file has a fileno
+  try:
+    get_fileno = f.fileno
+  except AttributeError:
+    pass
+  else:
+    fd = get_fileno()
+    if stat.S_ISREG(os.fstat(fd).st_mode):
+      for data in datafrom_fd(fd, offset, readsize=readsize):
+        yield data
   # presume a file-like object
   try:
     read1 = f.read1
@@ -779,7 +796,8 @@ class ReadMixin(object):
   '''
 
   def datafrom(self, offset, readsize=None):
-    ''' Yield data from the specified `offset` onward in some approximation of the "natural" chunk size.
+    ''' Yield data from the specified `offset` onward in some
+        approximation of the "natural" chunk size.
 
         NOTE: UNLIKE the global datafrom() function, this method
         MUST NOT move the logical file position. Implementors may need
@@ -790,6 +808,7 @@ class ReadMixin(object):
         The aspiration here is to read data with only a single call
         to the underlying storage, and to return the chunks in
         natural sizes instead of some default read size.
+
         Classes using this mixin must implement this method.
     '''
     raise NotImplementedError("return an iterator which does not change the file offset")
@@ -803,12 +822,13 @@ class ReadMixin(object):
     ''' Read up to `size` bytes, honouring the "single system call"
         spirit unless `longread` is true.
 
-        `size`: the number of bytes requested. A size of -1 requests
+        Parameters:
+        * `size`: the number of bytes requested. A size of -1 requests
           all bytes to the end of the file.
-        `offset`: the starting point of the read; if None, use the
+        * `offset`: the starting point of the read; if None, use the
           current file position; if not None, seek to this position
           before reading, even if `size` == 0.
-        `longread`: switch from "single system call" to "as many
+        * `longread`: switch from "single system call" to "as many
           as required to obtain `size` bytes"; short data will still
           be returned if the file is too short.
     '''
@@ -831,7 +851,8 @@ class ReadMixin(object):
         # We need to retest on each iteration because other reads
         # may be interleaved, interfering with the buffer.
         if bfr is None or bfr.offset != offset:
-          X("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
+          if bfr is not None:
+            X("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:
@@ -955,16 +976,17 @@ class BackedFile(ReadMixin):
   def datafrom(self, offset):
     ''' Generator yielding natural chunks from the file commencing at offset.
     '''
+    global_datafrom = globals()['datafrom']
     front_file = self.front_file
     try:
       front_datafrom = front_file.datafrom
     except AttributeError:
-      front_datafrom = partial(ReadMixin.datafrom, front_file)
+      front_datafrom = partial(global_datafrom, front_file)
     back_file = self.back_file
     try:
       back_datafrom = back_file.datafrom
     except AttributeError:
-      back_datafrom = partial(ReadMixin.datafrom, back_file)
+      back_datafrom = partial(global_datafrom, back_file)
     for in_front, span in self.front_range.slices(offset, len(self)):
       consume = len(span)
       if in_front:

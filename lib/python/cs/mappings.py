@@ -740,6 +740,8 @@ class StackableValues(object):
     return v
 
   def __setattr__(self, attr, value):
+    ''' For nonunderscore attributes, replace the top element of the stack.
+    '''
     if attr.startswith('_'):
       self.__dict__[attr] = value
     else:
@@ -759,7 +761,15 @@ class StackableValues(object):
     try:
       v = vs[-1]
     except IndexError:
-      raise KeyError(key)
+      try:
+        fallback_func = self._fallback
+      except AttributeError:
+        # no fallback function
+        raise KeyError(key)
+      try:
+        return fallback_func(key)
+      except Exception as e:
+        raise KeyError("fallback for %r fails: %s" % (key, e)) from e
     return v
 
   def get(self, key, default=None):

@@ -1,17 +1,17 @@
-import sys
-if sys.hexversion >= 0x02050000:
-  from hashlib import sha1
-else:
-  from sha import new as sha1
-if sys.hexversion < 0x02060000:
-  bytes = str
+#!/usr/bin/env python3
+#
+
+''' Functions and classes around hashcodes.
+'''
+
 from binascii import unhexlify
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
+from hashlib import sha1
+import sys
+from cs.binary import PacketField, BSUInt
 from cs.lex import hexify, get_identifier
-from cs.logutils import D
 from cs.resources import MultiOpenMixin
-from cs.serialise import get_bs, put_bs
-from cs.x import X
+from cs.serialise import put_bs
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
@@ -27,19 +27,34 @@ class MissingHashcodeError(KeyError):
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
 
-def decode(bs, offset=0):
-  ''' Decode a serialised hash.
-      Return the hash object and new offset.
+class HashCodeField(PacketField):
+  ''' A PacketField for parsing and transcibing hashcodes.
   '''
-  hashenum, offset = get_bs(bs, offset)
-  if hashenum == HASH_SHA1_T:
-    hashcls = Hash_SHA1
-  else:
-    raise ValueError("unsupported hashenum %d", hashenum)
-  return hashcls._decode(bs, offset)
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
+    '''
+    hashenum = BSUInt.value_from_buffer(bfr)
+    if hashenum == HASH_SHA1_T:
+      hashcls = Hash_SHA1
+    else:
+      raise ValueError("unsupported hashenum %d" % (hashenum,))
+    return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
+
+  @staticmethod
+  def transcribe_value(hashcode):
+    ''' Serialise a hashcode.
+    '''
+    yield BSUInt.transcribe_value(hashcode.HASHENUM)
+    yield hashcode
+
+decode_buffer = HashCodeField.value_from_buffer
+decode = HashCodeField.value_from_bytes
 
 def hash_of_byteses(bss):
-  ''' Compute a Hash_SHA1 from the bytes of the supplied `hashcodes`.
+  ''' Compute a `Hash_SHA1` from the bytes of the supplied `hashcodes`.
+
       This underlies the mechanism for comparing remote Stores.
   '''
   H = sha1()
@@ -47,7 +62,7 @@ def hash_of_byteses(bss):
     H.update(bs)
   return Hash_SHA1.from_chunk(H.digest())
 
-class _Hash(bytes, Transcriber):
+class HashCode(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
   '''
 
@@ -67,36 +82,37 @@ class _Hash(bytes, Transcriber):
   def __hash__(self):
     return bytes.__hash__(self)
 
+  @staticmethod
+  def from_buffer(bfr):
+    ''' Decode a hash from a buffer.
+    '''
+    return HashCodeField.value_from_buffer(bfr)
+
+  def transcribe_b(self):
+    ''' Binary transcription of this hash via `cs.binary.PacketField.transcribe_value`.
+    '''
+    return HashCodeField.transcribe_value(self)
+
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
-        If we ever have a variable length hash function, hash bytes will include that information.
+        If we ever have a variable length hash function,
+        hash bytes will have to include that information.
     '''
-    # no hashenum and raw hash
-    return self.HASHENUM_BS + self
-
-  @classmethod
-  def _decode(cls, encdata, offset=0):
-    ''' Pull off the encoded hash from the start of the encdata.
-        Return Hash_* object and new offset.
-        NOTE: this happens _after_ the hash type signature prefixed by .encode.
-    '''
-    hashbytes = encdata[offset:offset+cls.HASHLEN]
-    if len(hashbytes) != cls.HASHLEN:
-      raise ValueError("short data? got %d bytes, expected %d: %r"
-                       % (len(hashbytes), cls.HASHLEN, encdata[offset:offset+cls.HASHLEN]))
-    return cls.from_hashbytes(hashbytes), offset+len(hashbytes)
+    return bytes(HashCodeField(self))
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
     ''' Factory function returning a Hash_SHA1 object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
-      raise ValueError("expected %d bytes, received %d: %r" % (cls.HASHLEN, len(hashbytes), hashbytes))
+      raise ValueError(
+          "expected %d bytes, received %d: %r"
+          % (cls.HASHLEN, len(hashbytes), hashbytes))
     return cls(hashbytes)
 
   @classmethod
   def from_chunk(cls, chunk):
-    ''' Factory function returning a _Hash object from a data block.
+    ''' Factory function returning a HashCode object from a data block.
     '''
     hashbytes = cls.HASHFUNC(chunk).digest()
     return cls.from_hashbytes(hashbytes)
@@ -120,7 +136,8 @@ class _Hash(bytes, Transcriber):
 
   @staticmethod
   def parse_inner(T, s, offset, stopchar, prefix):
-    ''' Parse hashname:hashhextext from `s` at offset `offset`. Return _Hash instance and new offset.
+    ''' Parse hashname:hashhextext from `s` at offset `offset`.
+        Return HashCode instance and new offset.
     '''
     hashname, offset = get_identifier(s, offset)
     if not hashname:
@@ -138,9 +155,11 @@ class _Hash(bytes, Transcriber):
     H = hashclass.from_hashbytes(bs)
     return H, offset
 
-register_transcriber(_Hash)
+register_transcriber(HashCode)
 
-class Hash_SHA1(_Hash):
+class Hash_SHA1(HashCode):
+  ''' A hash class for SHA1.
+  '''
   __slots__ = ()
   HASHFUNC = sha1
   HASHNAME = 'sha1'
@@ -152,12 +171,13 @@ class Hash_SHA1(_Hash):
 HASHCLASS_BY_NAME = {}
 
 def register_hashclass(klass):
-  global HASHCLASS_BY_NAME
+  ''' Register a hash class for lookup elsewhere.
+  '''
   hashname = klass.HASHNAME
   if hashname in HASHCLASS_BY_NAME:
     raise ValueError(
-            'cannot register hash class %s: hashname %r already registered to %s'
-            % (klass, hashname, HASHCLASS_BY_NAME[hashname]))
+        'cannot register hash class %s: hashname %r already registered to %s'
+        % (klass, hashname, HASHCLASS_BY_NAME[hashname]))
   HASHCLASS_BY_NAME[hashname] = klass
 
 register_hashclass(Hash_SHA1)
@@ -189,13 +209,18 @@ class HashCodeUtilsMixin(object):
       start_hashcode=None,
       reverse=None, after=False, length=None
   ):
-    ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
+    ''' Return a hash of the hashcodes requested and the last
+        hashcode (or None if no hashcodes matched); used for comparing
+        remote Stores.
     '''
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-    hs = list(self.hashcodes(start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
+    hs = list(
+        self.hashcodes(
+            start_hashcode=start_hashcode,
+            reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
     else:
@@ -302,7 +327,12 @@ class HashCodeUtilsMixin(object):
           break
 
   def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
-    return self._defer(self.hashcodes, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
+    ''' Background a hashcodes call.
+    '''
+    return self._defer(
+        self.hashcodes,
+        start_hashcode=start_hashcode,
+        reverse=reverse, after=after, length=length)
 
 class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
@@ -317,7 +347,9 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
     return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
 
   def add(self, data):
-    hashcode = Hash_SHA1.from_chunk(data)
+    ''' Add `data` to the dict.
+    '''
+    hashcode = self.hashclass.from_chunk(data)
     self[hashcode] = data
     return hashcode
 

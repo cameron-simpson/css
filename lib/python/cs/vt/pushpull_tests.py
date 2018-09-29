@@ -9,6 +9,8 @@ from cs.randutils import rand0, randblock
 from cs.x import X
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
+from cs.x import X
+import cs.x; cs.x.X_via_tty = True
 
 class _TestMissingHashCodes(object):
 
@@ -23,9 +25,9 @@ class _TestMissingHashCodes(object):
     self.assertEqual(len(missing), 0)
 
   def test01random_identical(self):
-    ''' Fill map1 and map2 with the same fandom blocks.
+    ''' Fill map1 and map2 with identical some random blocks.
     '''
-    for n in range(32):
+    for _ in range(32):
       data = randblock(rand0(8193))
       h1 = self.map1.add(data)
       h2 = self.map2.add(data)

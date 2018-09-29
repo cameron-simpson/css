@@ -48,7 +48,7 @@ def import_dir(srcpath, D, delete=False, overlay=False, whole_read=False):
                 E = subD[filename]
                 if overlay:
                   if not whole_read:
-                    Estat = E.meta.stat()
+                    Estat = E.stat()
                     try:
                       S = os.stat(filepath)
                     except OSError as e:

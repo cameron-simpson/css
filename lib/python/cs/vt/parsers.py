@@ -124,7 +124,7 @@ def scan_mp4(bfr):
   from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
   with Pfx("parse_mp4"):
     def run_parser(bfr):
-      for B in parse_mp4_from_buffer(bfr, discard=True):
+      for B in parse_mp4_from_buffer(bfr, discard_data=True):
         pass
     return report_offsets(bfr, run_parser)
 

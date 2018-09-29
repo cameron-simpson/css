@@ -10,7 +10,7 @@ from cs.fileutils import BackedFile_TestMethods
 from . import defaults
 from .blockify import blockify, top_block_for
 from .store import MappingStore
-from .file import File
+from .file import RWBlockFile
 
 class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
 
@@ -22,7 +22,7 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     with open(__file__, "rb") as fp:
       self.backing_text = fp.read()
     self.vt_block = top_block_for(blockify([self.backing_text]))
-    self.vt_file = File(self.vt_block)
+    self.vt_file = RWBlockFile(self.vt_block)
     self.backed_fp = self.vt_file._file
 
   def tearDown(self):

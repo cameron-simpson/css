@@ -4,21 +4,21 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Unit tests for cs.vt.blockify.
+'''
+
 from collections import defaultdict
 import os
 import os.path
 import sys
 import time
 import unittest
-from unittest import skip
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
-from cs.logutils import warning
 from cs.randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
-                      blocks_of, MIN_BLOCKSIZE, MAX_BLOCKSIZE, \
-                      DEFAULT_SCAN_SIZE
+                      MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
 
@@ -27,11 +27,13 @@ QUICK = len(os.environ.get('QUICK', '')) > 0
 def random_blocks(max_size=65536, count=64):
   ''' Generate `count` blocks of random sizes from 1 to `max_size`.
   '''
-  for i in range(count):
+  for _ in range(count):
     size = rand0(max_size) + 1
     yield randblock(size)
 
 class TestAll(unittest.TestCase):
+  ''' All the unit tests.
+  '''
 
   # load my_code from this test suite
   with open(__file__, 'rb') as myfp:
@@ -44,12 +46,18 @@ class TestAll(unittest.TestCase):
     random_data = list(random_blocks(max_size=12000, count=1280))
 
   def setUp(self):
+    ''' Open the source file.
+    '''
     self.fp = open(__file__, "rb")
 
   def tearDown(self):
+    ''' Close the source file.
+    '''
     self.fp.close()
 
   def test01scanners(self):
+    ''' Test some domain specific data parsers.
+    '''
     rand_total = sum(len(chunk) for chunk in self.random_data)
     for scanner in (scan_text, scan_mp3):
       with self.subTest(scanner.__name__):
@@ -62,28 +70,31 @@ class TestAll(unittest.TestCase):
             ##X("no TEST.mp3 in ".os.getcwd())
             pass
         Q = scanner(CornuCopyBuffer(iter(input_chunks)))
-        offset = 0
         last_qoffset = 0
         for qoffset in Q:
           self.assertIsInstance(
-            qoffset, int,
-            'scanner must yield only ints, received %s:%r'
-            % (type(qoffset), qoffset))
-          self.assertTrue(last_qoffset <= qoffset, "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
+              qoffset, int,
+              'scanner must yield only ints, received %s:%r'
+              % (type(qoffset), qoffset))
+          self.assertTrue(
+              last_qoffset <= qoffset,
+              "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
           last_qoffset = qoffset
 
   def test02blocked_chunks_of(self):
+    ''' Blockify some input sources.
+    '''
     for scanner in (
         ##None,
         ##scan_text,
         ##scan_mp3,
         scan_mp4,
-      ):
+    ):
       scanner_desc = 'None' if scanner is None else scanner.__name__
       for input_desc, input_chunks in (
           ##('random data', self.random_data),
           ('100 x ' + __file__, [ self.mycode for _ in range(100) ]),
-        ):
+      ):
         testfile = None
         rfp = None
         if scanner is scan_mp3:
@@ -123,6 +134,7 @@ class TestAll(unittest.TestCase):
             all_chunks.append(chunk)
             offset += len(chunk)
             # the pending.flush operation can return short blocks
+            ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE)
             self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
                             "len(chunk)=%d > MAX_BLOCKSIZE=%d"
                             % (len(chunk), MAX_BLOCKSIZE))
@@ -143,7 +155,11 @@ class TestAll(unittest.TestCase):
             self.assertEqual(b''.join(source_chunks),
                              b''.join(all_chunks))
           if False:
-            for hits, size in sorted([ (hits, size) for size, hits in histogram.items() if isinstance(size, int) ]):
+            for hits, size in sorted([
+                (hits, size)
+                for size, hits in histogram.items()
+                if isinstance(size, int)
+            ]):
               if hits > 1:
                 X("size %d: %d", size, hits)
         if rfp is not None:
@@ -151,16 +167,25 @@ class TestAll(unittest.TestCase):
           rfp = None
 
   def test03blockifyAndRetrieve(self):
+    ''' Blockify some data and ensure that the blocks match the data.
+    '''
     with MappingStore("TestAll.test00blockifyAndRetrieve", {}):
       data = self.fp.read()
       blocks = list(blockify([data]))
       ##X("blocks=%r", blocks)
       data2 = b''.join( b.data for b in blocks )
-      self.assertEqual(len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" % (len(data), len(data2)))
-      self.assertEqual(data, data2, "data mismatch: data and data2 same length but contents differ")
+      self.assertEqual(
+          len(data), len(data2),
+          "data mismatch: len(data)=%d, len(data2)=%d"
+          % (len(data), len(data2)))
+      self.assertEqual(
+          data, data2,
+          "data mismatch: data and data2 same length but contents differ")
       ##for b in blocks: print("[", b.data, "]")
 
 def selftest(argv):
+  ''' Run the unit tests.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':

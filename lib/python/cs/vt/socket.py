@@ -28,13 +28,30 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   ''' The basis for TCPStoreServer and UNIXSocketStoreServer.
   '''
 
-  def __init__(self, *, exports=None, runstate=None):
+  def __init__(self, *, exports=None, runstate=None, local_store=None):
     ''' Initialise the server.
+
+        Parameters:
+        * `exports`: optional mapping of str=>Store
+        * `runstate`: option control RunState
+        * `local_store`: optional default Store
+
+        `exports` is a mapping of Stores which this server may present;
+        the default Store has key `''`.
+
+        If `local_store` is not None, `exports['']` is set to
+        `local_store` otherwise to `defaults.S`.
+        It is an error to provide both `local_store` and a prefilled
+        `exports['']`.
     '''
     if exports is None:
       exports = {}
-    elif not exports:
-      raise ValueError("empty exports: %r" % (exports,))
+    if local_store is not None:
+      if '' in exports:
+        raise ValueError(
+            "both local_store=%s and exports['']=%s provided"
+            % (local_store, exports['']))
+      exports[''] = local_store
     if '' not in exports:
       exports[''] = defaults.S
     MultiOpenMixin.__init__(self)

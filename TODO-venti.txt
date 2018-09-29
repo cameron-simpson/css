@@ -1,3 +1,13 @@
+when stable and more ergonomic, move vt.transcribe to cs.transcriber
+remove iref and n from Meta
+restore Inode.refcount but not += and -=, drop referenced - required for nlink stat count
+fs: save persistent Dirents as 8 level Dir with each level being 2 bytes of the UUID, hex encoded? seems sparse and if we're sucking them all in anyway, pointless? better idea needed for heavily hardlinked trees
+drop Meta.iref
+fs.__getitem__: int is inode number, str is relative path from mount, uuid is via the persistent Dirent uuid map
+vt.fs: inodes entirely on the fly, never saved - move to UUIDs for persistence
+vt.dir: FileSystem state: a mapping of UUID->Dirent for the indirect dirents - where to keep this context at runtime for indirection?
+vt.dir: new IndirectDirent pointing to another Dirent by UUID
+vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
 vt.stream: give the _connect method some hysteresis
 DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
 general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available

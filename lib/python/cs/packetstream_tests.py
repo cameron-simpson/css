@@ -12,12 +12,41 @@ import random
 import socket
 from threading import Thread
 import unittest
+from cs.binary_tests import _TestPacketFields
 from cs.py3 import bytes
 from cs.randutils import rand0, randblock
-from cs.serialise import get_bs
 from cs.socketutils import bind_next_port, OpenSocket
-from cs.x import X
-from .stream import PacketConnection
+from . import packetstream
+from .packetstream import Packet, PacketConnection
+
+class TestPacketStreamPacketFields(_TestPacketFields, unittest.TestCase):
+
+  def setUp(self):
+    self.module = packetstream
+
+class TestPacket(unittest.TestCase):
+
+  def test00round_trip(self):
+    for is_request in False, True:
+      for channel in 0, 1, 13, 17, 257:
+        for tag in 0, 1, 13, 17, 257:
+          for flags in 0, 1, 15, 137:
+            for payload in b'', b'123':
+              with self.subTest(
+                  is_request=is_request,
+                  channel=channel,
+                  tag=tag,
+                  flags=flags,
+                  payload=payload
+              ):
+                P = Packet(
+                    is_request, channel, tag, flags,
+                    0 if is_request else None,
+                    payload)
+                bs = b''.join(P.transcribe_flat())
+                P2, offset = Packet.from_bytes(bs)
+                self.assertEqual(offset, len(bs))
+                self.assertEqual(P, P2)
 
 class _TestStream(object):
 
@@ -77,13 +106,19 @@ class TestStreamPipes(_TestStream, unittest.TestCase):
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
     self.downstream_rd, self.downstream_wr = os.pipe()
-    self.local_conn = PacketConnection(os.fdopen(self.downstream_rd, 'rb'),
-                                       os.fdopen(self.upstream_wr, 'wb'),
+    self.local_conn = PacketConnection(self.downstream_rd,
+                                       self.upstream_wr,
                                        name="local-pipes")
-    self.remote_conn = PacketConnection(os.fdopen(self.upstream_rd, 'rb'),
-                                        os.fdopen(self.downstream_wr, 'wb'),
+    self.remote_conn = PacketConnection(self.upstream_rd,
+                                        self.downstream_wr,
                                         request_handler=self._request_handler,
                                         name="remote-pipes")
+
+  def _close_Streams(self):
+    os.close(self.upstream_rd)
+    os.close(self.upstream_wr)
+    os.close(self.downstream_rd)
+    os.close(self.downstream_wr)
 
 class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
 
