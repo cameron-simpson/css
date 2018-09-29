@@ -1,19 +1,19 @@
 #!/usr/bin/python
 
+''' Directory entry metadata.
+'''
+
 from __future__ import print_function
-import errno
 from functools import lru_cache
 import json
 import os
-import stat
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
 import time
-from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx
+from cs.logutils import error, warning
 from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
 from .transcribe import Transcriber, register as register_transcriber, \
@@ -167,9 +167,11 @@ AC_Group = lambda allow, deny: AC('g', allow, deny)
 AC_Other = lambda allow, deny: AC('*', allow, deny)
 
 class ACL(list):
+  ''' An access control list.
+  '''
 
   def __str__(self):
-    ''' transcribe a list of AC instances as text.
+    ''' Transcribe a list of AC instances as text.
     '''
     return ','.join( [ str(ac) for ac in self ] )
 
@@ -268,11 +270,15 @@ class Meta(dict, Transcriber):
     return d
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the Meta.
+    '''
     d = self._as_dict()
     return transcribe_mapping(d, fp, T=T)
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
+    ''' Parse a Meta transcription.
+    '''
     if prefix != 'M':
       raise ValueError("expected prefix='M', got: %r" % (prefix,))
     m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
@@ -297,7 +303,7 @@ class Meta(dict, Transcriber):
       if isinstance(v, str):
         v = ACL.from_str(v)
       elif not isinstance(v, ACL):
-        raise ValueError("not an ACL: %r", v)
+        raise ValueError("not an ACL: %r" % (v,))
     elif k in ('m',):
       v = float(v)
     dict.__setitem__(self, k, v)
@@ -444,10 +450,14 @@ class Meta(dict, Transcriber):
 
   @property
   def mtime(self):
+    ''' Return the time of last data modification, or 0.0.
+    '''
     return self.get('m', 0.0)
 
   @mtime.setter
   def mtime(self, when):
+    ''' Set the time of last modification.
+    '''
     self['m'] = when
 
   @property
@@ -497,14 +507,8 @@ class Meta(dict, Transcriber):
   def chmod(self, mode):
     ''' Apply UNIX permissions to ACL.
     '''
-    if mode&S_ISUID:
-      self.setuid = True
-    else:
-      self.setuid = False
-    if mode&S_ISGID:
-      self.setgid = True
-    else:
-      self.setgid = False
+    self.setuid = bool(mode & S_ISUID)
+    self.setgid = bool(mode & S_ISGID)
     acl = ACL()
     acl.append(AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ))
     acl.append(AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ))
@@ -522,7 +526,7 @@ class Meta(dict, Transcriber):
     # TODO: setuid, setgid, sticky
 
   @property
-  def unix_perm_bits(self, isdir=False):
+  def unix_perm_bits(self):
     ''' Return unix-mode-bits.
         *Note*: excludes the type bits (S_IFREG etc).
 
@@ -539,7 +543,7 @@ class Meta(dict, Transcriber):
         perms |= ac.unixmode
       else:
         warning("Meta.unix_perms: ignoring ACL element %s", ac)
-    # TODO: setuid, setgid, sticky
+    # TODO: sticky
     if self.setuid:
       perms |= S_ISUID
     if self.setgid:
@@ -583,31 +587,31 @@ class Meta(dict, Transcriber):
       g = default_gid
     if access_mode & os.R_OK:
       if access_uid is not None and access_uid == u:
-        if not ( (perms>>6) & 4 ):
+        if not (perms>>6) & 4:
           return False
       elif access_group is not None and access_group == g:
-        if not ( (perms>>3) & 4 ):
+        if not (perms>>3) & 4:
           return False
-      elif not ( perms & 4 ):
-          return False
+      elif not perms & 4:
+        return False
     if access_mode & os.W_OK:
       if access_uid is not None and access_uid == u:
-        if not ( (perms>>6) & 2 ):
+        if not (perms>>6) & 2:
           return False
       elif access_group is not None and access_group == g:
-        if not ( (perms>>3) & 2 ):
+        if not (perms>>3) & 2:
           return False
-      elif not ( perms & 2 ):
-          return False
+      elif not perms & 2:
+        return False
     if access_mode & os.X_OK:
       if access_uid is not None and access_uid == u:
-        if not ( (perms>>6) & 1 ):
+        if not (perms>>6) & 1:
           return False
       elif access_group is not None and access_group == g:
-        if not ( (perms>>3) & 1 ):
+        if not (perms>>3) & 1:
           return False
-      elif not ( perms & 1 ):
-          return False
+      elif not perms & 1:
+        return False
     return True
 
   @staticmethod
@@ -652,18 +656,26 @@ class Meta(dict, Transcriber):
       del self._xattrs[xk]
 
   def listxattrs(self):
+    ''' Return the xattr keys, a list of bytes.
+    '''
     return [ xk.encode('iso8859-1') for xk in self._xattrs.keys() ]
 
   @property
   def mime_type(self):
+    ''' Return the file's `user.mime_type` xattr, or None.
+    '''
     return self.getxattr('user.mime_type', None)
 
   @mime_type.setter
   def mime_type(self, new_type):
+    ''' Set the file's `user.mime_type` xattr.
+    '''
     self.setxattr('user.mime_type', new_type)
 
   @mime_type.deleter
   def mime_type(self):
+    ''' Delete the file's `user.mime_type` xattr.
+    '''
     self.delxattr('user.mime_type')
 
 register_transcriber(Meta)
