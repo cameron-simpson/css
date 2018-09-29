@@ -129,19 +129,19 @@ class Inode(Transcriber, NS):
     self.refcount = refcount
 
   def transcribe_inner(self, T, fp):
-    return transcribe_mapping({
+    return T.transcribe_mapping({
         'refcount': self.refcount,
         'E': self.E,
     }, fp, T=T)
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
-    if prefix != self.transcribe_prefix:
+    if prefix != cls.transcribe_prefix:
       raise ValueError(
           "expected prefix=%r, got: %r"
-          % (self.transcribe_prefix, prefix,))
-    m, offset = parse_mapping(s, offset, stopchar=stopchar, T=T)
-    return cls(m), offset
+          % (cls.transcribe_prefix, prefix,))
+    m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
+    return cls(None, m['E'], m['refcount']), offset
 
 class Inodes(object):
   ''' Inode information for a filesystem.
@@ -176,7 +176,8 @@ class Inodes(object):
     for name, E in D.entries.items():
       X("  name=%r, E=%s", name, E)
       with Pfx(name):
-        uuid_s, refcount_s = name.split(':')[:2]
+        # get the refcount from the :uuid:refcount" name
+        _, refcount_s = name.split(':')[:2]
         I = self.add(E)
         I.refcount = int(refcount_s)
         X("  I=%s", I)
@@ -437,7 +438,6 @@ class FileSystem(object):
   def E2inode(self, E):
     ''' Return the Inode for the supplied Dirent `E`.
     '''
-    E0 = E
     if E.isindirect:
       E = E.ref
     return self._inodes.add(E)
@@ -531,11 +531,12 @@ class FileSystem(object):
     fhs.append(file_handle)
     return len(fhs) - 1
 
-  def access(self, E, amode, uid=None, gid=None):
+  @staticmethod
+  def access(E, amode, uid=None, gid=None):
     ''' Check access mode `amode` against Dirent `E`.
     '''
     with Pfx("access(E=%r,amode=%s,uid=%r,gid=%d)", E, amode, uid, gid):
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
-      return E.meta.access(amode, uid, gid,
-                            default_uid=uid, default_gid=gid)
+      return E.meta.access(
+          amode, uid, gid, default_uid=uid, default_gid=gid)
