@@ -30,6 +30,7 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple, OrderedDict
 from io import StringIO
+import json
 import sys
 from uuid import UUID
 from cs.deco import decorator
@@ -118,6 +119,7 @@ class Transcribe:
         str: repr,
         bool: lambda v: '1' if v else '0',
         bytes: texthexify,
+        dict: lambda m: json.dumps(m, separators=(',', ':')),
         UUID: lambda u: 'U{' + str(u) + '}',
     }
     self.register(UUIDTranscriber, 'U')
@@ -235,6 +237,12 @@ class Transcribe:
     # decimal values
     if s[offset:offset+1].isdigit():
       return get_decimal_or_float_value(s, offset)
+    # {json}
+    if s.startswith('{', offset):
+      sub = s[offset:]
+      m, suboffset = json.JSONDecoder().raw_decode(sub)
+      offset += suboffset
+      return m, offset
     # prefix{....}
     prefix, offset = get_identifier(s, offset)
     if not prefix:
