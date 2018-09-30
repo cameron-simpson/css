@@ -16,7 +16,8 @@ import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from os.path import (
     basename, join as joinpath, exists as existspath,
-    isdir as isdirpath, relpath, isabs as isabspath)
+    isdir as isdirpath, isfile as isfilepath,
+    relpath, isabs as isabspath)
 import stat
 import sys
 from threading import RLock
@@ -1134,6 +1135,9 @@ class PlatonicDir(_FilesDir):
                   break
                 rfilepath = joinpath(rdirpath, filename)
                 if self.exclude_file(rfilepath):
+                  continue
+                filepath = joinpath(dirpath, filename)
+                if not isfilepath(filepath):
                   continue
                 # look up this file in our file state index
                 DFstate = filemap.get(rfilepath)
