@@ -1078,14 +1078,15 @@ class PlatonicDir(_FilesDir):
     else:
       warning("%s: no meta_store!", self)
     while not self.cancelled:
+      time.sleep(1)
       if self.flag_scan_disable:
-        time.sleep(1)
         continue
       # scan for new datafiles
       need_save = False
       datadirpath = self.datadirpath
-      with Pfx("walk(%r)", datadirpath):
+      with Pfx("%r", datadirpath):
         seen = set()
+        info("scan tree...")
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
           if self.cancelled or self.flag_scan_disable:
             break
@@ -1112,7 +1113,7 @@ class PlatonicDir(_FilesDir):
               if ino in seen:
                 # we have seen this subdir before, probably via a symlink
                 # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                info("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
+                debug("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
                 continue
               seen.add(ino)
               pruned_dirnames.append(dname)
@@ -1239,7 +1240,6 @@ class PlatonicDir(_FilesDir):
       if need_save:
         need_save = False
         self._save_state()
-      time.sleep(11)
 
   @staticmethod
   def scanfrom(filepath, offset=0, do_decompress=False):
