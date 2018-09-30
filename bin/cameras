@@ -1,0 +1,120 @@
+#!/bin/sh
+#
+# Poll and process IP camera snapshots.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cfg=$HOME/.cameras
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$0
+usage="Usage: $cmd [-f cfg] [--] op [args...]
+  Operations:
+    poll [names...]
+      Fetch camera images.
+    process [names...]
+      Move all images prior to today into subdirectories by day.
+      Create per-day MP4 files for all such subdirectories."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) cfg=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopt=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -s "$cfg" ] || {
+  echo "$cmd: missing config file: $cfg" >&2
+  badopts=1
+}
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case $op in
+    poll | process )
+        names=$*
+        ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$names" ] || names=$( awk '$1 ~ /^[^#]/ { print $1 }' "$cfg" | keepfirst )
+
+# process the named configurations
+for name in $names
+do
+  dir= url=
+  # name dir url
+  exec 3<"$cfg"
+  while read -r cfg_name cfg_dir cfg_url <&3
+  do
+    [ "x$cfg_name" = "x$name" ] || continue
+    dir=$cfg_dir url=$cfg_url
+    snapshots=$dir/snapshots
+    compiled=$dir/compiled
+    case "$op" in
+      poll)
+            [ -d "$snapshots/" ] || $trace mkdir $snapshots
+            $trace wget -q -O "$snapshots/`date +%Y-%m-%d-%H:%M:%S`.jpg" "$url"
+            ;;
+      process)
+            [ -d "$compiled/" ] || $trace mkdir "$compiled"
+            (
+              set -ue
+              cd "$snapshots"
+              for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
+              do
+                ddir=$compiled/$date
+                [ -d "$ddir" ] || $trace mkdir "$ddir"
+                $trace mv "$date"-*.jpg "$ddir/"
+              done
+            )
+            (
+              set -ue
+              cd "$compiled"
+              for date in 20??-??-??
+              do
+                [ -d "$date" ] || continue
+                video=$date.mp4
+                [ -f "$video" ] || (
+                  set -ue
+                  cd "$date"
+                  n=0
+                  for img in $date-*.jpg
+                  do  nimg=$(printf '%04d.jpg' "$n")
+                      ln "$img" "$nimg"
+                      n=$((n+1))
+                  done
+                  $trace ffmpeg -r 4 -s 1280x720 -i '%04d.jpg' "$video"
+                  rm [0-9][0-9][0-9][0-9].jpg
+                  $trace touch -d "$date" "$video"
+                  $trace mv "$video" ..
+                ) || { echo "VIDEO FAILED FOR $video" >&2; break; }
+              done
+            )
+            ;;
+      *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
+    esac
+  done
+  exec 3<&-
+done
