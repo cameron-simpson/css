@@ -107,7 +107,12 @@ do
                       ln "$img" "$nimg"
                       n=$((n+1))
                   done
-                  $trace ffmpeg -r 4 -s 1280x720 -i '%04d.jpg' "$video"
+                  size=$(
+                    set -- $date-*jpg
+                    { gm identify "$1" || identify "$1"; } \
+                    | awk '{print$3}' | sed 's/+.*//'
+                  )
+                  $trace ffmpeg -r 4 -s "$size" -i '%04d.jpg' "$video"
                   rm [0-9][0-9][0-9][0-9].jpg
                   $trace touch -d "$date" "$video"
                   $trace mv "$video" ..
