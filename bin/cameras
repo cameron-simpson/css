@@ -88,7 +88,8 @@ do
               do
                 ddir=$compiled/$date
                 [ -d "$ddir" ] || $trace mkdir "$ddir"
-                $trace mv "$date"-*.jpg "$ddir/"
+                echo "mv $date-*.jpg $ddir/" >&2
+                mv "$date"-*.jpg "$ddir/"
               done
             )
             (
@@ -101,10 +102,12 @@ do
                 [ -f "$video" ] || (
                   set -ue
                   cd "$date"
+                  # delete empty files
+                  find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
                   n=0
-                  for img in $date-*.jpg
+                  for img in "$date"-*.jpg
                   do  nimg=$(printf '%04d.jpg' "$n")
-                      ln "$img" "$nimg"
+                      $trace ln "$img" "$nimg"
                       n=$((n+1))
                   done
                   size=$(
