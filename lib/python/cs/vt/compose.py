@@ -34,43 +34,38 @@ def parse_store_specs(s, offset=0):
               % (sep,))
     return store_specs
 
-def get_store_spec(s, offset):
-  ''' Get a single Store specification from a string. Return the
-      text, store type, params and the new offset.
+def get_store_spec(s, offset=0):
+  ''' Get a single Store specification from a string.
+      Return `(matched, type, params, offset)`
+      being the matched text, store type, parameters and the new offset.
 
-        "text"          Quoted store spec, needed to enclose some of
-                        the following syntaxes if they do not consume the
-                        whole string.
+      Recognised specifications:
+      * `"text"`: Quoted store spec, needed to enclose some of the following
+        syntaxes if they do not consume the whole string.
+      * `[clause_name]`: The name of a clause to be obtained from a Config.
+      * `/path/to/something`, `./path/to/something`:
+        A filesystem path to a local resource.
+        Supported paths:
+        - `.../foo.sock`: A UNIX socket based StreamStore.
+        - `.../dir`: A DataDirStore directory.
+        - `.../foo.vtd `: (STILL TODO): A DataFileStore.
+      * `|command`: A subprocess implementing the streaming protocol.
+      * `store_type(param=value,...)`:
+        A general Store specification.
+      * `store_type:params...`:
+        An inline Store specification.
+        Supported inline types: `tcp:[host]:port`
 
-        [clause_name]   The name of a clause to be obtained from a Config.
-
-        /path/to/something
-        ./path/to/something
-                        A filesystem path to a local resource.
-                        Supported paths:
-                          .../foo.sock  A UNIX socket based StreamStore.
-                          .../dir       A DataDirStore directory.
-                        TODO:
-                          .../foo.vtd   A DataFileStore.
-
-        |command        A subprocess implementing the streaming protocol.
-
-        store_type(param=value,...)
-                        A general Store specification.
-        store_type:params...
-                        An inline Store specification. Supported inline types:
-                          tcp:[host]:port
-
-        TODO:
-          ssh://host/[store-designator-as-above]
-          unix:/path/to/socket
-                        Connect to a daemon implementing the streaming protocol.
-          http[s]://host/prefix
-                        A Store presenting content under prefix:
-                          /h/hashcode.hashtype  Block data by hashcode
-                          /i/hashcode.hashtype  Indirect block by hashcode.
-          s3://bucketname/prefix/hashcode.hashtype
-                        An AWS S3 bucket with raw blocks.
+      TODO:
+      * `ssh://host/[store-designator-as-above]`:
+      * `unix:/path/to/socket`:
+        Connect to a daemon implementing the streaming protocol.
+      * `http[s]://host/prefix`:
+        A Store presenting content under prefix:
+        + `/h/hashcode.hashtype`: Block data by hashcode
+        + `/i/hashcode.hashtype`: Indirect block by hashcode.
+      * `s3://bucketname/prefix/hashcode.hashtype`:
+        An AWS S3 bucket with raw blocks.
   '''
   offset0 = offset
   if offset >= len(s):
