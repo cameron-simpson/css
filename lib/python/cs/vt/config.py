@@ -97,6 +97,11 @@ class Config:
       return default
     return G.get(param, default)
 
+  def get_clause(self, clause_name):
+    ''' Return the clause without opening it as a Store.
+    '''
+    return self.map[clause_name]
+
   def Store_from_spec(self, store_spec):
     ''' Factory function to return an appropriate BasicStore* subclass
         based on its argument:
