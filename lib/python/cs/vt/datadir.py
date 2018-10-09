@@ -1083,6 +1083,7 @@ class PlatonicDir(_FilesDir):
         seen = set()
         info("scan tree...")
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
+          time.sleep(0.1)
           if self.cancelled or self.flag_scan_disable:
             break
           # update state before scan
