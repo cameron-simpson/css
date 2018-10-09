@@ -587,23 +587,21 @@ class VTCmd:
           else:
             special_basename = D.name
         elif special.startswith('[') and special.endswith(']'):
-          fsname = str(self.config) + special
-          special_basename = special[1:-1].strip()
-          special_store = self.config.Store_from_spec(special)
-          X("special_store=%s", special_store)
-          if special_store is not mount_store:
-            warning(
-                "mounting using Store from special %r instead of default: %s",
-                special, mount_store)
-            mount_store = special_store
-          try:
-            get_Archive = special_store.get_Archive
-          except AttributeError:
-            error("%s: no get_Archive method", special_store)
+          matched, type_, params, offset = get_store_spec(special)
+          if 'clause_name' not in params:
+            error("no clause name")
             badopts = True
           else:
-            X("MAIN: get_Archive=%s", get_Archive)
-            archive = get_Archive()
+            fsname = str(self.config) + special
+            special_basename = special[1:-1].strip()
+            special_store = self.config.Store_from_spec(special)
+            X("special_store=%s", special_store)
+            if special_store is not mount_store:
+              warning(
+                  "mounting using Store from special %r instead of default: %s",
+                  special, mount_store)
+              mount_store = special_store
+            archive = self.config.archive(special_basename)
         else:
           # pathname to archive file
           archive = special
