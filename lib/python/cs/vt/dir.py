@@ -267,9 +267,8 @@ class _Dirent(Transcriber):
     elif type_ == DirentType.INDIRECT:
       cls = IndirectDirent
     else:
-      X("from_components: UNSUPPORTED TYPE %r, using _Dirent", type_)
+      warning("from_components: UNSUPPORTED TYPE %r, using _Dirent", type_)
       cls = partial(_Dirent, type_)
-    X("from_components: cls=%r, kw=%r", cls, kw)
     return cls(name, **kw)
 
   @staticmethod

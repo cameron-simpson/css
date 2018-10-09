@@ -719,6 +719,7 @@ class ProxyStore(BasicStoreSync):
         `ch`: a channel for hashocde return
     '''
     X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
+    hashcode1 = None
     try:
       if not self.save:
         # no save - allow add if hashcode already present - dubious
@@ -727,7 +728,6 @@ class ProxyStore(BasicStoreSync):
           ch.put(hashcode)
           return
         raise RuntimeError("new add but no save Stores")
-      hashcode1 = None
       ok = True
       fallback = None
       for S, hashcode, exc_info in self._multicall(self.save, 'add_bg', (data,)):
@@ -845,11 +845,6 @@ class DataDirStore(MappingStore):
     '''
     super().shutdown()
     self._datadir.close()
-
-  def get_Archive(self, archive_name=None):
-    ''' DataDirStore Archives are stored in the internal DataDir.
-    '''
-    return self._datadir.get_Archive(archive_name)
 
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.

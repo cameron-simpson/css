@@ -16,7 +16,8 @@ import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from os.path import (
     basename, join as joinpath, exists as existspath,
-    isdir as isdirpath, relpath, isabs as isabspath)
+    isdir as isdirpath, isfile as isfilepath,
+    relpath, isabs as isabspath)
 import stat
 import sys
 from threading import RLock
@@ -356,12 +357,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     with Pfx("%s.get_Archive", self):
       if name is None:
-        name = DEFAULT_DATADIR_STATE_NAME
-      elif not name or name.startswith('.') or os.sep in name:
-        raise ValueError("invalid name: '.' and %r forbidden" % (os.sep,))
-      archive_path = self.localpathto(name + '.vt')
-      archive = Archive(archive_path)
-      return archive
+        archivepath = self.statedirpath + '.vt'
+      else:
+        if not name or '.' in name:
+          raise ValueError("invalid name: %r" % (name,))
+        archivepath = self.statedirpath + '-' + name + '.vt'
+      return Archive(archivepath)
 
   @property
   def indexbase(self):
@@ -1021,11 +1022,6 @@ class PlatonicDir(_FilesDir):
     if self.meta_store is not None:
       self.meta_store.close()
 
-  def get_Archive(self, name=None):
-    if name is None:
-      return self.archive
-    return super().get_Archive(name=name)
-
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
@@ -1077,15 +1073,17 @@ class PlatonicDir(_FilesDir):
     else:
       warning("%s: no meta_store!", self)
     while not self.cancelled:
+      time.sleep(1)
       if self.flag_scan_disable:
-        time.sleep(1)
         continue
       # scan for new datafiles
       need_save = False
       datadirpath = self.datadirpath
-      with Pfx("walk(%r)", datadirpath):
+      with Pfx("%r", datadirpath):
         seen = set()
+        info("scan tree...")
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
+          time.sleep(0.1)
           if self.cancelled or self.flag_scan_disable:
             break
           # update state before scan
@@ -1111,7 +1109,7 @@ class PlatonicDir(_FilesDir):
               if ino in seen:
                 # we have seen this subdir before, probably via a symlink
                 # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                info("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
+                debug("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
                 continue
               seen.add(ino)
               pruned_dirnames.append(dname)
@@ -1134,6 +1132,9 @@ class PlatonicDir(_FilesDir):
                   break
                 rfilepath = joinpath(rdirpath, filename)
                 if self.exclude_file(rfilepath):
+                  continue
+                filepath = joinpath(dirpath, filename)
+                if not isfilepath(filepath):
                   continue
                 # look up this file in our file state index
                 DFstate = filemap.get(rfilepath)
@@ -1235,7 +1236,6 @@ class PlatonicDir(_FilesDir):
       if need_save:
         need_save = False
         self._save_state()
-      time.sleep(11)
 
   @staticmethod
   def scanfrom(filepath, offset=0, do_decompress=False):
