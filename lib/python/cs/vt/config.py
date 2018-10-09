@@ -17,6 +17,7 @@ from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
 from . import defaults
+from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import parse_store_specs
 from .convert import get_integer, \
@@ -101,6 +102,29 @@ class Config:
     ''' Return the clause without opening it as a Store.
     '''
     return self.map[clause_name]
+
+  @property
+  def basedir(self):
+    ''' The default location for local archives and stores.
+    '''
+    return longpath(self.get_default('basedir'))
+
+  @property
+  def mountdir(self):
+    ''' The default directory for mount oints.
+    '''
+    return longpath(self.get_default('mountdir'))
+
+  def archive(self, archivename):
+    ''' Return the Archive named `archivename`.
+    '''
+    if (
+        not archivename
+        or '.' in archivename
+        or '/' in archivename
+    ):
+      raise ValueError("invalid archive name: %r" % (archivename,))
+    return Archive(joinpath(self.basedir, archivename + '.vt'))
 
   def Store_from_spec(self, store_spec):
     ''' Factory function to return an appropriate BasicStore* subclass
