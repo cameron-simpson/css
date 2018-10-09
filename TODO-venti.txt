@@ -1,3 +1,4 @@
+sqlite based index/state file: sharable and portable - but needs to batch lookups and inserts for performance
 when stable and more ergonomic, move vt.transcribe to cs.transcriber
 remove iref and n from Meta
 restore Inode.refcount but not += and -=, drop referenced - required for nlink stat count
