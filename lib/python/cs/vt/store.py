@@ -846,11 +846,6 @@ class DataDirStore(MappingStore):
     super().shutdown()
     self._datadir.close()
 
-  def get_Archive(self, archive_name=None):
-    ''' DataDirStore Archives are stored in the internal DataDir.
-    '''
-    return self._datadir.get_Archive(archive_name)
-
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.
     '''
