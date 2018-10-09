@@ -357,12 +357,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     with Pfx("%s.get_Archive", self):
       if name is None:
-        name = DEFAULT_DATADIR_STATE_NAME
-      elif not name or name.startswith('.') or os.sep in name:
-        raise ValueError("invalid name: '.' and %r forbidden" % (os.sep,))
-      archive_path = self.localpathto(name + '.vt')
-      archive = Archive(archive_path)
-      return archive
+        archivepath = self.statedirpath + '.vt'
+      else:
+        if not name or '.' in name:
+          raise ValueError("invalid name: %r" % (name,))
+        archivepath = self.statedirpath + '-' + name + '.vt'
+      return Archive(archivepath)
 
   @property
   def indexbase(self):
@@ -1021,11 +1021,6 @@ class PlatonicDir(_FilesDir):
     super().shutdown()
     if self.meta_store is not None:
       self.meta_store.close()
-
-  def get_Archive(self, name=None):
-    if name is None:
-      return self.archive
-    return super().get_Archive(name=name)
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
