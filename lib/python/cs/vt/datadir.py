@@ -217,7 +217,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.statedirpath = statedirpath
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
-      X("datadirpath => %r", datadirpath)
     self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
@@ -946,6 +945,11 @@ class PlatonicDir(_FilesDir):
       from the files in the backing directory tree.
   '''
 
+  # delays during scanning to limit the CPU and I/O impact of the
+  # monitoring and updating
+  DELAY_INTERSCAN = 1.0     # regular pause between directory scans
+  DELAY_INTRASCAN = 0.1     # stalls during scan: per directory and after big files
+
   index_entry_class = PlatonicDirIndexEntry
 
   def __init__(
@@ -1073,7 +1077,7 @@ class PlatonicDir(_FilesDir):
     else:
       warning("%s: no meta_store!", self)
     while not self.cancelled:
-      time.sleep(1)
+      time.sleep(self.DELAY_INTERSCAN)
       if self.flag_scan_disable:
         continue
       # scan for new datafiles
@@ -1083,7 +1087,7 @@ class PlatonicDir(_FilesDir):
         seen = set()
         info("scan tree...")
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
-          time.sleep(0.1)
+          time.sleep(self.DELAY_INTRASCAN)
           if self.cancelled or self.flag_scan_disable:
             break
           # update state before scan
@@ -1222,6 +1226,9 @@ class PlatonicDir(_FilesDir):
                         DFstate.scanned_to,
                         transcribe_bytes_geek(scanned),
                         transcribe_bytes_geek(scan_rate))
+                  # stall after a file scan, briefly, to limit impact
+                  if elapsed > 0:
+                    time.sleep(min(elapsed, self.DELAY_INTRASCAN))
                   if meta_store is not None:
                     blockQ.close()
                     try:
