@@ -41,7 +41,7 @@ from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
 from .datadir import DataDir, DataDirIndexEntry
-from .datafile import DataFile, DataFlag, decompress
+from .datafile import DataFile
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
@@ -54,10 +54,14 @@ from .smuggling import import_dir, import_file
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
-def main(argv):
-  return VTCmd().main(argv)
+def main(argv=None):
+  ''' Create a VTCmd instance and call its main method.
+  '''
+  return VTCmd().main(argv=argv)
 
 class VTCmd:
+  ''' A main programme instance.
+  '''
 
   USAGE = '''Usage: %s [options...] [profile] operation [args...]
   Options:
@@ -99,6 +103,8 @@ class VTCmd:
 '''
 
   def main(self, argv=None, environ=None, verbose=None):
+    ''' The main function for this programme.
+    '''
     global loginfo
     if argv is None:
       argv = sys.argv
@@ -212,7 +218,7 @@ class VTCmd:
     return xit
 
   def cmd_op(self, args):
-    ''' Run an command operation.
+    ''' Run a command operation from `args`.
     '''
     try:
       op = args[0]
@@ -286,6 +292,8 @@ class VTCmd:
       return xit
 
   def cmd_profile(self, *a, **kw):
+    ''' Wrapper to profile other operations and report.
+    '''
     try:
       import cProfile as profile
     except ImportError:
@@ -312,7 +320,7 @@ class VTCmd:
     return 0
 
   def cmd_catblock(self, args):
-    '''  Emit the content of the blocks specified by the supplied hashcodes.
+    ''' Emit the content of the blocks specified by the supplied hashcodes.
     '''
     indirect = False
     if args and args[0] == "-i":
@@ -370,6 +378,8 @@ class VTCmd:
     return 0
 
   def cmd_fsck(self, args):
+    ''' Data structure inspection/repair.
+    '''
     if not args:
       raise GetoptError("missing fsck type")
     fsck_type = args.pop(0)
@@ -384,6 +394,9 @@ class VTCmd:
       return fsck_op()
 
   def cmd_fsck_block(self, args):
+    ''' Inspect a single Block.
+        TODO: fromtext -> transcribe.
+    '''
     xit = 0
     if not args:
       raise GetoptError("missing blockrefs")
@@ -399,6 +412,8 @@ class VTCmd:
     return xit
 
   def cmd_fsck_dir(self, args):
+    ''' Inspect a Dir.
+    '''
     xit = 0
     if not args:
       raise GetoptError("missing dirents")
@@ -519,7 +534,7 @@ class VTCmd:
       if first:
         first = False
       else:
-        print
+        print()
       D = dirent_dir(path)
       ls(path, D, recurse, sys.stdout)
     return 0
@@ -627,7 +642,10 @@ class VTCmd:
       else:
         mountdir = mount_store.mountdir
         if mountdir is None:
-          error('missing mountpoint, no Sotre.mountdir, cannot infer mountpoint: store=%s', mount_store)
+          error(
+              'missing mountpoint, no Store.mountdir,'
+              ' cannot infer mountpoint: store=%s',
+              mount_store)
           badopts = True
         else:
           mountdir = expanduser(mountdir)
@@ -696,8 +714,7 @@ class VTCmd:
             if e.errno == errno.EEXIST:
               error("mountpoint is not a directory", mountpoint)
               return 1
-            else:
-              raise
+            raise
         try:
           T = mount(
               mountpoint, E,
@@ -749,6 +766,7 @@ class VTCmd:
 
   def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
+
         Usage: pullfrom other_store objects...
     '''
     if not args:
@@ -775,7 +793,9 @@ class VTCmd:
     return 0
 
   def cmd_pushto(self, args):
-    ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
+    ''' Push something to a secondary Store,
+        such that the secondary store has all the required Blocks.
+
         Usage: pushto other_store objects...
     '''
     if not args:
@@ -792,7 +812,7 @@ class VTCmd:
           try:
             obj = parse(obj_spec)
           except ValueError as e:
-            raise GetoptError("unparsed: %s", e) from e
+            raise GetoptError("unparsed: %s" % (e,)) from e
           try:
             pushto = obj.pushto
           except AttributeError:
@@ -823,9 +843,12 @@ class VTCmd:
     return 0
 
   def cmd_serve(self, args):
-    ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
+    ''' Start a service daemon listening on a TCP port
+        or on a UNIX domain socket or on stdin/stdout.
+
         Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
-        With no name:storespec arguments the default Store is served,
+
+        With no `name:storespec` arguments the default Store is served,
         otherwise the named Stores are exported with the first being
         served initially.
     '''
@@ -886,7 +909,10 @@ class VTCmd:
           srv = serve_tcp(bind_addr=(host, port), exports=exports, runstate=self.runstate)
         srv.join()
       else:
-        raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
+        raise GetoptError(
+            "invalid serve argument,"
+            " I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r"
+            % (address,))
     return 0
 
   def cmd_test(self, args):
@@ -916,7 +942,7 @@ class VTCmd:
         raise GetoptError("unrecognised subcommand")
 
   def cmd_unpack(self, args):
-    ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
+    ''' Unpack the archive file _archive_`.vt` as _archive_.
     '''
     if len(args) < 1:
       raise GetoptError("missing archive name")
@@ -1008,7 +1034,9 @@ def dump(path, fp=None):
   '''
   if fp is None:
     fp = sys.stdout
-  E, subname = dirent_resolve(path)
+  E, subname, unresolved = dirent_resolve(path)
+  if unresolved:
+    warning("%r: unresolved components: %r", path, unresolved)
   if subname:
     E = E[subname]
   dump_Block(E.block, fp)
