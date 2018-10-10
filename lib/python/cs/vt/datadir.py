@@ -309,13 +309,19 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     # shut down the monitor Thread
     self.runstate.cancel()
-    self._monitor_Thread.join()
-    self._monitor_Thread = None
+    mon_thread = self._monitor_Thread
+    if mon_thread is not None:
+      mon_thread.join()
+      self._monitor_Thread = None
     # drain index update queue
-    self._indexQ.close()
-    self._indexQ = None
-    self._index_Thread.join()
-    self._index_Thread = None
+    Q = self._indexQ
+    if Q is not None:
+      Q.close()
+      self._indexQ = None
+    index_thread = self._index_Thread
+    if index_thread is not None:
+      index_thread.join()
+      self._index_Thread = None
     if self._unindexed:
       error("UNINDEXED BLOCKS: %r", self._unindexed)
     # update state to substrate
