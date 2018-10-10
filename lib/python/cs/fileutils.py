@@ -489,7 +489,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
         warning(
             "cancelled; pid %d waited %ds",
             os.getpid(),
-            0 if start if None else time.time() - start)
+            0 if start is None else time.time() - start)
         raise CancellationError("lock acquisition cancelled")
       try:
         lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
