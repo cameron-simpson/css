@@ -601,6 +601,9 @@ class VTCmd:
             badopts = True
           else:
             special_basename = D.name
+            if not readonly:
+              warning("setting readonly")
+              readonly = True
         elif special.startswith('[') and special.endswith(']'):
           matched, type_, params, offset = get_store_spec(special)
           if 'clause_name' not in params:
