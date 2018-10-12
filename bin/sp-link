@@ -27,7 +27,7 @@ ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
 # TODO: needs to come from a config in the site dir
 BATTERY_CAPACITY_KWH = 10.0
 
-GRAPH_DAYS = 6 * 24 * 3600
+GRAPH_DAYS = 28
 
 RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
 
