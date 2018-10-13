@@ -355,7 +355,8 @@ class RunState(object):
         instance to be called whenever .cancel is called.
   '''
 
-  def __init__(self):
+  def __init__(self, name=None):
+    self.name = name
     self._started_from = None
     # core state
     self._running = False
@@ -376,7 +377,12 @@ class RunState(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "RunState:%s[%s:%gs]" % (id(self), self.state, self.run_time)
+    return "RunState:%s[%s:%gs]" % (
+        type(self).__name__
+        if self.name is None
+        else ':'.join( (type(self).__name__, repr(self.name)) ),
+        id(self), self.state, self.run_time
+    )
 
   def __enter__(self):
     self.start()
