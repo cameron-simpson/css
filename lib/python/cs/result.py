@@ -189,7 +189,7 @@ class Result(object):
         return False
       if state == ResultState.running or state == ResultState.pending:
         # in progress or not commenced - change state to cancelled and fall through to ._complete
-        state = ResultState.cancelled
+        self.state = ResultState.cancelled
       else:
         # state error
         raise RuntimeError(
