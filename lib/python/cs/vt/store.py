@@ -75,6 +75,20 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   _seq = Seq()
 
   def __init__(self, name, capacity=None, hashclass=None, lock=None, runstate=None):
+    ''' Initialise the Store.
+
+        Parameters:
+        * `name`: a name for this Store;
+	  if None, a sequential name based on the Store class name
+	  is generated
+        * `capacity`: a capacity for the unternal Later queue, default 4
+        * `hashclass`: the hash class to use for this Store,
+          default: `DEFAULT_HASHCLASS`
+        * `lock`: an optional lock for managing concurrency,
+          if not supplied a new `threading.RLock` is allocated
+        * `runstate`: a `cs.resources.RunState` for external control;
+          if not supplied one is allocated
+    '''
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if not isinstance(name, str):
         raise TypeError(
@@ -87,7 +101,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
       if runstate is None:
-        runstate = defaults.runstate
+        runstate = RunState(name)
       MultiOpenMixin.__init__(self, lock=lock)
       RunStateMixin.__init__(self, runstate=runstate)
       self._attrs = {}
@@ -188,12 +202,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def startup(self):
     ''' Startup: does nothing.
     '''
-    # Later already open
-    pass
+    # note that the Later is already open
+    self.runstate.start()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
+    self.runstate.stop()
     self.__funcQ.close()
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
