@@ -210,7 +210,7 @@ class BlockMap(RunStateMixin):
       X("BlockMap: set blockmapdir to %r (was None)", blockmapdir)
     else:
       X("BlockMap: supplied blockmapdir=%r", blockmapdir)
-    RunStateMixin.__init__(self)
+    RunStateMixin.__init__(self, "BlockMap")
     from .block import _IndirectBlock
     if not isinstance(block, _IndirectBlock):
       raise TypeError("block needs to be a _IndirectBlock, got a %s instead" % (type(block),))
