@@ -677,6 +677,9 @@ class ProxyStore(BasicStoreSync):
       self._attrs.update(read2=read2)
     self.readonly = len(self.save) == 0
 
+  def __str__(self):
+      return "%s(%r)" % (type(self).__name__, self.name)
+
   def startup(self):
     for S in self.save | self.read | self.save2 | self.read2:
       S.open()
