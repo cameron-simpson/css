@@ -208,11 +208,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
-    self.runstate.stop()
+    self.runstate.cancel()
     self.__funcQ.close()
     if not self.__funcQ.closed:
       debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
+    self.runstate.stop()
 
   #############################
   ## Function dispatch methods.
