@@ -95,7 +95,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
             "initial `name` argument must be a str, got %s"
             % (type(name),))
       if name is None:
-        name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
+        name = "%s%d" % (type(self).__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
         capacity = 4
       if hashclass is None:
