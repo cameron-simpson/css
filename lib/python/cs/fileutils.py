@@ -487,7 +487,8 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
     while True:
       if runstate is not None and runstate.cancelled:
         warning(
-            "cancelled; pid %d waited %ds",
+            "%s cancelled; pid %d waited %ds",
+            runstate,
             os.getpid(),
             0 if start is None else time.time() - start)
         raise CancellationError("lock acquisition cancelled")
