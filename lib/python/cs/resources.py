@@ -119,9 +119,9 @@ class MultiOpenMixin(O):
     with self.__mo_lock:
       self._opens += 1
       opens = self._opens
-    if opens == 1:
-      self._finalise = Condition(self.__mo_lock)
-      self.startup()
+      if opens == 1:
+        self._finalise = Condition(self.__mo_lock)
+        self.startup()
     return self
 
   def close(self, enforce_final_close=False, caller_frame=None):
@@ -153,12 +153,13 @@ class MultiOpenMixin(O):
         return retval
       self._opens -= 1
       opens = self._opens
-    if opens == 0:
-      ##INACTIVE##self.tcm_dump(MultiOpenMixin)
-      if caller_frame is None:
-        caller_frame = caller()
-      self._final_close_from = caller_frame
-      retval = self.shutdown()
+      if opens == 0:
+        ##INACTIVE##self.tcm_dump(MultiOpenMixin)
+        if caller_frame is None:
+          caller_frame = caller()
+        self._final_close_from = caller_frame
+        retval = self.shutdown()
+    if open == 0:
       if not self._finalise_later:
         self.finalise()
     else:
