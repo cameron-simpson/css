@@ -510,11 +510,13 @@ class RunStateMixin(object):
   def __init__(self, runstate=None):
     ''' Initialise the RunStateMixin; sets the .runstate attribute.
 
-        `runstate`: optional RunState instance. If omitted or None,
-        a new RunState is allocated.
+	`runstate`: RunState instance or name. If a `str`,
+        a new RunState with that name is allocated.
     '''
     if runstate is None:
-      runstate = RunState()
+      runstate = RunState(type(self).__name__)
+    elif isinstance(runstate, str):
+      runstate = RunState(runstate)
     self.runstate = runstate
   def cancel(self):
     ''' Call .runstate.cancel().
