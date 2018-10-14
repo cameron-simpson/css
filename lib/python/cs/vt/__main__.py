@@ -179,31 +179,30 @@ class VTCmd:
       logTo(dflt_log, delay=True)
 
     xit = None
-    self.runstate = RunState()
+    self.runstate = RunState("main")
     with defaults.push_runstate(self.runstate):
-      with self.runstate:
-        self.config = Config(self.config_path)
+      self.config = Config(self.config_path)
 
-        # catch signals, flag termination
-        def sig_handler(sig, frame):
-          ''' Signal handler
-          '''
-          warning("received signal %s from %s", sig, frame)
-          if sig == SIGQUIT:
-            thread_dump()
-          X("%s.cancel()...", self.runstate)
-          self.runstate.cancel()
-          if sig == SIGQUIT:
-            sys.exit(1)
-        signal(SIGHUP, sig_handler)
-        signal(SIGINT, sig_handler)
-        signal(SIGQUIT, sig_handler)
+      # catch signals, flag termination
+      def sig_handler(sig, frame):
+        ''' Signal handler
+        '''
+        warning("received signal %s from %s", sig, frame)
+        if sig == SIGQUIT:
+          thread_dump()
+        X("%s.cancel()...", self.runstate)
+        self.runstate.cancel()
+        if sig == SIGQUIT:
+          sys.exit(1)
+      signal(SIGHUP, sig_handler)
+      signal(SIGINT, sig_handler)
+      signal(SIGQUIT, sig_handler)
 
-        try:
-          xit = self.cmd_op(args)
-        except GetoptError as e:
-          error("%s", e)
-          badopts = True
+      try:
+        xit = self.cmd_op(args)
+      except GetoptError as e:
+        error("%s", e)
+        badopts = True
 
       if badopts:
         sys.stderr.write(usage)
@@ -239,7 +238,8 @@ class VTCmd:
       if self.store_spec is None:
         raise GetoptError("no $VT_STORE and no -S option")
       try:
-        S = Store(self.store_spec, self.config)
+        # set up the primary Store using the main programme RunState for control
+        S = Store(self.store_spec, self.config, runstate=self.runstate)
       except ValueError as e:
         raise GetoptError("unusable Store specification: %s: %s" % (self.store_spec, e))
       except Exception as e:
