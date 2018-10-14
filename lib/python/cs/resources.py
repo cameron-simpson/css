@@ -378,10 +378,10 @@ class RunState(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "RunState:%s[%s:%gs]" % (
-        type(self).__name__
+    return "%s:%s[%s:%gs]" % (
+        ( type(self).__name__
         if self.name is None
-        else ':'.join( (type(self).__name__, repr(self.name)) ),
+        else ':'.join( (type(self).__name__, repr(self.name)) ) ),
         id(self), self.state, self.run_time
     )
 
