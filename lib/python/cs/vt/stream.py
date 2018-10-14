@@ -16,9 +16,10 @@ from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.logutils import warning
+from cs.packetstream import PacketConnection
 from cs.pfx import Pfx
 from cs.resources import ClosedError
-from cs.packetstream import PacketConnection
+from cs.result import CancellationError
 from cs.threads import locked
 from .hash import (
     decode as hash_decode,
@@ -188,10 +189,16 @@ class StreamStore(BasicStoreSync):
         raise StoreError("no connection: %s" % (e,)) from e
       else:
         try:
-          return conn.do(rq.RQTYPE, rq.flags, bytes(rq))
+          retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
         except ClosedError as e:
           del self._conn
           raise StoreError("connection closed: %s" % (e,)) from e
+        except CancellationError as e:
+          raise StoreError("request cancelled: %s" % (e,)) from e
+        else:
+          if retval is None:
+            raise StoreError("NO RESPONSE from %s" % (rq,))
+        return retval
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
