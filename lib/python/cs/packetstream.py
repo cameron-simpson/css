@@ -351,7 +351,8 @@ class PacketConnection(object):
 
   @not_closed
   def do(self, *a, **kw):
-    ''' Synchronous request. Calls the `Result` returned from the request.
+    ''' Synchronous request.
+        Calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
 
