@@ -775,26 +775,27 @@ class ProxyStore(BasicStoreSync):
               error("no fallback Stores")
           continue
       if not ok:
-        failures = []
-        for LF, S in fallback:
-          hashcode, exc_info = LF.join()
-          if exc_info:
-            e = exc_info[1]
-            if isinstance(e, StoreError):
-              exc_info = None
-            X("==== ==== ==== exc_info=%r", exc_info)
-            error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
-            failures.append( (S, e) )
-          else:
-            if hashcode1 is None:
-              ch.put(hashcode)
-              hashcode1 = hashcode
-            elif hashcode1 != hashcode:
-              warning(
-                  "%s: different hashcodes returns from .add: %s vs %s",
-                  S, hashcode1, hashcode)
-        if failures:
-          raise RuntimeError("exceptions saving to save2: %r" % (failures,))
+        if fallback:
+          failures = []
+          for LF, S in fallback:
+            hashcode, exc_info = LF.join()
+            if exc_info:
+              e = exc_info[1]
+              if isinstance(e, StoreError):
+                exc_info = None
+              X("==== ==== ==== exc_info=%r", exc_info)
+              error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
+              failures.append( (S, e) )
+            else:
+              if hashcode1 is None:
+                ch.put(hashcode)
+                hashcode1 = hashcode
+              elif hashcode1 != hashcode:
+                warning(
+                    "%s: different hashcodes returns from .add: %s vs %s",
+                    S, hashcode1, hashcode)
+          if failures:
+            raise RuntimeError("exceptions saving to save2: %r" % (failures,))
     finally:
       # mark end of queue
       if hashcode1 is None:
