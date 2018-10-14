@@ -844,14 +844,14 @@ class DataDirStore(MappingStore):
       *,
       datadirpath=None,
       hashclass=None, indexclass=None,
-      rollover=None, runstate=None,
+      rollover=None,
       **kw
   ):
     datadir = DataDir(
         statedirpath, datadirpath, hashclass,
         indexclass=indexclass,
-        rollover=rollover, runstate=runstate)
-    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
+        rollover=rollover)
+    MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
   def startup(self, **kw):
@@ -906,9 +906,8 @@ class _PlatonicStore(MappingStore):
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
         flag_prefix=flag_prefix,
-        runstate=runstate,
     )
-    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
+    MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
     self.readonly = True
 
