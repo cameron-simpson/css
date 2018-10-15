@@ -180,7 +180,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       indexclass=None,
       create_statedir=None, create_datadir=None,
       flags=None, flag_prefix=None,
-      runstate=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
 
@@ -202,10 +201,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
-        * `runstate`: optional RunState, passed to RunStateMixin.__init__
     '''
+    RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
-    RunStateMixin.__init__(self, runstate=runstate)
     if flags is None:
       if flag_prefix is None:
         flags = DummyFlags()
