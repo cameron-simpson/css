@@ -201,6 +201,11 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
+
+        Note that __init__ only saves the settings such as the `indexclass`
+        and ensures that requisite directories exist.
+        The monitor thread and runtime state are setup by the `startup` method
+        and closed down by the `shutdown` method.
     '''
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
@@ -230,16 +235,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
-    self._unindexed = {}
-    self.index = {}         # dummy value
-    self._filemap = {}
-    self.lockpath = None
-    self._cache = None
-    self._indexQ = None
-    self._index_Thread = None
-    self._monitor_Thread = None
-    self._extra_state = {}
-    self._load_state()
     # the "default" data dir may be created if the statedir exists
     if create_datadir is None:
       create_datadir = existspath(statedirpath) and not existspath(datadirpath)
@@ -276,6 +271,17 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
     '''
+    self._unindexed = {}
+    self.index = {}         # dummy value
+    self._filemap = {}
+    self.lockpath = None
+    self._cache = None
+    self._indexQ = None
+    self._index_Thread = None
+    self._monitor_Thread = None
+    self._extra_state = {}
+    self._load_state()
+    self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(
         maxsize=4,
@@ -333,6 +339,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     except OSError as e:
       error("cannot remove lock file: %s", e)
     self.lockpath = None
+    self.runstate.stop()
 
   def localpathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the statedirpath.
