@@ -200,10 +200,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ##
 
   def startup(self):
-    ''' Startup: does nothing.
+    ''' Start the Store.
     '''
-    # note that the Later is already open
     self.runstate.start()
+    self.__funcQ.open()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
@@ -222,7 +222,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal Later queue.
     '''
-    return self.__funcQ.defer(func, *args, **kwargs)
+    self.open()
+    def deferred():
+      try:
+        return func(*args, **kwargs)
+      finally:
+        self.close()
+    return self.__funcQ.defer(deferred)
 
   def bg(self, func, *a, **kw):
     ''' Queue a function without consuming the queue capacity.
@@ -547,6 +553,7 @@ class MappingStore(BasicStoreSync):
     self._attrs.update(mapping=mapping)
 
   def startup(self):
+    super().startup()
     mapping = self.mapping
     try:
       openmap = mapping.open
@@ -554,7 +561,6 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       openmap()
-    super().startup()
 
   def shutdown(self):
     mapping = self.mapping
@@ -682,12 +688,14 @@ class ProxyStore(BasicStoreSync):
       return "%s(%r)" % (type(self).__name__, self.name)
 
   def startup(self):
+    super().startup()
     for S in self.save | self.read | self.save2 | self.read2:
       S.open()
 
   def shutdown(self):
     for S in self.save | self.read | self.save2 | self.read2:
       S.close()
+    super().shutdown()
 
   @staticmethod
   def _multicall0(stores, method_name, args):
@@ -697,7 +705,8 @@ class ProxyStore(BasicStoreSync):
     stores = list(stores)
     for S in stores:
       with Pfx("%s.%s()", S, method_name):
-        LF = getattr(S, method_name)(*args)
+        with S:
+          LF = getattr(S, method_name)(*args)
       yield LF, S   # outside Pfx because this is a generator
 
   def _multicall(self, stores, method_name, args):
@@ -857,14 +866,14 @@ class DataDirStore(MappingStore):
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
     '''
-    self._datadir.open()
     super().startup(**kw)
+    self._datadir.open()
 
   def shutdown(self):
     ''' Shutdown: close the internal DataDir.
     '''
-    super().shutdown()
     self._datadir.close()
+    super().shutdown()
 
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.
@@ -914,14 +923,14 @@ class _PlatonicStore(MappingStore):
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
     '''
-    self._datadir.open()
     super().startup(**kw)
+    self._datadir.open()
 
   def shutdown(self):
     ''' Shutdown: close the internal DataDir.
     '''
-    super().shutdown()
     self._datadir.close()
+    super().shutdown()
 
   def get_Archive(self, archive_name=None):
     ''' PlatonicStore Archive are stored in the internal DataDir.
