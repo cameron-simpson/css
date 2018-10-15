@@ -92,7 +92,10 @@ class StreamStore(BasicStoreSync):
     if connect is None:
       # set up protocol on existing stream
       # no reconnect facility
-      self._conn = self._packet_connection(recv, send)
+      conn = self._conn = self._packet_connection(recv, send)
+      # arrange to disassociate if the channel goes away
+      conn.notify_recv_eof.add(self._packet_disconnect)
+      conn.notify_send_eof.add(self._packet_disconnect)
     else:
       # defer protocol setup until needed
       if recv is not None or send is not None:
@@ -151,6 +154,9 @@ class StreamStore(BasicStoreSync):
         raise AttributeError("%r: connect fails: %s: %s" % (attr, type(e).__name__, e)) from e
       else:
         conn = self._conn = self._packet_connection(recv, send)
+        # arrange to disassociate if the channel goes away
+        conn.notify_recv_eof.add(self._packet_disconnect)
+        conn.notify_send_eof.add(self._packet_disconnect)
         return conn
     raise AttributeError(attr)
 
@@ -160,9 +166,6 @@ class StreamStore(BasicStoreSync):
     conn = PacketConnection(
         recv, send, self._handle_request,
         name='PacketConnection:'+self.name)
-    # arrange to disassociate if the channel goes away
-    conn.notify_recv_eof.add(self._packet_disconnect)
-    conn.notify_send_eof.add(self._packet_disconnect)
     return conn
 
   @locked
