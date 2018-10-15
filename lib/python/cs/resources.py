@@ -51,6 +51,10 @@ class MultiOpenMixin(O):
   ''' A mixin to count open and close calls, and to call .startup
       on the first .open and to call .shutdown on the last .close.
 
+      Recommended subclass implementations do as little as possible
+      during __init__, and do almost all setup during startup so
+      that the class may perform multiple startup/shutdown iterations.
+
       If used as a context manager calls open()/close() from
       __enter__() and __exit__().
 
@@ -73,6 +77,8 @@ class MultiOpenMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
         * `lock`: if set and not None, an RLock to use; otherwise one will be allocated
+
+        TODO:
         * `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
