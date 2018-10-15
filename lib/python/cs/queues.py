@@ -190,7 +190,6 @@ class Channel(object):
     self.__writable.release()
     # await a writer
     self.__readable.acquire()
-    self.close()
     value = self._value
     delattr(self,'_value')
     return value
