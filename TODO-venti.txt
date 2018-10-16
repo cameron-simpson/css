@@ -1,3 +1,4 @@
+make cs.later.Later restartable - tends to hang on the second shutdown?
 sqlite based index/state file: sharable and portable - but needs to batch lookups and inserts for performance
 make datadirs sharable by multiple vt instances: shared state csv
 when stable and more ergonomic, move vt.transcribe to cs.transcriber
