@@ -551,6 +551,32 @@ class Later(MultiOpenMixin):
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
 
+  def startup(self):
+    pass
+
+  def shutdown(self):
+    ''' Shut down the Later instance:
+        - close the TimerQueue if any
+        - close the request queue
+        - close the worker thread pool
+    '''
+    ##with Pfx("%s.shutdown()", self):
+    with PrePfx("LATER.SHUTDOWN [%s]", self):
+      if not self.closed:
+        error("NOT CLOSED")
+        raise RuntimeError("NOT CLOSED!")
+      if self._timerQ:
+        self._timerQ.close()
+        self._timerQ.join()
+      self._pendingq.close()          # prevent further submissions
+      self._workers.close()
+      # queue actions to detect activity completion
+      def finish_up():
+        self._dispatchThread.join()         # wait for all functions to be dispatched
+        self._workers.join()                # wait for all worker Threads to complete
+        self._finished.set()
+      bg(finish_up)
+
   @property
   def finished(self):
     ''' Probe the finishedness.
@@ -610,32 +636,6 @@ class Later(MultiOpenMixin):
           x = L(f, 3)   # x == 6
     '''
     return self.defer(func, *a, **kw)()
-
-  def startup(self):
-    pass
-
-  def shutdown(self):
-    ''' Shut down the Later instance:
-        - close the TimerQueue if any
-        - close the request queue
-        - close the worker thread pool
-    '''
-    ##with Pfx("%s.shutdown()", self):
-    with PrePfx("LATER.SHUTDOWN [%s]", self):
-      if not self.closed:
-        error("NOT CLOSED")
-        raise RuntimeError("NOT CLOSED!")
-      if self._timerQ:
-        self._timerQ.close()
-        self._timerQ.join()
-      self._pendingq.close()          # prevent further submissions
-      self._workers.close()
-      # queue actions to detect activity completion
-      def finish_up():
-        self._dispatchThread.join()         # wait for all functions to be dispatched
-        self._workers.join()                # wait for all worker Threads to complete
-        self._finished.set()
-      bg(finish_up)
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
