@@ -165,7 +165,7 @@ class MultiOpenMixin(O):
           caller_frame = caller()
         self._final_close_from = caller_frame
         retval = self.shutdown()
-    if open == 0:
+    if opens == 0:
       if not self._finalise_later:
         self.finalise()
     else:
