@@ -567,7 +567,6 @@ class Later(object):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._pendingq.close()          # prevent further submissions
       self._workers.close()
       # queue actions to detect activity completion
       def finish_up():
