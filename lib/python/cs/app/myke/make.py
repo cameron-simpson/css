@@ -80,11 +80,10 @@ class Maker(MultiOpenMixin):
 
   def startup(self):
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.open()
     self._makeQ.logTo("myke-later.log")
 
   def shutdown(self):
-    self._makeQ.close()
+    self._makeQ.shutdown()
     self._makeQ.wait()
 
   def report(self, fp=None):
