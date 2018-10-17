@@ -81,7 +81,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         * `name`: a name for this Store;
 	  if None, a sequential name based on the Store class name
 	  is generated
-        * `capacity`: a capacity for the unternal Later queue, default 4
+        * `capacity`: a capacity for the internal Later queue, default 4
         * `hashclass`: the hash class to use for this Store,
           default: `DEFAULT_HASHCLASS`
         * `lock`: an optional lock for managing concurrency,
@@ -106,6 +106,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       RunStateMixin.__init__(self, runstate=runstate)
       self._attrs = {}
       self.name = name
+      self._capacity = capacity
       self.hashclass = hashclass
       self.config = None
       self.logfp = None
@@ -114,7 +115,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.writeonly = False
       self._archives = {}
       self._blockmapdir = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
@@ -203,16 +203,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     ''' Start the Store.
     '''
     self.runstate.start()
-    self.__funcQ.open()
+    self.__funcQ = Later(self._capacity, name="%s:Later(__funcQ)" % (self.name,))
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.runstate.cancel()
-    self.__funcQ.close()
-    if not self.__funcQ.closed:
-      debug("%s.shutdown: __funcQ not closed yet", self)
-    self.__funcQ.wait()
+    L = self.__funcQ
+    L.shutdown()
+    L.wait()
+    del self.__funcQ
     self.runstate.stop()
 
   #############################
