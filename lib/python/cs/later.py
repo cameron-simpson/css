@@ -35,7 +35,7 @@ import traceback
 from cs.debug import ifdebug, Lock, Thread
 from cs.excutils import logexc, logexc_gen
 import cs.logutils
-from cs.logutils import error, warning, debug, exception, D, OBSOLETE
+from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
 from cs.pfx import Pfx, PrePfx, XP
 from cs.py.func import funcname
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
@@ -419,7 +419,6 @@ class _Pipeline(MultiOpenMixin):
       try:
         func_sig, functor = action
       except TypeError:
-        from cs.x import X
         X("_Pipeline: action=%r", action)
         func_sig = action.sig
         functor = action.functor(self.later)
@@ -441,7 +440,6 @@ class _Pipeline(MultiOpenMixin):
       elif func_sig == FUNC_MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_PIPELINE:
-        from cs.x import X
         X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
@@ -589,13 +587,10 @@ class Later(object):
     ''' Wait for the Later to be finished.
     '''
     f = self._finished
-    X("WAIT %s: finished is_set = %s", self, f.is_set())
     if not f.is_set():
-        X("  WAIT: Later=%r", self)
-    if self._finished.wait(5.0):
-      X("  WAIT COMPLETED")
-    else:
-      X("  WAIT TIMED OUT")
+      info("Later.WAIT: %r", self)
+    if not self._finished.wait(5.0):
+      warning("  Later.WAIT TIMED OUT")
 
   def __repr__(self):
     return (
