@@ -4,20 +4,22 @@
 r'''
 Queue functions for execution later in priority and time order.
 
-I use Later objects for convenient queuing of functions whose execution occurs later in a priority order with capacity constraints.
+I use Later objects for convenient queuing of functions whose
+execution occurs later in a priority order with capacity constraints.
 
 Why not futures?
 I already had this before futures came out,
 I prefer its naming scheme and interface,
 and futures did not seem to support prioritising execution.
 
-Use is simple enough: create a Later instance and typically queue functions with the .defer() method::
+Use is simple enough: create a Later instance and typically queue
+functions with the .defer() method::
 
-  L = Later(4)      # a Later with a parallelism of 4
-  ...
-  LF = L.defer(func, *args, **kwargs)
-  ...
-  x = LF()          # collect result
+    L = Later(4)      # a Later with a parallelism of 4
+    ...
+    LF = L.defer(func, *args, **kwargs)
+    ...
+    x = LF()          # collect result
 
 The .defer method and its siblings return a LateFunction,
 which is a subclass of cs.result.Result.
@@ -33,10 +35,10 @@ import threading
 import time
 import traceback
 from cs.debug import ifdebug, Lock, Thread
-from cs.excutils import logexc, logexc_gen
+from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
-from cs.pfx import Pfx, PrePfx, XP
+from cs.pfx import Pfx, PrePfx
 from cs.py.func import funcname
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
@@ -79,6 +81,7 @@ class _ThreadLocal(threading.local):
   '''
 
   def __init__(self):
+    threading.local.__init__(self)
     self.stack = []
 
   @property
@@ -93,7 +96,7 @@ class _ThreadLocal(threading.local):
 
 default = _ThreadLocal()
 
-def later(func, *a, **kw):
+def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
       Return the LateFunction.
   '''
@@ -173,7 +176,7 @@ class _Late_context_manager(object):
       return False
     W = self.latefunc.wait()
     self.latefunc = None
-    lf_ret, lf_exc_info = W
+    _, lf_exc_info = W
     if lf_exc_info is not None:
       raise lf_exc_info[1]
     return True
@@ -289,7 +292,9 @@ class LateFunction(_PendingFunction):
     self._complete(result, exc_info)
 
 class _PipelineStage(PushQueue):
-  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates computation via a Later; it also adds some activity tracking.
+  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates
+      computation via a Later; it also adds some activity tracking.
+
       This represents a single stage in a Later pipeline of functions.
       We raise the pipeline's _busy counter for every item in play,
       and also raise it while the finalisation function has not run.
@@ -298,12 +303,15 @@ class _PipelineStage(PushQueue):
   '''
 
   def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
-    ''' Initialise the _PipelineStage, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
-        `name`: namefor this pipeline stage as for PushQueue.
-        `pipeline`: parent pipeline for this pipeline stage
-        `functor`: callable used to process items
-        `outQ`: output queue
-        `retry_interval`: how often to retry (UNUSED? TODO: reimplement)
+    ''' Initialise the _PipelineStage, wrapping func_iter and
+        func_final in code to inc/dec the main pipeline _busy counter.
+
+        Parameters:
+        * `name`: namefor this pipeline stage as for PushQueue.
+        * `pipeline`: parent pipeline for this pipeline stage
+        * `functor`: callable used to process items
+        * `outQ`: output queue
+        * `retry_interval`: how often to retry (UNUSED? TODO: reimplement)
     '''
     if retry_interval is None:
       retry_interval = DEFAULT_RETRY_DELAY
@@ -401,12 +409,17 @@ class _PipelineStagePipeline(_PipelineStage):
     _PipelineStage.shutdown(self)
 
 class _Pipeline(MultiOpenMixin):
-  ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
+  ''' A _Pipeline encapsulates the chain of PushQueues created by
+      a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, actions, outQ):
-    ''' Initialise the _Pipeline from `name`, Later instance `L`, list of filter functions `actions` and output queue `outQ`.
-        Each action is either a 2-tuple of (sig, functor) or an object with a .sig attribute and a .functor method returning a callable.
+    ''' Initialise the _Pipeline from `name`, Later instance `L`,
+        list of filter functions `actions` and output queue `outQ`.
+
+        Each action is either a 2-tuple of (sig, functor) or an
+        object with a .sig attribute and a .functor method returning
+        a callable.
     '''
     MultiOpenMixin.__init__(self)
     self.name = name
@@ -518,7 +531,9 @@ class Later(object):
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
-    debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
+    debug(
+        "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)",
+        capacity, inboundCapacity, name)
     if isinstance(capacity, int):
       capacity = AdjustableSemaphore(capacity)
     if retry_delay is None:
@@ -555,7 +570,7 @@ class Later(object):
         - close the request queue
         - close the TimerQueue if any
         - close the worker thread pool
-	- dispatch a Thread to wait for completion and fire the
+        - dispatch a Thread to wait for completion and fire the
           _finished Event
     '''
     ##with Pfx("%s.shutdown()", self):
@@ -608,8 +623,8 @@ class Later(object):
 
   def __str__(self):
     return (
-         "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>" \
-         % (
+        "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>" \
+        % (
             self.name, self.capacity,
             len(self.pending), len(self.running), len(self.delayed),
             int(self._busy), self._busy)
@@ -789,16 +804,22 @@ class Later(object):
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
+
         If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
+
         If the parameter `delay` is not None, delay consideration of
         this function until `delay` seconds from now.
+
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
+
         If the parameter `name` is not None, use it to name the LateFunction.
+
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
+
         If the parameter `LF` is not None, construct a new LateFunction to
           track function completion.
     '''
@@ -806,7 +827,11 @@ class Later(object):
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
-  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None, LF=None, retry_delay=None):
+  def _submit(
+      self,
+      func, priority=None, delay=None, when=None,
+      name=None, pfx=None, LF=None, retry_delay=None
+  ):
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -906,7 +931,8 @@ class Later(object):
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
-    ''' Defer `callable1`, then add its result to the arguments for `func` and defer that. Return the LateFunction for `func`.
+    ''' Defer `callable1`, then add its result to the arguments for
+        `func` and defer that. Return the LateFunction for `func`.
     '''
     def then():
       LF1 = self.defer(callable1)
@@ -971,17 +997,22 @@ class Later(object):
     return after(LFs, None, submit_func)
 
   def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration to return results via the queue `outQ`. Return a Result for final synchronisation.
-        `outQ` must have a .put method to accept items and a .close method to
-        indicate the end of items.
-        When the iteration is complete, call outQ.close() and complete the Result.
-        If iteration ran to completion then the Result's .result
-        will be the number of iterations, otherwise if an iteration
-        raised an exception the the Result's .exc_info will contain
-        the exception information.
-        `test_ready`: if not None, a callable to test if iteration
-            is presently permitted; iteration will be deferred until
-            the callable returns a true value
+    ''' Submit an iterable `I` for asynchronous stepwise iteration
+        to return results via the queue `outQ`. Return a Result for
+        final synchronisation.
+
+        Parameters:
+        * `I`: the iterable for for asynchronous stepwise iteration
+        * `outQ` must have a .put method to accept items and a .close method to
+          indicate the end of items.
+          When the iteration is complete, call outQ.close() and complete the Result.
+          If iteration ran to completion then the Result's .result
+          will be the number of iterations, otherwise if an iteration
+          raised an exception the the Result's .exc_info will contain
+          the exception information.
+        * `test_ready`: if not None, a callable to test if iteration
+          is presently permitted; iteration will be deferred until
+          the callable returns a true value
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
@@ -1008,7 +1039,7 @@ class Later(object):
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
-        R.exc_info = exc_info()
+        R.exc_info = sys.exc_info()
       else:
         iterationss[0] += 1
         # put the item onto the output queue
@@ -1181,7 +1212,7 @@ class LatePool(object):
   def join(self):
     ''' Wait for completion of all the LateFunctions.
     '''
-    for LF in self:
+    for _ in self:
       pass
 
 def capacity(func):
