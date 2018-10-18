@@ -51,6 +51,10 @@ class MultiOpenMixin(O):
   ''' A mixin to count open and close calls, and to call .startup
       on the first .open and to call .shutdown on the last .close.
 
+      Recommended subclass implementations do as little as possible
+      during __init__, and do almost all setup during startup so
+      that the class may perform multiple startup/shutdown iterations.
+
       If used as a context manager calls open()/close() from
       __enter__() and __exit__().
 
@@ -73,6 +77,8 @@ class MultiOpenMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
         * `lock`: if set and not None, an RLock to use; otherwise one will be allocated
+
+        TODO:
         * `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
@@ -89,7 +95,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
     self._lock = lock
-    self.__mo_lock = Lock()
+    self.__mo_lock = RLock()
     self._finalise_later = finalise_later
     self._finalise = None
 
@@ -117,11 +123,12 @@ class MultiOpenMixin(O):
       self._opened_from[frame_key] = self._opened_from.get(frame_key, 0) + 1
     self.opened = True
     with self.__mo_lock:
-      self._opens += 1
       opens = self._opens
-    if opens == 1:
-      self._finalise = Condition(self.__mo_lock)
-      self.startup()
+      opens += 1
+      self._opens = opens
+      if opens == 1:
+        self._finalise = Condition(self.__mo_lock)
+        self.startup()
     return self
 
   def close(self, enforce_final_close=False, caller_frame=None):
@@ -141,7 +148,8 @@ class MultiOpenMixin(O):
       raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
     with self.__mo_lock:
-      if self._opens < 1:
+      opens = self._opens
+      if opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
         error("  final close was from %s", self._final_close_from)
         for frame_key in sorted(self._opened_from.keys()):
@@ -151,14 +159,15 @@ class MultiOpenMixin(O):
         ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return retval
-      self._opens -= 1
-      opens = self._opens
+      opens -= 1
+      self._opens = opens
+      if opens == 0:
+        ##INACTIVE##self.tcm_dump(MultiOpenMixin)
+        if caller_frame is None:
+          caller_frame = caller()
+        self._final_close_from = caller_frame
+        retval = self.shutdown()
     if opens == 0:
-      ##INACTIVE##self.tcm_dump(MultiOpenMixin)
-      if caller_frame is None:
-        caller_frame = caller()
-      self._final_close_from = caller_frame
-      retval = self.shutdown()
       if not self._finalise_later:
         self.finalise()
     else:
@@ -355,7 +364,8 @@ class RunState(object):
         instance to be called whenever .cancel is called.
   '''
 
-  def __init__(self):
+  def __init__(self, name=None):
+    self.name = name
     self._started_from = None
     # core state
     self._running = False
@@ -376,7 +386,12 @@ class RunState(object):
   __nonzero__ = __bool__
 
   def __str__(self):
-    return "RunState:%s[%s:%gs]" % (id(self), self.state, self.run_time)
+    return "%s:%s[%s:%gs]" % (
+        ( type(self).__name__
+          if self.name is None
+          else ':'.join( (type(self).__name__, repr(self.name)) ) ),
+        id(self), self.state, self.run_time
+    )
 
   def __enter__(self):
     self.start()
@@ -503,11 +518,13 @@ class RunStateMixin(object):
   def __init__(self, runstate=None):
     ''' Initialise the RunStateMixin; sets the .runstate attribute.
 
-        `runstate`: optional RunState instance. If omitted or None,
-        a new RunState is allocated.
+        `runstate`: RunState instance or name. If a `str`,
+        a new RunState with that name is allocated.
     '''
     if runstate is None:
-      runstate = RunState()
+      runstate = RunState(type(self).__name__)
+    elif isinstance(runstate, str):
+      runstate = RunState(runstate)
     self.runstate = runstate
   def cancel(self):
     ''' Call .runstate.cancel().

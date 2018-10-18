@@ -172,6 +172,7 @@ class TCPClientStore(StreamStore):
     StreamStore.shutdown(self)
     if self.sock:
       self.sock.close()
+      self.sock = None
 
   def _tcp_connect(self):
     with Pfx("connect %r", self.sock_bind_addr):
@@ -188,6 +189,15 @@ class TCPClientStore(StreamStore):
         raise
       X("TCP CONNECT to %r: CONNECTED", self.sock_bind_addr)
       return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+
+  @logexc
+  def _packet_disconnect(self, conn):
+    ''' On disconnect, close the socket as well.
+    '''
+    super()._packet_disconnect(conn)
+    sock = self.sock
+    self.sock = None
+    sock.close()
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 

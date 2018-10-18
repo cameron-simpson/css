@@ -180,7 +180,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       indexclass=None,
       create_statedir=None, create_datadir=None,
       flags=None, flag_prefix=None,
-      runstate=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
 
@@ -202,10 +201,14 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
-        * `runstate`: optional RunState, passed to RunStateMixin.__init__
+
+        Note that __init__ only saves the settings such as the `indexclass`
+        and ensures that requisite directories exist.
+        The monitor thread and runtime state are setup by the `startup` method
+        and closed down by the `shutdown` method.
     '''
+    RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
-    RunStateMixin.__init__(self, runstate=runstate)
     if flags is None:
       if flag_prefix is None:
         flags = DummyFlags()
@@ -217,7 +220,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.statedirpath = statedirpath
     if datadirpath is None:
       datadirpath = joinpath(statedirpath, 'data')
-      X("datadirpath => %r", datadirpath)
     self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
@@ -233,16 +235,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
-    self._unindexed = {}
-    self.index = {}         # dummy value
-    self._filemap = {}
-    self.lockpath = None
-    self._cache = None
-    self._indexQ = None
-    self._index_Thread = None
-    self._monitor_Thread = None
-    self._extra_state = {}
-    self._load_state()
     # the "default" data dir may be created if the statedir exists
     if create_datadir is None:
       create_datadir = existspath(statedirpath) and not existspath(datadirpath)
@@ -279,6 +271,17 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
     '''
+    self._unindexed = {}
+    self.index = {}         # dummy value
+    self._filemap = {}
+    self.lockpath = None
+    self._cache = None
+    self._indexQ = None
+    self._index_Thread = None
+    self._monitor_Thread = None
+    self._extra_state = {}
+    self._load_state()
+    self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(
         maxsize=4,
@@ -310,13 +313,19 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     # shut down the monitor Thread
     self.runstate.cancel()
-    self._monitor_Thread.join()
-    self._monitor_Thread = None
+    mon_thread = self._monitor_Thread
+    if mon_thread is not None:
+      mon_thread.join()
+      self._monitor_Thread = None
     # drain index update queue
-    self._indexQ.close()
-    self._indexQ = None
-    self._index_Thread.join()
-    self._index_Thread = None
+    Q = self._indexQ
+    if Q is not None:
+      Q.close()
+      self._indexQ = None
+    index_thread = self._index_Thread
+    if index_thread is not None:
+      index_thread.join()
+      self._index_Thread = None
     if self._unindexed:
       error("UNINDEXED BLOCKS: %r", self._unindexed)
     # update state to substrate
@@ -330,6 +339,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     except OSError as e:
       error("cannot remove lock file: %s", e)
     self.lockpath = None
+    self.runstate.stop()
 
   def localpathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the statedirpath.
@@ -946,6 +956,11 @@ class PlatonicDir(_FilesDir):
       from the files in the backing directory tree.
   '''
 
+  # delays during scanning to limit the CPU and I/O impact of the
+  # monitoring and updating
+  DELAY_INTERSCAN = 1.0     # regular pause between directory scans
+  DELAY_INTRASCAN = 0.1     # stalls during scan: per directory and after big files
+
   index_entry_class = PlatonicDirIndexEntry
 
   def __init__(
@@ -1073,7 +1088,7 @@ class PlatonicDir(_FilesDir):
     else:
       warning("%s: no meta_store!", self)
     while not self.cancelled:
-      time.sleep(1)
+      time.sleep(self.DELAY_INTERSCAN)
       if self.flag_scan_disable:
         continue
       # scan for new datafiles
@@ -1083,7 +1098,7 @@ class PlatonicDir(_FilesDir):
         seen = set()
         info("scan tree...")
         for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
-          time.sleep(0.1)
+          time.sleep(self.DELAY_INTRASCAN)
           if self.cancelled or self.flag_scan_disable:
             break
           # update state before scan
@@ -1222,6 +1237,9 @@ class PlatonicDir(_FilesDir):
                         DFstate.scanned_to,
                         transcribe_bytes_geek(scanned),
                         transcribe_bytes_geek(scan_rate))
+                  # stall after a file scan, briefly, to limit impact
+                  if elapsed > 0:
+                    time.sleep(min(elapsed, self.DELAY_INTRASCAN))
                   if meta_store is not None:
                     blockQ.close()
                     try:

@@ -141,8 +141,10 @@ class DataFile(MultiOpenMixin, ReadMixin):
     if self.readwrite:
       os.close(self._wfd)
       self._wfd = None
+      self._wlock = None
     os.close(self._rfd)
     self._rfd = None
+    self._rlock = None
 
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.

@@ -4,20 +4,22 @@
 r'''
 Queue functions for execution later in priority and time order.
 
-I use Later objects for convenient queuing of functions whose execution occurs later in a priority order with capacity constraints.
+I use Later objects for convenient queuing of functions whose
+execution occurs later in a priority order with capacity constraints.
 
 Why not futures?
 I already had this before futures came out,
 I prefer its naming scheme and interface,
 and futures did not seem to support prioritising execution.
 
-Use is simple enough: create a Later instance and typically queue functions with the .defer() method::
+Use is simple enough: create a Later instance and typically queue
+functions with the .defer() method::
 
-  L = Later(4)      # a Later with a parallelism of 4
-  ...
-  LF = L.defer(func, *args, **kwargs)
-  ...
-  x = LF()          # collect result
+    L = Later(4)      # a Later with a parallelism of 4
+    ...
+    LF = L.defer(func, *args, **kwargs)
+    ...
+    x = LF()          # collect result
 
 The .defer method and its siblings return a LateFunction,
 which is a subclass of cs.result.Result.
@@ -33,16 +35,17 @@ import threading
 import time
 import traceback
 from cs.debug import ifdebug, Lock, Thread
-from cs.excutils import logexc, logexc_gen
+from cs.excutils import logexc
 import cs.logutils
-from cs.logutils import error, warning, debug, exception, D, OBSOLETE
-from cs.pfx import Pfx, PrePfx, XP
+from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
+from cs.pfx import Pfx, PrePfx
 from cs.py.func import funcname
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.result import Result, _PendingFunction, ResultState, report, after
 from cs.seq import seq, TrackingCounter
 from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -78,6 +81,7 @@ class _ThreadLocal(threading.local):
   '''
 
   def __init__(self):
+    threading.local.__init__(self)
     self.stack = []
 
   @property
@@ -92,7 +96,7 @@ class _ThreadLocal(threading.local):
 
 default = _ThreadLocal()
 
-def later(func, *a, **kw):
+def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
       Return the LateFunction.
   '''
@@ -172,7 +176,7 @@ class _Late_context_manager(object):
       return False
     W = self.latefunc.wait()
     self.latefunc = None
-    lf_ret, lf_exc_info = W
+    _, lf_exc_info = W
     if lf_exc_info is not None:
       raise lf_exc_info[1]
     return True
@@ -227,8 +231,8 @@ class LateFunction(_PendingFunction):
       retry_delay = later.retry_delay
     self.name = name
     self.retry_delay = retry_delay
-    self.later = L = later.open()
-    L._busy.inc(name)
+    self.later = later
+    later._busy.inc(name)
     ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
     ##for sn, s in ('running', L.running), ('pending', L.pending):
     ##  D("    %s=%r", sn, s)
@@ -242,7 +246,6 @@ class LateFunction(_PendingFunction):
     _PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
     self.later._busy.dec(self.name)
-    self.later.close()
 
   def _resubmit(self):
     ''' Resubmit this function for later execution.
@@ -289,7 +292,9 @@ class LateFunction(_PendingFunction):
     self._complete(result, exc_info)
 
 class _PipelineStage(PushQueue):
-  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates computation via a Later; it also adds some activity tracking.
+  ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates
+      computation via a Later; it also adds some activity tracking.
+
       This represents a single stage in a Later pipeline of functions.
       We raise the pipeline's _busy counter for every item in play,
       and also raise it while the finalisation function has not run.
@@ -298,12 +303,15 @@ class _PipelineStage(PushQueue):
   '''
 
   def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
-    ''' Initialise the _PipelineStage, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
-        `name`: namefor this pipeline stage as for PushQueue.
-        `pipeline`: parent pipeline for this pipeline stage
-        `functor`: callable used to process items
-        `outQ`: output queue
-        `retry_interval`: how often to retry (UNUSED? TODO: reimplement)
+    ''' Initialise the _PipelineStage, wrapping func_iter and
+        func_final in code to inc/dec the main pipeline _busy counter.
+
+        Parameters:
+        * `name`: namefor this pipeline stage as for PushQueue.
+        * `pipeline`: parent pipeline for this pipeline stage
+        * `functor`: callable used to process items
+        * `outQ`: output queue
+        * `retry_interval`: how often to retry (UNUSED? TODO: reimplement)
     '''
     if retry_interval is None:
       retry_interval = DEFAULT_RETRY_DELAY
@@ -401,12 +409,17 @@ class _PipelineStagePipeline(_PipelineStage):
     _PipelineStage.shutdown(self)
 
 class _Pipeline(MultiOpenMixin):
-  ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
+  ''' A _Pipeline encapsulates the chain of PushQueues created by
+      a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, actions, outQ):
-    ''' Initialise the _Pipeline from `name`, Later instance `L`, list of filter functions `actions` and output queue `outQ`.
-        Each action is either a 2-tuple of (sig, functor) or an object with a .sig attribute and a .functor method returning a callable.
+    ''' Initialise the _Pipeline from `name`, Later instance `L`,
+        list of filter functions `actions` and output queue `outQ`.
+
+        Each action is either a 2-tuple of (sig, functor) or an
+        object with a .sig attribute and a .functor method returning
+        a callable.
     '''
     MultiOpenMixin.__init__(self)
     self.name = name
@@ -419,7 +432,6 @@ class _Pipeline(MultiOpenMixin):
       try:
         func_sig, functor = action
       except TypeError:
-        from cs.x import X
         X("_Pipeline: action=%r", action)
         func_sig = action.sig
         functor = action.functor(self.later)
@@ -441,7 +453,6 @@ class _Pipeline(MultiOpenMixin):
       elif func_sig == FUNC_MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_PIPELINE:
-        from cs.x import X
         X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
@@ -486,18 +497,18 @@ class _Pipeline(MultiOpenMixin):
     '''
     self.outQ.join()
 
-class Later(MultiOpenMixin):
+class Later(object):
   ''' A management class to queue function calls for later execution.
 
       Methods are provided for submitting functions to run ASAP or
       after a delay or after other pending functions. These methods
-      return LateFunctions, a subclass of cs.result.Asynchon.
+      return LateFunctions, a subclass of cs.result.Result.
 
-      A Later instance' shutdown method closes the Later for further
-      submission (except by functions run by this Later). Shutdown
-      does not imply that all submitted functions have completed
-      or even been dispatched. Callers may wait for completion and
-      optionally cancel functions.
+      A Later instance' closes method closes the Later for further
+      submission.
+      Shutdown does not imply that all submitted functions have
+      completed or even been dispatched.
+      Callers may wait for completion and optionally cancel functions.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
@@ -516,13 +527,13 @@ class Later(MultiOpenMixin):
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
-    MultiOpenMixin.__init__(self)
-    self._finished = threading.Event()
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
-    debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
+    debug(
+        "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)",
+        capacity, inboundCapacity, name)
     if isinstance(capacity, int):
       capacity = AdjustableSemaphore(capacity)
     if retry_delay is None:
@@ -531,6 +542,7 @@ class Later(MultiOpenMixin):
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
     self.name = name
+    self._lock = threading.Lock()
     self.outstanding = set()    # uncompleted LateFunctions
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
@@ -542,14 +554,43 @@ class Later(MultiOpenMixin):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._pendingq = IterablePriorityQueue(inboundCapacity, name="%s._pendingq" % (self.name,))
-    self._workers = WorkerThreadPool(name=name + ":WorkerThreadPool").open()
+    self._pendingq = IterablePriorityQueue(self.inboundCapacity, name="%s._pendingq" % (self.name,))
+    self._workers = WorkerThreadPool(name=self.name + ":WorkerThreadPool").open()
     self._dispatchThread = Thread(
         name=self.name + '._dispatcher',
         target=self._dispatcher
     )
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
+    self.closed = False
+    self._finished = threading.Event()
+
+  def shutdown(self):
+    ''' Shut down the Later instance:
+        - close the request queue
+        - close the TimerQueue if any
+        - close the worker thread pool
+        - dispatch a Thread to wait for completion and fire the
+          _finished Event
+    '''
+    ##with Pfx("%s.shutdown()", self):
+    with PrePfx("LATER.SHUTDOWN [%s]", self):
+      if not self.closed:
+        self.close()
+      if self._timerQ:
+        self._timerQ.close()
+        self._timerQ.join()
+      self._workers.close()
+      # queue actions to detect activity completion
+      def finish_up():
+        self._dispatchThread.join()         # wait for all functions to be dispatched
+        self._workers.join()                # wait for all worker Threads to complete
+        self._finished.set()
+      bg(finish_up)
+
+  def close(self, *a, **kw):
+    self.closed = True
+    self._pendingq.close()
 
   @property
   def finished(self):
@@ -560,15 +601,11 @@ class Later(MultiOpenMixin):
   def wait(self):
     ''' Wait for the Later to be finished.
     '''
-    self._finished.wait()
-
-  def close(self, *a, **kw):
-    with PrePfx("LATER.CLOSE %s", self):
-      try:
-        MultiOpenMixin.close(self, *a, **kw)
-      except RuntimeError as e:
-        XP("LATER NOT IDLE: %r: %s", self, e)
-        raise
+    f = self._finished
+    if not f.is_set():
+      info("Later.WAIT: %r", self)
+    if not self._finished.wait(5.0):
+      warning("  Later.WAIT TIMED OUT")
 
   def __repr__(self):
     return (
@@ -585,11 +622,13 @@ class Later(MultiOpenMixin):
     )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s opens=%d>" \
-           % (self.name, self.capacity,
-              len(self.pending), len(self.running), len(self.delayed),
-              int(self._busy), self._busy,
-              self._opens)
+    return (
+        "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>" \
+        % (
+            self.name, self.capacity,
+            len(self.pending), len(self.running), len(self.delayed),
+            int(self._busy), self._busy)
+    )
 
   def state(self, new_state, *a):
     if a:
@@ -597,7 +636,6 @@ class Later(MultiOpenMixin):
     D("STATE %r [%s]", new_state, self)
     self._state = new_state
 
-  @MultiOpenMixin.is_opened
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
         with the effect of deferring the function and waiting for
@@ -610,32 +648,6 @@ class Later(MultiOpenMixin):
           x = L(f, 3)   # x == 6
     '''
     return self.defer(func, *a, **kw)()
-
-  def startup(self):
-    pass
-
-  def shutdown(self):
-    ''' Shut down the Later instance:
-        - close the TimerQueue if any
-        - close the request queue
-        - close the worker thread pool
-    '''
-    ##with Pfx("%s.shutdown()", self):
-    with PrePfx("LATER.SHUTDOWN [%s]", self):
-      if not self.closed:
-        error("NOT CLOSED")
-        raise RuntimeError("NOT CLOSED!")
-      if self._timerQ:
-        self._timerQ.close()
-        self._timerQ.join()
-      self._pendingq.close()          # prevent further submissions
-      self._workers.close()
-      # queue actions to detect activity completion
-      def finish_up():
-        self._dispatchThread.join()         # wait for all functions to be dispatched
-        self._workers.join()                # wait for all worker Threads to complete
-        self._finished.set()
-      bg(finish_up)
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
@@ -732,10 +744,6 @@ class Later(MultiOpenMixin):
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.debug(*a, **kw)
 
-  def __del__(self):
-    if not self.closed:
-      self.shutdown()
-
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
         and dispatch them. The LateFunction's ._dispatch() method will
@@ -764,7 +772,6 @@ class Later(MultiOpenMixin):
     '''
     return not self.closed
 
-  @MultiOpenMixin.is_opened
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and priority system.
         This is really just an easy way to utilise the Later's thread pool
@@ -794,20 +801,25 @@ class Later(MultiOpenMixin):
     '''
     return _Late_context_manager(self, **kwargs)
 
-  @MultiOpenMixin.is_opened
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
+
         If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
+
         If the parameter `delay` is not None, delay consideration of
         this function until `delay` seconds from now.
+
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
+
         If the parameter `name` is not None, use it to name the LateFunction.
+
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
+
         If the parameter `LF` is not None, construct a new LateFunction to
           track function completion.
     '''
@@ -815,7 +827,11 @@ class Later(MultiOpenMixin):
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
-  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None, LF=None, retry_delay=None):
+  def _submit(
+      self,
+      func, priority=None, delay=None, when=None,
+      name=None, pfx=None, LF=None, retry_delay=None
+  ):
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -883,7 +899,6 @@ class Later(MultiOpenMixin):
     for LF in self.complete(until_idle=until_idle):
       pass
 
-  @MultiOpenMixin.is_opened
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
@@ -916,14 +931,14 @@ class Later(MultiOpenMixin):
     return LF
 
   def with_result_of(self, callable1, func, *a, **kw):
-    ''' Defer `callable1`, then add its result to the arguments for `func` and defer that. Return the LateFunction for `func`.
+    ''' Defer `callable1`, then add its result to the arguments for
+        `func` and defer that. Return the LateFunction for `func`.
     '''
     def then():
       LF1 = self.defer(callable1)
       return self.defer(func, *[a + [LF1.result]], **kw)
     return then()
 
-  @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
         Return a Result for collection of the result of `func`.
@@ -977,25 +992,27 @@ class Later(MultiOpenMixin):
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
     def submit_func():
       self._defer(put_func)
-      L.close()
       self._busy.dec("Later._after")
     self._busy.inc("Later._after")
-    L = self.open()
     return after(LFs, None, submit_func)
 
-  @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration to return results via the queue `outQ`. Return a Result for final synchronisation.
-        `outQ` must have a .put method to accept items and a .close method to
-        indicate the end of items.
-        When the iteration is complete, call outQ.close() and complete the Result.
-        If iteration ran to completion then the Result's .result
-        will be the number of iterations, otherwise if an iteration
-        raised an exception the the Result's .exc_info will contain
-        the exception information.
-        `test_ready`: if not None, a callable to test if iteration
-            is presently permitted; iteration will be deferred until
-            the callable returns a true value
+    ''' Submit an iterable `I` for asynchronous stepwise iteration
+        to return results via the queue `outQ`. Return a Result for
+        final synchronisation.
+
+        Parameters:
+        * `I`: the iterable for for asynchronous stepwise iteration
+        * `outQ` must have a .put method to accept items and a .close method to
+          indicate the end of items.
+          When the iteration is complete, call outQ.close() and complete the Result.
+          If iteration ran to completion then the Result's .result
+          will be the number of iterations, otherwise if an iteration
+          raised an exception the the Result's .exc_info will contain
+          the exception information.
+        * `test_ready`: if not None, a callable to test if iteration
+          is presently permitted; iteration will be deferred until
+          the callable returns a true value
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
@@ -1022,7 +1039,7 @@ class Later(MultiOpenMixin):
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
-        R.exc_info = exc_info()
+        R.exc_info = sys.exc_info()
       else:
         iterationss[0] += 1
         # put the item onto the output queue
@@ -1037,7 +1054,6 @@ class Later(MultiOpenMixin):
     self._defer(iterate_once)
     return R
 
-  @MultiOpenMixin.is_opened
   def pipeline(self, actions, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
@@ -1196,7 +1212,7 @@ class LatePool(object):
   def join(self):
     ''' Wait for completion of all the LateFunctions.
     '''
-    for LF in self:
+    for _ in self:
       pass
 
 def capacity(func):

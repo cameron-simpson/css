@@ -173,7 +173,6 @@ class PacketConnection(object):
     self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
-    self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
@@ -200,6 +199,8 @@ class PacketConnection(object):
 
   def shutdown(self, block=False):
     ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
+
+        Parameters:
         `block`: block for outstanding requests, default False.
     '''
     with Pfx("SHUTDOWN %s", self):
@@ -219,15 +220,11 @@ class PacketConnection(object):
       self._sendQ.close(enforce_final_close=True)
       self._send_thread.join()
       # we do not wait for the receiver - anyone hanging on outstaning
-      # requests will get them as they come in, and in thoery a network
+      # requests will get them as they come in, and in theory a network
       # disconnect might leave the receiver hanging anyway
+      self._later.close()
       if block:
-        self._later.wait_outstanding(until_idle=True)
-        self._later.close(enforce_final_close=True)
-        if not self._later.closed:
-          raise RuntimeError("%s: ._later not closed! %r" % (self, self._later))
-      else:
-        self._later.close()
+        self._later.wait()
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -351,7 +348,8 @@ class PacketConnection(object):
 
   @not_closed
   def do(self, *a, **kw):
-    ''' Synchronous request. Calls the `Result` returned from the request.
+    ''' Synchronous request.
+        Calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
 

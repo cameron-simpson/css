@@ -623,7 +623,7 @@ class Meta(dict, Transcriber):
     if isinstance(xkv, (int, float)):
       xkv = str(xkv)
     if isinstance(xkv, str):
-      return xkv.encode('utf-8')
+      xkv = xkv.encode('utf-8')
     if isinstance(xkv, bytes):
       return xkv.decode('iso8859-1')
     raise TypeError("cannot convert to bytes: %r" % (xkv,))

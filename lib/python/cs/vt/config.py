@@ -26,10 +26,10 @@ from .convert import get_integer, \
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 
-def Store(spec, config):
+def Store(spec, config, runstate=None):
   ''' Factory to construct Stores from string specifications.
   '''
-  return config.Store_from_spec(spec)
+  return config.Store_from_spec(spec, runstate=runstate)
 
 class Config:
   ''' A configuration specification.
@@ -42,21 +42,16 @@ class Config:
         or the filename of a file in `.ini` format
       * `environ`: optional environment mapp for `$varname` substitution.
         Default: `os.environ`
-      * `runstate`: a optional `cs.resources.RunState` to share
-        with the various Stores
   '''
 
-  def __init__(self, config_map, environ=None, runstate=None):
+  def __init__(self, config_map, environ=None):
     if environ is None:
       environ = os.environ
     self.environ = environ
     if isinstance(config_map, str):
       self.path = config_map
       config_map = ConfigWatcher(self.path)
-    if runstate is None:
-      runstate = defaults.runstate
     self.map = config_map
-    self.runstate = runstate
     self._stores_by_name = {}  # clause_name => Result->Store
     self._lock = Lock()
 
@@ -126,7 +121,7 @@ class Config:
       raise ValueError("invalid archive name: %r" % (archivename,))
     return Archive(joinpath(self.basedir, archivename + '.vt'))
 
-  def Store_from_spec(self, store_spec):
+  def Store_from_spec(self, store_spec, runstate=None):
     ''' Factory function to return an appropriate BasicStore* subclass
         based on its argument:
 
@@ -144,10 +139,14 @@ class Config:
       if not stores:
         raise ValueError("empty Store specification: %r" % (store_spec,))
       if len(stores) == 1:
-        return stores[0]
-      # multiple stores: save to the front store, read first from the
-      # front store then from the rest
-      return ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
+        S = stores[0]
+      else:
+        # multiple stores: save to the front store, read first from the
+        # front store then from the rest
+        S = ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
+      if runstate is not None:
+        S.runstate = runstate
+      return S
 
   def Stores_from_spec(self, store_spec):
     ''' Parse a colon separated list of Store specifications,
@@ -240,7 +239,6 @@ class Config:
       path=None,
       basedir=None,
       data=None,
-      runstate=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -261,9 +259,7 @@ class Config:
         path = joinpath(basedir, path)
     if data is not None:
       data = longpath(data)
-    if runstate is None:
-      runstate = self.runstate
-    return DataDirStore(store_name, path, datadirpath=data, runstate=runstate)
+    return DataDirStore(store_name, path, datadirpath=data)
 
   def filecache_Store(
       self,
@@ -275,7 +271,6 @@ class Config:
       max_file_size=None,
       basedir=None,
       backend=None,
-      runstate=None,
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
@@ -302,13 +297,10 @@ class Config:
         debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
-    if runstate is None:
-      runstate = self.runstate
     return FileCacheStore(
         store_name, backend_store, path,
         max_cachefile_size=max_file_size,
         max_cachefiles=max_files,
-        runstate=runstate,
     )
 
   def memory_Store(
@@ -317,7 +309,6 @@ class Config:
       *,
       type_=None,
       max_data=None,
-      runstate=None,
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
@@ -325,8 +316,6 @@ class Config:
       assert type_ == 'memory'
     if max_data is None:
       raise ValueError("missing max_data")
-    if runstate is None:
-      runstate = self.runstate
     return MemoryCacheStore(store_name, max_data)
 
   def platonic_Store(
@@ -340,7 +329,6 @@ class Config:
       follow_symlinks=False,
       meta=None,
       archive=None,
-      runstate=None,
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
@@ -374,8 +362,6 @@ class Config:
       meta_store = Store(meta, self)
     if isinstance(archive, str):
       archive = longpath(archive)
-    if runstate is None:
-      runstate = self.runstate
     return PlatonicStore(
         store_name, path,
         datadirpath=data,
@@ -383,7 +369,6 @@ class Config:
         follow_symlinks=follow_symlinks,
         meta_store=meta_store, archive=archive,
         flag_prefix='VT_' + clause_name,
-        runstate=runstate,
     )
 
   def proxy_Store(
@@ -395,7 +380,6 @@ class Config:
       read=None,
       save2=None,
       read2=None,
-      runstate=None,
   ):
     ''' Construct a ProxyStore.
     '''
@@ -429,13 +413,11 @@ class Config:
       read2_stores = self.Stores_from_spec(read2)
     else:
       read2_stores = read2
-    if runstate is None:
-      runstate = self.runstate
     S = ProxyStore(
         store_name,
         save_stores, read_stores,
         save2=save2_stores, read2=read2_stores,
-        runstate=runstate)
+    )
     S.readonly = readonly
     return S
 
@@ -446,7 +428,6 @@ class Config:
       type_=None,
       host=None,
       port=None,
-      runstate=None,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
@@ -458,9 +439,7 @@ class Config:
       raise ValueError('no "port"')
     if isinstance(port, str):
       port, _ = get_integer(port, 0)
-    if runstate is None:
-      runstate = self.runstate
-    return TCPClientStore(store_name, (host, port), runstate=runstate)
+    return TCPClientStore(store_name, (host, port))
 
   def socket_Store(
       self,
@@ -468,12 +447,9 @@ class Config:
       *,
       type_=None,
       socket_path=None,
-      runstate=None,
   ):
     ''' Construct a UNIXSocketClientStore from a "socket" clause.
     '''
     if type_ is not None:
       assert type_ == 'socket'
-    if runstate is None:
-      runstate = self.runstate
-    return UNIXSocketClientStore(store_name, socket_path, runstate=runstate)
+    return UNIXSocketClientStore(store_name, socket_path)

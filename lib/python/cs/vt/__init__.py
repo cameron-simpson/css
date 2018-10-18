@@ -13,16 +13,13 @@
           http://en.wikipedia.org/wiki/Venti
 '''
 
-from contextlib import contextmanager
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
-from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
-from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 from cs.resources import RunState
@@ -65,14 +62,12 @@ class _Defaults(threading.local, StackableValues):
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
-    newS.open()
     self.push('S', newS)
 
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
     oldS = self.pop('S')
-    oldS.close()
     return oldS
 
   def push_Ss(self, newS):

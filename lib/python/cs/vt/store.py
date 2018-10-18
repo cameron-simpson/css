@@ -14,13 +14,13 @@ from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Lock, Semaphore
 from cs.later import Later
-from cs.logutils import debug, warning, error
-from cs.pfx import Pfx, XP
+from cs.logutils import warning, error
+from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop, funccite
 from cs.py.stack import caller
 from cs.queues import Channel, IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report
 from cs.seq import Seq
 from cs.threads import bg
@@ -75,23 +75,38 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   _seq = Seq()
 
   def __init__(self, name, capacity=None, hashclass=None, lock=None, runstate=None):
+    ''' Initialise the Store.
+
+        Parameters:
+        * `name`: a name for this Store;
+          if None, a sequential name based on the Store class name
+          is generated
+        * `capacity`: a capacity for the internal Later queue, default 4
+        * `hashclass`: the hash class to use for this Store,
+          default: `DEFAULT_HASHCLASS`
+        * `lock`: an optional lock for managing concurrency,
+          if not supplied a new `threading.RLock` is allocated
+        * `runstate`: a `cs.resources.RunState` for external control;
+          if not supplied one is allocated
+    '''
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if not isinstance(name, str):
         raise TypeError(
             "initial `name` argument must be a str, got %s"
             % (type(name),))
       if name is None:
-        name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
+        name = "%s%d" % (type(self).__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
         capacity = 4
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
       if runstate is None:
-        runstate = defaults.runstate
+        runstate = RunState(name)
       MultiOpenMixin.__init__(self, lock=lock)
       RunStateMixin.__init__(self, runstate=runstate)
       self._attrs = {}
       self.name = name
+      self._capacity = capacity
       self.hashclass = hashclass
       self.config = None
       self.logfp = None
@@ -100,7 +115,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.writeonly = False
       self._archives = {}
       self._blockmapdir = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
@@ -186,18 +200,20 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ##
 
   def startup(self):
-    ''' Startup: does nothing.
+    ''' Start the Store.
     '''
-    # Later already open
-    pass
+    self.runstate.start()
+    self.__funcQ = Later(self._capacity, name="%s:Later(__funcQ)" % (self.name,))
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
-    self.__funcQ.close()
-    if not self.__funcQ.closed:
-      debug("%s.shutdown: __funcQ not closed yet", self)
-    self.__funcQ.wait()
+    self.runstate.cancel()
+    L = self.__funcQ
+    L.shutdown()
+    L.wait()
+    del self.__funcQ
+    self.runstate.stop()
 
   #############################
   ## Function dispatch methods.
@@ -206,7 +222,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def _defer(self, func, *args, **kwargs):
     ''' Defer a function via the internal Later queue.
     '''
-    return self.__funcQ.defer(func, *args, **kwargs)
+    self.open()
+    def deferred():
+      try:
+        return func(*args, **kwargs)
+      finally:
+        self.close()
+    return self.__funcQ.defer(deferred)
 
   def bg(self, func, *a, **kw):
     ''' Queue a function without consuming the queue capacity.
@@ -531,6 +553,7 @@ class MappingStore(BasicStoreSync):
     self._attrs.update(mapping=mapping)
 
   def startup(self):
+    super().startup()
     mapping = self.mapping
     try:
       openmap = mapping.open
@@ -538,7 +561,6 @@ class MappingStore(BasicStoreSync):
       pass
     else:
       openmap()
-    super().startup()
 
   def shutdown(self):
     mapping = self.mapping
@@ -662,13 +684,18 @@ class ProxyStore(BasicStoreSync):
       self._attrs.update(read2=read2)
     self.readonly = len(self.save) == 0
 
+  def __str__(self):
+      return "%s(%r)" % (type(self).__name__, self.name)
+
   def startup(self):
+    super().startup()
     for S in self.save | self.read | self.save2 | self.read2:
       S.open()
 
   def shutdown(self):
     for S in self.save | self.read | self.save2 | self.read2:
       S.close()
+    super().shutdown()
 
   @staticmethod
   def _multicall0(stores, method_name, args):
@@ -678,7 +705,8 @@ class ProxyStore(BasicStoreSync):
     stores = list(stores)
     for S in stores:
       with Pfx("%s.%s()", S, method_name):
-        LF = getattr(S, method_name)(*args)
+        with S:
+          LF = getattr(S, method_name)(*args)
       yield LF, S   # outside Pfx because this is a generator
 
   def _multicall(self, stores, method_name, args):
@@ -719,13 +747,14 @@ class ProxyStore(BasicStoreSync):
         `ch`: a channel for hashocde return
     '''
     X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
-    hashcode1 = None
+    hashcode1 = None    # becomes not None on successful add
     try:
       if not self.save:
         # no save - allow add if hashcode already present - dubious
         hashcode = self.hash(data)
         if hashcode in self:
           ch.put(hashcode)
+          hashcode1 = hashcode
           return
         raise RuntimeError("new add but no save Stores")
       ok = True
@@ -756,32 +785,32 @@ class ProxyStore(BasicStoreSync):
               error("no fallback Stores")
           continue
       if not ok:
-        failures = []
-        for LF, S in fallback:
-          hashcode, exc_info = LF.join()
-          if exc_info:
-            e = exc_info[1]
-            if isinstance(e, StoreError):
-              exc_info = None
-            X("==== ==== ==== exc_info=%r", exc_info)
-            error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
-            failures.append( (S, e) )
-          else:
-            if hashcode1 is None:
-              ch.put(hashcode)
-              hashcode1 = hashcode
-            elif hashcode1 != hashcode:
-              warning(
-                  "%s: different hashcodes returns from .add: %s vs %s",
-                  S, hashcode1, hashcode)
-        if failures:
-          raise RuntimeError("exceptions saving to save2: %r" % (failures,))
+        if fallback:
+          failures = []
+          for LF, S in fallback:
+            hashcode, exc_info = LF.join()
+            if exc_info:
+              e = exc_info[1]
+              if isinstance(e, StoreError):
+                exc_info = None
+              X("==== ==== ==== exc_info=%r", exc_info)
+              error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
+              failures.append( (S, e) )
+            else:
+              if hashcode1 is None:
+                ch.put(hashcode)
+                hashcode1 = hashcode
+              elif hashcode1 != hashcode:
+                warning(
+                    "%s: different hashcodes returns from .add: %s vs %s",
+                    S, hashcode1, hashcode)
+          if failures:
+            raise RuntimeError("exceptions saving to save2: %r" % (failures,))
     finally:
       # mark end of queue
       if hashcode1 is None:
         X("BG QUEUE ADD no hashcode1, put None")
         ch.put(None)
-      self.close()
       ch.close()
 
   def get(self, h):
@@ -824,27 +853,27 @@ class DataDirStore(MappingStore):
       *,
       datadirpath=None,
       hashclass=None, indexclass=None,
-      rollover=None, runstate=None,
+      rollover=None,
       **kw
   ):
     datadir = DataDir(
         statedirpath, datadirpath, hashclass,
         indexclass=indexclass,
-        rollover=rollover, runstate=runstate)
-    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
+        rollover=rollover)
+    MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
 
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
     '''
-    self._datadir.open()
     super().startup(**kw)
+    self._datadir.open()
 
   def shutdown(self):
     ''' Shutdown: close the internal DataDir.
     '''
-    super().shutdown()
     self._datadir.close()
+    super().shutdown()
 
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.
@@ -886,23 +915,22 @@ class _PlatonicStore(MappingStore):
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
         flag_prefix=flag_prefix,
-        runstate=runstate,
     )
-    MappingStore.__init__(self, name, datadir, runstate=runstate, **kw)
+    MappingStore.__init__(self, name, datadir, **kw)
     self._datadir = datadir
     self.readonly = True
 
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
     '''
-    self._datadir.open()
     super().startup(**kw)
+    self._datadir.open()
 
   def shutdown(self):
     ''' Shutdown: close the internal DataDir.
     '''
-    super().shutdown()
     self._datadir.close()
+    super().shutdown()
 
   def get_Archive(self, archive_name=None):
     ''' PlatonicStore Archive are stored in the internal DataDir.
@@ -999,6 +1027,8 @@ class ProgressStore(BasicStoreSync):
 
   @property
   def requests(self):
+    ''' The number of requests.
+    '''
     return self._progress['requests'].position
 
 if __name__ == '__main__':
