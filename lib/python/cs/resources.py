@@ -95,7 +95,7 @@ class MultiOpenMixin(O):
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
     self._lock = lock
-    self.__mo_lock = Lock()
+    self.__mo_lock = RLock()
     self._finalise_later = finalise_later
     self._finalise = None
 
@@ -123,8 +123,9 @@ class MultiOpenMixin(O):
       self._opened_from[frame_key] = self._opened_from.get(frame_key, 0) + 1
     self.opened = True
     with self.__mo_lock:
-      self._opens += 1
       opens = self._opens
+      opens += 1
+      self._opens = opens
       if opens == 1:
         self._finalise = Condition(self.__mo_lock)
         self.startup()
@@ -147,7 +148,8 @@ class MultiOpenMixin(O):
       raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
     with self.__mo_lock:
-      if self._opens < 1:
+      opens = self._opens
+      if opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
         error("  final close was from %s", self._final_close_from)
         for frame_key in sorted(self._opened_from.keys()):
@@ -157,8 +159,8 @@ class MultiOpenMixin(O):
         ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return retval
-      self._opens -= 1
-      opens = self._opens
+      opens -= 1
+      self._opens = opens
       if opens == 0:
         ##INACTIVE##self.tcm_dump(MultiOpenMixin)
         if caller_frame is None:
