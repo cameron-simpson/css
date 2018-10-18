@@ -65,14 +65,12 @@ class _Defaults(threading.local, StackableValues):
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
-    newS.open()
     self.push('S', newS)
 
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
     oldS = self.pop('S')
-    oldS.close()
     return oldS
 
   def push_Ss(self, newS):
