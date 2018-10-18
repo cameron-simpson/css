@@ -73,7 +73,9 @@ class VTCmd:
                 /path/to/dir    GDBMStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from $VT_STORE, or "[default]".
+	      Default from $VT_STORE, or "[default]", except for
+	      the "serve" operation which defaults to "[server]"
+	      and ignores $VT_STORE.
     -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
@@ -97,7 +99,7 @@ class VTCmd:
     pushto other-store objects...
     report
     scan datafile
-    serve {-|/path/to/socket|host:port} [name:storespec]...
+    serve [{DEFAULT|-|/path/to/socket|host:port} [name:storespec]...]
     test blockify file
     unpack dirrefs...
 '''
@@ -134,7 +136,7 @@ class VTCmd:
     ####cs.x.X_logger = logging.getLogger()
 
     config_path = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-    store_spec = os.environ.get('VT_STORE', '[default]')
+    store_spec = None
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
 
@@ -236,7 +238,10 @@ class VTCmd:
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
-        raise GetoptError("no $VT_STORE and no -S option")
+        if op == "serve":
+          store_spec = '[server]'
+        else:
+          store_spec = os.environ.get('VT_STORE', '[default]')
       try:
         # set up the primary Store using the main programme RunState for control
         S = Store(self.store_spec, self.config, runstate=self.runstate)
@@ -840,15 +845,28 @@ class VTCmd:
     ''' Start a service daemon listening on a TCP port
         or on a UNIX domain socket or on stdin/stdout.
 
-        Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
+        Usage: serve [{DEFAULT|-|/path/to/socket|[host]:port} [name:storespec]...]
 
         With no `name:storespec` arguments the default Store is served,
         otherwise the named Stores are exported with the first being
         served initially.
     '''
-    if not args:
-      raise GetoptError("missing socket indicator")
-    address = args.pop(0)
+    if args:
+      address = args.pop(0)
+    else:
+      address = 'DEFAULT'
+    if address == 'DEFAULT':
+      # obtain the address from the [server] config clause
+      try:
+        clause = self.config.get_clause('server')
+      except KeyError:
+        raise GetoptError(
+            "no [server] clause to implement address %r"
+            % (address,))
+      try:
+        address = clause['address']
+      except KeyError:
+        raise GetoptError("[server] clause: no address field")
     if not args:
       exports = {'': defaults.S}
     else:
