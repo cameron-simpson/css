@@ -20,7 +20,7 @@ import subprocess
 import sys
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
 from cs.vt.debug import dump_Dirent
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
@@ -114,14 +114,16 @@ def handler(method):
         "%s.%s(%s)",
         type(self).__name__, method.__name__, ','.join(arg_desc)
     ):
-      if method.__name__ not in ('getxattr','statfs',):
+      trace = method.__name__ not in ('getxattr','statfs',)
+      if trace:
         X("CALL %s(*%r,**%r)", method.__name__, a, kw)
       fs = self._vtfs
       try:
         with defaults.stack('fs', fs):
           with fs.S:
             result = method(self, *a, **kw)
-            ## XP(" result = %r", result)
+            if trace:
+              XP(" result => %r", result)
             return result
       except FuseOSError:
         raise
