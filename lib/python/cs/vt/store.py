@@ -14,8 +14,8 @@ from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Lock, Semaphore
 from cs.later import Later
-from cs.logutils import debug, warning, error
-from cs.pfx import Pfx, XP
+from cs.logutils import warning, error
+from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop, funccite
 from cs.py.stack import caller
@@ -79,8 +79,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
         Parameters:
         * `name`: a name for this Store;
-	  if None, a sequential name based on the Store class name
-	  is generated
+          if None, a sequential name based on the Store class name
+          is generated
         * `capacity`: a capacity for the internal Later queue, default 4
         * `hashclass`: the hash class to use for this Store,
           default: `DEFAULT_HASHCLASS`
@@ -1027,6 +1027,8 @@ class ProgressStore(BasicStoreSync):
 
   @property
   def requests(self):
+    ''' The number of requests.
+    '''
     return self._progress['requests'].position
 
 if __name__ == '__main__':

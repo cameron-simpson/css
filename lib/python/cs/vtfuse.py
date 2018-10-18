@@ -22,7 +22,6 @@ from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
 from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
-from cs.vt.debug import dump_Dirent
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from cs.vt.fs import FileHandle, FileSystem
 from cs.vt.store import MissingHashcodeError
@@ -114,7 +113,7 @@ def handler(method):
         "%s.%s(%s)",
         type(self).__name__, method.__name__, ','.join(arg_desc)
     ):
-      trace = method.__name__ not in ('getxattr','statfs',)
+      trace = method.__name__ not in ('getxattr', 'statfs',)
       if trace:
         X("CALL %s(*%r,**%r)", method.__name__, a, kw)
       fs = self._vtfs
@@ -346,7 +345,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   @handler
   def destroy(self):
-    ''' Cleanup operations, called when llfuse.close has been called, just before the filesystem is unmounted.
+    ''' Cleanup operations, called when llfuse.close has been called,
+        just before the filesystem is unmounted.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.destroy
     '''

@@ -388,8 +388,8 @@ class RunState(object):
   def __str__(self):
     return "%s:%s[%s:%gs]" % (
         ( type(self).__name__
-        if self.name is None
-        else ':'.join( (type(self).__name__, repr(self.name)) ) ),
+          if self.name is None
+          else ':'.join( (type(self).__name__, repr(self.name)) ) ),
         id(self), self.state, self.run_time
     )
 
@@ -518,7 +518,7 @@ class RunStateMixin(object):
   def __init__(self, runstate=None):
     ''' Initialise the RunStateMixin; sets the .runstate attribute.
 
-	`runstate`: RunState instance or name. If a `str`,
+        `runstate`: RunState instance or name. If a `str`,
         a new RunState with that name is allocated.
     '''
     if runstate is None:
