@@ -20,7 +20,7 @@ from cs.progress import Progress
 from cs.py.func import prop, funccite
 from cs.py.stack import caller
 from cs.queues import Channel, IterableQueue
-from cs.resources import MultiOpenMixin, RunStateMixin
+from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report
 from cs.seq import Seq
 from cs.threads import bg
