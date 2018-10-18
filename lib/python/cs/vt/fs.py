@@ -355,9 +355,10 @@ class FileSystem(object):
         inodes.load_fs_inode_dirents(inode_dir)
       else:
         X("NO INODE IMPORT")
-    with defaults.stack('fs', self):
       X("FileSystem mntE:")
-      dump_Dirent(mntE)
+    with self.S:
+        with defaults.stack('fs', self):
+          dump_Dirent(mntE)
 
   def close(self):
     ''' Close the FileSystem.
