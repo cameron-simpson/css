@@ -125,21 +125,27 @@ def handler(method):
             if trace:
               XP(" result => %r", result)
             return result
-      except FuseOSError:
+      except FuseOSError as e:
+        X("CALL %s(*%r,**%r) => FuseOSError %s", method.__name__, a, kw, e)
         raise
       except OSError as e:
+        X("CALL %s(*%r,**%r) => OSError %s => FuseOSError", method.__name__, a, kw, e)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
       except Exception as e:
+        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", method.__name__, a, kw, e)
         exception(
             "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
             method.__name__, a, kw, type(e), e)
         raise FuseOSError(errno.EINVAL) from e
       except BaseException as e:
-        error("UNCAUGHT EXCEPTION")
+        X("CALL %s(*%r,**%r) => EXCEPTION %s", method.__name__, a, kw, e)
+        error("UNCAUGHT EXCEPTION: %s", e)
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
+      except:
+        X("CALL %s(*%r,**%r) => EXCEPTION %r", method.__name__, a, kw, sys.exc_info())
   return handle
 
 class DirHandle:
