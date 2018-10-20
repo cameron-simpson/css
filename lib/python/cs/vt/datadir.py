@@ -46,7 +46,10 @@ from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_
 from .datafile import DataFile, DATAFILE_DOT_EXT
 from .debug import dump_Dirent
 from .dir import Dir, FileDirent
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin, MissingHashcodeError
+from .hash import (
+    DEFAULT_HASHCLASS, HASHCLASS_BY_NAME,
+    HashCode, HashCodeUtilsMixin, MissingHashcodeError
+)
 from .index import choose as choose_indexclass, class_by_name as indexclass_by_name
 from .parsers import scanner_from_filename
 
@@ -139,13 +142,14 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.csv'
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
+  DATA_SUBDIR = 'data'
 
   def __init__(
       self,
-      statedirpath, datadirpath, hashclass,
+      statedirpath, hashclass,
       *,
       indexclass=None,
-      create_statedir=None, create_datadir=None,
+      create_statedir=None,
       flags=None, flag_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -154,17 +158,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `statedirpath`: a directory containing state information about the
           DataFiles; this is the index-state.csv file and the associated
           index dbm-ish files.
-        * `datadirpath`: the directory containing the DataFiles.  If this is
-          shared by other clients then it should be different from the
-          `statedirpath`.  If None, default to "{statedirpath}/data", which
-          might be a symlink to a shared area such as a NAS.
         * `hashclass`: the hash class used to index chunk contents.
         * `indexclass`: the IndexClass providing the index to chunks in the
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
         * `create_statedir`: os.mkdir the state directory if missing
-        * `create_datadir`: os.mkdir the data directory if missing
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
@@ -174,6 +173,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         The monitor thread and runtime state are setup by the `startup` method
         and closed down by the `shutdown` method.
     '''
+    assert isinstance(statedirpath, str)
+    assert isinstance(hashclass, HashCode)
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
     if flags is None:
@@ -185,9 +186,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         raise ValueError("flags provided but no flag_prefix")
     FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
     self.statedirpath = statedirpath
-    if datadirpath is None:
-      datadirpath = joinpath(statedirpath, 'data')
-    self.datadirpath = datadirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
@@ -202,24 +200,19 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           os.mkdir(statedirpath)
       else:
         raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
-    # the "default" data dir may be created if the statedir exists
-    if create_datadir is None:
-      create_datadir = existspath(statedirpath) and not existspath(datadirpath)
+    # create the data subdir if missing
+    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
     if not isdirpath(datadirpath):
-      if create_datadir:
-        with Pfx("mkdir(%r)", datadirpath):
-          os.mkdir(datadirpath)
-      else:
-        raise ValueError("missing datadirpath directory: %r" % (datadirpath,))
+      with Pfx("mkdir(%r)", datadirpath):
+        os.mkdir(datadirpath)
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
   def __repr__(self):
-    return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s)'
+    return ( '%s(statedirpath=%r,hashclass=%s,indexclass=%s)'
              % (self.__class__.__name__,
                 self.statedirpath,
-                self.datadirpath,
                 self.hashclass.HASHNAME,
                 self.indexclass)
            )
@@ -308,7 +301,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def datapathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the datadirpath.
     '''
-    return joinpath(self.datadirpath, rpath)
+    return joinpath(self.statedirpath, self.DATA_SUBDIR, rpath)
 
   def state_localpath(self, hashclass):
     ''' Compute the filename of the statefile for the specified `hashclass`.
@@ -649,22 +642,17 @@ class DataDir(_FilesDir):
 
   def __init__(
       self,
-      statedirpath, datadirpath, hashclass,
+      statedirpath, hashclass,
       *,
       rollover=None,
       **kw
   ):
-    ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
+    ''' Initialise the DataDir with `statedirpath`.
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
           DataFiles; this is the index-state.csv file and the associated
           index dbm-ish files.
-        * `datadirpath`: the directory containing the DataFiles.
-          If this is shared by other clients then it should be different from
-          the `statedirpath`.
-          If None, default to "statedirpath/data", which might be a symlink
-          to a shared area such as a NAS.
         * `hashclass`: the hash class used to index chunk contents.
         * `indexclass`: the IndexClass providing the index to chunks in the
           DataFiles. If not specified, a supported index class with an
@@ -674,9 +662,8 @@ class DataDir(_FilesDir):
           this a new datafile is commenced for new blocks.  Default:
           `DEFAULT_ROLLOVER`.
         * `create_statedir`: os.mkdir the state directory if missing.
-        * `create_datadir`: os.mkdir the data directory if missing.
     '''
-    super().__init__(statedirpath, datadirpath, hashclass, **kw)
+    super().__init__(statedirpath, hashclass, **kw)
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
@@ -729,15 +716,16 @@ class DataDir(_FilesDir):
     '''
     filemap = self._filemap
     indexQ = self._indexQ
+    datadirpath = joinpath(self.statedirpath, self.DATA_SUBDIR)
     while not self.cancelled:
       if self.flag_scan_disable:
         time.sleep(1)
         continue
       # scan for new datafiles
       need_save = False
-      with Pfx("listdir(%r)", self.datadirpath):
+      with Pfx("listdir(%r)", datadirpath):
         try:
-          listing = list(os.listdir(self.datadirpath))
+          listing = list(os.listdir(datadirpath))
         except OSError as e:
           if e.errno == errno.ENOENT:
             error("listing failed: %s", e)
@@ -924,7 +912,7 @@ class PlatonicDir(_FilesDir):
 
   def __init__(
       self,
-      statedirpath, datadirpath, hashclass,
+      statedirpath, hashclass,
       create_datadir=False,
       exclude_dir=None, exclude_file=None,
       follow_symlinks=False, archive=None, meta_store=None,
@@ -936,10 +924,6 @@ class PlatonicDir(_FilesDir):
         * `statedirpath`: a directory containing state information about the
           DataFiles; this is the index-state.csv file and the associated
           index dbm-ish files.
-        * `datadirpath`: the directory containing the DataFiles.  If this is
-          shared by other clients then it should be different from the
-          `statedirpath`.  If None, default to "statedirpath/data", which
-          might be a symlink to a shared area such as a NAS.
         * `hashclass`: the hash class used to index chunk contents.
         * `exclude_dir`: optional function to test a directory path for
           exclusion from monitoring; default is to exclude directories
@@ -962,7 +946,7 @@ class PlatonicDir(_FilesDir):
     '''
     if meta_store is None:
       raise ValueError("meta_store may not be None")
-    super().__init__(statedirpath, datadirpath, hashclass, create_datadir=False, **kw)
+    super().__init__(statedirpath, hashclass, create_datadir=False, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
@@ -985,7 +969,7 @@ class PlatonicDir(_FilesDir):
       archive = self.archive
       _, D = archive.last
       if D is None:
-        info("%r: no entries in %s, create empty topdir Dir", self.datadirpath, archive)
+        info("%r: no archive entries, create empty topdir Dir", archive)
         D = Dir('.')
         archive.update(D)
       self.topdir = D
@@ -1042,6 +1026,7 @@ class PlatonicDir(_FilesDir):
     meta_store = self.meta_store
     filemap = self._filemap
     indexQ = self._indexQ
+    datadirpath = joinpath(self.statedirpath, self.DATA_SUBDIR)
     if meta_store is not None:
       topdir = self.topdir
     else:
@@ -1052,7 +1037,6 @@ class PlatonicDir(_FilesDir):
         continue
       # scan for new datafiles
       need_save = False
-      datadirpath = self.datadirpath
       with Pfx("%r", datadirpath):
         seen = set()
         info("scan tree...")
