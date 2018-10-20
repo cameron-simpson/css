@@ -463,17 +463,24 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
 
 def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   ''' Create a lockfile and return its path.
-      The file can be removed with os.remove.
+
+      The lockfile can be removed with os.remove.
       This is the core functionality supporting the lockfile()
       context manager.
-      `path`: the base associated with the lock file, often the
-              filesystem object whose access is being managed.
-      `ext`: the extension to the base used to construct the lock file name.
-             Default: ".lock"
-      `timeout`: maximum time to wait before failing,
-                 default None (wait forever).
-      `poll_interval`: polling frequency when timeout is not 0.
-      `runstate`: optional RunState duck instance supporting cancellation
+
+      Paramaters:
+      * `path`: the base associated with the lock file,
+        often the filesystem object whose access is being managed.
+      * `ext`: the extension to the base used to construct the lockfile name.
+        Default: ".lock"
+      * `timeout`: maximum time to wait before failing.
+        Default: `None` (wait forever).
+        Note that zero is an accepted value
+        and requires the lock to succeed on the first attempt.
+      * `poll_interval`: polling frequency when timeout is not 0.
+      * `runstate`: optional RunState duck instance supporting cancellation.
+        Note that if a cancelled RunState is provided
+        no attempt will be made to make the lockfile.
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -499,7 +506,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
           raise
         if timeout is not None and timeout <= 0:
           # immediate failure
-          raise TimeoutError( "pid %d timed out" % (os.getpid(),), timeout)
+          raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
         if start is None:
