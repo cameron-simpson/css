@@ -58,39 +58,6 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
 
-def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
-  ''' Accept `spec` of the form:
-        [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
-      and return a DataDir.
-  '''
-  indexdirpath = None
-  datadirpath = None
-  with Pfx(spec):
-    specpath = spec.split(os.pathsep)
-    for partnum, specpart in enumerate(specpath, 1):
-      with Pfx("%d:%r", partnum, specpart):
-        if indexclass is None:
-          try:
-            indexclass = indexclass_by_name(specpart)
-          except KeyError:
-            pass
-          else:
-            continue
-        if hashclass is None:
-          if specpart in HASHCLASS_BY_NAME:
-            hashclass = HASHCLASS_BY_NAME[specpart]
-            continue
-        if indexdirpath is None:
-          indexdirpath = specpart
-          continue
-        if datadirpath is None:
-          datadirpath = specpart
-          continue
-        raise ValueError("unexpected part")
-  if hashclass is None:
-    hashclass = DEFAULT_HASHCLASS
-  return DataDir(indexdirpath, datadirpath, hashclass, indexclass=indexclass, rollover=rollover)
-
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file in use by a files based data dir.
 
@@ -259,14 +226,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def _indexclass(self, preferred_indexclass=None):
     return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
-
-  def spec(self):
-    ''' Return a datadir_spec for this DataDirMapping.
-    '''
-    return ':'.join( (self.indexclass.NAME,
-                      self.hashclass.HASHNAME,
-                      str(self.statedirpath),
-                      str(self.datadirpath)) )
 
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
