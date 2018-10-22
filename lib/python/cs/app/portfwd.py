@@ -261,8 +261,7 @@ class Portfwd(FlaggedMixin):
     self.svcd.stop()
 
   def wait(self):
-    xit = self.svcd.wait()
-    return xit
+    self.svcd.wait()
 
   def ssh_argv(self, bare=False):
     argv = ['ssh']
