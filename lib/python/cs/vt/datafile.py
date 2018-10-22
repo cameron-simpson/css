@@ -19,6 +19,7 @@ from threading import Lock
 from zlib import compress, decompress
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.randutils import rand0, randblock
 from cs.resources import MultiOpenMixin
@@ -209,7 +210,14 @@ class DataFile(MultiOpenMixin, ReadMixin):
       else:
         is_locked = True
       offset = os.lseek(wfd, 0, SEEK_END)
-      os.write(wfd, bs)
+      written = os.write(wfd, bs)
+      # notice short writes, which should never happen with a regular file...
+      while written < len(bs):
+        warning(
+            "%s: tried to write %d bytes but only wrote %d, retrying",
+            self, len(bs), written)
+        bs = bs[written:]
+        written = os.write(wfd, bs)
       if is_locked:
         flock(wfd, LOCK_UN)
     return offset, offset + len(bs)
