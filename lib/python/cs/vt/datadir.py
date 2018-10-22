@@ -66,8 +66,7 @@ class DataFileState(SimpleNamespace):
 
       Attributes:
       * `datadir`: the _FilesDir tracking this state.
-      * `filename`: out path relative to the _FilesDir's data
-        directory>
+      * `filename`: path relative to the _FilesDir's data directory
       * `indexed_to`: the maximum amount of data scanned and indexed
         so far.
   '''
@@ -313,6 +312,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def get_Archive(self, name=None):
     ''' Return the Archive named `name`.
+
+        If `name` is omitted or `None`
+        the Archive path is the `statedirpath`
+        plus the extension `'.vt'`.
+        Otherwise it is the `statedirpath` plus a dash plus the `name`
+        plus the extension `'.vt'`.
+        The `name` may not be empty or contain a dot.
     '''
     with Pfx("%s.get_Archive", self):
       if name is None:
