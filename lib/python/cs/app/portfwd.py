@@ -100,6 +100,8 @@ in each Host claus with the group name appended.
 Example: "Host home ALL"'''
 
 def main(argv=None, environ=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   if environ is None:
@@ -205,7 +207,9 @@ def main(argv=None, environ=None):
     return 0
 
   running = True
-  def signal_handler(signum, frame):
+  def signal_handler(*_):
+    ''' Action on signal receipt: stop the portfwds and wait, then exit(1).
+    '''
     PFs.stop()
     PFs.wait()
     sys.exit(1)
@@ -220,8 +224,14 @@ def main(argv=None, environ=None):
   return 0
 
 class Portfwd(FlaggedMixin):
+  ''' A ssh tunnel built on a SvcD.
+  '''
 
-  def __init__(self, target, ssh_config=None, conditions=(), test_shcmd=None, trace=False, verbose=False, flags=None):
+  def __init__(
+      self,
+      target, ssh_config=None, conditions=(),
+      test_shcmd=None, trace=False, verbose=False, flags=None
+  ):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     self.test_shcmd = test_shcmd
@@ -255,15 +265,25 @@ class Portfwd(FlaggedMixin):
     return "Portfwd %s %s" % (self.target, shq(self.ssh_argv()))
 
   def start(self):
+    ''' Call the service start method.
+    '''
     self.svcd.start()
 
   def stop(self):
+    ''' Call the service stop method.
+    '''
     self.svcd.stop()
 
   def wait(self):
+    ''' Call the service wait method.
+    '''
     self.svcd.wait()
 
   def ssh_argv(self, bare=False):
+    ''' An ssh command line argument list.
+
+        `bare`: just to command and options, no trailing "--".
+    '''
     argv = ['ssh']
     if self.verbose:
       argv.append('-v')
@@ -280,6 +300,9 @@ class Portfwd(FlaggedMixin):
     return argv
 
   def ssh_options(self):
+    ''' Return a list of (option, value) tuples
+        representing the ssh configuration.
+    '''
     argv = self.ssh_argv(bare=True) + ['-G']
     P = pipefrom(argv)
     options = [
@@ -305,6 +328,8 @@ class Portfwd(FlaggedMixin):
     return shcmd
 
   def test_func(self):
+    ''' Servuice test function: probe all the conditions.
+    '''
     for condition in self.conditions:
       if not condition.probe():
         if self.verbose:
@@ -318,6 +343,8 @@ class Portfwd(FlaggedMixin):
     return True
 
 class Portfwds(object):
+  ''' A collection of Portfwd instances and associate control methods.
+  '''
 
   def __init__(self, ssh_config=None, environ=None, target_list=None,
                auto_mode=None, trace=False, verbose=False, flags=None):
@@ -365,6 +392,8 @@ class Portfwds(object):
     return P
 
   def start(self):
+    ''' Start all nonrunning targets, stop all running nonrequired targets.
+    '''
     required = self.targets_required()
     for target in required:
       P = self.forward(target)
@@ -381,10 +410,14 @@ class Portfwds(object):
         del self.targets_running[target]
 
   def stop(self):
+    ''' Stop all running targets.
+    '''
     for P in self.targets_running.values():
       P.stop()
 
   def wait(self):
+    ''' Wait for all running targets to stop.
+    '''
     while self.targets_running:
       targets = sorted(self.targets_running.keys())
       for target in targets:
@@ -396,6 +429,11 @@ class Portfwds(object):
           del self.targets_running[target]
 
   def targets_required(self):
+    ''' The concrete list of targets.
+
+        Computed from the target spec and, if in auto mode, the
+        PORTFWD_*_AUTO flags.
+    '''
     targets = set()
     for spec in self.target_list:
       targets.update(self.resolve_target_spec(spec))
@@ -415,6 +453,8 @@ class Portfwds(object):
 
   @prop
   def ssh_config(self):
+    ''' The path to the ssh configuration file.
+    '''
     cfg = self._ssh_config
     if cfg is None:
       cfg = envsub('$HOME/.ssh/config-pf')
@@ -514,6 +554,8 @@ def Condition(portfwd, op, invert, *args):
   raise ValueError("unsupported op")
 
 class _PortfwdCondition(object):
+  ''' Base class for port forward conditions.
+  '''
 
   def __init__(self, portfwd, invert):
     self.portfwd = portfwd
@@ -528,6 +570,7 @@ class _PortfwdCondition(object):
             for attr in sorted(self._attrnames)
         )
     )
+
   def __bool__(self):
     if self.test():
       return not self.invert
@@ -536,16 +579,22 @@ class _PortfwdCondition(object):
   __nonzero__ = __bool__
 
   def shcmd(self):
+    ''' The test argv as a shell command.
+    '''
     cmd = ' '.join(shq(self.test_argv))
     if self.invert:
       cmd = 'if ' + cmd + '; then false; else true; fi'
     return cmd
 
   def probe(self):
+    ''' Probe the condition: run the test function, optionally invert the result.
+    '''
     result = self.test()
     return not result if self.invert else result
 
 class FlagCondition(_PortfwdCondition):
+  ''' A flag based condition.
+  '''
 
   _attrnames = ['flag']
 
@@ -555,6 +604,8 @@ class FlagCondition(_PortfwdCondition):
 
   @prop
   def test_argv(self):
+    ''' Argv for testing a flag.
+    '''
     return ['flag', self.flag]
 
   def test(self, trace=False):
@@ -565,6 +616,8 @@ class FlagCondition(_PortfwdCondition):
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
+  ''' A ping based condition.
+  '''
 
   _attrnames = ['ping_target']
 
@@ -575,14 +628,18 @@ class PingCondition(_PortfwdCondition):
 
   @prop
   def test_argv(self):
+    ''' Test argv for ping.
+    '''
     return self.ping_argv
 
   def test(self, trace=False):
+    ''' Ping the target as a test.
+    '''
     if trace:
       info("run %r", self.ping_argv)
     retcode = subprocess.call(
-                self.ping_argv,
-                stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
+        self.ping_argv,
+        stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
     return retcode == 0
 
 if __name__ == '__main__':
