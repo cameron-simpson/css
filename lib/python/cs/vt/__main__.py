@@ -41,7 +41,7 @@ from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
 from .datadir import DataDir, DataDirIndexEntry
-from .datafile import DataFile
+from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
@@ -363,7 +363,7 @@ class VTCmd:
     for path in args:
       if path.endswith('.vtd'):
         print(path)
-        DF = DataFile(path)
+        DF = DataFileReader(path)
         with DF:
           try:
             for offset, flags, data, offset2 in DF.scanfrom(0, do_decompress=True):
@@ -834,7 +834,7 @@ class VTCmd:
             print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
       else:
         filepath = arg
-        DF = DataFile(filepath)
+        DF = DataFileReader(filepath)
         with DF:
           for record, offset in DF.scanfrom():
             data = record.data
