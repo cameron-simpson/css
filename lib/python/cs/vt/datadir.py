@@ -190,7 +190,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
     if indexclass is None:
-      indexclass = self._indexclass()
+      indexclass = choose_indexclass(self.indexbase)
     self.indexclass = indexclass
     if create_statedir is None:
       create_statedir = False
@@ -216,9 +216,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                 self.hashclass.HASHNAME,
                 self.indexclass)
            )
-
-  def _indexclass(self, preferred_indexclass=None):
-    return choose_indexclass(self.indexbase, preferred_indexclass=preferred_indexclass)
 
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
