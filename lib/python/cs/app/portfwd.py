@@ -236,12 +236,12 @@ class Portfwd(FlaggedMixin):
     def on_reap():
       self.flag_connected = False
     self.svcd = SvcD(
-        self.ssh_argv,
+        self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
         flags=self.flags,
         trace=trace,
-        sig_func=self.sig_func,
+        sig_func=self.ssh_options,
         test_func=self.test_func,
         test_flags={
             'PORTFWD_DISABLE': False,
@@ -252,7 +252,7 @@ class Portfwd(FlaggedMixin):
     )
 
   def __str__(self):
-    return "Portfwd %s %s" % (self.target, shq(self.ssh_argv))
+    return "Portfwd %s %s" % (self.target, shq(self.ssh_argv()))
 
   def start(self):
     self.svcd.start()
@@ -264,20 +264,34 @@ class Portfwd(FlaggedMixin):
     xit = self.svcd.wait()
     return xit
 
-  @prop
-  def ssh_argv(self):
+  def ssh_argv(self, bare=False):
     argv = ['ssh']
     if self.verbose:
       argv.append('-v')
     if self.ssh_config:
       argv.extend(['-F', self.ssh_config])
-    argv.extend([ '-N', '-T',
-                  '-o', 'ExitOnForwardFailure=yes',
-                  '-o', 'PermitLocalCommand=yes',
-                  '-o', 'LocalCommand=' + self.ssh_localcommand,
-                  '--',
-                  self.target ])
+    argv.extend([
+        '-N', '-T',
+        '-o', 'ExitOnForwardFailure=yes',
+        '-o', 'PermitLocalCommand=yes',
+        '-o', 'LocalCommand=' + self.ssh_localcommand,
+    ])
+    if not bare:
+      argv.extend(['--', self.target])
     return argv
+
+  def ssh_options(self):
+    argv = self.ssh_argv(bare=True) + ['-G']
+    P = pipefrom(argv)
+    options = [
+        line.strip().split(None, 1)
+        for line in P.stdout
+    ]
+    retcode = P.wait()
+    if retcode != 0:
+      error("%r: non-zero return code: %s", argv, retcode)
+      return None
+    return options
 
   @prop
   def ssh_localcommand(self):
@@ -290,22 +304,6 @@ class Portfwd(FlaggedMixin):
     alert_argv = [ 'alert', '-g', alert_group, '-t', alert_title, '--', alert_message ]
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
-
-  def sig_func(self):
-    ''' Signature function, returning the ssh options for this target.
-    '''
-    ssh_argv = ['ssh']
-    if self.ssh_config:
-      ssh_argv.extend(['-F', self.ssh_config])
-    ssh_argv.extend(['-G', '-T'])
-    ssh_argv.append(self.target)
-    ssh_proc = pipefrom(ssh_argv)
-    ssh_options = ssh_proc.stdout.read()
-    ssh_retcode = ssh_proc.wait()
-    if ssh_retcode != 0:
-      error("%r: non-zero return code: %s", ssh_argv, ssh_retcode)
-      return None
-    return ssh_options
 
   def test_func(self):
     for condition in self.conditions:
