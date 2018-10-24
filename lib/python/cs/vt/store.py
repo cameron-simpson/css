@@ -905,14 +905,16 @@ class _PlatonicStore(MappingStore):
   def __init__(
       self, name, statedirpath,
       *,
-      datadirpath=None, hashclass=None, indexclass=None,
+      hashclass=None, indexclass=None,
       follow_symlinks=False, archive=None, meta_store=None,
       flag_prefix=None,
       runstate=None,
       **kw
   ):
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
     datadir = PlatonicDir(
-        statedirpath, datadirpath, hashclass, indexclass,
+        statedirpath, hashclass, indexclass,
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
         flag_prefix=flag_prefix,
