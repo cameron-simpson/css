@@ -242,6 +242,7 @@ class VTCmd:
           store_spec = '[server]'
         else:
           store_spec = os.environ.get('VT_STORE', '[default]')
+        self.store_spec = store_spec
       try:
         # set up the primary Store using the main programme RunState for control
         S = Store(self.store_spec, self.config, runstate=self.runstate)
