@@ -851,13 +851,14 @@ class DataDirStore(MappingStore):
       name,
       statedirpath,
       *,
-      datadirpath=None,
       hashclass=None, indexclass=None,
       rollover=None,
       **kw
   ):
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
     datadir = DataDir(
-        statedirpath, datadirpath, hashclass,
+        statedirpath, hashclass,
         indexclass=indexclass,
         rollover=rollover)
     MappingStore.__init__(self, name, datadir, **kw)
