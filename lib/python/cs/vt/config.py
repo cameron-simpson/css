@@ -232,7 +232,6 @@ class Config:
       type_=None,
       path=None,
       basedir=None,
-      data=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -251,9 +250,7 @@ class Config:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         path = joinpath(basedir, path)
-    if data is not None:
-      data = longpath(data)
-    return DataDirStore(store_name, path, datadirpath=data)
+    return DataDirStore(store_name, path)
 
   def filecache_Store(
       self,
