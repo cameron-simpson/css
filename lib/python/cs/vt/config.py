@@ -71,10 +71,12 @@ class Config:
     # not previously accessed, construct S
     store_name = "%s[%s]" % (self, clause_name)
     with Pfx(store_name):
-      clause = self.map[clause_name]
-      store_type = clause.get('type')
-      S = Store
-      if store_type is None:
+      clause = dict(self.map[clause_name])
+      for discard in 'address',:
+        clause.pop(discard, None)
+      try:
+        store_type = clause.pop('type')
+      except KeyError:
         raise ValueError("missing type")
       S = self.new_Store(
           store_name,
@@ -168,9 +170,6 @@ class Config:
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
       if not isinstance(params, dict):
         params = dict(params)
-        if 'type' in params:
-          # shuffle to avoid using builtin "type" as parameter name
-          params['type_'] = params.pop('type')
       # process general purpose params
       # blockmapdir: location to store persistent blockmaps
       blockmapdir = params.pop('blockmapdir', None)
