@@ -66,7 +66,6 @@ class TestDataDir(unittest.TestCase):
   def _open_default_datadir(self):
     return DataDir(
         self.indexdirpath,
-        self.datadirpath,
         self.hashclass,
         indexclass=self.indexclass,
         rollover=self.rollover)
@@ -141,7 +140,6 @@ class TestDataDir(unittest.TestCase):
     D.open()
     # reopen the DataDir
     with D:
-      self.assertEqual(datadir_spec, D.spec())
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
       for n, hashcode in enumerate(hashcodes):
