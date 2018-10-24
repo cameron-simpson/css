@@ -35,7 +35,8 @@ from cs.fileutils import (
     datafrom_fd,
     makelockfile,
     read_from,
-    shortpath)
+    shortpath,
+    TimeoutError)
 from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, PfxThread as Thread, XP
 from cs.py.func import prop as property
@@ -665,17 +666,9 @@ class DataDir(_FilesDir):
     self._write_DF = None
     self._write_lockpath = None
 
-  def _new_datafile(self):
-    ''' Create a new datafile and return its DataFileState..
-    '''
-    filename = str(uuid4()) + DATAFILE_DOT_EXT
-    pathname = self.datapathto(filename)
-    if os.path.exists(pathname):
-      raise RuntimeError("path already exists: %r" % (pathname,))
-    # create the file
-    with open(pathname, "ab"):
-      pass
-    return self.filemap.add_path(filename)
+  def shutdown(self):
+    self._close_write_datafile()
+    super().shutdown()
 
   def _open_datafile(self, n):
     ''' Return the DataFileReader with index `n`.
@@ -713,7 +706,7 @@ class DataDir(_FilesDir):
         except TimeoutError:
           # lock taken, proceed to another file
           continue
-      WDF = DataFileWriter(DFstate.filepath)
+      WDF = DataFileWriter(DFstate.pathname)
       break
     if WDF is None:
       # no suitable existing file, make a new one
