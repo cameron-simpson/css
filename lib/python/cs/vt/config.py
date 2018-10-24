@@ -106,7 +106,7 @@ class Config:
 
   @property
   def mountdir(self):
-    ''' The default directory for mount oints.
+    ''' The default directory for mount points.
     '''
     return longpath(self.get_default('mountdir'))
 
@@ -316,7 +316,6 @@ class Config:
       type_=None,
       path=None,
       basedir=None,
-      data=None,
       follow_symlinks=False,
       meta=None,
       archive=None,
@@ -343,8 +342,6 @@ class Config:
         debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
-    if data is not None:
-      data = longpath(data)
     if follow_symlinks is None:
       follow_symlinks = False
     if meta is None:
@@ -355,7 +352,6 @@ class Config:
       archive = longpath(archive)
     return PlatonicStore(
         store_name, path,
-        datadirpath=data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
         meta_store=meta_store, archive=archive,
