@@ -709,7 +709,7 @@ class DataDir(_FilesDir):
     for n, DFstate in self._filemap.items():
       if DFstate.indexed_to < rollover:
         try:
-          lockpath = makelockfile(DFstate.filepath, timeout=0)
+          lockpath = makelockfile(DFstate.pathname, timeout=0)
         except TimeoutError:
           # lock taken, proceed to another file
           continue
@@ -960,6 +960,7 @@ class PlatonicDir(_FilesDir):
   def __init__(
       self,
       statedirpath, hashclass,
+      *,
       exclude_dir=None, exclude_file=None,
       follow_symlinks=False, archive=None, meta_store=None,
       **kw
@@ -968,7 +969,7 @@ class PlatonicDir(_FilesDir):
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
-          DataFiles; this is the index-state.csv file and the associated
+          DataFiles; this is the index-state.sqlite file and the associated
           index dbm-ish files.
         * `hashclass`: the hash class used to index chunk contents.
         * `exclude_dir`: optional function to test a directory path for
