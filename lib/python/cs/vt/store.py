@@ -914,7 +914,7 @@ class _PlatonicStore(MappingStore):
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     datadir = PlatonicDir(
-        statedirpath, hashclass, indexclass,
+        statedirpath, hashclass,
         follow_symlinks=follow_symlinks,
         archive=archive, meta_store=meta_store,
         flag_prefix=flag_prefix,
