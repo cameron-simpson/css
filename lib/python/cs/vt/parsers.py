@@ -11,7 +11,7 @@ from cs.buffer import chunky
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
-from .datafile import DataFile
+from .datafile import DataFileReader
 
 def linesof(chunks):
   ''' Process binary chunks, yield binary lines ending in '\n'.
@@ -102,7 +102,7 @@ def scan_vtd(bfr):
   '''
   with Pfx("scan_vtd"):
     def run_parser(bfr):
-      for offset, *etc in DataFile.scanbuffer(bfr, do_decompress=False):
+      for offset, *etc in DataFileReader.scanbuffer(bfr, do_decompress=False):
         bfr.report_offset(offset)
     return report_offsets(bfr, run_parser)
 

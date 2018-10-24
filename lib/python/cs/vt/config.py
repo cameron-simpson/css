@@ -71,10 +71,12 @@ class Config:
     # not previously accessed, construct S
     store_name = "%s[%s]" % (self, clause_name)
     with Pfx(store_name):
-      clause = self.map[clause_name]
-      store_type = clause.get('type')
-      S = Store
-      if store_type is None:
+      clause = dict(self.map[clause_name])
+      for discard in 'address',:
+        clause.pop(discard, None)
+      try:
+        store_type = clause.pop('type')
+      except KeyError:
         raise ValueError("missing type")
       S = self.new_Store(
           store_name,
@@ -106,7 +108,7 @@ class Config:
 
   @property
   def mountdir(self):
-    ''' The default directory for mount oints.
+    ''' The default directory for mount points.
     '''
     return longpath(self.get_default('mountdir'))
 
@@ -168,16 +170,9 @@ class Config:
     with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
       if not isinstance(params, dict):
         params = dict(params)
-        if 'type' in params:
-          # shuffle to avoid using builtin "type" as parameter name
-          params['type_'] = params.pop('type')
       # process general purpose params
       # blockmapdir: location to store persistent blockmaps
       blockmapdir = params.pop('blockmapdir', None)
-      # mountdir: default location for "mount [clausename]" => mountdir/clausename
-      mountdir = params.pop('mountdir', None)
-      if mountdir is None:
-        mountdir = self.get_default('mountdir')
       if store_name is None:
         store_name = str(self) + '[' + clause_name + ']'
       if store_type == 'config':
@@ -210,8 +205,6 @@ class Config:
         S.config = self
       if blockmapdir is not None:
         S.blockmapdir = blockmapdir
-      if mountdir is not None:
-        S.mountdir = mountdir
       return S
 
   def config_Store(
@@ -238,7 +231,6 @@ class Config:
       type_=None,
       path=None,
       basedir=None,
-      data=None,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -257,9 +249,7 @@ class Config:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         path = joinpath(basedir, path)
-    if data is not None:
-      data = longpath(data)
-    return DataDirStore(store_name, path, datadirpath=data)
+    return DataDirStore(store_name, path)
 
   def filecache_Store(
       self,
@@ -325,7 +315,6 @@ class Config:
       type_=None,
       path=None,
       basedir=None,
-      data=None,
       follow_symlinks=False,
       meta=None,
       archive=None,
@@ -352,8 +341,6 @@ class Config:
         debug("longpath(basedir) ==> %r", basedir)
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
-    if data is not None:
-      data = longpath(data)
     if follow_symlinks is None:
       follow_symlinks = False
     if meta is None:
@@ -364,7 +351,6 @@ class Config:
       archive = longpath(archive)
     return PlatonicStore(
         store_name, path,
-        datadirpath=data,
         hashclass=None, indexclass=None,
         follow_symlinks=follow_symlinks,
         meta_store=meta_store, archive=archive,
