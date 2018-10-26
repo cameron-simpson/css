@@ -299,19 +299,27 @@ class Portfwd(FlaggedMixin):
     return argv
 
   def ssh_options(self):
-    ''' Return a list of (option, value) tuples
+    ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
     argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
     P = pipefrom(argv)
-    options = [
+    options = defaultdict(list)
+    parsed = [
         line.strip().split(None, 1)
         for line in P.stdout
     ]
     retcode = P.wait()
     if retcode != 0:
       error("%r: non-zero return code: %s", argv, retcode)
-      return ()
+    else:
+      X("parsed=%r", parsed)
+      for parsed_item in parsed:
+        option = parsed_item.pop(0)
+        values = options[option]
+        if parsed_item:
+          value, = parsed_item
+          options[option].append(value)
     return options
 
   @prop
@@ -331,11 +339,9 @@ class Portfwd(FlaggedMixin):
 
         Initially remove local socket paths.
     '''
-    for option in self.ssh_options():
-      opt_name = option.pop(0)
-      if opt_name == 'localforward':
-        value, = option
-        local, remote = value.split(None, 1)
+    options = self.ssh_options()
+    for localforward in options['localforward']:
+        local, remote = localforward.split(None, 1)
         if '/' in local:
           with Pfx("remove %r", local):
             try:
@@ -346,7 +352,22 @@ class Portfwd(FlaggedMixin):
               else:
                 raise
             else:
-              info("removed %r", local)
+              info("removed")
+    if (
+        options['controlmaster'] == ['true',]
+        and options['controlpath'] != ['none',]
+    ):
+      controlpath, = options['controlpath']
+      with Pfx("remove %r", controlpath):
+        try:
+          os.remove(controlpath)
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            pass
+          else:
+            raise
+        else:
+          info("removed")
 
   def on_reap(self):
     ''' Actions to perform after the ssh tunnel exits.
