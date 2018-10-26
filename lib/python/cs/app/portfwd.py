@@ -8,7 +8,7 @@ r'''
 Manage persistent ssh tunnels and port forwards.
 
 Portfwd runs a collection of ssh tunnel commands persistently,
-each it its own `cs.app.svcd <https://pypi.org/project/cs.app.svcd>`_ instance
+each in its own `cs.app.svcd <https://pypi.org/project/cs.app.svcd>`_ instance
 with all the visibility and process control that SvcD brings.
 
 It reads tunnel preconditions from special comments within the ssh config file.
@@ -17,7 +17,7 @@ as the SvcD signature function
 thus restarting particular ssh tunnels when their specific configuration changes.
 It has an "automatic" mode (the -A option)
 which monitors the desired list of tunnels
-from status expressed via `cs.app.flag <https://pypi.org/project/cs.app.flag>`_
+from statuses expressed via `cs.app.flag <https://pypi.org/project/cs.app.flag>`_
 which allows live addition or removal of tunnels as needed.
 '''
 
@@ -42,7 +42,6 @@ from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
-from cs.x import X
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
