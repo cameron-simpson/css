@@ -35,7 +35,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -z "$proxy" ] || set -- --proxy "$proxy" "$@"
+set -- --proxy "$proxy" "$@"
 [ -d "$dldir" ] || $trace mkdir -p "$dldir"
 
 cd "$dldir"
