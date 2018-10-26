@@ -42,6 +42,7 @@ from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
 from cs.sh import quotecmd as shq
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -243,8 +244,6 @@ class Portfwd(FlaggedMixin):
     self.svcd_name = 'portfwd-' + target
     self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
-    def on_reap():
-      self.flag_connected = False
     self.svcd = SvcD(
         self.ssh_argv(),
         name=self.svcd_name,
@@ -258,7 +257,8 @@ class Portfwd(FlaggedMixin):
             'PORTFWD_SSH_READY': True,
             'ROUTE_DEFAULT': True,
         },
-        on_reap=on_reap
+        on_spawn=self.on_spawn,
+        on_reap=self.on_reap
     )
 
   def __str__(self):
@@ -303,7 +303,7 @@ class Portfwd(FlaggedMixin):
     ''' Return a list of (option, value) tuples
         representing the ssh configuration.
     '''
-    argv = self.ssh_argv(bare=True) + ['-G']
+    argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
     P = pipefrom(argv)
     options = [
         line.strip().split(None, 1)
@@ -312,7 +312,7 @@ class Portfwd(FlaggedMixin):
     retcode = P.wait()
     if retcode != 0:
       error("%r: non-zero return code: %s", argv, retcode)
-      return None
+      return ()
     return options
 
   @prop
@@ -326,6 +326,33 @@ class Portfwd(FlaggedMixin):
     alert_argv = [ 'alert', '-g', alert_group, '-t', alert_title, '--', alert_message ]
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
+
+  def on_spawn(self):
+    ''' Actions to perform before commencing the ssh tunnel.
+
+        Initially remove local socket paths.
+    '''
+    for option in self.ssh_options():
+      opt_name = option.pop(0)
+      if opt_name == 'localforward':
+        value, = option
+        local, remote = value.split(None, 1)
+        if '/' in local:
+          with Pfx("remove %r", local):
+            try:
+              os.remove(local)
+            except OSError as e:
+              if e.errno == errno.ENOENT:
+                pass
+              else:
+                raise
+            else:
+              info("removed %r", local)
+
+  def on_reap(self):
+    ''' Actions to perform after the ssh tunnel exits.
+    '''
+    self.flag_connected = False
 
   def test_func(self):
     ''' Servuice test function: probe all the conditions.
