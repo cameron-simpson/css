@@ -1,5 +1,4 @@
 portfwd: remove ssh control sockets before starting tunnel
-drop lib/python/cs/testdata/cs.mailutils/maildir, too big
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
