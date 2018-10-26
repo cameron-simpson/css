@@ -145,7 +145,7 @@ class Config:
       else:
         # multiple stores: save to the front store, read first from the
         # front store then from the rest
-        S = ProxyStore(store_spec, stores[0:1], stores[0:1], stores[1:])
+        S = ProxyStore(store_spec, stores[0:1], stores[0:1], read2=stores[1:])
       if runstate is not None:
         S.runstate = runstate
       return S
