@@ -489,7 +489,7 @@ class SqliteFilemap:
     del self.conn
 
   def _execute(self, sql, *a):
-    X("SQL: %r %r", sql.strip(), a)
+    X("SQL: %s: %r %r", shortpath(self.path), sql.strip(), a)
     return self.conn.execute(sql, *a)
 
   def filenums(self):
