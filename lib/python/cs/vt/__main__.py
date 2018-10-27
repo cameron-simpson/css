@@ -40,6 +40,7 @@ from .block import Block, IndirectBlock, Block_from_bytes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
+from .convert import expand_path
 from .datadir import DataDir, DataDirIndexEntry
 from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
@@ -903,11 +904,15 @@ class VTCmd:
           "serve -", sys.stdin, sys.stdout,
           exports=exports)
       remoteS.join()
-    elif isabspath(address):
-      # /path/to/socket
+    elif '/' in address:
+      # path/to/socket
+      socket_path = expand_path(address)
       X("serve via UNIX socket at %r", address)
       with defaults.S:
-        srv = serve_socket(socket_path=address, exports=exports, runstate=self.runstate)
+        srv = serve_socket(
+            socket_path=socket_path,
+            exports=exports,
+            runstate=self.runstate)
       srv.join()
     else:
       # [host]:port
