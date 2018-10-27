@@ -1,3 +1,4 @@
+portfwd: changes to match svcd changes
 svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
 portfwd: remove ssh control sockets before starting tunnel
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
