@@ -54,4 +54,5 @@ rm -f '$tmpf'
 $setx
 X
 { necho 'exec '; shqstr "$@"; } >>"$tmpf"
+[ "x$user" = xroot ] || chown "$user" "$tmpf" || :
 exec $trace su $suargs "$user" -c "$setx; . '$tmpf'"
