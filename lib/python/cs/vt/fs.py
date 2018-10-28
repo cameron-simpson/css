@@ -40,6 +40,7 @@ class FileHandle:
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
+    self._block_mapping = None
     self._lock = lock
     E.open()
 
@@ -67,6 +68,18 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
+    bm = self._blockmapping
+    if bm and offset < bm.filled:
+      # Fetch directly from the BlockMapping.
+      bmsize = min(size, bm.filled - offset)
+      data = bm.pread(bmsize, offset)
+      assert len(data) > 0
+      size -= len(data)
+      offset += len(data)
+      if size > 0:
+        tail = self.read(size, offset)
+        return data + tail
+      return data
     ##f = self.E.open_file
     ##X("f = %s %s", type(f), f)
     ##X("f.read = %s %s", type(f.read), f.read)
