@@ -410,12 +410,12 @@ class BlockMapping:
     self.size = size
     self.filled = 0
 
-  def pread(self, offset, size):
+  def pread(self, size, offset):
     ''' Return data from the main tempfile.
     '''
     assert offset >= 0
     assert offset + size <= self.filled
-    return self.tempf.pread(self.offset + offset, size)
+    return self.tempf.pread(size, self.offset + offset)
 
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
