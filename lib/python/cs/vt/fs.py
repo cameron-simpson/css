@@ -370,8 +370,8 @@ class FileSystem(object):
         X("NO INODE IMPORT")
       X("FileSystem mntE:")
     with self.S:
-        with defaults.stack('fs', self):
-          dump_Dirent(mntE)
+      with defaults.stack('fs', self):
+        dump_Dirent(mntE)
 
   def close(self):
     ''' Close the FileSystem.
