@@ -15,7 +15,7 @@ from threading import Lock, RLock, Thread
 from cs.fileutils import RWFileBlockCache
 from cs.logutils import error
 from cs.queues import IterableQueue
-from cs.resources import RunStateMixin
+from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import MAX_FILE_SIZE
@@ -394,8 +394,17 @@ class MemoryCacheMapping:
             self._skip_flush = 32
 
 class BlockMapping:
+  ''' A Block's contents mapped onto a temporary file.
+  '''
 
   def __init__(self, tempf, offset, size):
+    ''' Initialise the mapping.
+
+        Parameters:
+        * `tempf`: the BlockTempfile
+        * `offset`: where the Block data start
+        * `size`: the total size of the Block
+    '''
     self.tempf = tempf
     self.offset = offset
     self.size = size
@@ -413,6 +422,7 @@ class BlockTempfile:
   '''
 
   def __init__(self, cache, tmpdir, suffix):
+    X("new BlockTemptfile...")
     self.cache = cache
     self.tempfile = TemporaryFile(tmpdir=tmpdir, suffix=suffix)
     self.hashcodes = {}
@@ -449,9 +459,17 @@ class BlockTempfile:
         tempf.seek(offset)
       return tempf.write(data)
 
-  def append_block(self, block):
+  def append_block(self, block, runstate):
     ''' Add a Block to this tempfile.
+
+        Parameters:
+        * `block`: the Block to append to this tempfile.
+        * `runstate`: a RunState that can be used to cancel the
+          tempfile data population Thread
+
+        A Thread is dispatched to load the Block data into the temp file.
     '''
+    X("BlockTempfile.append_block(%s)...", block.hashcode)
     h = block.hashcode
     bsize = len(block)
     assert bsize > 0
@@ -464,14 +482,19 @@ class BlockTempfile:
       self.hashcodes[h] = bm
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
-        target=self._infill, args=(bm, offset, block))
+        target=self._infill, args=(bm, offset, block, runstate))
     T.daemon = True
     T.start()
     return bm
 
-  def _infill(self, bm, offset, block):
+  def _infill(self, bm, offset, block, runstate):
+    ''' Load the Block data into the tempfile,
+        updating the `BlockMapping.filled` attribute as we go.
+    '''
     needed = len(block)
     for leaf in block.leaves:
+      if runstate.cancelled:
+        break
       data = leaf.data
       assert len(data) <= needed
       written = self._pwrite(data, offset)
@@ -479,6 +502,7 @@ class BlockTempfile:
       offset += written
       needed -= written
       bm.filled += written
+    X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 class BlockCache:
   ''' A temporary file based cache for whole Blocks.
@@ -506,10 +530,13 @@ class BlockCache:
     self.blockmaps = {}      # hashcode -> BlockMapping
     self._tempfiles = []    # in play BlockTempfiles
     self._lock = Lock()
+    self.runstate = RunState()
+    self.runstate.start()
 
   def close(self):
     ''' Release all the blockmaps.
     '''
+    self.runstate.cancel()
     with self._lock:
       self.blockmaps = {}
       for tempf in self._tempfiles:
@@ -539,7 +566,7 @@ class BlockCache:
             otempf.close()
           tempf = BlockTempfile(self, self.tmpdir, self.suffix)
           tempfiles.append(tempf)
-        bm = tempf.append_block(block)
+        bm = tempf.append_block(block, self.runstate)
         blockmaps[h] = bm
     return bm
 
