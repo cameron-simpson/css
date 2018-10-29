@@ -19,14 +19,14 @@ def edit_strings(strs, editor=None, environ=None, errors=None):
       Honours $EDITOR envvar, defaults to "vi".
   '''
   if errors is None:
-    def errors(s, message):
+    def errors(message):
       raise ValueError(message)
   elif isinstance(errors, str):
     if errors == 'ignore':
-      def errors(s, message):
+      def errors(message):
         pass
     elif errors == 'raise':
-      def errors(s, message):
+      def errors(message):
         raise ValueError(message)
     else:
       raise ValueError("invalid errors: %r" % (errors,))

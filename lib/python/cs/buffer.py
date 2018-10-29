@@ -9,6 +9,7 @@
     an automatically refilling buffer to support parsing of data streams.
 '''
 
+from __future__ import print_function
 import os
 from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap

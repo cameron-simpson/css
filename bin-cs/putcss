@@ -19,5 +19,5 @@ dstdir=$OPTCSS
 
 for hostlist
 do
-  mrsync -iO -aH --delete --delete-excluded '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
+  mrsync -iO -aH --delete --delete-excluded --exclude=/release '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
 done

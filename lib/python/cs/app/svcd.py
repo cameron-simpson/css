@@ -132,6 +132,8 @@ USAGE = '''Usage:
     -x    Trace execution.'''
 
 def main(argv=None, environ=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   cmd = basename(argv.pop(0))
@@ -271,7 +273,7 @@ def main(argv=None, environ=None):
   S = SvcD(argv, name=name, pidfile=svc_pidfile, sig_func=sig_func,
            test_flags=test_flags, test_func=test_func, test_rate=test_rate,
            once=once, quiet=quiet, trace=trace)
-  def signal_handler(signum, frame):
+  def signal_handler(*_):
     S.stop()
     S.wait()
     S.flag_stop = False
@@ -291,43 +293,50 @@ def main(argv=None, environ=None):
     S.wait()
 
 class SvcD(FlaggedMixin, object):
+  ''' A process based service.
+  '''
 
-  def __init__(self, argv, name=None,
-        environ=None,
-        flags=None,
-        group_name=None,
-        pidfile=None,
-        sig_func=None,
-        test_flags=None,
-        test_func=None,
-        test_rate=None,
-        restart_delay=None,
-        once=False,
-        quiet=False,
-        trace=False,
-        on_spawn=None,
-        on_reap=None,
-    ):
+  def __init__(
+      self,
+      argv,
+      name=None,
+      environ=None,
+      flags=None,
+      group_name=None,
+      pidfile=None,
+      sig_func=None,
+      test_flags=None,
+      test_func=None,
+      test_rate=None,
+      restart_delay=None,
+      once=False,
+      quiet=False,
+      trace=False,
+      on_spawn=None,
+      on_reap=None,
+  ):
     ''' Initialise the SvcD.
-        `argv`: command to run as a subprocess.
-        `flags`: a cs.app.flag.Flags -like object, default None;
+
+        Parameters:
+        * `argv`: command to run as a subprocess.
+        * `flags`: a cs.app.flag.Flags -like object, default None;
           if None the default flags will be used.
-        `group_name`: alert group name, default "SVCD " + `name`.
-        `pidfile`: path to pid file, default $VARRUN/{name}.pid.
-        `sig_func`: signature function to compute a string which
+        * `group_name`: alert group name, default "SVCD " + `name`.
+        * `pidfile`: path to pid file, default $VARRUN/{name}.pid.
+        * `sig_func`: signature function to compute a string which
           causes a restart if it changes
-        `test_flags`: map of {flagname: truthiness} which should
+        * `test_flags`: map of {flagname: truthiness} which should
           be monitored at test time; truthy flags must be true and
           untruthy flags must be false
-        `test_func`: test function with must return true if the comannd can run
-        `test_rate`: frequency of tests, default TEST_RATE
-        `restart_delay`: delay before start of an exiting command,
+        * `test_func`: test function with must return true if the comannd can run
+        * `test_rate`: frequency of tests, default TEST_RATE
+        * `restart_delay`: delay before start of an exiting command,
           default RESTART_DELAY
-        `once`: if true, run the command only once
-        `quiet`: if true, do not issue alerts
-        `trace`: trace actions, default False
-        `on_spawn`: to be called after a new subprocess is spawned
-        `on_reap`: to be called after a subprocess is reaped
+        * `once`: if true, run the command only once
+        * `quiet`: if true, do not issue alerts
+        * `trace`: trace actions, default False
+        * `on_spawn`: to be called after a new subprocess is spawned
+        * `on_reap`: to be called after a subprocess is reaped
     '''
     if name is None:
       name = 'UNNAMED'
@@ -358,9 +367,9 @@ class SvcD(FlaggedMixin, object):
     self.trace = trace
     self.on_spawn = on_spawn
     self.on_reap = on_reap
-    self.active = False # flag to end the monitor Thread
-    self.subp = None    # current subprocess
-    self.monitor = None # monitoring Thread
+    self.active = False     # flag to end the monitor Thread
+    self.subp = None        # current subprocess
+    self.monitor = None     # monitoring Thread
     self.pidfile = pidfile
     self.sig_func = sig_func
 
@@ -373,11 +382,22 @@ class SvcD(FlaggedMixin, object):
     return str(self) + repr(self.argv)
 
   def dbg(self, msg, *a):
+    ''' Log a debug message if not tracing.
+    '''
     if not self.trace:
       return
     debug("%s: " + msg, self, *a)
 
   def test(self):
+    ''' Test whther the service should run.
+
+        In order:
+        * True if the override flag is true.
+        * False if the disable flag is true.
+        * False if any of the specified test flags are false.
+        * False if the test function fails.
+        * Otherwise true.
+    '''
     with Pfx("%s: test", self.name):
       if self.flag_override:
         self.dbg("flag_override true -> True")
@@ -402,6 +422,8 @@ class SvcD(FlaggedMixin, object):
       return True
 
   def alert(self, msg, *a):
+    ''' Issue an alert message via the "alert" command.
+    '''
     if self.quiet:
       return
     if a:
@@ -412,6 +434,10 @@ class SvcD(FlaggedMixin, object):
     Popen(alert_argv, stdin=DEVNULL)
 
   def spawn(self):
+    ''' Spawn the subprocess.
+
+        Calls the `on_spwan` function if any.
+    '''
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
@@ -424,6 +450,10 @@ class SvcD(FlaggedMixin, object):
       self.on_spawn()
 
   def reap(self):
+    ''' Collect the subprocess status after termination.
+
+        Calls the `on_reap` function if any.
+    '''
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
@@ -450,6 +480,8 @@ class SvcD(FlaggedMixin, object):
     return self.reap()
 
   def start(self):
+    ''' Start the subprocess and its monitor.
+    '''
     with Pfx("SvcD.start(%s)", self):
       def monitor():
         old_sig = None
@@ -494,8 +526,8 @@ class SvcD(FlaggedMixin, object):
                     changed = new_sig != old_sig
                   except TypeError as e:
                     warning(
-                        "type error comparing old_sig %s with new_sig %s",
-                        type(old_sig), type(new_sig),
+                        "type error comparing old_sig %s with new_sig %s: %s",
+                        type(old_sig), type(new_sig), e,
                     )
                     old_sig = new_sig
                   else:
@@ -516,23 +548,35 @@ class SvcD(FlaggedMixin, object):
       self.monitor = T
 
   def stop(self):
+    ''' Set the stop flag.
+    '''
     self.flag_stop = True
 
   def wait(self):
+    ''' Wait for the subprocess by waiting for the monitor.
+    '''
     if self.monitor:
       self.monitor.join()
       self.monitor = None
 
   def restart(self):
+    ''' Set the restart flag, will be cleared by the restart.
+    '''
     self.flag_restart = True
 
   def disable(self):
+    ''' Turn on the disable flag.
+    '''
     self.flag_disable = True
 
   def enable(self):
+    ''' Turn of the disable flag.
+    '''
     self.flag_disable = False
 
   def probe(self):
+    ''' Probe the subprocess: true if running.
+    '''
     if self.subp is None:
       return False
     return self.subp.poll() is None

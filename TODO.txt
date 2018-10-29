@@ -1,4 +1,6 @@
-drop lib/python/cs/testdata/cs.mailutils/maildir, too big
+portfwd: changes to match svcd changes
+svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
+portfwd: remove ssh control sockets before starting tunnel
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
 cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
