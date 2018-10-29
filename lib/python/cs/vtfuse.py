@@ -504,12 +504,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.listxattr
     '''
     # TODO: ctx allows to access inode?
-    E = self._vtfs.i2E(inode)
-    xattrs = set(E.meta.listxattrs())
-    ## conceal some special/dynamic xattrs: available on get but
-    ## not shown in list
-    ## xattrs.add(XATTR_NAME_BLOCKREF)
-    return list(xattrs)
+    return self._vtfs.i2E(inode).listxattrs()
 
   @handler
   def lookup(self, parent_inode, name_b, ctx):
