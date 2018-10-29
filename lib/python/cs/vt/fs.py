@@ -90,7 +90,7 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    bm = self._blockmapping
+    bm = self._block_mapping
     if bm and offset < bm.filled:
       # Fetch directly from the BlockMapping.
       bmsize = min(size, bm.filled - offset)
