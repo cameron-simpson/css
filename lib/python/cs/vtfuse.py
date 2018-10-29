@@ -38,8 +38,6 @@ XATTR_NOFOLLOW = 0x0001
 XATTR_CREATE   = 0x0002
 XATTR_REPLACE  = 0x0004
 
-XATTR_NAME_BLOCKREF = b'x-vt-blockref'
-
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
@@ -410,13 +408,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.getxattr
     '''
     # TODO: test for permission to access inode?
-    E = self._vtfs.i2E(inode)
-    if xattr_name == XATTR_NAME_BLOCKREF:
-      return E.block.encode()
-    # bit of a hack: pretend all attributes exist, empty if missing
-    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
-    # with a stack trace
-    return E.meta.getxattr(xattr_name, b'')
+    return self._vtfs.getxattr(inode, xattr_name)
 
   @handler
   def link(self, inode, new_parent_inode, new_name_b, ctx):
@@ -512,12 +504,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.listxattr
     '''
     # TODO: ctx allows to access inode?
-    E = self._vtfs.i2E(inode)
-    xattrs = set(E.meta.listxattrs())
-    ## conceal some special/dynamic xattrs: available on get but
-    ## not shown in list
-    ## xattrs.add(XATTR_NAME_BLOCKREF)
-    return list(xattrs)
+    return self._vtfs.i2E(inode).meta.listxattrs()
 
   @handler
   def lookup(self, parent_inode, name_b, ctx):
@@ -799,18 +786,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.removexattr
     '''
-    if self._vtfs.readonly:
-      raise FuseOSError(errno.EROFS)
     # TODO: test for inode ownership?
-    if xattr_name == XATTR_NAME_BLOCKREF:
-      # removing the x-vt-blockref xattr is a no-op
-      return
-    E = self._vtfs.i2E(inode)
-    meta = E.meta
-    try:
-      meta.delxattr(xattr_name)
-    except KeyError:
-      raise FuseOSError(errno.ENOATTR)
+    return self._vtfs.removexattr(inode, xattr_name)
 
   @handler
   def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
@@ -896,14 +873,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         TODO: x-vt-* control/query psuedo attributes.
     '''
-    if self._vtfs.readonly:
-      raise FuseOSError(errno.EROFS)
     # TODO: check perms (ownership?)
-    if xattr_name == XATTR_NAME_BLOCKREF:
-      # TODO: support this as a "switch out the content action"?
-      raise FuseOSError(errno.EINVAL)
-    E = self._vtfs.i2E(inode)
-    E.meta.setxattr(xattr_name, value)
+    return self._vtfs.setxattr(inode, xattr_name, value)
 
   @handler
   def statfs(self, ctx):

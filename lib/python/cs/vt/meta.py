@@ -615,7 +615,7 @@ class Meta(dict, Transcriber):
     return True
 
   @staticmethod
-  def _xattrify(xkv):
+  def xattrify(xkv):
     ''' Convert value `xkv` to str as though an ISO8859-1 encoding.
 
         We keep a mapping of str->str for the JSON encoding.
@@ -631,7 +631,7 @@ class Meta(dict, Transcriber):
   def getxattr(self, xk, xv_default):
     ''' Return the bytes value for key `kx`, or `xv_default` if missing.
     '''
-    k = self._xattrify(xk)
+    k = self.xattrify(xk)
     try:
       v = self._xattrs[k]
     except KeyError:
@@ -643,15 +643,15 @@ class Meta(dict, Transcriber):
     ''' Set the value for key `xk` to `xv`.
         Accepted types include: bytes, str, int, float.
     '''
-    xk = self._xattrify(xk)
-    xv = self._xattrify(xv)
+    xk = self.xattrify(xk)
+    xv = self.xattrify(xv)
     self._xattrs[xk] = xv
     dict.__setitem__(self, 'x', self._xattrs)
 
   def delxattr(self, xk):
     ''' Delete the key `xk` if present.
     '''
-    xk = self._xattrify(xk)
+    xk = self.xattrify(xk)
     if xk in self._xattrs:
       del self._xattrs[xk]
 

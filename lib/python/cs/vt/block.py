@@ -206,6 +206,11 @@ def Blocks_from_bytes(bs, offset=0):
     B, offset = Block_from_bytes(bs, offset)
     yield B
 
+def isBlock(o):
+  ''' Test if an object `o` is a subinstance of `_Block`.
+  '''
+  return isinstance(o, _Block)
+
 class _Block(Transcriber, ABC):
 
   def __init__(self, block_type, span):

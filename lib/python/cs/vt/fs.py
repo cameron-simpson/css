@@ -14,17 +14,39 @@ from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
-from cs.logutils import error, warning, debug
+from cs.logutils import error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
 from cs.x import X
 from . import defaults
+from .block import isBlock
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
+from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber
+from .transcribe import Transcriber, mapping_transcriber, parse
+
+XATTR_VT_PREFIX = 'x-vt-'
+
+def oserror(errno, msg, *a):
+  ''' Function to issue a warning and then raise an OSError.
+  '''
+  assert isinstance(errno, int)
+  assert isinstance(msg, str)
+  if a:
+    msg = msg % a
+  warning("raise OSError(%s): %s", errno, msg)
+  raise OSError(errno, msg)
+
+OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
+OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
+OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
+OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
+OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
+OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
+OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -40,6 +62,7 @@ class FileHandle:
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
+    self._block_mapping = None
     self._lock = lock
     E.open()
 
@@ -54,9 +77,9 @@ class FileHandle:
     with f:
       with self._lock:
         if self.for_append and offset != len(f):
-          error("%s: file open for append but offset(%s) != length(%s)",
-                f, offset, len(f))
-          raise OSError(errno.EFAULT)
+          OS_EFAULT(
+              "%s: file open for append but offset(%s) != length(%s)",
+              f, offset, len(f))
         f.seek(offset)
         written = f.write(data)
     self.E.touch()
@@ -67,6 +90,18 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
+    bm = self._blockmapping
+    if bm and offset < bm.filled:
+      # Fetch directly from the BlockMapping.
+      bmsize = min(size, bm.filled - offset)
+      data = bm.pread(bmsize, offset)
+      assert len(data) > 0
+      size -= len(data)
+      offset += len(data)
+      if size > 0:
+        tail = self.read(size, offset)
+        return data + tail
+      return data
     ##f = self.E.open_file
     ##X("f = %s %s", type(f), f)
     ##X("f.read = %s %s", type(f.read), f.read)
@@ -357,8 +392,8 @@ class FileSystem(object):
         X("NO INODE IMPORT")
       X("FileSystem mntE:")
     with self.S:
-        with defaults.stack('fs', self):
-          dump_Dirent(mntE)
+      with defaults.stack('fs', self):
+        dump_Dirent(mntE)
 
   def close(self):
     ''' Close the FileSystem.
@@ -426,7 +461,7 @@ class FileSystem(object):
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      raise OSError(errno.ENOENT)
+      OS_ENOENT("cannot resolve path %r", path)
     return E, P
 
   def _namei(self, path):
@@ -458,14 +493,13 @@ class FileSystem(object):
         Wraps self.open.
     '''
     if not P.isdir:
-      error("parent (name=%r) not a directory, raising ENOTDIR", P.name)
-      raise OSError(errno.ENOTDIR)
+      OS_ENOTDIR("parent (name=%r) not a directory", P.name)
     if name in P:
       if flags & O_EXCL:
-        raise OSError(errno.EEXIST)
+        OS_EEXIST("entry %r already exists", name)
       E = P[name]
     elif not flags & O_CREAT:
-      raise OSError(errno.ENOENT)
+      OS_NOENT("no entry named %r", name)
     else:
       E = FileDirent(name)
       P[name] = E
@@ -482,20 +516,16 @@ class FileSystem(object):
     debug("for_read=%s, for_write=%s, for_append=%s",
           for_read, for_write, for_append)
     if for_trunc and not for_write:
-      error("O_TRUNC requires O_WRONLY or O_RDWR")
-      raise OSError(errno.EINVAL)
+      OS_EINVAL("O_TRUNC requires O_WRONLY or O_RDWR")
     if for_append and not for_write:
-      error("O_APPEND requires O_WRONLY or O_RDWR")
-      raise OSError(errno.EINVAL)
+      OS_EINVAL("O_APPEND requires O_WRONLY or O_RDWR")
     if (for_write and not for_append) and self.append_only:
-      error("fs is append_only but no O_APPEND")
-      raise OSError(errno.EINVAL)
+      OS_EINVAL("fs is append_only but no O_APPEND")
     if for_trunc and self.append_only:
-      error("fs is append_only but O_TRUNC")
-      raise OSError(errno.EINVAL)
+      OS_EINVAL("fs is append_only but O_TRUNC")
     if (for_write or for_append) and self.readonly:
       error("fs is readonly")
-      raise OSError(errno.EROFS)
+      OS_EROFS("fs is readonly")
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     if flags & O_TRUNC:
       FH.truncate(0)
@@ -521,6 +551,7 @@ class FileSystem(object):
   @locked
   def _new_file_handle_index(self, file_handle):
     ''' Allocate a new FileHandle index for a `file_handle`.
+
         TODO: linear allocation cost, may need recode if things get
           busy; might just need a list of released fds for reuse.
     '''
@@ -541,3 +572,68 @@ class FileSystem(object):
       # pass same in as default file ownership in case there are no metadata
       return E.meta.access(
           amode, uid, gid, default_uid=uid, default_gid=gid)
+
+  def getxattr(self, inum, xattr_name):
+    ''' Get the extended attribute `xattr_name` from `inum`.
+    '''
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      # process special attribute names
+      suffix = xattr_name[len(XATTR_VT_PREFIX):]
+      if suffix == 'block':
+        return str(E.block).encode()
+      OS_EINVAL(
+          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
+          inum, xattr_name, XATTR_VT_PREFIX)
+    # bit of a hack: pretend all attributes exist, empty if missing
+    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
+    # with a stack trace
+    return E.meta.getxattr(xattr_name, b'')
+
+  def removexattr(self, inum, xattr_name):
+    ''' Remove the extended attribute named `xattr_name` from `inum`.
+    '''
+    if self.readonly:
+      OS_EROFS("fs is read only")
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      OS_EINVAL(
+          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
+          inum, xattr_name, XATTR_VT_PREFIX)
+    meta = E.meta
+    try:
+      meta.delxattr(xattr_name)
+    except KeyError:
+      OS_NOATTR("no such extended attribute: %r", xattr_name)
+
+  def setxattr(self, inum, xattr_name, xattr_value):
+    ''' Set the extended attribute `xattr_name` to `xattr_value`
+        on inode `inum`.
+    '''
+    if self.readonly:
+      OS_EROFS("fs is read only")
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      with Pfx("%s.setxattr(%d,%r,%r)", self, inum, xattr_name, xattr_value):
+        # process special attribute names
+        suffix = xattr_name[len(XATTR_VT_PREFIX):]
+        if suffix == 'block':
+          # update the Dirent's content directly
+          if not E.isfile:
+            OS_EINVAL("tried to update the data content of a non file: %s", E)
+          block_s = Meta.xattrify(xattr_value)
+          B, offset = parse(block_s)
+          if offset < len(block_s):
+            OS_EINVAL(
+                "unparsed text after trancription: %r",
+                block_s[offset:])
+          if not isBlock(B):
+            OS_EINVAL("not a Block transcription")
+          info("%s: update .block directly to %r", E, str(B))
+          E.block = B
+          return
+        OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
+    E.meta.setxattr(xattr_name, xattr_value)

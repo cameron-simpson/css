@@ -10,14 +10,16 @@
 from __future__ import with_statement
 from collections import namedtuple
 import sys
-from threading import Lock, Thread
+from tempfile import TemporaryFile
+from threading import Lock, RLock, Thread
 from cs.fileutils import RWFileBlockCache
 from cs.logutils import error
 from cs.queues import IterableQueue
-from cs.resources import RunStateMixin
+from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import MAX_FILE_SIZE
+from .block import IndirectBlock
 from .store import BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
@@ -390,6 +392,183 @@ class MemoryCacheMapping:
               if used_data <= max_data:
                 break
             self._skip_flush = 32
+
+class BlockMapping:
+  ''' A Block's contents mapped onto a temporary file.
+  '''
+
+  def __init__(self, tempf, offset, size):
+    ''' Initialise the mapping.
+
+        Parameters:
+        * `tempf`: the BlockTempfile
+        * `offset`: where the Block data start
+        * `size`: the total size of the Block
+    '''
+    self.tempf = tempf
+    self.offset = offset
+    self.size = size
+    self.filled = 0
+
+  def pread(self, size, offset):
+    ''' Return data from the main tempfile.
+    '''
+    assert offset >= 0
+    assert offset + size <= self.filled
+    return self.tempf.pread(size, self.offset + offset)
+
+class BlockTempfile:
+  ''' Manage a temporary file which contains the contents of various Blocks.
+  '''
+
+  def __init__(self, cache, tmpdir, suffix):
+    X("new BlockTemptfile...")
+    self.cache = cache
+    self.tempfile = TemporaryFile(tmpdir=tmpdir, suffix=suffix)
+    self.hashcodes = {}
+    self.size = 0
+    self._lock = RLock()
+
+  def close(self):
+    ''' Release the tempfile and unmap the associates hashcodes.
+    '''
+    blockmap = self.cache.blockmap
+    for h in self.hashcodes:
+      del blockmap[h]
+    self.hashcodes = None
+    self.tempfile.close()
+    self.tempfile = None
+
+  def pread(self, size, offset):
+    ''' Read `size` bytes from the temp file at `offset`.
+    '''
+    tempf = self.tempfile
+    with self._lock:
+      if tempf.tell() != offset:
+        tempf.seek(offset)
+      return tempf.read(size)
+
+  def _pwrite(self, data, offset):
+    ''' Write data into the tempfile.
+
+        This is not public as these files are read only.
+    '''
+    tempf = self.tempfile
+    with self._lock:
+      if tempf.tell() != offset:
+        tempf.seek(offset)
+      return tempf.write(data)
+
+  def append_block(self, block, runstate):
+    ''' Add a Block to this tempfile.
+
+        Parameters:
+        * `block`: the Block to append to this tempfile.
+        * `runstate`: a RunState that can be used to cancel the
+          tempfile data population Thread
+
+        A Thread is dispatched to load the Block data into the temp file.
+    '''
+    X("BlockTempfile.append_block(%s)...", block.hashcode)
+    h = block.hashcode
+    bsize = len(block)
+    assert bsize > 0
+    with self._lock:
+      offset = self.size
+      self._pwrite(b'\0', offset + bsize - 1)
+      self.size = offset + bsize
+    bm = BlockMapping(self.tempfile, offset, bsize)
+    with self._lock:
+      self.hashcodes[h] = bm
+    T = Thread(
+        name="%s._infill(%s)" % (type(self).__name__, block),
+        target=self._infill, args=(bm, offset, block, runstate))
+    T.daemon = True
+    T.start()
+    return bm
+
+  def _infill(self, bm, offset, block, runstate):
+    ''' Load the Block data into the tempfile,
+        updating the `BlockMapping.filled` attribute as we go.
+    '''
+    needed = len(block)
+    for leaf in block.leaves:
+      if runstate.cancelled:
+        break
+      data = leaf.data
+      assert len(data) <= needed
+      written = self._pwrite(data, offset)
+      assert written == len(data)
+      offset += written
+      needed -= written
+      bm.filled += written
+    X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
+
+class BlockCache:
+  ''' A temporary file based cache for whole Blocks.
+
+      This is to support filesystems' and files' direct read/write
+      actions by passing them straight through to this cache is
+      there's a mapping.
+
+      We accrue complete Block contents in unlinked files.
+  '''
+
+  # default cace size
+  MAX_FILES = 32
+  MAX_FILE_SIZE = 1024 * 1024 * 1024
+
+  def __init__(self, tmpdir=None, suffix='.dat', max_files=None, max_file_size=None):
+    if max_files is None:
+      max_files = self.MAX_FILES
+    if max_file_size is None:
+      max_file_size = self.MAX_FILE_SIZE
+    self.tmpdir = tmpdir
+    self.suffix = suffix
+    self.max_files = max_files
+    self.max_file_size = max_file_size
+    self.blockmaps = {}      # hashcode -> BlockMapping
+    self._tempfiles = []    # in play BlockTempfiles
+    self._lock = Lock()
+    self.runstate = RunState()
+    self.runstate.start()
+
+  def close(self):
+    ''' Release all the blockmaps.
+    '''
+    self.runstate.cancel()
+    with self._lock:
+      self.blockmaps = {}
+      for tempf in self._tempfiles:
+        tempf.close()
+      self._tempfiles = []
+
+  def get_blockmap(self, block):
+    ''' Add the specified Block to the cache, return the BlockMapping.
+    '''
+    if not block.indirect:
+      block = IndirectBlock(block)
+    blockmaps = self.blockmaps
+    h = block.hashcode
+    with self._lock:
+      bm = blockmaps.get(h)
+      if bm is None:
+        tempfiles = self._tempfiles
+        if tempfiles:
+          tempf = tempfiles[-1]
+          if tempf.size >= self.max_file_size:
+            tempf = None
+        else:
+          tempf = None
+        if tempf is None:
+          while len(tempfiles) >= self.max_files:
+            otempf = tempfiles.pop(0)
+            otempf.close()
+          tempf = BlockTempfile(self, self.tmpdir, self.suffix)
+          tempfiles.append(tempf)
+        bm = tempf.append_block(block, self.runstate)
+        blockmaps[h] = bm
+    return bm
 
 if __name__ == '__main__':
   from .cache_tests import selftest
