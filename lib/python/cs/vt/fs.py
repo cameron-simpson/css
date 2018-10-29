@@ -22,9 +22,13 @@ from cs.x import X
 from . import defaults
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
+from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
 from .transcribe import Transcriber, mapping_transcriber
+
+XATTR_VT_PREFIX = 'x-vt-'
+XATTR_NAME_BLOCKREF = 'x-vt-blockref'
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -554,3 +558,62 @@ class FileSystem(object):
       # pass same in as default file ownership in case there are no metadata
       return E.meta.access(
           amode, uid, gid, default_uid=uid, default_gid=gid)
+
+  def getxattr(self, inum, xattr_name):
+    ''' Get the extended attribute `xattr_name` from `inum`.
+    '''
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      # process special attribute names
+      if xattr_name == XATTR_NAME_BLOCKREF:
+        return E.block.encode()
+      warning(
+          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
+          inum, xattr_name, XATTR_VT_PREFIX)
+      raise OSError(errno.EINVAL)
+    # bit of a hack: pretend all attributes exist, empty if missing
+    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
+    # with a stack trace
+    return E.meta.getxattr(xattr_name, b'')
+
+  def removexattr(self, inum, xattr_name):
+    ''' Remove the extended attribut named `xattr_name` from `inum`.
+    '''
+    if self.readonly:
+      raise OSError(errno.EROFS)
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      # process special attribute names
+      if xattr_name == XATTR_NAME_BLOCKREF:
+        # removing the x-vt-blockref xattr is a no-op
+        return
+      warning(
+          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
+          inum, xattr_name, XATTR_VT_PREFIX)
+      raise OSError(errno.EINVAL)
+    meta = E.meta
+    try:
+      meta.delxattr(xattr_name)
+    except KeyError:
+      raise OSError(errno.ENOATTR)
+
+  def setxattr(self, inum, xattr_name, xattr_value):
+    ''' Set the extended attribute `xattr_name` to `xattr_value`
+        on inode `inum`.
+    '''
+    if self.readonly:
+      raise OSError(errno.EROFS)
+    E = self.i2E(inum)
+    xattr_name = Meta.xattrify(xattr_name)
+    if xattr_name.startswith(XATTR_VT_PREFIX):
+      # process special attribute names
+      if xattr_name == XATTR_NAME_BLOCKREF:
+        # TODO: support this as a "switch out the content action"?
+        raise OSError(errno.EINVAL)
+      warning(
+          "setxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
+          inum, xattr_name, XATTR_VT_PREFIX)
+      raise OSError(errno.EINVAL)
+    E.meta.setxattr(xattr_name, xattr_value)
