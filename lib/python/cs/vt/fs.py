@@ -14,21 +14,21 @@ from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
-from cs.logutils import error, warning, debug
+from cs.logutils import error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
 from cs.x import X
 from . import defaults
+from .block import isBlock
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
 from .parsers import scanner_from_filename, scanner_from_mime_type
 from .paths import resolve
-from .transcribe import Transcriber, mapping_transcriber
+from .transcribe import Transcriber, mapping_transcriber, parse
 
 XATTR_VT_PREFIX = 'x-vt-'
-XATTR_NAME_BLOCKREF = 'x-vt-blockref'
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -538,6 +538,7 @@ class FileSystem(object):
   @locked
   def _new_file_handle_index(self, file_handle):
     ''' Allocate a new FileHandle index for a `file_handle`.
+
         TODO: linear allocation cost, may need recode if things get
           busy; might just need a list of released fds for reuse.
     '''
@@ -566,8 +567,9 @@ class FileSystem(object):
     xattr_name = Meta.xattrify(xattr_name)
     if xattr_name.startswith(XATTR_VT_PREFIX):
       # process special attribute names
-      if xattr_name == XATTR_NAME_BLOCKREF:
-        return E.block.encode()
+      suffix = xattr_name[len(XATTR_VT_PREFIX):]
+      if suffix == 'block':
+        return str(E.block).encode()
       warning(
           "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
           inum, xattr_name, XATTR_VT_PREFIX)
@@ -578,17 +580,13 @@ class FileSystem(object):
     return E.meta.getxattr(xattr_name, b'')
 
   def removexattr(self, inum, xattr_name):
-    ''' Remove the extended attribut named `xattr_name` from `inum`.
+    ''' Remove the extended attribute named `xattr_name` from `inum`.
     '''
     if self.readonly:
       raise OSError(errno.EROFS)
     E = self.i2E(inum)
     xattr_name = Meta.xattrify(xattr_name)
     if xattr_name.startswith(XATTR_VT_PREFIX):
-      # process special attribute names
-      if xattr_name == XATTR_NAME_BLOCKREF:
-        # removing the x-vt-blockref xattr is a no-op
-        return
       warning(
           "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
           inum, xattr_name, XATTR_VT_PREFIX)
@@ -608,12 +606,26 @@ class FileSystem(object):
     E = self.i2E(inum)
     xattr_name = Meta.xattrify(xattr_name)
     if xattr_name.startswith(XATTR_VT_PREFIX):
-      # process special attribute names
-      if xattr_name == XATTR_NAME_BLOCKREF:
-        # TODO: support this as a "switch out the content action"?
+      with Pfx("%s.setxattr(%d,%r,%r)", self, inum, xattr_name, xattr_value):
+        # process special attribute names
+        suffix = xattr_name[len(XATTR_VT_PREFIX):]
+        if suffix == 'block':
+          # update the Dirent's content directly
+          if not E.isfile():
+            warning("tried to update the data content of a non file: %s", E)
+          block_s = Meta.xattrify(xattr_value)
+          B, offset = parse(block_s)
+          if offset < len(block_s):
+            warning(
+                "unparsed text after trancription: %r",
+                block_s[offset:])
+            raise OSError(errno.EINVAL)
+          if not isBlock(B):
+            warning("not a Block transcription")
+            raise OSError(errno.EINVAL)
+          info("%s: update .block directly to %r", E, str(B))
+          E.block = B
+          return
+        warning("invalid %r prefixed name", XATTR_VT_PREFIX)
         raise OSError(errno.EINVAL)
-      warning(
-          "setxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
-          inum, xattr_name, XATTR_VT_PREFIX)
-      raise OSError(errno.EINVAL)
     E.meta.setxattr(xattr_name, xattr_value)
