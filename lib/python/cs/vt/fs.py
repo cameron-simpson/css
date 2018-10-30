@@ -616,14 +616,18 @@ class FileSystem(object):
       OS_EROFS("fs is read only")
     E = self.i2E(inum)
     xattr_name = Meta.xattrify(xattr_name)
-    if xattr_name.startswith(XATTR_VT_PREFIX):
-      with Pfx("%s.setxattr(%d,%r,%r)", self, inum, xattr_name, xattr_value):
-        # process special attribute names
-        suffix = xattr_name[len(XATTR_VT_PREFIX):]
+    if not xattr_name.startswith(XATTR_VT_PREFIX):
+      # ordinary attribute, set it and return
+      E.meta.setxattr(xattr_name, xattr_value)
+      return
+    # process special attribute names
+    with Pfx("%s.setxattr(%d,%r,%r)", self, inum, xattr_name, xattr_value):
+      suffix = xattr_name[len(XATTR_VT_PREFIX):]
+      with Pfx(suffix):
         if suffix == 'block':
           # update the Dirent's content directly
           if not E.isfile:
-            OS_EINVAL("tried to update the data content of a non file: %s", E)
+            OS_EINVAL("tried to update the data content of a nonfile: %s", E)
           block_s = Meta.xattrify(xattr_value)
           B, offset = parse(block_s)
           if offset < len(block_s):
@@ -635,5 +639,11 @@ class FileSystem(object):
           info("%s: update .block directly to %r", E, str(B))
           E.block = B
           return
-        OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
-    E.meta.setxattr(xattr_name, xattr_value)
+        if suffix == 'control':
+          argv = shlex.split(xattr_value.decode('utf-8'))
+          if not argv:
+            OS_EINVAL("no control command")
+          op = argv.pop(0)
+          with Pfx(op):
+            OS_EINVAL("unrecognised control command")
+      OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
