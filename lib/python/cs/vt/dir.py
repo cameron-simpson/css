@@ -276,6 +276,13 @@ class _Dirent(Transcriber):
     '''
     return DirentRecord.value_from_bytes(data, offset=offset)
 
+  @staticmethod
+  def from_buffer(bfr):
+    ''' Factory to extract a Dirent from the CornuCopyBuffer `bfr`.
+        Returns the Dirent.
+    '''
+    return DirentRecord.value_from_buffer(bfr)
+
   def ingest_extended_data(self, extended_data):
     ''' The basic _Dirent subclasses do not use extended data.
     '''
@@ -383,12 +390,13 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    data = prev_blockref.data
-    E, offset = _Dirent.from_bytes(data)
-    if offset < len(data):
+    bfr = prev_blockref.datafrom()
+    E = _Dirent.from_buffer(bfr)
+    if not bfr.at_eof():
       warning(
-          "prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
-          prev_blockref, offset, data[offset:])
+          "prev_dirent: _prev_dirent_blockref=%s:"
+          " unparsed bytes after dirent at offset %d",
+          prev_blockref, bfr.offset)
     return E
 
   @prev_dirent.setter
