@@ -384,11 +384,13 @@ class BlockMap(RunStateMixin):
       assert isinstance(submap, MappedFD), \
           "maps[%d] is not a MappedFD: %r; maps=%r" % (i, type(submap), self.maps)
 
-  def chunks(self, offset, span=None):
+  def datafrom(self, offset=0, span=None):
     ''' Generator yielding data from [offset:offset+span] from the relevant leaves.
-        `offset`: starting offset within `self.block`
-        `span`: number of bytes to cover; if omitted or None, the
-          span runs to the end of self.block
+
+        Parameters:
+        * `offset`: starting offset within `self.block`, default `0`
+        * `span`: number of bytes to cover; if omitted or None, the
+          span runs to the end of `self.block`
     '''
     for leaf, start, end in self.slices(offset, span):
       assert start < end
