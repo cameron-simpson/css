@@ -571,16 +571,6 @@ class _Dirent(Transcriber):
       typemode = stat.S_IFREG
     return typemode
 
-  def complete(self, S2, recurse=False):
-    ''' Complete this Dirent from alternative Store `S2`.
-        TODO: parallelise like _Block.complete.
-    '''
-    self.block.complete(S2)
-    if self.isdir and recurse:
-      for name, entry in self.entries.items():
-        if name != '.' and name != '..':
-          entry.complete(S2, True)
-
 register_transcriber(_Dirent, (
     'INVALIDDirent',
     'SymLink',
