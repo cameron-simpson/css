@@ -63,10 +63,10 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20       # extended BSData field
 
-def Dirents_from_data(data):
-  ''' Decode Dirents from `data`, yield each in turn.
+def Dirents_from_chunks(chunks):
+  ''' Decode Dirents from `chunks`, yield each in turn.
   '''
-  bfr = CornuCopyBuffer.from_bytes(data)
+  bfr = CornuCopyBuffer(chunks)
   while not bfr.at_eof():
     yield DirentRecord.value_from_buffer(bfr)
 
@@ -962,14 +962,9 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      try:
-        data = self._block.data
-      except Exception as e:
-        warning("Dir.entries: self._block.data: %s", e)
-      else:
-        for E in Dirents_from_data(data):
-          E.parent = self
-          emap[E.name] = E
+      for E in Dirents_from_chunks(self._block.datafrom()):
+        E.parent = self
+        emap[E.name] = E
       self._entries = emap
     return emap
 
@@ -1256,7 +1251,7 @@ class Dir(_Dirent):
     # push the Dir block data
     B.pushto(S2, Q=Q, runstate=runstate)
     # and recurse into contents
-    for E in Dirents_from_data(B.data):
+    for E in Dirents_from_chunks(B.datafrom()):
       if runstate and runstate.cancelled:
         warning("pushto(%s) cancelled", self)
         break
