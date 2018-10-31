@@ -21,7 +21,6 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
-from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
@@ -63,10 +62,9 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20       # extended BSData field
 
-def Dirents_from_chunks(chunks):
-  ''' Decode Dirents from `chunks`, yield each in turn.
+def Dirents_from_buffer(bfr):
+  ''' Decode Dirents from `bfr`, yield each in turn.
   '''
-  bfr = CornuCopyBuffer(chunks)
   while not bfr.at_eof():
     yield DirentRecord.value_from_buffer(bfr)
 
@@ -962,7 +960,7 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      for E in Dirents_from_chunks(self._block.datafrom()):
+      for E in Dirents_from_buffer(self._block.bufferfrom()):
         E.parent = self
         emap[E.name] = E
       self._entries = emap
@@ -1251,7 +1249,7 @@ class Dir(_Dirent):
     # push the Dir block data
     B.pushto(S2, Q=Q, runstate=runstate)
     # and recurse into contents
-    for E in Dirents_from_chunks(B.datafrom()):
+    for E in Dirents_from_buffer(B.bufferfrom()):
       if runstate and runstate.cancelled:
         warning("pushto(%s) cancelled", self)
         break
