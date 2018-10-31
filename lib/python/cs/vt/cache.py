@@ -492,10 +492,9 @@ class BlockTempfile:
         updating the `BlockMapping.filled` attribute as we go.
     '''
     needed = len(block)
-    for leaf in block.leaves:
+    for data in block.datafrom():
       if runstate.cancelled:
         break
-      data = leaf.data
       assert len(data) <= needed
       written = self._pwrite(data, offset)
       assert written == len(data)
