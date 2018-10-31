@@ -456,7 +456,7 @@ class BlockMap(RunStateMixin):
   def data(self, offset, span):
     ''' Return the data from [offset:offset+span] as a single bytes object.
     '''
-    return b''.join(self.chunks(offset, span))
+    return b''.join(self.datafrom(offset, span))
 
   def __getitem__(self, index):
     ''' Return a single byte from the BlockMap.
