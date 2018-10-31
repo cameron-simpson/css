@@ -336,14 +336,6 @@ class _Block(Transcriber, ABC):
     '''
     return self.span
 
-  def rq_data(self):
-    ''' Queue a request to fetch this Block's immediate data.
-    '''
-    X("rq_data(%s)", self)
-    if 'data' not in self.__dict__:
-      X("dispatch bg call to _data ...")
-      defaults.S.bg(self._data)
-
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
         NB: _not_ defined on indirect Blocks to avoid mistakes.
