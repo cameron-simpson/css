@@ -374,12 +374,18 @@ class _Block(Transcriber, ABC):
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
-  def datafrom(self, offset=0, end=None, no_blockmap=False):
+  def datafrom(self, offset=0, *, end=None, no_blockmap=False):
     ''' Generator yielding data from the direct blocks.
     '''
     for leaf, leaf_start, leaf_end in self.slices(
-        start=offset, end=end, no_blockmap=no_blockmap):
+        start=offset, end=end, no_blockmap=no_blockmap
+    ):
       yield leaf[leaf_start:leaf_end]
+
+  def bufferfrom(self, offset=0, **kw):
+    ''' Return a CornuCopyBuffer presenting data from the Block.
+    '''
+    return CornuCopyBuffer(self.datafrom(offset=offset, **kw), offset=offset)
 
   def slices(self, start=None, end=None, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
