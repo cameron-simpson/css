@@ -21,7 +21,6 @@ from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
-from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
@@ -62,13 +61,6 @@ class DirentFlags(IntFlag):
   HASUUID = 0x08        # has a UUID
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20       # extended BSData field
-
-def Dirents_from_data(data):
-  ''' Decode Dirents from `data`, yield each in turn.
-  '''
-  bfr = CornuCopyBuffer.from_bytes(data)
-  while not bfr.at_eof():
-    yield DirentRecord.value_from_buffer(bfr)
 
 class DirentRecord(PacketField):
   ''' PacketField subclass to parsing and transcribing Dirents in binary form.
@@ -271,12 +263,20 @@ class _Dirent(Transcriber):
       cls = partial(_Dirent, type_)
     return cls(name, **kw)
 
+  # TODO: remove all uses of _Dirent.from_bytes
   @staticmethod
   def from_bytes(data, offset=0):
     ''' Factory to extract a Dirent from binary data at `offset` (default 0).
         Returns the Dirent and the new offset.
     '''
     return DirentRecord.value_from_bytes(data, offset=offset)
+
+  @staticmethod
+  def from_buffer(bfr):
+    ''' Factory to extract a Dirent from the CornuCopyBuffer `bfr`.
+        Returns the Dirent.
+    '''
+    return DirentRecord.value_from_buffer(bfr)
 
   def ingest_extended_data(self, extended_data):
     ''' The basic _Dirent subclasses do not use extended data.
@@ -385,12 +385,13 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    data = prev_blockref.data
-    E, offset = _Dirent.from_bytes(data)
-    if offset < len(data):
+    bfr = prev_blockref.datafrom()
+    E = _Dirent.from_buffer(bfr)
+    if not bfr.at_eof():
       warning(
-          "prev_dirent: _prev_dirent_blockref=%s: unparsed bytes after dirent at offset %d: %r",
-          prev_blockref, offset, data[offset:])
+          "prev_dirent: _prev_dirent_blockref=%s:"
+          " unparsed bytes after dirent at offset %d",
+          prev_blockref, bfr.offset)
     return E
 
   @prev_dirent.setter
@@ -564,16 +565,6 @@ class _Dirent(Transcriber):
           % (type(self), self.type))
       typemode = stat.S_IFREG
     return typemode
-
-  def complete(self, S2, recurse=False):
-    ''' Complete this Dirent from alternative Store `S2`.
-        TODO: parallelise like _Block.complete.
-    '''
-    self.block.complete(S2)
-    if self.isdir and recurse:
-      for name, entry in self.entries.items():
-        if name != '.' and name != '..':
-          entry.complete(S2, True)
 
 register_transcriber(_Dirent, (
     'INVALIDDirent',
@@ -962,14 +953,9 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      try:
-        data = self._block.data
-      except Exception as e:
-        warning("Dir.entries: self._block.data: %s", e)
-      else:
-        for E in Dirents_from_data(data):
-          E.parent = self
-          emap[E.name] = E
+      for E in DirentRecord.parse_buffer_values(self._block.bufferfrom()):
+        E.parent = self
+        emap[E.name] = E
       self._entries = emap
     return emap
 
@@ -1256,7 +1242,7 @@ class Dir(_Dirent):
     # push the Dir block data
     B.pushto(S2, Q=Q, runstate=runstate)
     # and recurse into contents
-    for E in Dirents_from_data(B.data):
+    for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
       if runstate and runstate.cancelled:
         warning("pushto(%s) cancelled", self)
         break

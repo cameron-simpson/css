@@ -57,7 +57,7 @@
       `flatten(field.transcribe())` or via the convenience
       `field.transcribe_flat()` method which calls `flatten` itself.
     * a `CornuCopyBuffer` is an easy to use wrapper for parsing any
-      iterable of chunks, which may come from almost any source.  
+      iterable of chunks, which may come from almost any source.
       It has a bunch of convenient factories including:
       `from_bytes`, make a buffer from a chunk;
       `from_fd`, make a buffer from a file descriptor;
@@ -65,7 +65,7 @@
       `from_mmap`, make a buffer from a file descriptor using a
       memory map (the `mmap` module) of the file, so that chunks
       can use the file itself as backing store instead of allocating
-      and copying memory.  
+      and copying memory.
       See the `cs.buffer` module for further detail.
 
     Cameron Simpson <cs@cskk.id.au> 22jul2018
@@ -191,14 +191,30 @@ class PacketField(ABC):
     '''
     raise NotImplementedError("no value_from_buffer method")
 
+  @classmethod
+  def parse_buffer(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw)
+
+  @classmethod
+  def parse_buffer_values(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls.value`
+        from the buffer `bfr` until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw).value
+
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
 
         This may directly return:
-        * a `bytes` or `memryview` holding the binary data
+        * a `bytes` or `memoryview` holding the binary data
         * `None`: indicating no binary data
         * `str`: indicating the ASCII encoding of the string
-          * an iterable of these things (including further iterables)
+        * an iterable of these things (including further iterables)
           to support trivially transcribing via other fields'
           `transcribe` methods
 
@@ -241,8 +257,8 @@ class EmptyPacketField(PacketField):
   '''
 
   TEST_CASES = (
-    b'',
-    ({}, b''),
+      b'',
+      ({}, b''),
   )
 
   def __init__(self):
@@ -909,13 +925,13 @@ _TestStructTuple = structtuple(
 _TestStructTuple.TEST_CASES = (
     b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
     ( (-1, 2, -2, 4, -3, 8), ),
-##    ({  'short': -1,
-##        'ushort': 2,
-##        'long': -2,
-##        'ulong': 4,
-##        'quad': -3,
-##        'uquad': 8,
-##    },),
+    ##    ({  'short': -1,
+    ##        'ushort': 2,
+    ##        'long': -2,
+    ##        'ulong': 4,
+    ##        'quad': -3,
+    ##        'uquad': 8,
+    ##    },),
 )
 
 class Packet(PacketField):

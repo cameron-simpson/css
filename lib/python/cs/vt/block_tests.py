@@ -45,6 +45,8 @@ class TestAll(unittest.TestCase):
       BR2, offset = BlockRecord.from_bytes(BRbs)
       self.assertEqual(offset, len(BRbs))
       self.assertEqual(BR, BR2)
+      for err in verify_block(B):
+        raise ValueError("verify_block(%s): %s" % (B, err))
       errs = list(verify_block(B, **kw))
       self.assertEqual(errs, [])
 
@@ -118,9 +120,7 @@ class TestAll(unittest.TestCase):
         self._verify_block(B)
         self.assertEqual(len(B), size)
         self.assertEqual(B.span, size)
-        self.assertEqual(B.data, rs)
-        if hasattr(B, '_data'):
-          self.assertEqual(B._data(), rs)
+        self.assertEqual(B.get_spanned_data(), rs)
 
   def test10IndirectBlock(self):
     ''' Construct various random indirect blocks and test.
@@ -136,7 +136,7 @@ class TestAll(unittest.TestCase):
             B = self._make_random_Block()
             subblocks.append(B)
             total_length += B.span
-            chunks.append(B.data)
+            chunks.append(B.get_spanned_data())
           fullblock = b''.join(chunks)
           IB = IndirectBlock(subblocks=subblocks, force=True)
           self._verify_block(IB, recurse=True)
@@ -145,13 +145,13 @@ class TestAll(unittest.TestCase):
               IBspan, total_length,
               "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
           IBH = IB.superblock.hashcode
-          IBdata = IB.data
+          IBdata = IB.get_spanned_data()
           self.assertEqual(len(IBdata), total_length)
           self.assertEqual(IBdata, fullblock)
           # refetch block by hashcode
           IB2 = IndirectBlock(hashcode=IBH, span=len(IBdata))
           self._verify_block(IB2, recurse=True)
-          IB2data = IB2.data
+          IB2data = IB2.get_spanned_data()
           self.assertEqual(
               IBdata, IB2data,
               "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
@@ -195,18 +195,21 @@ class TestAll(unittest.TestCase):
             self.assertEqual(B.type, B2.type, "block types differ")
             self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
           self.assertEqual(B.span, B2.span, "span lengths differ")
-          self.assertEqual(B.data, B2.data, "spanned data differ")
+          self.assertEqual(
+                  B.get_spanned_data(),
+                  B2.get_spanned_data(),
+                  "spanned data differ")
           Btype = B2.type
           if Btype == BlockType.BT_INDIRECT:
             self.assertTrue(B.indirect)
             self._verify_block(B2.superblock)
           else:
             self.assertFalse(B.indirect)
-            self.assertEqual(B.span, len(B.data))
+            self.assertEqual(B.span, sum(len(chunk) for chunk in B.datafrom()))
             if Btype == BlockType.BT_HASHCODE:
               self.assertEqual(B.hashcode, B2.hashcode)
             elif Btype == BlockType.BT_RLE:
-              self.assertEqual(B2.data, B2.octet * B2.span)
+              self.assertEqual(B2.get_spanned_data(), B2.octet * B2.span)
             elif Btype == BlockType.BT_LITERAL:
               raise unittest.SkipTest("no specific test for LiteralBlock")
             elif Btype == BlockType.BT_SUBBLOCK:

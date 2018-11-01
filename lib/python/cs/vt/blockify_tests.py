@@ -8,6 +8,7 @@
 '''
 
 from collections import defaultdict
+from itertools import chain
 import os
 import os.path
 import sys
@@ -173,7 +174,7 @@ class TestAll(unittest.TestCase):
       data = self.fp.read()
       blocks = list(blockify([data]))
       ##X("blocks=%r", blocks)
-      data2 = b''.join( b.data for b in blocks )
+      data2 = b''.join( chain(*[ B.datafrom() for B in blocks ]) )
       self.assertEqual(
           len(data), len(data2),
           "data mismatch: len(data)=%d, len(data2)=%d"
@@ -181,7 +182,6 @@ class TestAll(unittest.TestCase):
       self.assertEqual(
           data, data2,
           "data mismatch: data and data2 same length but contents differ")
-      ##for b in blocks: print("[", b.data, "]")
 
 def selftest(argv):
   ''' Run the unit tests.

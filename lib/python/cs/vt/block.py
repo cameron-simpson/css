@@ -196,16 +196,6 @@ class BlockRecord(PacketField):
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     return BSData(b''.join(flatten_transcription(transcription))).transcribe()
 
-Block_from_bytes = BlockRecord.value_from_bytes
-
-def Blocks_from_bytes(bs, offset=0):
-  ''' Process the bytes `bs` from the supplied `offset` (default 0).
-      Yield Blocks.
-  '''
-  while offset < len(bs):
-    B, offset = Block_from_bytes(bs, offset)
-    yield B
-
 def isBlock(o):
   ''' Test if an object `o` is a subinstance of `_Block`.
   '''
@@ -243,7 +233,8 @@ class _Block(Transcriber, ABC):
     if not self.indirect and not oblock.indirect:
       # directly compare data otherwise
       # TODO: this may be expensive for some Block types?
-      return self.data == oblock.data
+      #       some kind of rolling buffer compare required
+      return self.get_spanned_data() == oblock.get_spanned_data()
     # one of the blocks is indirect: walk both blocks comparing leaves
     # we could do this by stuffing one into a buffer but we still
     # want to do direct leaf comparisons when the leaves are aligned,
@@ -318,31 +309,27 @@ class _Block(Transcriber, ABC):
     '''
     return b''.join(BlockRecord.transcribe_value_flat(self))
 
-  def __getattr__(self, attr):
-    if attr == 'data':
-      with self._lock:
-        if 'data' not in self.__dict__:
-          self.data = self._data()
-      return self.data
-    raise AttributeError(attr)
-
   def __getitem__(self, index):
     ''' Return specified direct data.
     '''
-    return self.data[index]
+    return self.get_spanned_data()[index]
 
   def __len__(self):
     ''' len(Block) is the length of the encompassed data.
     '''
     return self.span
 
-  def rq_data(self):
-    ''' Queue a request to fetch this Block's immediate data.
+  def get_spanned_data(self):
+    ''' Collect up all the data of this Block and return a single bytes instance.
+
+        This is painfully named because it may be very expensive.
     '''
-    X("rq_data(%s)", self)
-    if 'data' not in self.__dict__:
-      X("dispatch bg call to _data ...")
-      defaults.S.bg(self._data)
+    chunks = list(self.datafrom())
+    if not chunks:
+      return b''
+    if len(chunks) == 1:
+      return chunks[0]
+    return b''.join(chunks)
 
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
@@ -382,11 +369,18 @@ class _Block(Transcriber, ABC):
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
-  def chunks(self, start=None, end=None, no_blockmap=False):
+  def SKIP0000datafrom(self, offset=0, *, end=None, no_blockmap=False):
     ''' Generator yielding data from the direct blocks.
     '''
-    for leaf, leaf_start, leaf_end in self.slices(start=start, end=end, no_blockmap=no_blockmap):
+    for leaf, leaf_start, leaf_end in self.slices(
+        start=offset, end=end, no_blockmap=no_blockmap
+    ):
       yield leaf[leaf_start:leaf_end]
+
+  def bufferfrom(self, offset=0, **kw):
+    ''' Return a CornuCopyBuffer presenting data from the Block.
+    '''
+    return CornuCopyBuffer(self.datafrom(start=offset, **kw), offset=offset)
 
   def slices(self, start=None, end=None, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
@@ -586,9 +580,19 @@ class HashCodeBlock(_Block):
           raise ValueError(
               "supplied hashcode %r != saved hash for data (%r : %r)"
               % (hashcode, h, data))
+    self._data = data
     self._span = None
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  def get_direct_data(self):
+    ''' Return the direct data of this Block, fetching it if necessary.
+    '''
+    with self._lock:
+      data = self._data
+      if data is None:
+        data =self._data = defaults.S[self.hashcode]
+    return data
 
   @prop
   def span(self):
@@ -596,7 +600,7 @@ class HashCodeBlock(_Block):
     '''
     _span = self._span
     if _span is None:
-      self._span = _span = len(self.data)
+      self._span = _span = len(self._data)
     return _span
 
   @span.setter
@@ -616,13 +620,26 @@ class HashCodeBlock(_Block):
       else:
         raise RuntimeError("SECOND UNEXPECTED")
 
-  def _data(self):
-    S = defaults.S
-    bs = S[self.hashcode]
-    if self._span is not None and len(bs) != self._span:
-      raise RuntimeError(
-          "%s: span=%d but len(bs)=%d" % (self, self.span, len(bs)))
-    return bs
+  def datafrom(self, start=None, end=None):
+    if start is not None and start < 0:
+      raise ValueError("invalid start=%s" % (start,))
+    if end is not None and end < 0:
+      raise ValueError("invalid end=%s" % (end,))
+    bs = self.get_direct_data()
+    if start is None:
+      if end is None:
+        yield bs
+        return
+      raise ValueError("start is None but end=%s" % (end,))
+    if end is not None and end < start:
+      raise ValueError("end(%s) < start(%s)" % (end, start))
+    if start == 0:
+      if end is None:
+        yield bs
+      else:
+        yield bs[:end]
+    else:
+      yield bs[start:end]
 
   def transcribe_inner(self, T, fp):
     m = {'hash': self.hashcode}
@@ -735,20 +752,16 @@ class _IndirectBlock(_Block):
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
     self.hashcode = superB.hashcode
+    self._data = None
 
   def __getattr__(self, attr):
     if attr == 'subblocks':
       with self._lock:
         if 'subblocks' not in self.__dict__:
-          idata = self.superblock.data
-          self.subblocks = tuple(Blocks_from_bytes(idata))
+          self.subblocks = tuple(
+              BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
       return self.subblocks
-    return super().__getattr__(attr)
-
-  def _data(self):
-    ''' Return the concatenation of all the leaf data.
-    '''
-    return b''.join(leaf.data for leaf in self.leaves)
+    raise AttributeError(attr)
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe "span:Block".
@@ -767,6 +780,11 @@ class _IndirectBlock(_Block):
     offset = offset2 + 1
     superB, offset = parse(s, offset, T)
     return cls(superB, span), offset
+
+  def datafrom(self, start=0, end=None):
+    for B, Bstart, Bend in self.slices(start, end):
+      assert not B.indirect
+      yield B.get_direct_data()[Bstart:Bend]
 
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
@@ -787,10 +805,24 @@ class RLEBlock(_Block):
     _Block.__init__(self, BlockType.BT_RLE, span=span, **kw)
     self.octet = octet
 
-  def _data(self):
-    ''' The data of this RLEBlock.
+  def get_direct_data(self):
+    ''' The full RLEBlock.
     '''
     return self.octet * self.span
+
+  def datafrom(self, start=None, end=None):
+    ''' Yield the data from `start` to `end`.
+    '''
+    if start is None:
+      start = 0
+    if end is None:
+      end = self.span
+    if end > self.span:
+      end = self.span
+    length = end - start
+    if length < 0:
+      raise ValueError("end(%s) < start(%s)" % (end, start))
+    yield self.octet * length
 
   def transcribe_inner(self, T, fp):
     return T.transcribe_mapping({'span': self.span, 'octet': self.octet}, fp)
@@ -826,6 +858,16 @@ class LiteralBlock(_Block):
       raise ValueError("stopchar %r not found" % (stopchar,))
     data = untexthexify(s[offset:endpos])
     return cls(data), endpos
+
+  def get_direct_data(self):
+    return self.data
+
+  def datafrom(self, start=0, end=None):
+    if start < 0 or end is not None and start > end:
+      raise ValueError("invalid start=%s (span=%s)" % (start, span))
+    if end is None:
+      end = self.span
+    yield self.data[start:end]
 
 register_transcriber(LiteralBlock)
 
@@ -872,17 +914,21 @@ class _SubBlock(_Block):
       self.superblock = superB
       self.offset = suboffset
 
-  def _data(self):
-    ''' The full data for this block.
+  def get_direct_data(self):
+    ''' The direct data are the spanned data.
     '''
-    # TODO: _Blocks need a subrange method that is efficient for indirect blocks
-    bs = self.superblock.data[self.offset:self.offset + self.span]
-    if len(bs) != self.span:
-      raise RuntimeError(
-          "%s: span=%d but superblock[%d:%d+%d=%d] has length %d"
-          % (self, self.span, self.offset, self.offset, self.span,
-             self.offset + self.span, len(bs)))
-    return bs
+    return self.get_spanned_data()
+
+  def datafrom(self, start=0, end=None):
+    ''' Yield the data from this Block between `start` and `end`.
+    '''
+    if start < 0 or (end is not None and end < 0):
+      raise ValueError("invalid start(%s) or end(%s)" % (start, end))
+    start = self.offset + start
+    if end is None:
+      end = self.span
+    end = self.offset + end
+    return self.superblock.datafrom(start, end)
 
   def __getitem__(self, index):
     if isinstance(index, slice):
@@ -920,10 +966,12 @@ def verify_block(B, recurse=False, S=None):
     if hashcode not in S:
       yield str(B), "hashcode not in %s" % (S,)
     else:
+      # compare the direct data versus the hashcode
       if B.indirect:
-        hashdata = B.superblock.data
+        bfr = B.superblock.datafrom()
       else:
-        hashdata = B.data
+        bfr = B.datafrom()
+      hashdata = b''.join(bfr)
       # hash the data using the matching hash function
       data_hashcode = hashcode.hashfunc(hashdata)
       if hashcode != data_hashcode:
@@ -936,11 +984,11 @@ def verify_block(B, recurse=False, S=None):
     if recurse:
       for subB in B.subblocks:
         yield from verify_block(subB, recurse=True, S=S)
-  data = B.data
-  if B.span != len(data):
-    X("VERIFY BLOCK %s: B.span=%d, len(data)=%d, data=%r...",
-      B, B.span, len(data), data[:16])
-    yield str(B), "span(%d) != len(data:%d)" % (B.span, len(data))
+  Blength = sum(len(chunk) for chunk in B.datafrom())
+  if B.span != Blength:
+    X("VERIFY BLOCK %s: B.span=%d, len(data)=%d",
+      B, B.span, Blength)
+    yield str(B), "span(%d) != len(data:%d)" % (B.span, Blength)
 
 if __name__ == '__main__':
   from .block_tests import selftest
