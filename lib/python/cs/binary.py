@@ -199,6 +199,14 @@ class PacketField(ABC):
     while not bfr.at_eof():
       yield cls.from_buffer(bfr, **kw)
 
+  @classmethod
+  def parse_buffer_values(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls.value`
+        from the buffer `bfr` until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw).value
+
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
 
