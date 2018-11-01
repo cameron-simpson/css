@@ -196,14 +196,6 @@ class BlockRecord(PacketField):
       raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
     return BSData(b''.join(flatten_transcription(transcription))).transcribe()
 
-def Blocks_from_buffer(bfr):
-  ''' Process the bytes `bs` from the supplied `offset` (default 0).
-      Yield Blocks.
-  '''
-  decode = BlockRecord.value_from_buffer
-  while not bfr.at_eof():
-    yield decode(bfr)
-
 def isBlock(o):
   ''' Test if an object `o` is a subinstance of `_Block`.
   '''
@@ -738,7 +730,7 @@ class _IndirectBlock(_Block):
       with self._lock:
         if 'subblocks' not in self.__dict__:
           self.subblocks = tuple(
-              Blocks_from_buffer(self.superblock.datafrom()))
+              BlockRecord.parse_buffer_values(self.superblock.datafrom()))
       return self.subblocks
     return super().__getattr__(attr)
 
