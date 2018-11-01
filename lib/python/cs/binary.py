@@ -191,6 +191,14 @@ class PacketField(ABC):
     '''
     raise NotImplementedError("no value_from_buffer method")
 
+  @classmethod
+  def parse_buffer(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw)
+
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
 
