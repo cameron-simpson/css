@@ -62,12 +62,6 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20       # extended BSData field
 
-def Dirents_from_buffer(bfr):
-  ''' Decode Dirents from `bfr`, yield each in turn.
-  '''
-  while not bfr.at_eof():
-    yield DirentRecord.value_from_buffer(bfr)
-
 class DirentRecord(PacketField):
   ''' PacketField subclass to parsing and transcribing Dirents in binary form.
 
@@ -269,6 +263,7 @@ class _Dirent(Transcriber):
       cls = partial(_Dirent, type_)
     return cls(name, **kw)
 
+  # TODO: remove all uses of _Dirent.from_bytes
   @staticmethod
   def from_bytes(data, offset=0):
     ''' Factory to extract a Dirent from binary data at `offset` (default 0).
@@ -958,7 +953,7 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      for E in Dirents_from_buffer(self._block.bufferfrom()):
+      for E in DirentRecord.parse_buffer_values(self._block.bufferfrom()):
         E.parent = self
         emap[E.name] = E
       self._entries = emap
@@ -1247,7 +1242,7 @@ class Dir(_Dirent):
     # push the Dir block data
     B.pushto(S2, Q=Q, runstate=runstate)
     # and recurse into contents
-    for E in Dirents_from_buffer(B.bufferfrom()):
+    for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
       if runstate and runstate.cancelled:
         warning("pushto(%s) cancelled", self)
         break
