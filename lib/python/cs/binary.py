@@ -211,10 +211,10 @@ class PacketField(ABC):
     ''' Return or yield the bytes transcription of this field.
 
         This may directly return:
-        * a `bytes` or `memryview` holding the binary data
+        * a `bytes` or `memoryview` holding the binary data
         * `None`: indicating no binary data
         * `str`: indicating the ASCII encoding of the string
-          * an iterable of these things (including further iterables)
+        * an iterable of these things (including further iterables)
           to support trivially transcribing via other fields'
           `transcribe` methods
 
