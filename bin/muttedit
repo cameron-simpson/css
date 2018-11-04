@@ -38,15 +38,13 @@ then
   exit $xit
 fi
 
+bg=
 mode_screen=-m
 mode_tmux=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -d) bg=1
-        mode_screen='-d -m'
-        mode_tmux=-d
-        ;;
+    -d) bg=1 ;;
     -w) wprog=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -57,8 +55,8 @@ do
   shift
 done
 
-bg=
 [ -n "$wprog" ] && bg=1
+[ $bg ] && { mode_screen='-d -m' mode_tmux=-d; }
 
 if [ $# -gt 0 ]
 then
@@ -83,28 +81,24 @@ fi
   exit 2
 }
 
-if [ $bg ]
-then
-  tmpf=$TMPDIR/muttedit.$$
-  ( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
-  filename=$tmpf
-fi
-
-if [ -n "$wprog" ]
-then
-  # run muttedit in a terminal with the copied template
-  $wprog "$0" -w '' "$filename" </dev/null >&2 &
-  exit 0
-fi
-
 now=$( date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]' )
 subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]/_/g; s/___*/_/g; p; q; }' <"$filename" | tr : _ )
 
 session_name=mutt-$now-$subj
 
-set -- mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+# take a copy of the composition file
+tmpf=$TMPDIR/muttedit.$$
+( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
+filename=$tmpf
+
+set -- rmafter "$filename" mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
 
 if tmux start-server
+then  use_tmux=1
+else  use_tmux=
+fi
+
+if [ $use_tmux ]
 then
   session_name=$( printf '%s\n' "$session_name" | tr : _ )
   shcmd=$( shqstr "$@" )
@@ -115,4 +109,14 @@ else
   session_name=$( printf '%s\n' "$session_name" | cut -c1-20 )
   set -x
   screen $mode_screen -S "$session_name" -- "$@"
+fi
+
+if [ -n "$wprog" ]
+then
+  if [ $use_tmux ]
+  then  set -- tmux attach-session -t "$session_name"
+  else  set -- screen -Aax "$session_name"
+  fi
+  $wprog "$@" </dev/null >&2 &
+  exit 0
 fi
