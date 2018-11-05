@@ -69,7 +69,7 @@ else
         echo "$tags"
         exec 1>&-
       else
-        echo "$cmd: no tags found from $dirpath/" >&2
+        [ -t 2 ] && echo "$cmd: no tags found from $dirpath/" >&2
       fi
     }
   done
@@ -80,6 +80,7 @@ else
 fi
 
 [ -n "$tags" ] || {
+  [ -t 2 ] || exit 0
   echo "$cmd: no tags file found" >&2
   badopts=1
 }
