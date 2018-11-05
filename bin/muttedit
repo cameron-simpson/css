@@ -150,6 +150,9 @@ fi
 
 # attach to the session according to the mode
 case "$mode" in
+  detach)
+    exit 0
+    ;;
   inline)
     exec tmux attach-session -t "$session_name"
     ;;
