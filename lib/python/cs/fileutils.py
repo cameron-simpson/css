@@ -749,7 +749,7 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
 
-      *NOTE*: this function may move the file pointer.
+      *WARNING*: this function might move the file pointer.
 
       Parameters:
       * `f`: the file from which to read data; if a string, the file
@@ -810,7 +810,7 @@ class ReadMixin(object):
     ''' Yield data from the specified `offset` onward in some
         approximation of the "natural" chunk size.
 
-        NOTE: UNLIKE the global datafrom() function, this method
+        *NOTE*: UNLIKE the global datafrom() function, this method
         MUST NOT move the logical file position. Implementors may need
         to save and restore the file pointer within a lock around
         the I/O if they do not use a direct access method like
@@ -863,7 +863,7 @@ class ReadMixin(object):
         # may be interleaved, interfering with the buffer.
         if bfr is None or bfr.offset != offset:
           if bfr is not None:
-            X("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
+            info("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:
@@ -949,7 +949,9 @@ class BackedFile(ReadMixin):
     return old_back_file
 
   def __enter__(self):
-    ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
+    ''' BackedFile instances offer a context manager that take the lock,
+        allowing synchronous use of the file
+        without implementing a suite of special methods like pread/pwrite.
     '''
     self._lock.acquire()
 
