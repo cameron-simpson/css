@@ -11,7 +11,7 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY
 try:
   from os import pread
 except ImportError:
@@ -745,7 +745,7 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
     yield bs
     offset += len(bs)
 
-@strable(open_func=partial(open, mode='rb'))
+@strable(open_func=partial(os.open, flags=O_RDONLY))
 def datafrom(f, offset, readsize=None):
   ''' General purpose reader for files yielding data from `offset`.
 
