@@ -1001,9 +1001,9 @@ class BackedFile(ReadMixin):
     for in_front, span in self.front_range.slices(offset, len(self)):
       consume = len(span)
       if in_front:
-        chunks = front_datafrom(offset)
+        chunks = front_datafrom(span.start)
       else:
-        chunks = back_datafrom(offset)
+        chunks = back_datafrom(span.start)
       for bs in chunks:
         if len(bs) > consume:
           bs = memoryview(bs)[:consume]
