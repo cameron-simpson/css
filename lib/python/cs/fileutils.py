@@ -991,7 +991,7 @@ class BackedFile(ReadMixin):
     elif whence == SEEK_END:
       endpos = self.back_file.seek(0, SEEK_END)
       if self.front_range is not None:
-        endpos = max(len(self.back_file), self.front_range.end)
+        endpos = max(endpos, self.front_range.end)
       self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
