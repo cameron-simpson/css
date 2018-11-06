@@ -723,7 +723,7 @@ class Pathname(str):
     '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-def datafrom_fd(fd, offset, readsize=None, aligned=True):
+def datafrom_fd(fd, offset, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       This does not move the file offset.
   '''
@@ -733,17 +733,27 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True):
     # do an initial read to align all subsequent reads
     alignsize = offset % readsize
     if alignsize > 0:
+      if maxlength is not None:
+        alignsize = min(maxlength, alignsize)
       bs = pread(fd, alignsize, offset)
       if not bs:
         return
       yield bs
-      offset += len(bs)
-  while True:
+      bslen = len(bs)
+      offset += bslen
+      if maxlength is not None:
+        maxlength -= bslen
+  while maxlength is None or maxlength > 0:
+    if maxlength is not None:
+      readsize = min(readsize, maxlength)
     bs = pread(fd, readsize, offset)
     if not bs:
       return
     yield bs
-    offset += len(bs)
+    bslen = len(bs)
+    offset += bslen
+    if maxlength is not None:
+      maxlength -= bslen
 
 @strable(open_func=partial(os.open, flags=O_RDONLY))
 def datafrom(f, offset, readsize=None):
