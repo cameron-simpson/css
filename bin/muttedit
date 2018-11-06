@@ -113,7 +113,7 @@ filename=$tmpf
 
 set -- \
   rmafter "$filename" \
-    mutt -e "set editor=$editor" -e 'set resume_draft_files' -H "$filename"
+    mutt -e "set editor=$editor" -e 'unset signature' -H "$filename"
 
 if tmux start-server
 then  use_tmux=1
