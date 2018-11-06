@@ -905,6 +905,8 @@ class ReadMixin(object):
       raise ValueError("n two low, expected >=1, got %r" % (n,))
     data = bytearray(n)
     nread = self.readinto(data)
+    if nread != len(data):
+      raise RuntimeError("  WRONG NUMBER OF BYTES(%d): data=%s", nread, data)
     return memoryview(data)[:nread] if nread != n else data
 
   @locked
@@ -1012,16 +1014,20 @@ class BackedFile(ReadMixin):
       back_datafrom = partial(global_datafrom, back_file)
     for in_front, span in self.front_range.slices(offset, len(self)):
       consume = len(span)
+      assert consume > 0
       if in_front:
         chunks = front_datafrom(span.start)
       else:
         chunks = back_datafrom(span.start)
       for bs in chunks:
+        assert len(bs) > 0
         if len(bs) > consume:
           bs = memoryview(bs)[:consume]
         yield bs
         bs_len = len(bs)
         consume -= bs_len
+        if consume <= 0:
+          break
         offset += bs_len
 
   @locked
@@ -1089,7 +1095,7 @@ class BackedFile_TestMethods(object):
     # read a chunk that overlaps the old data and the new data
     bfp.seek(256)
     overlap_chunk = bfp.read_n(512)
-    self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
+    self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %d:%s" % (len(overlap_chunk), bytes(overlap_chunk)))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 class Tee(object):
