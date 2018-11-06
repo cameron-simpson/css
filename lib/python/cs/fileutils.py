@@ -29,14 +29,13 @@ from cs.deco import cached, decorator, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import error, warning, debug
+from cs.logutils import error, warning, info, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
-from cs.x import X
 
 DISTINFO = {
     'description': "convenience functions and classes for files and filenames/pathnames",
@@ -425,7 +424,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
             for path, old_filestate in zip(old_paths, old_filestates):
               try:
                 new_filestate = FileState(path)
-              except OSError as e:
+              except OSError:
                 changed = True
               else:
                 preload_filestate_map[path] = new_filestate
@@ -897,6 +896,7 @@ class ReadMixin(object):
 
   def read_n(self, n):
     ''' Read `n` bytes of data and return them.
+
         Unlike traditional file.read(), RawIOBase.read() may return short
         data, thus this workalike, which may only return short data if it
         hits EOF.
@@ -906,7 +906,7 @@ class ReadMixin(object):
     data = bytearray(n)
     nread = self.readinto(data)
     if nread != len(data):
-      raise RuntimeError("  WRONG NUMBER OF BYTES(%d): data=%s", nread, data)
+      raise RuntimeError("  WRONG NUMBER OF BYTES(%d): data=%s" % (nread, data))
     return memoryview(data)[:nread] if nread != n else data
 
   @locked
@@ -928,7 +928,9 @@ class ReadMixin(object):
     return boff
 
 class BackedFile(ReadMixin):
-  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front scratch file.
+  ''' A RawIOBase duck type
+      which uses a backing file for initial data
+      and writes new data to a front scratch file.
   '''
 
   def __init__(self, back_file, dirpath=None):
@@ -1071,7 +1073,10 @@ class BackedFile_TestMethods(object):
     # test reading first 512 bytes only
     bfp.seek(0)
     bfp_leading_text = bfp.read_n(512)
-    self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
+    self._eq(
+        backing_text[:512],
+        bfp_leading_text,
+        "leading 512 bytes of backing_text vs bfp_leading_text")
     # test writing some data and reading it back
     random_chunk = bytes( randint(0, 255) for x in range(256) )
     bfp.seek(512)
@@ -1095,7 +1100,11 @@ class BackedFile_TestMethods(object):
     # read a chunk that overlaps the old data and the new data
     bfp.seek(256)
     overlap_chunk = bfp.read_n(512)
-    self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %d:%s" % (len(overlap_chunk), bytes(overlap_chunk)))
+    self.assertEqual(
+        len(overlap_chunk),
+        512,
+        "overlap_chunk not 512 bytes: %d:%s"
+        % (len(overlap_chunk), bytes(overlap_chunk)))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 class Tee(object):
@@ -1154,7 +1163,9 @@ def tee(fp, fp2):
 
 class NullFile(object):
   ''' Writable file that discards its input.
-      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
+
+      Note that this is _not_ an open of `os.devnull`;
+      it just discards writes and is not the underlying file descriptor.
   '''
 
   def __init__(self):
