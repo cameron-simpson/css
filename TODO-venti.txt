@@ -1,6 +1,15 @@
-vt.fs: does Inodes._hardlinked need to exist?
+Config needs a hashclass option to supply to Store constructors
+make cs.later.Later restartable - tends to hang on the second shutdown?
+sqlite based index/state file: sharable and portable - but needs to batch lookups and inserts for performance
+make datadirs sharable by multiple vt instances: shared state csv
+when stable and more ergonomic, move vt.transcribe to cs.transcriber
+fs: save persistent Dirents as 8 level Dir with each level being 2 bytes of the UUID, hex encoded? seems sparse and if we're sucking them all in anyway, pointless? better idea needed for heavily hardlinked trees
+vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
+vt.stream: give the _connect method some hysteresis
+DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
+general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
+DataDir: compute current on open as the newest data file less than maxsize-maxblocksize, drop from state CSV - what to do about shared append to the file?
 vt.fs.FileSystem: make the modes into a set, simplify the initialiser
-Dir.D_*_T values to be IntEnums
 ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates from archive, push local changes to Dir and archive
 get rid of uses of totext/fromtext and dirent_fromtext etc
 sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
@@ -11,7 +20,6 @@ move CancellationError into cs.resources, associate with RunState
 readahead for CornuCopyBuffer?
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
-make datadirs sharable by multiple vt instances: shared state csv
 cs.vt.socket_tests: UNIX domain socket tests
 ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
 vt setup/tutorial
@@ -22,7 +30,6 @@ vtrc.5 man entry
 vt.1 man entry
 blockmap updates - use lower priority than regular I/O
 platonic updates - use lower priority than regular I/O
-Store.archive plumbing
 ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
@@ -36,7 +43,6 @@ Dirent:
 FS:
   file system layer on top of Dir etc
   split out from vtfuse
-  inodes derived from uuids, but only on request or for hardlinks
   vtfuse: no .. in top dir? check mount point .. impl
 config:
   Config object with singleton mapping to clauses
@@ -82,10 +88,7 @@ vtfuse close file should not block, but update mtime and queue sync with callbac
 SIGINT clean shutdown of mount
 make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
     NULBlock trite factory for RLEBlock(b'\0', length)
-cs.buffer.CornuCopyBuffer: automatically upgrade iterables to iterators?
-    probe for __next__ ?
 salt entries for Dirs,
-text serialisation: all human readable, regular syntax
 stats in new vs existing blocks when adding blocks
 scanners:
   mbox look for nn and rnrn

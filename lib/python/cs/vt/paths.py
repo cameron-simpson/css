@@ -67,8 +67,9 @@ def path_split(path):
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
+      Return the final Dirent, its parent, and a list of unresolved path components.
+
       `subpath` may be a str or an array of str.
-      Return the final Dirent, its parent, and any unresolved path components.
   '''
   if not rootD.isdir:
     raise ValueError("resolve: not a Dir: %s" % (rootD,))

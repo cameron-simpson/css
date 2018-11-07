@@ -1,0 +1,10 @@
+Refactor SeekableFDIterator and SeekableFileIterator to subclass new SeekableIterator.
+New SeekableMMapIterator to process a memory mapped file descriptor, intended for large files.
+New CornuCopyBuffer.hint method to pass a length hint through to the input_data iterator
+if it has a `hint` method, causing it possibly to make a differently sized fetch.
+SeekableIterator: new __del__ method calling self.close() - subclasses must provide
+a .close, which should be safe to call multiple times.
+CornuCopyBuffer: add support for .offset and .end_offset optional attributes on the input_data iterator.
+_BoundedBufferIterator: add .offset property plumbed to the underlying buffer offset.
+New CornuCopyBuffer.from_mmap to make a mmap backed buffer so that large data can be returned without penalty.
+Assorted fixes and doc improvements.

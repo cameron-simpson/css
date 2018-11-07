@@ -27,7 +27,7 @@ import threading
 from threading import Semaphore, Condition, current_thread
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.excutils import transmute
+from cs.excutils import logexc, transmute
 from cs.debug import Lock, RLock, Thread
 from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
@@ -139,6 +139,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
         T.start()
       entry.queue.put( (func, retq, deliver) )
 
+  @logexc
   def _handler(self, entry):
     ''' The code run by each handler thread.
         Read a function `func`, return queue `retq` and delivery

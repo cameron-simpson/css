@@ -7,7 +7,7 @@
 # - Cameron Simpson <cs@cskk.id.au> 18sep2008
 #
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import sys
 import os.path
 import getopt
@@ -91,7 +91,7 @@ def main(argv):
     outputFile = configFile
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   if patchFile == '-':

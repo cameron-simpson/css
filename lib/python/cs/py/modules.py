@@ -16,6 +16,7 @@ DISTINFO = {
 }
 
 import importlib
+from inspect import getmodule
 import os.path
 import sys
 
@@ -58,3 +59,19 @@ def module_files(M):
     for filename in filenames:
       if filename.endswith('.py'):
         yield os.path.join(dirpath, filename)
+
+def module_attributes(M):
+  ''' Generator yielding the names and values of attributes from a module
+      which were defined in the module.
+  '''
+  for attr in dir(M):
+    value = getattr(M, attr, None)
+    if getmodule(value) is not M:
+      continue
+    yield attr, value
+
+def module_names(M):
+  ''' Return a list of the names of attributes from a module which were
+      defined in the module.
+  '''
+  return [ attr for attr, value in module_attributes(M) ]

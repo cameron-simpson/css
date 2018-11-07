@@ -13,15 +13,14 @@
           http://en.wikipedia.org/wiki/Venti
 '''
 
-from contextlib import contextmanager
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
-from cs.excutils import logexc
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
-from cs.py.func import prop
+from cs.mappings import StackableValues
+from cs.py.stack import stack_dump
 from cs.seq import isordered
 from cs.resources import RunState
 
@@ -32,59 +31,59 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-class _Defaults(threading.local):
-  ''' Per-thread default store stack.
+class _Defaults(threading.local, StackableValues):
+  ''' Per-thread default context stack.
+
       A Store's __enter__/__exit__ methods push/pop that store
-      from the default.
+      from the `.S` attribute.
   '''
+
   _Ss = []  # global stack of fallback Store values
+
   def __init__(self):
     threading.local.__init__(self)
-    self.Ss = []
-    self.runstate = RunState()
-  @prop
-  @logexc
-  def S(self):
-    ''' The topmost per-Thread Store, or the topmost global Store.
+    StackableValues.__init__(self)
+    self.push('runstate', RunState())
+    self.push('fs', None)
+
+  def _fallback(self, key):
+    ''' Fallback function for empty stack.
     '''
-    Ss = self.Ss
-    if Ss:
-      return Ss[-1]
-    warning("no per-Thread Store stack, using the global stack")
-    ##raise RuntimeError("BANG")
-    Ss = self._Ss
-    if Ss:
-      return Ss[-1]
-    error("%s: no per-Thread defaults.S and no global stack, returning None", self)
-    return None
+    if key == 'S':
+      warning("no per-Thread Store stack, using the global stack")
+      stack_dump()
+      Ss = self._Ss
+      if Ss:
+        return Ss[-1]
+      error("%s: no per-Thread defaults.S and no global stack, returning None", self)
+      return None
+    raise ValueError("no fallback for %r" % (key,))
+
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
-    newS.open()
-    self.Ss.append(newS)
+    self.push('S', newS)
+
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
-    oldS = self.Ss.pop()
-    oldS.close()
+    oldS = self.pop('S')
     return oldS
+
   def push_Ss(self, newS):
     ''' Push a new Store onto the global stack.
     '''
     self._Ss.append(newS)
+
   def pop_Ss(self):
     ''' Pop and return the topmost Store from the global stack.
     '''
     return self._Ss.pop()
 
-  @contextmanager
   def push_runstate(self, new_runstate):
     ''' Context manager to push a new RunState instance onto the per-Thread stack.
     '''
-    old_runstate = self.runstate
-    self.runstate = new_runstate
-    yield new_runstate
-    self.runstate = old_runstate
+    return self.stack('runstate', new_runstate)
 
 defaults = _Defaults()
 
@@ -127,9 +126,7 @@ class _TestAdditionsMixin:
     try:
       olen = len(o)
     except TypeError:
-      from cs.x import X
-      X("no len(0) for o=%s:%r", type(o), o)
-      ##pass
+      pass
     else:
       self.assertEqual(olen, length, *a, **kw)
 

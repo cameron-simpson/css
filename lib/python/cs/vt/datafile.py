@@ -6,74 +6,122 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Implementation of DataFile: a file containing Block records.
+'''
+
 from enum import IntFlag
+from fcntl import flock, LOCK_EX, LOCK_UN
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END, \
+from os import SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
 from threading import Lock
-import time
 from zlib import compress, decompress
+from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
-from cs.logutils import info
+from cs.logutils import warning
 from cs.pfx import Pfx
+from cs.randutils import rand0, randblock
 from cs.resources import MultiOpenMixin
-from cs.serialise import put_bs, read_bs, put_bsdata, read_bsdata
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlag(IntFlag):
+  ''' Flag values for DataFile records.
+
+      `COMPRESSED`: the data are compressed using zlib.compress.
+  '''
   COMPRESSED = 0x01
 
-class DataFile(MultiOpenMixin, ReadMixin):
-  ''' A data file, storing data chunks in compressed form.
-      This is the usual file based persistence layer of a local Store.
-
-      A DataFile is a MultiOpenMixin and supports:
-        .fetch(offset)  Fetch the uncompressed data chunk from `offset`.
-        .add(data)      Store data chunk, return (offset, offset2) indicating its location.
-        .scan([do_decompress=],[offset=0])
-                        Scan the data file and yield (offset, flags, zdata, offset2) tuples.
-                        This can take place during other activity.
+class DataRecord(PacketField):
+  ''' A data chunk file record.
   '''
 
-  def __init__(self, pathname, do_create=False, readwrite=False, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.pathname = pathname
-    self.readwrite = readwrite
-    if do_create and not readwrite:
-      raise ValueError("do_create=true requires readwrite=true")
-    self.appending = False
-    if do_create:
-      fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
-      os.close(fd)
+  TEST_CASES = (
+      (b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),
+  )
+
+  def __init__(self, data, is_compressed=False):
+    self._data = data
+    self._is_compressed = is_compressed
 
   def __str__(self):
-    return "DataFile(%s)" % (self.pathname,)
+    return "%s(%d-bytes,%s)" % (
+        type(self).__name__,
+        len(self._data),
+        "compressed" if self._is_compressed else "raw",
+    )
+
+  def __eq__(self, other):
+    return self.data == other.data
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse a DataRecord from a buffer.
+    '''
+    flags = BSUInt.value_from_buffer(bfr)
+    data = BSData.value_from_buffer(bfr)
+    is_compressed = (flags & DataFlag.COMPRESSED) != 0
+    flags &= ~DataFlag.COMPRESSED
+    if flags:
+      raise ValueError("unsupported flags: 0x%02x" % (flags,))
+    return cls(data, is_compressed=is_compressed)
+
+  def transcribe(self, uncompressed=False):
+    ''' Transcribe this data chunk as a data record.
+    '''
+    data = self._data
+    is_compressed = self._is_compressed
+    if uncompressed:
+      flags = 0x00
+      if is_compressed:
+        data = decompress(data)
+    else:
+      flags = DataFlag.COMPRESSED
+      if not is_compressed:
+        data = compress(data)
+    yield BSUInt.transcribe_value(flags)
+    yield BSData.transcribe_value(data)
+
+  @property
+  def data(self):
+    ''' The uncompressed data.
+    '''
+    raw_data = self._data
+    if self._is_compressed:
+      raw_data = decompress(raw_data)
+      self._data = raw_data
+      self._is_compressed = False
+    return raw_data
+
+class DataFileReader(MultiOpenMixin, ReadMixin):
+  ''' Read access to a data file, storing data chunks in compressed form.
+      This is the usual file based persistence layer of a local Store.
+  '''
+
+  def __init__(self, pathname, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self.pathname = pathname
+    self._rfd = None
+    self._rlock = None
+
+  def __str__(self):
+    return "%s(%s)" % (type(self).__name__, self.pathname,)
 
   def startup(self):
-    with Pfx("%s.startup: open(%r)", self, self.pathname):
-      rfd = os.open(self.pathname, O_RDONLY)
-      self._rfd = rfd
-      self._rlock = Lock()
-      if self.readwrite:
-        self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
-        os.lseek(self._wfd, 0, SEEK_END)
-        self._wlock = Lock()
+    ''' Start up the DataFile: open the read and write file descriptors.
+    '''
+    rfd = os.open(self.pathname, O_RDONLY)
+    self._rfd = rfd
+    self._rlock = Lock()
 
   def shutdown(self):
-    if self.readwrite:
-      os.close(self._wfd)
-      del self._wfd
+    ''' Shut down the DataFIle: close read and write file descriptors.
+    '''
     os.close(self._rfd)
-    del self._rfd
-
-  def tell(self):
-    return lseek(self._rfd, 0, SEEK_CUR)
-
-  def seek(self, offset):
-    return lseek(self._rfd, offset, how=SEEK_SET)
+    self._rfd = None
+    self._rlock = None
 
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
@@ -87,70 +135,94 @@ class DataFile(MultiOpenMixin, ReadMixin):
       readsize = 2048
     return datafrom_fd(self._rfd, offset, readsize)
 
-  @staticmethod
-  def data_record(data, no_compress=False):
-    ''' Compose a data record for transcription to a DataFile.
+  def fetch_record(self, offset):
+    ''' Fetch a DataRecord from the supplied `offset`.
     '''
-    flags = DataFlag(0)
-    if not no_compress:
-      data2 = compress(data)
-      if len(data2) < len(data):
-        data = data2
-        flags |= DataFlag.COMPRESSED
-    return put_bs(flags) + put_bsdata(data)
-
-  @staticmethod
-  def read_record(fp, do_decompress=False):
-    ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
-        If do_decompress is true and flags&DataFlag.COMPRESSED, strip that
-        flag and decompress the data before return.
-        Raises EOFError on premature end of file.
-    '''
-    flags = DataFlag(read_bs(fp))
-    data = read_bsdata(fp)
-    post_offset = fp.tell()
-    if do_decompress and (flags & DataFlag.COMPRESSED):
-      data = decompress(data)
-      flags &= ~DataFlag.COMPRESSED
-    return flags, data, post_offset
-
-  def fetch_record(self, offset, do_decompress=False):
-    ''' Fetch a record from the supplied `offset`. Return (flags, data, new_offset).
-    '''
-    return self.read_record(self.bufferfrom(offset), do_decompress=do_decompress)
+    return DataRecord.from_buffer(self.bufferfrom(offset))
 
   def fetch(self, offset):
     ''' Fetch the nucompressed data at `offset`.
     '''
-    flags, data, _ = self.fetch_record(offset, do_decompress=True)
-    assert flags == 0
-    return data
+    return self.fetch_record(offset).data
 
   @staticmethod
-  def scan_records(fp, do_decompress=False):
-    ''' Generator yielding (flags, data, post_offset) from a data file from its current offset.
-        `do_decompress`: decompress the scanned data, default False
+  def scanbuffer(bfr):
+    ''' Generator yielding DataRecords and end offsets from a DataFile.
+
+        Parameters:
+        * `bfr`: the buffer.
+        * `do_decompress`: decompress the scanned data, default False.
     '''
     while True:
-      yield read_record(fp, do_decompress=do_decompress)
+      try:
+        record = DataRecord.from_buffer(bfr)
+      except EOFError:
+        break
+      yield record, bfr.offset
 
-  def scanfrom(self, offset, do_decompress=False):
-    ''' Generator yielding (flags, data, post_offset) from the DataFile.
-        `offset`: the starting offset for the scan
-        `do_decompress`: decompress the scanned data, default False
+  def scanfrom(self, offset=0):
+    ''' Generator yielding (DataRecord, post_offset) from the
+        DataFile starting from `offset`, default 0.
     '''
-    return self.scan_records(datafrom(offset), do_decompress=do_decompress)
+    return self.scanbuffer(self.bufferfrom(offset))
 
-  def add(self, data, no_compress=False):
-    ''' Append a chunk of data to the file, return the store start and end offsets.
+class DataFileWriter(MultiOpenMixin):
+  ''' Append access to a data file, storing data chunks in compressed form.
+  '''
+
+  def __init__(self, pathname, do_create=False, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self.pathname = pathname
+    if do_create:
+      fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
+      os.close(fd)
+    self._wfd = None
+    self._wlock = None
+
+  def __str__(self):
+    return "%s(%s)" % (type(self).__name__, self.pathname,)
+
+  def startup(self):
+    ''' Start up the DataFile: open the read and write file descriptors.
     '''
-    if not self.readwrite:
-      raise RuntimeError("%s: not readwrite" % (self,))
-    bs = self.data_record(data, no_compress=no_compress)
+    self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
+    self._wlock = Lock()
+
+  def shutdown(self):
+    ''' Shut down the DataFIle: close read and write file descriptors.
+    '''
+    os.close(self._wfd)
+    self._wfd = None
+    self._wlock = None
+
+  def add(self, data):
+    ''' Append a chunk of data to the file, return the store start
+        and end offsets.
+
+        The fcntl.flock function is used to hold an OS level lock
+        for the duration of the write to support shared use of the
+        file.
+    '''
+    bs = bytes(DataRecord(data))
     wfd = self._wfd
     with self._wlock:
-      offset = os.lseek(wfd, 0, SEEK_CUR)
-      os.write(wfd, bs)
+      try:
+        flock(wfd, LOCK_EX)
+      except OSError:
+        is_locked = False
+      else:
+        is_locked = True
+      offset = os.lseek(wfd, 0, SEEK_END)
+      written = os.write(wfd, bs)
+      # notice short writes, which should never happen with a regular file...
+      while written < len(bs):
+        warning(
+            "%s: tried to write %d bytes but only wrote %d, retrying",
+            self, len(bs), written)
+        bs = bs[written:]
+        written = os.write(wfd, bs)
+      if is_locked:
+        flock(wfd, LOCK_UN)
     return offset, offset + len(bs)
 
 if __name__ == '__main__':
