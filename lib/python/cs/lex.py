@@ -99,7 +99,8 @@ def strlist(ary, sep=", "):
 
 def lastlinelen(s):
   ''' The length of text after the last newline in a string.
-      Initially used by cs.hier to compute effective text width.
+
+      (Initially used by cs.hier to compute effective text width.)
   '''
   return len(s) - s.rfind('\n') - 1
 
@@ -108,7 +109,8 @@ def htmlify(s, nbsp=False):
 
       Parameters:
       * `s`: the string
-      * `nbsp`: replaces spaces with "&nbsp;" to prevent word folding, default `False`.
+      * `nbsp`: replaces spaces with `"&nbsp;"` to prevent word folding,
+        default `False`.
   '''
   s = s.replace("&", "&amp;")
   s = s.replace("<", "&lt;")
@@ -151,7 +153,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
 
       This can be reversed with the `untexthexify` function.
 
-      This is an ah doc format devised to be compact but also to
+      This is an ad doc format devised to be compact but also to
       expose "text" embedded within to the eye. The original use
       case was transcribing a binary directory entry format, where
       the filename parts would be somewhat visible in the transcription.
@@ -753,7 +755,7 @@ def match_tokens(s, offset, getters):
     return tokens, offset2
 
 def isUC_(s):
-  ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
+  ''' Check that a string matches `^[A-Z][A-Z_0-9]*$`.
   '''
   if s.isalpha() and s.isupper():
     return True
@@ -767,11 +769,11 @@ def isUC_(s):
   return True
 
 def parseUC_sAttr(attr):
-  ''' Take an attribute name and return (key, is_plural).
+  ''' Take an attribute name and return `(key, is_plural)`.
 
-      FOO returns (FOO, False).  
-      FOOs or FOOes returns (FOO, True).  
-      Otherwise return (None, False).
+      `'FOO'` returns `(`FOO`, False)`.
+      `'FOOs'` or `'FOOes'` returns `('FOO', True)`.
+      Otherwise return `(None, False)`.
   '''
   if len(attr) > 1:
     if attr[-1] == 's':

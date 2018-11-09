@@ -11,11 +11,33 @@
 
 set -ue
 
+: ${TMPDIR:=/tmp}
+: ${TMUX:=''}
+wprog=${MUTTEDIT_WINDOWPROG:-}
+editor=${MUTTEDIT_EDITOR:-vim-flowed}
+
 cmd=$0
 usage="Usage:
-  $cmd [-d] filename    Start a new message in mutt based on filename.
-    -d  Start session detached.
-  $cmd reopen           Open sessions for all mutt editor files sitting about."
+  $cmd [-d] [-T] [-w wprog] filename
+    Start a new message in mutt based on filename.
+    -d          Start session detached.
+    -T          Start session in split tmux pane.
+    -w wprog    Invoke the submutt in wprog asynchronously.
+                This is a command prefix such as \"xterm -e\".
+  $cmd reopen
+    Open sessions for all mutt editor files sitting about.
+
+Environment:
+  \$MUTTEDIT_WINDOWPROG
+              If not empty, implies -w mode with its value.
+  \$MUTTEDIT_EDITOR
+              Editor for the sub mutt to invoke for composition.
+              Default: vim-flowed
+
+The default mode is window mode if \$MUTTEDIT_WINDOWPROG is set,
+otherwise pane mode (-T) if $TMUX is set, otherwise inline."
+
+badopts=
 
 if [ $# -gt 0 ] && [ "x$1" = xreopen ]
 then
@@ -28,36 +50,124 @@ then
   exit $xit
 fi
 
-mode_screen=-m
-mode_tmux=
-if [ $# -gt 0 ] && [ "x$1" = x-d ]
-then
+# choose mode:
+# window: attach to session in window via $wprog
+# pane: attach to session in split pane
+# inline: attach to session inline
+# detach: leave session detached
+[ -n "$wprog" ] && {
+  mode=window
+} || [ -n "$TMUX" ] && {
+    mode=pane
+} || {
+  mode=inline
+}
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) mode=detach ;;
+    -T) mode=pane ;;
+    -w) mode=window wprog=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
   shift
-  mode_screen='-d -m'
-  mode_tmux=-d
+done
+
+if [ $# -gt 0 ]
+then
+  filename=$1
+  shift
+  [ -s "$filename" ] || {
+    echo "$cmd: expected non-empty file, got: $filename" >&2
+    badopts=1
+  }
+  else
+  echo "$cmd: missing filename" >&2
+  badopts=1
 fi
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-filename=$1; shift
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
 
-[ -s "$filename" ] || { echo "$cmd: expected non-empty file, got: $filename" >&2; exit 2; }
+[ $badopts ] && {
+  echo "$usage" >&2
+  exit 2
+}
 
 now=$( date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]' )
 subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]/_/g; s/___*/_/g; p; q; }' <"$filename" | tr : _ )
 
 session_name=mutt-$now-$subj
 
-set -- mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+# take a copy of the composition file
+tmpf=$TMPDIR/muttedit.$$
+( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
+filename=$tmpf
+
+set -- \
+  rmafter "$filename" \
+    mutt -e "set editor=$editor" -e 'unset signature' -H "$filename"
 
 if tmux start-server
+then  use_tmux=1
+else  use_tmux=
+fi
+
+# fallback for unachievable modes
+if [ "$mode" = window ]
+then
+  [ -n "$wprog" ] || {
+    echo "$cmd: window mode but empty wprog, falling back to pane" >&2
+    mode=pane
+  }
+fi
+if [ "$mode" = pane ]
+then
+  { [ $use_tmux ] && [ -n "$TMUX" ]; } || {
+    echo "$cmd: not in a tmux session, falling back to inline" >&2
+    mode=inline
+  }
+fi
+
+# spawn the new session
+if [ $use_tmux ]
 then
   session_name=$( printf '%s\n' "$session_name" | tr : _ )
-  shcmd=$( shqstr "$@" )
-  set -x
-  ## was "$shcmd"
-  tmux new-session $mode_tmux -s "$session_name" -- "$@"
+  ( unset TMUX
+    tmux new-session -d -s "$session_name" -- "$@"
+  )
 else
   session_name=$( printf '%s\n' "$session_name" | cut -c1-20 )
-  set -x
-  screen $mode_screen -S "$session_name" -- "$@"
+  screen -d -m -S "$session_name" -- "$@"
 fi
+
+# attach to the session according to the mode
+case "$mode" in
+  detach)
+    exit 0
+    ;;
+  inline)
+    exec tmux attach-session -t "$session_name"
+    ;;
+  pane)
+    qsession_name=$( shqstr "$session_name" )
+    tmux split-window -v -p 80 "unset TMUX; exec tmux attach-session -t $qsession_name"
+    ;;
+  window)
+    if [ $use_tmux ]
+    then  set -- tmux attach-session -t "$session_name"
+    else  set -- screen -Aax "$session_name"
+    fi
+    $wprog "$@" </dev/null >&2 &
+    ;;
+  *)echo "$0: unsupported mode: $mode" >&2
+    exit 1
+    ;;
+esac

@@ -254,15 +254,15 @@ class Pfx(object):
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
         # now hack the exception attributes
-        prefix = self._state.prefix
+        current_prefix = self._state.prefix
         def prefixify(text):
           if not isinstance(text, StringTypes):
             ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-            ##  prefix, text.__class__, text, sys.exc_info())
+            ##  current_prefix, text.__class__, text, sys.exc_info())
             return text
-          return prefix \
+          return current_prefix \
               + ': ' \
-              + ustr(text, errors='replace').replace('\n', '\n' + prefix)
+              + ustr(text, errors='replace').replace('\n', '\n' + current_prefix)
         did_prefix = False
         for attr in 'args', 'message', 'msg', 'reason':
           try:
@@ -277,7 +277,7 @@ class Pfx(object):
                 vlen = len(value)
               except TypeError:
                 print(
-                    "warning: %s: %s.%s: " % (prefix, exc_value, attr),
+                    "warning: %s: %s.%s: " % (current_prefix, exc_value, attr),
                     prefixify("do not know how to prefixify: %r" % (value,)),
                     file=sys.stderr)
                 continue
@@ -292,7 +292,7 @@ class Pfx(object):
         if not did_prefix:
           print(
               "warning: %s: %s:%s: message not prefixed"
-              % (prefix, type(exc_value).__name__, exc_value),
+              % (current_prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr)
     _state.pop()
     if _state.trace:
@@ -302,7 +302,7 @@ class Pfx(object):
   @property
   def umark(self):
     ''' Return the unicode message mark for use with this Pfx.
-        
+
         This is used by Pfx._state.prefix to compute the full prefix.
     '''
     u = self._umark
@@ -360,24 +360,40 @@ class Pfx(object):
 
   # Logger methods
   def exception(self, msg, *args):
+    ''' Log an exception message to this Pfx's loggers.
+    '''
     for L in self.loggers:
       L.exception(msg, *args)
   def log(self, level, msg, *args, **kwargs):
+    ''' Log a message at an arbitrary log level to this Pfx's loggers.
+    '''
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
       try:
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
-        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" % (self._state.prefix, L, msg, args, kwargs, e), file=sys.stderr)
+        print(
+            "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s"
+            % (self._state.prefix, L, msg, args, kwargs, e), file=sys.stderr)
   def debug(self, msg, *args, **kwargs):
+    ''' Emit a debug log message.
+    '''
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
+    ''' Emit an info log message.
+    '''
     self.log(logging.INFO, msg, *args, **kwargs)
   def warning(self, msg, *args, **kwargs):
+    ''' Emit a warning log message.
+    '''
     self.log(logging.WARNING, msg, *args, **kwargs)
   def error(self, msg, *args, **kwargs):
+    ''' Emit an error log message.
+    '''
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
+    ''' Emit a critical log message.
+    '''
     self.log(logging.CRITICAL, msg, *args, **kwargs)
 
 def prefix():
@@ -405,7 +421,7 @@ class PfxCallInfo(Pfx):
 
   def __init__(self):
     import traceback
-    grandcaller, caller, myframe = traceback.extract_stack(None, 3)
+    grandcaller, caller, _ = traceback.extract_stack(None, 3)
     Pfx.__init__(self,
                  "at %s:%d %s(), called from %s:%d %s()",
                  caller[0], caller[1], caller[2],
@@ -432,13 +448,18 @@ def XP(msg, *args, **kwargs):
   elif file is not None:
     if isinstance(file, StringTypes):
       with open(file, "a") as fp:
-        XP(msg, *args, file=fp)
-      return
+        return XP(msg, *args, file=fp)
   file.write(prefix())
   file.write(': ')
   file.flush()
   return X(msg, *args, file=file)
 
 def XX(prepfx, msg, *args, **kwargs):
+  ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
+
+      Example:
+
+          XX("NOTE!", "some message")
+  '''
   with PrePfx(prepfx):
     return XP(msg, *args, **kwargs)

@@ -1,0 +1,8 @@
+Derive CancellationError from Exception instead of RuntimeError, fix initialiser.
+Rename AsynchState to ResultState and make it an Enum.
+Make Results hashable and comparable for equality for use as mapping keys: equality is identity.
+New Result.collected attribute, set true if .result or .exc_info are accessed, logs an error if Result.__del__ is called when false, may be set true externally if a Result is not required.
+Drop `final` parameter; never used and supplanted by Result.notify.
+Result.join: return the .result and .exc_info properties in order to mark the Result as collected.
+Result: set .collected to True when a notifier has been called successfully.
+Bugfix Result.cancel: apply the new cancelled state.

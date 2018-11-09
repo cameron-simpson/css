@@ -1,0 +1,8 @@
+Various bugfixes for BackedFile.
+Use a file's .read1 method if available in some scenarios.
+makelockfile: accept am optional RunState control parameter, improve some behaviour.
+datafrom_fd: new optional maxlength parameter limiting the amount of data returned.
+datafrom_fd: by default, perform an initial read to align all subsequent reads with the readsize.
+drop fdreader, add datafrom(f, offset, readsize) accepting a file or a file descriptor, expose datafrom_fd.
+ReadMixin.datafrom now mandatory. Add ReadMixin.bufferfrom.
+Assorted other improvements, minor bugfixes, documentation improvements.
