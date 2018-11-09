@@ -21,6 +21,7 @@ from cs.threads import locked
 from cs.x import X
 from . import defaults
 from .block import isBlock
+from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
@@ -345,6 +346,9 @@ class FileSystem(object):
       raise ValueError("not dir Dir: %s" % (E,))
     if S is None:
       S = defaults.S
+    self._old_S_block_cache = S.block_cache
+    block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    S.block_cache = block_cache
     S.open()
     if readonly is None:
       readonly = S.readonly
@@ -400,6 +404,7 @@ class FileSystem(object):
     '''
     self._sync()
     self.S.close()
+    self.S.block_cache = self._old_S_block_cache
 
   def __str__(self):
     if self.subpath:
@@ -407,7 +412,7 @@ class FileSystem(object):
           self.__class__.__name__,
           self.S, self.E, self.subpath, self.mntE
       )
-    return "<%s S=%s /=%s>" % (self.__class__.__name__, self.S, self.E)
+    return "%s(S=%s,/=%s)" % (type(self).__name__, self.S, self.E)
 
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
