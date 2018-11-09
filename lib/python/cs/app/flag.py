@@ -19,32 +19,33 @@ an empty or missing file is "false"
 and a nonempty file is "true".
 
 The Flags class provides easy Pythonic access to this directory.
-It presents as a modifiable mapping whose keys are the flag names::
+It presents as a modifiable mapping whose keys are the flag names:
 
-  flags = Flags()
-  flags['UNTOPPOST'] = True
+      flags = Flags()
+      flags['UNTOPPOST'] = True
 
 There is also a FlaggedMixin class providing convenient methods and attributes
 for maintaining a collection of flags associated with some object
-with flag names prefixed by the object's .name attribute uppercased and with an underscore appended::
+with flag names prefixed by the object's .name attribute
+uppercased and with an underscore appended:
 
-  class SvcD(...,FlaggedMixin):
-    def __init__(self, name, ...)
-      self.name = name
-      FlaggedMixin.__init__(self)
-      ...
-    def disable(self):
-      self.flag_disable = True
-    def restart(self):
-      self.flag_restart = True
-    def _restart(self):
-      self.flag_restart = False
-      ... restart the SvcD ...
+      class SvcD(...,FlaggedMixin):
+        def __init__(self, name, ...)
+          self.name = name
+          FlaggedMixin.__init__(self)
+          ...
+        def disable(self):
+          self.flag_disable = True
+        def restart(self):
+          self.flag_restart = True
+        def _restart(self):
+          self.flag_restart = False
+          ... restart the SvcD ...
 
-so that an object set up as::
+so that an object set up as:
 
-  svcd - SvcD("portfwd")
-  print(svcd.flag_disable)
+      svcd = SvcD("portfwd")
+      print(svcd.flag_disable)
 
 accesses the flag named "PORTFWD_DISABLE".
 '''
@@ -70,7 +71,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.env', 'cs.lex'],
+    'install_requires': ['cs.env', 'cs.lex', 'cs.pfx'],
     'entry_points': {
         'console_scripts': [
             'flagset = cs.app.flag:main_flagset'
@@ -206,12 +207,14 @@ def lowername(s):
 
 def truthy(value):
   ''' Decide whether a value is considered true.
+
       Strings are converted to:
-        '0': False
-        '1': True
-        'true': True (case insensitive)
-        'false': False (case insensitive)
-        Other values are unchanged.
+      * `'0'`: False
+      * `'1'`: True
+      * `'true'`: True (case insensitive)
+      * `'false'`: False (case insensitive)
+      * Other values are unchanged.
+
       Other types are converted with bool().
   '''
   if isinstance(value, str):
@@ -235,8 +238,11 @@ class FlaggedMixin(object):
 
   def __init__(self, flags=None, debug=None, prefix=None):
     ''' Initialise the mixin.
-        `flags`: optional parameter; if None defaults to a new default Flags().
-        `prefix`: optional prefix; if not proveded the prefix is
+
+        Parameters:
+        * `flags`: optional parameter;
+          if None defaults to a new default `Flags()`.
+        * `prefix`: optional prefix; if not proveded the prefix is
           derived from the objects .name attribute, or is empty if
           there is no .name
     '''
@@ -250,6 +256,7 @@ class FlaggedMixin(object):
 
   def __flagname(self, suffix):
     ''' Compute a flag name from `suffix`.
+
         The object's .name attribute is used as the basis, so a
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
@@ -380,6 +387,7 @@ class Flags(MutableMapping, FlaggedMixin):
 
   def __setitem__(self, k, value):
     ''' Set the flag value.
+
         If true, write "1\n" to the flag file.
         If false, remove the flag file.
     '''
@@ -411,17 +419,23 @@ class Flags(MutableMapping, FlaggedMixin):
       print("%s -> %d" % (k, (1 if value else 0)), file=sys.stderr)
 
   def update_prefix(self, prefix, updates, omitted_value=False):
-    ''' Update all flag values commencing with `prefix`, falsifying any unmentioned flags.
-        `prefix`: common prefix for updated flags
-        `updates`: iterable of (flagname, flagvalue)
-        `omitted_value`: value to be assigned to any unmentioned flags, default False.
+    ''' Update all flag values commencing with `prefix`,
+        falsifying any unmentioned flags.
+
+        Parameters:
+        * `prefix`: common prefix for updated flags.
+        * `updates`: iterable of `(flagname, flagvalue)`.
+        * `omitted_value`: value to be assigned to any unmentioned flags,
+          default `False`.
           Set this to None to leave unmentioned flags alone.
     '''
     all_names = set( name for name in self if name.startswith(prefix) )
     named = set()
     for flagname, flagvalue in updates:
       if not flagname.startswith(prefix):
-        raise ValueError("update flag %r does not start with prefix %r" % (flagname, prefix))
+        raise ValueError(
+            "update flag %r does not start with prefix %r"
+            % (flagname, prefix))
       self[flagname] = flagvalue
       named.add(flagname)
     if omitted_value is not None:
@@ -430,7 +444,9 @@ class Flags(MutableMapping, FlaggedMixin):
           self[flagname] = omitted_value
 
 class PolledFlags(dict):
-  ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
+  ''' A mapping which maintains a dict of the current state of the flags directory
+      and updates it regularly.
+
       This allows an application to consult the flags very frequently
       without hammering the filesystem.
   '''
@@ -449,7 +465,7 @@ class PolledFlags(dict):
     T.start()
 
   def _monitor_flags(self, delay=1.1):
-    ''' Monitor self._flags regularly, updating self.flags.
+    ''' Monitor `self._flags` regularly, updating `self.flags`.
     '''
     while True:
       sleep(delay)
