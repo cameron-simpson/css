@@ -86,12 +86,18 @@ class _ThreadLocal(threading.local):
 
   @property
   def current(self):
+    ''' The current topmost `Later` on the stack.
+    '''
     return self.stack[-1]
 
   def push(self, L):
+    ''' Push a `Later` onto the stack.
+    '''
     self.stack.append(L)
 
   def pop(self):
+    ''' Pop and return the top `Later` from the stack.
+    '''
     return self.stack.pop()
 
 default = _ThreadLocal()
@@ -115,7 +121,7 @@ def retry(retry_interval, func, *a, **kw):
   while True:
     try:
       return func(*a, **kw)
-    except RetryError as e:
+    except RetryError:
       time.sleep(retry_interval)
 
 class _Late_context_manager(object):
@@ -260,12 +266,14 @@ class LateFunction(_PendingFunction):
     L.debug("DISPATCH %s", self)
     with self._lock:
       if not self.pending:
-        raise RuntimeError("should be pending, but state = %s", self.state)
+        raise RuntimeError("should be pending, but state = %s" % (self.state,))
       self.state = ResultState.running
       L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
 
   @OBSOLETE
   def wait(self):
+    ''' Obsolete name for `.join`.
+    '''
     return self.join()
 
   def _worker_complete(self, work_result):
@@ -320,9 +328,13 @@ class _PipelineStage(PushQueue):
     self.retry_interval = retry_interval
 
   def defer(self, functor, *a, **kw):
+    ''' Submit a callable `functor` for execution.
+    '''
     return self.pipeline.later.defer(functor, *a, **kw)
 
   def defer_iterable(self, I, outQ):
+    ''' Submit an iterable `I` for processing to `outQ`.
+    '''
     return self.pipeline.later.defer_iterable(I, outQ)
 
 class _PipelineStageOneToOne(_PipelineStage):
@@ -377,7 +389,7 @@ class _PipelineStageManyToMany(_PipelineStage):
       I, exc_info = LF.join()
       if exc_info:
         # report exception
-        error("%s.put(%r): %r", self.name, item, exc_info)
+        error("%s.put(%r): %r", self.name, I, exc_info)
         self.outQ.close()
       else:
         self.defer_iterable(I, self.outQ)
@@ -485,6 +497,8 @@ class _Pipeline(MultiOpenMixin):
     return self.queues[-1]
 
   def startup(self):
+    ''' Startup for the _Pipeline, required method of MultiOpenMixin.
+    '''
     pass
 
   def shutdown(self):
@@ -589,6 +603,8 @@ class Later(object):
       bg(finish_up)
 
   def close(self, *a, **kw):
+    ''' Close the Later, preventing further task submission.
+    '''
     self.closed = True
     self._pendingq.close()
 
@@ -623,7 +639,7 @@ class Later(object):
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>" \
+        "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>"
         % (
             self.name, self.capacity,
             len(self.pending), len(self.running), len(self.delayed),
@@ -631,6 +647,8 @@ class Later(object):
     )
 
   def state(self, new_state, *a):
+    ''' Update the state of this Later.
+    '''
     if a:
       new_state = new_state % a
     D("STATE %r [%s]", new_state, self)
@@ -672,6 +690,8 @@ class Later(object):
         toset.add(LF)
 
   def log_status(self):
+    ''' Log the current delayed, pending and running state.
+    '''
     for LF in list(self.delayed):
       self.debug("STATUS: delayed: %s", LF)
     for LF in list(self.pending):
@@ -704,6 +724,8 @@ class Later(object):
 
   @contextmanager
   def more_capacity(self, increment=1):
+    ''' Context manager to temporarily increase the capacity of this Later.
+    '''
     self.capacity.adjust_delta(increment)
     try:
       yield
@@ -725,21 +747,29 @@ class Later(object):
     self.logger = logger
 
   def error(self, *a, **kw):
+    ''' Issue an error message with `later_name` in `'extra'`.
+    '''
     if self.logger:
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.error(*a, **kw)
 
   def warning(self, *a, **kw):
+    ''' Issue a warning message with `later_name` in `'extra'`.
+    '''
     if self.logger:
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.warning(*a, **kw)
 
   def info(self, *a, **kw):
+    ''' Issue an info message with `later_name` in `'extra'`.
+    '''
     if self.logger:
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.info(*a, **kw)
 
   def debug(self, *a, **kw):
+    ''' Issue a debug message with `later_name` in `'extra'`.
+    '''
     if self.logger:
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.debug(*a, **kw)
@@ -896,7 +926,7 @@ class Later(object):
   def wait_outstanding(self, until_idle=False):
     ''' Wrapper for complete(), to collect and discard completed LateFunctions.
     '''
-    for LF in self.complete(until_idle=until_idle):
+    for _ in self.complete(until_idle=until_idle):
       pass
 
   def defer(self, func, *a, **kw):
@@ -1093,13 +1123,13 @@ class Later(object):
 
   def _pipeline(self, actions, inputs=None, outQ=None, name=None):
     filter_funcs = list(actions)
-    if not actions:
+    if not filter_funcs:
       raise ValueError("no actions")
     if outQ is None:
       outQ = IterableQueue(name="pipelineIQ")
     if name is None:
       name = "pipelinePQ"
-    pipeline = _Pipeline(name, self, actions, outQ)
+    pipeline = _Pipeline(name, self, filter_funcs, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
       self._defer_iterable( inputs, inQ )
