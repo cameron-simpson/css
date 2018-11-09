@@ -115,6 +115,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.writeonly = False
       self._archives = {}
       self._blockmapdir = None
+      self.block_cache = None
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
