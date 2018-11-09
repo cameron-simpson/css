@@ -65,6 +65,7 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
+        'cs.x',
     ],
 }
 
