@@ -32,9 +32,10 @@ from functools import partial
 import logging
 import sys
 import threading
+from threading import Lock, Thread, Event
 import time
 import traceback
-from cs.debug import ifdebug, Lock, Thread
+from cs.debug import ifdebug
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
@@ -556,7 +557,7 @@ class Later(object):
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
     self.name = name
-    self._lock = threading.Lock()
+    self._lock = Lock()
     self.outstanding = set()    # uncompleted LateFunctions
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
@@ -577,7 +578,7 @@ class Later(object):
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
     self.closed = False
-    self._finished = threading.Event()
+    self._finished = Event()
 
   def shutdown(self):
     ''' Shut down the Later instance:
@@ -708,9 +709,8 @@ class Later(object):
   def __enter__(self):
     global default
     debug("%s: __enter__", self)
-    L = MultiOpenMixin.__enter__(self)
-    default.push(L)
-    return L
+    default.push(self)
+    return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     ''' Exit handler: release the "complete" lock; the placeholder
@@ -718,7 +718,6 @@ class Later(object):
     '''
     global default
     debug("%s: __exit__: exc_type=%s", self, exc_type)
-    MultiOpenMixin.__exit__(self, exc_type, exc_val, exc_tb)
     default.pop()
     return False
 
