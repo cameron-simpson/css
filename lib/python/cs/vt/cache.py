@@ -12,7 +12,7 @@ from collections import namedtuple
 import sys
 from tempfile import TemporaryFile
 from threading import Lock, RLock, Thread
-from cs.fileutils import RWFileBlockCache
+from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
@@ -417,6 +417,26 @@ class BlockMapping:
     assert offset + size <= self.filled
     return self.tempf.pread(size, self.offset + offset)
 
+  def datafrom(self, offset=0, maxlength=None):
+    ''' Yield data from the underlying temp file.
+
+        Parameters:
+        * `offset`: start of data, default `0`
+        * `maxlength`: maximum amount of data to yield,
+          default `self.filled - offset`
+    '''
+    assert offset >= 0
+    if maxlength is None:
+      maxlength = self.filled - offset
+    else:
+      maxlength = min(maxlength, self.filled - offset)
+    if maxlength <= 0:
+      return
+    yield from datafrom_fd(
+        self.tempf.fileno(),
+        self.offset + offset,
+        maxlength=maxlength)
+
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
   '''
@@ -526,7 +546,7 @@ class BlockCache:
     self.suffix = suffix
     self.max_files = max_files
     self.max_file_size = max_file_size
-    self.blockmaps = {}      # hashcode -> BlockMapping
+    self.blockmaps = {}     # hashcode -> BlockMapping
     self._tempfiles = []    # in play BlockTempfiles
     self._lock = Lock()
     self.runstate = RunState()
@@ -541,6 +561,11 @@ class BlockCache:
       for tempf in self._tempfiles:
         tempf.close()
       self._tempfiles = []
+
+  def __getitem__(self, hashcode):
+    ''' Fetch BlockMapping associated with `hashcode`, raise KeyError if missing.
+    '''
+    return self.blockmaps[hashcode]
 
   def get_blockmap(self, block):
     ''' Add the specified Block to the cache, return the BlockMapping.
