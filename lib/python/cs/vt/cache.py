@@ -444,7 +444,7 @@ class BlockTempfile:
   def __init__(self, cache, tmpdir, suffix):
     X("new BlockTemptfile...")
     self.cache = cache
-    self.tempfile = TemporaryFile(tmpdir=tmpdir, suffix=suffix)
+    self.tempfile = TemporaryFile(dir=tmpdir, suffix=suffix)
     self.hashcodes = {}
     self.size = 0
     self._lock = RLock()
@@ -570,8 +570,6 @@ class BlockCache:
   def get_blockmap(self, block):
     ''' Add the specified Block to the cache, return the BlockMapping.
     '''
-    if not block.indirect:
-      block = IndirectBlock(block)
     blockmaps = self.blockmaps
     h = block.hashcode
     with self._lock:
