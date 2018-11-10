@@ -782,9 +782,39 @@ class _IndirectBlock(_Block):
     return cls(superB, span), offset
 
   def datafrom(self, start=0, end=None):
-    for B, Bstart, Bend in self.slices(start, end):
-      assert not B.indirect
-      yield B.get_direct_data()[Bstart:Bend]
+    ''' Yield data from a point in the Block.
+    '''
+    X("DATAFROM %s ...", self)
+    if end is None:
+      end = self.span
+    if start >= end:
+      return
+    block_cache = defaults.S.block_cache
+    X("DATAFROM: defaults.S.block_cache=%s", block_cache)
+    if block_cache:
+      X("DAtAFROM: look up %s in block_cache", self.hashcode)
+      try:
+        bm = block_cache[self.hashcode]
+      except KeyError:
+        X("DATAFROM: NOT PRESENT")
+        pass
+      else:
+        filled = bm.filled
+        X("DATAFROM: PRESENT, filled=%s", filled)
+        if filled > start:
+          X("%s.datafrom(%d): get data from BlockMap", self, start)
+          maxlength = end - start
+          for bs in bm.datafrom(start, maxlength=maxlength):
+            X("DATAFROM: bm.datafrom: %d bytes", len(bs))
+            yield bs
+            start += len(bs)
+            assert start <= end
+        X("DATAFROM: past filled point")
+    X("DATAFROM: now get data not from block_cache")
+    if start < end:
+      for B, Bstart, Bend in self.slices(start, end):
+        assert not B.indirect
+        yield B.get_direct_data()[Bstart:Bend]
 
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
