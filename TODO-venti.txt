@@ -1,3 +1,4 @@
+decouple File sync from filesystem FileHandle close
 Config needs a hashclass option to supply to Store constructors
 make cs.later.Later restartable - tends to hang on the second shutdown?
 sqlite based index/state file: sharable and portable - but needs to batch lookups and inserts for performance
