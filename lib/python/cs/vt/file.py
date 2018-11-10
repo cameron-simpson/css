@@ -261,8 +261,8 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         yield from filedata(f.front_file, start=span.start, end=span.end)
       else:
         # data from the backing block
-        for B, Bstart, Bend in backing_block.slices(span.start, span.end):
-          yield B[Bstart:Bend]
+        for bs in backing_block.datafrom(start=span.start, end=span.end):
+          yield bs
 
   @locked
   def high_level_blocks(self, start=None, end=None, scanner=None):
