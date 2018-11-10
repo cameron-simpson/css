@@ -10,6 +10,7 @@
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
+import shlex
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
@@ -332,8 +333,8 @@ class FileSystem(object):
     if S is None:
       S = defaults.S
     self._old_S_block_cache = S.block_cache
-    block_cache = S.block_cache or defaults.block_cache or BlockCache()
-    S.block_cache = block_cache
+    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    S.block_cache = self.block_cache
     S.open()
     if readonly is None:
       readonly = S.readonly
@@ -635,5 +636,16 @@ class FileSystem(object):
             OS_EINVAL("no control command")
           op = argv.pop(0)
           with Pfx(op):
+            if op == 'cache':
+              if argv:
+                OS_EINVAL("extra arguments: %r", argv)
+              B = E.block
+              if B.indirect:
+                X("ADD BLOCK CACHE FOR %s", B)
+                bm = self.block_cache.get_blockmap(B)
+                X("==> BLOCKMAP: %s", bm)
+              else:
+                X("IGNORE BLOCK CACHE for %s: not indirect", B)
+              return
             OS_EINVAL("unrecognised control command")
-      OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
+        OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
