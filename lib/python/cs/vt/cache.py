@@ -18,7 +18,7 @@ from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
-from . import MAX_FILE_SIZE
+from . import defaults, MAX_FILE_SIZE
 from .block import IndirectBlock
 from .store import BasicStoreSync, MappingStore
 
@@ -502,25 +502,26 @@ class BlockTempfile:
       self.hashcodes[h] = bm
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
-        target=self._infill, args=(bm, offset, block, runstate))
+        target=self._infill, args=(defaults.S, bm, offset, block, runstate))
     T.daemon = True
     T.start()
     return bm
 
-  def _infill(self, bm, offset, block, runstate):
+  def _infill(self, S, bm, offset, block, runstate):
     ''' Load the Block data into the tempfile,
         updating the `BlockMapping.filled` attribute as we go.
     '''
-    needed = len(block)
-    for data in block.datafrom():
-      if runstate.cancelled:
-        break
-      assert len(data) <= needed
-      written = self._pwrite(data, offset)
-      assert written == len(data)
-      offset += written
-      needed -= written
-      bm.filled += written
+    with S:
+        needed = len(block)
+        for data in block.datafrom():
+          if runstate.cancelled:
+            break
+          assert len(data) <= needed
+          written = self._pwrite(data, offset)
+          assert written == len(data)
+          offset += written
+          needed -= written
+          bm.filled += written
     X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 class BlockCache:
