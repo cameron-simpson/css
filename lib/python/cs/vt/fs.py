@@ -72,6 +72,15 @@ class FileHandle:
     fhndx = getattr(self, 'fhndx', None)
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
+  def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
+    S = defaults.S
+    R = self.E.flush()
+    self.E.parent.changed = True
+    S.open()
+    R.notify(lambda _: (self.E.close(), S.close()))
+
   def write(self, data, offset):
     ''' Write data to the file.
     '''
@@ -117,12 +126,6 @@ class FileHandle:
     self.E.flush(scanner)
     ## no touch, already done by any writes
     X("FileHandle.Flush DONE")
-
-  def close(self):
-    ''' Close the file, mark its parent directory as changed.
-    '''
-    self.E.close()
-    self.E.parent.changed = True
 
 @mapping_transcriber(
     prefix="Ino",
