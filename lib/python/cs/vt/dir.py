@@ -787,6 +787,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ''' Update the Block for this FileDirent.
         The Dirent is expected to be closed.
     '''
+    self._check()
     if self.open_file is not None:
       raise RuntimeError("tried to set .block directly while open")
     self._block = B
