@@ -16,7 +16,7 @@ from cs.fileutils import BackedFile, ReadMixin
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
-from cs.result import bg
+from cs.result import bg, Result
 from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults
@@ -136,6 +136,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   @locked
   def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
+        Return a Result while completes later.
 
         We dispatch the sync in the background within a lock.
 
@@ -150,7 +151,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
       # no bg syncher, no modified data: file unchanged
-      return
+      return Result(result=True)
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       def update_store():
         ''' Commit unsynched file contents to the Store.
@@ -187,6 +188,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       self._file.flush = self.flush
       S.open()
       self._syncer = bg(update_store)
+      return self._syncer
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
