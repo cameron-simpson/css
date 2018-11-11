@@ -378,12 +378,9 @@ class MemoryCacheMapping:
         self._ticker += 1
         max_data = self.max_data
         if used_data > max_data and len(mapping) > 1:
-          X("overflow: _skip_flush=%d", self._skip_flush)
           if self._skip_flush > 0:
-            X("overflow: defer hashcode discard")
             self._skip_flush -= 1
           else:
-            X("overflow: discard hashcodes with lowest tick value...")
             _tick = self._tick
             for _, old_hashcode in sorted( (tick, h) for h, tick in _tick.items() ):
               old_data = mapping.pop(old_hashcode)

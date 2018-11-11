@@ -747,7 +747,6 @@ class ProxyStore(BasicStoreSync):
         `data`: the data to add
         `ch`: a channel for hashocde return
     '''
-    X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
     hashcode1 = None    # becomes not None on successful add
     try:
       if not self.save:
@@ -810,7 +809,6 @@ class ProxyStore(BasicStoreSync):
     finally:
       # mark end of queue
       if hashcode1 is None:
-        X("BG QUEUE ADD no hashcode1, put None")
         ch.put(None)
       ch.close()
 
