@@ -177,6 +177,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
           # if we're still current, update the front settings
           if self._file is new_file:
             self._reset(B)
+        self.close()
         S.close()
         return B
       S = defaults.S
@@ -187,6 +188,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       self._file = new_file
       self._file.flush = self.flush
       S.open()
+      self.open()
       self._syncer = bg(update_store)
       return self._syncer
 
