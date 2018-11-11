@@ -752,7 +752,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
           self._block)
     f = self.open_file
     f.filename = self.name
-    self._block = f.close(enforce_final_close=True)
+    self._block = f.sync()
+    f.close()
     self.open_file = None
     self._check()
 
