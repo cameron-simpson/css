@@ -190,7 +190,12 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       self._file.flush = self.flush
       S.open()
       self.open()
-      self._syncer = bg(update_store)
+      new_syncer = self._syncer = bg(update_store)
+      def cleanup_syncer(R):
+        with self._lock:
+          if self._syncer is new_syncer:
+            self._syncer = None
+      new_syncer.notify(cleanup_syncer)
       return self._syncer
 
   def sync(self):
