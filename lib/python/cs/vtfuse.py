@@ -99,6 +99,7 @@ def handler(method):
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
+  @logexc
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
