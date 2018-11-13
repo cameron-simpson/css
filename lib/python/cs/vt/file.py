@@ -67,8 +67,7 @@ class ROBlockFile(RawIOBase, ReadMixin):
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       X("ROBlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
-    for B, Bstart, Bend in backing_block.slices(start=offset):
-      yield B[Bstart:Bend]
+    return backing_block.datafrom(offset)
 
 class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
