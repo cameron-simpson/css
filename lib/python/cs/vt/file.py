@@ -136,7 +136,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   @locked
   def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
-        Return a Result while completes later.
+        Return a Result which completes later.
 
         We dispatch the sync in the background within a lock.
 
@@ -151,8 +151,8 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
       # no bg syncher, no modified data: file unchanged
-    with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
       return Result(result=old_file.back_file.block)
+    with Pfx("%s.flush(scanner=%r)...", type(self).__qualname__, scanner):
       @logexc
       def update_store():
         ''' Commit unsynched file contents to the Store.
