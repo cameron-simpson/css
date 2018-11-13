@@ -12,6 +12,7 @@ from os import SEEK_SET
 import sys
 from threading import RLock
 from cs.buffer import CornuCopyBuffer
+from cs.excutils import logexc
 from cs.fileutils import BackedFile, ReadMixin
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
@@ -150,8 +151,9 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
       # no bg syncher, no modified data: file unchanged
-      return Result(result=True)
     with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
+      return Result(result=old_file.back_file.block)
+      @logexc
       def update_store():
         ''' Commit unsynched file contents to the Store.
         '''
