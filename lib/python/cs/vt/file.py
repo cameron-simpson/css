@@ -151,7 +151,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
       # no bg syncher, no modified data: file unchanged
-      return Result(result=old_file.back_file.block)
+      return Result(result=self._backing_block)
     with Pfx("%s.flush(scanner=%r)...", type(self).__qualname__, scanner):
       @logexc
       def update_store():
@@ -205,7 +205,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self.flush()
     R = self._syncer
     if R:
-      B = R.join()
+      B = R()
     else:
       B = self.backing_block
     X("%s.sync: B=%s", type(self), B)
