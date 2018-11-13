@@ -986,10 +986,11 @@ class Dir(_Dirent):
         data = b''.join(self._unhandled_dirent_chunks)
       # append the valid or new Dirents
       names = sorted(self.keys())
-      data += b''.join( self[name].encode()
-                        for name in names
-                        if name != '.' and name != '..'
-                      )
+      data += b''.join(
+          self[name].encode()
+          for name in names
+          if name != '.' and name != '..'
+      )
       # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self._changed = False
