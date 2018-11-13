@@ -115,6 +115,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.writeonly = False
       self._archives = {}
       self._blockmapdir = None
+      self.block_cache = None
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
@@ -746,7 +747,6 @@ class ProxyStore(BasicStoreSync):
         `data`: the data to add
         `ch`: a channel for hashocde return
     '''
-    X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
     hashcode1 = None    # becomes not None on successful add
     try:
       if not self.save:
@@ -809,7 +809,6 @@ class ProxyStore(BasicStoreSync):
     finally:
       # mark end of queue
       if hashcode1 is None:
-        X("BG QUEUE ADD no hashcode1, put None")
         ch.put(None)
       ch.close()
 

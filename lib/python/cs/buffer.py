@@ -523,8 +523,8 @@ class CornuCopyBuffer(object):
             if short_ok:
               break
             raise EOFError(
-                "insufficient chunks: skipto:%d but only reached %d"
-                % (new_offset, offset)
+                "insufficient chunks: toskip:%d but only reached %d"
+                % (toskip, offset)
             )
           # TODO: an empty chunk from input_data indicates "not
           #   yet" from a nonblocking tailing file - some kind of

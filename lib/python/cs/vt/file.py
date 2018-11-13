@@ -12,11 +12,12 @@ from os import SEEK_SET
 import sys
 from threading import RLock
 from cs.buffer import CornuCopyBuffer
+from cs.excutils import logexc
 from cs.fileutils import BackedFile, ReadMixin
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
-from cs.result import bg
+from cs.result import bg, Result
 from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults
@@ -67,8 +68,7 @@ class ROBlockFile(RawIOBase, ReadMixin):
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       X("ROBlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
-    for B, Bstart, Bend in backing_block.slices(start=offset):
-      yield B[Bstart:Bend]
+    return backing_block.datafrom(offset)
 
 class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
@@ -136,6 +136,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
   @locked
   def flush(self, scanner=None):
     ''' Push the current state to the Store and update the current top block.
+        Return a Result which completes later.
 
         We dispatch the sync in the background within a lock.
 
@@ -150,8 +151,9 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     # only do work if there are new data in the file or pending syncs
     if not old_syncer and not old_file.front_range:
       # no bg syncher, no modified data: file unchanged
-      return
-    with Pfx("%s.flush(scanner=%r)...", self.__class__.__qualname__, scanner):
+      return Result(result=old_file.back_file.block)
+    with Pfx("%s.flush(scanner=%r)...", type(self).__qualname__, scanner):
+      @logexc
       def update_store():
         ''' Commit unsynched file contents to the Store.
         '''
@@ -176,6 +178,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
           # if we're still current, update the front settings
           if self._file is new_file:
             self._reset(B)
+        self.close()
         S.close()
         return B
       S = defaults.S
@@ -186,7 +189,14 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       self._file = new_file
       self._file.flush = self.flush
       S.open()
-      self._syncer = bg(update_store)
+      self.open()
+      new_syncer = self._syncer = bg(update_store)
+      def cleanup_syncer(R):
+        with self._lock:
+          if self._syncer is new_syncer:
+            self._syncer = None
+      new_syncer.notify(cleanup_syncer)
+      return self._syncer
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
@@ -195,8 +205,10 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self.flush()
     R = self._syncer
     if R:
-      R.join()
-    B = self.backing_block
+      B = R.join()
+    else:
+      B = self.backing_block
+    X("%s.sync: B=%s", type(self), B)
     return B
 
   @locked
@@ -261,8 +273,8 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         yield from filedata(f.front_file, start=span.start, end=span.end)
       else:
         # data from the backing block
-        for B, Bstart, Bend in backing_block.slices(span.start, span.end):
-          yield B[Bstart:Bend]
+        for bs in backing_block.datafrom(start=span.start, end=span.end):
+          yield bs
 
   @locked
   def high_level_blocks(self, start=None, end=None, scanner=None):

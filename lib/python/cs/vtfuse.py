@@ -99,50 +99,60 @@ def handler(method):
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
+  @logexc
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
-    arg_desc = [ repr(arg) for arg in a ]
+    syscall = method.__name__
+    if syscall == 'write':
+      fh, offset, bs = a
+      arg_desc = [ str(a[0]), str(a[1]), "%d bytes:%r..." % (len(bs), bytes(bs[:16])) ]
+    else:
+      arg_desc = [ repr(arg) for arg in a ]
     arg_desc.extend(
         "%s=%r" % (kw_name, kw_value)
         for kw_name, kw_value in kw.items()
     )
+    arg_desc = ','.join(arg_desc)
     with Pfx(
         "%s.%s(%s)",
-        type(self).__name__, method.__name__, ','.join(arg_desc)
+        type(self).__name__, syscall, arg_desc
     ):
-      trace = method.__name__ not in ('getxattr', 'statfs',)
+      trace = syscall not in ('getxattr', 'statfs',)
       if trace:
-        X("CALL %s(*%r,**%r)", method.__name__, a, kw)
+        X("CALL %s(%s)", syscall, arg_desc)
       fs = self._vtfs
       try:
         with defaults.stack('fs', fs):
           with fs.S:
             result = method(self, *a, **kw)
             if trace:
-              XP(" result => %r", result)
+              if isinstance(result, bytes):
+                XP(" result => %d bytes, %r...", len(result), result[:16])
+              else:
+                XP(" result => %r", result)
             return result
       except FuseOSError as e:
-        X("CALL %s(*%r,**%r) => FuseOSError %s", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
         raise
       except OSError as e:
-        X("CALL %s(*%r,**%r) => OSError %s => FuseOSError", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
       except Exception as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", syscall, a, kw, e)
         exception(
             "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
-            method.__name__, a, kw, type(e), e)
+            syscall, a, kw, type(e), e)
         raise FuseOSError(errno.EINVAL) from e
       except BaseException as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => EXCEPTION %s", syscall, a, kw, e)
         error("UNCAUGHT EXCEPTION: %s", e)
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
       except:
-        X("CALL %s(*%r,**%r) => EXCEPTION %r", method.__name__, a, kw, sys.exc_info())
+        X("CALL %s(*%r,**%r) => EXCEPTION %r", syscall, a, kw, sys.exc_info())
   return handle
 
 class DirHandle:
@@ -643,7 +653,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
-    ##X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
+    X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
     FH = self._vtfs._fh(fhndx)
     chunks = []
     while size > 0:

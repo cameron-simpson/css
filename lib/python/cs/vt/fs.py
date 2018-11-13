@@ -10,6 +10,7 @@
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
+import shlex
 from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
@@ -21,6 +22,7 @@ from cs.threads import locked
 from cs.x import X
 from . import defaults
 from .block import isBlock
+from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
@@ -70,6 +72,21 @@ class FileHandle:
     fhndx = getattr(self, 'fhndx', None)
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
+  def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
+    S = defaults.S
+    R = self.E.flush()
+    self.E.parent.changed = True
+    S.open()
+    # NB: additional S.open/close around self.E.close
+    R.notify(logexc(lambda _: (
+        defaults.pushStore(S),
+        self.E.close(),
+        defaults.popStore(),
+        S.close()
+    )))
+
   def write(self, data, offset):
     ''' Write data to the file.
     '''
@@ -90,21 +107,6 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    bm = self._block_mapping
-    if bm and offset < bm.filled:
-      # Fetch directly from the BlockMapping.
-      bmsize = min(size, bm.filled - offset)
-      data = bm.pread(bmsize, offset)
-      assert len(data) > 0
-      size -= len(data)
-      offset += len(data)
-      if size > 0:
-        tail = self.read(size, offset)
-        return data + tail
-      return data
-    ##f = self.E.open_file
-    ##X("f = %s %s", type(f), f)
-    ##X("f.read = %s %s", type(f.read), f.read)
     return self.E.open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
@@ -130,12 +132,6 @@ class FileHandle:
     self.E.flush(scanner)
     ## no touch, already done by any writes
     X("FileHandle.Flush DONE")
-
-  def close(self):
-    ''' Close the file, mark its parent directory as changed.
-    '''
-    self.E.close()
-    self.E.parent.changed = True
 
 @mapping_transcriber(
     prefix="Ino",
@@ -345,6 +341,9 @@ class FileSystem(object):
       raise ValueError("not dir Dir: %s" % (E,))
     if S is None:
       S = defaults.S
+    self._old_S_block_cache = S.block_cache
+    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    S.block_cache = self.block_cache
     S.open()
     if readonly is None:
       readonly = S.readonly
@@ -400,6 +399,7 @@ class FileSystem(object):
     '''
     self._sync()
     self.S.close()
+    self.S.block_cache = self._old_S_block_cache
 
   def __str__(self):
     if self.subpath:
@@ -407,7 +407,7 @@ class FileSystem(object):
           self.__class__.__name__,
           self.S, self.E, self.subpath, self.mntE
       )
-    return "<%s S=%s /=%s>" % (self.__class__.__name__, self.S, self.E)
+    return "%s(S=%s,/=%s)" % (type(self).__name__, self.S, self.E)
 
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
@@ -645,5 +645,16 @@ class FileSystem(object):
             OS_EINVAL("no control command")
           op = argv.pop(0)
           with Pfx(op):
+            if op == 'cache':
+              if argv:
+                OS_EINVAL("extra arguments: %r", argv)
+              B = E.block
+              if B.indirect:
+                X("ADD BLOCK CACHE FOR %s", B)
+                bm = self.block_cache.get_blockmap(B)
+                X("==> BLOCKMAP: %s", bm)
+              else:
+                X("IGNORE BLOCK CACHE for %s: not indirect", B)
+              return
             OS_EINVAL("unrecognised control command")
-      OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
+        OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)

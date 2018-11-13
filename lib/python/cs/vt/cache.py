@@ -12,13 +12,13 @@ from collections import namedtuple
 import sys
 from tempfile import TemporaryFile
 from threading import Lock, RLock, Thread
-from cs.fileutils import RWFileBlockCache
+from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
-from . import MAX_FILE_SIZE
+from . import defaults, MAX_FILE_SIZE
 from .block import IndirectBlock
 from .store import BasicStoreSync, MappingStore
 
@@ -378,12 +378,9 @@ class MemoryCacheMapping:
         self._ticker += 1
         max_data = self.max_data
         if used_data > max_data and len(mapping) > 1:
-          X("overflow: _skip_flush=%d", self._skip_flush)
           if self._skip_flush > 0:
-            X("overflow: defer hashcode discard")
             self._skip_flush -= 1
           else:
-            X("overflow: discard hashcodes with lowest tick value...")
             _tick = self._tick
             for _, old_hashcode in sorted( (tick, h) for h, tick in _tick.items() ):
               old_data = mapping.pop(old_hashcode)
@@ -417,6 +414,26 @@ class BlockMapping:
     assert offset + size <= self.filled
     return self.tempf.pread(size, self.offset + offset)
 
+  def datafrom(self, offset=0, maxlength=None):
+    ''' Yield data from the underlying temp file.
+
+        Parameters:
+        * `offset`: start of data, default `0`
+        * `maxlength`: maximum amount of data to yield,
+          default `self.filled - offset`
+    '''
+    assert offset >= 0
+    if maxlength is None:
+      maxlength = self.filled - offset
+    else:
+      maxlength = min(maxlength, self.filled - offset)
+    if maxlength <= 0:
+      return
+    yield from datafrom_fd(
+        self.tempf.fileno(),
+        self.offset + offset,
+        maxlength=maxlength)
+
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
   '''
@@ -424,7 +441,7 @@ class BlockTempfile:
   def __init__(self, cache, tmpdir, suffix):
     X("new BlockTemptfile...")
     self.cache = cache
-    self.tempfile = TemporaryFile(tmpdir=tmpdir, suffix=suffix)
+    self.tempfile = TemporaryFile(dir=tmpdir, suffix=suffix)
     self.hashcodes = {}
     self.size = 0
     self._lock = RLock()
@@ -482,25 +499,26 @@ class BlockTempfile:
       self.hashcodes[h] = bm
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
-        target=self._infill, args=(bm, offset, block, runstate))
+        target=self._infill, args=(defaults.S, bm, offset, block, runstate))
     T.daemon = True
     T.start()
     return bm
 
-  def _infill(self, bm, offset, block, runstate):
+  def _infill(self, S, bm, offset, block, runstate):
     ''' Load the Block data into the tempfile,
         updating the `BlockMapping.filled` attribute as we go.
     '''
-    needed = len(block)
-    for data in block.datafrom():
-      if runstate.cancelled:
-        break
-      assert len(data) <= needed
-      written = self._pwrite(data, offset)
-      assert written == len(data)
-      offset += written
-      needed -= written
-      bm.filled += written
+    with S:
+        needed = len(block)
+        for data in block.datafrom():
+          if runstate.cancelled:
+            break
+          assert len(data) <= needed
+          written = self._pwrite(data, offset)
+          assert written == len(data)
+          offset += written
+          needed -= written
+          bm.filled += written
     X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 class BlockCache:
@@ -526,7 +544,7 @@ class BlockCache:
     self.suffix = suffix
     self.max_files = max_files
     self.max_file_size = max_file_size
-    self.blockmaps = {}      # hashcode -> BlockMapping
+    self.blockmaps = {}     # hashcode -> BlockMapping
     self._tempfiles = []    # in play BlockTempfiles
     self._lock = Lock()
     self.runstate = RunState()
@@ -542,11 +560,14 @@ class BlockCache:
         tempf.close()
       self._tempfiles = []
 
+  def __getitem__(self, hashcode):
+    ''' Fetch BlockMapping associated with `hashcode`, raise KeyError if missing.
+    '''
+    return self.blockmaps[hashcode]
+
   def get_blockmap(self, block):
     ''' Add the specified Block to the cache, return the BlockMapping.
     '''
-    if not block.indirect:
-      block = IndirectBlock(block)
     blockmaps = self.blockmaps
     h = block.hashcode
     with self._lock:

@@ -716,6 +716,7 @@ class VTCmd:
               error("mountpoint is not a directory", mountpoint)
               return 1
             raise
+        T = None
         try:
           T = mount(
               mountpoint, E,
@@ -723,11 +724,12 @@ class VTCmd:
               readonly=readonly, append_only=append_only,
               fsname=fsname)
           cs.x.X_via_tty = True
-          T.join()
         except KeyboardInterrupt as e:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
-          T.join()
+        finally:
+          if T:
+            T.join()
       if need_rmdir:
         info("rmdir %r ...", mountpoint)
         try:

@@ -22,6 +22,7 @@ import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.cmdutils import docmd
+from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
 from cs.lex import texthexify
@@ -752,7 +753,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
           self._block)
     f = self.open_file
     f.filename = self.name
-    self._block = f.close(enforce_final_close=True)
+    self._block = f.sync()
+    f.close()
     self.open_file = None
     self._check()
 
@@ -786,6 +788,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ''' Update the Block for this FileDirent.
         The Dirent is expected to be closed.
     '''
+    self._check()
     if self.open_file is not None:
       raise RuntimeError("tried to set .block directly while open")
     self._block = B
@@ -968,6 +971,7 @@ class Dir(_Dirent):
 
   @property
   @locked
+  @logexc
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
 
@@ -984,10 +988,11 @@ class Dir(_Dirent):
         data = b''.join(self._unhandled_dirent_chunks)
       # append the valid or new Dirents
       names = sorted(self.keys())
-      data += b''.join( self[name].encode()
-                        for name in names
-                        if name != '.' and name != '..'
-                      )
+      data += b''.join(
+          self[name].encode()
+          for name in names
+          if name != '.' and name != '..'
+      )
       # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
       self._changed = False
