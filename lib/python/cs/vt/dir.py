@@ -22,6 +22,7 @@ import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.cmdutils import docmd
+from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info, exception
 from cs.pfx import Pfx
 from cs.lex import texthexify
@@ -970,6 +971,7 @@ class Dir(_Dirent):
 
   @property
   @locked
+  @logexc
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
 
