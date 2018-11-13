@@ -196,8 +196,9 @@ class TCPClientStore(StreamStore):
     '''
     super()._packet_disconnect(conn)
     sock = self.sock
-    self.sock = None
-    sock.close()
+    if sock:
+        self.sock = None
+        sock.close()
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
