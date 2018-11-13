@@ -205,8 +205,10 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self.flush()
     R = self._syncer
     if R:
-      R.join()
-    B = self.backing_block
+      B = R.join()
+    else:
+      B = self.backing_block
+    X("%s.sync: B=%s", type(self), B)
     return B
 
   @locked
