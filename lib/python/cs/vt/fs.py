@@ -79,7 +79,13 @@ class FileHandle:
     R = self.E.flush()
     self.E.parent.changed = True
     S.open()
-    R.notify(lambda _: (self.E.close(), S.close()))
+    # NB: additional S.open/close around self.E.close
+    R.notify(logexc(lambda _: (
+        defaults.pushStore(S),
+        self.E.close(),
+        defaults.popStore(),
+        S.close()
+    )))
 
   def write(self, data, offset):
     ''' Write data to the file.
