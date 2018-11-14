@@ -121,6 +121,7 @@ class _PfxThreadState(threading.local):
     self._ur_prefix = None
     self.stack = []
     self.trace = None
+    self._doing_prefix = False
 
   @property
   def cur(self):
@@ -142,11 +143,20 @@ class _PfxThreadState(threading.local):
     ''' Return the prevailing message prefix.
     '''
     global cmd
+    # Because P.umark can call str() on the mark, which in turn may
+    # call arbitrary code which in turn may issue log messages, which
+    # in turn may call this, we prevent such recursion.
+    doing_prefix = self._doing_prefix
+    self._doing_prefix = True
     marks = []
     for P in reversed(list(self.stack)):
-      marks.append(P.umark)
+      if doing_prefix:
+        marks.append(str(type(P._umark)))
+      else:
+        marks.append(P.umark)
       if P.absolute:
         break
+    self._doing_prefix = doing_prefix
     if self._ur_prefix is not None:
       marks.append(self._ur_prefix)
     if cmd is not None:
