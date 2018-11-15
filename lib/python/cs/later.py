@@ -1162,6 +1162,65 @@ class Later(object):
     '''
     return LatePool(L=self, *a, **kw)
 
+class SubLater(object):
+  ''' A class for managing a group of deferred tasks using an existing `Later`.
+  '''
+
+  def __init__(self, L):
+    ''' Initialise the `SubLater` with its parent `Later`.
+    '''
+    self._later = L
+    self._lock = Lock()
+    self._deferred = 0
+    self._queued = 0
+    self._queue = IterableQueue()
+    self.closed = False
+
+  def __str__(self):
+    return "%s(%s%s,deferred=%d,completed=%d)" % (
+            type(self), self._later,
+            "[CLOSED]" if self.closed else "",
+            self._deferred, self._queued,
+        )
+
+  def __iter__(self):
+    ''' Iteration over the `SubLater`
+        iterates over the queue of completed `LateFUnction`s.
+    '''
+    return iter(self._queue)
+
+  def close(self):
+    ''' Close the SubLater.
+
+        This prevents further deferrals.
+    '''
+    with self._lock:
+      closed = self.closed
+      if closed:
+        L.warning("repeated close of %s", self)
+      else:
+        self.closed = True
+        if self._queued >= self._deferred:
+          self._queue.close()
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function, return its LateFunction.
+
+	The resulting LateFunction will queue itself for collection
+	on completion.
+    '''
+    with self._lock:
+      LF = self.L.defer(func, *a, **kw)
+      self._deferred += 1
+      def on_complete(R):
+        with self._lock:
+          self._queue.put(R)
+          self._queued += 1
+          if self.closed and self._queued >= self._deferred:
+            self._queue.close()
+    LF.notify(on_complete)
+    return LF
+
 class LatePool(object):
   ''' A context manager after the style of subprocess.Pool but with deferred completion.
       Example usage:
