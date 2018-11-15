@@ -1222,20 +1222,22 @@ class SubLater(object):
     return LF
 
 class LatePool(object):
-  ''' A context manager after the style of subprocess.Pool but with deferred completion.
+  ''' A context manager after the style of subprocess.Pool
+      but with deferred completion.
+
       Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        with LatePool(L) as LP:
-          # several calls to LatePool.defer, perhaps looped
-          LP.defer(func, *args, **kwargs)
-          LP.defer(func, *args, **kwargs)
-        # now we can LP.join() to block for all LateFunctions
-        #
-        # or iterate over LP to collect LateFunctions as they complete
-        for LF in LP:
-          result = LF()
-          print(result)
+          L = Later(4)    # a 4 thread Later
+          with LatePool(L) as LP:
+            # several calls to LatePool.defer, perhaps looped
+            LP.defer(func, *args, **kwargs)
+            LP.defer(func, *args, **kwargs)
+          # now we can LP.join() to block for all LateFunctions
+          #
+          # or iterate over LP to collect LateFunctions as they complete
+          for LF in LP:
+            result = LF()
+            print(result)
   '''
 
   def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
