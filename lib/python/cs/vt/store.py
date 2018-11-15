@@ -637,17 +637,17 @@ class ProxyStore(BasicStoreSync):
 
       A example setup utilising a working ProxyStore might look like this:
 
-        ProxyStore(
-          save=[local,upstream],
-          save2=[spool],
-          read=[local],
-          read2=[upstream],
-        )
+          ProxyStore(
+            save=[local,upstream],
+            save2=[spool],
+            read=[local],
+            read2=[upstream],
+          )
 
       In this example:
-        "local" is a local low latency store such as a DataDirStore.
-        "upstream" is a remote high latency Store such as a TCPStore.
-        "spool" is a local scondary Store, probably a DataDirStore
+      * local: is a local low latency store such as a DataDirStore.
+      * upstream: is a remote high latency Store such as a TCPStore.
+      * spool: is a local scondary Store, probably a DataDirStore
 
       This setup causes all saved data to be saved to "local" and
       "upstream". If a save to "local" or "upstream" fails, for
@@ -658,7 +658,8 @@ class ProxyStore(BasicStoreSync):
       Reads are attempted first from the "read" Stores, then from
       the "read2" Stores".
 
-      TODO: implement save2 saves
+      TODO: copy2: anything fetched from read2 is saved here
+
       TODO: replay and purge the spool? probably better as a separate
       pushto operation ("vt despool spool_store upstream_store").
   '''
