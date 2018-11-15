@@ -645,18 +645,18 @@ class ProxyStore(BasicStoreSync):
           )
 
       In this example:
-      * local: is a local low latency store such as a DataDirStore.
-      * upstream: is a remote high latency Store such as a TCPStore.
-      * spool: is a local scondary Store, probably a DataDirStore
+      * `local`: is a local low latency store such as a DataDirStore.
+      * `upstream`: is a remote high latency Store such as a TCPStore.
+      * `spool`: is a local scondary Store, probably a DataDirStore.
 
-      This setup causes all saved data to be saved to "local" and
-      "upstream". If a save to "local" or "upstream" fails, for
+      This setup causes all saved data to be saved to `local` and
+      `upstream`. If a save to `local` or "upstream" fails, for
       example if the upstream if offline, the save is repeated to
-      the "spool", intended as a holding location for data needing
+      the `spool`, intended as a holding location for data needing
       a resave.
 
-      Reads are attempted first from the "read" Stores, then from
-      the "read2" Stores".
+      Reads are attempted first from the `read` Stores, then from
+      the `read2` Stores".
 
       TODO: copy2: anything fetched from read2 is saved here
 
