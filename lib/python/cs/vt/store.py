@@ -15,7 +15,7 @@ import sys
 from threading import Lock, Semaphore
 from cs.later import Later
 from cs.logutils import warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
 from cs.progress import Progress
 from cs.py.func import prop, funccite
 from cs.py.stack import caller
@@ -629,11 +629,13 @@ class MappingStore(BasicStoreSync):
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
 
-      Two classes of Stores are managed:
+      Three classes of Stores are managed:
 
       Save stores. All data added to the Proxy is added to these Stores.
 
       Read Stores. Requested data may be obtained from these Stores.
+
+      Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
 
       A example setup utilising a working ProxyStore might look like this:
 
@@ -642,6 +644,7 @@ class ProxyStore(BasicStoreSync):
             save2=[spool],
             read=[local],
             read2=[upstream],
+            copy2=[local],
           )
 
       In this example:
@@ -650,40 +653,49 @@ class ProxyStore(BasicStoreSync):
       * `spool`: is a local scondary Store, probably a DataDirStore.
 
       This setup causes all saved data to be saved to `local` and
-      `upstream`. If a save to `local` or "upstream" fails, for
-      example if the upstream if offline, the save is repeated to
-      the `spool`, intended as a holding location for data needing
-      a resave.
+      `upstream`.
+      If a save to `local` or `upstream` fails,
+      for example if the upstream if offline,
+      the save is repeated to the `spool`,
+      intended as a holding location for data needing a resave.
 
       Reads are attempted first from the `read` Stores, then from
-      the `read2` Stores".
-
-      TODO: copy2: anything fetched from read2 is saved here
+      the `read2` Stores.
+      If there are any `copy2` Stores,
+      any data obtained from `read2` are copied into the `copy2` Stores;
+      in this way remote data become locally saved.
 
       TODO: replay and purge the spool? probably better as a separate
       pushto operation ("vt despool spool_store upstream_store").
   '''
 
-  def __init__(self, name, save, read, *, save2=(), read2=(), **kw):
+  def __init__(self, name, save, read, *, save2=(), read2=(), copy2=(), **kw):
     ''' Initialise a ProxyStore.
-        `name`: ProxyStore name.
-        `save`: iterable of Stores to which to save blocks
-        `read`: iterable of Stores from which to fetch blocks
-        `save2`: fallback Store for saves which fail
-        `read2`: optional fallback iterable of Stores from which
+
+        Parameters:
+        * `name`: ProxyStore name.
+        * `save`: iterable of Stores to which to save blocks
+        * `read`: iterable of Stores from which to fetch blocks
+        * `save2`: fallback Store for saves which fail
+        * `read2`: optional fallback iterable of Stores from which
           to fetch blocks if not found via `read`. Typically these
           would be higher latency upstream Stores.
+        * `copy2`: optional iterable of Stores to receive copies
+          of data obtained via `read2` Stores.
     '''
     BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.save2 = frozenset(save2)
     self.read2 = frozenset(read2)
+    self.copy2 = frozenset(copy2)
     self._attrs.update(save=save, read=read)
     if save2:
       self._attrs.update(save2=save2)
     if read2:
       self._attrs.update(read2=read2)
+    if copy2:
+      self._attrs.update(copy2=copy2)
     self.readonly = len(self.save) == 0
 
   def __str__(self):
@@ -691,11 +703,11 @@ class ProxyStore(BasicStoreSync):
 
   def startup(self):
     super().startup()
-    for S in self.save | self.read | self.save2 | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.open()
 
   def shutdown(self):
-    for S in self.save | self.read | self.save2 | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.close()
     super().shutdown()
 
@@ -816,14 +828,20 @@ class ProxyStore(BasicStoreSync):
   def get(self, h):
     ''' Fetch a block from the first Store which has it.
     '''
-    for stores in self.read, self.read2:
-      for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
-        if exc_info:
-          error("exception fetching from %s: %s", S, exc_info)
-        elif data is not None:
-          X("ProxyStore.GET %s succeeds from %s: %d bytes", h, S.name, len(data))
-          return data
-    return None
+    with Pfx("%s.get", type(self)):
+      for stores in self.read, self.read2:
+        for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
+          with Pfx("%s.get_bg(%s)", S, h):
+            if exc_info:
+              error("exception", exc_info=exc_info)
+            elif data is not None:
+              XP("got %d bytes", len(data))
+              if S not in self.read:
+                for copyS in self.copy2:
+                  XP("copy to %s", copyS)
+                  copyS.add_bg(data)
+              return data
+      return None
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
