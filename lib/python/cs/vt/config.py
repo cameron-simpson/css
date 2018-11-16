@@ -366,6 +366,7 @@ class Config:
       read=None,
       save2=None,
       read2=None,
+      copy2=None,
   ):
     ''' Construct a ProxyStore.
     '''
@@ -399,10 +400,17 @@ class Config:
       read2_stores = self.Stores_from_spec(read2)
     else:
       read2_stores = read2
+    if copy2 is None:
+      copy2_stores = []
+    elif isinstance(copy2, str):
+      copy2_stores = self.Stores_from_spec(copy2)
+    else:
+      copy2_stores = copy2
     S = ProxyStore(
         store_name,
         save_stores, read_stores,
         save2=save2_stores, read2=read2_stores,
+        copy2=copy2_stores,
     )
     S.readonly = readonly
     return S
