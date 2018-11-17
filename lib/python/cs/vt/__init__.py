@@ -13,14 +13,20 @@
           http://en.wikipedia.org/wiki/Venti
 '''
 
+from collections import namedtuple
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
+from threading import (
+    Lock as threading_Lock,
+    RLock as threading_RLock,
+    current_thread,
+)
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
-from cs.py.stack import stack_dump
+from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
 from cs.resources import RunState
 
@@ -137,3 +143,56 @@ class _TestAdditionsMixin:
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+
+def Lock():
+  return DebuggingLock()
+
+def RLock():
+  return DebuggingLock(recursive=True)
+
+LockContext = namedtuple("LockContext", "caller thread")
+
+class DebuggingLock(object):
+  ''' A wrapper for a threading Lock or RLock
+      to notice contention and report contending uses.
+  '''
+
+  def __init__(self, recursive=False):
+    self.recursive = recursive
+    self._lock = threading_RLock() if recursive else threading_Lock()
+    self._held = None
+
+  def acquire(self, timeout=-1):
+    lock = self._lock
+    hold = LockContext(caller(), current_thread())
+    if lock.acquire(0):
+      contended = False
+      lock.release()
+    else:
+      contended = True
+      held = self._held
+      warning(
+          "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
+          hold.caller.filename, hold.caller.lineno,
+          lock,
+          held.caller.thread, held.caller.filename, held.caller.lineno)
+    acquired = lock.acquire(timeout=timeout)
+    if contended:
+      warning(
+          "%s:%d: lock %s: %s",
+          hold.caller.filename, hold.caller.lineno,
+          lock,
+          "acquired" if acquired else "timed out")
+    self._held = hold
+    return acquired
+
+  def release(self):
+    self._lock.release()
+
+  def __enter__(self):
+    self.acquire()
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.release()
+    return False

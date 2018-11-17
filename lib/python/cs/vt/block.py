@@ -38,7 +38,6 @@ from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
-from threading import RLock
 from cs.binary import (
     PacketField, BSUInt, BSData,
     flatten as flatten_transcription
@@ -50,7 +49,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
-from . import defaults, totext
+from . import defaults, totext, RLock
 from .hash import HashCode
 from .transcribe import Transcriber, register as register_transcriber, parse
 

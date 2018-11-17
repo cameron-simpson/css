@@ -7,11 +7,11 @@
 
 from contextlib import contextmanager
 from os.path import exists as existspath
-from threading import Lock
 ##from cs.debug import TimingOutLock as Lock
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
+from . import Lock
 from .hash import HashCodeUtilsMixin
 
 _CLASSES = []

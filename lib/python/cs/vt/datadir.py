@@ -22,7 +22,6 @@ from os.path import (
 import sqlite3
 import stat
 import sys
-from threading import Lock, RLock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -47,7 +46,7 @@ from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.x import X
-from . import MAX_FILE_SIZE
+from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE

@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from functools import partial
 from os.path import expanduser, isabs as isabspath
 import sys
-from threading import Lock, Semaphore
+from threading import Semaphore
 from cs.later import Later
 from cs.logutils import warning, error
 from cs.pfx import Pfx, XP
@@ -25,7 +25,7 @@ from cs.result import report
 from cs.seq import Seq
 from cs.threads import bg
 from cs.x import X
-from . import defaults
+from . import defaults, Lock
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin, MissingHashcodeError
 

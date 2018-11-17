@@ -17,7 +17,6 @@ import pwd
 import shlex
 import stat
 import sys
-from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
@@ -31,7 +30,7 @@ from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked, locked_property
 from cs.x import X
-from . import totext, PATHSEP, defaults
+from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .file import RWBlockFile
 from .meta import Meta, rwx, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL

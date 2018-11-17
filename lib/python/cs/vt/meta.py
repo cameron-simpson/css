@@ -11,12 +11,12 @@ from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
-from threading import RLock
 import time
 from cs.logutils import error, warning
 from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
 from cs.x import X
+from . import RLock
 from .transcribe import Transcriber, register as register_transcriber, \
                         transcribe_mapping, parse_mapping
 

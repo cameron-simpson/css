@@ -11,7 +11,6 @@ import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 import shlex
-from threading import Lock, RLock
 from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
@@ -20,7 +19,7 @@ from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
 from cs.x import X
-from . import defaults
+from . import defaults, Lock, RLock
 from .block import isBlock
 from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent

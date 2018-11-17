@@ -10,13 +10,12 @@ Store definition configuration file.
 
 import os
 from os.path import abspath, isabs as isabspath, join as joinpath
-from threading import Lock
 from cs.configutils import ConfigWatcher
 from cs.fileutils import shortpath, longpath
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
-from . import defaults
+from . import defaults, Lock
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import parse_store_specs

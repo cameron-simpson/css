@@ -10,7 +10,6 @@ from __future__ import print_function, absolute_import
 from io import RawIOBase
 from os import SEEK_SET
 import sys
-from threading import RLock
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.fileutils import BackedFile, ReadMixin
@@ -20,7 +19,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import bg, Result
 from cs.threads import locked, LockableMixin
 from cs.x import X
-from . import defaults
+from . import defaults, RLock
 from .block import Block
 from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
 
