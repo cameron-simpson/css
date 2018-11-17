@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath
+usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
   -i    Itemise changes.
   -x    Trace execution."
 
@@ -36,20 +36,28 @@ then
   echo "$cmd: missing srcpath:dstpath" >&2
   badopts=1
 else
+  rsopts=
   for src_dst
   do
-    case "$src_dst" in
-      ?*:?*)
-          dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
-          [ -d "$dst/." ] || {
-            echo "$cmd: $src_dst: missing destination: $dst" >&2
+    rspart=
+    if [ $rspart ]
+    then
+      rsopts="$rsopts $src_dst"
+    else
+      case "$src_dst" in
+        ?*:?*)
+            dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
+            [ -d "$dst/." ] || {
+              echo "$cmd: $src_dst: missing destination: $dst" >&2
+              badopts=1
+            }
+            ;;
+        -*) rsopts=$src_dst rspart=1 ;;
+        *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
             badopts=1
-          }
-          ;;
-      *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
-          badopts=1
-          ;;
-    esac
+            ;;
+      esac
+    fi
   done
 fi
 
@@ -59,9 +67,12 @@ xit=0
 
 for src_dst
 do
+  case "$src_dst" in
+    -*) break ;;
+  esac
   src=$( expr "x$src_dst" : 'x\(.*\):..*' )
   dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
-  $trace histbackup $hbopts -- "$src" "$dst" || xit=1
+  $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
 done
 
 exit $xit
