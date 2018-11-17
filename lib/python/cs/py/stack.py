@@ -32,7 +32,7 @@ def frames():
   return [ Frame(*f) for f in extract_stack()[:-1] ]
 
 def caller(frame_index = -3):
-  ''' Return the frame of the caller's caller.
+  ''' Return the `Frame` of the caller's caller.
   '''
   # -1: caller, this function
   # -2: invoker, who wants to know the caller
