@@ -8,8 +8,9 @@ set -ue
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
-  -i    Itemise changes.
-  -x    Trace execution."
+  -i            Itemise changes.
+  -x            Trace execution.
+  --copy-times  Passed to histbackup."
 
 hbopts=
 trace=
@@ -22,6 +23,8 @@ do
   case $1 in
     -i) hbopts="$hbopts $1" ;;
     -x) trace=set-x hbopts="$hbopts $1" ;;
+    --copy-times)
+        hbopts="$hbopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -37,9 +40,9 @@ then
   badopts=1
 else
   rsopts=
+  rspart=
   for src_dst
   do
-    rspart=
     if [ $rspart ]
     then
       rsopts="$rsopts $src_dst"
