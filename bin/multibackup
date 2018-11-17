@@ -45,13 +45,7 @@ else
       rsopts="$rsopts $src_dst"
     else
       case "$src_dst" in
-        ?*:?*)
-            dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
-            [ -d "$dst/." ] || {
-              echo "$cmd: $src_dst: missing destination: $dst" >&2
-              badopts=1
-            }
-            ;;
+        ?*:?*) ;;
         -*) rsopts=$src_dst rspart=1 ;;
         *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
             badopts=1
@@ -72,6 +66,11 @@ do
   esac
   src=$( expr "x$src_dst" : 'x\(.*\):..*' )
   dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
+  [ -d "$dst/." ] || {
+    echo "$cmd: $src_dst: skipping missing destination: $dst" >&2
+    xit=1
+    continue
+  }
   $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
 done
 
