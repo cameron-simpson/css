@@ -45,6 +45,7 @@ def oserror(errno, msg, *a):
 OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
 OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
 OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
+OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
 OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
 OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
 OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
@@ -526,6 +527,12 @@ class FileSystem(object):
     if (for_write or for_append) and self.readonly:
       error("fs is readonly")
       OS_EROFS("fs is readonly")
+    if E.issym:
+      if flags & O_NOFOLLOW:
+        OS_ELOOP("open symlink with O_NOFOLLOW")
+      OS_EINVAL("open(%s)" % (E,))
+    elif not E.isfile:
+      OS_EINVAL("open of nonfile: %s" % (E,))
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     if flags & O_TRUNC:
       FH.truncate(0)
