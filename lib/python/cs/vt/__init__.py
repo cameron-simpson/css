@@ -199,3 +199,7 @@ class DebuggingLock(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.release()
     return False
+
+  def _is_owned(self):
+    lock = self._lock
+    return lock._is_owned()
