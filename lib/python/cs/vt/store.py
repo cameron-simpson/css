@@ -474,7 +474,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                   return True
                 Xs("{")
                 sem.acquire()
-                addR = S2.bg(addblock, S1, S2, h, B)
+                addR = S2._defer(addblock, S1, S2, h, B)
                 Xs("<")
                 with lock:
                   pending.add(addR)
@@ -748,7 +748,7 @@ class ProxyStore(BasicStoreSync):
         hashcode received.
     '''
     ch = Channel()
-    self.bg(self._bg_add, data, ch)
+    self._defer(self._bg_add, data, ch)
     hashcode = ch.get()
     if hashcode is None:
       raise RuntimeError("no hashcode returned from .add")
@@ -758,7 +758,7 @@ class ProxyStore(BasicStoreSync):
     ''' Add a data chunk to the save Stores.
 
         `data`: the data to add
-        `ch`: a channel for hashocde return
+        `ch`: a channel for hashcode return
     '''
     hashcode1 = None    # becomes not None on successful add
     try:
