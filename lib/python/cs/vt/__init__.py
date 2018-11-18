@@ -28,7 +28,9 @@ from cs.logutils import error, warning
 from cs.mappings import StackableValues
 from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
+import cs.resources
 from cs.resources import RunState, MultiOpenMixin
+from cs.x import X
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
@@ -144,14 +146,16 @@ class _TestAdditionsMixin:
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
 
+if False:
+  def RLock():
+    return DebuggingLock(recursive=True)
+  # monkey patch MultiOpenMixin
+  cs.resources._mom_lockclass = RLock
+else:
+  Lock = threading_Lock
+  RLock = threading_RLock
 def Lock():
   return DebuggingLock()
-
-def RLock():
-  return DebuggingLock(recursive=True)
-
-# monkey patch MultiOpenMixin
-MultiOpenMixin._mo_lockclass = RLock
 
 LockContext = namedtuple("LockContext", "caller thread")
 
@@ -173,6 +177,10 @@ class DebuggingLock(object):
       _caller = caller()
     lock = self._lock
     hold = LockContext(_caller, current_thread())
+    if timeout != -1:
+      warning("%s:%d: lock %s: timeout=%s",
+          hold.caller.filename, hold.caller.lineno,
+          lock, timeout)
     if lock.acquire(0):
       contended = False
       lock.release()
