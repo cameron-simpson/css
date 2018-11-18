@@ -910,15 +910,21 @@ class Later(object):
 
   def complete(self, outstanding=None, until_idle=False):
     ''' Generator which waits for outstanding functions to complete and yields them.
-        `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
-        `until_idle`: if outstanding is not None, continue until self.outstanding is empty
+
+        Parameters:
+        * `outstanding`: if not None, an iterable of LateFunctions;
+          default `self.outstanding`.
+        * `until_idle`: if true,
+          continue until `self.outstanding` is empty.
+          This requires the `outstanding` parameter to the `None`.
     '''
     if outstanding is not None:
       if until_idle:
-        raise ValueError("outstanding is not None and until_idle is not false")
+        raise ValueError("outstanding is not None and until_idle is true")
       for LF in report(outstanding):
         yield LF
       return
+    # outstanding is None: loop until self.outstanding is empty
     while True:
       outstanding = list(self.outstanding)
       if not outstanding:
