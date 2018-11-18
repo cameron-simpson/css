@@ -28,7 +28,7 @@ from cs.logutils import error, warning
 from cs.mappings import StackableValues
 from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
-from cs.resources import RunState
+from cs.resources import RunState, MultiOpenMixin
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
@@ -149,6 +149,9 @@ def Lock():
 
 def RLock():
   return DebuggingLock(recursive=True)
+
+# monkey patch MultiOpenMixin
+MultiOpenMixin._mo_lockclass = RLock
 
 LockContext = namedtuple("LockContext", "caller thread")
 
