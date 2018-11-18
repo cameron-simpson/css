@@ -66,6 +66,8 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
+  _mo_lockclass = RLock
+
   def __init__(self, finalise_later=False, lock=None, subopens=False):
     ''' Initialise the MultiOpenMixin state.
 
@@ -88,14 +90,14 @@ class MultiOpenMixin(O):
     O.__init__(self)
     ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
     if lock is None:
-      lock = RLock()
+      lock = MultiOpenMixin._mo_lockclass()
     self.opened = False
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
     self._lock = lock
-    self.__mo_lock = RLock()
+    self.__mo_lock = MultiOpenMixin._mo_lockclass()
     self._finalise_later = finalise_later
     self._finalise = None
 
