@@ -16,6 +16,7 @@ from cs.logutils import error, warning
 from cs.obj import O, Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
+from cs.x import X
 
 DISTINFO = {
     'description': "resourcing related classes and functions",
@@ -46,6 +47,9 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
+
+_mom_lockclass = RLock
+
 ## debug: TrackedClassMixin
 class MultiOpenMixin(O):
   ''' A mixin to count open and close calls, and to call .startup
@@ -65,8 +69,6 @@ class MultiOpenMixin(O):
 
       Classes using this mixin need to define .startup and .shutdown.
   '''
-
-  _mo_lockclass = RLock
 
   def __init__(self, finalise_later=False, lock=None, subopens=False):
     ''' Initialise the MultiOpenMixin state.
@@ -90,14 +92,14 @@ class MultiOpenMixin(O):
     O.__init__(self)
     ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
     if lock is None:
-      lock = MultiOpenMixin._mo_lockclass()
+      lock = _mom_lockclass()
     self.opened = False
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
     self._lock = lock
-    self.__mo_lock = MultiOpenMixin._mo_lockclass()
+    self.__mo_lock = _mom_lockclass()
     self._finalise_later = finalise_later
     self._finalise = None
 
