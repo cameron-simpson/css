@@ -9,7 +9,7 @@
 
 import errno
 import os
-from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
+from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
 import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
@@ -372,7 +372,7 @@ class FileSystem(object):
     self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
-    self._lock = S._lock
+    self._lock = RLock()
     self._path_files = {}
     self._file_handles = []
     inodes = self._inodes = Inodes(self)
