@@ -126,7 +126,7 @@ def handler(method):
         with defaults.stack('fs', fs):
           with fs.S:
             result = method(self, *a, **kw)
-            if trace:
+            if False and trace:
               if isinstance(result, bytes):
                 XP(" result => %d bytes, %r...", len(result), result[:16])
               else:
