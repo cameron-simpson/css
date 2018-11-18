@@ -45,7 +45,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.result import Result, _PendingFunction, ResultState, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
+from cs.threads import AdjustableSemaphore, bg
 from cs.x import X
 
 DISTINFO = {
@@ -246,7 +246,7 @@ class LateFunction(_PendingFunction):
     ##  D("    %s=%r", sn, s)
 
   def __str__(self):
-    return "<LateFunction %s>" % (self.name,)
+    return "LateFunction[%s]" % (self.name,)
 
   def _complete(self, result, exc_info):
     ''' Record the completion result of this LateFunction and update the parent Later.
@@ -270,7 +270,15 @@ class LateFunction(_PendingFunction):
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s" % (self.state,))
       self.state = ResultState.running
-      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
+      from cs.x import X
+      @logexc
+      def work():
+        try:
+          self._worker_complete( (self.func(), None) )
+        except:
+          self._worker_complete( (None, sys.exc_info()) )
+      T = Thread(name="%s:worker:func=%s" % (self, self.func), target=work)
+      T.start()
 
   @OBSOLETE
   def wait(self):
@@ -571,7 +579,6 @@ class Later(object):
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
     self._pendingq = IterablePriorityQueue(self.inboundCapacity, name="%s._pendingq" % (self.name,))
-    self._workers = WorkerThreadPool(name=self.name + ":WorkerThreadPool").open()
     self._dispatchThread = Thread(
         name=self.name + '._dispatcher',
         target=self._dispatcher
@@ -596,11 +603,9 @@ class Later(object):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._workers.close()
       # queue actions to detect activity completion
       def finish_up():
         self._dispatchThread.join()         # wait for all functions to be dispatched
-        self._workers.join()                # wait for all worker Threads to complete
         self._finished.set()
       bg(finish_up)
 
