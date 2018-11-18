@@ -533,20 +533,27 @@ class Later(object):
       Shutdown does not imply that all submitted functions have
       completed or even been dispatched.
       Callers may wait for completion and optionally cancel functions.
+
+      TODO: replace the Thread running the _pendingq priority queue
+      with a trivial post-submit/post-complete probe of the _pendingq
+      for another task and sufficient capacity.
+      Implies replacing the capacity semaphore with a counter.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
     ''' Initialise the Later instance.
-        `capacity`: resource contraint on this Later; if an int, it is used
+
+        Parameters:
+        * `capacity`: resource contraint on this Later; if an int, it is used
           to size a Semaphore to constrain the number of dispatched functions
           which may be in play at a time; if not an int it is presumed to be a
           suitable Semaphore-like object, perhaps shared with other subsystems.
-        `name`: optional identifying name for this instance.
-        `inboundCapacity`: if >0, used as a limit on the number of
+        * `name`: optional identifying name for this instance.
+        * `inboundCapacity`: if >0, used as a limit on the number of
           undispatched functions that may be queued up; the default is 0 (no
           limit).  Calls to submit functions when the inbound limit is reached
           block until some functions are dispatched.
-        `retry_delay`: time delay for requeued functions.
+        * `retry_delay`: time delay for requeued functions.
           Default: DEFAULT_RETRY_DELAY.
     '''
     if name is None:
