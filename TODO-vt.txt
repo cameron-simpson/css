@@ -1,3 +1,4 @@
+datadir: use flock or like instead of a .lock file because aborting a vtd leaves them lying around
 decouple File sync from filesystem FileHandle close
 Config needs a hashclass option to supply to Store constructors
 make cs.later.Later restartable - tends to hang on the second shutdown?
