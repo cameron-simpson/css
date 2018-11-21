@@ -22,7 +22,7 @@ def dump_Block(block, indent=''):
 def dump_Dirent(E, indent='', recurse=False, not_dir=False):
   ''' Dump a Dirent.
   '''
-  X("%s%s", indent, E)
+  X("%s%r", indent, E)
   if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):
