@@ -525,7 +525,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     name = self._vt_str(name_b)
     fs = self._vtfs
     I = fs[parent_inode]
-    X("lookup: I=%s", I)
+    X("lookup: I=%r", I)
     # TODO: test for permission to search parent_inode
     P = I.E
     EA = None
