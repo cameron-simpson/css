@@ -268,6 +268,7 @@ class VTCmd:
               "%s:%s" % (cacheS.name, S.name),
               read=(cacheS,),
               read2=(S,),
+              copy2=(cacheS,),
               save=(cacheS, S)
           )
           S.config = self.config
