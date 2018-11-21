@@ -226,7 +226,7 @@ class _Dirent(Transcriber):
       self.parent = parent
 
   def __repr__(self):
-    return "%s:%s:%s(%s:%s,%s)" % (
+    return "%s:%s:%s(%r:%s,%r)" % (
         self.__class__.__name__,
         id(self),
         self.type,
