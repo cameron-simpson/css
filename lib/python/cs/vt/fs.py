@@ -159,6 +159,17 @@ class Inode(Transcriber, NS):
     self.E = E
     self.refcount = refcount
 
+  def __repr__(self):
+    return (
+        "%s(inum=%d,refcount=%d,E=%s(%r))"
+        % (
+          type(self).__name__,
+          self.inum,
+          self.refcount,
+          type(self.E).__name__, self.E.name
+        )
+    )
+
   def transcribe_inner(self, T, fp):
     return T.transcribe_mapping({
         'refcount': self.refcount,
@@ -205,7 +216,7 @@ class Inodes(object):
     X("LOAD FS INODE DIRENTS:")
     dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%s", name, E)
+      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
@@ -407,13 +418,13 @@ class FileSystem(object):
           self.__class__.__name__,
           self.S, self.E, self.subpath, self.mntE
       )
-    return "%s(S=%s,/=%s)" % (type(self).__name__, self.S, self.E)
+    return "%s(S=%s,/=%r)" % (type(self).__name__, self.S, self.E)
 
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
     '''
     I = self._inodes[inum]
-    X("__getitem__(%d)=>%s", inum, I)
+    X("__getitem__(%d)=>%r", inum, I)
     return I
 
   def __setitem__(self, inum, E):
@@ -431,9 +442,9 @@ class FileSystem(object):
         with self._lock:
           E = self.E
           updated = False
-          X("snapshot %s ...", E)
+          X("snapshot %r  ...", E)
           E.snapshot()
-          X("snapshot: afterwards E=%s", E)
+          X("snapshot: afterwards E=%r", E)
           fs_inode_dirents = self._inodes.get_fs_inode_dirents()
           X("_SYNC: FS_INODE_DIRENTS:")
           dump_Dirent(fs_inode_dirents)
