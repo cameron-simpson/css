@@ -119,7 +119,7 @@ class MappedFD:
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
-      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset)
+      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
       entry = MapEntry(-1, None, None, None)
     return entry
 
