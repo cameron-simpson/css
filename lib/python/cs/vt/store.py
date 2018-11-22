@@ -13,7 +13,7 @@ from functools import partial
 from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Semaphore
-from cs.later import Later
+from cs.later import Later, SubLater
 from cs.logutils import warning, error
 from cs.pfx import Pfx, XP
 from cs.progress import Progress
@@ -205,11 +205,15 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self.runstate.start()
     self.__funcQ = Later(self._capacity, name="%s:Later(__funcQ)" % (self.name,))
+    self._worker = SubLater(self.__funcQ)
+    self._reaper = self._worker.reaper()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.runstate.cancel()
+    self._worker.close()
+    self._reaper.join()
     L = self.__funcQ
     L.shutdown()
     L.wait()
