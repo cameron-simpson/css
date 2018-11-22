@@ -130,10 +130,10 @@ class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        ...
-        with L.ready( ... optional Later.submit() args ... ):
-          ... do stuff when L queues us ...
+          L = Later(4)    # a 4 thread Later
+          ...
+          with L.ready( ... optional Later.submit() args ... ):
+            ... do stuff when L queues us ...
 
       This permits easy inline scheduled code.
   '''
@@ -234,7 +234,7 @@ class LateFunction(_PendingFunction):
     '''
     _PendingFunction.__init__(self, func)
     if name is None:
-      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+      name = "LF-%d[%s]" % ( seq(), funcname(func) )
     if retry_delay is None:
       retry_delay = later.retry_delay
     self.name = name
@@ -292,6 +292,8 @@ class LateFunction(_PendingFunction):
         Otherwise record completion as normal.
         If the function raised one of NameError, AttributeError, RuntimeError
         (broadly: "programmer errors"), report the stack trace to aid debugging.
+
+        TODO: merge into primary _complete method.
     '''
     result, exc_info = work_result
     if exc_info:
@@ -302,11 +304,7 @@ class LateFunction(_PendingFunction):
         self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
-        warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
-        with Pfx('>>'):
-          for formatted in traceback.format_exception(*exc_info):
-            for line in formatted.rstrip().split('\n'):
-              warning(line)
+        exception("%s._worker_completed: %s", self.name, e, exc_info=exc_info)
     self._complete(result, exc_info)
 
 class _PipelineStage(PushQueue):
@@ -538,6 +536,10 @@ class Later(object):
       with a trivial post-submit/post-complete probe of the _pendingq
       for another task and sufficient capacity.
       Implies replacing the capacity semaphore with a counter.
+
+      TODO: __enter__ returns a SubLater, __exit__ closes the SubLater.
+
+      TODO: drop global default Later.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
@@ -554,7 +556,7 @@ class Later(object):
           limit).  Calls to submit functions when the inbound limit is reached
           block until some functions are dispatched.
         * `retry_delay`: time delay for requeued functions.
-          Default: DEFAULT_RETRY_DELAY.
+          Default: `DEFAULT_RETRY_DELAY`.
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
@@ -1186,6 +1188,9 @@ class SubLater(object):
 
   def __init__(self, L):
     ''' Initialise the `SubLater` with its parent `Later`.
+
+	TODO: accept discard=False param to suppress the queue and
+	associated checks.
     '''
     self._later = L
     self._lock = Lock()
