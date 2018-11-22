@@ -266,6 +266,9 @@ class Result(object):
       r = func(*a, **kw)
     except BaseException:
       self.exc_info = sys.exc_info()
+    except:
+      exception("%s: unexpected exception: %s", func, e)
+      self.exc_info = sys.exc_info()
     else:
       self.result = r
 
