@@ -739,17 +739,18 @@ class ProxyStore(BasicStoreSync):
   def _bg_add(self, data, ch):
     ''' Add a data chunk to the save Stores.
 
+        Parameters:
         `data`: the data to add
         `ch`: a channel for hashcode return
     '''
-    hashcode1 = None    # becomes not None on successful add
+    assert ch, "ch is false! %r" % (ch,)
     try:
       if not self.save:
         # no save - allow add if hashcode already present - dubious
         hashcode = self.hash(data)
         if hashcode in self:
           ch.put(hashcode)
-          hashcode1 = hashcode
+          ch = None
           return
         raise RuntimeError("new add but no save Stores")
       ok = True
@@ -757,13 +758,9 @@ class ProxyStore(BasicStoreSync):
       for S, hashcode, exc_info in self._multicall(self.save, 'add_bg', (data,)):
         if exc_info is None:
           assert hashcode is not None, "None from .add of %s" % (S,)
-          if hashcode1 is None:
+          if ch:
             ch.put(hashcode)
-            hashcode1 = hashcode
-          elif hashcode1 != hashcode:
-            warning(
-                "%s: different hashcodes returns from .add: %s vs %s",
-                S, hashcode1, hashcode)
+            ch = None
         else:
           e = exc_info[1]
           if isinstance(e, StoreError):
@@ -792,20 +789,17 @@ class ProxyStore(BasicStoreSync):
               error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
               failures.append( (S, e) )
             else:
-              if hashcode1 is None:
+              if ch:
                 ch.put(hashcode)
-                hashcode1 = hashcode
-              elif hashcode1 != hashcode:
-                warning(
-                    "%s: different hashcodes returns from .add: %s vs %s",
-                    S, hashcode1, hashcode)
+                ch = None
           if failures:
             raise RuntimeError("exceptions saving to save2: %r" % (failures,))
     finally:
       # mark end of queue
-      if hashcode1 is None:
+      if ch:
         ch.put(None)
-      ch.close()
+        ch = None
+        ch.close()
 
   def get(self, h):
     ''' Fetch a block from the first Store which has it.
