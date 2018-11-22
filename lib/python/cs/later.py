@@ -1230,6 +1230,25 @@ class SubLater(object):
     LF.notify(on_complete)
     return LF
 
+  def reaper(self, handler=None):
+    ''' Dispatch a Thread to collect completed `LateFunction`s.
+        Return the Thread.
+
+        `handler`: optional callable to be passed each `LateFunction`
+        as it completes.
+    '''
+    @logexc
+    def reap(Q):
+      for LF in Q:
+        if handler:
+          try:
+            handler(LF)
+          except Exception as e:
+            exception("%s: reap %s: %s", self, LF, e)
+    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T.start()
+    return T
+
 class LatePool(object):
   ''' A context manager after the style of subprocess.Pool
       but with deferred completion.
