@@ -1174,7 +1174,7 @@ class PlatonicDir(_FilesDir):
                     info("scan from %d", DFstate.scanned_to)
                   if meta_store is not None:
                     blockQ = IterableQueue()
-                    R = meta_store.bg(
+                    R = meta_store._defer(
                         lambda B, Q: top_block_for(spliced_blocks(B, Q)),
                         E.block, blockQ)
                   scan_from = DFstate.scanned_to
