@@ -230,14 +230,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     self.open()
     def deferred():
       with self:
-        try:
-          value = func(*a, **kw)
-        finally:
-          # release the Store from earlier
-          self.close()
-        return value
-    func2.__name__ = func2name
-    return self.__funcQ.bg(func2)
+        result = func(*args, **kwargs)
+      return result
+    deferred.__name__ = "deferred:" + funcname(func)
+    LF = self._worker.defer(deferred)
+    LF.notify(lambda LF: self.close())
+    return LF
 
   ##########################################################################
   # Core Store methods, all abstract.
