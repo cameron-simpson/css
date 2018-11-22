@@ -17,7 +17,7 @@ from cs.later import Later, SubLater
 from cs.logutils import warning, error
 from cs.pfx import Pfx, XP
 from cs.progress import Progress
-from cs.py.func import prop, funccite
+from cs.py.func import prop, funccite, funcname
 from cs.py.stack import caller
 from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, RunState
@@ -229,26 +229,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self.open()
     def deferred():
-      try:
-        return func(*args, **kwargs)
-      finally:
-        self.close()
-    return self.__funcQ.defer(deferred)
-
-  def bg(self, func, *a, **kw):
-    ''' Queue a function without consuming the queue capacity.
-
-        This is intended for "control" functions which themselves
-        do all their work through the Store's function queue, such
-        as the .pushto method's worker.
-    '''
-    # keep the Store open
-    func2name = "%s (from %s)" % (funccite(func), caller())
-    self.open()
-    def func2():
-      ''' Inner function to call `func` and then close the Store.
-      '''
-      # use the Store as the context for actions
       with self:
         try:
           value = func(*a, **kw)
