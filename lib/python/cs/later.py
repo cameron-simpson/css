@@ -1206,7 +1206,7 @@ class SubLater(object):
     with self._lock:
       closed = self.closed
       if closed:
-        L.warning("repeated close of %s", self)
+        self._later.warning("repeated close of %s", self)
       else:
         self.closed = True
         if self._queued >= self._deferred:
@@ -1219,7 +1219,7 @@ class SubLater(object):
 	on completion.
     '''
     with self._lock:
-      LF = self.L.defer(func, *a, **kw)
+      LF = self._later.defer(func, *a, **kw)
       self._deferred += 1
       def on_complete(R):
         with self._lock:
