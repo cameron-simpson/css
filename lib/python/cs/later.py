@@ -264,21 +264,7 @@ class LateFunction(_PendingFunction):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    L = self.later
-    L.debug("DISPATCH %s", self)
-    with self._lock:
-      if not self.pending:
-        raise RuntimeError("should be pending, but state = %s" % (self.state,))
-      self.state = ResultState.running
-      from cs.x import X
-      @logexc
-      def work():
-        try:
-          self._worker_complete( (self.func(), None) )
-        except:
-          self._worker_complete( (None, sys.exc_info()) )
-      T = Thread(name="%s:worker:func=%s" % (self, self.func), target=work)
-      T.start()
+    return self.bg(logexc(self.func))
 
   @OBSOLETE
   def wait(self):
