@@ -460,6 +460,32 @@ class _Block(Transcriber, ABC):
               % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
 
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def spliced(self, start, end, new_block):
+    ''' Generator yielding Blocks producing the data
+        from `self` with the range `start:end`
+        replaced by the data from `new_block`.
+    '''
+    if start == len(self):
+      yield self
+    else:
+      yield from self.top_blocks(0, start)
+    yield new_block
+    if end < len(self):
+      yield from self.top_blocks(end, len(self))
+
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def splice(self, start, end, new_block):
+    ''' Return a new Block consisting of `self` with the span
+        `start:end` replaced by the data from `new_block`.
+    '''
+    from .blockify import top_block_for
+    return top_block_for(self.splaced(start, end, new_block))
+
   def textencode(self):
     ''' Transcribe this Block's binary encoding as text.
         TODO: Obsolete, remove.
