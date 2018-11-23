@@ -439,6 +439,9 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
   def top_blocks(self, start, end):
     ''' Yield existing high level blocks and new partial Blocks
         covering a portion of this Block,
