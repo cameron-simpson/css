@@ -14,6 +14,7 @@ import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
+from cs.later import Later
 from cs.logutils import error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
@@ -30,6 +31,8 @@ from .paths import resolve
 from .transcribe import Transcriber, mapping_transcriber, parse
 
 XATTR_VT_PREFIX = 'x-vt-'
+
+DEFAULT_FS_THREAD_MAX = 16
 
 def oserror(errno, msg, *a):
   ''' Function to issue a warning and then raise an OSError.
@@ -71,6 +74,11 @@ class FileHandle:
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
+
+  def bg(self, func, *a, **kw):
+    ''' Function dispatcher.
+    '''
+    return self.fs.bg(func, *a, **kw)
 
   def close(self):
     ''' Close the file, mark its parent directory as changed.
@@ -129,7 +137,7 @@ class FileHandle:
     if scanner is None:
       X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
-    self.E.flush(scanner)
+    self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
     X("FileHandle.Flush DONE")
 
@@ -333,7 +341,8 @@ class FileSystem(object):
       subpath=None,
       readonly=None,
       append_only=False,
-      show_prev_dirent=False
+      show_prev_dirent=False,
+      thread_max=None,
   ):
     ''' Initialise a new mountpoint.
 
@@ -358,6 +367,8 @@ class FileSystem(object):
     S.open()
     if readonly is None:
       readonly = S.readonly
+    if thread_max is None:
+      thread_max = DEFAULT_FS_THREAD_MAX
     self.E = E
     self.S = S
     self.archive = archive
@@ -384,6 +395,7 @@ class FileSystem(object):
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = RLock()
+    self._later = Later(DEFAULT_FS_THREAD_MAX)
     self._path_files = {}
     self._file_handles = []
     inodes = self._inodes = Inodes(self)
@@ -404,6 +416,11 @@ class FileSystem(object):
     with self.S:
       with defaults.stack('fs', self):
         dump_Dirent(mntE)
+
+  def bg(self, func, *a, **kw):
+    ''' Dispatch a function via the FileSystem's Later instance.
+    '''
+    return self._later.defer(func, *a, **kw)
 
   def close(self):
     ''' Close the FileSystem.
