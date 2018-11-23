@@ -806,11 +806,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
       sz = len(self.open_file)
     return sz
 
-  def flush(self, scanner=None):
+  def flush(self, scanner=None, dispatch=None):
     ''' Flush the contents of the file.
         Presumes the Dirent is open.
     '''
-    return self.open_file.flush(scanner)
+    return self.open_file.flush(scanner, dispatch=dispatch)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
