@@ -37,6 +37,7 @@ from __future__ import print_function
 from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
+from icontract import require
 import sys
 from cs.binary import (
     PacketField, BSUInt, BSData,
@@ -368,34 +369,20 @@ class _Block(Transcriber, ABC):
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
-  def SKIP0000datafrom(self, offset=0, *, end=None, no_blockmap=False):
-    ''' Generator yielding data from the direct blocks.
-    '''
-    for leaf, leaf_start, leaf_end in self.slices(
-        start=offset, end=end, no_blockmap=no_blockmap
-    ):
-      yield leaf[leaf_start:leaf_end]
-
   def bufferfrom(self, offset=0, **kw):
     ''' Return a CornuCopyBuffer presenting data from the Block.
     '''
     return CornuCopyBuffer(self.datafrom(start=offset, **kw), offset=offset)
 
-  def slices(self, start=None, end=None, no_blockmap=False):
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def slices(self, start, end, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
         representing the leaf data covering the supplied span `start`:`end`.
 
         The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
-    assert end <= len(self)
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
@@ -783,33 +770,24 @@ class _IndirectBlock(_Block):
   def datafrom(self, start=0, end=None):
     ''' Yield data from a point in the Block.
     '''
-    X("DATAFROM %s ...", self)
     if end is None:
       end = self.span
     if start >= end:
       return
     block_cache = defaults.S.block_cache
-    X("DATAFROM: defaults.S.block_cache=%s", block_cache)
     if block_cache:
-      X("DAtAFROM: look up %s in block_cache", self.hashcode)
       try:
         bm = block_cache[self.hashcode]
       except KeyError:
-        X("DATAFROM: NOT PRESENT")
         pass
       else:
         filled = bm.filled
-        X("DATAFROM: PRESENT, filled=%s", filled)
         if filled > start:
-          X("%s.datafrom(%d): get data from BlockMap", self, start)
           maxlength = end - start
           for bs in bm.datafrom(start, maxlength=maxlength):
-            X("DATAFROM: bm.datafrom: %d bytes", len(bs))
             yield bs
             start += len(bs)
             assert start <= end
-        X("DATAFROM: past filled point")
-    X("DATAFROM: now get data not from block_cache")
     if start < end:
       for B, Bstart, Bend in self.slices(start, end):
         assert not B.indirect
