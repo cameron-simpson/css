@@ -133,7 +133,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     return self._backing_block
 
   @locked
-  def flush(self, scanner=None):
+  def flush(self, scanner=None, dispatch=None):
     ''' Push the current state to the Store and update the current top block.
         Return a Result which completes later.
 
@@ -143,6 +143,8 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         * `scanner`: optional scanner for new file data to locate
           preferred block boundaries.
     '''
+    if dispatch is None:
+      dispatch = bg
     flushnum = self.flush_count
     self.flush_count += 1
     old_file = self._file
@@ -189,7 +191,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       self._file.flush = self.flush
       S.open()
       self.open()
-      new_syncer = self._syncer = bg(update_store)
+      new_syncer = self._syncer = dispatch(update_store)
       def cleanup_syncer(R):
         with self._lock:
           if self._syncer is new_syncer:
