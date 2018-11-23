@@ -405,26 +405,19 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  def top_slices(self, start=None, end=None):
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def top_slices(self, start, end):
     ''' Return an iterator yielding (Block, start, len) tuples
-        representing the uppermost Blocks spanning `start`:`end`.
+        representing the uppermost Blocks spanning `start:end`.
 
         The originating use case is to support providing minimal
         Block references required to assemble a new indirect Block
         consisting of data from this Block comingled with updated
         data without naively layering deeper levels of Block
         indirection with every update phase.
-
-        The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
     if self.indirect:
       offset = 0        # the absolute index of the left edge of subblock B
       for B in self.subblocks:
