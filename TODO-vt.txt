@@ -1,3 +1,4 @@
+Dir: HASCHAFF flag: variable sized random bsdata leads dirents
 fs.Ino: trim redundant transcriber methods/attrs from class if @mapping_transcriber did the job
 datadir: use flock or like instead of a .lock file because aborting a vtd leaves them lying around
 decouple File sync from filesystem FileHandle close
