@@ -265,13 +265,14 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     ##raise RuntimeError("BANG")
     f = self._file
+    front_file = f.front_file
     backing_block = self.backing_block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       backing_block.get_blockmap()
     for inside, span in f.front_range.slices(offset, len(self)):
       if inside:
         # data from the front file
-        yield from filedata(f.front_file, start=span.start, end=span.end)
+        yield from filedata(front_file, span.start, span.end)
       else:
         # data from the backing block
         for bs in backing_block.datafrom(start=span.start, end=span.end):
@@ -304,10 +305,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       for in_front, span in front_range.slices(start, end):
         if in_front:
           # blockify the new data and yield the top block
-          B = top_block_for(blockify(filedata(front_file,
-                                              start=span.start,
-                                              end=span.end),
-                                     scanner))
+          B = file_top_block(front_file, span.start, span.end, scanner=scanner)
           yield B
           offset += len(B)
         else:
@@ -324,7 +322,7 @@ def filedata(f, start, end):
   '''
   return datafrom(f, start, maxlength=end-start)
 
-def file_top_block(fp, rsize=None, start=None, end=None):
+def file_top_block(f, start, end, scanner=None):
   ''' Return a top Block for the data from an open file.
   '''
   return top_block_for(blockify(filedata(f, start, end), scanner=scanner))
