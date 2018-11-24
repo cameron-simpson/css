@@ -317,33 +317,17 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         if offset < end:
           warning("only got data to offset %d", offset)
 
-def filedata(fp, rsize=None, start=None, end=None):
+def filedata(f, start, end):
   ''' A generator to yield chunks of data from a file.
       These chunks don't need to be preferred-edge aligned;
       blockify() does that.
   '''
-  if rsize is None:
-    rsize = DEFAULT_SCAN_SIZE
-  if start is None:
-    pos = fp.tell()
-  else:
-    pos = start
-    fp.seek(pos)
-  while end is None or pos < end:
-    if end is None:
-      toread = rsize
-    else:
-      toread = min(rsize, end - pos)
-    data = fp.read(toread)
-    if len(data) == 0:
-      break
-    pos += len(data)
-    yield data
+  return datafrom(f, start, maxlength=end-start)
 
 def file_top_block(fp, rsize=None, start=None, end=None):
   ''' Return a top Block for the data from an open file.
   '''
-  return top_block_for(blockify(filedata(fp, rsize=rsize, start=start, end=end)))
+  return top_block_for(blockify(filedata(f, start, end), scanner=scanner))
 
 if __name__ == '__main__':
   from .file_tests import selftest
