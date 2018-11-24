@@ -484,7 +484,7 @@ class _Block(Transcriber, ABC):
         `start:end` replaced by the data from `new_block`.
     '''
     from .blockify import top_block_for
-    return top_block_for(self.splaced(start, end, new_block))
+    return top_block_for(self.spliced(start, end, new_block))
 
   def textencode(self):
     ''' Transcribe this Block's binary encoding as text.
