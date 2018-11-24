@@ -786,7 +786,7 @@ def datafrom_fd(fd, offset, readsize=None, aligned=True, maxlength=None):
       maxlength -= bslen
 
 @strable(open_func=partial(os.open, flags=O_RDONLY))
-def datafrom(f, offset, readsize=None):
+def datafrom(f, offset, readsize=None, maxlength=None):
   ''' General purpose reader for files yielding data from `offset`.
 
       *WARNING*: this function might move the file pointer.
@@ -798,6 +798,7 @@ def datafrom(f, offset, readsize=None):
         If that object has a `.fileno()` method, treat that as an
         OS file descriptor and use it.
       * `offset`: starting offset for the data
+      * `maxlength`: optional maximum amount of data to yield
       * `readsize`: read size, default DEFAULT_READSIZE.
 
       For file-like objects, the read1 method is used in preference
@@ -808,9 +809,10 @@ def datafrom(f, offset, readsize=None):
     readsize = DEFAULT_READSIZE
   if isinstance(f, int):
     # operating system file descriptor
-    for data in datafrom_fd(f, offset, readsize=readsize):
+    for data in datafrom_fd(f, offset, readsize=readsize, maxlength=maxlength):
       yield data
-  # see if the file has a fileno
+    return
+  # see if the file has a fileno; if so use datafrom_fd
   try:
     get_fileno = f.fileno
   except AttributeError:
@@ -818,8 +820,9 @@ def datafrom(f, offset, readsize=None):
   else:
     fd = get_fileno()
     if stat.S_ISREG(os.fstat(fd).st_mode):
-      for data in datafrom_fd(fd, offset, readsize=readsize):
+      for data in datafrom_fd(fd, offset, readsize=readsize, maxlength=maxlength):
         yield data
+      return
   # presume a file-like object
   try:
     read1 = f.read1
@@ -827,14 +830,21 @@ def datafrom(f, offset, readsize=None):
     read1 = f.read
   tell = f.tell
   seek = f.seek
-  while True:
+  while maxlength is None or maxlength > 0:
     offset0 = tell()
     seek(offset, SEEK_SET)
-    bs = read1(readsize)
+    n = readsize
+    if maxlength is not None:
+      n = min(n, maxlength)
+    bs = read1(n)
     seek(offset0)
     if not bs:
-      yield bs
+      break
+    yield bs
     offset += len(bs)
+    if maxlength is not None:
+      maxlength -= len(bs)
+      assert maxlength >= 0
 
 class ReadMixin(object):
   ''' Useful read methods to accomodate modes not necessarily available in a class.
