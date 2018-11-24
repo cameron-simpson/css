@@ -977,8 +977,9 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      X("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+      warning("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
         id(self), self.name, self._block, self.changed)
+      stack_dump()
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
