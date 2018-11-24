@@ -22,6 +22,7 @@ otherwise, write the message to sys.stderr.
 
 from __future__ import print_function
 import sys
+from cs.ansi_colour import colourise
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.ansi_colour'],
 }
 
 # set to a logger to log as a warning
@@ -41,8 +42,14 @@ X_via_tty = False
 def X(msg, *args, **kw):
   ''' Unconditionally write the message `msg`.
 
-      * `args`: if not empty, format `msg` using %-expansion with `args`.
+      If there are positional arguments after `msg`,
+      format `msg` using %-expansion with those arguments.
+
+      Keyword arguments:
       * `file`: optional keyword argument specifying the output file.
+      * `colour`: optional text colour.
+        If specified, surround the message with ANSI escape sequences
+        to render the text in that colour.
 
       If `file` is not None, write to it unconditionally;
       otherwise, if X_logger then log a warning to that logger;
@@ -50,11 +57,14 @@ def X(msg, *args, **kw):
       otherwise write the message to sys.stderr.
   '''
   fp = kw.pop('file', None)
+  colour = kw.pop('colour', None)
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
   if args:
     msg = msg % args
+  if colour:
+    msg = colourise(msg, colour=colour)
   if fp is None:
     if X_logger:
       # NB: ignores any kwargs

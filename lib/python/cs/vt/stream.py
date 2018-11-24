@@ -12,10 +12,11 @@
 from __future__ import with_statement
 from enum import IntEnum
 import sys
+import time
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx
 from cs.resources import ClosedError
@@ -89,6 +90,9 @@ class StreamStore(BasicStoreSync):
       if local_store.hashclass is not self.hashclass:
         raise ValueError("local_store.hashclass %s is not self.hashclass %s"
                          % (local_store.hashclass, self.hashclass))
+    # parameters controlling connection hysteresis
+    self._conn_attempt_last = 0.0
+    self._conn_attempt_delay = 1.0
     if connect is None:
       # set up protocol on existing stream
       # no reconnect facility
@@ -138,26 +142,39 @@ class StreamStore(BasicStoreSync):
     ''' Shut down the StreamStore.
     '''
     with Pfx("SHUTDOWN %s", self):
-      if '_conn' in dir(self):
-        self._conn.shutdown()
+      conn = self._conn_probe()
+      if conn:
+        conn.shutdown()
       local_store = self.local_store
       if local_store is not None:
         local_store.close()
       super().shutdown()
 
+  def _conn_probe(self):
+    ''' Probe for a current connection without risk of triggering a new one.
+    '''
+    if '_conn' in dir(self):
+      return self._conn
+    return None
+
   @locked
   def __getattr__(self, attr):
     if attr == '_conn':
+      next_attempt = self._conn_attempt_last + self._conn_attempt_delay
+      now = time.time()
+      if now < next_attempt:
+        return None
+      self._conn_attemp_last = now
       try:
         recv, send = self.connect()
       except Exception as e:
-        raise AttributeError("%r: connect fails: %s: %s" % (attr, type(e).__name__, e)) from e
-      else:
-        conn = self._conn = self._packet_connection(recv, send)
-        # arrange to disassociate if the channel goes away
-        conn.notify_recv_eof.add(self._packet_disconnect)
-        conn.notify_send_eof.add(self._packet_disconnect)
-        return conn
+        error("%r: connect fails: %s: %s", attr, type(e).__name__, e)
+        return None
+      conn = self._conn = self._packet_connection(recv, send)
+      # arrange to disassociate if the channel goes away
+      conn.notify_recv_eof.add(self._packet_disconnect)
+      conn.notify_send_eof.add(self._packet_disconnect)
+      return conn
     raise AttributeError(attr)
 
   def _packet_connection(self, recv, send):
@@ -171,37 +188,38 @@ class StreamStore(BasicStoreSync):
   @locked
   def _packet_disconnect(self, conn):
     warning("PacketConnection DISCONNECT notification: %s", conn)
-    oconn = self._conn
+    oconn = self._conn_probe()
     if oconn is conn:
       del self._conn
+      self._conn_attemp_last = time.time()
     else:
       warning("disconnect of %s, but that is not the current connection, ignoring", conn)
 
   def join(self):
     ''' Wait for the PacketConnection to shut down.
     '''
-    self._conn.join()
+    conn = self._conn_probe()
+    if conn:
+      conn.join()
 
   def do(self, rq):
     ''' Wrapper for self._conn.do to catch and report failed autoconnection.
     '''
     with Pfx("%s.do(%s)", self, rq):
+      conn = self._conn
+      if conn is None:
+        raise StoreError("no connection")
       try:
-        conn = self._conn
-      except AttributeError as e:
-        raise StoreError("no connection: %s" % (e,)) from e
+        retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
+      except ClosedError as e:
+        del self._conn
+        raise StoreError("connection closed: %s" % (e,)) from e
+      except CancellationError as e:
+        raise StoreError("request cancelled: %s" % (e,)) from e
       else:
-        try:
-          retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
-        except ClosedError as e:
-          del self._conn
-          raise StoreError("connection closed: %s" % (e,)) from e
-        except CancellationError as e:
-          raise StoreError("request cancelled: %s" % (e,)) from e
-        else:
-          if retval is None:
-            raise StoreError("NO RESPONSE from %s" % (rq,))
-        return retval
+        if retval is None:
+          raise StoreError("NO RESPONSE from %s" % (rq,))
+      return retval
 
   @staticmethod
   def decode_request(rq_type, flags, payload):

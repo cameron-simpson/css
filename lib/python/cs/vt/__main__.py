@@ -268,6 +268,7 @@ class VTCmd:
               "%s:%s" % (cacheS.name, S.name),
               read=(cacheS,),
               read2=(S,),
+              copy2=(cacheS,),
               save=(cacheS, S)
           )
           S.config = self.config
@@ -688,7 +689,7 @@ class VTCmd:
           # no "last entry" (==> first use) - make an empty directory
           if E is None:
             E = Dir(mount_base)
-            X("cmd_mount: new E=%s", E)
+            X("cmd_mount: new E=%r", E)
           else:
             ##dump_Dirent(E, recurse=True)
             if not E.isdir:

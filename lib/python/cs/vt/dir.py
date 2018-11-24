@@ -17,7 +17,6 @@ import pwd
 import shlex
 import stat
 import sys
-from threading import RLock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
@@ -31,7 +30,7 @@ from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked, locked_property
 from cs.x import X
-from . import totext, PATHSEP, defaults
+from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .file import RWBlockFile
 from .meta import Meta, rwx, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
@@ -227,7 +226,7 @@ class _Dirent(Transcriber):
       self.parent = parent
 
   def __repr__(self):
-    return "%s:%s:%s(%s:%s,%s)" % (
+    return "%s:%s:%s(%r:%s,%r)" % (
         self.__class__.__name__,
         id(self),
         self.type,
@@ -719,9 +718,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
   transcribe_prefix = 'F'
 
-  def __init__(self, name, block=None, lock=None, **kw):
+  def __init__(self, name, block=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
-    MultiOpenMixin.__init__(self, lock=lock)
+    MultiOpenMixin.__init__(self)
     if block is None:
       block = Block(data=b'')
     self.open_file = None
@@ -807,11 +806,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
       sz = len(self.open_file)
     return sz
 
-  def flush(self, scanner=None):
+  def flush(self, scanner=None, dispatch=None):
     ''' Flush the contents of the file.
         Presumes the Dirent is open.
     '''
-    return self.open_file.flush(scanner)
+    return self.open_file.flush(scanner, dispatch=dispatch)
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -978,8 +977,9 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      X("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+      warning("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
         id(self), self.name, self._block, self.changed)
+      stack_dump()
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:

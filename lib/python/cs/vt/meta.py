@@ -11,11 +11,12 @@ from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
-from threading import RLock
 import time
 from cs.logutils import error, warning
 from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
+from cs.x import X
+from . import RLock
 from .transcribe import Transcriber, register as register_transcriber, \
                         transcribe_mapping, parse_mapping
 
@@ -565,7 +566,7 @@ class Meta(dict, Transcriber):
 
   def access(
       self, access_mode,
-      access_uid=None, access_group=None,
+      access_uid=None, access_gid=None,
       default_uid=None, default_gid=None
   ):
     ''' POSIX like access call, accepting os.access `access_mode`.
@@ -575,39 +576,46 @@ class Meta(dict, Transcriber):
           the os.access function.
         * `access_uid`: the effective uid of the querying user.
         * `access_gid`: the effective gid of the querying user.
-        * `default_uid`: the reference uid to use if this Meta.uid == NOUSERID.
-        * `default_gid`: the reference gid to use if this Meta.gid == NOGROUPID.
+        * `default_uid`: the reference uid to use if this Meta.uid is None
+        * `default_gid`: the reference gid to use if this Meta.gid is None
+
+        If the Meta has no uid or `access_uid == Meta.uid`,
+        use the owner permissions.
+        Otherwise if the Meta has no gid or `access_gid == Meta.gid`,
+        use the group permissions.
+        Otherwise use the "other" permissions.
     '''
+    X("META.ACCESS...")
     u = self.uid
-    g = self.gid
-    perms = self.unix_perm_bits
-    if u == NOUSERID and default_uid is not None:
+    if u is None:
       u = default_uid
-    if g == NOGROUPID and default_gid is not None:
+    g = self.gid
+    if g is None:
       g = default_gid
+    perms = self.unix_perm_bits
     if access_mode & os.R_OK:
-      if access_uid is not None and access_uid == u:
+      if u is None or ( access_uid is not None and access_uid == u):
         if not (perms>>6) & 4:
           return False
-      elif access_group is not None and access_group == g:
+      elif g is None or ( access_gid is not None and access_gid == g):
         if not (perms>>3) & 4:
           return False
       elif not perms & 4:
         return False
     if access_mode & os.W_OK:
-      if access_uid is not None and access_uid == u:
+      if u is None or ( access_uid is not None and access_uid == u):
         if not (perms>>6) & 2:
           return False
-      elif access_group is not None and access_group == g:
+      elif g is None or ( access_gid is not None and access_gid == g):
         if not (perms>>3) & 2:
           return False
       elif not perms & 2:
         return False
     if access_mode & os.X_OK:
-      if access_uid is not None and access_uid == u:
+      if u is None or ( access_uid is not None and access_uid == u):
         if not (perms>>6) & 1:
           return False
-      elif access_group is not None and access_group == g:
+      elif g is None or ( access_gid is not None and access_gid == g):
         if not (perms>>3) & 1:
           return False
       elif not perms & 1:

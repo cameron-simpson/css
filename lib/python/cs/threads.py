@@ -402,20 +402,7 @@ def locked(func):
       Relies upon a ._lock attribute for locking.
   '''
   def lockfunc(self, *a, **kw):
-    # quite probe for contention
-    if self._lock.acquire(0):
-      self._lock.release()
-      contended = False
-    else:
-      warning(
-          "@locked(self._lock=%r <%s>, func=%r): waiting for contended lock...",
-          self._lock, type(self._lock), func)
-      contended = True
     with self._lock:
-      if contended:
-        warning(
-            "@locked(self._lock=%r <%s>, func=%r): ACQUIRED",
-            self._lock, type(self._lock), func)
       return func(self, *a, **kw)
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc

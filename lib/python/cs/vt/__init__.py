@@ -13,16 +13,24 @@
           http://en.wikipedia.org/wiki/Venti
 '''
 
+from collections import namedtuple
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
+from threading import (
+    Lock as threading_Lock,
+    RLock as threading_RLock,
+    current_thread,
+)
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
-from cs.py.stack import stack_dump
+from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
-from cs.resources import RunState
+import cs.resources
+from cs.resources import RunState, MultiOpenMixin
+from cs.x import X
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
@@ -137,3 +145,74 @@ class _TestAdditionsMixin:
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+
+if False:
+  def RLock():
+    return DebuggingLock(recursive=True)
+  # monkey patch MultiOpenMixin
+  cs.resources._mom_lockclass = RLock
+else:
+  Lock = threading_Lock
+  RLock = threading_RLock
+def Lock():
+  return DebuggingLock()
+
+LockContext = namedtuple("LockContext", "caller thread")
+
+class DebuggingLock(object):
+  ''' A wrapper for a threading Lock or RLock
+      to notice contention and report contending uses.
+  '''
+
+  def __init__(self, recursive=False):
+    self.recursive = recursive
+    self._lock = threading_RLock() if recursive else threading_Lock()
+    self._held = None
+
+  def __repr__(self):
+    return "%s(lock=%r,held=%s)" % (type(self).__name__, self._lock, self._held)
+
+  def acquire(self, timeout=-1, _caller=None):
+    if _caller is None:
+      _caller = caller()
+    lock = self._lock
+    hold = LockContext(_caller, current_thread())
+    if timeout != -1:
+      warning("%s:%d: lock %s: timeout=%s",
+          hold.caller.filename, hold.caller.lineno,
+          lock, timeout)
+    if lock.acquire(0):
+      contended = False
+      lock.release()
+    else:
+      contended = True
+      held = self._held
+      warning(
+          "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
+          hold.caller.filename, hold.caller.lineno,
+          lock,
+          held.thread, held.caller.filename, held.caller.lineno)
+    acquired = lock.acquire(timeout=timeout)
+    if contended:
+      warning(
+          "%s:%d: lock %s: %s",
+          hold.caller.filename, hold.caller.lineno,
+          lock,
+          "acquired" if acquired else "timed out")
+    self._held = hold
+    return acquired
+
+  def release(self):
+    self._lock.release()
+
+  def __enter__(self):
+    self.acquire(_caller=caller())
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.release()
+    return False
+
+  def _is_owned(self):
+    lock = self._lock
+    return lock._is_owned()

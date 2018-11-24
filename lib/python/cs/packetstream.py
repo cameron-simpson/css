@@ -11,6 +11,7 @@ from collections import namedtuple
 import errno
 import os
 import sys
+from time import sleep
 from threading import Lock
 from cs.binary import PacketField, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
@@ -24,6 +25,9 @@ from cs.resources import not_closed, ClosedError
 from cs.result import Result
 from cs.seq import seq, Seq
 from cs.threads import locked
+
+# default pause before flush to allow for additional packet data to arrive
+DEFAULT_PACKET_GRACE = 0.01
 
 class Packet(PacketField):
   ''' A protocol packet.
@@ -177,6 +181,7 @@ class PacketConnection(object):
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
+    self.packet_grace = DEFAULT_PACKET_GRACE
     # dispatch Thread to process received packets
     self._recv_thread = Thread(
         target=self._receive_loop,
@@ -492,7 +497,16 @@ class PacketConnection(object):
             for bs in P.transcribe_flat():
               fp.write(bs)
             if Q.empty():
-              fp.flush()
+              # no immediately ready further packets: flush the output buffer
+              grace = self.packet_grace
+              if grace > 0:
+                # allow a little time for further Packets to queue
+                sleep(grace)
+                if Q.empty():
+                  # still nothing
+                  fp.flush()
+              else:
+                fp.flush()
           except OSError as e:
             if e.errno == errno.EPIPE:
               warning("remote end closed")

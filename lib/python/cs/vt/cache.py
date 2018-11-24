@@ -11,14 +11,14 @@ from __future__ import with_statement
 from collections import namedtuple
 import sys
 from tempfile import TemporaryFile
-from threading import Lock, RLock, Thread
+from threading import Thread
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
-from . import defaults, MAX_FILE_SIZE
+from . import defaults, MAX_FILE_SIZE, Lock, RLock
 from .block import IndirectBlock
 from .store import BasicStoreSync, MappingStore
 

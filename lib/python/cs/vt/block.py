@@ -37,8 +37,8 @@ from __future__ import print_function
 from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
+from icontract import require
 import sys
-from threading import RLock
 from cs.binary import (
     PacketField, BSUInt, BSData,
     flatten as flatten_transcription
@@ -50,7 +50,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
-from . import defaults, totext
+from . import defaults, totext, RLock
 from .hash import HashCode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -369,34 +369,20 @@ class _Block(Transcriber, ABC):
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
-  def SKIP0000datafrom(self, offset=0, *, end=None, no_blockmap=False):
-    ''' Generator yielding data from the direct blocks.
-    '''
-    for leaf, leaf_start, leaf_end in self.slices(
-        start=offset, end=end, no_blockmap=no_blockmap
-    ):
-      yield leaf[leaf_start:leaf_end]
-
   def bufferfrom(self, offset=0, **kw):
     ''' Return a CornuCopyBuffer presenting data from the Block.
     '''
     return CornuCopyBuffer(self.datafrom(start=offset, **kw), offset=offset)
 
-  def slices(self, start=None, end=None, no_blockmap=False):
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def slices(self, start, end, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
         representing the leaf data covering the supplied span `start`:`end`.
 
         The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
-    assert end <= len(self)
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
@@ -419,26 +405,19 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  def top_slices(self, start=None, end=None):
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def top_slices(self, start, end):
     ''' Return an iterator yielding (Block, start, len) tuples
-        representing the uppermost Blocks spanning `start`:`end`.
+        representing the uppermost Blocks spanning `start:end`.
 
         The originating use case is to support providing minimal
         Block references required to assemble a new indirect Block
         consisting of data from this Block comingled with updated
         data without naively layering deeper levels of Block
         indirection with every update phase.
-
-        The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
     if self.indirect:
       offset = 0        # the absolute index of the left edge of subblock B
       for B in self.subblocks:
@@ -460,6 +439,9 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
   def top_blocks(self, start, end):
     ''' Yield existing high level blocks and new partial Blocks
         covering a portion of this Block,
@@ -477,6 +459,32 @@ class _Block(Transcriber, ABC):
               " but Block is indirect! should be a partial leaf"
               % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
+
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def spliced(self, start, end, new_block):
+    ''' Generator yielding Blocks producing the data
+        from `self` with the range `start:end`
+        replaced by the data from `new_block`.
+    '''
+    if start == len(self):
+      yield self
+    else:
+      yield from self.top_blocks(0, start)
+    yield new_block
+    if end < len(self):
+      yield from self.top_blocks(end, len(self))
+
+  @require(lambda start: start >= 0)
+  @require(lambda start, end: start <= end)
+  @require(lambda self, end: end <= len(self))
+  def splice(self, start, end, new_block):
+    ''' Return a new Block consisting of `self` with the span
+        `start:end` replaced by the data from `new_block`.
+    '''
+    from .blockify import top_block_for
+    return top_block_for(self.spliced(start, end, new_block))
 
   def textencode(self):
     ''' Transcribe this Block's binary encoding as text.
@@ -784,33 +792,24 @@ class _IndirectBlock(_Block):
   def datafrom(self, start=0, end=None):
     ''' Yield data from a point in the Block.
     '''
-    X("DATAFROM %s ...", self)
     if end is None:
       end = self.span
     if start >= end:
       return
     block_cache = defaults.S.block_cache
-    X("DATAFROM: defaults.S.block_cache=%s", block_cache)
     if block_cache:
-      X("DAtAFROM: look up %s in block_cache", self.hashcode)
       try:
         bm = block_cache[self.hashcode]
       except KeyError:
-        X("DATAFROM: NOT PRESENT")
         pass
       else:
         filled = bm.filled
-        X("DATAFROM: PRESENT, filled=%s", filled)
         if filled > start:
-          X("%s.datafrom(%d): get data from BlockMap", self, start)
           maxlength = end - start
           for bs in bm.datafrom(start, maxlength=maxlength):
-            X("DATAFROM: bm.datafrom: %d bytes", len(bs))
             yield bs
             start += len(bs)
             assert start <= end
-        X("DATAFROM: past filled point")
-    X("DATAFROM: now get data not from block_cache")
     if start < end:
       for B, Bstart, Bend in self.slices(start, end):
         assert not B.indirect

@@ -45,7 +45,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.result import Result, _PendingFunction, ResultState, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
+from cs.threads import AdjustableSemaphore, bg
 from cs.x import X
 
 DISTINFO = {
@@ -130,10 +130,10 @@ class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        ...
-        with L.ready( ... optional Later.submit() args ... ):
-          ... do stuff when L queues us ...
+          L = Later(4)    # a 4 thread Later
+          ...
+          with L.ready( ... optional Later.submit() args ... ):
+            ... do stuff when L queues us ...
 
       This permits easy inline scheduled code.
   '''
@@ -234,7 +234,7 @@ class LateFunction(_PendingFunction):
     '''
     _PendingFunction.__init__(self, func)
     if name is None:
-      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+      name = "LF-%d[%s]" % ( seq(), funcname(func) )
     if retry_delay is None:
       retry_delay = later.retry_delay
     self.name = name
@@ -246,7 +246,7 @@ class LateFunction(_PendingFunction):
     ##  D("    %s=%r", sn, s)
 
   def __str__(self):
-    return "<LateFunction %s>" % (self.name,)
+    return "LateFunction[%s]" % (self.name,)
 
   def _complete(self, result, exc_info):
     ''' Record the completion result of this LateFunction and update the parent Later.
@@ -264,13 +264,7 @@ class LateFunction(_PendingFunction):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    L = self.later
-    L.debug("DISPATCH %s", self)
-    with self._lock:
-      if not self.pending:
-        raise RuntimeError("should be pending, but state = %s" % (self.state,))
-      self.state = ResultState.running
-      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
+    return self.bg(logexc(self.func))
 
   @OBSOLETE
   def wait(self):
@@ -284,6 +278,8 @@ class LateFunction(_PendingFunction):
         Otherwise record completion as normal.
         If the function raised one of NameError, AttributeError, RuntimeError
         (broadly: "programmer errors"), report the stack trace to aid debugging.
+
+        TODO: merge into primary _complete method.
     '''
     result, exc_info = work_result
     if exc_info:
@@ -294,11 +290,7 @@ class LateFunction(_PendingFunction):
         self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
-        warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
-        with Pfx('>>'):
-          for formatted in traceback.format_exception(*exc_info):
-            for line in formatted.rstrip().split('\n'):
-              warning(line)
+        exception("%s._worker_completed: %s", self.name, e, exc_info=exc_info)
     self._complete(result, exc_info)
 
 class _PipelineStage(PushQueue):
@@ -525,21 +517,32 @@ class Later(object):
       Shutdown does not imply that all submitted functions have
       completed or even been dispatched.
       Callers may wait for completion and optionally cancel functions.
+
+      TODO: replace the Thread running the _pendingq priority queue
+      with a trivial post-submit/post-complete probe of the _pendingq
+      for another task and sufficient capacity.
+      Implies replacing the capacity semaphore with a counter.
+
+      TODO: __enter__ returns a SubLater, __exit__ closes the SubLater.
+
+      TODO: drop global default Later.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
     ''' Initialise the Later instance.
-        `capacity`: resource contraint on this Later; if an int, it is used
+
+        Parameters:
+        * `capacity`: resource contraint on this Later; if an int, it is used
           to size a Semaphore to constrain the number of dispatched functions
           which may be in play at a time; if not an int it is presumed to be a
           suitable Semaphore-like object, perhaps shared with other subsystems.
-        `name`: optional identifying name for this instance.
-        `inboundCapacity`: if >0, used as a limit on the number of
+        * `name`: optional identifying name for this instance.
+        * `inboundCapacity`: if >0, used as a limit on the number of
           undispatched functions that may be queued up; the default is 0 (no
           limit).  Calls to submit functions when the inbound limit is reached
           block until some functions are dispatched.
-        `retry_delay`: time delay for requeued functions.
-          Default: DEFAULT_RETRY_DELAY.
+        * `retry_delay`: time delay for requeued functions.
+          Default: `DEFAULT_RETRY_DELAY`.
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
@@ -571,7 +574,6 @@ class Later(object):
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
     self._pendingq = IterablePriorityQueue(self.inboundCapacity, name="%s._pendingq" % (self.name,))
-    self._workers = WorkerThreadPool(name=self.name + ":WorkerThreadPool").open()
     self._dispatchThread = Thread(
         name=self.name + '._dispatcher',
         target=self._dispatcher
@@ -596,11 +598,9 @@ class Later(object):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._workers.close()
       # queue actions to detect activity completion
       def finish_up():
         self._dispatchThread.join()         # wait for all functions to be dispatched
-        self._workers.join()                # wait for all worker Threads to complete
         self._finished.set()
       bg(finish_up)
 
@@ -905,15 +905,21 @@ class Later(object):
 
   def complete(self, outstanding=None, until_idle=False):
     ''' Generator which waits for outstanding functions to complete and yields them.
-        `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
-        `until_idle`: if outstanding is not None, continue until self.outstanding is empty
+
+        Parameters:
+        * `outstanding`: if not None, an iterable of LateFunctions;
+          default `self.outstanding`.
+        * `until_idle`: if true,
+          continue until `self.outstanding` is empty.
+          This requires the `outstanding` parameter to the `None`.
     '''
     if outstanding is not None:
       if until_idle:
-        raise ValueError("outstanding is not None and until_idle is not false")
+        raise ValueError("outstanding is not None and until_idle is true")
       for LF in report(outstanding):
         yield LF
       return
+    # outstanding is None: loop until self.outstanding is empty
     while True:
       outstanding = list(self.outstanding)
       if not outstanding:
@@ -1162,21 +1168,104 @@ class Later(object):
     '''
     return LatePool(L=self, *a, **kw)
 
+class SubLater(object):
+  ''' A class for managing a group of deferred tasks using an existing `Later`.
+  '''
+
+  def __init__(self, L):
+    ''' Initialise the `SubLater` with its parent `Later`.
+
+	TODO: accept discard=False param to suppress the queue and
+	associated checks.
+    '''
+    self._later = L
+    self._lock = Lock()
+    self._deferred = 0
+    self._queued = 0
+    self._queue = IterableQueue()
+    self.closed = False
+
+  def __str__(self):
+    return "%s(%s%s,deferred=%d,completed=%d)" % (
+            type(self), self._later,
+            "[CLOSED]" if self.closed else "",
+            self._deferred, self._queued,
+        )
+
+  def __iter__(self):
+    ''' Iteration over the `SubLater`
+        iterates over the queue of completed `LateFUnction`s.
+    '''
+    return iter(self._queue)
+
+  def close(self):
+    ''' Close the SubLater.
+
+        This prevents further deferrals.
+    '''
+    with self._lock:
+      closed = self.closed
+      if closed:
+        self._later.warning("repeated close of %s", self)
+      else:
+        self.closed = True
+        if self._queued >= self._deferred:
+          self._queue.close()
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function, return its LateFunction.
+
+	The resulting LateFunction will queue itself for collection
+	on completion.
+    '''
+    with self._lock:
+      LF = self._later.defer(func, *a, **kw)
+      self._deferred += 1
+      def on_complete(R):
+        with self._lock:
+          self._queue.put(R)
+          self._queued += 1
+          if self.closed and self._queued >= self._deferred:
+            self._queue.close()
+    LF.notify(on_complete)
+    return LF
+
+  def reaper(self, handler=None):
+    ''' Dispatch a Thread to collect completed `LateFunction`s.
+        Return the Thread.
+
+        `handler`: optional callable to be passed each `LateFunction`
+        as it completes.
+    '''
+    @logexc
+    def reap(Q):
+      for LF in Q:
+        if handler:
+          try:
+            handler(LF)
+          except Exception as e:
+            exception("%s: reap %s: %s", self, LF, e)
+    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T.start()
+    return T
+
 class LatePool(object):
-  ''' A context manager after the style of subprocess.Pool but with deferred completion.
+  ''' A context manager after the style of subprocess.Pool
+      but with deferred completion.
+
       Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        with LatePool(L) as LP:
-          # several calls to LatePool.defer, perhaps looped
-          LP.defer(func, *args, **kwargs)
-          LP.defer(func, *args, **kwargs)
-        # now we can LP.join() to block for all LateFunctions
-        #
-        # or iterate over LP to collect LateFunctions as they complete
-        for LF in LP:
-          result = LF()
-          print(result)
+          L = Later(4)    # a 4 thread Later
+          with LatePool(L) as LP:
+            # several calls to LatePool.defer, perhaps looped
+            LP.defer(func, *args, **kwargs)
+            LP.defer(func, *args, **kwargs)
+          # now we can LP.join() to block for all LateFunctions
+          #
+          # or iterate over LP to collect LateFunctions as they complete
+          for LF in LP:
+            result = LF()
+            print(result)
   '''
 
   def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
