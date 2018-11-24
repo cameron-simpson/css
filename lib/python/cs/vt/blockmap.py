@@ -292,7 +292,7 @@ class BlockMap(RunStateMixin):
       submap_path = None
       nleaves = 0
       while offset < blocklen and not runstate.cancelled:
-        for leaf, start, length in block.slices(offset):
+        for leaf, start, length in block.slices(offset, len(block)):
           if runstate.cancelled:
             break
           if start > 0:
@@ -398,8 +398,11 @@ class BlockMap(RunStateMixin):
       assert end <= len(leaf)
       yield leaf[start:end]
 
+  # TODO: accept start,end instead of start,span like other slices methods
   def slices(self, offset, span=None):
     ''' Generator yielding (leaf, start, end) from [offset:offset+span].
+
+        Parameters:
         `offset`: starting offset within `self.block`
         `span`: number of bytes to cover; if omitted or None, the
           span runs to the end of self.block
