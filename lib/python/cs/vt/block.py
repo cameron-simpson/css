@@ -374,9 +374,7 @@ class _Block(Transcriber, ABC):
     '''
     return CornuCopyBuffer(self.datafrom(start=offset, **kw), offset=offset)
 
-  @require(lambda start: start >= 0)
-  @require(lambda start, end: start <= end)
-  @require(lambda self, end: end <= len(self))
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def slices(self, start, end, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
         representing the leaf data covering the supplied span `start`:`end`.
@@ -405,9 +403,7 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  @require(lambda start: start >= 0)
-  @require(lambda start, end: start <= end)
-  @require(lambda self, end: end <= len(self))
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def top_slices(self, start, end):
     ''' Return an iterator yielding (Block, start, len) tuples
         representing the uppermost Blocks spanning `start:end`.
@@ -439,9 +435,7 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  @require(lambda start: start >= 0)
-  @require(lambda start, end: start <= end)
-  @require(lambda self, end: end <= len(self))
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def top_blocks(self, start, end):
     ''' Yield existing high level blocks and new partial Blocks
         covering a portion of this Block,
@@ -460,9 +454,7 @@ class _Block(Transcriber, ABC):
               % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
 
-  @require(lambda start: start >= 0)
-  @require(lambda start, end: start <= end)
-  @require(lambda self, end: end <= len(self))
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def spliced(self, start, end, new_block):
     ''' Generator yielding Blocks producing the data
         from `self` with the range `start:end`
@@ -476,9 +468,7 @@ class _Block(Transcriber, ABC):
     if end < len(self):
       yield from self.top_blocks(end, len(self))
 
-  @require(lambda start: start >= 0)
-  @require(lambda start, end: start <= end)
-  @require(lambda self, end: end <= len(self))
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def splice(self, start, end, new_block):
     ''' Return a new Block consisting of `self` with the span
         `start:end` replaced by the data from `new_block`.
@@ -629,6 +619,8 @@ class HashCodeBlock(_Block):
         raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=None, end=None):
+    ''' Generator yielding data from `start:end`.
+    '''
     if start is not None and start < 0:
       raise ValueError("invalid start=%s" % (start,))
     if end is not None and end < 0:
