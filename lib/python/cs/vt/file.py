@@ -12,7 +12,7 @@ from os import SEEK_SET
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
-from cs.fileutils import BackedFile, ReadMixin
+from cs.fileutils import BackedFile, ReadMixin, datafrom
 from cs.logutils import warning
 from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
@@ -20,7 +20,7 @@ from cs.result import bg, Result
 from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults, RLock
-from .block import Block
+from .block import Block, IndirectBlock, RLEBlock
 from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
 
 # arbitrary threshold to generate blockmaps
@@ -87,25 +87,34 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self._syncer = None     # syncing Result, close waits for it
     self._backing_block = None
     self._blockmap = None
-    self._reset(backing_block)
+    self._file = None
+    self.flush_count = 0
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
     self.open()
-    self.flush_count = 0
+    self._reset(backing_block)
 
   def __str__(self):
     return "RWBlockFile(backing_block=%s)" % (self._backing_block,)
 
   def _reset(self, new_backing_block):
+    ''' Discard the file contents and replace with the supplied Block, unmodified.
+    '''
     old_backing_block = self._backing_block
     if old_backing_block is not new_backing_block:
-      try:
-        del old_backing_block.blockmap
-      except AttributeError:
-        pass
+      if old_backing_block is not None:
+        try:
+          del old_backing_block.blockmap
+        except AttributeError:
+          pass
+      if self._file is not None:
+        self._file.close()
       self._backing_block = new_backing_block
-      self._file = BackedFile(ROBlockFile(new_backing_block))
-      self._file.flush = self.flush
+      if new_backing_block is None:
+        self._file = None
+      else:
+        self._file = BackedFile(ROBlockFile(new_backing_block))
+        self._file.flush = self.flush
 
   def startup(self):
     ''' Startup actions.
@@ -116,6 +125,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     ''' Close the RWBlockFile, return the top Block.
     '''
     B = self.sync()
+    self._reset(None)
     return B
 
   def __len__(self):
