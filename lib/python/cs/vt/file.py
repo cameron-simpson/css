@@ -10,18 +10,14 @@ from __future__ import print_function, absolute_import
 from io import RawIOBase
 from os import SEEK_SET
 import sys
-from cs.buffer import CornuCopyBuffer
-from cs.excutils import logexc
 from cs.fileutils import BackedFile, ReadMixin, datafrom
-from cs.logutils import warning
-from cs.pfx import Pfx, PfxThread
 from cs.resources import MultiOpenMixin
-from cs.result import bg, Result
+from cs.result import bg
 from cs.threads import locked, LockableMixin
 from cs.x import X
 from . import defaults, RLock
 from .block import Block, IndirectBlock, RLEBlock
-from .blockify import top_block_for, blockify, DEFAULT_SCAN_SIZE
+from .blockify import top_block_for, blockify
 
 # arbitrary threshold to generate blockmaps
 AUTO_BLOCKMAP_THRESHOLD = 1024 * 1024
@@ -88,7 +84,6 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self._backing_block = None
     self._blockmap = None
     self._file = None
-    self.flush_count = 0
     self._lock = RLock()
     MultiOpenMixin.__init__(self, lock=self._lock)
     self.open()
@@ -155,8 +150,6 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     '''
     if dispatch is None:
       dispatch = bg
-    flushnum = self.flush_count
-    self.flush_count += 1
     syncer = self._syncer
     if syncer is None:
       X("FILE FLUSH: dispatch=%s", dispatch)
@@ -218,14 +211,16 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       # let any syncers complete
       self.sync()
       cur_len = len(self)
-      front_range = self._file.front_range
+      f = self._file
+      front_range = f.front_range
+      front_file = f.front_file
       backing_block0 = self.backing_block
       if length < cur_len:
         # shorten file
         if front_range.end > length:
           front_range.discard_span(cur_len, front_range.end)
           # the front_file should also be too big
-          self.front_file.truncate(length)
+          front_file.truncate(length)
         if len(backing_block0) > length:
           # new top Block built on previous Block
           # this might overlap some of the front_range but the only new blocks
@@ -235,7 +230,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
               = top_block_for(backing_block0.top_blocks(0, length))
       elif length > cur_len:
         # extend the front_file and front_range
-        self.front_file.truncate(length)
+        front_file.truncate(length)
         front_range.add_span(front_range.end, length)
 
   def tell(self):
@@ -271,43 +266,6 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         # data from the backing block
         for bs in backing_block.datafrom(start=span.start, end=span.end):
           yield bs
-
-  @locked
-  def high_level_blocks(self, start=None, end=None, scanner=None):
-    ''' Return an iterator of new high level Blocks covering the specified data span.
-        The default is the entire current file data.
-    '''
-    return self._high_level_blocks_from_front_back(
-        self.front_file, self.backing_block, self.front_range,
-        start, end, scanner=scanner)
-
-  @staticmethod
-  def _high_level_blocks_from_front_back(
-      front_file, back_block, front_range,
-      start=None, end=None, scanner=None
-  ):
-    ''' Generator yielding high level blocks spanning the content of `front_file` and `back_block`, chosen through the filter of `front_range`.
-    '''
-    with Pfx("RWBlockFile.high_level_blocks(%s..%s)", start, end):
-      if start is None:
-        start = 0
-      if end is None:
-        end = max(front_range.end, len(back_block))
-      ##X("_HLB: front_file=%s, back_block=%s, front_range=%s, start=%s, end=%s...",
-      ##  front_file, back_block, front_range, start, end)
-      offset = start
-      for in_front, span in front_range.slices(start, end):
-        if in_front:
-          # blockify the new data and yield the top block
-          B = file_top_block(front_file, span.start, span.end, scanner=scanner)
-          yield B
-          offset += len(B)
-        else:
-          for B in back_block.top_blocks(span.start, span.end):
-            yield B
-            offset += len(B)
-        if offset < end:
-          warning("only got data to offset %d", offset)
 
 def filedata(f, start, end):
   ''' A generator to yield chunks of data from a file.
