@@ -212,6 +212,33 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     X("%s.sync: B=%s", type(self), B)
     return B
 
+  def _sync_file(self, S):
+    # worker to sync the front ranges to the Block store
+    f = self._file
+    while f.front_range:
+      with self._lock:
+        if f.front_range:
+          start, end = f.front_range._spans.pop(0)
+          X("FILE SYNC %s: sync span %s:%s", self, start, end)
+          with S:
+            new_block = file_top_block(f.front_file, start, end)
+            old_backing_block = self._backing_block
+            if start >= len(old_backing_block):
+              # old_block + pad + new_block
+              subblocks = [old_backing_block]
+              pad_length = start - len(old_backing_block)
+              if pad_length > 0:
+                subblocks.append(RLEBlock(pad_length, b'\0'))
+              subblocks.append(new_block)
+              new_backing_block = IndirectBlock(subblocks=subblocks)
+            else:
+              end = min(end, len(old_backing_block))
+              new_backing_block = old_backing_block.splice(start, end, new_block)
+          self._backing_block = new_backing_block
+          f.back_file = ROBlockFile(new_backing_block)
+    S.close()
+    return self._backing_block
+
   @locked
   def truncate(self, length):
     ''' Truncate the RWBlockFile to the specified `length`.
