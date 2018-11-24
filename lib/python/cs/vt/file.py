@@ -147,68 +147,25 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       dispatch = bg
     flushnum = self.flush_count
     self.flush_count += 1
-    old_file = self._file
-    old_syncer = self._syncer
-    # only do work if there are new data in the file or pending syncs
-    if not old_syncer and not old_file.front_range:
-      # no bg syncher, no modified data: file unchanged
-      return Result(result=self._backing_block)
-    with Pfx("%s.flush(scanner=%r)...", type(self).__qualname__, scanner):
-      @logexc
-      def update_store():
-        ''' Commit unsynched file contents to the Store.
-        '''
-        # wait for previous sync to complete, if any
-        if old_syncer:
-          # fetch the result Block of the preceeding sync
-          old_block = old_syncer()
-        else:
-          # otherwise use the file's current backing Block
-          old_block = old_file.back_file.block
-        # Recompute the top Block from the current high level blocks.
-        # As a side-effect of setting .backing_block we discard the
-        # front file data, which are now saved to the Store.
-        with S:
-          B = top_block_for(
-              self._high_level_blocks_from_front_back(
-                  old_file.front_file, old_block,
-                  old_file.front_range,
-                  scanner=scanner))
-        old_file.close()
-        with self._lock:
-          # if we're still current, update the front settings
-          if self._file is new_file:
-            self._reset(B)
-        self.close()
-        S.close()
-        return B
+    syncer = self._syncer
+    if syncer is None:
+      X("FILE FLUSH: dispatch=%s", dispatch)
       S = defaults.S
-      # push the current state as the backing file
-      # and initiate a sync to the Store
-      old_file.read_only = True
-      new_file = BackedFile(old_file)
-      self._file = new_file
-      self._file.flush = self.flush
       S.open()
-      self.open()
-      new_syncer = self._syncer = dispatch(update_store)
-      def cleanup_syncer(R):
+      syncer = self._syncer = dispatch(self._sync_file, S)
+      X("FILE FLUSH: syncer=%s", syncer)
+      def cleanup(R):
         with self._lock:
-          if self._syncer is new_syncer:
+          if R is self._syncer:
             self._syncer = None
-      new_syncer.notify(cleanup_syncer)
-      return self._syncer
+      syncer.notify(cleanup)
+    return syncer
 
   def sync(self):
     ''' Dispatch a flush, return the flushed backing block.
         Wait for any flush to complete before returing the backing block.
     '''
-    self.flush()
-    R = self._syncer
-    if R:
-      B = R()
-    else:
-      B = self.backing_block
+    B = self.flush()()
     X("%s.sync: B=%s", type(self), B)
     return B
 
