@@ -96,7 +96,7 @@ class StreamStore(BasicStoreSync):
     if connect is None:
       # set up protocol on existing stream
       # no reconnect facility
-      conn = self._conn = self._packet_connection(recv, send)
+      self._conn = conn = self._packet_connection(recv, send)
       # arrange to disassociate if the channel goes away
       conn.notify_recv_eof.add(self._packet_disconnect)
       conn.notify_send_eof.add(self._packet_disconnect)
@@ -105,6 +105,7 @@ class StreamStore(BasicStoreSync):
       if recv is not None or send is not None:
         raise ValueError("connect is not None and one of recv or send is not None")
       self.connect = connect
+      self._conn = None
 
   @property
   def local_store(self):
@@ -142,40 +143,37 @@ class StreamStore(BasicStoreSync):
     ''' Shut down the StreamStore.
     '''
     with Pfx("SHUTDOWN %s", self):
-      conn = self._conn_probe()
+      conn = self._conn
       if conn:
         conn.shutdown()
+        self._conn = None
       local_store = self.local_store
       if local_store is not None:
         local_store.close()
       super().shutdown()
 
-  def _conn_probe(self):
-    ''' Probe for a current connection without risk of triggering a new one.
+  def connection(self):
+    ''' Return the current connection, creating it if necessary.
+        Returns None if there was no current connection
+        and it is too soon since the last connection attempt.
     '''
-    if '_conn' in dir(self):
-      return self._conn
-    return None
-
-  @locked
-  def __getattr__(self, attr):
-    if attr == '_conn':
-      next_attempt = self._conn_attempt_last + self._conn_attempt_delay
-      now = time.time()
-      if now < next_attempt:
-        return None
-      self._conn_attemp_last = now
-      try:
-        recv, send = self.connect()
-      except Exception as e:
-        error("%r: connect fails: %s: %s", attr, type(e).__name__, e)
-        return None
-      conn = self._conn = self._packet_connection(recv, send)
-      # arrange to disassociate if the channel goes away
-      conn.notify_recv_eof.add(self._packet_disconnect)
-      conn.notify_send_eof.add(self._packet_disconnect)
-      return conn
-    raise AttributeError(attr)
+    with self._lock:
+      conn = self._conn
+      if conn is None:
+        next_attempt = self._conn_attempt_last + self._conn_attempt_delay
+        now = time.time()
+        if now >= next_attempt:
+          self._conn_attemp_last = now
+          try:
+            recv, send = self.connect()
+          except Exception as e:
+            error("connect fails: %s: %s", type(e).__name__, e)
+          else:
+            self._conn = conn = self._packet_connection(recv, send)
+            # arrange to disassociate if the channel goes away
+            conn.notify_recv_eof.add(self._packet_disconnect)
+            conn.notify_send_eof.add(self._packet_disconnect)
+    return conn
 
   def _packet_connection(self, recv, send):
     ''' Wrap a pair of binary streams in a PacketConnection.
@@ -188,9 +186,9 @@ class StreamStore(BasicStoreSync):
   @locked
   def _packet_disconnect(self, conn):
     warning("PacketConnection DISCONNECT notification: %s", conn)
-    oconn = self._conn_probe()
+    oconn = self._conn
     if oconn is conn:
-      del self._conn
+      self._conn = None
       self._conn_attemp_last = time.time()
     else:
       warning("disconnect of %s, but that is not the current connection, ignoring", conn)
@@ -198,7 +196,7 @@ class StreamStore(BasicStoreSync):
   def join(self):
     ''' Wait for the PacketConnection to shut down.
     '''
-    conn = self._conn_probe()
+    conn = self._conn
     if conn:
       conn.join()
 
@@ -206,13 +204,13 @@ class StreamStore(BasicStoreSync):
     ''' Wrapper for self._conn.do to catch and report failed autoconnection.
     '''
     with Pfx("%s.do(%s)", self, rq):
-      conn = self._conn
+      conn = self.connection()
       if conn is None:
         raise StoreError("no connection")
       try:
         retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
       except ClosedError as e:
-        del self._conn
+        self._conn = None
         raise StoreError("connection closed: %s" % (e,)) from e
       except CancellationError as e:
         raise StoreError("request cancelled: %s" % (e,)) from e
