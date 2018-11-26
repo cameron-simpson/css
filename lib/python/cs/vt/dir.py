@@ -376,16 +376,19 @@ class _Dirent(Transcriber):
         and self.block == other.block
     )
 
-  @locked_property
+  @prop
   def prev_dirent(self):
     ''' Return the previous Dirent.
+
         If not None, during encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
+
+        TODO: parse out multiple blockrefs.
     '''
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    bfr = prev_blockref.datafrom()
+    bfr = CornuCopyBuffer(prev_blockref.datafrom())
     E = _Dirent.from_buffer(bfr)
     if not bfr.at_eof():
       warning(
