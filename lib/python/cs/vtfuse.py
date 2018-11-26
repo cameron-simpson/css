@@ -19,7 +19,7 @@ import stat
 import subprocess
 import sys
 from cs.excutils import logexc
-from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
@@ -125,7 +125,8 @@ def handler(method):
       try:
         with defaults.stack('fs', fs):
           with fs.S:
-            result = method(self, *a, **kw)
+            with LogTime("SLOW SYSCALL", threshold=5.0):
+              result = method(self, *a, **kw)
             if False and trace:
               if isinstance(result, bytes):
                 XP(" result => %d bytes, %r...", len(result), result[:16])
