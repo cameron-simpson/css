@@ -419,6 +419,9 @@ class AddRequest(VTPacket):
 
   RQTYPE = RqType.ADD
 
+  def __str__(self):
+    return "%s(%d:%r...)" % (type(self).__name__, len(self.value), self.value[:16])
+
   @classmethod
   def value_from_buffer(cls, bfr, flags=0):
     if flags:
