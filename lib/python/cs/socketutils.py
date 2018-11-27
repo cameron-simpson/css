@@ -10,7 +10,7 @@
 import os
 import errno
 import socket
-from cs.logutils import warning
+from cs.logutils import debug, warning
 from cs.pfx import Pfx
 
 def bind_next_port(sock, host, base_port):
@@ -80,7 +80,7 @@ class OpenSocket(object):
             ##info("%s", e)
             pass
           elif e.errno == errno.EBADF:
-            warning("closed: %s", e)
+            debug("%s", e)
           else:
             warning("UNEXPECTED ERROR 1: %s:%r", type(e), e)
             raise
