@@ -35,19 +35,17 @@ import sys
 import threading
 from threading import Lock, Thread, Event
 import time
-import traceback
 from cs.debug import ifdebug
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
-from cs.pfx import Pfx, PrePfx
+from cs.pfx import PrePfx
 from cs.py.func import funcname
-from cs.py.stack import stack_dump
-from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
+from cs.queues import IterableQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
-from cs.result import Result, ResultState, report, after
+from cs.result import Result, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import AdjustableSemaphore, bg
+from cs.threads import bg
 from cs.x import X
 
 DISTINFO = {
@@ -250,6 +248,7 @@ class LateFunction(Result):
   def _resubmit(self):
     ''' Resubmit this function for later execution.
     '''
+    # TODO: put the retry logic in Later notify func, resubmit with delay from there
     self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
 
   def _dispatch(self):
@@ -391,7 +390,8 @@ class _PipelineStagePipeline(_PipelineStage):
       outQ.close()
     self.copier = Thread(name="%s.copy_out" % (self,),
                          target=copy_out,
-                         args=(subpipeline.outQ, outQ)).start()
+                         args=(subpipeline.outQ, outQ))
+    self.copier.start()
 
   def put(self, item):
     self.subpipeline.put(item)
@@ -575,7 +575,7 @@ class Later(object):
         self._finished.set()
       bg(finish_up)
 
-  def close(self, *a, **kw):
+  def close(self):
     ''' Close the Later, preventing further task submission.
     '''
     self.closed = True
@@ -839,7 +839,7 @@ class Later(object):
     # record the function as outstanding and attach a notification
     # to remove it from the outstanding set on completion
     self.outstanding.add(LF)
-    LF.notify(lambda LF: self.outstanding.remove(LF))
+    LF.notify(self.outstanding.remove)
     return LF
 
   def complete(self, outstanding=None, until_idle=False):
@@ -1121,10 +1121,10 @@ class SubLater(object):
 
   def __str__(self):
     return "%s(%s%s,deferred=%d,completed=%d)" % (
-            type(self), self._later,
-            "[CLOSED]" if self.closed else "",
-            self._deferred, self._queued,
-        )
+        type(self), self._later,
+        "[CLOSED]" if self.closed else "",
+        self._deferred, self._queued,
+    )
 
   def __iter__(self):
     ''' Iteration over the `SubLater`
@@ -1204,9 +1204,12 @@ class LatePool(object):
 
   def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
     ''' Initialise the LatePool.
-        `L`: Later instance, default from default.current.
-        `priority`, `delay`, `when`, `name`, `pfx`: default values passed to Later.submit.
-        `block`: if true, wait for LateFunction completion before leaving __exit__.
+
+        Parameters:
+        * `L`: Later instance, default from default.current.
+        * `priority`, `delay`, `when`, `name`, `pfx`:
+          default values passed to Later.submit.
+        * `block`: if true, wait for LateFunction completion before leaving __exit__.
     '''
     if L is None:
       L = default.current
