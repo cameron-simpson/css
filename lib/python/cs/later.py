@@ -564,7 +564,7 @@ class Later(object):
           _finished Event
     '''
     ##with Pfx("%s.shutdown()", self):
-    with PrePfx("LATER.SHUTDOWN [%s]", self):
+    with PrePfx("%s SHUTDOWN [%s]", type(self).__name__, self):
       if not self.closed:
         self.close()
       if self._timerQ:
@@ -603,7 +603,7 @@ class Later(object):
 
   def _complete_LF(self, LF):
     ''' Process a completed LateFunction: remove from .running,
-        bump capacity, try to dispatch another function.
+        try to dispatch another function.
     '''
     with self._lock:
       self.running.remove(LF)
