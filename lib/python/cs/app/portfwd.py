@@ -313,7 +313,6 @@ class Portfwd(FlaggedMixin):
     if retcode != 0:
       error("%r: non-zero return code: %s", argv, retcode)
     else:
-      X("parsed=%r", parsed)
       for parsed_item in parsed:
         option = parsed_item.pop(0)
         values = options[option]
