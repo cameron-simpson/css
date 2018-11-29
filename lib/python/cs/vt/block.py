@@ -753,15 +753,16 @@ class _IndirectBlock(_Block):
     self.span = span
     self.hashcode = superB.hashcode
     self._data = None
+    self._subblocks = None
 
-  def __getattr__(self, attr):
-    if attr == 'subblocks':
-      with self._lock:
-        if 'subblocks' not in self.__dict__:
-          self.subblocks = tuple(
+  @prop
+  @locked
+  def subblocks(self):
+    blocks = self._subblocks
+    if blocks is None:
+      blocks = self._subblocks = tuple(
               BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
-      return self.subblocks
-    raise AttributeError(attr)
+    return blocks
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe "span:Block".
