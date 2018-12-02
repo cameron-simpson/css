@@ -250,12 +250,16 @@ class BlockMap(RunStateMixin):
       self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
       self._worker.start()
+    else:
+      self._worker = None
 
   def join(self):
     ''' Wait for the worker to complete.
     '''
     self.runstate.cancel()
-    self._worker.join()
+    worker = self._worker
+    if worker is not None:
+      self._worker.join()
 
   def __del__(self):
     ''' Release resources on object deletion.
