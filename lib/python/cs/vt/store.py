@@ -811,10 +811,10 @@ class ProxyStore(BasicStoreSync):
             if exc_info:
               error("exception", exc_info=exc_info)
             elif data is not None:
-              XP("got %d bytes", len(data))
+              ##XP("got %d bytes", len(data))
               if S not in self.read:
                 for copyS in self.copy2:
-                  XP("copy to %s", copyS)
+                  ##XP("copy to %s", copyS)
                   copyS.add_bg(data)
               return data
       return None
