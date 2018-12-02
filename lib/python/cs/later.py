@@ -276,7 +276,7 @@ class LateFunction(Result):
         self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
-        exception("%s._worker_completed: %s", self.name, e, exc_info=exc_info)
+        error("%s._worker_completed: %s", self.name, e, exc_info=exc_info)
     Result._complete(self, result, exc_info)
 
 class _PipelineStage(PushQueue):
