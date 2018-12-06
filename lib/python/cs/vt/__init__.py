@@ -32,6 +32,18 @@ import cs.resources
 from cs.resources import RunState, MultiOpenMixin
 from cs.x import X
 
+# intercept Lock and RLock
+if True:
+  def RLock():
+    return DebuggingLock(recursive=True)
+  # monkey patch MultiOpenMixin
+  cs.resources._mom_lockclass = RLock
+else:
+  Lock = threading_Lock
+  RLock = threading_RLock
+def Lock():
+  return DebuggingLock()
+
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
 MAX_FILE_SIZE = 1024 * 1024 * 1024
@@ -145,17 +157,6 @@ class _TestAdditionsMixin:
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
-
-if False:
-  def RLock():
-    return DebuggingLock(recursive=True)
-  # monkey patch MultiOpenMixin
-  cs.resources._mom_lockclass = RLock
-else:
-  Lock = threading_Lock
-  RLock = threading_RLock
-def Lock():
-  return DebuggingLock()
 
 LockContext = namedtuple("LockContext", "caller thread")
 
