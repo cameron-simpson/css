@@ -204,6 +204,7 @@ class DebuggingLock(object):
     return acquired
 
   def release(self):
+    self._held = None
     self._lock.release()
 
   def __enter__(self):
