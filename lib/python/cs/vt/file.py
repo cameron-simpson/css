@@ -61,7 +61,6 @@ class ROBlockFile(RawIOBase, ReadMixin):
     # data from the backing block
     backing_block = self.block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      X("ROBlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
     return backing_block.datafrom(offset)
 
@@ -161,11 +160,9 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       dispatch = bg
     syncer = self._syncer
     if syncer is None:
-      X("FILE FLUSH: dispatch=%s", dispatch)
       S = defaults.S
       S.open()
       syncer = self._syncer = dispatch(self._sync_file, S, scanner=scanner)
-      X("FILE FLUSH: syncer=%s", syncer)
       def cleanup(R):
         with self._lock:
           if R is self._syncer:
@@ -177,25 +174,19 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     ''' Dispatch a flush, return the flushed backing block.
         Wait for any flush to complete before returing the backing block.
     '''
-    B = self.flush()()
-    X("%s.sync: B=%s", type(self), B)
-    return B
+    return self.flush()()
 
   def _sync_file(self, S, scanner=None):
-    X("FILE SYNC BEGIN...")
     # worker to sync the front ranges to the Block store
     f = self._file
     while f.front_range:
       span = None
-      X("FILE SYNC: get front_range span...")
       with self._lock:
         if f.front_range:
           span = f.front_range._spans.pop(0)
-      X("FILE SYNC: span=%s", span)
       if span is None:
         break
       start, end = span
-      X("FILE SYNC %s: sync span %s:%s", self, start, end)
       with S:
         self._sync_span = span
         new_block = file_top_block(f.front_file, start, end, scanner=scanner)
@@ -218,7 +209,6 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         f.back_file = new_file
         self._sync_span = None
     S.close()
-    X("FILE SYNC END: _backing_block=%s", self._backing_block)
     return self._backing_block
 
   @locked
