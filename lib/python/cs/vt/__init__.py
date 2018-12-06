@@ -167,6 +167,7 @@ class DebuggingLock(object):
 
   def __init__(self, recursive=False):
     self.recursive = recursive
+    self.trace_acquire = False
     self._lock = threading_RLock() if recursive else threading_Lock()
     self._held = None
 
@@ -182,17 +183,18 @@ class DebuggingLock(object):
       warning("%s:%d: lock %s: timeout=%s",
           hold.caller.filename, hold.caller.lineno,
           lock, timeout)
-    if lock.acquire(0):
-      contended = False
-      lock.release()
-    else:
-      contended = True
-      held = self._held
-      warning(
-          "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
-          hold.caller.filename, hold.caller.lineno,
-          lock,
-          held.thread, held.caller.filename, held.caller.lineno)
+    contended = False
+    if True:
+      if lock.acquire(0):
+        lock.release()
+      else:
+        contended = True
+        held = self._held
+        warning(
+            "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
+            hold.caller.filename, hold.caller.lineno,
+            lock,
+            held.thread, held.caller.filename, held.caller.lineno)
     acquired = lock.acquire(timeout=timeout)
     if contended:
       warning(
@@ -201,6 +203,9 @@ class DebuggingLock(object):
           lock,
           "acquired" if acquired else "timed out")
     self._held = hold
+    if acquired and self.trace_acquire:
+      X("ACQUIRED %r", self)
+      stack_dump()
     return acquired
 
   def release(self):
@@ -208,7 +213,9 @@ class DebuggingLock(object):
     self._lock.release()
 
   def __enter__(self):
+    ##X("%s.ENTER...", type(self).__name__)
     self.acquire(_caller=caller())
+    ##X("%s.ENTER: acquired, returning self", type(self).__name__)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
