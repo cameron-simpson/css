@@ -257,7 +257,6 @@ class Inodes(object):
     else:
       inum = 1
     allocated.add(inum)
-    X("ALLOCATED INUM %d, allocated=%s", inum, allocated)
     return inum
 
   def add(self, E, inum=None):
@@ -441,9 +440,7 @@ class FileSystem(object):
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
     '''
-    I = self._inodes[inum]
-    X("__getitem__(%d)=>%r", inum, I)
-    return I
+    return self._inodes[inum]
 
   def __setitem__(self, inum, E):
     ''' Associate a specific inode number with a Dirent.
