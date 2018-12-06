@@ -125,10 +125,14 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     return B
 
   def __len__(self):
-    length = len(self._file)
-    span = self._sync_span
-    if span is not None:
-      length = max(length, span.end)
+    f = self._file
+    if f is None:
+      length = len(self._backing_block)
+    else:
+      length = len(f)
+      span = self._sync_span
+      if span is not None:
+        length = max(length, span.end)
     return length
 
   @property
@@ -178,13 +182,16 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     return B
 
   def _sync_file(self, S, scanner=None):
+    X("FILE SYNC BEGIN...")
     # worker to sync the front ranges to the Block store
     f = self._file
     while f.front_range:
       span = None
+      X("FILE SYNC: get front_range span...")
       with self._lock:
         if f.front_range:
           span = f.front_range._spans.pop(0)
+      X("FILE SYNC: span=%s", span)
       if span is None:
         break
       start, end = span
@@ -205,11 +212,13 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
           end = min(end, len(old_backing_block))
           new_backing_block = old_backing_block.splice(start, end, new_block)
       # update the backing file, leave the front file alone
+      new_file = ROBlockFile(new_backing_block)
       with self._lock:
         self._backing_block = new_backing_block
-        f.back_file = ROBlockFile(new_backing_block)
+        f.back_file = new_file
         self._sync_span = None
     S.close()
+    X("FILE SYNC END: _backing_block=%s", self._backing_block)
     return self._backing_block
 
   @locked
