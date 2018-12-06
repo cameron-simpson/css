@@ -43,7 +43,7 @@ from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDir, DataDirIndexEntry
 from .datafile import DataFileReader
-from .debug import dump_chunk, dump_Block
+from .debug import dump_chunk, dump_Block, dump_Store
 from .dir import Dir, DirFTP
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
@@ -272,6 +272,8 @@ class VTCmd:
               save=(cacheS, S)
           )
           S.config = self.config
+      X("MAIN CMD_OP S:")
+      dump_Store(S)
       defaults.push_Ss(S)
       # start the status ticker
       if False and sys.stdout.isatty():
