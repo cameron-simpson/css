@@ -15,7 +15,7 @@ from cs.fileutils import shortpath, longpath
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
-from . import defaults, Lock
+from . import Lock
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import parse_store_specs
@@ -71,12 +71,12 @@ class Config:
     store_name = "%s[%s]" % (self, clause_name)
     with Pfx(store_name):
       clause = dict(self.map[clause_name])
-      for discard in 'address',:
+      for discard in 'address', :
         clause.pop(discard, None)
       try:
         store_type = clause.pop('type')
       except KeyError:
-        raise ValueError("missing type")
+        raise ValueError("missing type field in clause")
       S = self.new_Store(
           store_name,
           store_type,
