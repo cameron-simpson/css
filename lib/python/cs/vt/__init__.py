@@ -33,16 +33,16 @@ from cs.resources import RunState, MultiOpenMixin
 from cs.x import X
 
 # intercept Lock and RLock
-if True:
+if False:
   def RLock():
     return DebuggingLock(recursive=True)
+  def Lock():
+    return DebuggingLock()
   # monkey patch MultiOpenMixin
   cs.resources._mom_lockclass = RLock
 else:
   Lock = threading_Lock
   RLock = threading_RLock
-def Lock():
-  return DebuggingLock()
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
