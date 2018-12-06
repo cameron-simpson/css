@@ -599,7 +599,10 @@ class Later(object):
           # the LF completes really fast - notify fires immediately
           # in the current thread if the function is already complete.
           LF.notify(self._complete_LF)
+          debug("LATER: dispatch %s", LF)
           LF._dispatch()
+      elif self.pending:
+        debug("LATER: at capacity, nothing dispatched: %s", self)
 
   def _complete_LF(self, LF):
     ''' Process a completed LateFunction: remove from .running,
