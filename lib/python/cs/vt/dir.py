@@ -796,13 +796,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._block = B
 
   @property
-  @locked
   def size(self):
     ''' Return the size of this file.
         If open, use the open file's size.
         Otherwise get the length of the top Block.
     '''
-    self._check()
     if self.open_file is None:
       sz = len(self.block)
     else:
