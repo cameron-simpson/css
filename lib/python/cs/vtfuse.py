@@ -360,9 +360,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.destroy
     '''
     # TODO: call self.forget with all kreffed inums?
-    X("%s.destroy...", self)
     self._vtfs.close()
-    X("%s.destroy COMPLETE", self)
 
   @handler
   def flush(self, fh):
@@ -526,7 +524,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     name = self._vt_str(name_b)
     fs = self._vtfs
     I = fs[parent_inode]
-    X("lookup: I=%r", I)
     # TODO: test for permission to search parent_inode
     P = I.E
     EA = None
@@ -654,7 +651,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
-    X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
     FH = self._vtfs._fh(fhndx)
     chunks = []
     while size > 0:
@@ -874,7 +870,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
         FH = FileHandle(self, E, False, True, False)
         FH.truncate(attr.st_size)
         FH.close()
-      return self._vt_EntryAttributes(E)
+      EA = self._vt_EntryAttributes(E)
+    return EA
 
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
