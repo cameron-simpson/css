@@ -225,6 +225,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)" % (attr, a, kw))
     return attrfunc
 
+##def __getattribute__(self, attr):
+##  X("LOOKUP %r ...", attr)
+##  try:
+##    return object.__getattribute__(self, attr)
+##  except AttributeError:
+##    return self.__getattr__(attr)
+
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vtfs)
 
@@ -241,6 +248,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       defaults.push_Ss(S)
       opts = set(self._vt_llf_opts)
       opts.add("fsname=" + fsname)
+      ##opts.add('noappledouble')
       llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
