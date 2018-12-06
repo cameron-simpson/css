@@ -273,8 +273,9 @@ class Config:
     path = longpath(path)
     debug("longpath(path) ==> %r", path)
     if backend is None:
-      raise ValueError('missing backend')
-    backend_store = self.Store_from_spec(backend)
+      backend_store = None
+    else:
+      backend_store = self.Store_from_spec(backend)
     if not isabspath(path):
       if path.startswith('./'):
         path = abspath(path)
