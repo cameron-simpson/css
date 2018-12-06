@@ -772,7 +772,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ##  raise ValueError("._block is %s and .open_file is %r" % (self._block, self.open_file))
 
   @property
-  @locked
   def block(self):
     ''' Obtain the top level Block.
         If open, sync the file to update ._block.
@@ -780,8 +779,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
     ##X("access FileDirent.block from:")
     ##stack_dump(indent=2)
-    if self.open_file is None:
-      return self._block
+    with self._lock:
+      if self.open_file is None:
+        return self._block
     return self.open_file.sync()
 
   @block.setter
