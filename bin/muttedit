@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Spawn a mutt to edit a message and dispatch a reply in tmux or screen.
 # This lets you detach from an unfinished reply and finish it later.
@@ -55,13 +55,9 @@ fi
 # pane: attach to session in split pane
 # inline: attach to session inline
 # detach: leave session detached
-[ -n "$wprog" ] && {
-  mode=window
-} || [ -n "$TMUX" ] && {
-    mode=pane
-} || {
-  mode=inline
-}
+{ [ -n "$wprog" ] && mode=window; } \
+|| { [ -n "$TMUX" ] && mode=pane; } \
+|| mode=inline
 
 while [ $# -gt 0 ]
 do
