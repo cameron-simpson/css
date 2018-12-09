@@ -14,7 +14,7 @@ set -ue
 : ${TMPDIR:=/tmp}
 : ${TMUX:=''}
 wprog=${MUTTEDIT_WINDOWPROG:-}
-editor=${MUTTEDIT_EDITOR:-vim-flowed}
+editor=${MUTTEDIT_EDITOR:-${EDITOR:-vim-flowed}}
 
 cmd=$0
 usage="Usage:
