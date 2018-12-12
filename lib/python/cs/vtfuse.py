@@ -19,7 +19,7 @@ import stat
 import subprocess
 import sys
 from cs.excutils import logexc
-from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
@@ -125,7 +125,8 @@ def handler(method):
       try:
         with defaults.stack('fs', fs):
           with fs.S:
-            result = method(self, *a, **kw)
+            with LogTime("SLOW SYSCALL", threshold=5.0):
+              result = method(self, *a, **kw)
             if False and trace:
               if isinstance(result, bytes):
                 XP(" result => %d bytes, %r...", len(result), result[:16])
@@ -224,6 +225,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)" % (attr, a, kw))
     return attrfunc
 
+##def __getattribute__(self, attr):
+##  X("LOOKUP %r ...", attr)
+##  try:
+##    return object.__getattribute__(self, attr)
+##  except AttributeError:
+##    return self.__getattr__(attr)
+
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vtfs)
 
@@ -240,6 +248,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       defaults.push_Ss(S)
       opts = set(self._vt_llf_opts)
       opts.add("fsname=" + fsname)
+      ##opts.add('noappledouble')
       llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
@@ -359,9 +368,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.destroy
     '''
     # TODO: call self.forget with all kreffed inums?
-    X("%s.destroy...", self)
     self._vtfs.close()
-    X("%s.destroy COMPLETE", self)
 
   @handler
   def flush(self, fh):
@@ -525,7 +532,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     name = self._vt_str(name_b)
     fs = self._vtfs
     I = fs[parent_inode]
-    X("lookup: I=%r", I)
     # TODO: test for permission to search parent_inode
     P = I.E
     EA = None
@@ -653,7 +659,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
-    X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
     FH = self._vtfs._fh(fhndx)
     chunks = []
     while size > 0:
@@ -873,7 +878,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
         FH = FileHandle(self, E, False, True, False)
         FH.truncate(attr.st_size)
         FH.close()
-      return self._vt_EntryAttributes(E)
+      EA = self._vt_EntryAttributes(E)
+    return EA
 
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):

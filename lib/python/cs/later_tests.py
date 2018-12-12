@@ -4,16 +4,20 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Unit tests for the cs.later module.
+'''
+
 from functools import partial
 import sys
 import time
 import unittest
-from cs.logutils import D, setup_logging
 from cs.timeutils import sleep
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY, FUNC_SELECTOR
 from cs.result import report
 
 class TestLater(unittest.TestCase):
+  ''' Unit tests for the Later class.
+  '''
 
   @staticmethod
   def _f(x):
@@ -29,14 +33,19 @@ class TestLater(unittest.TestCase):
     raise TestLater._Bang()
 
   def setUp(self):
+    ''' Set up a Later, log to the terminal.
+    '''
     self.L = Later(2)
     self.L.logTo("/dev/tty")
 
   def tearDown(self):
+    ''' Close the Later.
+    '''
     self.L.close()
 
   def test00one(self):
-    # compute 3*2
+    ''' Compute 3*2.
+    '''
     L = self.L
     F = partial(self._f, 3)
     LF = L.defer(F)
@@ -44,7 +53,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual(x, 6)
 
   def test01two(self):
-    # two sleep(2) in parallel
+    ''' Run two sleep(2) in parallel.
+    '''
     L = self.L
     F = partial(self._delay, 2)
     LF1 = L.defer(F)
@@ -71,7 +81,8 @@ class TestLater(unittest.TestCase):
     self.assertTrue(elapsed >= 4, "elapsed (%s) < 4" % (elapsed,))
 
   def test03calltwice(self):
-    # compute once, get result twice
+    ''' Run a LateFunction once, get results twice.
+    '''
     L = self.L
     F = partial(self._f, 5)
     LF = L.defer(F)
@@ -81,23 +92,28 @@ class TestLater(unittest.TestCase):
     self.assertEqual(y, 10)
 
   def test04raise(self):
-    # raise exception
+    ''' A LateFunction which raises an exception.
+    '''
     LF = self.L.defer(self._bang)
     self.assertRaises(TestLater._Bang, LF)
 
   def test05raiseTwice(self):
-    # raise exception again
+    ''' A LateFunction which raises an exception, called twice.
+    '''
     LF = self.L.defer(self._bang)
     self.assertRaises(TestLater._Bang, LF)
     self.assertRaises(TestLater._Bang, LF)
 
   def test06defer_with_args(self):
-    # compute 7*2 using .defer_with_args()
+    ''' Compute 7*2 using .defer_with_args().
+    '''
     LF = self.L.defer(self._f, 7)
     x = LF()
     self.assertEqual(x, 14)
 
   def test07report(self):
+    ''' Report LateFunctions in order of completion.
+    '''
     with Later(3) as L3:
       LF1 = L3.defer(self._delay, 3)
       LF2 = L3.defer(self._delay, 2)
@@ -106,14 +122,17 @@ class TestLater(unittest.TestCase):
       self.assertEqual(results, [1, 2, 3])
 
   def test09pipeline_00noop(self):
+    ''' Run a single stage one to one no-op pipeline.
+    '''
     with Later(1) as L:
       items = ['a', 'b', 'c', 'g', 'f', 'e']
       P = L.pipeline([ (FUNC_ONE_TO_ONE, lambda x:x) ], items)
-      outQ = P.outQ
       result = list(P.outQ)
       self.assertEqual( items, result )
 
   def test09pipeline_01idenitity(self):
+    ''' Run a single stage one to many no-op pipeline.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     def func(x):
@@ -124,6 +143,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual( items, result )
 
   def test09pipeline_02double(self):
+    ''' Run a single stage one to many pipeline.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'a', 'b', 'b', 'c', 'c', 'g', 'g', 'f', 'f', 'e', 'e']
@@ -138,6 +159,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual( sorted(result), sorted(expected) )
 
   def test09pipeline_03a_sort(self):
+    ''' Run a single stage many to many pipeline doing a sort.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
@@ -146,9 +169,11 @@ class TestLater(unittest.TestCase):
     P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
-    self.assertEqual( result, sorted(items) )
+    self.assertEqual( result, expected )
 
   def test09pipeline_03b_set(self):
+    ''' Run a single stage man to many pipeline.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
@@ -160,6 +185,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual( result, set(items) )
 
   def test09pipeline_04select(self):
+    ''' Run a single stage selection pipeline.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     want = ('a', 'f', 'c')
@@ -172,6 +199,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual( result, expected )
 
   def test09pipeline_05two_by_two_by_sort(self):
+    ''' Run a 3 stage pipeline with some fan out.
+    '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = [ 'a', 'a', 'a', 'a',
@@ -192,7 +221,8 @@ class TestLater(unittest.TestCase):
     self.assertEqual( result, expected )
 
 def selftest(argv):
-  setup_logging()
+  ''' Run unit tests for cs.later.
+  '''
   unittest.main(__name__, None, argv, failfast=True)
 
 if __name__ == '__main__':

@@ -13,13 +13,14 @@ import sys
 from tempfile import TemporaryFile
 from threading import Thread
 from cs.fileutils import RWFileBlockCache, datafrom_fd
-from cs.logutils import error
+from cs.logutils import error, warning
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
 from .block import IndirectBlock
+from .hash import DEFAULT_HASHCLASS
 from .store import BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
@@ -27,12 +28,11 @@ DEFAULT_MAX_CACHEFILES = 3
 
 class FileCacheStore(BasicStoreSync):
   ''' A Store wrapping another Store that provides fast access to
-      previously fetched data and fast storage of new data with
-      asynchronous updates to the backing Store.
+      previously fetched data and fast storage of new data.
+      asynchronous updates to the backing Store (which may be None).
 
       This class is a thin Store shaped shim over a FileDataMappingProxy,
-      which does the heavy lifting of storing data and ensuring all
-      new data is passed to the backend.
+      which does the heavy lifting of storing data.
   '''
 
   def __init__(
@@ -40,21 +40,35 @@ class FileCacheStore(BasicStoreSync):
       name, backend, dirpath,
       max_cachefile_size=None, max_cachefiles=None,
       runstate=None,
+      hashclass=None,
       **kw
   ):
     ''' Initialise the FileCacheStore.
-        `name`: the Store name
-        `backend`: the backing Store; this may be None, and the
+
+        Parameters:
+        * `name`: the Store name
+        * `backend`: the backing Store; this may be None, and the
           property .backend may be switched to another Store at any
           time
-        `dirpath`: directory to hold the cache files
+        * `dirpath`: directory to hold the cache files
+        * `hashclass`: hash class for data chunks;
+          if the `backend`
     '''
-    if backend is None:
-      raise ValueError("backend=None")
-    backend.open()
+    if backend:
+      backend.open()
+      if hashclass is None:
+        hashclass = backend.hashclass
+      elif hashclass is not backend.hashclass:
+        raise ValueError(
+            "supplied hashclass %s does not match backend hashclass %s from %s"
+            % (hashclass, backend.hashclass, backend))
+    else:
+      hashclass = DEFAULT_HASHCLASS
+      warning("%s:%r: using default hashclass: %s", type(self), name, hashclass)
     super().__init__(name, runstate=runstate, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
+    self.hashclass = hashclass
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
@@ -112,8 +126,7 @@ class FileCacheStore(BasicStoreSync):
     return h in self.cache
 
   def add(self, data):
-    backend = self.backend
-    h = backend.hash(data)
+    h = self.hashclass.from_chunk(data)
     self.cache[h] = data
     return h
 

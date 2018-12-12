@@ -186,14 +186,12 @@ class PacketConnection(object):
     self._recv_thread = Thread(
         target=self._receive_loop,
         name="%s[_receive_loop]" % (self.name,))
-    self._recv_thread.daemon = True
     self._recv_thread.start()
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
     self._send_thread = Thread(
         target=self._send_loop,
         name="%s[_send]" % (self.name,))
-    self._send_thread.daemon = True
     self._send_thread.start()
     # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()

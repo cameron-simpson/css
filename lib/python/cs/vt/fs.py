@@ -51,6 +51,7 @@ OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
 OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
 OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
 OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
+OS_ENOTSUP = lambda msg, *a: oserror(errno.ENOTSUP, msg, *a)
 OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
 
 class FileHandle:
@@ -256,7 +257,6 @@ class Inodes(object):
     else:
       inum = 1
     allocated.add(inum)
-    X("ALLOCATED INUM %d, allocated=%s", inum, allocated)
     return inum
 
   def add(self, E, inum=None):
@@ -440,9 +440,7 @@ class FileSystem(object):
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
     '''
-    I = self._inodes[inum]
-    X("__getitem__(%d)=>%r", inum, I)
-    return I
+    return self._inodes[inum]
 
   def __setitem__(self, inum, E):
     ''' Associate a specific inode number with a Dirent.
@@ -620,10 +618,12 @@ class FileSystem(object):
       OS_EINVAL(
           "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
           inum, xattr_name, XATTR_VT_PREFIX)
-    # bit of a hack: pretend all attributes exist, empty if missing
-    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
-    # with a stack trace
-    return E.meta.getxattr(xattr_name, b'')
+    xattr = E.meta.getxattr(xattr_name, None)
+    if xattr is None:
+      ##if xattr_name == 'com.apple.FinderInfo':
+      ##  OS_ENOTSUP("inum %d: no xattr %r, pretend not supported", inum, xattr_name)
+      OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+    return xattr
 
   def removexattr(self, inum, xattr_name):
     ''' Remove the extended attribute named `xattr_name` from `inum`.

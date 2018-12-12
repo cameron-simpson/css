@@ -376,16 +376,19 @@ class _Dirent(Transcriber):
         and self.block == other.block
     )
 
-  @locked_property
+  @prop
   def prev_dirent(self):
     ''' Return the previous Dirent.
+
         If not None, during encoding or transcription, if self !=
         prev_dirent, include it in the encoding or transcription.
+
+        TODO: parse out multiple blockrefs.
     '''
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    bfr = prev_blockref.datafrom()
+    bfr = CornuCopyBuffer(prev_blockref.datafrom())
     E = _Dirent.from_buffer(bfr)
     if not bfr.at_eof():
       warning(
@@ -769,7 +772,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ##  raise ValueError("._block is %s and .open_file is %r" % (self._block, self.open_file))
 
   @property
-  @locked
   def block(self):
     ''' Obtain the top level Block.
         If open, sync the file to update ._block.
@@ -777,8 +779,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
     ##X("access FileDirent.block from:")
     ##stack_dump(indent=2)
-    if self.open_file is None:
-      return self._block
+    with self._lock:
+      if self.open_file is None:
+        return self._block
     return self.open_file.sync()
 
   @block.setter
@@ -793,13 +796,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._block = B
 
   @property
-  @locked
   def size(self):
     ''' Return the size of this file.
         If open, use the open file's size.
         Otherwise get the length of the top Block.
     '''
-    self._check()
     if self.open_file is None:
       sz = len(self.block)
     else:

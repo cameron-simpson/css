@@ -61,7 +61,6 @@ class ROBlockFile(RawIOBase, ReadMixin):
     # data from the backing block
     backing_block = self.block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
-      X("ROBlockFile.datafrom: get_blockmap...")
       backing_block.get_blockmap()
     return backing_block.datafrom(offset)
 
@@ -99,7 +98,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     if old_backing_block is not new_backing_block:
       if old_backing_block is not None:
         try:
-          del old_backing_block.blockmap
+          old_backing_block.blockmap = None
         except AttributeError:
           pass
       if self._file is not None:
@@ -110,6 +109,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       else:
         self._file = BackedFile(ROBlockFile(new_backing_block))
         self._file.flush = self.flush
+        self._sync_span = None
 
   def startup(self):
     ''' Startup actions.
@@ -124,7 +124,15 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     return B
 
   def __len__(self):
-    return len(self._file)
+    f = self._file
+    if f is None:
+      length = len(self._backing_block)
+    else:
+      length = len(f)
+      span = self._sync_span
+      if span is not None:
+        length = max(length, span.end)
+    return length
 
   @property
   @locked
@@ -152,11 +160,9 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       dispatch = bg
     syncer = self._syncer
     if syncer is None:
-      X("FILE FLUSH: dispatch=%s", dispatch)
       S = defaults.S
       S.open()
-      syncer = self._syncer = dispatch(self._sync_file, S)
-      X("FILE FLUSH: syncer=%s", syncer)
+      syncer = self._syncer = dispatch(self._sync_file, S, scanner=scanner)
       def cleanup(R):
         with self._lock:
           if R is self._syncer:
@@ -168,34 +174,40 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     ''' Dispatch a flush, return the flushed backing block.
         Wait for any flush to complete before returing the backing block.
     '''
-    B = self.flush()()
-    X("%s.sync: B=%s", type(self), B)
-    return B
+    return self.flush()()
 
-  def _sync_file(self, S):
+  def _sync_file(self, S, scanner=None):
     # worker to sync the front ranges to the Block store
     f = self._file
     while f.front_range:
+      span = None
       with self._lock:
         if f.front_range:
-          start, end = f.front_range._spans.pop(0)
-          X("FILE SYNC %s: sync span %s:%s", self, start, end)
-          with S:
-            new_block = file_top_block(f.front_file, start, end)
-            old_backing_block = self._backing_block
-            if start >= len(old_backing_block):
-              # old_block + pad + new_block
-              subblocks = [old_backing_block]
-              pad_length = start - len(old_backing_block)
-              if pad_length > 0:
-                subblocks.append(RLEBlock(pad_length, b'\0'))
-              subblocks.append(new_block)
-              new_backing_block = IndirectBlock(subblocks=subblocks)
-            else:
-              end = min(end, len(old_backing_block))
-              new_backing_block = old_backing_block.splice(start, end, new_block)
-          self._backing_block = new_backing_block
-          f.back_file = ROBlockFile(new_backing_block)
+          span = f.front_range._spans.pop(0)
+      if span is None:
+        break
+      start, end = span
+      with S:
+        self._sync_span = span
+        new_block = file_top_block(f.front_file, start, end, scanner=scanner)
+        old_backing_block = self._backing_block
+        if start >= len(old_backing_block):
+          # old_block + pad + new_block
+          subblocks = [old_backing_block]
+          pad_length = start - len(old_backing_block)
+          if pad_length > 0:
+            subblocks.append(RLEBlock(pad_length, b'\0'))
+          subblocks.append(new_block)
+          new_backing_block = IndirectBlock(subblocks=subblocks)
+        else:
+          end = min(end, len(old_backing_block))
+          new_backing_block = old_backing_block.splice(start, end, new_block)
+      # update the backing file, leave the front file alone
+      new_file = ROBlockFile(new_backing_block)
+      with self._lock:
+        self._backing_block = new_backing_block
+        f.back_file = new_file
+        self._sync_span = None
     S.close()
     return self._backing_block
 
@@ -258,13 +270,31 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     backing_block = self.backing_block
     if len(backing_block) >= AUTO_BLOCKMAP_THRESHOLD:
       backing_block.get_blockmap()
-    for inside, span in f.front_range.slices(offset, len(self)):
+    # TODO: iterate afresh from each offset? expensive, but accomodates changes
+    for inside, (start, end) in f.front_range.slices(offset, len(self)):
       if inside:
         # data from the front file
-        yield from filedata(front_file, span.start, span.end)
+        yield from filedata(front_file, start, end)
       else:
+        # sync span data are also obtained from the front file
+        sync_span = self._sync_span
+        if sync_span is not None:
+          sync_start, sync_end = sync_span
+          if start < sync_start and end > sync_start:
+            # preamble from the backing block: start:sync_start
+            yield from backing_block.datafrom(start=start, end=sync_start)
+            start = sync_start
+          if start < sync_end and end > sync_start:
+            # overlap from front file: start:min(end,sync_end)
+            new_start = min(end, sync_end)
+            yield from filedata(front_file, start, new_start)
+            start = new_start
+          if start == end:
+            # no post sync span data
+            continue
+          assert start < end
         # data from the backing block
-        for bs in backing_block.datafrom(start=span.start, end=span.end):
+        for bs in backing_block.datafrom(start=start, end=end):
           yield bs
 
 def filedata(f, start, end):
