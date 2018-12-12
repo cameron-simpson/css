@@ -28,7 +28,7 @@ from cs.fileutils import file_data
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, logTo
+                        setup_logging, logTo, loginfo
 from cs.pfx import Pfx
 from cs.resources import RunState
 from cs.tty import statusline, ttysize
