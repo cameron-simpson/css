@@ -208,15 +208,6 @@ class _Archive(object):
       return when, E
     return None, None
 
-  @staticmethod
-  def strfor_Dirent(E):
-    ''' Exposed function for obtaining the text form of a Dirent.
-        This is to support callers optimising away calls to .save
-        if they know the previous save state, obtainable from this
-        function.
-    '''
-    return E.textencode()
-
 def copy_in_dir(rootD, rootpath, modes, log=None):
   ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
       `modes` is an optional CopyModes value.
