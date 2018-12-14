@@ -1,9 +1,15 @@
-Stores: push foo,foo_bg implementations back to _foo,_foo_bg and put tracking etc boilerplate on the public methods
-remove _data from hashcode blocks, always access shared hash:data mapping cache and fall back to caching Store fetch
+SHORTLIST:
+  Store exports
+    base STore: empty exports
+    DataDir: 
+      default exports based on the datadir-*.vt files
+    ProxyStore
+      exports = name:store_spec ...
+  Stores: push foo,foo_bg implementations back to _foo,_foo_bg and put tracking etc boilerplate on the public methods
+  remove _data from hashcode blocks, always access shared hash:data mapping cache and fall back to caching Store fetch
 Dir: HASCHAFF flag: variable sized random bsdata leads dirents
 fs.Ino: trim redundant transcriber methods/attrs from class if @mapping_transcriber did the job
 datadir: use flock or like instead of a .lock file because aborting a vtd leaves them lying around
-decouple File sync from filesystem FileHandle close
 Config needs a hashclass option to supply to Store constructors
 make cs.later.Later restartable - tends to hang on the second shutdown?
 when stable and more ergonomic, move vt.transcribe to cs.transcriber
