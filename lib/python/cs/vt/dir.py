@@ -32,9 +32,10 @@ from cs.threads import locked, locked_property
 from cs.x import X
 from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
+from .blockify import top_block_for, blockify
 from .file import RWBlockFile
 from .meta import Meta, rwx, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
-from .paths import path_split, resolve
+from .paths import path_split, resolve, DirLike, FileLike
 from .transcribe import Transcriber, parse as parse_transcription, \
                         register as register_transcriber
 
@@ -708,7 +709,7 @@ class IndirectDirent(_Dirent):
     '''
     return super().transcribe_inner(T, fp, {})
 
-class FileDirent(_Dirent, MultiOpenMixin):
+class FileDirent(_Dirent, MultiOpenMixin, FileLike):
   ''' A _Dirent subclass referring to a file.
 
       If closed, ._block refers to the file content.
@@ -771,6 +772,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
     ##elif self.open_file is not None:
     ##  raise ValueError("._block is %s and .open_file is %r" % (self._block, self.open_file))
 
+  @classmethod
+  def from_chunks(cls, chunks):
+    ''' Create a FileDirent from an iterable of bytes `chunks`.
+    '''
+    return cls('', block=top_block_for(blockify(chunks)))
+
   @property
   def block(self):
     ''' Obtain the top level Block.
@@ -794,6 +801,14 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self.open_file is not None:
       raise RuntimeError("tried to set .block directly while open")
     self._block = B
+
+  def datafrom(self):
+    ''' Generator yielding data from the FileDirent.
+    '''
+    f = self.open_file
+    if f is None:
+      return self.block.datafrom()
+    return f.datafrom()
 
   @property
   def size(self):
@@ -877,7 +892,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     '''
     return self.block.pushto(S2, Q=Q, runstate=runstate)
 
-class Dir(_Dirent):
+class Dir(_Dirent, DirLike):
   ''' A directory.
 
       Special attributes:
@@ -898,7 +913,7 @@ class Dir(_Dirent):
         * `parent`: parent Dir
         * `block`: pre-existing Block with initial Dir content
     '''
-    super().__init__(DirentType.DIR, name, **kw)
+    _Dirent.__init__(self, DirentType.DIR, name, **kw)
     if block is None:
       self._block = None
       self._entries = {}
@@ -1112,6 +1127,13 @@ class Dir(_Dirent):
     D = self[name] = Dir(name, parent=self)
     return D
 
+  def file_frombuffer(self, name, bfr):
+    if name in self:
+      raise KeyError("name already exists: %r" % (name,))
+    E = FileDirent.from_chunks(iter(bfr))
+    self[name] = E
+    return E
+
   def chdir1(self, name):
     ''' Change directory to the immediate entry `name`.
         Return the entry.
@@ -1170,6 +1192,8 @@ class Dir(_Dirent):
     ''' Update this Dir with changes from `D2` which is presumed to be new.
         Note: this literally attaches nodes from `D2` into this
         Dir's tree where possible.
+
+        TODO: replace with code from vt.merge.
     '''
     if path is None:
       path = self.pathto()
