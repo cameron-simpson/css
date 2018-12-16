@@ -48,8 +48,9 @@ from .dir import Dir
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
+from .merge import merge
 from .parsers import scanner_from_filename
-from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
+from .paths import OSDir, OSFile, decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .server import serve_tcp, serve_socket
 from .smuggling import import_dir, import_file
 from .store import ProgressStore, ProxyStore
@@ -712,11 +713,17 @@ class VTCmd:
         error("missing")
         return 1
       arpath = ospath + '.vt'
-      try:
-        update_archive(arpath, ospath, modes, create_archive=True)
-      except IOError as e:
-        error("%s" % (e,))
-        return 1
+      A = Archive(arpath, missing_ok=True)
+      when, target = A.last
+      if target is None:
+        target = Dir(basename(ospath))
+      if isdirpath(ospath):
+        source = OSDir(ospath)
+      else:
+        source = OSFile(ospath)
+      X("target = %s, source= %s", type(target), type(source))
+      merge(target, source)
+      A.update(target)
       info("remove %r", ospath)
       if isdirpath(ospath):
         shutil.rmtree(ospath)
