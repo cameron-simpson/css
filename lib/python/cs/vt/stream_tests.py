@@ -10,6 +10,7 @@
 import os
 import sys
 import unittest
+from cs.x import X
 from .hash import DEFAULT_HASHCLASS
 from .hash_tests import HashUtilDict, _TestHashCodeUtils
 from .store import MappingStore
@@ -43,14 +44,38 @@ def make_stream_store(hashclass, addif):
 class TestStreamStore(TestStore, unittest.TestCase):
   ''' Test a stream in non-addif mode.
   '''
+
+  hashclass = DEFAULT_HASHCLASS
+
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=False)
+
+  def setUp(self):
+    self._init_Store()
+    TestStore.setUp(self)
+    self.remote_S.open()
+
+  def tearDown(self):
+    self.remote_S.close()
+    TestStore.tearDown(self)
 
 class TestStreamStoreAddIf(TestStore, unittest.TestCase):
   ''' test a stream in addif mode.
   '''
+
+  hashclass = DEFAULT_HASHCLASS
+
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=True)
+
+  def setUp(self):
+    self._init_Store()
+    TestStore.setUp(self)
+    self.remote_S.open()
+
+  def tearDown(self):
+    self.remote_S.close()
+    TestStore.tearDown(self)
 
 ##@unittest.skip("too noisy")
 class TestHashCodeUtilsStreamStore(_TestHashCodeUtils, unittest.TestCase):
