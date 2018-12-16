@@ -4,10 +4,17 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07may2013
 #
 
+from abc import ABC, abstractmethod
+import errno
 import os
-from cs.logutils import error
+from os.path import join as joinpath
+from stat import S_ISDIR
+from cs.buffer import CornuCopyBuffer
+from cs.fileutils import datafrom
+from cs.logutils import error, warning
 from cs.pfx import Pfx
-from . import fromtext
+from cs.x import X
+from . import fromtext, PATHSEP
 
 def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Dirent, such as from
@@ -45,6 +52,8 @@ def dirent_file(direntpath, do_create=False):
   raise RuntimeError("file creation not yet implemented")
 
 def dirent_resolve(direntpath, do_mkdir=False):
+  ''' Resolve `direntpath`, optionally making missing intermediate directories.
+  '''
   rootD, tail = get_dirent(direntpath)
   return resolve(rootD, tail, do_mkdir=do_mkdir)
 
@@ -133,3 +142,232 @@ def walk(rootD, topdown=True, yield_status=False):
             pending.append( (subD, subpath) )
   if yield_status:
     yield ok
+
+class DirLike(ABC):
+  ''' Facilities offered by directory like objects.
+  '''
+
+  isdir = property(lambda self: True)
+  isfile = property(lambda self: False)
+
+  @staticmethod
+  def check_subname(name):
+    ''' Sanity check `name`, raise ValueError if invalid.
+    '''
+    if not name:
+      raise ValueError("name may not be empty")
+    if PATHSEP in name:
+      raise ValueError("name may not contain PATHSEP %r: %r" % (PATHSEP, name))
+
+  @abstractmethod
+  def __contains__(self, name):
+    raise NotImplementedError("no %s.__contains__" % (type(self),))
+
+  @abstractmethod
+  def __getitem__(self, name):
+    raise NotImplementedError("no %s.__getitem__" % (type(self),))
+
+  def get(self, name, default=None):
+    ''' Mapping method.
+    '''
+    try:
+      return self[name]
+    except KeyError:
+      return default
+
+  @abstractmethod
+  def __delitem__(self, name):
+    raise NotImplementedError("no %s.__delitem__" % (type(self),))
+
+  @abstractmethod
+  def keys(self):
+    ''' The names in this DirLike.
+    '''
+    raise NotImplementedError("no %s.__getitem__" % (type(self),))
+
+  def __iter__(self):
+    return iter(self.keys())
+
+  def values(self):
+    ''' Iterator yielding values.
+    '''
+    for k in self.keys():
+      try:
+        v = self[k]
+      except KeyError:
+        pass
+      else:
+        yield v
+
+  def items(self):
+    ''' Iterator yielding `(key, vlaue)` tuples.
+    '''
+    for k in self.keys():
+      try:
+        v = self[k]
+      except KeyError:
+        pass
+      else:
+        yield k, v
+
+  @abstractmethod
+  def mkdir(self, name):
+    ''' Construct and return a new empty subdirectory.
+    '''
+    raise NotImplementedError("no %s.mkdir" % (type(self),))
+
+  @abstractmethod
+  def file_frombuffer(self, name, bfr):
+    ''' Contruct a new file containing data from `bfr`.
+    '''
+    raise NotImplementedError("no %s.file_frombuffer" % (type(self),))
+
+  def file_fromchunks(self, name, chunks):
+    ''' Create a new file named `name` from the data in `chunks`.
+    '''
+    return self.file_frombuffer(name, CornuCopyBuffer(chunks))
+
+  def resolve(self, rpath):
+    ''' Resolve `rpath` relative to `self`, return resolved node or `None`.
+
+        *WARNING*: this can walk upwards an arbitrary distance.
+    '''
+    node = self
+    for part in rpath.split(PATHSEP):
+      if not part:
+        continue
+      if part == '.':
+        continue
+      if part == '..':
+        node = self.parent
+        if node is None:
+          break
+      node = self.get(part)
+      if node is None:
+        break
+    return node
+
+  def walk(self):
+    ''' Walk this tree.
+    '''
+    X("======= WALK %r ... =============", self.path)
+    pending = [ (self, []) ]
+    while pending:
+      node, rparts = pending.pop()
+      X("node=%r, rparts=%r", node.path, rparts)
+      rpath = PATHSEP.join(rparts)
+      X("rpath=%r", rpath)
+      dirnames = []
+      filenames = []
+      for name in sorted(node.keys()):
+        subnode = node.get(name)
+        if subnode is None:
+          continue
+        if subnode.isdir:
+          dirnames.append(name)
+        else:
+          filenames.append(name)
+      odirnames = set(dirnames)
+      X("YIELD %r, %r, %r", rpath, dirnames, filenames)
+      yield rpath, dirnames, filenames
+      for name in dirnames:
+        if name not in odirnames:
+          warning(
+              "walk(%s): %r: dirname %r not in original set",
+              self, rpath, name)
+          continue
+        node = node.get(name)
+        if node is None:
+          continue
+        pending.append( (node, rparts + [name]) )
+        X("PENDING => %r", pending)
+
+class FileLike(ABC):
+  ''' Facilities offered by file like objects.
+  '''
+
+  isdir = property(lambda self: False)
+  isfile = property(lambda self: True)
+
+  @abstractmethod
+  def datafrom(self):
+    ''' Iterator yielding natural data chunks from the file.
+    '''
+    raise NotImplementedError("no %s.datafrom" % (type(self),))
+
+  def bufferfrom(self):
+    ''' Return a CornuCopyBuffer presenting data from the file.
+    '''
+    return CornuCopyBuffer(self.datafrom())
+
+class OSDir(DirLike):
+  ''' DirLike class for an OS directory.
+  '''
+
+  def __init__(self, path):
+    DirLike.__init__(self)
+    self.path = path
+
+  def keys(self):
+    ''' Directory entry names.
+    '''
+    return os.listdir(self.path)
+
+  def __contains__(self, name):
+    return name in self.keys()
+
+  def __getitem__(self, name):
+    if name not in self.keys():
+      raise KeyError(name)
+    namepath = joinpath(self.path, name)
+    try:
+      S = os.stat(namepath)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        raise KeyError(name)
+      raise
+    if S_ISDIR(S.st_mode):
+      return type(self)(namepath)
+    return OSFile(namepath)
+
+  def __delitem__(self, name):
+    self.check_subname(name)
+    os.remove(joinpath(self.path, name))
+
+  @property
+  def parent(self):
+    if PATHSEP in self.path:
+      return OSDir(dirname(self.path))
+    return None
+
+  def mkdir(self, name):
+    ''' Create a subdirectory.
+    '''
+    if not name or PATHSEP in name:
+      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+    subpath = joinpath(self.path, name)
+    os.mkdir(subpath)
+    return OSDir(subpath)
+
+  def file_frombuffer(self, name, bfr):
+    if not name or PATHSEP in name:
+      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+    subpath = joinpath(self.path, name)
+    with open(subpath, 'wb') as f:
+      for data in bfr:
+        f.write(data)
+    return OSFile(subpath)
+
+class OSFile(FileLike):
+  ''' FileLike class for an OS file.
+  '''
+
+  def __init__(self, path):
+    FileLike.__init__(self)
+    self.path = path
+
+  def datafrom(self):
+    ''' Yield data from the file.
+    '''
+    with open(self.path, 'rb') as f:
+      yield from datafrom(f, 0)
