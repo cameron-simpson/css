@@ -305,8 +305,13 @@ class OSDir(DirLike):
   '''
 
   def __init__(self, path):
+    if not path:
+      path = '.'
     DirLike.__init__(self)
     self.path = path
+
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.path)
 
   def keys(self):
     ''' Directory entry names.
@@ -354,7 +359,8 @@ class OSDir(DirLike):
     if not name or PATHSEP in name:
       raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
     subpath = joinpath(self.path, name)
-    os.mkdir(subpath)
+    with Pfx("mkdir(%r)", subpath):
+      os.mkdir(subpath)
     return OSDir(subpath)
 
   def file_frombuffer(self, name, bfr):
