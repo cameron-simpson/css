@@ -45,7 +45,6 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -488,7 +487,6 @@ class SqliteFilemap:
     del self.conn
 
   def _execute(self, sql, *a):
-    X("SQL: %s: %r %r", shortpath(self.path), sql.strip(), a)
     return self.conn.execute(sql, *a)
 
   def filenums(self):
@@ -504,7 +502,6 @@ class SqliteFilemap:
   def _map(self, path, n, indexed_to=0):
     ''' Add a DataFileState for `path` and `n` to the mapping.
     '''
-    X("_map(path=%r,n=%r,indexed_to=%r", path, n, indexed_to)
     datadir = self.datadir
     if n in self.n_to_DFstate:
       warning("replacing n_to_DFstate[%s]", n)
@@ -512,7 +509,6 @@ class SqliteFilemap:
       warning("replacing path_toDFstate[%r]", path)
     DFstate = DataFileState(
         datadir, n, path, indexed_to=indexed_to)
-    X("DFstate=%r", DFstate)
     self.n_to_DFstate[n] = DFstate
     self.path_to_DFstate[path] = DFstate
 
@@ -522,7 +518,6 @@ class SqliteFilemap:
           SELECT id, path, indexed_to FROM filemap
       ''')
       for n, path, indexed_to in c.fetchall():
-        X("n=%r, path=%r, indexed_to=%r", n, path, indexed_to)
         self._map(path, n, indexed_to)
       c.close()
 
@@ -651,7 +646,6 @@ class DataDir(_FilesDir):
           `DEFAULT_ROLLOVER`.
         * `create_statedir`: os.mkdir the state directory if missing.
     '''
-    X("DataDir.__init__: statedirpath=%r, hashclass=%r", statedirpath, hashclass)
     super().__init__(statedirpath, hashclass, **kw)
     if rollover is None:
       rollover = DEFAULT_ROLLOVER

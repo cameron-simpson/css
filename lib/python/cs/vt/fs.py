@@ -375,7 +375,7 @@ class FileSystem(object):
     if archive is None:
       self._last_sync_state = None
     else:
-      self._last_sync_state = archive.strfor_Dirent(E)
+      self._last_sync_state = bytes(E)
     self.subpath = subpath
     self.readonly = readonly
     self.append_only = append_only
@@ -468,7 +468,7 @@ class FileSystem(object):
             E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
           else:
             E.meta['fs_inode_dirents'] = ''
-          new_state = archive.strfor_Dirent(E)
+          new_state = bytes(E)
           if new_state != self._last_sync_state:
             archive.update(E)
             self._last_sync_state = new_state

@@ -99,7 +99,6 @@ def handler(method):
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
-  @logexc
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
@@ -118,7 +117,11 @@ def handler(method):
         "%s.%s(%s)",
         type(self).__name__, syscall, arg_desc
     ):
-      trace = syscall not in ('getxattr', 'statfs',)
+      trace = syscall in (
+          'getxattr',
+          'setxattr',
+          ##'statfs',
+      )
       if trace:
         X("CALL %s(%s)", syscall, arg_desc)
       fs = self._vtfs
@@ -127,17 +130,17 @@ def handler(method):
           with fs.S:
             with LogTime("SLOW SYSCALL", threshold=5.0):
               result = method(self, *a, **kw)
-            if False and trace:
+            if trace:
               if isinstance(result, bytes):
-                XP(" result => %d bytes, %r...", len(result), result[:16])
+                X("CALL %s result => %d bytes, %r...", syscall, len(result), result[:16])
               else:
-                XP(" result => %r", result)
+                X("CALL %s result => %s", syscall, result)
             return result
       except FuseOSError as e:
-        X("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
+        warning("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
         raise
       except OSError as e:
-        X("CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e)
+        warning("CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
@@ -259,7 +262,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         '''
         with defaults.stack('fs', fs):
           with S:
-            llfuse.main()
+            llfuse.main(workers=32)
             llfuse.close()
         S.close()
         defaults.pop_Ss()
