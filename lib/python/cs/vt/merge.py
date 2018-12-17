@@ -7,7 +7,7 @@
 from os.path import basename, dirname
 from icontract import require
 from cs.logutils import warning
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from .dir import Dir, FileDirent
 from .paths import DirLike
 
@@ -22,7 +22,6 @@ def merge(target_root, source_root):
     target_root.create()
   for rpath, dirnames, filenames in source_root.walk():
     with Pfx(rpath):
-      XP("LOOP TOP: rpath=%r", rpath)
       source = source_root.resolve(rpath)
       if source is None:
         warning("no longer resolves, pruning this branch")
@@ -45,7 +44,6 @@ def merge(target_root, source_root):
       # import files
       for name in filenames:
         with Pfx(name):
-          XP("FILE LOOP TOP")
           sourcef = source.get(name)
           if sourcef is None:
             # no longer available
