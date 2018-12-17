@@ -269,8 +269,8 @@ class VTCmd:
               save=(cacheS, S)
           )
           S.config = self.config
-      X("MAIN CMD_OP S:")
-      dump_Store(S)
+      ##X("MAIN CMD_OP S:")
+      ##dump_Store(S)
       defaults.push_Ss(S)
       # start the status ticker
       if False and sys.stdout.isatty():
@@ -722,7 +722,9 @@ class VTCmd:
       else:
         source = OSFile(ospath)
       X("target = %s, source= %s", type(target), type(source))
-      merge(target, source)
+      if not merge(target, source):
+        error("merge into %r fails", arpath)
+        return 1
       A.update(target)
       info("remove %r", ospath)
       if isdirpath(ospath):
@@ -909,7 +911,6 @@ class VTCmd:
       raise GetoptError("missing archive name")
     arpath = args.pop(0)
     arbase, arext = splitext(arpath)
-    X("arbase=%r, arext=%r", arbase, arext)
     if arext != '.vt':
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
     if args:
@@ -918,16 +919,17 @@ class VTCmd:
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):
-      when, rootE = Archive(arpath).last
-      if rootE is None:
+      when, source = Archive(arpath).last
+      if source is None:
         error("no entries in archive")
         return 1
-    with Pfx(arbase):
-      if rootE.isdir:
-        os.mkdir(arbase)
-        copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+      if source.isdir:
+        target = OSDir(arbase)
       else:
-        copy_out_file(rootE, arbase)
+        target = OSFile(arbase)
+    with Pfx(arbase):
+      if not merge(target, source):
+        return 1
     return 0
 
 def lsDirent(fp, E, name):
