@@ -4,16 +4,18 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07may2013
 #
 
+''' Assorted path related utility functions and classes.
+'''
+
 from abc import ABC, abstractmethod
 import errno
 import os
-from os.path import join as joinpath, exists as pathexists
+from os.path import dirname, join as joinpath, exists as pathexists
 from stat import S_ISDIR
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
 from cs.logutils import error, warning
 from cs.pfx import Pfx
-from cs.x import X
 from . import fromtext, PATHSEP
 
 def decode_Dirent_text(text):
@@ -29,17 +31,21 @@ def decode_Dirent_text(text):
   return E
 
 def dirent_dir(direntpath, do_mkdir=False):
-  dir, name, unresolved = dirent_resolve(direntpath, do_mkdir=do_mkdir)
+  ''' Convert a direntpath into a Dir.
+  '''
+  D, name, unresolved = dirent_resolve(direntpath, do_mkdir=do_mkdir)
   if unresolved:
     raise ValueError("unresolved remaining path: %r" % (unresolved,))
   if name is not None:
-    if name in dir or not do_mkdir:
-      dir = dir.chdir1(name)
+    if name in D or not do_mkdir:
+      D = D.chdir1(name)
     else:
-      dir = dir.mkdir(name)
-  return dir
+      D = D.mkdir(name)
+  return D
 
 def dirent_file(direntpath, do_create=False):
+  ''' Convert a direntpath into a FileDirent.
+  '''
   E, name, unresolved = dirent_resolve(direntpath)
   if unresolved:
     raise ValueError("unresolved remaining path: %r" % (unresolved,))
@@ -48,7 +54,7 @@ def dirent_file(direntpath, do_create=False):
   if name in E:
     return E[name]
   if not do_create:
-    raise ValueError("no such file: %s", direntpath)
+    raise ValueError("no such file: %s" % (direntpath,))
   raise RuntimeError("file creation not yet implemented")
 
 def dirent_resolve(direntpath, do_mkdir=False):
@@ -125,20 +131,20 @@ def walk(rootD, topdown=True, yield_status=False):
     filenames = thisD.files()
     yield thisD, relpath, dirnames, filenames
     with Pfx("walk(relpath=%r)", relpath):
-      for dirname in reversed(dirnames):
-        with Pfx("dirname=%r", dirname):
+      for name in reversed(dirnames):
+        with Pfx("name=%r", name):
           try:
-            subD = thisD.chdir1(dirname)
+            subD = thisD.chdir1(name)
           except KeyError as e:
             if not yield_status:
               raise
-            error("chdir1(%r): %s", dirname, e)
+            error("chdir1(%r): %s", name, e)
             ok = False
           else:
             if relpath:
-              subpath = os.path.join(relpath, dirname)
+              subpath = os.path.join(relpath, name)
             else:
-              subpath = dirname
+              subpath = name
             pending.append( (subD, subpath) )
   if yield_status:
     yield ok
@@ -250,13 +256,10 @@ class DirLike(ABC):
   def walk(self):
     ''' Walk this tree.
     '''
-    X("======= WALK %r ... =============", self.path)
     pending = [ (self, []) ]
     while pending:
       node, rparts = pending.pop()
-      X("node=%r, rparts=%r", node.path, rparts)
       rpath = PATHSEP.join(rparts)
-      X("rpath=%r", rpath)
       dirnames = []
       filenames = []
       for name in sorted(node.keys()):
@@ -268,7 +271,6 @@ class DirLike(ABC):
         else:
           filenames.append(name)
       odirnames = set(dirnames)
-      X("YIELD %r, %r, %r", rpath, dirnames, filenames)
       yield rpath, dirnames, filenames
       for name in dirnames:
         if name not in odirnames:
@@ -280,7 +282,6 @@ class DirLike(ABC):
         if node is None:
           continue
         pending.append( (node, rparts + [name]) )
-        X("PENDING => %r", pending)
 
 class FileLike(ABC):
   ''' Facilities offered by file like objects.
@@ -341,11 +342,15 @@ class OSDir(DirLike):
 
   @property
   def parent(self):
+    ''' This directory's parent.
+    '''
     if PATHSEP in self.path:
       return OSDir(dirname(self.path))
     return None
 
   def exists(self):
+    ''' Test if the directory exists.
+    '''
     return pathexists(self.path)
 
   def create(self):
@@ -364,6 +369,8 @@ class OSDir(DirLike):
     return OSDir(subpath)
 
   def file_frombuffer(self, name, bfr):
+    ''' Create a new file from data from a CornuCopyBuffer.
+    '''
     if not name or PATHSEP in name:
       raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
     subpath = joinpath(self.path, name)
@@ -381,6 +388,8 @@ class OSFile(FileLike):
     self.path = path
 
   def exists(self):
+    ''' Test if the file exists.
+    '''
     return pathexists(self.path)
 
   def datafrom(self):
