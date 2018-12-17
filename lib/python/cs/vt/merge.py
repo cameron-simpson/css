@@ -17,12 +17,16 @@ def merge(target_root, source_root):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
   '''
+  ok = True
+  if not target_root.exists():
+    target_root.create()
   for rpath, dirnames, filenames in source_root.walk():
     with Pfx(rpath):
       XP("LOOP TOP: rpath=%r", rpath)
       source = source_root.resolve(rpath)
       if source is None:
         warning("no longer resolves, pruning this branch")
+        ok = False
         dirnames[:] = []
         filenames[:] = []
         continue
@@ -37,6 +41,7 @@ def merge(target_root, source_root):
         pass
       else:
         warning("conflicting item in target: not a directory")
+        ok = False
       # import files
       for name in filenames:
         with Pfx(name):
@@ -47,6 +52,7 @@ def merge(target_root, source_root):
             continue
           if sourcef.isdir:
             warning("source now a directory, skipping")
+            ok = False
             continue
           targetf = target.get(name)
           if targetf is None:
@@ -59,3 +65,5 @@ def merge(target_root, source_root):
               targetf = target.file_fromchunks(name, sourcef.datafrom())
           else:
             warning("conflicting target file")
+            ok = False
+  return ok
