@@ -7,7 +7,7 @@
 from abc import ABC, abstractmethod
 import errno
 import os
-from os.path import join as joinpath
+from os.path import join as joinpath, exists as pathexists
 from stat import S_ISDIR
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
@@ -342,6 +342,11 @@ class OSDir(DirLike):
 
   def exists(self):
     return pathexists(self.path)
+
+  def create(self):
+    ''' Create this directory.
+    '''
+    os.mkdir(self.path)
 
   def mkdir(self, name):
     ''' Create a subdirectory.
