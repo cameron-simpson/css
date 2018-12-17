@@ -279,6 +279,11 @@ class _Dirent(Transcriber):
     '''
     return DirentRecord.value_from_buffer(bfr)
 
+  def exists(self):
+    ''' Does this exist? For a Dir this is always true: cogito ergo sum.
+    '''
+    return True
+
   def ingest_extended_data(self, extended_data):
     ''' The basic _Dirent subclasses do not use extended data.
     '''
@@ -961,11 +966,6 @@ class Dir(_Dirent, DirLike):
     if notifiers:
       for notifier in notifiers:
         notifier(self)
-
-  def exists(self):
-    ''' Does this exist? For a Dir this is always true: cogito ergo sum.
-    '''
-    return True
 
   @property
   @locked
