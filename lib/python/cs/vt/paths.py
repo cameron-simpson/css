@@ -340,6 +340,9 @@ class OSDir(DirLike):
       return OSDir(dirname(self.path))
     return None
 
+  def exists(self):
+    return pathexists(self.path)
+
   def mkdir(self, name):
     ''' Create a subdirectory.
     '''
@@ -365,6 +368,9 @@ class OSFile(FileLike):
   def __init__(self, path):
     FileLike.__init__(self)
     self.path = path
+
+  def exists(self):
+    return pathexists(self.path)
 
   def datafrom(self):
     ''' Yield data from the file.

@@ -962,6 +962,11 @@ class Dir(_Dirent, DirLike):
       for notifier in notifiers:
         notifier(self)
 
+  def exists(self):
+    ''' Does this exist? For a Dir this is always true: cogito ergo sum.
+    '''
+    return True
+
   @property
   @locked
   def entries(self):
