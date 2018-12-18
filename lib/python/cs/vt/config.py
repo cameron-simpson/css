@@ -120,7 +120,8 @@ class Config:
         or '/' in archivename
     ):
       raise ValueError("invalid archive name: %r" % (archivename,))
-    return Archive(joinpath(self.basedir, archivename + '.vt'))
+    arpath = joinpath(self.basedir, archivename + '.vt')
+    return Archive(arpath)
 
   def Store_from_spec(self, store_spec, runstate=None):
     ''' Factory function to return an appropriate BasicStore* subclass
