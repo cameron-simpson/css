@@ -14,7 +14,7 @@ import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, splitext, \
+from os.path import basename, realpath, splitext, \
     exists as existspath, join as joinpath, \
     isdir as isdirpath, isfile as isfilepath
 import shutil
@@ -24,7 +24,7 @@ from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.env import envsub
-from cs.fileutils import file_data
+from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
@@ -65,7 +65,7 @@ class VTCmd:
   ''' A main programme instance.
   '''
 
-  USAGE = '''Usage: %s [options...] [profile] operation [args...]
+  USAGE = '''Usage: %s [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
@@ -76,12 +76,12 @@ class VTCmd:
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
               Default from $VT_STORE, or "[default]", except for
-              the "serve" operation which defaults to "[server]"
+              the "serve" subcommand which defaults to "[server]"
               and ignores $VT_STORE.
     -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
-  Operations:
+  Subcommands:
     cat filerefs...
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
@@ -209,7 +209,7 @@ class VTCmd:
         return 2
 
       if not isinstance(xit, int):
-        raise RuntimeError("exit code not set by operation: %r" % (xit,))
+        raise RuntimeError("exit code not set by subcommand: %r" % (xit,))
 
       if ifdebug():
         dump_debug_threads()
@@ -217,7 +217,7 @@ class VTCmd:
     return xit
 
   def cmd_op(self, args):
-    ''' Run a command operation from `args`.
+    ''' Run a subcommand from `args`.
     '''
     try:
       op = args[0]
@@ -230,7 +230,7 @@ class VTCmd:
       try:
         op_func = getattr(self, "cmd_" + op)
       except AttributeError:
-        raise GetoptError("unknown operation \"%s\"" % (op,))
+        raise GetoptError("unknown subcommand \"%s\"" % (op,))
       # these commands run without a context Store
       if op in ("dump", "scan", "test"):
         return op_func(args)
@@ -299,7 +299,7 @@ class VTCmd:
       return xit
 
   def cmd_profile(self, *a, **kw):
-    ''' Wrapper to profile other operations and report.
+    ''' Wrapper to profile other subcommands and report.
     '''
     try:
       import cProfile as profile
@@ -593,6 +593,7 @@ class VTCmd:
             error("not a file: %r", archive)
             badopts = True
           else:
+            fsname = shortpath(realpath(archive))
             spfx, sext = splitext(basename(special))
             if spfx and sext == '.vt':
               special_basename = spfx
