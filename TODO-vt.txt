@@ -1,4 +1,6 @@
 SHORTLIST:
+  config: socket: replace socket_path with address
+  config: tcp: replace host and port with address
   mount -a
   Store exports
     base Store: empty exports
