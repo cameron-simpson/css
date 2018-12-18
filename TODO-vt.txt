@@ -1,6 +1,7 @@
 SHORTLIST:
+  mount -a
   Store exports
-    base STore: empty exports
+    base Store: empty exports
     DataDir: 
       default exports based on the datadir-*.vt files
     ProxyStore
