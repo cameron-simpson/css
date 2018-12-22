@@ -266,7 +266,7 @@ The following references are understood:
 ### Basic Types
 
 *unsigned_int*
-  Unsigned integers are representing as decimal values.
+  Unsigned integers are represented as decimal values.
 
 *float*
   Floating point values are transcribed using Python's `%f` format specifier.
@@ -461,9 +461,9 @@ They are typically remote.
 TCP stores and socket Stores are examples of this type.
 The server side is normally presented by a `vt serve` command.
 
-### Ideal Store
+### Platonic Store
 
-An ideal Store is a local Store
+A Platonic Store is a local Store
 whose data are contained in a regular file tree
 such as a collection of manual PDFs
 or a media collection on a RAID.
@@ -527,9 +527,9 @@ Example configuration file clauses:
     copy2 = [trove]
 
 This clause is for a laptop with limited storage.
-Saves are stores to its `[trove]`,
+Saves are stored to its `[trove]`,
 an essentially permanent local Store,
-and to `[home_server]`
+and to `[home_server]`,
 the network accessable vt service
 with the home store of almost everything on its RAID.
 You might typically arrange such access over a persistent ssh port forward.
@@ -553,7 +553,8 @@ vt(5), the `.vt` file format
 
 vtrc(5), the configuration file format used in `~/.vtrc`
 
-vtd(5), the flat file block storage format
+vt(5), the binary data formats in use
 
-vt-datadir(5),
-a local Store composed of a directory containing vtd(5) files and an index
+## AUTHOR
+
+Cameron Simpson <cs@cskk.id.au>
