@@ -381,7 +381,7 @@ to response packets as the low order bit,
 shifting the response-provided flags up an additional position.
 So in responses there is an additional flag:
 
-`0x04` "IS\OK":
+`0x04` "IS\_OK":
   if set the the request was correctly handled;
   otherwise there was some kind of server side failure.
 
@@ -465,7 +465,7 @@ with the following `rq_type` values and associated values:
   instead of `>=start_hashcode`
   (or `<start_hashcode` instead of `<=start_hashcode`
   if the "reverse" flag is provided)
-  and `0x04` "has\_start\_hashcode" to indicate that a `start\_hashcode`
+  and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
   (or the highest hashocde if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
@@ -488,7 +488,7 @@ with the following `rq_type` values and associated values:
   instead of `>=start_hashcode`
   (or `<start_hashcode` instead of `<=start_hashcode`
   if the "reverse" flag is provided)
-  and `0x04` "has\_start\_hashcode" to indicate that a `start\_hashcode`
+  and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
   (or the highest hashocde if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
