@@ -511,7 +511,7 @@ class _Dirent(Transcriber):
     if fs is None:
       fs = defaults.fs
     M = self.meta
-    I = fs.E2inode(self)
+    I = fs.E2inode(self) if fs else None
     perm_bits = M.unix_perm_bits
     if perm_bits is None:
       if self.isdir:
@@ -519,14 +519,14 @@ class _Dirent(Transcriber):
       else:
         perm_bits = 0o600
     st_mode = self.unix_typemode | perm_bits
-    st_ino = I.inum
+    st_ino = I.inum if I else -1
     # TODO: dev from FileSystem
     st_dev = fs.device_id
     if self.isdir:
       # TODO: should nlink for Dirs count its subdirs?
       st_nlink = 1
     else:
-      st_nlink = I.refcount
+      st_nlink = I.refcount if I else 1
     st_uid = M.uid
     st_gid = M.gid
     if self.issym:
@@ -736,6 +736,9 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     self._block = block
     self._check()
 
+  # FileLike.lstat uses the common stat method
+  lstat = stat
+
   @locked
   def startup(self):
     ''' Set up .open_file on first open.
@@ -929,6 +932,9 @@ class Dir(_Dirent, DirLike):
     self._changed = False
     self._change_notifiers = None
     self._lock = RLock()
+
+  # DirLike.lstat uses the common stat method
+  lstat = stat
 
   @prop
   def changed(self):
