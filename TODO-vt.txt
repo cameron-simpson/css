@@ -1,3 +1,4 @@
+.stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
 SHORTLIST:
   config: socket: replace socket_path with address
   config: tcp: replace host and port with address
