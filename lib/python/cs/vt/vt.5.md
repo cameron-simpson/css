@@ -201,7 +201,7 @@ The length of the leaf block can be computed from the leaf offset
 and the offset of the next leaf.
 Once the appropriate leaf block is found
 the following leaf blocks are immediately known
-from the following record
+from the following records
 making sequential file access from an arbitrary point
 very efficient.
 
@@ -225,11 +225,11 @@ As such,
 the blockmap files are kept in a directory tree whose internal stucture
 is composed of blockmap files whose pathnames have the form:
 
-  `mapsize:`*spansize*`/*hashcodehex*`.`*hashtype*`/`*spanindex*`.blockmap`
+  `mapsize:`*spansize*`/`*hashcodehex*`.`*hashtype*`/`*spanindex*`.blockmap`
 
 The use of such a structure allows vt systems
 using different blockmap span sizes and different hashcode functions
-can be accomodated side by side without conflict.
+to be accomodated side by side without conflict.
 
 For example, this path:
 
@@ -253,7 +253,7 @@ The current vt blockmap system uses blockmap records of the form:
     }
 
 where `uint32be` indicates a bigendian 32 bit unsigned integer
-and `hasdata` is the raw hashcode binary dump,
+and `hashdata` is the raw hashcode binary dump,
 so 20 bytes for a SHA1 hashcode.
 
 ### DataDir Stores
@@ -353,7 +353,7 @@ All packets are `bsdata` encoded and have the form:
       }
     }
 
-The `flags` field is a bitmap with of following predefined flags:
+The `flags` field is a bitmap with the following predefined flags:
 
 `0x01` "HAS\_CHANNEL":
   if set, the `channel` field is present to provide the channel number;
@@ -423,7 +423,7 @@ which translate to response packets as follows:
 
 If a handler raises an exception
 a failure packet will be returned,
-with no IS\_OK flag, no additional flags and an empty payload.
+with no `IS_OK` flag, no additional `flags` and an empty `payload`.
 
 ### Serial Protocol: Store Specific Protocol
 
