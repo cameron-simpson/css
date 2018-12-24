@@ -217,6 +217,15 @@ class DirLike(ABC):
         yield k, v
 
   @abstractmethod
+  def lstat(self):
+    ''' Return a stat object.
+        Depending on the backend various fields may be None or meaningless.
+        Returns None if `self` does not represent
+        an existing object in the backend.
+    '''
+    raise NotImplementedError("no %s.stat" % (type(self),))
+
+  @abstractmethod
   def mkdir(self, name):
     ''' Construct and return a new empty subdirectory.
     '''
@@ -291,6 +300,15 @@ class FileLike(ABC):
   isfile = property(lambda self: True)
 
   @abstractmethod
+  def lstat(self):
+    ''' Return a stat object.
+        Depending on the backend various fields may be None or meaningless.
+        Returns None if `self` does not represent
+        an existing object in the backend.
+    '''
+    raise NotImplementedError("no %s.stat" % (type(self),))
+
+  @abstractmethod
   def datafrom(self):
     ''' Iterator yielding natural data chunks from the file.
     '''
@@ -340,6 +358,15 @@ class OSDir(DirLike):
     self.check_subname(name)
     os.remove(joinpath(self.path, name))
 
+  def lstat(self):
+    with Pfx("lstat(%r)", self.path):
+      try:
+        return os.lstat(self.path)
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          return None
+        raise
+
   @property
   def parent(self):
     ''' This directory's parent.
@@ -386,6 +413,15 @@ class OSFile(FileLike):
   def __init__(self, path):
     FileLike.__init__(self)
     self.path = path
+
+  def lstat(self):
+    with Pfx("lstat(%r)", self.path):
+      try:
+        return os.lstat(self.path)
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          return None
+        raise
 
   def exists(self):
     ''' Test if the file exists.
