@@ -402,7 +402,7 @@ The concrete transcriptions are as follows:
   This is used to implement the equivalent of UNIX hard links.
 
 `Symlink{`[*name*`:`]*param*`=`*value*`,`...`}`
-  A reference to nothing filesystem object using a file path.
+  A reference to another filesystem object using a file path.
   This is the equivalent of a UNIX symbolic link.
   The reference path is part of the metadata in the `pathref` attribute.
 
@@ -509,7 +509,7 @@ Its parameters are as follows:
   These would normally be local low latency Stores.
 
 `read2`
-  A squence of Stores from which to obtain data blocks
+  A secondary sequence of Stores from which to obtain data blocks
   if they were not available from the Stores in `read`.
 
 `copy2`
@@ -549,11 +549,9 @@ so that they are available locally in the future.
 
 ## SEE ALSO
 
-vt(5), the `.vt` file format
+vt(5), the binary data formats in use
 
 vtrc(5), the configuration file format used in `~/.vtrc`
-
-vt(5), the binary data formats in use
 
 ## AUTHOR
 
