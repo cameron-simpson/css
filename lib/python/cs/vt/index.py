@@ -78,10 +78,14 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
   @classmethod
   def pathof(cls, basepath):
+    ''' Construct the path to the index file.
+    '''
     return '.'.join((basepath, cls.SUFFIX))
 
   @property
   def path(self):
+    ''' The path to the index file.
+    '''
     return self.pathof(self.basepath)
 
 class LMDBIndex(_Index):
@@ -116,10 +120,14 @@ class LMDBIndex(_Index):
     return True
 
   def startup(self):
-    self.map_size = 10240   ## self.MAP_SIZE
+    ''' Start up the index.
+    '''
+    self.map_size = 10240   # self.MAP_SIZE
     self._open_lmdb()
 
   def shutdown(self):
+    ''' Shut down the index.
+    '''
     with self._txn_idle:
       self.flush()
       self._lmdb.close()
@@ -178,6 +186,8 @@ class LMDBIndex(_Index):
           self._txn_idle.release()
 
   def flush(self):
+    ''' Flush outstanding data to the index.
+    '''
     # no force=True param?
     self._lmdb.sync()
 
@@ -189,6 +199,8 @@ class LMDBIndex(_Index):
         yield mkhash(hashcode)
 
   def items(self):
+    ''' Yield `(hashcode,record)` from index.
+    '''
     mkhash = self.hashclass.from_hashbytes
     with self._txn() as txn:
       cursor = txn.cursor()
@@ -253,6 +265,8 @@ class GDBMIndex(_Index):
     return True
 
   def startup(self):
+    ''' Start the index: open dbm, allocate lock.
+    '''
     import dbm.gnu
     with Pfx(self.path):
       self._gdbm = dbm.gnu.open(self.path, 'cf')
@@ -260,6 +274,8 @@ class GDBMIndex(_Index):
     self._written = False
 
   def shutdown(self):
+    ''' Shutdown the index.
+    '''
     self.flush()
     with self._gdbm_lock:
       self._gdbm.close()
@@ -267,6 +283,8 @@ class GDBMIndex(_Index):
       del self._gdbm_lock
 
   def flush(self):
+    ''' Flush the index: sync the gdbm.
+    '''
     if self._written:
       with self._gdbm_lock:
         if self._written:

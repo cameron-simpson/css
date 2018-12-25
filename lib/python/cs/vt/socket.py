@@ -14,7 +14,7 @@ from socketserver import TCPServer, UnixStreamServer, \
 import sys
 from threading import Thread
 from cs.excutils import logexc
-from cs.logutils import info, warning, exception
+from cs.logutils import info, warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -136,7 +136,8 @@ class _TCPServer(ThreadingMixIn, TCPServer):
   def __init__(self, store_server, bind_addr):
     with Pfx(
         "%s.__init__(store_server=%s, bind_addr=%r)",
-        type(self).__name__, store_server, bind_addr):
+        type(self).__name__, store_server, bind_addr
+    ):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.store_server = store_server
@@ -197,15 +198,16 @@ class TCPClientStore(StreamStore):
     super()._packet_disconnect(conn)
     sock = self.sock
     if sock:
-        self.sock = None
-        sock.close()
+      self.sock = None
+      sock.close()
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, store_server, socket_path, exports=None):
     with Pfx(
         "%s.__init__(store_server=%s, socket_path=%r)",
-        type(self), store_server, socket_path):
+        type(self), store_server, socket_path
+    ):
       UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
       self.store_server = store_server
       self.socket_path = socket_path
@@ -256,7 +258,7 @@ class UNIXSocketClientStore(StreamStore):
       with Pfx("connect(%r)", self.socket_path):
         try:
           self.sock.connect(self.socket_path)
-        except OSError as e:
+        except OSError:
           self.sock.close()
           self.sock = None
           raise

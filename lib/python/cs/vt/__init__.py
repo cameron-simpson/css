@@ -29,14 +29,18 @@ from cs.mappings import StackableValues
 from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
 import cs.resources
-from cs.resources import RunState, MultiOpenMixin
+from cs.resources import RunState
 from cs.x import X
 
 # intercept Lock and RLock
 if False:
   def RLock():
+    ''' Obtain a recursive DebuggingLock.
+    '''
     return DebuggingLock(recursive=True)
   def Lock():
+    ''' Obtain a nonrecursive DebuggingLock.
+    '''
     return DebuggingLock()
   # monkey patch MultiOpenMixin
   cs.resources._mom_lockclass = RLock
@@ -175,12 +179,15 @@ class DebuggingLock(object):
     return "%s(lock=%r,held=%s)" % (type(self).__name__, self._lock, self._held)
 
   def acquire(self, timeout=-1, _caller=None):
+    ''' Acquire the lock and note the caller who takes it.
+    '''
     if _caller is None:
       _caller = caller()
     lock = self._lock
     hold = LockContext(_caller, current_thread())
     if timeout != -1:
-      warning("%s:%d: lock %s: timeout=%s",
+      warning(
+          "%s:%d: lock %s: timeout=%s",
           hold.caller.filename, hold.caller.lineno,
           lock, timeout)
     contended = False
@@ -209,6 +216,8 @@ class DebuggingLock(object):
     return acquired
 
   def release(self):
+    ''' Release the lock and forget who took it.
+    '''
     self._held = None
     self._lock.release()
 

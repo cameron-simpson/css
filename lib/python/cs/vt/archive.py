@@ -19,7 +19,7 @@ import os
 from os.path import realpath, isfile
 import stat
 import time
-from cs.fileutils import lockfile, shortpath
+from cs.fileutils import lockfile, shortpath, filedata
 from cs.inttypes import Flags
 from cs.lex import unctrl
 from cs.logutils import warning, error, exception, debug
@@ -28,7 +28,6 @@ from cs.py.func import prop
 from cs.x import X
 from .blockify import blockify, top_block_for
 from .dir import _Dirent, FileDirent, DirFTP
-from .file import filedata
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve, walk
 
@@ -149,8 +148,10 @@ class _Archive(object):
   @staticmethod
   def write(fp, E, when=None, etc=None):
     ''' Write a Dirent to an open archive file. Return the Dirent transcription.
+
         Archive lines have the form:
-          isodatetime unixtime transcribe(dirent) dirent.name
+
+            isodatetime unixtime transcribe(dirent) dirent.name
     '''
     if when is None:
       when = time.time()
@@ -180,7 +181,7 @@ class _Archive(object):
   @staticmethod
   @pfxgen
   def parse(fp, first_lineno=1):
-    ''' Parse lines from an open archive file, yield (when, E).
+    ''' Parse lines from an open archive file, yield `(when, E)`.
     '''
     for lineno, line in enumerate(fp, first_lineno):
       with Pfx(str(lineno)):
@@ -317,18 +318,19 @@ def copy_in_file(E, filepath, modes):
       st = os.fstat(fp.fileno())
     if B.span != st.st_size:
       warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
-      filedata = open(filepath, "rb").read()
-      blockdata = B.data
-      X("len(filedata)=%d", len(filedata))
-      X("len(blockdata)=%d", len(blockdata))
-      open("data1file", "wb").write(filedata)
-      open("data2block", "wb").write(blockdata)
+      data_from_file = open(filepath, "rb").read()
+      data_from_block = B.data
+      X("len(data_from_file)=%d", len(data_from_file))
+      X("len(data_from_block)=%d", len(data_from_block))
+      open("data1file", "wb").write(data_from_file)
+      open("data2block", "wb").write(data_from_block)
       raise RuntimeError("ABORT")
     E.meta.update_from_stat(st)
 
 def _blockify_file(fp, E):
   ''' Read data from the file `fp` and compare with the FileDirect
       `E`, yielding leaf Blocks for a new file.
+
       This underpins copy_in_file().
   '''
   # read file data in chunks matching the existing leaves
@@ -355,6 +357,7 @@ def _blockify_file(fp, E):
 def copy_out_dir(rootD, rootpath, modes=None, log=None):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
       `modes` is an optional CopyModes value.
+
       Notes: `modes.delete` not implemented.
   '''
   if modes is None:

@@ -37,8 +37,8 @@ from __future__ import print_function
 from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
-from icontract import require
 import sys
+from icontract import require
 from cs.binary import (
     PacketField, BSUInt, BSData,
     flatten as flatten_transcription
@@ -589,7 +589,7 @@ class HashCodeBlock(_Block):
     with self._lock:
       data = self._data
       if data is None:
-        data =self._data = defaults.S[self.hashcode]
+        data = self._data = defaults.S[self.hashcode]
     return data
 
   @prop
@@ -719,7 +719,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
     if isinstance(subblocks, _Block):
       subblocks = (subblocks,)
     elif isinstance(subblocks, bytes):
-      subblocks = (Block(subblocks),)
+      subblocks = (Block(data=subblocks),)
     else:
       subblocks = tuple(subblocks)
     spans = [ subB.span for subB in subblocks ]
@@ -758,10 +758,12 @@ class _IndirectBlock(_Block):
   @prop
   @locked
   def subblocks(self):
+    ''' The immediate subblocks of this indirect block.
+    '''
     blocks = self._subblocks
     if blocks is None:
       blocks = self._subblocks = tuple(
-              BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
+          BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
     return blocks
 
   def transcribe_inner(self, T, fp):
@@ -871,10 +873,14 @@ class LiteralBlock(_Block):
     self.data = data
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the block data in texthexified form.
+    '''
     fp.write(texthexify(self.data))
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
+    ''' Parse the interior of the transcription: texthexified data.
+    '''
     endpos = s.find(stopchar, offset)
     if endpos < offset:
       raise ValueError("stopchar %r not found" % (stopchar,))
@@ -882,11 +888,13 @@ class LiteralBlock(_Block):
     return cls(data), endpos
 
   def get_direct_data(self):
+    ''' Return the direct data of this Block>
+    '''
     return self.data
 
   def datafrom(self, start=0, end=None):
     if start < 0 or end is not None and start > end:
-      raise ValueError("invalid start=%s (span=%s)" % (start, span))
+      raise ValueError("invalid start=%s (end=%s)" % (start, end))
     if end is None:
       end = self.span
     yield self.data[start:end]

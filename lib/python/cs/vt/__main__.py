@@ -35,7 +35,7 @@ from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
 from . import fromtext, defaults
-from .archive import Archive, CopyModes, copy_out_dir, copy_out_file
+from .archive import Archive, CopyModes
 from .block import BlockRecord
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
@@ -43,7 +43,7 @@ from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
-from .debug import dump_chunk, dump_Block, dump_Store
+from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS

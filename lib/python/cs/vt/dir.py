@@ -5,7 +5,6 @@
 '''
 
 from cmd import Cmd
-from collections import OrderedDict
 from enum import IntEnum, IntFlag
 import errno
 from functools import partial
@@ -23,7 +22,7 @@ from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.excutils import logexc
-from cs.logutils import debug, error, warning, info, exception
+from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.lex import texthexify
 from cs.py.func import prop
@@ -376,8 +375,8 @@ class _Dirent(Transcriber):
     return os.path.join(*reversed(path))
 
   def __eq__(self, other):
-    block = get(self, 'block', None)
-    oblock = get(other, 'block', None)
+    block = getattr(self, 'block', None)
+    oblock = getattr(other, 'block', None)
     return (
         self.name == other.name
         and self.type == other.type

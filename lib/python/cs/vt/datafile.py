@@ -19,8 +19,6 @@ from zlib import compress, decompress
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import warning
-from cs.pfx import Pfx
-from cs.randutils import rand0, randblock
 from cs.resources import MultiOpenMixin
 from . import Lock
 

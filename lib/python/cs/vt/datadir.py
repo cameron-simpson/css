@@ -786,7 +786,6 @@ class DataDir(_FilesDir):
         time.sleep(1)
         continue
       # scan for new datafiles
-      need_save = False
       with Pfx("listdir(%r)", datadirpath):
         try:
           listing = list(os.listdir(datadirpath))
@@ -828,7 +827,6 @@ class DataDir(_FilesDir):
               info("skip nonfile")
               continue
           if new_size > DFstate.scanned_to:
-            need_save = False
             offset = DFstate.scanned_to
             for record, post_offset in DFstate.scanfrom(offset=offset):
               hashcode = self.hashclass.from_chunk(record.data)
@@ -1069,7 +1067,6 @@ class PlatonicDir(_FilesDir):
       if self.flag_scan_disable:
         continue
       # scan for new datafiles
-      need_save = False
       with Pfx("%r", datadirpath):
         seen = set()
         info("scan tree...")
@@ -1137,14 +1134,12 @@ class PlatonicDir(_FilesDir):
                 if DFstate is None:
                   XP("new DFstate")
                   DFstate = filemap.add_path(rfilepath)
-                  need_save = True
                 try:
                   new_size = DFstate.stat_size(self.follow_symlinks)
                 except OSError as e:
                   if e.errno == errno.ENOENT:
                     warning("forgetting missing file")
                     self._del_datafilestate(DFstate)
-                    need_save = True
                   else:
                     warning("stat: %s", e)
                   continue
@@ -1187,7 +1182,6 @@ class PlatonicDir(_FilesDir):
                       B = Block(data=data, hashcode=hashcode, added=True)
                       blockQ.put( (offset, B) )
                     DFstate.scanned_to = post_offset
-                    need_save = True
                     if self.cancelled or self.flag_scan_disable:
                       break
                   elapsed = time.time() - scan_start
