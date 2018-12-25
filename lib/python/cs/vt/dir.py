@@ -20,6 +20,7 @@ import sys
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
+from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import docmd
 from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info, exception
@@ -28,8 +29,7 @@ from cs.lex import texthexify
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
-from cs.threads import locked, locked_property
-from cs.x import X
+from cs.threads import locked
 from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
@@ -204,7 +204,7 @@ class _Dirent(Transcriber):
       if kw:
         error("unsupported keyword arguments: %r", kw)
       if block is not None:
-        raise ValueError("block is not None: %r", block)
+        raise ValueError("block is not None: %r" % (block,))
       self.type = type_
       self.name = name
       self.uuid = uuid
@@ -289,8 +289,8 @@ class _Dirent(Transcriber):
     '''
     if extended_data:
       raise ValueError(
-          "expected extended_data to be None or empty, got: %r",
-          extended_data)
+          "expected extended_data to be None or empty, got: %r"
+          % (extended_data,))
 
   def get_extended_data(self):
     ''' The basic _Dirent subclasses do not use extended data.
@@ -309,9 +309,11 @@ class _Dirent(Transcriber):
     '''
     return id(self)
 
-  def transcribe_inner(self, T, fp, attrs={}):
+  def transcribe_inner(self, T, fp, attrs=None):
     ''' Transcribe the inner components of the Dirent as text.
     '''
+    if attrs is None:
+      attrs = {}
     if self.name and self.name != '.':
       T.transcribe(self.name, fp=fp)
       fp.write(':')
@@ -324,7 +326,7 @@ class _Dirent(Transcriber):
         attrs['meta'] = self.meta
       block = getattr(self, 'block', None)
       if block:
-        attrs['block'] = self.block
+        attrs['block'] = block
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is not None:
       attrs['prevblock'] = prev_blockref
@@ -373,13 +375,14 @@ class _Dirent(Transcriber):
       E = E.parent
     return os.path.join(*reversed(path))
 
-  # TODO: support .block=None
   def __eq__(self, other):
+    block = get(self, 'block', None)
+    oblock = get(other, 'block', None)
     return (
         self.name == other.name
         and self.type == other.type
         and self.meta == other.meta
-        and self.block == other.block
+        and (block is None if oblock is None else block == oblock)
     )
 
   @prop
@@ -483,7 +486,7 @@ class _Dirent(Transcriber):
 
         Note that Dirents with a None Block return None.
     '''
-    block = self.block
+    block = getattr(self, 'block', None)
     return None if block is None else len(block)
 
   @property
@@ -597,12 +600,11 @@ class InvalidDirent(_Dirent):
         self,
         DirentType.INVALID,
         name,
-        block=None,
         **kw)
     self.chunk = chunk
 
   def __str__(self):
-    return '<InvalidDirent:%s:%s>' % (self.components, texthexify(self.chunk))
+    return '<InvalidDirent:%s>' % (texthexify(self.chunk),)
 
   def encode(self):
     ''' Return the original data chunk.
@@ -612,10 +614,7 @@ class InvalidDirent(_Dirent):
   def transcribe_inner(self, T, fp):
     ''' Transcribe the inner components of this InvalidDirent's transcription.
     '''
-    attrs = OrderedDict()
-    attrs['block'] = self.block     # data block if any
-    attrs['chunk'] = self.chunk     # original encoded data
-    return super().transcribe_inner(T, fp, attrs)
+    return super().transcribe_inner(T, fp, {'chunks': self.chunk})
 
 class SymlinkDirent(_Dirent):
   ''' A symbolic link.
@@ -623,11 +622,8 @@ class SymlinkDirent(_Dirent):
 
   transcribe_prefix = 'SymLink'
 
-  def __init__(self, name, *, block=None, target=None, **kw):
-    if block is not None:
-      raise ValueError("block must be None, received: %s" % (block,))
+  def __init__(self, name, *, target=None, **kw):
     super().__init__(DirentType.SYMBOLIC, name, **kw)
-    self.block = None
     if target is None:
       if self.meta.pathref is None:
         raise ValueError("missing target")
@@ -671,7 +667,7 @@ class IndirectDirent(_Dirent):
     if fs is None:
       fs = defaults.fs
       if not fs:
-        exception("NO CURRENT FILESYSTEM")
+        error("NO CURRENT FILESYSTEM")
         stack_dump()
         raise ValueError("no current FileSystem")
     try:
@@ -1004,8 +1000,9 @@ class Dir(_Dirent, DirLike):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      warning("Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
-        id(self), self.name, self._block, self.changed)
+      warning(
+          "Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+          id(self), self.name, self._block, self.changed)
       stack_dump()
       # recompute in case of change
       # restore the unparsed Dirents from initial load
