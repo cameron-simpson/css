@@ -14,7 +14,7 @@ import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, splitext, \
+from os.path import basename, realpath, splitext, \
     exists as existspath, join as joinpath, \
     isdir as isdirpath, isfile as isfilepath
 import shutil
@@ -24,7 +24,7 @@ from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.env import envsub
-from cs.fileutils import file_data
+from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
@@ -35,7 +35,7 @@ from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
 from . import fromtext, defaults
-from .archive import Archive, CopyModes, copy_out_dir, copy_out_file
+from .archive import Archive, CopyModes
 from .block import BlockRecord
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
@@ -43,7 +43,7 @@ from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
-from .debug import dump_chunk, dump_Block, dump_Store
+from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
@@ -52,7 +52,6 @@ from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
 from .server import serve_tcp, serve_socket
-from .smuggling import import_dir, import_file
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
@@ -65,7 +64,7 @@ class VTCmd:
   ''' A main programme instance.
   '''
 
-  USAGE = '''Usage: %s [options...] [profile] operation [args...]
+  USAGE = '''Usage: %s [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
@@ -76,12 +75,12 @@ class VTCmd:
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
               Default from $VT_STORE, or "[default]", except for
-              the "serve" operation which defaults to "[server]"
+              the "serve" subcommand which defaults to "[server]"
               and ignores $VT_STORE.
     -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
-  Operations:
+  Subcommands:
     cat filerefs...
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
@@ -209,7 +208,7 @@ class VTCmd:
         return 2
 
       if not isinstance(xit, int):
-        raise RuntimeError("exit code not set by operation: %r" % (xit,))
+        raise RuntimeError("exit code not set by subcommand: %r" % (xit,))
 
       if ifdebug():
         dump_debug_threads()
@@ -217,7 +216,7 @@ class VTCmd:
     return xit
 
   def cmd_op(self, args):
-    ''' Run a command operation from `args`.
+    ''' Run a subcommand from `args`.
     '''
     try:
       op = args[0]
@@ -230,7 +229,7 @@ class VTCmd:
       try:
         op_func = getattr(self, "cmd_" + op)
       except AttributeError:
-        raise GetoptError("unknown operation \"%s\"" % (op,))
+        raise GetoptError("unknown subcommand \"%s\"" % (op,))
       # these commands run without a context Store
       if op in ("dump", "scan", "test"):
         return op_func(args)
@@ -299,7 +298,7 @@ class VTCmd:
       return xit
 
   def cmd_profile(self, *a, **kw):
-    ''' Wrapper to profile other operations and report.
+    ''' Wrapper to profile other subcommands and report.
     '''
     try:
       import cProfile as profile
@@ -410,6 +409,8 @@ class VTCmd:
 
   def cmd_import(self, args):
     ''' Import paths into the Store, print top Dirent for each.
+
+        TODO: hook into vt.merge.
     '''
     xit = 0
     delete = False
@@ -437,7 +438,7 @@ class VTCmd:
     if args:
       raise GetoptError("extra arguments: %s" % (' '.join(args),))
     if special is None:
-      D = None
+      D = Dir('.')
     else:
       with Pfx(repr(special)):
         try:
@@ -447,43 +448,40 @@ class VTCmd:
           error("cannot open archive for append: %s", e)
           return 1
         _, D = Archive(special).last
-    if D is None:
-      D = Dir('import')
-    srcbase = basename(srcpath.rstrip(os.sep))
-    E = D.get(srcbase)
+      if D is None:
+        dstbase, suffix = splitext(basename(special))
+        D = Dir(dstbase)
     with Pfx(srcpath):
+      srcbase = basename(srcpath.rstrip(os.sep))
+      dst = D.get(srcbase)
       if isdirpath(srcpath):
-        if E is None:
-          E = D.mkdir(srcbase)
-        elif not overlay:
-          error("name %r already imported", srcbase)
-          return 1
-        elif not E.isdir:
-          error("name %r is not a directory", srcbase)
-        E, errors = import_dir(
-            srcpath, E,
-            delete=delete, overlay=overlay, whole_read=whole_read)
-        if errors:
-          warning("directory not fully imported")
-          for err in errors:
-            warning("  %s", err)
+        src = OSDir(srcpath)
+        if dst is None:
+          dst = D.mkdir(srcbase)
+        elif not dst.isdir:
+          error('target name %r is not a directory', srcbase)
+          xit = 1
+        elif not merge(dst, src):
+          error("merge failed")
           xit = 1
       elif isfilepath(srcpath):
-        if E is not None:
-          error("name %r already imported", srcbase)
-          return 1
-        E = D[srcbase] = import_file(srcpath)
+        src = OSFile(srcpath)
+        if dst is None or dst.isfile:
+          D.file_fromchunks(srcbase, src.datafrom())
+        else:
+          error("name %r already imported: %s", srcbase, dst)
+          xit = 1
       else:
-        error("not a file or directory")
+        error("unsupported file type")
         xit = 1
-        return 1
-    if xit != 0:
-      fp = sys.stderr
-      print("updated dirent after import:", file=fp)
-    elif special is None:
-      Archive.write(sys.stdout, D)
+    if special is None:
+      print(D)
     else:
-      Archive(special).update(D)
+      with Pfx(special):
+        if xit == 0:
+          Archive(special).update(D)
+        else:
+          warning("archive not updated")
     return xit
 
   def cmd_ls(self, args):
@@ -593,6 +591,7 @@ class VTCmd:
             error("not a file: %r", archive)
             badopts = True
           else:
+            fsname = shortpath(realpath(archive))
             spfx, sext = splitext(basename(special))
             if spfx and sext == '.vt':
               special_basename = spfx

@@ -5,6 +5,9 @@
 #   - Cameron Simpson <cs@cskk.id.au> 05mar2017
 #
 
+''' Parsers for various recognised data formats to aid block edge selection.
+'''
+
 from functools import partial
 from os.path import basename, splitext
 from cs.buffer import chunky
@@ -43,16 +46,21 @@ def scan_text(bfr, prefixes=None):
   with Pfx("scan_text"):
     if prefixes is None:
       prefixes = PREFIXES_ALL
-    prefixes = [ ( prefix
-                   if isinstance(prefix, bytes)
-                   else bytes(prefix)
-                        if isinstance(prefix, memoryview)
-                        else prefix.encode('utf-8')
-                             if isinstance(prefix, str)
-                             else prefix
-                 )
-                 for prefix in prefixes
-               ]
+    prefixes = [
+        (
+            prefix
+            if isinstance(prefix, bytes)
+            else (
+                bytes(prefix)
+                if isinstance(prefix, memoryview)
+                else (
+                    prefix.encode('utf-8')
+                    if isinstance(prefix, str)
+                    else prefix
+                )
+            )
+        ) for prefix in prefixes
+    ]
     offset = 0
     for line in linesof(bfr):
       next_offset = None
@@ -102,7 +110,7 @@ def scan_vtd(bfr):
   '''
   with Pfx("scan_vtd"):
     def run_parser(bfr):
-      for offset, *etc in DataFileReader.scanbuffer(bfr, do_decompress=False):
+      for offset, *_ in DataFileReader.scanbuffer(bfr):
         bfr.report_offset(offset)
     return report_offsets(bfr, run_parser)
 
@@ -112,7 +120,7 @@ def scan_mp3(bfr):
   from cs.mp3 import framesof as parse_mp3_from_buffer
   with Pfx("scan_mp3"):
     def run_parser(bfr):
-      for frame in parse_mp3_from_buffer(bfr):
+      for _ in parse_mp3_from_buffer(bfr):
         pass
     return report_offsets(bfr, run_parser)
 
@@ -124,7 +132,7 @@ def scan_mp4(bfr):
   from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
   with Pfx("parse_mp4"):
     def run_parser(bfr):
-      for B in parse_mp4_from_buffer(bfr, discard_data=True):
+      for _ in parse_mp4_from_buffer(bfr, discard_data=True):
         pass
     return report_offsets(bfr, run_parser)
 
@@ -134,7 +142,7 @@ def scanner_from_filename(filename):
   ''' Choose a scanner based a filename.
       Returns None if these is no special scanner.
   '''
-  root, ext = splitext(basename(filename))
+  _, ext = splitext(basename(filename))
   if ext:
     assert ext.startswith('.')
     parser = SCANNERS_BY_EXT.get(ext[1:].lower())
@@ -172,25 +180,25 @@ PREFIXES_SQL_DUMP = (
 )
 
 SCANNERS_BY_EXT = {
-  'go':     partial(scan_text, prefixes=PREFIXES_GO),
-  'mp3':    scan_mp3,
-  'mp4':    scan_mp4,
-  'pdf':    partial(scan_text, prefixes=PREFIXES_PDF),
-  'pl':     partial(scan_text, prefixes=PREFIXES_PERL),
-  'pm':     partial(scan_text, prefixes=PREFIXES_PERL),
-  'py':     partial(scan_text, prefixes=PREFIXES_PYTHON),
-  'sh':     partial(scan_text, prefixes=PREFIXES_SH),
-  'sql':    partial(scan_text, prefixes=PREFIXES_SQL_DUMP),
-  'vtd':    scan_vtd,
+    'go': partial(scan_text, prefixes=PREFIXES_GO),
+    'mp3': scan_mp3,
+    'mp4': scan_mp4,
+    'pdf': partial(scan_text, prefixes=PREFIXES_PDF),
+    'pl': partial(scan_text, prefixes=PREFIXES_PERL),
+    'pm': partial(scan_text, prefixes=PREFIXES_PERL),
+    'py': partial(scan_text, prefixes=PREFIXES_PYTHON),
+    'sh': partial(scan_text, prefixes=PREFIXES_SH),
+    'sql': partial(scan_text, prefixes=PREFIXES_SQL_DUMP),
+    'vtd': scan_vtd,
 }
 
 SCANNERS_BY_MIME_TYPE = {
-  'text/x-go':     partial(scan_text, prefixes=PREFIXES_GO),
-  'audio/mpeg':    scan_mp3,
-  'video/mp4':     scan_mp4,
-  'text/x-perl':   partial(scan_text, prefixes=PREFIXES_PERL),
-  'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
-  'text/x-sh':     partial(scan_text, prefixes=PREFIXES_SH),
+    'text/x-go': partial(scan_text, prefixes=PREFIXES_GO),
+    'audio/mpeg': scan_mp3,
+    'video/mp4': scan_mp4,
+    'text/x-perl': partial(scan_text, prefixes=PREFIXES_PERL),
+    'text/x-python': partial(scan_text, prefixes=PREFIXES_PYTHON),
+    'text/x-sh': partial(scan_text, prefixes=PREFIXES_SH),
 }
 
 PREFIXES_ALL = (

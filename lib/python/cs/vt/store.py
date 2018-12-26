@@ -15,10 +15,9 @@ import sys
 from threading import Semaphore
 from cs.later import Later, SubLater
 from cs.logutils import warning, error
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py.func import prop, funccite, funcname
-from cs.py.stack import caller
+from cs.py.func import prop, funcname
 from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report
@@ -681,7 +680,7 @@ class ProxyStore(BasicStoreSync):
     self.readonly = len(self.save) == 0
 
   def __str__(self):
-      return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r)" % (type(self).__name__, self.name)
 
   def startup(self):
     super().startup()
@@ -953,8 +952,18 @@ class _ProgressStoreTemplateMapping(object):
     return value
 
 class ProgressStore(BasicStoreSync):
+  ''' A shim for another Store to do progress reporting.
+      TODO: planning to redo basic store methods as shims, with
+      implementations supplying _foo methods across the board
+      instead.
+  '''
 
-  def __init__(self, name, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+  def __init__(
+      self,
+      name, S,
+      template='rq  {requests_position}  {requests_throughput}/s',
+      **kw
+  ):
     ''' Wrapper for a Store which collects statistics on use.
     '''
     lock = kw.pop('lock', None)

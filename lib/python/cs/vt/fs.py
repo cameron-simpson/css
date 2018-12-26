@@ -34,15 +34,15 @@ XATTR_VT_PREFIX = 'x-vt-'
 
 DEFAULT_FS_THREAD_MAX = 16
 
-def oserror(errno, msg, *a):
+def oserror(errno_, msg, *a):
   ''' Function to issue a warning and then raise an OSError.
   '''
-  assert isinstance(errno, int)
+  assert isinstance(errno_, int)
   assert isinstance(msg, str)
   if a:
     msg = msg % a
-  warning("raise OSError(%s): %s", errno, msg)
-  raise OSError(errno, msg)
+  warning("raise OSError(%s): %s", errno_, msg)
+  raise OSError(errno_, msg)
 
 OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
 OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
@@ -172,10 +172,10 @@ class Inode(Transcriber, NS):
     return (
         "%s(inum=%d,refcount=%d,E=%s(%r))"
         % (
-          type(self).__name__,
-          self.inum,
-          self.refcount,
-          type(self.E).__name__, self.E.name
+            type(self).__name__,
+            self.inum,
+            self.refcount,
+            type(self.E).__name__, self.E.name
         )
     )
 
@@ -525,7 +525,7 @@ class FileSystem(object):
         OS_EEXIST("entry %r already exists", name)
       E = P[name]
     elif not flags & O_CREAT:
-      OS_NOENT("no entry named %r", name)
+      OS_ENOENT("no entry named %r", name)
     else:
       E = FileDirent(name)
       P[name] = E
@@ -640,7 +640,7 @@ class FileSystem(object):
     try:
       meta.delxattr(xattr_name)
     except KeyError:
-      OS_NOATTR("no such extended attribute: %r", xattr_name)
+      OS_ENOATTR("no such extended attribute: %r", xattr_name)
 
   def setxattr(self, inum, xattr_name, xattr_value):
     ''' Set the extended attribute `xattr_name` to `xattr_value`

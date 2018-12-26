@@ -14,7 +14,6 @@ from cs.fileutils import BackedFile, ReadMixin, datafrom
 from cs.resources import MultiOpenMixin
 from cs.result import bg
 from cs.threads import locked, LockableMixin
-from cs.x import X
 from . import defaults, RLock
 from .block import Block, IndirectBlock, RLEBlock
 from .blockify import top_block_for, blockify
@@ -280,7 +279,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
         sync_span = self._sync_span
         if sync_span is not None:
           sync_start, sync_end = sync_span
-          if start < sync_start and end > sync_start:
+          if start < sync_start < end:
             # preamble from the backing block: start:sync_start
             yield from backing_block.datafrom(start=start, end=sync_start)
             start = sync_start

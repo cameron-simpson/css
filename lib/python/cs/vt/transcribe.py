@@ -116,7 +116,7 @@ class Transcribe:
     self.class_transcribers = {
         int: str,
         float: lambda f: "%f" % f,
-        str: repr,
+        str: json.dumps,
         bool: lambda v: '1' if v else '0',
         bytes: texthexify,
         dict: lambda m: json.dumps(m, separators=(',', ':')),

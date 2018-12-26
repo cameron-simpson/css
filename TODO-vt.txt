@@ -1,12 +1,21 @@
+.stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
 SHORTLIST:
+  config: socket: replace socket_path with address
+  config: tcp: replace host and port with address
+  mount -a
   Store exports
-    base STore: empty exports
+    base Store: empty exports
     DataDir: 
       default exports based on the datadir-*.vt files
     ProxyStore
       exports = name:store_spec ...
   Stores: push foo,foo_bg implementations back to _foo,_foo_bg and put tracking etc boilerplate on the public methods
   remove _data from hashcode blocks, always access shared hash:data mapping cache and fall back to caching Store fetch
+  xfstests
+FS:
+  file system layer on top of Dir etc
+  split out from vtfuse
+  vtfuse: no .. in top dir? check mount point .. impl
 Dir: HASCHAFF flag: variable sized random bsdata leads dirents
 fs.Ino: trim redundant transcriber methods/attrs from class if @mapping_transcriber did the job
 datadir: use flock or like instead of a .lock file because aborting a vtd leaves them lying around
@@ -15,7 +24,6 @@ make cs.later.Later restartable - tends to hang on the second shutdown?
 when stable and more ergonomic, move vt.transcribe to cs.transcriber
 fs: save persistent Dirents as 8 level Dir with each level being 2 bytes of the UUID, hex encoded? seems sparse and if we're sucking them all in anyway, pointless? better idea needed for heavily hardlinked trees
 vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
-vt.stream: give the _connect method some hysteresis
 DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
 general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
 vt.fs.FileSystem: make the modes into a set, simplify the initialiser
@@ -26,19 +34,14 @@ Config: parser which returns pure dict of dicts, Config constructed from wired-i
 socket Stores: just use path instead of socket_path?
 streamstore: Client handler: make current Store local to it for independence
 move CancellationError into cs.resources, associate with RunState
-readahead for CornuCopyBuffer?
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
 cs.vt.socket_tests: UNIX domain socket tests
 ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
 vt setup/tutorial
-vt-blockmap.5 man entry
-vt-datadir.5 man entry
-vtd.5 man entry
-vtrc.5 man entry
-vt.1 man entry
 blockmap updates - use lower priority than regular I/O
 platonic updates - use lower priority than regular I/O
+readahead for CornuCopyBuffer?
 ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
 Store.archive([name]) ==> an Archive instance for state updates for Dirs
 [clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
@@ -49,10 +52,6 @@ PlatonicStore:
 Dirent:
   metadata st_ctime - useful for reconciliation/update?
   S_IFWHT whiteout entries
-FS:
-  file system layer on top of Dir etc
-  split out from vtfuse
-  vtfuse: no .. in top dir? check mount point .. impl
 config:
   Config object with singleton mapping to clauses
   clauses to support direct [key]=value for access and update
@@ -68,8 +67,6 @@ mount -o append: accept O_TRUNC for empty/missing files
 audit fs: append only, no deletes, maybe no renames
 mount -a: live mode, tracing new .vt entries
 mount -e command...
-test vtfuse MT functionality: 2 threads, then 16
-xfstests
 daemon: listen on UNIX domain socket
   test access to socket via ssh forwarding
 ticker to regularly sync the fs

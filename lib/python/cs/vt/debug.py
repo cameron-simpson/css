@@ -59,6 +59,8 @@ def dump_chunk(data, leadin, max_width=None, one_line=False):
     doff = doff2
 
 def dump_Store(S, indent=''):
+  ''' Dump a description of a Store.
+  '''
   from .cache import FileCacheStore
   from .store import MappingStore, ProxyStore, DataDirStore
   X("%s%s:%s", indent, type(S).__name__, S.name)

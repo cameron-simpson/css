@@ -19,7 +19,6 @@ from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
-from .block import IndirectBlock
 from .hash import DEFAULT_HASHCLASS
 from .store import BasicStoreSync, MappingStore
 
@@ -522,16 +521,16 @@ class BlockTempfile:
         updating the `BlockMapping.filled` attribute as we go.
     '''
     with S:
-        needed = len(block)
-        for data in block.datafrom():
-          if runstate.cancelled:
-            break
-          assert len(data) <= needed
-          written = self._pwrite(data, offset)
-          assert written == len(data)
-          offset += written
-          needed -= written
-          bm.filled += written
+      needed = len(block)
+      for data in block.datafrom():
+        if runstate.cancelled:
+          break
+        assert len(data) <= needed
+        written = self._pwrite(data, offset)
+        assert written == len(data)
+        offset += written
+        needed -= written
+        bm.filled += written
     X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 class BlockCache:

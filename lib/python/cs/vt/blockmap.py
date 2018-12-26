@@ -28,8 +28,8 @@ from cs.x import X
 from . import defaults
 from .block import HashCodeBlock
 
-# the record format uses 4 byte integer offsets
-# to this is the maximum (and default) scale for the mmory maps
+# The record format uses 4 byte integer offsets
+# so this is the maximum (and default) scale for the memory maps.
 OFFSET_SCALE = 2 ** 32
 
 OFF_STRUCT = Struct('<L')
@@ -52,7 +52,8 @@ class MapEntry(_MapEntry):
     return self.leaf.data
 
 class MappedFD:
-  ''' Manage a memory map of the contents of a file representing a block's backing leaf content.
+  ''' Manage a memory map of the contents of a file
+      representing a block's backing leaf content.
 
       The file contains records (offset, hashcode) in offset order,
       being the starting offset of a leaf block relative to the

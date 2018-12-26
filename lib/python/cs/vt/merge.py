@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 
-''' Code to merge directories trees.
+''' Code to merge directory trees.
 '''
 
 from os.path import basename, dirname
@@ -16,6 +16,11 @@ from .paths import DirLike
 def merge(target_root, source_root):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
+
+      TODO: apply .stat results to merge targets.
+      TODO: many modes for conflict resolution.
+      TODO: whiteout entry support.
+      TODO: change hash function support? or do I need 2 Stores?
   '''
   ok = True
   if not target_root.exists():
