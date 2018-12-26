@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 
-''' Code to merge directories trees.
+''' Code to merge directory trees.
 '''
 
 from os.path import basename, dirname
