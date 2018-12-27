@@ -4,9 +4,6 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    Man page:
-      http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
-
     See also:
         The Plan 9 Venti system:
           http://library.pantek.com/general/plan9.documents/venti/venti.html
