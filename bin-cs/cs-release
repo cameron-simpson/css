@@ -409,14 +409,20 @@ class Module(object):
         for lineno, line in enumerate(codefp, 1):
           with Pfx(lineno):
             if line.startswith('import ') or line.startswith('from '):
-              words = line.strip().split()
+              line = line.strip()
+              # quick hack to strip trailing "; second-statement"
+              try:
+                line, _ = line.split(';', 1)
+              except ValueError:
+                pass
+              words = line.split()
               if not words:
                 continue
               if words[0] == 'import' or words[0] == 'from':
                 if len(words) < 2:
                   silent or warning("missing module name")
                   continue
-                subimport0 = subimport = words[1]
+                subimport = words[1]
                 if subimport == '.':
                   # don't recurse into ourself
                   pkg_name = self.package_name
