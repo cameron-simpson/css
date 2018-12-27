@@ -1,0 +1,2 @@
+New decoartor @strable for function which may accept a str instead of their primary type.
+Improvements to @cached.
