@@ -179,7 +179,7 @@ class _Dirent(Transcriber):
       parent=None,
       prevblock=None,
       block=None,
-      **kw,
+      **kw
   ):
     ''' Initialise a _Dirent.
 
