@@ -356,8 +356,10 @@ class Module(object):
     return self._check_status
 
   def _check(self, silent):
-    ok = True
     distinfo = self.DISTINFO
+    if not distinfo:
+      return False
+    ok = True
     install_requires = self.requires
     if install_requires is None:
       silent or error("missing DISTINFO[install_requires]")
@@ -377,6 +379,9 @@ class Module(object):
     for name in sorted(self.imports):
       if not name.startswith('cs.'):
         continue
+      if name.endswith('_tests'):
+        # tests are part of another package: ignore
+        continue
       if name == pkg_name:
         # tests usually import the package - this is not a dependency
         continue
@@ -386,6 +391,11 @@ class Module(object):
       if name not in install_requires:
         silent or warning("import %r not mentioned in install_requires", name)
         ok = False
+        continue
+      M = self.modules[name]
+      if not M.check(silent):
+        ok = False
+        continue
     for name in sorted(install_requires):
       if name not in self.imports:
         silent or warning("requirement %r not imported", name)
