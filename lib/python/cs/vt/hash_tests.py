@@ -13,7 +13,7 @@ import random
 import sys
 import unittest
 from cs.binary_tests import _TestPacketFields
-from cs.randutils import rand0, randbool, randblock
+from .randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin, hash as hash_module
 from .hash import Hash_SHA1, decode as decode_hash, HashUtilDict
 from .transcribe import Transcriber, parse
