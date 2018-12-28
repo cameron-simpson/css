@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
-import sys
+''' A few caching facilities.
+'''
+
 from collections import deque
 from threading import RLock
 
@@ -11,8 +13,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.threads'],
+    ],
 }
 
 class LRU_Cache(object):
@@ -99,6 +100,8 @@ class LRU_Cache(object):
     return self._cache[key]
 
   def get(self, key, default=None):
+    ''' Mapping method: get value for `key` or `default`.
+    '''
     try:
       return self._cache[key]
     except KeyError:
@@ -143,7 +146,7 @@ class LRU_Cache(object):
     return self._cache == other
 
   def __ne__(self, other):
-    return not (self == other)
+    return self != other
 
   def flush(self):
     ''' Clear the cache.
