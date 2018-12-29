@@ -72,6 +72,30 @@ DISTINFO = {
     ],
 }
 
+DEFAULT_CONFIG_PATH = '~/.vtrc'
+
+DEFAULT_BASEDIR = '~/.vt_stores'
+
+DEFAULT_CONFIG = {
+    'GLOBAL': {
+      'basedir': DEFAULT_BASEDIR,
+      'blockmapdir': '[default]/blockmaps',
+    },
+    'default': {
+      'type': 'datadir',
+      'path': 'trove',
+    },
+    'cache': {
+      'type': 'memory',
+      'max_data': '16 GiB',
+    },
+    'server': {
+      'type': 'datadir',
+      'path': 'trove',
+      'address': '~/.vt.sock',
+    },
+}
+
 # intercept Lock and RLock
 if False:
   def RLock():

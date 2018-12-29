@@ -14,7 +14,7 @@ import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, realpath, splitext, \
+from os.path import basename, realpath, splitext, expanduser, \
     exists as existspath, join as joinpath, \
     isdir as isdirpath, isfile as isfilepath
 import shutil
@@ -34,7 +34,7 @@ from cs.resources import RunState
 from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
-from . import fromtext, defaults
+from . import fromtext, defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, CopyModes
 from .block import BlockRecord
 from .blockify import blocked_chunks_of
@@ -77,11 +77,13 @@ class VTCmd:
               Default from $VT_STORE, or "[default]", except for
               the "serve" subcommand which defaults to "[server]"
               and ignores $VT_STORE.
-    -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
+    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
+    + DEFAULT_CONFIG_PATH + '''
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
   Subcommands:
     cat filerefs...
+    config
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
     import [-oW] path {-|archive.vt}
@@ -132,7 +134,7 @@ class VTCmd:
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
     ####cs.x.X_logger = logging.getLogger()
 
-    config_path = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
+    config_path = os.environ.get('VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH))
     store_spec = None
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
@@ -323,6 +325,14 @@ class VTCmd:
       raise GetoptError("missing filerefs")
     for path in args:
       cat(path)
+    return 0
+
+  def cmd_config(self, args):
+    ''' Recite the configuration.
+    '''
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    self.config.write(sys.stdout)
     return 0
 
   def cmd_dump(self, args):

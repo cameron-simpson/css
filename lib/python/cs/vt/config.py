@@ -8,14 +8,16 @@
 Store definition configuration file.
 '''
 
+from configparser import ConfigParser
 import os
-from os.path import abspath, isabs as isabspath, join as joinpath
-from cs.configutils import ConfigWatcher
+from os.path import abspath, isabs as isabspath, join as joinpath, exists as pathexists
+import sys
 from cs.fileutils import shortpath, longpath
 from cs.logutils import debug
 from cs.pfx import Pfx
 from cs.result import Result
-from . import Lock
+from cs.x import X
+from . import Lock, DEFAULT_CONFIG
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import parse_store_specs
@@ -43,14 +45,32 @@ class Config:
         Default: `os.environ`
   '''
 
-  def __init__(self, config_map, environ=None):
+  def __init__(self, config_map, environ=None, default_config=None):
     if environ is None:
       environ = os.environ
+    if default_config is None:
+      default_config = DEFAULT_CONFIG
     self.environ = environ
+    config = ConfigParser()
     if isinstance(config_map, str):
-      self.path = config_map
-      config_map = ConfigWatcher(self.path)
-    self.map = config_map
+      self.path = path = config_map
+      with Pfx(path):
+        read_ok = False
+        if pathexists(path):
+          try:
+            config.read(path)
+          except OSError as e:
+            error("read error: %s", e)
+          else:
+            read_ok = True
+        else:
+          warning("missing config file")
+      if not read_ok:
+        warning("falling back to default configuration")
+        config.read_dict(default_config)
+    else:
+      config.read_dict(config_map)
+    self.map = config
     self._stores_by_name = {}  # clause_name => Result->Store
     self._lock = Lock()
 
@@ -58,6 +78,13 @@ class Config:
     if self.path is None:
       return repr(self)
     return "Config(%s)" % (shortpath(self.path),)
+
+  def write(self, fp=None):
+    ''' Write the configuration out to the file `fp`.
+    '''
+    if fp is None:
+      fp = sys.stdout
+    self.map.write(fp)
 
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
@@ -89,7 +116,7 @@ class Config:
   def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
     '''
-    G = self.map.get('GLOBAL')
+    G = self.map['GLOBAL']
     if not G:
       return default
     return G.get(param, default)
