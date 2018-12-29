@@ -40,6 +40,12 @@ notably via the following subcommands:
 
 These and other subcommands are detailed below.
 
+## GETTING STARTED
+
+Run the command `vt init`;
+this will create an initial `~/.vtrc` file
+and empty default Stores.
+
 ## OPTIONS
 
 `-C` *store*
