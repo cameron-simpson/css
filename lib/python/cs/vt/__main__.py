@@ -87,6 +87,7 @@ class VTCmd:
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
     import [-oW] path {-|archive.vt}
+    init
     ls [-R] dirrefs...
     mount [-a] [-o {append_only,readonly}] [-r] {Dir|config-clause|archive.vt} [mountpoint [subpath]]
       -a  All dates. Implies readonly.

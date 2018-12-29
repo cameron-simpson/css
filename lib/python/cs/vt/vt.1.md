@@ -80,6 +80,17 @@ These and other subcommands are detailed below.
 
 ## SUBCOMMANDS
 
+`config`
+
+  Recite the configuration in .ini format.
+
+`init`
+
+  Initialise.
+  Create the .vtrc if missing, with the default configuration.
+  Create the directories for any missing local datadir Stores
+  from the configuration.
+
 `mount` [*option*...] *special* [*mountpoint* [*subpath*]]
 
   Mount the storage specified by *special* on *mountpoint*
