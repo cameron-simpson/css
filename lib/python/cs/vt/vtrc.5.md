@@ -139,10 +139,21 @@ Parameters:
 #### `type = socket`
 
 A stream store presented via a UNIX domain socket.
+Parameters:
+
+`socket_path`:
+  the path to the socket, default from the clause name;
+  relative paths are resolved with respect to `basedir`
 
 #### `type = tcp`
 
 A stream store presented via a TCP *host*`:`*port* address.
+Parameters:
+
+`host`
+  the hostname for the server, default from the clause name
+`port`
+  the port number
 
 ## SEE ALSO
 
