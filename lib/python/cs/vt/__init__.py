@@ -4,10 +4,9 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    See also:
-        The Plan 9 Venti system:
-          http://library.pantek.com/general/plan9.documents/venti/venti.html
-          http://en.wikipedia.org/wiki/Venti
+    See also the Plan 9 Venti system:
+    (http://library.pantek.com/general/plan9.documents/venti/venti.html,
+    http://en.wikipedia.org/wiki/Venti).
 '''
 
 from collections import namedtuple
@@ -28,6 +27,50 @@ from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
 from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.buffer',
+        'cs.app.flag',
+        'cs.binary',
+        'cs.binary_tests',
+        'cs.cache',
+        'cs.configutils',
+        'cs.debug',
+        'cs.deco',
+        'cs.env',
+        'cs.excutils',
+        'cs.fileutils',
+        'cs.html',
+        'cs.inttypes',
+        'cs.later',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mappings',
+        'cs.packetstream',
+        'cs.pfx',
+        'cs.progress',
+        'cs.py.func',
+        'cs.py.stack',
+        'cs.queues',
+        'cs.range',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.serialise',
+        'cs.socketutils',
+        'cs.threads',
+        'cs.tty',
+        'cs.units',
+        'cs.x',
+    ],
+}
 
 # intercept Lock and RLock
 if False:
