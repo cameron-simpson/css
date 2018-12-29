@@ -15,7 +15,7 @@ from getopt import getopt, GetoptError
 import logging
 import os
 from os.path import basename, realpath, splitext, expanduser, \
-    exists as existspath, join as joinpath, \
+    exists as pathexists, join as joinpath, \
     isdir as isdirpath, isfile as isfilepath
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
@@ -233,7 +233,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown subcommand \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("dump", "scan", "test"):
+      if op in ("config", "dump", "init", "scan", "test"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -494,6 +494,38 @@ class VTCmd:
           warning("archive not updated")
     return xit
 
+  def cmd_init(self, args):
+    ''' Install a default config and initialise the configured datadir Stores.
+    '''
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    config = self.config
+    config_path = config.path
+    try:
+      if not pathexists(config_path):
+        info("write %r", config_path)
+        with Pfx(config_path):
+          with open(config_path, 'w') as cfg:
+            self.config.write(cfg)
+      basedir = config.basedir
+      if not isdirpath(basedir):
+        with Pfx("basedir"):
+          info("mkdir %r", basedir)
+          with Pfx("mkdir(%r)", basedir):
+            os.mkdir(basedir)
+      for clause_name, clause in sorted(config.map.items()):
+        with Pfx("%s[%s]", shortpath(config_path), clause_name):
+          if clause_name == 'GLOBAL':
+            continue
+          store_type = clause.get('type')
+          if store_type == 'datadir':
+            S = config[clause_name]
+            S.init()
+    except OSError as e:
+      error("init failed: %s", e)
+      return 1
+    return 0
+
   def cmd_ls(self, args):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
@@ -718,7 +750,7 @@ class VTCmd:
       raise GetoptError("extra arguments after path: %r" % (args,))
     modes = CopyModes(trust_size_mtime=True)
     with Pfx(ospath):
-      if not existspath(ospath):
+      if not pathexists(ospath):
         error("missing")
         return 1
       arpath = ospath + '.vt'
@@ -924,7 +956,7 @@ class VTCmd:
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
     if args:
       raise GetoptError("extra arguments after archive name %r" % (arpath,))
-    if existspath(arbase):
+    if pathexists(arbase):
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):

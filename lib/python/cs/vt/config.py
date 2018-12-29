@@ -13,10 +13,9 @@ import os
 from os.path import abspath, isabs as isabspath, join as joinpath, exists as pathexists
 import sys
 from cs.fileutils import shortpath, longpath
-from cs.logutils import debug
+from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.result import Result
-from cs.x import X
 from . import Lock, DEFAULT_CONFIG
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore

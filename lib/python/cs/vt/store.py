@@ -869,6 +869,11 @@ class DataDirStore(MappingStore):
     self._datadir.close()
     super().shutdown()
 
+  def init(self):
+    ''' Init the supporting data dir.
+    '''
+    self._datadir.init()
+
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.
     '''

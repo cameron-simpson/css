@@ -141,7 +141,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       statedirpath, hashclass,
       *,
       indexclass=None,
-      create_statedir=None,
       flags=None, flag_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -155,7 +154,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
-        * `create_statedir`: os.mkdir the state directory if missing
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
@@ -184,19 +182,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     if indexclass is None:
       indexclass = choose_indexclass(self.indexbase)
     self.indexclass = indexclass
-    if create_statedir is None:
-      create_statedir = False
-    if not isdirpath(statedirpath):
-      if create_statedir:
-        with Pfx("mkdir(%r)", statedirpath):
-          os.mkdir(statedirpath)
-      else:
-        raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
-    # create the data subdir if missing
-    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
-    if not isdirpath(datadirpath):
-      with Pfx("mkdir(%r)", datadirpath):
-        os.mkdir(datadirpath)
     self._filemap = None
     self._unindexed = None
     self.index = None
@@ -204,6 +189,21 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._indexQ = None
     self._index_Thread = None
     self._monitor_Thread = None
+
+  def init(self):
+    ''' Initialise the data dir if not present.
+    '''
+    statedirpath = self.statedirpath
+    if not isdirpath(statedirpath):
+      info("mkdir %r", statedirpath)
+      with Pfx("mkdir(%r)", statedirpath):
+        os.mkdir(statedirpath)
+    # create the data subdir if missing
+    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
+    if not isdirpath(datadirpath):
+      info("mkdir %r", datadirpath)
+      with Pfx("mkdir(%r)", datadirpath):
+        os.mkdir(datadirpath)
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
@@ -644,7 +644,6 @@ class DataDir(_FilesDir):
         * `rollover`: data file roll over size; if a data file grows beyond
           this a new datafile is commenced for new blocks.  Default:
           `DEFAULT_ROLLOVER`.
-        * `create_statedir`: os.mkdir the state directory if missing.
     '''
     super().__init__(statedirpath, hashclass, **kw)
     if rollover is None:
