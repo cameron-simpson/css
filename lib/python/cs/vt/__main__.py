@@ -738,6 +738,9 @@ class VTCmd:
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
+        except Exception as e:
+          exception("unexpected exception: %s", e)
+          xit = 1
         finally:
           if T:
             T.join()
