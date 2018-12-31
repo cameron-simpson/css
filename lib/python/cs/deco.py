@@ -51,7 +51,7 @@ def decorator(deco, *da, **dkw):
     func = da[0]
     dfunc = deco(func, **dkw)
     dfunc.__doc__ = getattr(func, '__doc__', '')
-    return fdunc
+    return dfunc
   return overdeco
 
 @decorator
