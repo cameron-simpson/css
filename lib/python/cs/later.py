@@ -193,35 +193,34 @@ class LateFunction(_PendingFunction):
   ''' State information about a pending function.
       A LateFunction is callable, so a synchronous call can be done like this:
 
-        def func():
-          return 3
-        L = Later(4)
-        LF = L.defer()
-        x = LF()
-        print(x)        # prints 3
+          def func():
+            return 3
+          L = Later(4)
+          LF = L.defer()
+          x = LF()
+          print(x)        # prints 3
 
       Used this way, if the called function raises an exception it is visible:
 
-        LF = L.defer()
-        try:
-          x = LF()
-        except SomeException as e:
-          # handle the exception ...
+          LF = L.defer()
+          try:
+            x = LF()
+          except SomeException as e:
+            # handle the exception ...
 
       To avoid handling exceptions with try/except the .wait()
       method should be used:
 
-        LF = L.defer()
-        x, exc_info = LF.wait()
-        if exc_info:
-          # handle exception
-          exc_type, exc_value, exc_traceback = exc_info
-          ...
-        else:
-          # use `x`, the function result
+          LF = L.defer()
+          x, exc_info = LF.wait()
+          if exc_info:
+            # handle exception
+            exc_type, exc_value, exc_traceback = exc_info
+            ...
+          else:
+            # use `x`, the function result
 
-      TODO: .cancel()
-            timeout for wait()
+      TODO: .cancel(), timeout for wait().
   '''
 
   def __init__(self, later, func, name=None, retry_delay=None):
@@ -905,8 +904,10 @@ class Later(object):
 
   def complete(self, outstanding=None, until_idle=False):
     ''' Generator which waits for outstanding functions to complete and yields them.
-        `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
-        `until_idle`: if outstanding is not None, continue until self.outstanding is empty
+
+        Parameters:
+        * `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
+        * `until_idle`: if outstanding is not None, continue until self.outstanding is empty
     '''
     if outstanding is not None:
       if until_idle:
@@ -933,12 +934,15 @@ class Later(object):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
+
         `func` may optionally be preceeded by one or both of:
-          a string specifying the function's descriptive name,
-          a mapping containing parameters for `priority`,
-            `delay`, and `when`.
+        * a string specifying the function's descriptive name,
+        * a mapping containing parameters for `priority`,
+          `delay`, and `when`.
+
         Equivalent to:
-          submit(functools.partial(func, *a, **kw), **params)
+
+            submit(functools.partial(func, *a, **kw), **params)
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer(...) but not self.submittable" % (self,))
@@ -1056,6 +1060,7 @@ class Later(object):
     @logexc
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
+
           Close the queue at end of iteration or other exception.
           Otherwise, requeue ourself to collect the next iteration value.
       '''
@@ -1086,36 +1091,36 @@ class Later(object):
 
   def pipeline(self, actions, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
-        Return:
-          input, output
+        Return: `input, output`
         where `input`` is a closeable queue on which more data items can be put
         and `output` is an iterable from which result can be collected.
 
-        `actions`: an iterable of filter functions accepting
+        Parameters:
+        * `actions`: an iterable of filter functions accepting
           single items from the iterable `inputs`, returning an
           iterable output.
-        `inputs`: the initial iterable inputs; this may be None.
+        * `inputs`: the initial iterable inputs; this may be None.
           If missing or None, it is expected that the caller will
           be supplying input items via `input.put()`.
-        `outQ`: the optional output queue; if None, an IterableQueue() will be
+        * `outQ`: the optional output queue; if None, an IterableQueue() will be
           allocated.
-        `name`: name for the PushQueue implementing this pipeline.
+        * `name`: name for the PushQueue implementing this pipeline.
 
         If `inputs` is None or `open` is true, the returned `input` requires
         a call to `input.close()` when no further inputs are to be supplied.
 
         Example use with presupplied Later `L`:
 
-          input, output = L.pipeline(
-                  [
-                    ls,
-                    filter_ls,
-                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
-                  ],
-                  ('.', '..', '../..'),
-                 )
-          for item in output:
-            print(item)
+            input, output = L.pipeline(
+                    [
+                      ls,
+                      filter_ls,
+                      ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
+                    ],
+                    ('.', '..', '../..'),
+                   )
+            for item in output:
+              print(item)
     '''
     if not self.submittable:
       raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
@@ -1166,24 +1171,28 @@ class LatePool(object):
   ''' A context manager after the style of subprocess.Pool but with deferred completion.
       Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        with LatePool(L) as LP:
-          # several calls to LatePool.defer, perhaps looped
-          LP.defer(func, *args, **kwargs)
-          LP.defer(func, *args, **kwargs)
-        # now we can LP.join() to block for all LateFunctions
-        #
-        # or iterate over LP to collect LateFunctions as they complete
-        for LF in LP:
-          result = LF()
-          print(result)
-  '''
+          L = Later(4)    # a 4 thread Later
+          with LatePool(L) as LP:
+            # several calls to LatePool.defer, perhaps looped
+            LP.defer(func, *args, **kwargs)
+            LP.defer(func, *args, **kwargs)
+          # now we can LP.join() to block for all LateFunctions
+          #
+          # or iterate over LP to collect LateFunctions as they complete
+          for LF in LP:
+            result = LF()
+            print(result)
+    '''
 
   def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
     ''' Initialise the LatePool.
-        `L`: Later instance, default from default.current.
-        `priority`, `delay`, `when`, `name`, `pfx`: default values passed to Later.submit.
-        `block`: if true, wait for LateFunction completion before leaving __exit__.
+
+        Parameters:
+        * `L`: Later instance, default from default.current.
+        * `priority`, `delay`, `when`, `name`, `pfx`:
+          default values passed to Later.submit.
+        * `block`: if true, wait for LateFunction completion
+          before leaving __exit__.
     '''
     if L is None:
       L = default.current
@@ -1247,9 +1256,11 @@ class LatePool(object):
 
 def capacity(func):
   ''' Decorator for functions which wish to manage concurrent requests.
+
       The caller must provide a `capacity` keyword arguments which
       is either a Later instance or an int; if an int a Later with
       that capacity will be made.
+
       The Later will be passed into the inner function as the
       `capacity` keyword argument.
   '''
