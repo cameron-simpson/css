@@ -195,6 +195,9 @@ def main(argv):
             lvkey, last_upload = N.last_upload(pypi_flavour)
             if last_upload != tagged:
               result.append("%s:%s" % (pypi_flavour, last_upload))
+          changes = list(N.log_since())
+          if changes:
+            result.append("new-commits:%d" % (len(changes),))
           print(*result)
         else:
           warning("unrecognised op %r", op)
