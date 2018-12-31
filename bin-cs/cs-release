@@ -684,7 +684,10 @@ class ReleaseName(object):
           warning("submitting anyway")
         else:
           return
-      with Pfx("%r->%r", last_pypi_release, last_suffix):
+      with Pfx(
+          "%s->%r",
+          repr(last_pypi_release) if last_pypi_release else '',
+          last_suffix):
         defaults = dict(DISTINFO_DEFAULTS)
         PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         PKG.upload()
