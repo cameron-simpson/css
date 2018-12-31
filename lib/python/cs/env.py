@@ -40,18 +40,6 @@ def get_standard_var(varname, default, environ=None):
     value = envsub(default, environ)
   return value
 
-def getLogin(uid=None):
-  import pwd
-  if uid is None:
-    uid = os.geteuid()
-  return pwd.getpwuid(uid)[0]
-
-def getHomeDir(login=None):
-  import pwd
-  if login is None:
-    login = getLogin()
-  return pwd.getpwnam(login)[5]
-
 def getenv(var, default=None, environ=None, dosub=False):
   ''' Fetch environment value.
       `var`: name of variable to fetch.
