@@ -55,10 +55,10 @@ from .server import serve_tcp, serve_socket
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
-def main(argv=None):
+def main(*a, **kw):
   ''' Create a VTCmd instance and call its main method.
   '''
-  return VTCmd().main(argv=argv)
+  return VTCmd().main(*a, **kw)
 
 class VTCmd:
   ''' A main programme instance.
@@ -104,8 +104,17 @@ class VTCmd:
     unpack archive.vt
 '''
 
-  def main(self, argv=None, environ=None, verbose=None):
-    ''' The main function for this programme.
+  def main(self, argv=None, environ=None, verbose=None, subcmd=None):
+    ''' The main function for cs.vt.
+
+        Parameters:
+        * `argv`: the command line arguments,
+          default from `sys.argv`.
+        * `environ`: the environment variable mapping,
+          default from `os.environ`.
+        * `verbose`: verbose mode, also activated by the `-v` option.
+        * `subcmd`: which subcommand to run,
+          default from the first argument after the options.
     '''
     global loginfo
     if argv is None:
@@ -201,7 +210,7 @@ class VTCmd:
       signal(SIGQUIT, sig_handler)
 
       try:
-        xit = self.cmd_op(args)
+        xit = self.cmd_op(args, op=subcmd)
       except GetoptError as e:
         error("%s", e)
         badopts = True
@@ -218,14 +227,15 @@ class VTCmd:
 
     return xit
 
-  def cmd_op(self, args):
+  def cmd_op(self, args, op=None):
     ''' Run a subcommand from `args`.
     '''
-    try:
-      op = args[0]
-    except IndexError:
-      raise GetoptError("missing command")
-    args = args[1:]
+    if op is None:
+      try:
+        op = args[0]
+      except IndexError:
+        raise GetoptError("missing command")
+      args = args[1:]
     with Pfx(op):
       if op == "profile":
         return self.cmd_profile(args)
