@@ -70,6 +70,11 @@ DISTINFO = {
         'cs.units',
         'cs.x',
     ],
+    'entry_points': {
+        'console_scripts': [
+            'vt = cs.vt.__main__:main',
+        ],
+    },
 }
 
 DEFAULT_CONFIG_PATH = '~/.vtrc'
