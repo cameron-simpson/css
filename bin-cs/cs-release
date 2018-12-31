@@ -378,6 +378,11 @@ class Module(object):
     # check imports against install_requires
     for name in sorted(self.imports):
       if not name.startswith('cs.'):
+        M = self.modules[name]
+        Mpath = getattr(M.module, '__file__', None)
+        if Mpath and '/site-ackages/' in Mpath:
+          silent or warning("third party import %r not mentioned in install_requires", name)
+          ok = False
         continue
       if name.endswith('_tests'):
         # tests are part of another package: ignore
@@ -550,10 +555,10 @@ class ReleaseName(object):
       ok = False
     unreleased_changes = list(self.log_since())
     if unreleased_changes:
-      show_log = not silent and ok
+      show_log = False and not silent and ok
       ok = False
       if not silent:
-        error("unreleased changes")
+        error("%d unreleased changes", len(unreleased_changes))
         if show_log:
           for files, firstline in unreleased_changes:
             files = [
