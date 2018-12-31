@@ -9,18 +9,20 @@
 
 import errno
 import os
-from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
-from threading import Lock, RLock
+from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
+import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
-from cs.logutils import error, warning, info, debug
+from cs.later import Later
+from cs.logutils import exception, error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
 from cs.x import X
-from . import defaults
+from . import defaults, Lock, RLock
 from .block import isBlock
+from .cache import BlockCache
 from .dir import _Dirent, Dir, FileDirent
 from .debug import dump_Dirent
 from .meta import Meta
@@ -30,22 +32,26 @@ from .transcribe import Transcriber, mapping_transcriber, parse
 
 XATTR_VT_PREFIX = 'x-vt-'
 
-def oserror(errno, msg, *a):
+DEFAULT_FS_THREAD_MAX = 16
+
+def oserror(errno_, msg, *a):
   ''' Function to issue a warning and then raise an OSError.
   '''
-  assert isinstance(errno, int)
+  assert isinstance(errno_, int)
   assert isinstance(msg, str)
   if a:
     msg = msg % a
-  warning("raise OSError(%s): %s", errno, msg)
-  raise OSError(errno, msg)
+  warning("raise OSError(%s): %s", errno_, msg)
+  raise OSError(errno_, msg)
 
 OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
 OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
 OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
+OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
 OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
 OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
 OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
+OS_ENOTSUP = lambda msg, *a: oserror(errno.ENOTSUP, msg, *a)
 OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
 
 class FileHandle:
@@ -70,6 +76,26 @@ class FileHandle:
     fhndx = getattr(self, 'fhndx', None)
     return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
 
+  def bg(self, func, *a, **kw):
+    ''' Function dispatcher.
+    '''
+    return self.fs.bg(func, *a, **kw)
+
+  def close(self):
+    ''' Close the file, mark its parent directory as changed.
+    '''
+    S = defaults.S
+    R = self.E.flush()
+    self.E.parent.changed = True
+    S.open()
+    # NB: additional S.open/close around self.E.close
+    R.notify(logexc(lambda _: (
+        defaults.pushStore(S),
+        self.E.close(),
+        defaults.popStore(),
+        S.close()
+    )))
+
   def write(self, data, offset):
     ''' Write data to the file.
     '''
@@ -90,21 +116,6 @@ class FileHandle:
     '''
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
-    bm = self._block_mapping
-    if bm and offset < bm.filled:
-      # Fetch directly from the BlockMapping.
-      bmsize = min(size, bm.filled - offset)
-      data = bm.pread(bmsize, offset)
-      assert len(data) > 0
-      size -= len(data)
-      offset += len(data)
-      if size > 0:
-        tail = self.read(size, offset)
-        return data + tail
-      return data
-    ##f = self.E.open_file
-    ##X("f = %s %s", type(f), f)
-    ##X("f.read = %s %s", type(f.read), f.read)
     return self.E.open_file.read(size, offset=offset, longread=True)
 
   def truncate(self, length):
@@ -127,15 +138,9 @@ class FileHandle:
     if scanner is None:
       X("look up scanner from filename %r", self.E.name)
       scanner = scanner_from_filename(self.E.name)
-    self.E.flush(scanner)
+    self.E.flush(scanner, dispatch=self.bg)
     ## no touch, already done by any writes
     X("FileHandle.Flush DONE")
-
-  def close(self):
-    ''' Close the file, mark its parent directory as changed.
-    '''
-    self.E.close()
-    self.E.parent.changed = True
 
 @mapping_transcriber(
     prefix="Ino",
@@ -162,6 +167,17 @@ class Inode(Transcriber, NS):
     self.inum = inum
     self.E = E
     self.refcount = refcount
+
+  def __repr__(self):
+    return (
+        "%s(inum=%d,refcount=%d,E=%s(%r))"
+        % (
+            type(self).__name__,
+            self.inum,
+            self.refcount,
+            type(self.E).__name__, self.E.name
+        )
+    )
 
   def transcribe_inner(self, T, fp):
     return T.transcribe_mapping({
@@ -209,7 +225,7 @@ class Inodes(object):
     X("LOAD FS INODE DIRENTS:")
     dump_Dirent(D)
     for name, E in D.entries.items():
-      X("  name=%r, E=%s", name, E)
+      X("  name=%r, E=%r", name, E)
       with Pfx(name):
         # get the refcount from the :uuid:refcount" name
         _, refcount_s = name.split(':')[:2]
@@ -241,7 +257,6 @@ class Inodes(object):
     else:
       inum = 1
     allocated.add(inum)
-    X("ALLOCATED INUM %d, allocated=%s", inum, allocated)
     return inum
 
   def add(self, E, inum=None):
@@ -326,7 +341,8 @@ class FileSystem(object):
       subpath=None,
       readonly=None,
       append_only=False,
-      show_prev_dirent=False
+      show_prev_dirent=False,
+      thread_max=None,
   ):
     ''' Initialise a new mountpoint.
 
@@ -345,16 +361,21 @@ class FileSystem(object):
       raise ValueError("not dir Dir: %s" % (E,))
     if S is None:
       S = defaults.S
+    self._old_S_block_cache = S.block_cache
+    self.block_cache = S.block_cache or defaults.block_cache or BlockCache()
+    S.block_cache = self.block_cache
     S.open()
     if readonly is None:
       readonly = S.readonly
+    if thread_max is None:
+      thread_max = DEFAULT_FS_THREAD_MAX
     self.E = E
     self.S = S
     self.archive = archive
     if archive is None:
       self._last_sync_state = None
     else:
-      self._last_sync_state = archive.strfor_Dirent(E)
+      self._last_sync_state = bytes(E)
     self.subpath = subpath
     self.readonly = readonly
     self.append_only = append_only
@@ -373,33 +394,43 @@ class FileSystem(object):
     self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
-    self._lock = S._lock
+    self._lock = RLock()
+    self._later = Later(DEFAULT_FS_THREAD_MAX)
     self._path_files = {}
     self._file_handles = []
     inodes = self._inodes = Inodes(self)
     self[1] = mntE
-    with Pfx("fs_inode_dirents"):
-      fs_inode_dirents = E.meta.get("fs_inode_dirents")
-      X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
-      if fs_inode_dirents:
-        inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
-        if offset < len(fs_inode_dirents):
-          warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
-        X("IMPORT INODES:")
-        dump_Dirent(inode_dir)
-        inodes.load_fs_inode_dirents(inode_dir)
-      else:
-        X("NO INODE IMPORT")
-      X("FileSystem mntE:")
-    with self.S:
-      with defaults.stack('fs', self):
-        dump_Dirent(mntE)
+    try:
+      with Pfx("fs_inode_dirents"):
+        fs_inode_dirents = E.meta.get("fs_inode_dirents")
+        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
+        if fs_inode_dirents:
+          inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
+          if offset < len(fs_inode_dirents):
+            warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
+          X("IMPORT INODES:")
+          dump_Dirent(inode_dir)
+          inodes.load_fs_inode_dirents(inode_dir)
+        else:
+          X("NO INODE IMPORT")
+        X("FileSystem mntE:")
+      with self.S:
+        with defaults.stack('fs', self):
+          dump_Dirent(mntE)
+    except Exception as e:
+      exception("exception during initial report: %s", e)
+
+  def bg(self, func, *a, **kw):
+    ''' Dispatch a function via the FileSystem's Later instance.
+    '''
+    return self._later.defer(func, *a, **kw)
 
   def close(self):
     ''' Close the FileSystem.
     '''
     self._sync()
     self.S.close()
+    self.S.block_cache = self._old_S_block_cache
 
   def __str__(self):
     if self.subpath:
@@ -407,14 +438,12 @@ class FileSystem(object):
           self.__class__.__name__,
           self.S, self.E, self.subpath, self.mntE
       )
-    return "<%s S=%s /=%s>" % (self.__class__.__name__, self.S, self.E)
+    return "%s(S=%s,/=%r)" % (type(self).__name__, self.S, self.E)
 
   def __getitem__(self, inum):
     ''' Lookup inode numbers or UUIDs.
     '''
-    I = self._inodes[inum]
-    X("__getitem__(%d)=>%s", inum, I)
-    return I
+    return self._inodes[inum]
 
   def __setitem__(self, inum, E):
     ''' Associate a specific inode number with a Dirent.
@@ -431,9 +460,9 @@ class FileSystem(object):
         with self._lock:
           E = self.E
           updated = False
-          X("snapshot %s ...", E)
+          X("snapshot %r  ...", E)
           E.snapshot()
-          X("snapshot: afterwards E=%s", E)
+          X("snapshot: afterwards E=%r", E)
           fs_inode_dirents = self._inodes.get_fs_inode_dirents()
           X("_SYNC: FS_INODE_DIRENTS:")
           dump_Dirent(fs_inode_dirents)
@@ -442,7 +471,7 @@ class FileSystem(object):
             E.meta['fs_inode_dirents'] = str(fs_inode_dirents)
           else:
             E.meta['fs_inode_dirents'] = ''
-          new_state = archive.strfor_Dirent(E)
+          new_state = bytes(E)
           if new_state != self._last_sync_state:
             archive.update(E)
             self._last_sync_state = new_state
@@ -499,7 +528,7 @@ class FileSystem(object):
         OS_EEXIST("entry %r already exists", name)
       E = P[name]
     elif not flags & O_CREAT:
-      OS_NOENT("no entry named %r", name)
+      OS_ENOENT("no entry named %r", name)
     else:
       E = FileDirent(name)
       P[name] = E
@@ -526,6 +555,12 @@ class FileSystem(object):
     if (for_write or for_append) and self.readonly:
       error("fs is readonly")
       OS_EROFS("fs is readonly")
+    if E.issym:
+      if flags & O_NOFOLLOW:
+        OS_ELOOP("open symlink with O_NOFOLLOW")
+      OS_EINVAL("open(%s)" % (E,))
+    elif not E.isfile:
+      OS_EINVAL("open of nonfile: %s" % (E,))
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
     if flags & O_TRUNC:
       FH.truncate(0)
@@ -586,10 +621,12 @@ class FileSystem(object):
       OS_EINVAL(
           "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
           inum, xattr_name, XATTR_VT_PREFIX)
-    # bit of a hack: pretend all attributes exist, empty if missing
-    # this is essentially to shut up llfuse, which otherwise reports ENOATTR
-    # with a stack trace
-    return E.meta.getxattr(xattr_name, b'')
+    xattr = E.meta.getxattr(xattr_name, None)
+    if xattr is None:
+      ##if xattr_name == 'com.apple.FinderInfo':
+      ##  OS_ENOTSUP("inum %d: no xattr %r, pretend not supported", inum, xattr_name)
+      OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+    return xattr
 
   def removexattr(self, inum, xattr_name):
     ''' Remove the extended attribute named `xattr_name` from `inum`.
@@ -606,7 +643,7 @@ class FileSystem(object):
     try:
       meta.delxattr(xattr_name)
     except KeyError:
-      OS_NOATTR("no such extended attribute: %r", xattr_name)
+      OS_ENOATTR("no such extended attribute: %r", xattr_name)
 
   def setxattr(self, inum, xattr_name, xattr_value):
     ''' Set the extended attribute `xattr_name` to `xattr_value`
@@ -645,5 +682,16 @@ class FileSystem(object):
             OS_EINVAL("no control command")
           op = argv.pop(0)
           with Pfx(op):
+            if op == 'cache':
+              if argv:
+                OS_EINVAL("extra arguments: %r", argv)
+              B = E.block
+              if B.indirect:
+                X("ADD BLOCK CACHE FOR %s", B)
+                bm = self.block_cache.get_blockmap(B)
+                X("==> BLOCKMAP: %s", bm)
+              else:
+                X("IGNORE BLOCK CACHE for %s: not indirect", B)
+              return
             OS_EINVAL("unrecognised control command")
-      OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)
+        OS_EINVAL("invalid %r prefixed name", XATTR_VT_PREFIX)

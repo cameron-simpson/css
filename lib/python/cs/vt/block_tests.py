@@ -11,7 +11,7 @@ import sys
 from random import choice
 import unittest
 from cs.binary_tests import _TestPacketFields
-from cs.randutils import rand0, randblock
+from .randutils import rand0, randblock
 from . import totext, block as block_module
 from .block import Block, \
     IndirectBlock, \

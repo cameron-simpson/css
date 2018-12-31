@@ -110,7 +110,8 @@ def flatten(chunks):
   if chunks is None:
     pass
   elif isinstance(chunks, (bytes, memoryview)):
-    yield chunks
+    if len(chunks) > 0:
+      yield chunks
   elif isinstance(chunks, str):
     yield chunks.encode('ascii')
   else:

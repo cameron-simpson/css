@@ -15,7 +15,7 @@ except ImportError:
   kyotocabinet = None
 from cs.binary_tests import _TestPacketFields
 ##from cs.debug import thread_dump
-from cs.randutils import rand0, randblock
+from .randutils import rand0, randblock
 from . import datafile
 from .datafile import DataFileReader, DataFileWriter
 # from .hash_tests import _TestHashCodeUtils

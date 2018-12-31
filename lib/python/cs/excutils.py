@@ -231,7 +231,11 @@ def logexc(func):
   def logexc_wrapper(*a, **kw):
     with LogExceptions():
       return func(*a, **kw)
-  logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
+  try:
+    name = func.__name__
+  except AttributeError:
+    name = str(func)
+  logexc_wrapper.__name__ = 'logexc(%s)' % (name,)
   return logexc_wrapper
 
 def logexc_gen(genfunc):

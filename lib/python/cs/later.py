@@ -29,23 +29,23 @@ As such it is a callable, so to collect the result you just call the LateFunctio
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
+from heapq import heappush, heappop
 import logging
 import sys
 import threading
 from threading import Lock, Thread, Event
 import time
-import traceback
 from cs.debug import ifdebug
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
-from cs.pfx import Pfx, PrePfx
+from cs.pfx import PrePfx
 from cs.py.func import funcname
-from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
+from cs.queues import IterableQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
-from cs.result import Result, _PendingFunction, ResultState, report, after
+from cs.result import Result, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import AdjustableSemaphore, WorkerThreadPool, bg
+from cs.threads import bg
 from cs.x import X
 
 DISTINFO = {
@@ -130,10 +130,10 @@ class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
 
-        L = Later(4)    # a 4 thread Later
-        ...
-        with L.ready( ... optional Later.submit() args ... ):
-          ... do stuff when L queues us ...
+          L = Later(4)    # a 4 thread Later
+          ...
+          with L.ready( ... optional Later.submit() args ... ):
+            ... do stuff when L queues us ...
 
       This permits easy inline scheduled code.
   '''
@@ -189,7 +189,7 @@ class _Late_context_manager(object):
       raise lf_exc_info[1]
     return True
 
-class LateFunction(_PendingFunction):
+class LateFunction(Result):
   ''' State information about a pending function.
       A LateFunction is callable, so a synchronous call can be done like this:
 
@@ -223,53 +223,38 @@ class LateFunction(_PendingFunction):
       TODO: .cancel(), timeout for wait().
   '''
 
-  def __init__(self, later, func, name=None, retry_delay=None):
+  def __init__(self, func, name=None, retry_delay=None):
     ''' Initialise a LateFunction.
-        `later` is the controlling Later instance.
-        `func` is the callable for later execution.
-        `name`, if supplied, specifies an identifying name for the LateFunction.
-        `retry_local`: time delay before retry of this function on RetryError.
-            Default from `later.retry_delay`.
+
+        Parameters:
+        * `func` is the callable for later execution.
+        * `name`, if supplied, specifies an identifying name for the LateFunction.
+        * `retry_local`: time delay before retry of this function on RetryError.
+          Default from `later.retry_delay`.
     '''
-    _PendingFunction.__init__(self, func)
+    Result.__init__(self)
+    self.func = func
     if name is None:
-      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+      name = "LF-%d[%s]" % ( seq(), funcname(func) )
     if retry_delay is None:
-      retry_delay = later.retry_delay
+      retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
     self.retry_delay = retry_delay
-    self.later = later
-    later._busy.inc(name)
-    ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
-    ##for sn, s in ('running', L.running), ('pending', L.pending):
-    ##  D("    %s=%r", sn, s)
 
   def __str__(self):
-    return "<LateFunction %s>" % (self.name,)
-
-  def _complete(self, result, exc_info):
-    ''' Record the completion result of this LateFunction and update the parent Later.
-    '''
-    _PendingFunction._complete(self, result, exc_info)
-    self.later._completed(self, result, exc_info)
-    self.later._busy.dec(self.name)
+    return "LateFunction[%s]" % (self.name,)
 
   def _resubmit(self):
     ''' Resubmit this function for later execution.
     '''
+    # TODO: put the retry logic in Later notify func, resubmit with delay from there
     self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    L = self.later
-    L.debug("DISPATCH %s", self)
-    with self._lock:
-      if not self.pending:
-        raise RuntimeError("should be pending, but state = %s" % (self.state,))
-      self.state = ResultState.running
-      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
+    return self.bg(self.func)
 
   @OBSOLETE
   def wait(self):
@@ -277,14 +262,11 @@ class LateFunction(_PendingFunction):
     '''
     return self.join()
 
-  def _worker_complete(self, work_result):
-    ''' Accept the result of the queued function as returned from the work queue.
-        If the function raised RetryError, requeue the function for later.
-        Otherwise record completion as normal.
+  def _complete(self, result, exc_info):
+    ''' Intercept RetryErrors in the completion.
         If the function raised one of NameError, AttributeError, RuntimeError
         (broadly: "programmer errors"), report the stack trace to aid debugging.
     '''
-    result, exc_info = work_result
     if exc_info:
       e = exc_info[1]
       if isinstance(e, RetryError):
@@ -293,12 +275,8 @@ class LateFunction(_PendingFunction):
         self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
-        warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
-        with Pfx('>>'):
-          for formatted in traceback.format_exception(*exc_info):
-            for line in formatted.rstrip().split('\n'):
-              warning(line)
-    self._complete(result, exc_info)
+        error("%s._worker_completed: %s", self.name, e, exc_info=exc_info)
+    Result._complete(self, result, exc_info)
 
 class _PipelineStage(PushQueue):
   ''' A _PipelineStage subclasses cs.queues.PushQueue and mediates
@@ -411,7 +389,8 @@ class _PipelineStagePipeline(_PipelineStage):
       outQ.close()
     self.copier = Thread(name="%s.copy_out" % (self,),
                          target=copy_out,
-                         args=(subpipeline.outQ, outQ)).start()
+                         args=(subpipeline.outQ, outQ))
+    self.copier.start()
 
   def put(self, item):
     self.subpipeline.put(item)
@@ -519,26 +498,32 @@ class Later(object):
       after a delay or after other pending functions. These methods
       return LateFunctions, a subclass of cs.result.Result.
 
-      A Later instance' closes method closes the Later for further
+      A Later instance' close method closes the Later for further
       submission.
       Shutdown does not imply that all submitted functions have
       completed or even been dispatched.
       Callers may wait for completion and optionally cancel functions.
+
+      TODO: __enter__ returns a SubLater, __exit__ closes the SubLater.
+
+      TODO: drop global default Later.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
     ''' Initialise the Later instance.
-        `capacity`: resource contraint on this Later; if an int, it is used
+
+        Parameters:
+        * `capacity`: resource contraint on this Later; if an int, it is used
           to size a Semaphore to constrain the number of dispatched functions
           which may be in play at a time; if not an int it is presumed to be a
           suitable Semaphore-like object, perhaps shared with other subsystems.
-        `name`: optional identifying name for this instance.
-        `inboundCapacity`: if >0, used as a limit on the number of
+        * `name`: optional identifying name for this instance.
+        * `inboundCapacity`: if >0, used as a limit on the number of
           undispatched functions that may be queued up; the default is 0 (no
           limit).  Calls to submit functions when the inbound limit is reached
           block until some functions are dispatched.
-        `retry_delay`: time delay for requeued functions.
-          Default: DEFAULT_RETRY_DELAY.
+        * `retry_delay`: time delay for requeued functions.
+          Default: `DEFAULT_RETRY_DELAY`.
     '''
     if name is None:
       name = "Later-%d" % (seq(),)
@@ -549,8 +534,6 @@ class Later(object):
     debug(
         "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)",
         capacity, inboundCapacity, name)
-    if isinstance(capacity, int):
-      capacity = AdjustableSemaphore(capacity)
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
     self.capacity = capacity
@@ -558,25 +541,16 @@ class Later(object):
     self.retry_delay = retry_delay
     self.name = name
     self._lock = Lock()
-    self.outstanding = set()    # uncompleted LateFunctions
+    self.outstanding = set()    # dispatched but uncompleted LateFunctions
     self.delayed = set()        # unqueued, delayed until specific time
-    self.pending = set()        # undispatched LateFunctions
+    self.pending = []           # undispatched LateFunctions, a heap
     self.running = set()        # running LateFunctions
     # counter tracking jobs queued or active
-    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,), lock=self._lock)
     self._state = ""
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._pendingq = IterablePriorityQueue(self.inboundCapacity, name="%s._pendingq" % (self.name,))
-    self._workers = WorkerThreadPool(name=self.name + ":WorkerThreadPool").open()
-    self._dispatchThread = Thread(
-        name=self.name + '._dispatcher',
-        target=self._dispatcher
-    )
-    self._dispatchThread.daemon = True
-    self._dispatchThread.start()
     self.closed = False
     self._finished = Event()
 
@@ -589,25 +563,53 @@ class Later(object):
           _finished Event
     '''
     ##with Pfx("%s.shutdown()", self):
-    with PrePfx("LATER.SHUTDOWN [%s]", self):
+    with PrePfx("%s SHUTDOWN [%s]", type(self).__name__, self):
       if not self.closed:
         self.close()
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._workers.close()
       # queue actions to detect activity completion
       def finish_up():
-        self._dispatchThread.join()         # wait for all functions to be dispatched
-        self._workers.join()                # wait for all worker Threads to complete
         self._finished.set()
       bg(finish_up)
 
-  def close(self, *a, **kw):
+  def close(self):
     ''' Close the Later, preventing further task submission.
     '''
     self.closed = True
-    self._pendingq.close()
+
+  def _try_dispatch(self):
+    ''' Try to dispatch the next LateFunction.
+
+        Does nothing if insufficient capacity or no pending tasks.
+    '''
+    with self._lock:
+      if len(self.running) < self.capacity:
+        try:
+          pri_entry = heappop(self.pending)
+        except IndexError:
+          pass
+        else:
+          LF = pri_entry[-1]
+          self.running.add(LF)
+          # NB: set up notify before dispatch so that it cannot
+          # fire before we release the lock (which would happen if
+          # the LF completes really fast - notify fires immediately
+          # in the current thread if the function is already complete.
+          LF.notify(self._complete_LF)
+          debug("LATER: dispatch %s", LF)
+          LF._dispatch()
+      elif self.pending:
+        debug("LATER: at capacity, nothing dispatched: %s", self)
+
+  def _complete_LF(self, LF):
+    ''' Process a completed LateFunction: remove from .running,
+        try to dispatch another function.
+    '''
+    with self._lock:
+      self.running.remove(LF)
+    self._try_dispatch()
 
   @property
   def finished(self):
@@ -626,25 +628,24 @@ class Later(object):
 
   def __repr__(self):
     return (
-        '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r closed=%s>'
+        '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>'
         % (
             self.__class__.__name__, self.name,
             self.capacity,
             len(self.running), ','.join( repr(LF.name) for LF in self.running ),
             len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
             len(self.delayed),
-            int(self._busy), self._busy,
             self.closed
         )
     )
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s>"
+        "<%s[%s] pending=%d running=%d delayed=%d>"
         % (
             self.name, self.capacity,
-            len(self.pending), len(self.running), len(self.delayed),
-            int(self._busy), self._busy)
+            len(self.pending), len(self.running), len(self.delayed)
+        )
     )
 
   def state(self, new_state, *a):
@@ -668,28 +669,6 @@ class Later(object):
     '''
     return self.defer(func, *a, **kw)()
 
-  def _track(self, tag, LF, fromset, toset):
-    def SN(s):
-      if s is None:
-        return "None"
-      if s is self.delayed:
-        return "delayed"
-      if s is self.pending:
-        return "pending"
-      if s is self.running:
-        return "running"
-      return repr(s)
-    debug("_track %s => %s: %s %s", SN(fromset), SN(toset), tag, LF.name)
-    if not LF:
-      raise ValueError("LF false! (%r)", LF)
-    if fromset is None and toset is None:
-      raise ValueError("fromset and toset are None")
-    with self._lock:
-      if fromset is not None:
-        fromset.remove(LF)
-      if toset is not None:
-        toset.add(LF)
-
   def log_status(self):
     ''' Log the current delayed, pending and running state.
     '''
@@ -699,12 +678,6 @@ class Later(object):
       self.debug("STATUS: pending: %s", LF)
     for LF in list(self.running):
       self.debug("STATUS: running: %s", LF)
-
-  def _completed(self, LF, result, exc_info):
-    self.debug("COMPLETE %s: result = %r, exc_info = %r", LF, result, exc_info)
-    self.log_status()
-    self.capacity.release()
-    self._track("_completed(%s)" % (LF.name,), LF, self.running, None)
 
   def __enter__(self):
     global default
@@ -720,16 +693,6 @@ class Later(object):
     debug("%s: __exit__: exc_type=%s", self, exc_type)
     default.pop()
     return False
-
-  @contextmanager
-  def more_capacity(self, increment=1):
-    ''' Context manager to temporarily increase the capacity of this Later.
-    '''
-    self.capacity.adjust_delta(increment)
-    try:
-      yield
-    finally:
-      self.capacity.adjust_delta(-increment)
 
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
@@ -773,25 +736,6 @@ class Later(object):
       kw.setdefault('extra', {}).update(later_name=str(self))
       self.logger.debug(*a, **kw)
 
-  def _dispatcher(self):
-    ''' Read LateFunctions from the inbound queue as capacity is available
-        and dispatch them. The LateFunction's ._dispatch() method will
-        release the capacity on completion.
-    '''
-    while True:
-      # will be released by the LateFunction
-      self.capacity.acquire()
-      try:
-        pri_entry = self._pendingq.next()
-      except StopIteration:
-        # end of queue, not calling the handler
-        self.capacity.release()
-        break
-      LF = pri_entry[-1]
-      self._track("_dispatcher: dispatch", LF, self.pending, self.running)
-      self.debug("dispatched %s", LF)
-      LF._dispatch()
-
   @property
   def submittable(self):
     ''' May new tasks be submitted?
@@ -819,8 +763,7 @@ class Later(object):
       func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = LateFunction(self, func, name)
-    self._track("bg: dispatch", LF, None, self.running)
+    LF = LateFunction(func, name=name)
     LF._dispatch()
     return LF
 
@@ -870,7 +813,7 @@ class Later(object):
     if pfx is not None:
       func = pfx.partial(func)
     if LF is None:
-      LF = LateFunction(self, func, name=name, retry_delay=retry_delay)
+      LF = LateFunction(func, name=name, retry_delay=retry_delay)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -881,40 +824,43 @@ class Later(object):
     if when is None or when <= now:
       # queue the request now
       self.debug("queuing %s", LF)
-      self._track("_submit: _pendingq.put", LF, None, self.pending)
-      self._pendingq.put( pri_entry )
+      heappush(self.pending, pri_entry)
+      self._try_dispatch()
     else:
       # queue the request at a later time
       def queueFunc():
         LF = pri_entry[-1]
         self.debug("queuing %s after delay", LF)
-        self._track("_submit: _pendingq.put after delay", LF, self.delayed, self.running)
-        self._pendingq.put( pri_entry )
+        heappush(self.pending, pri_entry)
+        self._try_dispatch()
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>" % (self.name,))
       self.debug("delay %s until %s", LF, when)
-      self._track("_submit: delay", LF, None, self.delayed)
       self._timerQ.add(when, queueFunc)
     # record the function as outstanding and attach a notification
     # to remove it from the outstanding set on completion
     self.outstanding.add(LF)
-    LF.notify(lambda LF: self.outstanding.remove(LF))
+    LF.notify(self.outstanding.remove)
     return LF
 
   def complete(self, outstanding=None, until_idle=False):
     ''' Generator which waits for outstanding functions to complete and yields them.
 
         Parameters:
-        * `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
-        * `until_idle`: if outstanding is not None, continue until self.outstanding is empty
+        * `outstanding`: if not None, an iterable of LateFunctions;
+          default `self.outstanding`.
+        * `until_idle`: if true,
+          continue until `self.outstanding` is empty.
+          This requires the `outstanding` parameter to the `None`.
     '''
     if outstanding is not None:
       if until_idle:
-        raise ValueError("outstanding is not None and until_idle is not false")
+        raise ValueError("outstanding is not None and until_idle is true")
       for LF in report(outstanding):
         yield LF
       return
+    # outstanding is None: loop until self.outstanding is empty
     while True:
       outstanding = list(self.outstanding)
       if not outstanding:
@@ -955,10 +901,9 @@ class Later(object):
     while not callable(func):
       if isinstance(func, str):
         params['name'] = func
-        func = a.pop(0)
       else:
         params.update(func)
-        func = a.pop(0)
+      func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
     LF = self._submit(func, **params)
@@ -1024,11 +969,7 @@ class Later(object):
       '''
       R.call(func, *a, **kw)
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
-    def submit_func():
-      self._defer(put_func)
-      self._busy.dec("Later._after")
-    self._busy.inc("Later._after")
-    return after(LFs, None, submit_func)
+    return after(LFs, None, lambda: self._defer(put_func))
 
   def defer_iterable(self, I, outQ, test_ready=None):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
@@ -1167,8 +1108,91 @@ class Later(object):
     '''
     return LatePool(L=self, *a, **kw)
 
+class SubLater(object):
+  ''' A class for managing a group of deferred tasks using an existing `Later`.
+  '''
+
+  def __init__(self, L):
+    ''' Initialise the `SubLater` with its parent `Later`.
+
+        TODO: accept discard=False param to suppress the queue and
+        associated checks.
+    '''
+    self._later = L
+    self._lock = Lock()
+    self._deferred = 0
+    self._queued = 0
+    self._queue = IterableQueue()
+    self.closed = False
+
+  def __str__(self):
+    return "%s(%s%s,deferred=%d,completed=%d)" % (
+        type(self), self._later,
+        "[CLOSED]" if self.closed else "",
+        self._deferred, self._queued,
+    )
+
+  def __iter__(self):
+    ''' Iteration over the `SubLater`
+        iterates over the queue of completed `LateFUnction`s.
+    '''
+    return iter(self._queue)
+
+  def close(self):
+    ''' Close the SubLater.
+
+        This prevents further deferrals.
+    '''
+    with self._lock:
+      closed = self.closed
+      if closed:
+        self._later.warning("repeated close of %s", self)
+      else:
+        self.closed = True
+        if self._queued >= self._deferred:
+          self._queue.close()
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function, return its LateFunction.
+
+        The resulting LateFunction will queue itself for collection
+        on completion.
+    '''
+    with self._lock:
+      LF = self._later.defer(func, *a, **kw)
+      self._deferred += 1
+      def on_complete(R):
+        with self._lock:
+          self._queue.put(R)
+          self._queued += 1
+          if self.closed and self._queued >= self._deferred:
+            self._queue.close()
+    LF.notify(on_complete)
+    return LF
+
+  def reaper(self, handler=None):
+    ''' Dispatch a Thread to collect completed `LateFunction`s.
+        Return the Thread.
+
+        `handler`: optional callable to be passed each `LateFunction`
+        as it completes.
+    '''
+    @logexc
+    def reap(Q):
+      for LF in Q:
+        if handler:
+          try:
+            handler(LF)
+          except Exception as e:
+            exception("%s: reap %s: %s", self, LF, e)
+    T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
+    T.start()
+    return T
+
 class LatePool(object):
-  ''' A context manager after the style of subprocess.Pool but with deferred completion.
+  ''' A context manager after the style of subprocess.Pool
+      but with deferred completion.
+
       Example usage:
 
           L = Later(4)    # a 4 thread Later
@@ -1182,7 +1206,7 @@ class LatePool(object):
           for LF in LP:
             result = LF()
             print(result)
-    '''
+  '''
 
   def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
     ''' Initialise the LatePool.
@@ -1253,26 +1277,6 @@ class LatePool(object):
     '''
     for _ in self:
       pass
-
-def capacity(func):
-  ''' Decorator for functions which wish to manage concurrent requests.
-
-      The caller must provide a `capacity` keyword arguments which
-      is either a Later instance or an int; if an int a Later with
-      that capacity will be made.
-
-      The Later will be passed into the inner function as the
-      `capacity` keyword argument.
-  '''
-  def with_capacity(*a, **kw):
-    ''' Wrapper function provide a Later for resource control.
-    '''
-    L = kw.pop('capacity')
-    if isinstance(L, int):
-      L = Later(L)
-    kw['capacity'] = L
-    return func(*a, **kw)
-  return with_capacity
 
 if __name__ == '__main__':
   import cs.later_tests

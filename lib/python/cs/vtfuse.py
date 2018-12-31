@@ -19,14 +19,39 @@ import stat
 import subprocess
 import sys
 from cs.excutils import logexc
-from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT
+from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
+from cs.vt.__main__ import main as vt_main
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from cs.vt.fs import FileHandle, FileSystem
 from cs.vt.store import MissingHashcodeError
 from cs.x import X
 import llfuse
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        ##"Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+        "Topic :: System :: Filesystems",
+    ],
+    'install_requires': [
+        'cs.excutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.vt',
+        'cs.x',
+        'llfuse',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'mount.vtfs = cs.vtfuse:main',
+        ],
+    },
+}
 
 FuseOSError = llfuse.FUSEError
 
@@ -40,6 +65,11 @@ XATTR_REPLACE  = 0x0004
 
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
+
+def main(argv=None):
+  ''' Run the "mount" subcommand of the vt(1) command.
+  '''
+  return vt_main(argv, subcmd='mount')
 
 def mount(
     mnt, E,
@@ -102,47 +132,61 @@ def handler(method):
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
-    arg_desc = [ repr(arg) for arg in a ]
+    syscall = method.__name__
+    if syscall == 'write':
+      fh, offset, bs = a
+      arg_desc = [ str(a[0]), str(a[1]), "%d bytes:%r..." % (len(bs), bytes(bs[:16])) ]
+    else:
+      arg_desc = [ repr(arg) for arg in a ]
     arg_desc.extend(
         "%s=%r" % (kw_name, kw_value)
         for kw_name, kw_value in kw.items()
     )
+    arg_desc = ','.join(arg_desc)
     with Pfx(
         "%s.%s(%s)",
-        type(self).__name__, method.__name__, ','.join(arg_desc)
+        type(self).__name__, syscall, arg_desc
     ):
-      trace = method.__name__ not in ('getxattr', 'statfs',)
+      trace = syscall in (
+          'getxattr',
+          'setxattr',
+          ##'statfs',
+      )
       if trace:
-        X("CALL %s(*%r,**%r)", method.__name__, a, kw)
+        X("CALL %s(%s)", syscall, arg_desc)
       fs = self._vtfs
       try:
         with defaults.stack('fs', fs):
           with fs.S:
-            result = method(self, *a, **kw)
+            with LogTime("SLOW SYSCALL", threshold=5.0):
+              result = method(self, *a, **kw)
             if trace:
-              XP(" result => %r", result)
+              if isinstance(result, bytes):
+                X("CALL %s result => %d bytes, %r...", syscall, len(result), result[:16])
+              else:
+                X("CALL %s result => %s", syscall, result)
             return result
       except FuseOSError as e:
-        X("CALL %s(*%r,**%r) => FuseOSError %s", method.__name__, a, kw, e)
+        warning("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
         raise
       except OSError as e:
-        X("CALL %s(*%r,**%r) => OSError %s => FuseOSError", method.__name__, a, kw, e)
+        warning("CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
       except Exception as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", syscall, a, kw, e)
         exception(
             "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
-            method.__name__, a, kw, type(e), e)
+            syscall, a, kw, type(e), e)
         raise FuseOSError(errno.EINVAL) from e
       except BaseException as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s", method.__name__, a, kw, e)
+        X("CALL %s(*%r,**%r) => EXCEPTION %s", syscall, a, kw, e)
         error("UNCAUGHT EXCEPTION: %s", e)
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
       except:
-        X("CALL %s(*%r,**%r) => EXCEPTION %r", method.__name__, a, kw, sys.exc_info())
+        X("CALL %s(*%r,**%r) => EXCEPTION %r", syscall, a, kw, sys.exc_info())
   return handle
 
 class DirHandle:
@@ -214,11 +258,19 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)" % (attr, a, kw))
     return attrfunc
 
+##def __getattribute__(self, attr):
+##  X("LOOKUP %r ...", attr)
+##  try:
+##    return object.__getattribute__(self, attr)
+##  except AttributeError:
+##    return self.__getattr__(attr)
+
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self._vtfs)
 
   def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
+        Return a Thread managing the mount.
     '''
     fs = self._vtfs
     S = fs.S
@@ -230,6 +282,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       defaults.push_Ss(S)
       opts = set(self._vt_llf_opts)
       opts.add("fsname=" + fsname)
+      ##opts.add('noappledouble')
       llfuse.init(self, mnt, opts)
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
@@ -240,7 +293,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         '''
         with defaults.stack('fs', fs):
           with S:
-            llfuse.main()
+            llfuse.main(workers=32)
             llfuse.close()
         S.close()
         defaults.pop_Ss()
@@ -349,9 +402,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.destroy
     '''
     # TODO: call self.forget with all kreffed inums?
-    X("%s.destroy...", self)
     self._vtfs.close()
-    X("%s.destroy COMPLETE", self)
 
   @handler
   def flush(self, fh):
@@ -515,7 +566,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     name = self._vt_str(name_b)
     fs = self._vtfs
     I = fs[parent_inode]
-    X("lookup: I=%s", I)
     # TODO: test for permission to search parent_inode
     P = I.E
     EA = None
@@ -643,7 +693,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.read
     '''
-    ##X("FUSE.read(fhndx=%d,off=%d,size=%d)...", fhndx, off, size)
     FH = self._vtfs._fh(fhndx)
     chunks = []
     while size > 0:
@@ -863,7 +912,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
         FH = FileHandle(self, E, False, True, False)
         FH.truncate(attr.st_size)
         FH.close()
-      return self._vt_EntryAttributes(E)
+      EA = self._vt_EntryAttributes(E)
+    return EA
 
   @handler
   def setxattr(self, inode, xattr_name, value, ctx):
@@ -970,5 +1020,4 @@ class StoreFS_LLFUSE(llfuse.Operations):
 StoreFS = StoreFS_LLFUSE
 
 if __name__ == '__main__':
-  from .vtfuse_tests import selftest
-  selftest(sys.argv)
+  sys.exit(main(sys.argv))

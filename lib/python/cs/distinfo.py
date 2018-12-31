@@ -18,7 +18,13 @@ from inspect import (
 )
 import os
 import os.path
-from os.path import basename, exists as pathexists, isdir as pathisdir, join as joinpath
+from os.path import (
+    basename,
+    exists as pathexists,
+    isdir as pathisdir,
+    join as joinpath,
+    splitext
+)
 from pprint import pprint
 from subprocess import Popen, PIPE
 import shutil
@@ -182,10 +188,10 @@ def needdir(dirpath):
     warning("makedirs(%r)", dirpath)
     os.makedirs(dirpath)
 
-def runcmd(argv):
+def runcmd(argv, **kw):
   ''' Run command.
   '''
-  P = Popen(argv)
+  P = Popen(argv, **kw)
   xit = P.wait()
   if xit != 0:
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
@@ -422,8 +428,23 @@ class PyPI_Package(O):
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with open(manifest_path, "w") as mfp:
        # TODO: support extra files
-      self.copyin(pkg_dir)
-
+      subpaths = self.copyin(pkg_dir)
+      for subpath in subpaths:
+        with Pfx(subpath):
+          prefix, ext = splitext(subpath)
+          if ext == '.md':
+            prefix2, ext2 = splitext(prefix)
+            if len(ext2) == 2 and ext2[-1].isdigit():
+              # md2man manual entry
+              mdsrc = joinpath(pkg_dir, subpath)
+              mddst = joinpath(pkg_dir, prefix)
+              if pathexists(mddst):
+                error("not converting because %r already exists", mddst)
+              else:
+                info("create %s", mddst)
+                with Pfx(mddst):
+                  with open(mddst, 'w') as mddstf:
+                    runcmd(['md2man-roff', mdsrc], stdout=mddstf)
       # create README.rst
       with open('README.rst', 'w') as fp:
         print(distinfo['description'], file=fp)
@@ -511,16 +532,22 @@ class PyPI_Package(O):
         for filename in filenames:
           if filename.startswith('.'):
             continue
-          if filename.endswith('.pyc'):
+          prefix, ext = splitext(filename)
+          if ext == '.pyc':
             continue
-          if filename.endswith('.py'):
+          if ext == '.py':
+            yield joinpath(dirpath[len(libprefix):], filename)
+            continue
+          if ext == '.md':
             yield joinpath(dirpath[len(libprefix):], filename)
             continue
           warning("skipping %s", joinpath(dirpath, filename))
 
   def copyin(self, dstdir):
     ''' Write the contents of the tagged release into `dstdir`.
+        Return the subpaths of dstdir created.
     '''
+    included = []
     hgargv = ['set-x', 'hg',
               'archive',
               '-r', '"%s"' % self.hg_tag,
@@ -533,14 +560,19 @@ class PyPI_Package(O):
       if first:
         # collect entire package contents
         for subpath in self.package_paths(superpackage_name, self.libdir):
-          hgargv.extend(['-I', joinpath(self.libdir, subpath)])
+          incpath = joinpath(self.libdir, subpath)
+          hgargv.extend(['-I', incpath])
+          included.append(incpath)
       else:
         # just collecting required __init__.py files
-        hgargv.extend(['-I', joinpath(base, '__init__.py')])
+        incpath = joinpath(base, '__init__.py')
+        hgargv.extend(['-I', incpath])
+        included.append(incpath)
       package_parts.pop()
       first = False
     hgargv.append(dstdir)
     runcmd(hgargv)
+    return included
 
 class PyPI_PackageCheckout(O):
   ''' Facilities available with a checkout of a package.

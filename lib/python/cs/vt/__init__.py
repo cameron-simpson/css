@@ -4,25 +4,120 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    Man page:
-      http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
+    *NOTE*: pre-Alpha; alpha release following soon once the packaging
+    is complete.
 
-    See also:
-        The Plan 9 Venti system:
-          http://library.pantek.com/general/plan9.documents/venti/venti.html
-          http://en.wikipedia.org/wiki/Venti
+    See also the Plan 9 Venti system:
+    (http://library.pantek.com/general/plan9.documents/venti/venti.html,
+    http://en.wikipedia.org/wiki/Venti).
 '''
 
+from collections import namedtuple
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
+from threading import (
+    Lock as threading_Lock,
+    RLock as threading_RLock,
+    current_thread,
+)
 from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
-from cs.py.stack import stack_dump
+from cs.py.stack import caller, stack_dump
 from cs.seq import isordered
+import cs.resources
 from cs.resources import RunState
+from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        ##"Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.buffer',
+        'cs.app.flag',
+        'cs.binary',
+        'cs.cache',
+        'cs.debug',
+        'cs.deco',
+        'cs.env',
+        'cs.excutils',
+        'cs.fileutils',
+        'cs.inttypes',
+        'cs.later',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mappings',
+        'cs.packetstream',
+        'cs.pfx',
+        'cs.progress',
+        'cs.py.func',
+        'cs.py.stack',
+        'cs.queues',
+        'cs.range',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.serialise',
+        'cs.socketutils',
+        'cs.threads',
+        'cs.tty',
+        'cs.units',
+        'cs.x',
+        'lmdb',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'vt = cs.vt.__main__:main',
+        ],
+    },
+}
+
+DEFAULT_CONFIG_PATH = '~/.vtrc'
+
+DEFAULT_BASEDIR = '~/.vt_stores'
+
+DEFAULT_CONFIG = {
+    'GLOBAL': {
+      'basedir': DEFAULT_BASEDIR,
+      'blockmapdir': '[default]/blockmaps',
+    },
+    'default': {
+      'type': 'datadir',
+      'path': 'trove',
+    },
+    'cache': {
+      'type': 'memory',
+      'max_data': '16 GiB',
+    },
+    'server': {
+      'type': 'datadir',
+      'path': 'trove',
+      'address': '~/.vt.sock',
+    },
+}
+
+# intercept Lock and RLock
+if False:
+  def RLock():
+    ''' Obtain a recursive DebuggingLock.
+    '''
+    return DebuggingLock(recursive=True)
+  def Lock():
+    ''' Obtain a nonrecursive DebuggingLock.
+    '''
+    return DebuggingLock()
+  # monkey patch MultiOpenMixin
+  cs.resources._mom_lockclass = RLock
+else:
+  Lock = threading_Lock
+  RLock = threading_RLock
 
 # Default OS level file high water mark.
 # This is used for rollover levels for DataDir files and cache files.
@@ -45,6 +140,7 @@ class _Defaults(threading.local, StackableValues):
     StackableValues.__init__(self)
     self.push('runstate', RunState())
     self.push('fs', None)
+    self.push('block_cache', None)
 
   def _fallback(self, key):
     ''' Fallback function for empty stack.
@@ -136,3 +232,76 @@ class _TestAdditionsMixin:
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+
+LockContext = namedtuple("LockContext", "caller thread")
+
+class DebuggingLock(object):
+  ''' A wrapper for a threading Lock or RLock
+      to notice contention and report contending uses.
+  '''
+
+  def __init__(self, recursive=False):
+    self.recursive = recursive
+    self.trace_acquire = False
+    self._lock = threading_RLock() if recursive else threading_Lock()
+    self._held = None
+
+  def __repr__(self):
+    return "%s(lock=%r,held=%s)" % (type(self).__name__, self._lock, self._held)
+
+  def acquire(self, timeout=-1, _caller=None):
+    ''' Acquire the lock and note the caller who takes it.
+    '''
+    if _caller is None:
+      _caller = caller()
+    lock = self._lock
+    hold = LockContext(_caller, current_thread())
+    if timeout != -1:
+      warning(
+          "%s:%d: lock %s: timeout=%s",
+          hold.caller.filename, hold.caller.lineno,
+          lock, timeout)
+    contended = False
+    if True:
+      if lock.acquire(0):
+        lock.release()
+      else:
+        contended = True
+        held = self._held
+        warning(
+            "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
+            hold.caller.filename, hold.caller.lineno,
+            lock,
+            held.thread, held.caller.filename, held.caller.lineno)
+    acquired = lock.acquire(timeout=timeout)
+    if contended:
+      warning(
+          "%s:%d: lock %s: %s",
+          hold.caller.filename, hold.caller.lineno,
+          lock,
+          "acquired" if acquired else "timed out")
+    self._held = hold
+    if acquired and self.trace_acquire:
+      X("ACQUIRED %r", self)
+      stack_dump()
+    return acquired
+
+  def release(self):
+    ''' Release the lock and forget who took it.
+    '''
+    self._held = None
+    self._lock.release()
+
+  def __enter__(self):
+    ##X("%s.ENTER...", type(self).__name__)
+    self.acquire(_caller=caller())
+    ##X("%s.ENTER: acquired, returning self", type(self).__name__)
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.release()
+    return False
+
+  def _is_owned(self):
+    lock = self._lock
+    return lock._is_owned()

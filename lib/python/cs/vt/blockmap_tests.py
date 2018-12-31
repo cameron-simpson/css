@@ -10,7 +10,7 @@
 import sys
 from random import randint
 import unittest
-from cs.randutils import randblock
+from .randutils import randblock
 import cs.x
 from cs.x import X
 from .block import IndirectBlock, HashCodeBlock, _IndirectBlock

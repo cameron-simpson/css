@@ -4,6 +4,7 @@
 '''
 
 from binascii import hexlify
+from cs.fileutils import shortpath
 from cs.tty import ttysize
 from cs.x import X
 
@@ -22,7 +23,7 @@ def dump_Block(block, indent=''):
 def dump_Dirent(E, indent='', recurse=False, not_dir=False):
   ''' Dump a Dirent.
   '''
-  X("%s%s", indent, E)
+  X("%s%r", indent, E)
   if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):
@@ -56,3 +57,28 @@ def dump_chunk(data, leadin, max_width=None, one_line=False):
       break
     leadin = leadin2
     doff = doff2
+
+def dump_Store(S, indent=''):
+  ''' Dump a description of a Store.
+  '''
+  from .cache import FileCacheStore
+  from .store import MappingStore, ProxyStore, DataDirStore
+  X("%s%s:%s", indent, type(S).__name__, S.name)
+  indent += '  '
+  if isinstance(S, DataDirStore):
+    X("%sdir = %s", indent, shortpath(S._datadir.statedirpath))
+  elif isinstance(S, FileCacheStore):
+    X("%sdatadir = %s", indent, shortpath(S.cache.dirpath))
+  elif isinstance(S, ProxyStore):
+    for attr in 'save', 'read', 'save2', 'read2', 'copy2':
+      backends = getattr(S, attr)
+      if backends:
+        backends = sorted(backends, key=lambda S: S.name)
+        X("%s%s = %s", indent, attr, ','.join(backend.name for backend in backends))
+        for backend in backends:
+          dump_Store(backend, indent + '  ')
+  elif isinstance(S, MappingStore):
+    mapping = S.mapping
+    X("%smapping = %s", indent, type(mapping))
+  else:
+    X("%sUNRECOGNISED Store type", indent)

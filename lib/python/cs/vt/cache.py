@@ -11,15 +11,15 @@ from __future__ import with_statement
 from collections import namedtuple
 import sys
 from tempfile import TemporaryFile
-from threading import Lock, RLock, Thread
-from cs.fileutils import RWFileBlockCache
-from cs.logutils import error
+from threading import Thread
+from cs.fileutils import RWFileBlockCache, datafrom_fd
+from cs.logutils import error, warning
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
-from . import MAX_FILE_SIZE
-from .block import IndirectBlock
+from . import defaults, MAX_FILE_SIZE, Lock, RLock
+from .hash import DEFAULT_HASHCLASS
 from .store import BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
@@ -27,12 +27,11 @@ DEFAULT_MAX_CACHEFILES = 3
 
 class FileCacheStore(BasicStoreSync):
   ''' A Store wrapping another Store that provides fast access to
-      previously fetched data and fast storage of new data with
-      asynchronous updates to the backing Store.
+      previously fetched data and fast storage of new data.
+      asynchronous updates to the backing Store (which may be None).
 
       This class is a thin Store shaped shim over a FileDataMappingProxy,
-      which does the heavy lifting of storing data and ensuring all
-      new data is passed to the backend.
+      which does the heavy lifting of storing data.
   '''
 
   def __init__(
@@ -40,21 +39,35 @@ class FileCacheStore(BasicStoreSync):
       name, backend, dirpath,
       max_cachefile_size=None, max_cachefiles=None,
       runstate=None,
+      hashclass=None,
       **kw
   ):
     ''' Initialise the FileCacheStore.
-        `name`: the Store name
-        `backend`: the backing Store; this may be None, and the
+
+        Parameters:
+        * `name`: the Store name
+        * `backend`: the backing Store; this may be None, and the
           property .backend may be switched to another Store at any
           time
-        `dirpath`: directory to hold the cache files
+        * `dirpath`: directory to hold the cache files
+        * `hashclass`: hash class for data chunks;
+          if the `backend`
     '''
-    if backend is None:
-      raise ValueError("backend=None")
-    backend.open()
+    if backend:
+      backend.open()
+      if hashclass is None:
+        hashclass = backend.hashclass
+      elif hashclass is not backend.hashclass:
+        raise ValueError(
+            "supplied hashclass %s does not match backend hashclass %s from %s"
+            % (hashclass, backend.hashclass, backend))
+    else:
+      hashclass = DEFAULT_HASHCLASS
+      warning("%s:%r: using default hashclass: %s", type(self), name, hashclass)
     super().__init__(name, runstate=runstate, **kw)
     self._attrs.update(backend=backend)
     self._backend = backend
+    self.hashclass = hashclass
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
@@ -112,8 +125,7 @@ class FileCacheStore(BasicStoreSync):
     return h in self.cache
 
   def add(self, data):
-    backend = self.backend
-    h = backend.hash(data)
+    h = self.hashclass.from_chunk(data)
     self.cache[h] = data
     return h
 
@@ -378,12 +390,9 @@ class MemoryCacheMapping:
         self._ticker += 1
         max_data = self.max_data
         if used_data > max_data and len(mapping) > 1:
-          X("overflow: _skip_flush=%d", self._skip_flush)
           if self._skip_flush > 0:
-            X("overflow: defer hashcode discard")
             self._skip_flush -= 1
           else:
-            X("overflow: discard hashcodes with lowest tick value...")
             _tick = self._tick
             for _, old_hashcode in sorted( (tick, h) for h, tick in _tick.items() ):
               old_data = mapping.pop(old_hashcode)
@@ -417,6 +426,26 @@ class BlockMapping:
     assert offset + size <= self.filled
     return self.tempf.pread(size, self.offset + offset)
 
+  def datafrom(self, offset=0, maxlength=None):
+    ''' Yield data from the underlying temp file.
+
+        Parameters:
+        * `offset`: start of data, default `0`
+        * `maxlength`: maximum amount of data to yield,
+          default `self.filled - offset`
+    '''
+    assert offset >= 0
+    if maxlength is None:
+      maxlength = self.filled - offset
+    else:
+      maxlength = min(maxlength, self.filled - offset)
+    if maxlength <= 0:
+      return
+    yield from datafrom_fd(
+        self.tempf.fileno(),
+        self.offset + offset,
+        maxlength=maxlength)
+
 class BlockTempfile:
   ''' Manage a temporary file which contains the contents of various Blocks.
   '''
@@ -424,7 +453,7 @@ class BlockTempfile:
   def __init__(self, cache, tmpdir, suffix):
     X("new BlockTemptfile...")
     self.cache = cache
-    self.tempfile = TemporaryFile(tmpdir=tmpdir, suffix=suffix)
+    self.tempfile = TemporaryFile(dir=tmpdir, suffix=suffix)
     self.hashcodes = {}
     self.size = 0
     self._lock = RLock()
@@ -482,25 +511,26 @@ class BlockTempfile:
       self.hashcodes[h] = bm
     T = Thread(
         name="%s._infill(%s)" % (type(self).__name__, block),
-        target=self._infill, args=(bm, offset, block, runstate))
+        target=self._infill, args=(defaults.S, bm, offset, block, runstate))
     T.daemon = True
     T.start()
     return bm
 
-  def _infill(self, bm, offset, block, runstate):
+  def _infill(self, S, bm, offset, block, runstate):
     ''' Load the Block data into the tempfile,
         updating the `BlockMapping.filled` attribute as we go.
     '''
-    needed = len(block)
-    for data in block.datafrom():
-      if runstate.cancelled:
-        break
-      assert len(data) <= needed
-      written = self._pwrite(data, offset)
-      assert written == len(data)
-      offset += written
-      needed -= written
-      bm.filled += written
+    with S:
+      needed = len(block)
+      for data in block.datafrom():
+        if runstate.cancelled:
+          break
+        assert len(data) <= needed
+        written = self._pwrite(data, offset)
+        assert written == len(data)
+        offset += written
+        needed -= written
+        bm.filled += written
     X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 class BlockCache:
@@ -526,7 +556,7 @@ class BlockCache:
     self.suffix = suffix
     self.max_files = max_files
     self.max_file_size = max_file_size
-    self.blockmaps = {}      # hashcode -> BlockMapping
+    self.blockmaps = {}     # hashcode -> BlockMapping
     self._tempfiles = []    # in play BlockTempfiles
     self._lock = Lock()
     self.runstate = RunState()
@@ -542,11 +572,14 @@ class BlockCache:
         tempf.close()
       self._tempfiles = []
 
+  def __getitem__(self, hashcode):
+    ''' Fetch BlockMapping associated with `hashcode`, raise KeyError if missing.
+    '''
+    return self.blockmaps[hashcode]
+
   def get_blockmap(self, block):
     ''' Add the specified Block to the cache, return the BlockMapping.
     '''
-    if not block.indirect:
-      block = IndirectBlock(block)
     blockmaps = self.blockmaps
     h = block.hashcode
     with self._lock:

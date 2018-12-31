@@ -28,8 +28,8 @@ from cs.x import X
 from . import defaults
 from .block import HashCodeBlock
 
-# the record format uses 4 byte integer offsets
-# to this is the maximum (and default) scale for the mmory maps
+# The record format uses 4 byte integer offsets
+# so this is the maximum (and default) scale for the memory maps.
 OFFSET_SCALE = 2 ** 32
 
 OFF_STRUCT = Struct('<L')
@@ -52,7 +52,8 @@ class MapEntry(_MapEntry):
     return self.leaf.data
 
 class MappedFD:
-  ''' Manage a memory map of the contents of a file representing a block's backing leaf content.
+  ''' Manage a memory map of the contents of a file
+      representing a block's backing leaf content.
 
       The file contains records (offset, hashcode) in offset order,
       being the starting offset of a leaf block relative to the
@@ -119,7 +120,7 @@ class MappedFD:
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
-      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset)
+      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
       entry = MapEntry(-1, None, None, None)
     return entry
 
@@ -250,12 +251,16 @@ class BlockMap(RunStateMixin):
       self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
       self._worker.start()
+    else:
+      self._worker = None
 
   def join(self):
     ''' Wait for the worker to complete.
     '''
     self.runstate.cancel()
-    self._worker.join()
+    worker = self._worker
+    if worker is not None:
+      self._worker.join()
 
   def __del__(self):
     ''' Release resources on object deletion.
@@ -292,7 +297,7 @@ class BlockMap(RunStateMixin):
       submap_path = None
       nleaves = 0
       while offset < blocklen and not runstate.cancelled:
-        for leaf, start, length in block.slices(offset):
+        for leaf, start, length in block.slices(offset, len(block)):
           if runstate.cancelled:
             break
           if start > 0:
@@ -398,8 +403,11 @@ class BlockMap(RunStateMixin):
       assert end <= len(leaf)
       yield leaf[start:end]
 
+  # TODO: accept start,end instead of start,span like other slices methods
   def slices(self, offset, span=None):
     ''' Generator yielding (leaf, start, end) from [offset:offset+span].
+
+        Parameters:
         `offset`: starting offset within `self.block`
         `span`: number of bytes to cover; if omitted or None, the
           span runs to the end of self.block

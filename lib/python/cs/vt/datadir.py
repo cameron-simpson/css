@@ -22,7 +22,6 @@ from os.path import (
 import sqlite3
 import stat
 import sys
-from threading import Lock, RLock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -46,8 +45,7 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.x import X
-from . import MAX_FILE_SIZE
+from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
 from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
@@ -143,7 +141,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       statedirpath, hashclass,
       *,
       indexclass=None,
-      create_statedir=None,
       flags=None, flag_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
@@ -157,7 +154,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
-        * `create_statedir`: os.mkdir the state directory if missing
         * `flags`: optional Flags object for control; if specified then
           `flag_prefix` is also required
         * `flag_prefix`: prefix for control flag names
@@ -186,19 +182,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     if indexclass is None:
       indexclass = choose_indexclass(self.indexbase)
     self.indexclass = indexclass
-    if create_statedir is None:
-      create_statedir = False
-    if not isdirpath(statedirpath):
-      if create_statedir:
-        with Pfx("mkdir(%r)", statedirpath):
-          os.mkdir(statedirpath)
-      else:
-        raise ValueError("missing statedirpath directory: %r" % (statedirpath,))
-    # create the data subdir if missing
-    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
-    if not isdirpath(datadirpath):
-      with Pfx("mkdir(%r)", datadirpath):
-        os.mkdir(datadirpath)
     self._filemap = None
     self._unindexed = None
     self.index = None
@@ -206,6 +189,21 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._indexQ = None
     self._index_Thread = None
     self._monitor_Thread = None
+
+  def init(self):
+    ''' Initialise the data dir if not present.
+    '''
+    statedirpath = self.statedirpath
+    if not isdirpath(statedirpath):
+      info("mkdir %r", statedirpath)
+      with Pfx("mkdir(%r)", statedirpath):
+        os.mkdir(statedirpath)
+    # create the data subdir if missing
+    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
+    if not isdirpath(datadirpath):
+      info("mkdir %r", datadirpath)
+      with Pfx("mkdir(%r)", datadirpath):
+        os.mkdir(datadirpath)
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
@@ -489,7 +487,6 @@ class SqliteFilemap:
     del self.conn
 
   def _execute(self, sql, *a):
-    X("SQL: %s: %r %r", shortpath(self.path), sql.strip(), a)
     return self.conn.execute(sql, *a)
 
   def filenums(self):
@@ -505,7 +502,6 @@ class SqliteFilemap:
   def _map(self, path, n, indexed_to=0):
     ''' Add a DataFileState for `path` and `n` to the mapping.
     '''
-    X("_map(path=%r,n=%r,indexed_to=%r", path, n, indexed_to)
     datadir = self.datadir
     if n in self.n_to_DFstate:
       warning("replacing n_to_DFstate[%s]", n)
@@ -513,7 +509,6 @@ class SqliteFilemap:
       warning("replacing path_toDFstate[%r]", path)
     DFstate = DataFileState(
         datadir, n, path, indexed_to=indexed_to)
-    X("DFstate=%r", DFstate)
     self.n_to_DFstate[n] = DFstate
     self.path_to_DFstate[path] = DFstate
 
@@ -523,7 +518,6 @@ class SqliteFilemap:
           SELECT id, path, indexed_to FROM filemap
       ''')
       for n, path, indexed_to in c.fetchall():
-        X("n=%r, path=%r, indexed_to=%r", n, path, indexed_to)
         self._map(path, n, indexed_to)
       c.close()
 
@@ -650,9 +644,7 @@ class DataDir(_FilesDir):
         * `rollover`: data file roll over size; if a data file grows beyond
           this a new datafile is commenced for new blocks.  Default:
           `DEFAULT_ROLLOVER`.
-        * `create_statedir`: os.mkdir the state directory if missing.
     '''
-    X("DataDir.__init__: statedirpath=%r, hashclass=%r", statedirpath, hashclass)
     super().__init__(statedirpath, hashclass, **kw)
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
@@ -793,7 +785,6 @@ class DataDir(_FilesDir):
         time.sleep(1)
         continue
       # scan for new datafiles
-      need_save = False
       with Pfx("listdir(%r)", datadirpath):
         try:
           listing = list(os.listdir(datadirpath))
@@ -835,7 +826,6 @@ class DataDir(_FilesDir):
               info("skip nonfile")
               continue
           if new_size > DFstate.scanned_to:
-            need_save = False
             offset = DFstate.scanned_to
             for record, post_offset in DFstate.scanfrom(offset=offset):
               hashcode = self.hashclass.from_chunk(record.data)
@@ -1076,7 +1066,6 @@ class PlatonicDir(_FilesDir):
       if self.flag_scan_disable:
         continue
       # scan for new datafiles
-      need_save = False
       with Pfx("%r", datadirpath):
         seen = set()
         info("scan tree...")
@@ -1144,14 +1133,12 @@ class PlatonicDir(_FilesDir):
                 if DFstate is None:
                   XP("new DFstate")
                   DFstate = filemap.add_path(rfilepath)
-                  need_save = True
                 try:
                   new_size = DFstate.stat_size(self.follow_symlinks)
                 except OSError as e:
                   if e.errno == errno.ENOENT:
                     warning("forgetting missing file")
                     self._del_datafilestate(DFstate)
-                    need_save = True
                   else:
                     warning("stat: %s", e)
                   continue
@@ -1175,7 +1162,7 @@ class PlatonicDir(_FilesDir):
                     info("scan from %d", DFstate.scanned_to)
                   if meta_store is not None:
                     blockQ = IterableQueue()
-                    R = meta_store.bg(
+                    R = meta_store._defer(
                         lambda B, Q: top_block_for(spliced_blocks(B, Q)),
                         E.block, blockQ)
                   scan_from = DFstate.scanned_to
@@ -1194,7 +1181,6 @@ class PlatonicDir(_FilesDir):
                       B = Block(data=data, hashcode=hashcode, added=True)
                       blockQ.put( (offset, B) )
                     DFstate.scanned_to = post_offset
-                    need_save = True
                     if self.cancelled or self.flag_scan_disable:
                       break
                   elapsed = time.time() - scan_start

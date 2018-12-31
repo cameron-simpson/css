@@ -15,14 +15,12 @@ import os
 from os import SEEK_END, \
                O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
 import sys
-from threading import Lock
 from zlib import compress, decompress
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import warning
-from cs.pfx import Pfx
-from cs.randutils import rand0, randblock
 from cs.resources import MultiOpenMixin
+from . import Lock
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT

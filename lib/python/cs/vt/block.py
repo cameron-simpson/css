@@ -38,7 +38,7 @@ from abc import ABC
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
-from threading import RLock
+from icontract import require
 from cs.binary import (
     PacketField, BSUInt, BSData,
     flatten as flatten_transcription
@@ -50,7 +50,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
-from . import defaults, totext
+from . import defaults, totext, RLock
 from .hash import HashCode
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -369,34 +369,18 @@ class _Block(Transcriber, ABC):
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
     return blockmap
 
-  def SKIP0000datafrom(self, offset=0, *, end=None, no_blockmap=False):
-    ''' Generator yielding data from the direct blocks.
-    '''
-    for leaf, leaf_start, leaf_end in self.slices(
-        start=offset, end=end, no_blockmap=no_blockmap
-    ):
-      yield leaf[leaf_start:leaf_end]
-
   def bufferfrom(self, offset=0, **kw):
     ''' Return a CornuCopyBuffer presenting data from the Block.
     '''
     return CornuCopyBuffer(self.datafrom(start=offset, **kw), offset=offset)
 
-  def slices(self, start=None, end=None, no_blockmap=False):
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
+  def slices(self, start, end, no_blockmap=False):
     ''' Return an iterator yielding (Block, start, len) tuples
         representing the leaf data covering the supplied span `start`:`end`.
 
         The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
-    assert end <= len(self)
     if self.indirect:
       if not no_blockmap:
         # use the blockmap to access the data if present
@@ -419,26 +403,17 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  def top_slices(self, start=None, end=None):
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
+  def top_slices(self, start, end):
     ''' Return an iterator yielding (Block, start, len) tuples
-        representing the uppermost Blocks spanning `start`:`end`.
+        representing the uppermost Blocks spanning `start:end`.
 
         The originating use case is to support providing minimal
         Block references required to assemble a new indirect Block
         consisting of data from this Block comingled with updated
         data without naively layering deeper levels of Block
         indirection with every update phase.
-
-        The iterator may end early if the span exceeds the Block data.
     '''
-    if start is None:
-      start = 0
-    elif start < 0:
-      raise ValueError("start must be >= 0, received: %r" % (start,))
-    if end is None:
-      end = len(self)
-    elif end < start:
-      raise ValueError("end must be >= start(%r), received: %r" % (start, end))
     if self.indirect:
       offset = 0        # the absolute index of the left edge of subblock B
       for B in self.subblocks:
@@ -460,6 +435,7 @@ class _Block(Transcriber, ABC):
       if start < len(self):
         yield self, start, min(end, len(self))
 
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
   def top_blocks(self, start, end):
     ''' Yield existing high level blocks and new partial Blocks
         covering a portion of this Block,
@@ -477,6 +453,28 @@ class _Block(Transcriber, ABC):
               " but Block is indirect! should be a partial leaf"
               % (B, Bstart, Bend))
         yield SubBlock(B, Bstart, Bend - Bstart)
+
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
+  def spliced(self, start, end, new_block):
+    ''' Generator yielding Blocks producing the data
+        from `self` with the range `start:end`
+        replaced by the data from `new_block`.
+    '''
+    if start == len(self):
+      yield self
+    else:
+      yield from self.top_blocks(0, start)
+    yield new_block
+    if end < len(self):
+      yield from self.top_blocks(end, len(self))
+
+  @require(lambda self, start, end: 0 <= start <= end <= len(self))
+  def splice(self, start, end, new_block):
+    ''' Return a new Block consisting of `self` with the span
+        `start:end` replaced by the data from `new_block`.
+    '''
+    from .blockify import top_block_for
+    return top_block_for(self.spliced(start, end, new_block))
 
   def textencode(self):
     ''' Transcribe this Block's binary encoding as text.
@@ -591,7 +589,7 @@ class HashCodeBlock(_Block):
     with self._lock:
       data = self._data
       if data is None:
-        data =self._data = defaults.S[self.hashcode]
+        data = self._data = defaults.S[self.hashcode]
     return data
 
   @prop
@@ -621,6 +619,8 @@ class HashCodeBlock(_Block):
         raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=None, end=None):
+    ''' Generator yielding data from `start:end`.
+    '''
     if start is not None and start < 0:
       raise ValueError("invalid start=%s" % (start,))
     if end is not None and end < 0:
@@ -719,7 +719,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
     if isinstance(subblocks, _Block):
       subblocks = (subblocks,)
     elif isinstance(subblocks, bytes):
-      subblocks = (Block(subblocks),)
+      subblocks = (Block(data=subblocks),)
     else:
       subblocks = tuple(subblocks)
     spans = [ subB.span for subB in subblocks ]
@@ -753,15 +753,18 @@ class _IndirectBlock(_Block):
     self.span = span
     self.hashcode = superB.hashcode
     self._data = None
+    self._subblocks = None
 
-  def __getattr__(self, attr):
-    if attr == 'subblocks':
-      with self._lock:
-        if 'subblocks' not in self.__dict__:
-          self.subblocks = tuple(
-              BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
-      return self.subblocks
-    raise AttributeError(attr)
+  @prop
+  @locked
+  def subblocks(self):
+    ''' The immediate subblocks of this indirect block.
+    '''
+    blocks = self._subblocks
+    if blocks is None:
+      blocks = self._subblocks = tuple(
+          BlockRecord.parse_buffer_values(self.superblock.bufferfrom()))
+    return blocks
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe "span:Block".
@@ -782,9 +785,30 @@ class _IndirectBlock(_Block):
     return cls(superB, span), offset
 
   def datafrom(self, start=0, end=None):
-    for B, Bstart, Bend in self.slices(start, end):
-      assert not B.indirect
-      yield B.get_direct_data()[Bstart:Bend]
+    ''' Yield data from a point in the Block.
+    '''
+    if end is None:
+      end = self.span
+    if start >= end:
+      return
+    block_cache = defaults.S.block_cache
+    if block_cache:
+      try:
+        bm = block_cache[self.hashcode]
+      except KeyError:
+        pass
+      else:
+        filled = bm.filled
+        if filled > start:
+          maxlength = end - start
+          for bs in bm.datafrom(start, maxlength=maxlength):
+            yield bs
+            start += len(bs)
+            assert start <= end
+    if start < end:
+      for B, Bstart, Bend in self.slices(start, end):
+        assert not B.indirect
+        yield B.get_direct_data()[Bstart:Bend]
 
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
@@ -849,10 +873,14 @@ class LiteralBlock(_Block):
     self.data = data
 
   def transcribe_inner(self, T, fp):
+    ''' Transcribe the block data in texthexified form.
+    '''
     fp.write(texthexify(self.data))
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
+    ''' Parse the interior of the transcription: texthexified data.
+    '''
     endpos = s.find(stopchar, offset)
     if endpos < offset:
       raise ValueError("stopchar %r not found" % (stopchar,))
@@ -860,11 +888,13 @@ class LiteralBlock(_Block):
     return cls(data), endpos
 
   def get_direct_data(self):
+    ''' Return the direct data of this Block>
+    '''
     return self.data
 
   def datafrom(self, start=0, end=None):
     if start < 0 or end is not None and start > end:
-      raise ValueError("invalid start=%s (span=%s)" % (start, span))
+      raise ValueError("invalid start=%s (end=%s)" % (start, end))
     if end is None:
       end = self.span
     yield self.data[start:end]

@@ -12,20 +12,19 @@ from abc import ABC, abstractmethod
 from functools import partial
 from os.path import expanduser, isabs as isabspath
 import sys
-from threading import Lock, Semaphore
-from cs.later import Later
+from threading import Semaphore
+from cs.later import Later, SubLater
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.py.func import prop, funccite
-from cs.py.stack import caller
+from cs.py.func import prop, funcname
 from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report
 from cs.seq import Seq
 from cs.threads import bg
 from cs.x import X
-from . import defaults
+from . import defaults, Lock
 from .datadir import DataDir, PlatonicDir
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin, MissingHashcodeError
 
@@ -115,6 +114,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       self.writeonly = False
       self._archives = {}
       self._blockmapdir = None
+      self.block_cache = None
 
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
@@ -204,11 +204,15 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self.runstate.start()
     self.__funcQ = Later(self._capacity, name="%s:Later(__funcQ)" % (self.name,))
+    self._worker = SubLater(self.__funcQ)
+    self._reaper = self._worker.reaper()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.runstate.cancel()
+    self._worker.close()
+    self._reaper.join()
     L = self.__funcQ
     L.shutdown()
     L.wait()
@@ -224,35 +228,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self.open()
     def deferred():
-      try:
-        return func(*args, **kwargs)
-      finally:
-        self.close()
-    return self.__funcQ.defer(deferred)
-
-  def bg(self, func, *a, **kw):
-    ''' Queue a function without consuming the queue capacity.
-
-        This is intended for "control" functions which themselves
-        do all their work through the Store's function queue, such
-        as the .pushto method's worker.
-    '''
-    # keep the Store open
-    func2name = "%s (from %s)" % (funccite(func), caller())
-    self.open()
-    def func2():
-      ''' Inner function to call `func` and then close the Store.
-      '''
-      # use the Store as the context for actions
       with self:
-        try:
-          value = func(*a, **kw)
-        finally:
-          # release the Store from earlier
-          self.close()
-        return value
-    func2.__name__ = func2name
-    return self.__funcQ.bg(func2)
+        result = func(*args, **kwargs)
+      return result
+    deferred.__name__ = "deferred:" + funcname(func)
+    LF = self._worker.defer(deferred)
+    LF.notify(lambda LF: self.close())
+    return LF
 
   ##########################################################################
   # Core Store methods, all abstract.
@@ -473,7 +455,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                   return True
                 Xs("{")
                 sem.acquire()
-                addR = S2.bg(addblock, S1, S2, h, B)
+                addR = S2._defer(addblock, S1, S2, h, B)
                 Xs("<")
                 with lock:
                   pending.add(addR)
@@ -628,72 +610,85 @@ class MappingStore(BasicStoreSync):
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
 
-      Two classes of Stores are managed:
+      Three classes of Stores are managed:
 
       Save stores. All data added to the Proxy is added to these Stores.
 
       Read Stores. Requested data may be obtained from these Stores.
 
+      Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
+
       A example setup utilising a working ProxyStore might look like this:
 
-        ProxyStore(
-          save=[local,upstream],
-          save2=[spool],
-          read=[local],
-          read2=[upstream],
-        )
+          ProxyStore(
+            save=[local,upstream],
+            save2=[spool],
+            read=[local],
+            read2=[upstream],
+            copy2=[local],
+          )
 
       In this example:
-        "local" is a local low latency store such as a DataDirStore.
-        "upstream" is a remote high latency Store such as a TCPStore.
-        "spool" is a local scondary Store, probably a DataDirStore
+      * `local`: is a local low latency store such as a DataDirStore.
+      * `upstream`: is a remote high latency Store such as a TCPStore.
+      * `spool`: is a local scondary Store, probably a DataDirStore.
 
-      This setup causes all saved data to be saved to "local" and
-      "upstream". If a save to "local" or "upstream" fails, for
-      example if the upstream if offline, the save is repeated to
-      the "spool", intended as a holding location for data needing
-      a resave.
+      This setup causes all saved data to be saved to `local` and
+      `upstream`.
+      If a save to `local` or `upstream` fails,
+      for example if the upstream if offline,
+      the save is repeated to the `spool`,
+      intended as a holding location for data needing a resave.
 
-      Reads are attempted first from the "read" Stores, then from
-      the "read2" Stores".
+      Reads are attempted first from the `read` Stores, then from
+      the `read2` Stores.
+      If there are any `copy2` Stores,
+      any data obtained from `read2` are copied into the `copy2` Stores;
+      in this way remote data become locally saved.
 
-      TODO: implement save2 saves
       TODO: replay and purge the spool? probably better as a separate
       pushto operation ("vt despool spool_store upstream_store").
   '''
 
-  def __init__(self, name, save, read, *, save2=(), read2=(), **kw):
+  def __init__(self, name, save, read, *, save2=(), read2=(), copy2=(), **kw):
     ''' Initialise a ProxyStore.
-        `name`: ProxyStore name.
-        `save`: iterable of Stores to which to save blocks
-        `read`: iterable of Stores from which to fetch blocks
-        `save2`: fallback Store for saves which fail
-        `read2`: optional fallback iterable of Stores from which
+
+        Parameters:
+        * `name`: ProxyStore name.
+        * `save`: iterable of Stores to which to save blocks
+        * `read`: iterable of Stores from which to fetch blocks
+        * `save2`: fallback Store for saves which fail
+        * `read2`: optional fallback iterable of Stores from which
           to fetch blocks if not found via `read`. Typically these
           would be higher latency upstream Stores.
+        * `copy2`: optional iterable of Stores to receive copies
+          of data obtained via `read2` Stores.
     '''
     BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
     self.read = frozenset(read)
     self.save2 = frozenset(save2)
     self.read2 = frozenset(read2)
+    self.copy2 = frozenset(copy2)
     self._attrs.update(save=save, read=read)
     if save2:
       self._attrs.update(save2=save2)
     if read2:
       self._attrs.update(read2=read2)
+    if copy2:
+      self._attrs.update(copy2=copy2)
     self.readonly = len(self.save) == 0
 
   def __str__(self):
-      return "%s(%r)" % (type(self).__name__, self.name)
+    return "%s(%r)" % (type(self).__name__, self.name)
 
   def startup(self):
     super().startup()
-    for S in self.save | self.read | self.save2 | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.open()
 
   def shutdown(self):
-    for S in self.save | self.read | self.save2 | self.read2:
+    for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.close()
     super().shutdown()
 
@@ -734,7 +729,7 @@ class ProxyStore(BasicStoreSync):
         hashcode received.
     '''
     ch = Channel()
-    self.bg(self._bg_add, data, ch)
+    self._defer(self._bg_add, data, ch)
     hashcode = ch.get()
     if hashcode is None:
       raise RuntimeError("no hashcode returned from .add")
@@ -743,18 +738,18 @@ class ProxyStore(BasicStoreSync):
   def _bg_add(self, data, ch):
     ''' Add a data chunk to the save Stores.
 
+        Parameters:
         `data`: the data to add
-        `ch`: a channel for hashocde return
+        `ch`: a channel for hashcode return
     '''
-    X("BG QUEUE ADD %d bytes, ch=%s ...", len(data), ch)
-    hashcode1 = None    # becomes not None on successful add
+    assert ch, "ch is false! %r" % (ch,)
     try:
       if not self.save:
         # no save - allow add if hashcode already present - dubious
         hashcode = self.hash(data)
         if hashcode in self:
           ch.put(hashcode)
-          hashcode1 = hashcode
+          ch = None
           return
         raise RuntimeError("new add but no save Stores")
       ok = True
@@ -762,13 +757,9 @@ class ProxyStore(BasicStoreSync):
       for S, hashcode, exc_info in self._multicall(self.save, 'add_bg', (data,)):
         if exc_info is None:
           assert hashcode is not None, "None from .add of %s" % (S,)
-          if hashcode1 is None:
+          if ch:
             ch.put(hashcode)
-            hashcode1 = hashcode
-          elif hashcode1 != hashcode:
-            warning(
-                "%s: different hashcodes returns from .add: %s vs %s",
-                S, hashcode1, hashcode)
+            ch = None
         else:
           e = exc_info[1]
           if isinstance(e, StoreError):
@@ -797,33 +788,35 @@ class ProxyStore(BasicStoreSync):
               error("exception saving to %s: %s", S, exc_info[1], exc_info=exc_info)
               failures.append( (S, e) )
             else:
-              if hashcode1 is None:
+              if ch:
                 ch.put(hashcode)
-                hashcode1 = hashcode
-              elif hashcode1 != hashcode:
-                warning(
-                    "%s: different hashcodes returns from .add: %s vs %s",
-                    S, hashcode1, hashcode)
+                ch = None
           if failures:
             raise RuntimeError("exceptions saving to save2: %r" % (failures,))
     finally:
       # mark end of queue
-      if hashcode1 is None:
-        X("BG QUEUE ADD no hashcode1, put None")
+      if ch:
         ch.put(None)
-      ch.close()
+        ch = None
+        ch.close()
 
   def get(self, h):
     ''' Fetch a block from the first Store which has it.
     '''
-    for stores in self.read, self.read2:
-      for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
-        if exc_info:
-          error("exception fetching from %s: %s", S, exc_info)
-        elif data is not None:
-          X("ProxyStore.GET %s succeeds from %s: %d bytes", h, S.name, len(data))
-          return data
-    return None
+    with Pfx("%s.get", type(self)):
+      for stores in self.read, self.read2:
+        for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
+          with Pfx("%s.get_bg(%s)", S, h):
+            if exc_info:
+              error("exception", exc_info=exc_info)
+            elif data is not None:
+              ##XP("got %d bytes", len(data))
+              if S not in self.read:
+                for copyS in self.copy2:
+                  ##XP("copy to %s", copyS)
+                  copyS.add_bg(data)
+              return data
+      return None
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
@@ -875,6 +868,11 @@ class DataDirStore(MappingStore):
     '''
     self._datadir.close()
     super().shutdown()
+
+  def init(self):
+    ''' Init the supporting data dir.
+    '''
+    self._datadir.init()
 
   def localpathto(self, rpath):
     ''' Compute the full path from a relative path.
@@ -959,8 +957,18 @@ class _ProgressStoreTemplateMapping(object):
     return value
 
 class ProgressStore(BasicStoreSync):
+  ''' A shim for another Store to do progress reporting.
+      TODO: planning to redo basic store methods as shims, with
+      implementations supplying _foo methods across the board
+      instead.
+  '''
 
-  def __init__(self, name, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+  def __init__(
+      self,
+      name, S,
+      template='rq  {requests_position}  {requests_throughput}/s',
+      **kw
+  ):
     ''' Wrapper for a Store which collects statistics on use.
     '''
     lock = kw.pop('lock', None)

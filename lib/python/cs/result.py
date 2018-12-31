@@ -266,6 +266,9 @@ class Result(object):
       r = func(*a, **kw)
     except BaseException:
       self.exc_info = sys.exc_info()
+    except:
+      exception("%s: unexpected exception: %s", func, e)
+      self.exc_info = sys.exc_info()
     else:
       self.result = r
 
@@ -459,9 +462,8 @@ def after(Rs, R, func, *a, **kw):
       subR.notify(count_down)
   return R
 
-class _PendingFunction(Result):
-  ''' An Result with a callable used to obtain its result.
-      Since nothing triggers the function call this is an abstract class.
+class OnDemandFunction(Result):
+  ''' Wrap a callable, run it when required.
   '''
 
   def __init__(self, func, *a, **kw):
@@ -469,10 +471,6 @@ class _PendingFunction(Result):
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
-
-class OnDemandFunction(_PendingFunction):
-  ''' Wrap a callable, run it when required.
-  '''
 
   def __call__(self):
     with self._lock:
