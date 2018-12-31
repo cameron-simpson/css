@@ -4,6 +4,9 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
+    *NOTE*: pre-Alpha; alpha release following soon once the packaging
+    is complete.
+
     See also the Plan 9 Venti system:
     (http://library.pantek.com/general/plan9.documents/venti/venti.html,
     http://en.wikipedia.org/wiki/Venti).
@@ -40,7 +43,6 @@ DISTINFO = {
         'cs.buffer',
         'cs.app.flag',
         'cs.binary',
-        'cs.binary_tests',
         'cs.cache',
         'cs.debug',
         'cs.deco',
