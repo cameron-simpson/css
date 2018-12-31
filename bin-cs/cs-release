@@ -150,42 +150,44 @@ def main(argv):
               return 1
           changes = list(N.log_since())
           if not changes:
-            error("no changes since last release, not making new release")
+            if force:
+              warning("no changes since last release, making release anyway")
+            else:
+              error("no changes since last release, not making new release")
+              return 1
+          print("Changes since the last release:")
+          for files, firstline in changes:
+            print(" ", ' '.join(files) + ': ' + firstline)
+          print()
+          with pipefrom('readdottext', keep_stdin=True) as dotfp:
+            release_message = dotfp.read().rstrip()
+          if not release_message:
+            error("empty release message, not making new release")
             xit = 1
           else:
-            print("Changes since the last release:")
-            for files, firstline in changes:
-              print(" ", ' '.join(files) + ': ' + firstline)
-            print()
-            with pipefrom('readdottext', keep_stdin=True) as dotfp:
-              release_message = dotfp.read().rstrip()
-            if not release_message:
-              error("empty release message, not making new release")
+            next_tag = N.next_release_tag()
+            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+              error("aborting release at user request")
               xit = 1
             else:
-              next_tag = N.next_release_tag()
-              if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-                error("aborting release at user request")
-                xit = 1
-              else:
-                rel_dir = os.path.join('release', next_tag)
-                with Pfx("mkdir(%s)", rel_dir):
-                  os.mkdir(rel_dir)
-                summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-                with Pfx(summary_filename):
-                  with open(summary_filename, 'w') as sfp:
-                    print(release_message, file=sfp)
-                changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-                with Pfx(changes_filename):
-                  with open(changes_filename, 'w') as cfp:
-                    for files, firstline in changes:
-                      print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-                VCS = N.vcs
-                VCS.add_files(summary_filename, changes_filename)
-                VCS.commit('Release information for %s.\nSummary:\n%s'
-                           % (next_tag, release_message),
-                           summary_filename, changes_filename)
-                VCS.tag(next_tag)
+              rel_dir = os.path.join('release', next_tag)
+              with Pfx("mkdir(%s)", rel_dir):
+                os.mkdir(rel_dir)
+              summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+              with Pfx(summary_filename):
+                with open(summary_filename, 'w') as sfp:
+                  print(release_message, file=sfp)
+              changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+              with Pfx(changes_filename):
+                with open(changes_filename, 'w') as cfp:
+                  for files, firstline in changes:
+                    print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+              VCS = N.vcs
+              VCS.add_files(summary_filename, changes_filename)
+              VCS.commit('Release information for %s.\nSummary:\n%s'
+                         % (next_tag, release_message),
+                         summary_filename, changes_filename)
+              VCS.tag(next_tag)
         elif op == 'status':
           tagged = N.last_suffix()
           result = [name, tagged]
