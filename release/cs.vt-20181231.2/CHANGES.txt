@@ -1,0 +1,1 @@
+  : cs.vt: not pre-Alpha status in docstring, drop cs.binary_tests from install_requires
