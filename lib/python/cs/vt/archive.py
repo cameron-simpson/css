@@ -23,7 +23,7 @@ from cs.lex import unctrl
 from cs.logutils import warning, exception, debug
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
-from .dir import _Dirent, DirFTP
+from .dir import _Dirent
 from .meta import NOUSERID, NOGROUPID
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
@@ -244,22 +244,3 @@ def apply_posix_stat(src_st, ospath):
               "utime(%r,atime=%s,mtime=%s) from mtime=%s",
               ospath, path_st.st_atime, mst_mtime, st_mtime)
           os.utime(ospath, (path_st.st_atime, mst_mtime))
-
-class ArchiveFTP(DirFTP):
-  ''' Initial sketch for FTP interface to an Archive.
-  '''
-
-  def __init__(self, arpath, prompt=None):
-    self.path = arpath
-    self.archive = Archive(arpath)
-    if prompt is None:
-      prompt = shortpath(arpath)
-    _, rootD = self.archive.last
-    self.rootD = rootD
-    super().__init__(rootD, prompt=prompt)
-
-  def postloop(self):
-    ''' Sync the Archive at the end of the FTP session.
-    '''
-    super().postloop()
-    self.archive.update(self.rootD)

@@ -4,13 +4,12 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    Man page:
-      http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
+    *NOTE*: pre-Alpha; alpha release following soon once the packaging
+    is complete.
 
-    See also:
-        The Plan 9 Venti system:
-          http://library.pantek.com/general/plan9.documents/venti/venti.html
-          http://en.wikipedia.org/wiki/Venti
+    See also the Plan 9 Venti system:
+    (http://library.pantek.com/general/plan9.documents/venti/venti.html,
+    http://en.wikipedia.org/wiki/Venti).
 '''
 
 from collections import namedtuple
@@ -31,6 +30,78 @@ from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
 from cs.x import X
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        ##"Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.buffer',
+        'cs.app.flag',
+        'cs.binary',
+        'cs.cache',
+        'cs.debug',
+        'cs.deco',
+        'cs.env',
+        'cs.excutils',
+        'cs.fileutils',
+        'cs.inttypes',
+        'cs.later',
+        'cs.lex',
+        'cs.logutils',
+        'cs.mappings',
+        'cs.packetstream',
+        'cs.pfx',
+        'cs.progress',
+        'cs.py.func',
+        'cs.py.stack',
+        'cs.queues',
+        'cs.range',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.serialise',
+        'cs.socketutils',
+        'cs.threads',
+        'cs.tty',
+        'cs.units',
+        'cs.x',
+        'lmdb',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'vt = cs.vt.__main__:main',
+        ],
+    },
+}
+
+DEFAULT_CONFIG_PATH = '~/.vtrc'
+
+DEFAULT_BASEDIR = '~/.vt_stores'
+
+DEFAULT_CONFIG = {
+    'GLOBAL': {
+      'basedir': DEFAULT_BASEDIR,
+      'blockmapdir': '[default]/blockmaps',
+    },
+    'default': {
+      'type': 'datadir',
+      'path': 'trove',
+    },
+    'cache': {
+      'type': 'memory',
+      'max_data': '16 GiB',
+    },
+    'server': {
+      'type': 'datadir',
+      'path': 'trove',
+      'address': '~/.vt.sock',
+    },
+}
 
 # intercept Lock and RLock
 if False:

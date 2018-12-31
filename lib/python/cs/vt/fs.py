@@ -15,7 +15,7 @@ from types import SimpleNamespace as NS
 from uuid import UUID
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import error, warning, info, debug
+from cs.logutils import exception, error, warning, info, debug
 from cs.pfx import Pfx
 from cs.range import Range
 from cs.threads import locked
@@ -400,22 +400,25 @@ class FileSystem(object):
     self._file_handles = []
     inodes = self._inodes = Inodes(self)
     self[1] = mntE
-    with Pfx("fs_inode_dirents"):
-      fs_inode_dirents = E.meta.get("fs_inode_dirents")
-      X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
-      if fs_inode_dirents:
-        inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
-        if offset < len(fs_inode_dirents):
-          warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
-        X("IMPORT INODES:")
-        dump_Dirent(inode_dir)
-        inodes.load_fs_inode_dirents(inode_dir)
-      else:
-        X("NO INODE IMPORT")
-      X("FileSystem mntE:")
-    with self.S:
-      with defaults.stack('fs', self):
-        dump_Dirent(mntE)
+    try:
+      with Pfx("fs_inode_dirents"):
+        fs_inode_dirents = E.meta.get("fs_inode_dirents")
+        X("FS INIT: fs_inode_dirents=%s", fs_inode_dirents)
+        if fs_inode_dirents:
+          inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
+          if offset < len(fs_inode_dirents):
+            warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
+          X("IMPORT INODES:")
+          dump_Dirent(inode_dir)
+          inodes.load_fs_inode_dirents(inode_dir)
+        else:
+          X("NO INODE IMPORT")
+        X("FileSystem mntE:")
+      with self.S:
+        with defaults.stack('fs', self):
+          dump_Dirent(mntE)
+    except Exception as e:
+      exception("exception during initial report: %s", e)
 
   def bg(self, func, *a, **kw):
     ''' Dispatch a function via the FileSystem's Later instance.

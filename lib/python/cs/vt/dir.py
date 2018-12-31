@@ -4,23 +4,18 @@
 ''' Implementation of directories (Dir) and their entries (FileDirent, etc).
 '''
 
-from cmd import Cmd
 from enum import IntEnum, IntFlag
-import errno
 from functools import partial
-from getopt import GetoptError
 import grp
 import os
 import os.path
 import pwd
-import shlex
 import stat
 import sys
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.cmdutils import docmd
 from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
@@ -33,8 +28,8 @@ from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
-from .meta import Meta, rwx, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
-from .paths import path_split, resolve, DirLike, FileLike
+from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
+from .paths import path_split, DirLike, FileLike
 from .transcribe import Transcriber, parse as parse_transcription, \
                         register as register_transcriber
 
@@ -179,7 +174,7 @@ class _Dirent(Transcriber):
       parent=None,
       prevblock=None,
       block=None,
-      **kw,
+      **kw
   ):
     ''' Initialise a _Dirent.
 
@@ -1287,181 +1282,6 @@ class Dir(_Dirent, DirLike):
     if T:
       Q.close()
       T.join()
-
-class DirFTP(Cmd):
-  ''' Class for FTP-like interactive access to a Dir.
-
-      TODO: move into some utility module.
-  '''
-
-  def __init__(self, D, prompt=None):
-    Cmd.__init__(self)
-    self._prompt = prompt
-    self.root = D
-    self.cwd = D
-
-  @property
-  def prompt(self):
-    ''' The interactive prompt.
-    '''
-    prompt = self._prompt
-    wd_path = PATHSEP + self.op_pwd()
-    return ( wd_path if prompt is None else ":".join( (prompt, wd_path) ) ) + '> '
-
-  def emptyline(self):
-    ''' Empty line handler.
-    '''
-    pass
-
-  def do_EOF(self, args):
-    ''' Quit on end of input.
-    '''
-    return True
-
-  @docmd
-  def do_quit(self, args):
-    ''' Usage: quit
-    '''
-    return True
-
-  @docmd
-  def do_cd(self, args):
-    ''' Usage: cd pathname
-        Change working directory.
-    '''
-    argv = shlex.split(args)
-    if len(argv) != 1:
-      raise GetoptError("exactly one argument expected, received: %r" % (argv,))
-    self.op_cd(argv[0])
-    print(self.op_pwd())
-
-  def op_cd(self, path):
-    ''' Change working directory.
-    '''
-    if path.startswith(PATHSEP):
-      D = self.root
-    else:
-      D = self.cwd
-    for base in path.split(PATHSEP):
-      if base == '' or base == '.':
-        pass
-      elif base == '..':
-        if D is not self.root:
-          D = D.parent
-      else:
-        D = D.chdir1(base)
-    self.cwd = D
-
-  @docmd
-  def do_inspect(self, args):
-    ''' Usage: inspect name
-        Print VT level details about name.
-    '''
-    argv = shlex.split(args)
-    if len(argv) != 1:
-      raise GetoptError("invalid arguments: %r" % (argv,))
-    name, = argv
-    E, P, tail = resolve(self.cwd, name)
-    if tail:
-      raise OSError(errno.ENOENT)
-    print("%s: %s" % (name, E))
-    M = E.meta
-    print(M.textencode())
-    print("size=%d" % (len(E.block),))
-
-  @docmd
-  def do_pwd(self, args):
-    ''' Usage: pwd
-        Print the current working directory path.
-    '''
-    argv = shlex.split(args)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (args,))
-    print(self.op_pwd())
-
-  def op_pwd(self):
-    ''' Return the path to the current working directory.
-    '''
-    E = self.cwd
-    names = []
-    seen = set()
-    while E is not self.root:
-      seen.add(E)
-      P = E.parent
-      if P is None:
-        raise ValueError("no parent: names=%r, E=%s" % (names, E))
-      if P in seen:
-        raise ValueError("loop detected: names=%r, E=%s" % (names, E))
-      name = E.name
-      if P[name] is not E:
-        name = None
-        for Pname, PE in sorted(P.entries.items()):
-          if PE is E:
-            name = Pname
-            break
-        if name is None:
-          raise ValueError("detached: E not present in P: E=%s, P=%s" % (E, P))
-      names.append(name)
-      E = P
-    return PATHSEP.join(reversed(names))
-
-  @docmd
-  def do_ls(self, args):
-    ''' Usage: ls [paths...]
-    '''
-    argv = shlex.split(args)
-    if not argv:
-      argv = sorted(self.cwd.entries.keys())
-    for name in argv:
-      with Pfx(name):
-        E, P, tail = resolve(self.cwd, name)
-        if tail:
-          error("not found: unresolved path elements: %r", tail)
-        else:
-          M = E.meta
-          u, g, perms = M.unix_perms
-          typemode = M.unix_typemode
-          typechar = (
-              '-' if typemode == stat.S_IFREG
-              else 'd' if typemode == stat.S_IFDIR
-              else 's' if typemode == stat.S_IFLNK
-              else '?'
-          )
-          print("%s%s%s%s %s" % (
-              typechar,
-              rwx((typemode>>6)&7),
-              rwx((typemode>>3)&7),
-              rwx((typemode)&7),
-              name
-          ))
-
-  def op_ls(self):
-    ''' Return a dict mapping current directories names to Dirents.
-    '''
-    return dict(self.cwd.entries)
-
-  @docmd
-  def do_mkdir(self, args):
-    ''' Make a directory.
-    '''
-    argv = shlex.split(args)
-    if not argv:
-      raise GetoptError("missing arguments")
-    for arg in argv:
-      with Pfx(arg):
-        E, _, tail = resolve(self.cwd, arg)
-        if not tail:
-          error("path exists")
-        elif len(tail) > 1:
-          error("missing superdirectory")
-        elif not E.isdir:
-          error("superpath is not a directory")
-        else:
-          subname = tail[0]
-          if subname in E:
-            error("%r exists", subname)
-          else:
-            E.mkdir(subname)
 
 if __name__ == '__main__':
   from .dir_tests import selftest

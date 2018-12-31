@@ -16,7 +16,7 @@ import time
 import unittest
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
-from cs.randutils import rand0, randblock
+from .randutils import rand0, randblock
 from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
                       MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE

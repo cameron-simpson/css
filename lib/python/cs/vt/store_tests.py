@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from cs.excutils import logexc
 from cs.logutils import setup_logging, warning
-from cs.randutils import randblock
+from .randutils import randblock
 from cs.x import X
 import cs.x
 cs.x.X_via_tty = True

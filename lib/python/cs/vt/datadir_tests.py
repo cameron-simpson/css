@@ -11,7 +11,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from cs.randutils import rand0, randblock
+from .randutils import rand0, randblock
 from .datadir import DataDir, DataDirIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import class_names as indexclass_names, class_by_name as indexclass_by_name

@@ -10,7 +10,7 @@
 from random import shuffle
 import sys
 import unittest
-from cs.randutils import randbool
+from .randutils import randbool
 from .dir import FileDirent, Dir, _Dirent
 from .paths import decode_Dirent_text
 from .store import MappingStore

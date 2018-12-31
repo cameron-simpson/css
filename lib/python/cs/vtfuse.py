@@ -22,11 +22,36 @@ from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
 from cs.vt import defaults
+from cs.vt.__main__ import main as vt_main
 from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
 from cs.vt.fs import FileHandle, FileSystem
 from cs.vt.store import MissingHashcodeError
 from cs.x import X
 import llfuse
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        ##"Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Programming Language :: Python :: 3",
+        "Topic :: System :: Filesystems",
+    ],
+    'install_requires': [
+        'cs.excutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.vt',
+        'cs.x',
+        'llfuse',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'mount.vtfs = cs.vtfuse:main',
+        ],
+    },
+}
 
 FuseOSError = llfuse.FUSEError
 
@@ -40,6 +65,11 @@ XATTR_REPLACE  = 0x0004
 
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
+
+def main(argv=None):
+  ''' Run the "mount" subcommand of the vt(1) command.
+  '''
+  return vt_main(argv, subcmd='mount')
 
 def mount(
     mnt, E,
@@ -240,6 +270,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
 
   def _vt_runfuse(self, mnt, fsname=None):
     ''' Run the filesystem once.
+        Return a Thread managing the mount.
     '''
     fs = self._vtfs
     S = fs.S
@@ -989,5 +1020,4 @@ class StoreFS_LLFUSE(llfuse.Operations):
 StoreFS = StoreFS_LLFUSE
 
 if __name__ == '__main__':
-  from .vtfuse_tests import selftest
-  selftest(sys.argv)
+  sys.exit(main(sys.argv))

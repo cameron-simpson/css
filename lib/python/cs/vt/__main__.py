@@ -14,8 +14,8 @@ import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, realpath, splitext, \
-    exists as existspath, join as joinpath, \
+from os.path import basename, realpath, splitext, expanduser, \
+    exists as pathexists, join as joinpath, \
     isdir as isdirpath, isfile as isfilepath
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
@@ -34,7 +34,7 @@ from cs.resources import RunState
 from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
-from . import fromtext, defaults
+from . import fromtext, defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, CopyModes
 from .block import BlockRecord
 from .blockify import blocked_chunks_of
@@ -55,10 +55,10 @@ from .server import serve_tcp, serve_socket
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
 
-def main(argv=None):
+def main(*a, **kw):
   ''' Create a VTCmd instance and call its main method.
   '''
-  return VTCmd().main(argv=argv)
+  return VTCmd().main(*a, **kw)
 
 class VTCmd:
   ''' A main programme instance.
@@ -77,14 +77,17 @@ class VTCmd:
               Default from $VT_STORE, or "[default]", except for
               the "serve" subcommand which defaults to "[server]"
               and ignores $VT_STORE.
-    -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
+    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
+    + DEFAULT_CONFIG_PATH + '''
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
   Subcommands:
     cat filerefs...
+    config
     dump {datafile.vtd|index.gdbm|index.lmdb}
     fsck block blockref...
     import [-oW] path {-|archive.vt}
+    init
     ls [-R] dirrefs...
     mount [-a] [-o {append_only,readonly}] [-r] {Dir|config-clause|archive.vt} [mountpoint [subpath]]
       -a  All dates. Implies readonly.
@@ -101,8 +104,17 @@ class VTCmd:
     unpack archive.vt
 '''
 
-  def main(self, argv=None, environ=None, verbose=None):
-    ''' The main function for this programme.
+  def main(self, argv=None, environ=None, verbose=None, subcmd=None):
+    ''' The main function for cs.vt.
+
+        Parameters:
+        * `argv`: the command line arguments,
+          default from `sys.argv`.
+        * `environ`: the environment variable mapping,
+          default from `os.environ`.
+        * `verbose`: verbose mode, also activated by the `-v` option.
+        * `subcmd`: which subcommand to run,
+          default from the first argument after the options.
     '''
     global loginfo
     if argv is None:
@@ -132,7 +144,7 @@ class VTCmd:
     setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
     ####cs.x.X_logger = logging.getLogger()
 
-    config_path = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
+    config_path = os.environ.get('VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH))
     store_spec = None
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
@@ -198,7 +210,7 @@ class VTCmd:
       signal(SIGQUIT, sig_handler)
 
       try:
-        xit = self.cmd_op(args)
+        xit = self.cmd_op(args, op=subcmd)
       except GetoptError as e:
         error("%s", e)
         badopts = True
@@ -215,14 +227,15 @@ class VTCmd:
 
     return xit
 
-  def cmd_op(self, args):
+  def cmd_op(self, args, op=None):
     ''' Run a subcommand from `args`.
     '''
-    try:
-      op = args[0]
-    except IndexError:
-      raise GetoptError("missing command")
-    args = args[1:]
+    if op is None:
+      try:
+        op = args[0]
+      except IndexError:
+        raise GetoptError("missing command")
+      args = args[1:]
     with Pfx(op):
       if op == "profile":
         return self.cmd_profile(args)
@@ -231,7 +244,7 @@ class VTCmd:
       except AttributeError:
         raise GetoptError("unknown subcommand \"%s\"" % (op,))
       # these commands run without a context Store
-      if op in ("dump", "scan", "test"):
+      if op in ("config", "dump", "init", "scan", "test"):
         return op_func(args)
       # open the default Store
       if self.store_spec is None:
@@ -323,6 +336,14 @@ class VTCmd:
       raise GetoptError("missing filerefs")
     for path in args:
       cat(path)
+    return 0
+
+  def cmd_config(self, args):
+    ''' Recite the configuration.
+    '''
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    self.config.write(sys.stdout)
     return 0
 
   def cmd_dump(self, args):
@@ -483,6 +504,38 @@ class VTCmd:
         else:
           warning("archive not updated")
     return xit
+
+  def cmd_init(self, args):
+    ''' Install a default config and initialise the configured datadir Stores.
+    '''
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    config = self.config
+    config_path = config.path
+    try:
+      if not pathexists(config_path):
+        info("write %r", config_path)
+        with Pfx(config_path):
+          with open(config_path, 'w') as cfg:
+            self.config.write(cfg)
+      basedir = config.basedir
+      if not isdirpath(basedir):
+        with Pfx("basedir"):
+          info("mkdir %r", basedir)
+          with Pfx("mkdir(%r)", basedir):
+            os.mkdir(basedir)
+      for clause_name, clause in sorted(config.map.items()):
+        with Pfx("%s[%s]", shortpath(config_path), clause_name):
+          if clause_name == 'GLOBAL':
+            continue
+          store_type = clause.get('type')
+          if store_type == 'datadir':
+            S = config[clause_name]
+            S.init()
+    except OSError as e:
+      error("init failed: %s", e)
+      return 1
+    return 0
 
   def cmd_ls(self, args):
     ''' Do a directory listing of the specified I<dirrefs>.
@@ -685,6 +738,9 @@ class VTCmd:
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
+        except Exception as e:
+          exception("unexpected exception: %s", e)
+          xit = 1
         finally:
           if T:
             T.join()
@@ -708,7 +764,7 @@ class VTCmd:
       raise GetoptError("extra arguments after path: %r" % (args,))
     modes = CopyModes(trust_size_mtime=True)
     with Pfx(ospath):
-      if not existspath(ospath):
+      if not pathexists(ospath):
         error("missing")
         return 1
       arpath = ospath + '.vt'
@@ -914,7 +970,7 @@ class VTCmd:
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
     if args:
       raise GetoptError("extra arguments after archive name %r" % (arpath,))
-    if existspath(arbase):
+    if pathexists(arbase):
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):

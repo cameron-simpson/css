@@ -9,7 +9,7 @@
 '''
 
 from contextlib import contextmanager
-from os.path import exists as existspath
+from os.path import exists as pathexists
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
@@ -49,7 +49,7 @@ def choose(basepath, preferred_indexclass=None):
     if not indexclass.is_supported():
       continue
     indexpath = indexclass.pathof(basepath)
-    if existspath(indexpath):
+    if pathexists(indexpath):
       return indexclass
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():

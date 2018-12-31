@@ -87,7 +87,12 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-exec 2>>"$logfile" 1>&2
+bg=1; [ -t 1 ] && bg=
+
+[ $bg ] && exec 2>>"$logfile" 1>&2
 
 lock -P "$tags" $trace ctags -a -o "$tags" --tag-relative --links=no --extra=fq "$@" &
+
+[ $bg ] || wait
+
 exit 0

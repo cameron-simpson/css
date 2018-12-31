@@ -14,10 +14,12 @@ It is presented here in its own module for reuse.
 It normally writes directly to `sys.stderr` but accepts an optional
 keyword argument `file` to specify a different filelike object.
 If `file` is not specified, its behaviour is further tweaked with
-the globals `X_logger` or `X_via_tty`:
+the globals `X_discard`, `X_logger` and `X_via_tty`:
 if X_logger then log a warning to that logger;
-otherwise, if X_via_tty then open /dev/tty and write the message to it;
-otherwise, write the message to sys.stderr.
+otherwise if X_via_tty then open /dev/tty and write the message to it;
+otherwise if X_discard then discard the message;
+otherwise write the message to sys.stderr.
+`X_discard`'s default value is `not sys.stderr.isatty()`.
 '''
 
 from __future__ import print_function
@@ -34,6 +36,13 @@ DISTINFO = {
     'install_requires': ['cs.ansi_colour'],
 }
 
+# discard output? the default if sys.stderr is not a tty
+try:
+  isatty = sys.stderr.isatty
+except AttributeError:
+  X_discard = True
+else:
+  X_discard = not isatty()
 # set to a logger to log as a warning
 X_logger = None
 # set to true to write direct to /dev/tty
@@ -52,8 +61,9 @@ def X(msg, *args, **kw):
         to render the text in that colour.
 
       If `file` is not None, write to it unconditionally;
-      otherwise, if X_logger then log a warning to that logger;
-      otherwise, if X_via_tty then open /dev/tty and write the message to it;
+      otherwise if X_logger then log a warning to that logger;
+      otherwise if X_via_tty then open /dev/tty and write the message to it;
+      otherwise if X_discard then discard the message;
       otherwise write the message to sys.stderr.
   '''
   fp = kw.pop('file', None)
@@ -78,7 +88,9 @@ def X(msg, *args, **kw):
           fp.write('\n')
       except (IOError, OSError) as e:
         X("X: cannot write to /dev/tty: %s", e, file=sys.stderr)
-      else:
-        return
+        X(msg, file=sys.stderr)
+      return
+    if X_discard:
+      return
     fp = sys.stderr
   print(msg, file=fp)

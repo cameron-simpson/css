@@ -26,6 +26,18 @@ from cs.result import Result
 from cs.seq import seq, Seq
 from cs.threads import locked
 
+DISTINFO = {
+    'description': "general purpose bidirectional packet stream connection",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: System :: Networking",
+    ],
+    'install_requires': ['cs.logutils', 'cs.pfx'],
+}
+
 # default pause before flush to allow for additional packet data to arrive
 DEFAULT_PACKET_GRACE = 0.01
 
@@ -139,7 +151,7 @@ class PacketConnection(object):
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
         * `request_handler`: an optional callable accepting
-          (`rq_type`, `flags`, `payload`).  
+          (`rq_type`, `flags`, `payload`).
           The request_handler may return one of 5 values on success:
           * `None`: response will be 0 flags and an empty payload.
           * `int`: flags only. Response will be the flags and an empty payload.
@@ -435,7 +447,7 @@ class PacketConnection(object):
                       channel, tag, self.request_handler,
                       rq_type, flags, payload)
                   self._running.add(LF)
-                  LF.notify(lambda LF: self._running.remove(LF))
+                  LF.notify(self._running.remove)
           else:
             with Pfx("response[%d:%d]", channel, tag):
               # response: get state of matching pending request, remove state
@@ -460,7 +472,7 @@ class PacketConnection(object):
                     # decode payload
                     try:
                       result = decode_response(flags, payload)
-                    except Exception as e:
+                    except Exception:
                       R.exc_info = sys.exc_info()
                     else:
                       R.result = (True, flags, result)

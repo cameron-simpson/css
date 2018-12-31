@@ -40,6 +40,12 @@ notably via the following subcommands:
 
 These and other subcommands are detailed below.
 
+## GETTING STARTED
+
+Run the command `vt init`;
+this will create an initial `~/.vtrc` file
+and empty default Stores.
+
 ## OPTIONS
 
 `-C` *store*
@@ -79,6 +85,17 @@ These and other subcommands are detailed below.
   This is the default if the standard error output is a tty.
 
 ## SUBCOMMANDS
+
+`config`
+
+  Recite the configuration in .ini format.
+
+`init`
+
+  Initialise.
+  Create the .vtrc if missing, with the default configuration.
+  Create the directories for any missing local datadir Stores
+  from the configuration.
 
 `mount` [*option*...] *special* [*mountpoint* [*subpath*]]
 

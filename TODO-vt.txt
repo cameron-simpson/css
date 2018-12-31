@@ -1,3 +1,4 @@
+autocreate basic .vtrc, and put one in the vtrc manual entry and vt.1
 .stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
 SHORTLIST:
   config: socket: replace socket_path with address

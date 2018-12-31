@@ -150,42 +150,44 @@ def main(argv):
               return 1
           changes = list(N.log_since())
           if not changes:
-            error("no changes since last release, not making new release")
+            if force:
+              warning("no changes since last release, making release anyway")
+            else:
+              error("no changes since last release, not making new release")
+              return 1
+          print("Changes since the last release:")
+          for files, firstline in changes:
+            print(" ", ' '.join(files) + ': ' + firstline)
+          print()
+          with pipefrom('readdottext', keep_stdin=True) as dotfp:
+            release_message = dotfp.read().rstrip()
+          if not release_message:
+            error("empty release message, not making new release")
             xit = 1
           else:
-            print("Changes since the last release:")
-            for files, firstline in changes:
-              print(" ", ' '.join(files) + ': ' + firstline)
-            print()
-            with pipefrom('readdottext', keep_stdin=True) as dotfp:
-              release_message = dotfp.read().rstrip()
-            if not release_message:
-              error("empty release message, not making new release")
+            next_tag = N.next_release_tag()
+            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+              error("aborting release at user request")
               xit = 1
             else:
-              next_tag = N.next_release_tag()
-              if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-                error("aborting release at user request")
-                xit = 1
-              else:
-                rel_dir = os.path.join('release', next_tag)
-                with Pfx("mkdir(%s)", rel_dir):
-                  os.mkdir(rel_dir)
-                summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-                with Pfx(summary_filename):
-                  with open(summary_filename, 'w') as sfp:
-                    print(release_message, file=sfp)
-                changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-                with Pfx(changes_filename):
-                  with open(changes_filename, 'w') as cfp:
-                    for files, firstline in changes:
-                      print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-                VCS = N.vcs
-                VCS.add_files(summary_filename, changes_filename)
-                VCS.commit('Release information for %s.\nSummary:\n%s'
-                           % (next_tag, release_message),
-                           summary_filename, changes_filename)
-                VCS.tag(next_tag)
+              rel_dir = os.path.join('release', next_tag)
+              with Pfx("mkdir(%s)", rel_dir):
+                os.mkdir(rel_dir)
+              summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+              with Pfx(summary_filename):
+                with open(summary_filename, 'w') as sfp:
+                  print(release_message, file=sfp)
+              changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+              with Pfx(changes_filename):
+                with open(changes_filename, 'w') as cfp:
+                  for files, firstline in changes:
+                    print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+              VCS = N.vcs
+              VCS.add_files(summary_filename, changes_filename)
+              VCS.commit('Release information for %s.\nSummary:\n%s'
+                         % (next_tag, release_message),
+                         summary_filename, changes_filename)
+              VCS.tag(next_tag)
         elif op == 'status':
           tagged = N.last_suffix()
           result = [name, tagged]
@@ -193,6 +195,9 @@ def main(argv):
             lvkey, last_upload = N.last_upload(pypi_flavour)
             if last_upload != tagged:
               result.append("%s:%s" % (pypi_flavour, last_upload))
+          changes = list(N.log_since())
+          if changes:
+            result.append("new-commits:%d" % (len(changes),))
           print(*result)
         else:
           warning("unrecognised op %r", op)
@@ -356,8 +361,10 @@ class Module(object):
     return self._check_status
 
   def _check(self, silent):
-    ok = True
     distinfo = self.DISTINFO
+    if not distinfo:
+      return False
+    ok = True
     install_requires = self.requires
     if install_requires is None:
       silent or error("missing DISTINFO[install_requires]")
@@ -376,6 +383,14 @@ class Module(object):
     # check imports against install_requires
     for name in sorted(self.imports):
       if not name.startswith('cs.'):
+        M = self.modules[name]
+        Mpath = getattr(M.module, '__file__', None)
+        if Mpath and '/site-ackages/' in Mpath:
+          silent or warning("third party import %r not mentioned in install_requires", name)
+          ok = False
+        continue
+      if name.endswith('_tests'):
+        # tests are part of another package: ignore
         continue
       if name == pkg_name:
         # tests usually import the package - this is not a dependency
@@ -386,6 +401,11 @@ class Module(object):
       if name not in install_requires:
         silent or warning("import %r not mentioned in install_requires", name)
         ok = False
+        continue
+      M = self.modules[name]
+      if not M.check(silent):
+        ok = False
+        continue
     for name in sorted(install_requires):
       if name not in self.imports:
         silent or warning("requirement %r not imported", name)
@@ -409,14 +429,20 @@ class Module(object):
         for lineno, line in enumerate(codefp, 1):
           with Pfx(lineno):
             if line.startswith('import ') or line.startswith('from '):
-              words = line.strip().split()
+              line = line.strip()
+              # quick hack to strip trailing "; second-statement"
+              try:
+                line, _ = line.split(';', 1)
+              except ValueError:
+                pass
+              words = line.split()
               if not words:
                 continue
               if words[0] == 'import' or words[0] == 'from':
                 if len(words) < 2:
                   silent or warning("missing module name")
                   continue
-                subimport0 = subimport = words[1]
+                subimport = words[1]
                 if subimport == '.':
                   # don't recurse into ourself
                   pkg_name = self.package_name
@@ -534,10 +560,10 @@ class ReleaseName(object):
       ok = False
     unreleased_changes = list(self.log_since())
     if unreleased_changes:
-      show_log = not silent and ok
+      show_log = False and not silent and ok
       ok = False
       if not silent:
-        error("unreleased changes")
+        error("%d unreleased changes", len(unreleased_changes))
         if show_log:
           for files, firstline in unreleased_changes:
             files = [
@@ -663,7 +689,10 @@ class ReleaseName(object):
           warning("submitting anyway")
         else:
           return
-      with Pfx("%r->%r", last_pypi_release, last_suffix):
+      with Pfx(
+          "%s->%r",
+          repr(last_pypi_release) if last_pypi_release else '',
+          last_suffix):
         defaults = dict(DISTINFO_DEFAULTS)
         PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         PKG.upload()

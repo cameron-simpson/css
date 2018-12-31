@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 from random import randint
-from cs.py3 import bytes
 
 def rand0(maxn):
   ''' Generate a pseudorandom interger from 0 to `maxn`-1.
