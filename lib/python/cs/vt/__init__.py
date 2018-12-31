@@ -42,13 +42,11 @@ DISTINFO = {
         'cs.binary',
         'cs.binary_tests',
         'cs.cache',
-        'cs.configutils',
         'cs.debug',
         'cs.deco',
         'cs.env',
         'cs.excutils',
         'cs.fileutils',
-        'cs.html',
         'cs.inttypes',
         'cs.later',
         'cs.lex',
@@ -70,6 +68,7 @@ DISTINFO = {
         'cs.tty',
         'cs.units',
         'cs.x',
+        'lmdb',
     ],
     'entry_points': {
         'console_scripts': [
