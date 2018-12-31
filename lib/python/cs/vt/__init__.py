@@ -31,7 +31,8 @@ from cs.x import X
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        "Development Status :: 3 - Alpha",
+        ##"Development Status :: 3 - Alpha",
+        "Development Status :: 2 - Pre-Alpha",
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
