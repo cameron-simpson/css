@@ -44,10 +44,10 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         If `pid` is a string, treat as a process id file and read the
         process id from it.
       * `signum`: the signal to send, default `signal.SIGTERM`.
-      * `wait`: whether to wait for the process, default `None`. 
-        If `None`, return `True` (signal delivered). 
+      * `wait`: whether to wait for the process, default `None`.
+        If `None`, return `True` (signal delivered).
         If `0`, wait indefinitely until the process exits as tested by
-        `os.kill(pid, 0)`. 
+        `os.kill(pid, 0)`.
         If greater than 0, wait up to `wait` seconds for the process to die;
         if it exits, return `True`, otherwise `False`;
       * `do_SIGKILL`: if true (default `False`),
@@ -234,9 +234,9 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
       * `max_argv`: optional, the maximum length of each distributed
         argument list, default: MAX_ARGV
       * `encode`: default False.
-        If true, encode the argv sequences into bytes for accurate tallying. 
+        If true, encode the argv sequences into bytes for accurate tallying.
         If `encode` is a Boolean,
-        encode the elements with their .encode() method. 
+        encode the elements with their .encode() method.
         If `encode` is a `str`, encode the elements with their `.encode()`
         method with `encode` as the encoding name;
         otherwise presume that `encode` is a callable
