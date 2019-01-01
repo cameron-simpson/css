@@ -6,16 +6,6 @@
 
 r'''
 Stuff to do with counters, sequences and iterables.
-
-Presents:
-
-* Seq, a class for thread safe sequential integer generation.
-
-* seq(), a function to return such a number from a default global Seq instance.
-
-* the(), first(), last(), get0(): return the only, first, last or optional-first element of an iterable respectively.
-
-* TrackingCounter, a counting object with facilities for users to wait for it to reach arbitrary values.
 '''
 
 import heapq
@@ -113,9 +103,15 @@ def get0(iterable, default=None):
     return i
 
 def tee(iterable, *Qs):
-  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
-      `Qs`: the queues, objects accepting a .put method.
-      Note: the item is .put onto every queue before being yielded from this generator.
+  ''' A generator yielding the items from an iterable
+      which also copies those items to a series of queues.
+
+      Parameters:
+      * `iterable`: the iterable to copy
+      * `Qs`: the queues, objects accepting a `.put` method.
+
+      Note: the item is `.put` onto every queue
+      before being yielded from this generator.
   '''
   for item in iterable:
     for Q in Qs:
@@ -124,14 +120,18 @@ def tee(iterable, *Qs):
 
 def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
-      `reverse`: if true, yield items in reverse order
-                 this requires the iterables themselves to also be in
-                 reversed order
-      It relies on the source iterables being ordered and their elements
-      being comparable, through slightly misordered iterables (for example,
-      as extracted from web server logs) will produce only slightly
-      misordered results, as the merging is done on the basis of the front
-      elements of each iterable.
+
+      Parameters:
+      * `iters`: an iterable of iterators
+      * `reverse`: if true, yield items in reverse order.
+        This requires the iterables themselves to also be in
+        reversed order.
+
+      This function relies on the source iterables being ordered
+      and their elements being comparable, through slightly misordered
+      iterables (for example, as extracted from web server logs)
+      will produce only slightly misordered results, as the merging
+      is done on the basis of the front elements of each iterable.
   '''
   reverse = kw.get('reverse', False)
   if kw:
