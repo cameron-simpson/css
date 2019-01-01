@@ -84,14 +84,6 @@ DISTINFO = {
     ],
 }
 
-try:
-  import builtins
-except ImportError:
-  pass
-else:
-  if not hasattr(builtins, 'X'):
-    builtins.X = lambda msg, *a: None
-
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
