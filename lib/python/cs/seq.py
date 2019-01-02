@@ -6,6 +6,10 @@
 
 r'''
 Stuff to do with counters, sequences and iterables.
+
+Note that any function accepting an iterable
+will consume some or all of the derived iterator
+in the course of its function.
 '''
 
 import heapq
@@ -123,7 +127,7 @@ def imerge(*iters, **kw):
 
       Parameters:
       * `iters`: an iterable of iterators
-      * `reverse`: if true, yield items in reverse order.
+      * `reverse`: keyword parameter: if true, yield items in reverse order.
         This requires the iterables themselves to also be in
         reversed order.
 
@@ -170,13 +174,15 @@ def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
       passing every element of the sequence to the function, expecting a
       single value back.
+
       Example:
-        class X(list):
-          @onetoone
-          def lower(self, item):
-            return item.lower()
-        strs = X(['Abc', 'Def'])
-        lower_strs = X.lower()
+
+            class X(list):
+                  @onetoone
+                  def lower(self, item):
+                        return item.lower()
+            strs = X(['Abc', 'Def'])
+            lower_strs = X.lower()
   '''
   def gather(self, *a, **kw):
     ''' Yield the results of calling the function on each item.
@@ -189,13 +195,15 @@ def onetomany(func):
   ''' A decorator for a method of a sequence to merge the results of
       passing every element of the sequence to the function, expecting
       multiple values back.
+
       Example:
-        class X(list):
-          @onetomany
-          def chars(self, item):
-            return item
-        strs = X(['Abc', 'Def'])
-        all_chars = X.chars()
+
+            class X(list):
+                  @onetomany
+                  def chars(self, item):
+                        return item
+            strs = X(['Abc', 'Def'])
+            all_chars = X.chars()
   '''
   def gather(self, *a, **kw):
     ''' Chain the function results together.
@@ -224,9 +232,11 @@ def isordered(s, reverse=False, strict=False):
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
+
       A facility is provided to wait for the counter to reach a specific value.
       The .inc and .dec methods also accept a `tag` argument to keep
       individual counts based on the tag to aid debugging.
+
       TODO: add `strict` option to error and abort if any counter tries
       to go below zero.
   '''
@@ -323,8 +333,8 @@ class StatefulIterator(object):
   ''' A trivial iterator which wraps another iterator to expose some tracking state.
 
       This has 2 attributes:
-      .it, the internal iterator which should yield (item, new_state)
-      .state, the last state value from the internal iterator
+      * `.it`: the internal iterator which should yield `(item,new_state)`
+      * `.state`: the last state value from the internal iterator
 
       The originating use case is resuse of an iterator by independent
       calls that are typically sequential, specificly the .read
