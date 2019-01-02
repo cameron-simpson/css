@@ -28,11 +28,11 @@ DISTINFO = {
 }
 
 # various standard locations used in the cs.* modules
-LOGDIR = lambda environ=None: get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
-VARRUN = lambda environ=None: get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
-FLAGDIR = lambda environ=None: get_standard_var('FLAGDIR', '$HOME/var/flags', environ=environ)
+LOGDIR = lambda environ=None: _get_standard_var('LOGDIR', '$HOME/var/log', environ=environ)
+VARRUN = lambda environ=None: _get_standard_var('VARRUN', '$HOME/var/run', environ=environ)
+FLAGDIR = lambda environ=None: _get_standard_var('FLAGDIR', '$HOME/var/flags', environ=environ)
 
-def get_standard_var(varname, default, environ=None):
+def _get_standard_var(varname, default, environ=None):
   if environ is None:
     environ = os.environ
   value = environ.get(varname)
@@ -42,12 +42,14 @@ def get_standard_var(varname, default, environ=None):
 
 def getenv(var, default=None, environ=None, dosub=False):
   ''' Fetch environment value.
-      `var`: name of variable to fetch.
-      `default`: default value if not present. If not specified or None,
+
+      Parameters:
+      * `var`: name of variable to fetch.
+      * `default`: default value if not present. If not specified or None,
           raise KeyError.
-      `environ`: environment mapping, default os.environ.
-      `dosub`: if true, use envsub() to perform environment variable
-          substitution on `default` if it used. Default value is False.
+      * `environ`: environment mapping, default `os.environ`.
+      * `dosub`: if true, use envsub() to perform environment variable
+          substitution on `default` if it used. Default value is `False`.
   '''
   if environ is None:
     environ = os.environ
@@ -62,9 +64,11 @@ def getenv(var, default=None, environ=None, dosub=False):
 
 def envsub(s, environ=None, default=None):
   ''' Replace substrings of the form '$var' with the value of 'var' from environ.
-      `environ`: environment mapping, default os.environ.
-      `default`: value to substitute for unknown vars;
-              if `default` is None a ValueError is raised.
+
+      Parameters:
+      * `environ`: environment mapping, default `os.environ`.
+      * `default`: value to substitute for unknown vars;
+              if `default` is `None` a `ValueError` is raised.
   '''
   if environ is None:
     environ = os.environ
