@@ -34,7 +34,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.py.func',
-        'cs.py3'
+        'cs.py3',
         'cs.queues',
         'cs.seq',
     ],
