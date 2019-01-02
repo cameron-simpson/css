@@ -1,0 +1,9 @@
+  lib/python/cs/README-env.rst: merge pypi ==> default: move misfiled functions from cs.cmdutils to cs.psutils, do more module releases
+  lib/python/cs/README-env.rst: merge default ==> beyonwiz
+  lib/python/cs/README-env.rst: merge default ==> iphoto
+  lib/python/cs/README-env.rst: merge default ==> venti
+  lib/python/cs/README-env.rst: merge default ==> later
+  lib/python/cs/README-env.rst: merge later ==> pilfer
+  lib/python/cs/README-env.rst: merge default ==> media
+  lib/python/cs/env.py: cs.env: drop getLogin and getHomeDir, unused
+  lib/python/cs/env.py: cs.env: make get_standard_var private as _get_standard_var; docstring tweaks
