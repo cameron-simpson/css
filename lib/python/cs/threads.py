@@ -44,8 +44,8 @@ def bg(func, daemon=None, name=None):
   ''' Dispatch the callable `func` in its own Thread; return the Thread.
 
       Parameters:
-      `daemon`: optional argument specifying the .daemon attribute.
-      `name`: optional argument specifying the Thread name.
+      * `daemon`: optional argument specifying the .daemon attribute.
+      * `name`: optional argument specifying the Thread name.
   '''
   T = Thread(name=name, target=func)
   if daemon is not None:
