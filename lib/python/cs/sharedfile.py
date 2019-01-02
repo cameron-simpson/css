@@ -32,7 +32,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': [
+    'install_requires': [
         'cs.filestate',
         'cs.lex',
         'cs.logutils',
