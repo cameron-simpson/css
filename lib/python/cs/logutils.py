@@ -105,41 +105,45 @@ def setup_logging(
       line error messaging; return an object with informative attributes.
 
       Parameters:
-      * `cmd_name`: program name, default from basename(sys.argv[0]).
-        Side-effect: sets cs.pfx.cmd to this value.
-      * `main_log`: default logging system. If None, the main log will go to
-        sys.stderr; if `main_log` is a string, is it used as a filename to
-        open in append mode; otherwise main_log should be a stream suitable
-        for use with logging.StreamHandler().
-        The resulting log handler is added to the logging root logger.
-      * `format`: the message format for `main_log`. If None, use
-        DEFAULT_PFX_FORMAT_TTY when `main_log` is a tty or FIFO,
-        otherwise DEFAULT_PFX_FORMAT.
-      * `level`: `main_log` logging level. If None, infer a level
-        from the environment using infer_logging_level().
-      * `flags`: a string containing debugging flags separated by
-        commas. If None, infer the flags from the environment using
-        infer_logging_level().
+      * `cmd_name`: program name, default from `basename(sys.argv[0])`.
+        Side-effect: sets `cs.pfx.cmd` to this value.
+      * `main_log`: default logging system.
+        If None, the main log will go to sys.stderr;
+        if `main_log` is a string, is it used as a filename to
+        open in append mode;
+        otherwise main_log should be a stream suitable
+        for use with `logging.StreamHandler()`.
+        The resulting log handler is added to the `logging` root logger.
+      * `format`: the message format for `main_log`.
+        If `None`, use `DEFAULT_PFX_FORMAT_TTY`
+        when `main_log` is a tty or FIFO,
+        otherwise `DEFAULT_PFX_FORMAT`.
+      * `level`: `main_log` logging level.
+        If None, infer a level from the environment
+        using `infer_logging_level()`.
+      * `flags`: a string containing debugging flags separated by commas.
+        If `None`, infer the flags from the environment using
+        `infer_logging_level()`.
         The following flags have meaning:
-        `D``: set cs.logutils.D_mode to True;
+        `D`: set cs.logutils.D_mode to True;
         `TDUMP`: attach a signal handler to SIGHUP to do a thread stack dump;
         `TRACE`: enable various noisy tracing facilities;
         `UPD`, `NOUPD`: set the default for `upd_mode` to True or False respectively.
-      * `upd_mode`: a Boolean to activate cs.upd as the `main_log`
-        method; if None, set it to True if `flags` contains 'UPD',
-        otherwise to False if `flags` contains 'NOUPD', otherwise set
-        it to False (was from main_log.isatty()).
-        A true value causes the root logger to use cs.upd for logging.
-      * `ansi_mode`: if None, set it from main_log.isatty().
+      * `upd_mode`: a Boolean to activate cs.upd as the `main_log` method;
+        if `None`, set it to `True` if `flags` contains 'UPD',
+        otherwise to `False` if `flags` contains 'NOUPD',
+        otherwise set it to `False` (was from main_log.isatty()).
+        A true value causes the root logger to use `cs.upd` for logging.
+      * `ansi_mode`: if `None`, set it from `main_log.isatty()`.
         A true value causes the root logger to colour certain logging levels
-        using ANSI terminal sequences (currently only if cs.upd is used).
-      * `trace_mode`: if None, set it according to the presence of
+        using ANSI terminal sequences (currently only if `cs.upd` is used).
+      * `trace_mode`: if `None`, set it according to the presence of
         'TRACE' in flags. Otherwise if `trace_mode` is true, set the
         global `trace_level` to `logging_level`; otherwise it defaults
         to `logging.DEBUG`.
-      * `verbose`: if None, then if stderr is a tty then the log
-        level is INFO otherwise WARNING. Otherwise, if `verbose` is
-        true then the log level is INFO otherwise WARNING.
+      * `verbose`: if `None`, then if stderr is a tty then the log
+        level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
+        true then the log level is `INFO` otherwise `WARNING`.
   '''
   global logging_level, trace_level, D_mode, loginfo
   import cs.pfx
@@ -307,6 +311,7 @@ class PfxFormatter(Formatter):
 
   def __init__(self, fmt=None, datefmt=None, cmd=None):
     ''' Initialise the PfxFormatter.
+
         `fmt` and `datefmt` are passed to Formatter.
         If `fmt` is None, DEFAULT_PFX_FORMAT is used.
         If `cmd` is not None, the message is prefixed with the string `cmd`.
@@ -513,9 +518,12 @@ def logException(exc_type, exc_value, exc_tb):
 
 def OBSOLETE(func):
   ''' Decorator for obsolete functions.
+
       Use:
-        @OBSOLETE
-        def f(...):
+
+          @OBSOLETE
+          def f(...):
+
       This emits a warning log message before calling the decorated function.
   '''
   def wrapped(*args, **kwargs):
@@ -571,16 +579,18 @@ class LogTime(object):
   '''
   def __init__(self, tag, *args, **kwargs):
     ''' Set up a LogTime.
-        `tag`: label included at the start of the log entry
-        `args`: optional array; if not empty `args` is applied to
+
+        Parameters:
+        * `tag`: label included at the start of the log entry
+        * `args`: optional array; if not empty `args` is applied to
           `tag` with `%`
-        `level`: keyword argument specifying a log level for a
+        * `level`: keyword argument specifying a log level for a
           default log entry, default `logging.INFO`
-        `threshold`: keyword argument specifying minimum time to
+        * `threshold`: keyword argument specifying minimum time to
           cause a log, default None (no minimum)
-        `warning_level`: keyword argument specifying the log level
+        * `warning_level`: keyword argument specifying the log level
           for a warning log entry, default `logging.WARNING`
-        `warning_threshold`: keyword argument specifying a time
+        * `warning_threshold`: keyword argument specifying a time
           which raises the log level to `warning_level`
     '''
     threshold = kwargs.pop('threshold', 1.0)
@@ -611,18 +621,21 @@ class LogTime(object):
     return False
 
 class UpdHandler(StreamHandler):
-  ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
+  ''' A `StreamHandler` subclass whose `.emit` method
+      uses a `cs.upd.Upd` for transcription.
   '''
 
   def __init__(self, strm=None, nl_level=None, ansi_mode=None):
     ''' Initialise the UpdHandler.
-        `strm` is the output stream, default sys.stderr.
-        `nl_level` is the logging level at which conventional line-of-text
-        output is written; log messages of a lower level go via the
-        update-the-current-line method. Default is logging.WARNING.
-        If `ansi_mode` is None, set if from strm.isatty().
-        A true value causes the handler to colour certain logging levels
-        using ANSI terminal sequences.
+
+        Parameters:
+        * `strm`: the output stream, default sys.stderr.
+        * `nl_level`: the logging level at which conventional line-of-text
+          output is written; log messages of a lower level go via the
+          update-the-current-line method. Default is logging.WARNING.
+        * `ansi_mode`: if `None`, set from `strm.isatty()`.
+          A true value causes the handler to colour certain logging levels
+          using ANSI terminal sequences.
     '''
     if strm is None:
       strm = sys.stderr
