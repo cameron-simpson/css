@@ -521,6 +521,7 @@ class RunState(object):
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a RunState.
+
       Provides: .runstate, .cancelled, .running, .stopping, .stopped.
   '''
   def __init__(self, runstate=None):
