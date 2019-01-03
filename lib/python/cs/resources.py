@@ -16,7 +16,6 @@ from cs.logutils import error, warning
 from cs.obj import O, Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
-from cs.x import X
 
 DISTINFO = {
     'description': "resourcing related classes and functions",
@@ -139,7 +138,7 @@ class MultiOpenMixin(O):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown() and return its value.
 
-        Paramaters:
+        Parameters:
         * `enforce_final_close`: if true, the caller expects this to
           be the final close for the object and a RuntimeError is
           raised if this is not actually the case.
@@ -207,6 +206,7 @@ class MultiOpenMixin(O):
 
   def join(self):
     ''' Join this object.
+
         Wait for the internal _finalise Condition (if still not None).
         Normally this is notified at the end of the shutdown procedure
         unless the object's `finalise_later` parameter was true.
@@ -279,22 +279,25 @@ class MultiOpen(MultiOpenMixin):
 
 class Pool(O):
   ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
+
       All the pool objects must be suitable for use, so the
-      `new_object` callable will typically be a closure. For example,
-      here is the __init__ for a per-thread AWS Bucket using a
+      `new_object` callable will typically be a closure.
+      For example, here is the __init__ for a per-thread AWS Bucket using a
       distinct Session:
 
-      def __init__(self, bucket_name):
-        Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
+          def __init__(self, bucket_name):
+              Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
   '''
 
   def __init__(self, new_object, max_size=None, lock=None):
     ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
-        `new_object` is a callable which returns a new object for the Pool.
-        `max_size`: The maximum size of the pool of available objects saved for reuse.
-            If omitted or None, defaults to 4.
+
+        Parameters:
+        * `new_object` is a callable which returns a new object for the Pool.
+        * `max_size`: The maximum size of the pool of available objects saved for reuse.
+            If omitted or `None`, defaults to 4.
             If 0, no upper limit is applied.
-        `lock`: optional shared Lock; if omitted or None a new Lock is allocated
+        * `lock`: optional shared Lock; if omitted or `None` a new Lock is allocated
     '''
     O.__init__(self)
     if max_size is None:
@@ -338,12 +341,13 @@ class RunState(object):
 
       Monitor or daemon processes can poll the RunState to see when
       they should terminate, and may also manage the overall state
-      easily using a context manager. Example:
+      easily using a context manager.
+      Example:
 
-        def monitor(self):
-          with self.runstate:
-            while not self.runstate.cancelled:
-              ... main loop body here ...
+          def monitor(self):
+              with self.runstate:
+                  while not self.runstate.cancelled:
+                      ... main loop body here ...
 
       A RunState has three main methods:
       * `.start()`: set .running and clear .cancelled
@@ -517,6 +521,7 @@ class RunState(object):
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a RunState.
+
       Provides: .runstate, .cancelled, .running, .stopping, .stopped.
   '''
   def __init__(self, runstate=None):

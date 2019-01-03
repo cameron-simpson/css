@@ -4,6 +4,9 @@
 #   - Cameron Simpson <cs@cskk.id.au> 10mar2015
 #
 
+''' A few ad hoc numeric alogrithms: `factors` and `primes`.
+'''
+
 DISTINFO = {
     'description': "some numeric functions; currently primes() and factors()",
     'keywords': ["python2", "python3"],

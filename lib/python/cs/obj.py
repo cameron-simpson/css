@@ -8,12 +8,9 @@ Convenience facilities for objects.
 
 Presents:
 * flavour, for deciding whether an object resembles a mapping or sequence.
-
 * O, an object subclass with a nice __str__ and convenient __init__.
-
 * Some O_* functions for working with objects, particularly O subclasses.
-
-* Proxy, a very simple minded object proxy intened to aid debugging.
+* Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
 from __future__ import print_function
@@ -37,9 +34,9 @@ T_SCALAR = 'SCALAR'
 
 def flavour(obj):
   """ Return constants indicating the ``flavour'' of an object:
-      T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
-      T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
-      T_SCALAR: Anything else.
+      * `T_MAP`: DictType, DictionaryType, objects with an __keys__ or keys attribute.
+      * `T_SEQ`: TupleType, ListType, objects with an __iter__ attribute.
+      * `T_SCALAR`: Anything else.
   """
   t = type(obj)
   if isinstance(t, (tuple, list)):
@@ -58,10 +55,13 @@ def flavour(obj):
 #
 def O_merge(o, _conflict=None, _overwrite=False, **kw):
   ''' Merge key:value pairs from a mapping into an O as attributes.
+
       Ignore keys that do not start with a letter.
       New attributes or attributes whose values compare equal are
       merged in. Unequal values are passed to:
-        _conflict(o, attr, old_value, new_value)
+
+          _conflict(o, attr, old_value, new_value)
+
       to resolve the conflict. If _conflict is omitted or None
       then the new value overwrites the old if _overwrite is true.
   '''
@@ -85,8 +85,9 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
           _conflict(o, attr, ovalue, value)
 
 def O_attrs(o):
-  ''' Yield attribute names from o which are pertinent to O_str.
-      Note: this calls getattr(o, attr) to inspect it in order to
+  ''' Yield attribute names from `o` which are pertinent to `O_str`.
+
+      Note: this calls `getattr(o,attr)` to inspect it in order to
       prune callables.
   '''
   omit = getattr(o, '_O_omit', ())
@@ -100,6 +101,8 @@ def O_attrs(o):
         yield attr
 
 def O_attritems(o):
+  ''' Generator yielding `(attr,value)` for relevant attributes of `o`.
+  '''
   for attr in O_attrs(o):
     try:
       value = getattr(o, attr)
@@ -109,6 +112,15 @@ def O_attritems(o):
       yield attr, value
 
 def O_str(o, no_recurse=False, seen=None):
+  ''' Return a `str` representation of the object `o`.
+
+      Parameters:
+      * `o`: the object to describe.
+      * `no_recurse`: if true, do not recurse into the object's structure.
+        Default: `False`.
+      * `seen`: a set of previously sighted objects
+        to prevent recursion loops.
+  '''
   if seen is None:
     seen = set()
   obj_type = type(o)
@@ -143,15 +155,17 @@ def O_str(o, no_recurse=False, seen=None):
   return s
 
 class O(object):
-
   ''' A bare object subclass to allow storing arbitrary attributes.
-      It also has a nicer default str() action.
+
+      It also has a nice default `__str__`
+      and `__eq__` and `__ne__` based on the `O_attrs` of the object.
   '''
 
   _O_recurse = True
 
   def __init__(self, **kw):
     ''' Initialise this O.
+
         Fill in attributes from any keyword arguments if supplied.
         This call can be omitted in subclasses if desired.
     '''
@@ -193,10 +207,13 @@ class O(object):
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
+
        Performs a shallow copy of `self` using copy.copy.
+
        Treat all positional parameters as attribute names, and
        replace those attributes with shallow copies of the original
        attribute.
+
        Treat all keyword arguments as (attribute,value) tuples and
        replace those attributes with the supplied values.
   '''
@@ -226,7 +243,9 @@ def obj_as_dict(o, attr_prefix=None, attr_match=None):
   return obj_attrs
 
 class Proxy(object):
-  ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
+  ''' An extremely simple proxy object
+      that passes all unmatched attribute accesses to the proxied object.
+
       Note that setattr and delattr work directly on the proxy, not the proxied object.
   '''
 
@@ -254,19 +273,19 @@ class TrackedClassMixin(object):
 
       The class to be tracked includes this mixin as a superclass and calls:
 
-        TrackedClassMixin.__init__(class_to_track)
+          TrackedClassMixin.__init__(class_to_track)
 
       from its __init__ method. Note that `class_to_track` is
       typically the class name itself, not `type(self)` which would
       track the specific subclass. At some relevant point one can call:
 
-        self.tcm_dump(class_to_track[, file])
+          self.tcm_dump(class_to_track[, file])
 
       `class_to_track` needs a `tcm_get_state` method to return the
       salient information, such as this from cs.resources.MultiOpenMixin:
 
-        def tcm_get_state(self):
-          return {'opened': self.opened, 'opens': self._opens}
+          def tcm_get_state(self):
+              return {'opened': self.opened, 'opens': self._opens}
 
       See cs.resources.MultiOpenMixin for example use.
   '''
@@ -283,12 +302,21 @@ class TrackedClassMixin(object):
 
   @staticmethod
   def tcm_all_state(cls):
+    ''' Generator yielding tracking information
+        for objects of type `cls`
+        in the form `(o,state)`
+        where `o` if a tracked object
+        and `state` is the object's `get_tcm_state` method result.
+    '''
     m = cls.__map
     for o in m.values():
       yield o, cls.__state(o, cls)
 
   @staticmethod
   def tcm_dump(cls, f=None):
+    ''' Dump the tracking information for `cls` to the file `f`
+        (default `sys.stderr`).
+    '''
     if f is None:
       f = sys.stderr
     for o, state in TrackedClassMixin.tcm_all_state(cls):

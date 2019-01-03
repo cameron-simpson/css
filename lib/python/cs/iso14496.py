@@ -143,7 +143,7 @@ class BoxHeader(Packet):
 
   # speculative max size that will fit in the UInt32BE box_size
   # with room for bigger sizes in the optional UInt64BE length field
-  MAX_BOX_SIZE_32 = 2 ^ 32 -8
+  MAX_BOX_SIZE_32 = 2 ^ 32 - 8
 
   PACKET_FIELDS = {
       'box_size': UInt32BE,
