@@ -27,7 +27,7 @@ from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, logTo
+                        setup_logging, logTo, loginfo
 from cs.pfx import Pfx
 from cs.resources import RunState
 from cs.tty import statusline, ttysize
@@ -400,19 +400,19 @@ class VTCmd:
           error("unparsed text: %r", arg[offset:])
           xit = 1
           continue
-      if isBlock(o):
-        fsck_func = fsck_Block
-      elif isinstance(o, Dir):
-        fsck_func = fsck_Dir
-      else:
-        error("unsupported object type: %s", type(o))
-        xit = 1
-        continue
-      if fsck_func(o):
-        info("OK")
-      else:
-        info("BAD")
-        xit = 1
+        if isBlock(o):
+          fsck_func = fsck_Block
+        elif isinstance(o, Dir):
+          fsck_func = fsck_Dir
+        else:
+          error("unsupported object type: %s", type(o))
+          xit = 1
+          continue
+        if fsck_func(o):
+          info("OK")
+        else:
+          info("BAD")
+          xit = 1
     return xit
 
   @staticmethod
