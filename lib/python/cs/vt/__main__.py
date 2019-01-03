@@ -380,52 +380,38 @@ class VTCmd:
         warning("unsupported file type: %r", path)
     return 0
 
-  def cmd_fsck(self, args):
+  @staticmethod
+  def cmd_fsck(args):
     ''' Data structure inspection/repair.
     '''
     if not args:
-      raise GetoptError("missing fsck type")
-    fsck_type = args.pop(0)
-    with Pfx(fsck_type):
-      try:
-        fsck_op = {
-            "block": self.cmd_fsck_block,
-            "dir": self.cmd_fsck_dir,
-        }[fsck_type]
-      except KeyError:
-        raise GetoptError("unsupported fsck type")
-      return fsck_op()
-
-  def cmd_fsck_block(self, args):
-    ''' Inspect a single Block.
-        TODO: fromtext -> transcribe.
-    '''
+      raise GetoptError("missing fsck objects")
     xit = 0
-    if not args:
-      raise GetoptError("missing blockrefs")
-    for blockref in args:
-      with Pfx(blockref):
-        blockref_bs = fromtext(blockref)
-        B, offset = BlockRecord.value_from_bytes(blockref_bs)
-        if offset < len(blockref_bs):
-          raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
-        if not fsck_Block(B):
-          error("fsck failed")
+    for arg in args:
+      with Pfx(arg):
+        try:
+          o, offset = parse(arg)
+        except ValueError as e:
+          error("does not seem to be a transcription: %s", e)
           xit = 1
-    return xit
-
-  def cmd_fsck_dir(self, args):
-    ''' Inspect a Dir.
-    '''
-    xit = 0
-    if not args:
-      raise GetoptError("missing dirents")
-    for dirent_txt in args:
-      with Pfx(dirent_txt):
-        D = decode_Dirent_text(dirent_txt)
-        if not fsck_dir(D):
-          error("fsck failed")
+          continue
+        if offset != len(arg):
+          error("unparsed text: %r", arg[offset:])
           xit = 1
+          continue
+      if isBlock(o):
+        fsck_func = fsck_Block
+      elif isinstance(o, Dir):
+        fsck_func = fsck_Dir
+      else:
+        error("unsupported object type")
+        xit = 1
+        continue
+      if fsck_func(o):
+        info("OK")
+      else:
+        info("BAD")
+        xit = 1
     return xit
 
   def cmd_import(self, args):
