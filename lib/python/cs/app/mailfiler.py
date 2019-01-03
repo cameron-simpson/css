@@ -4,7 +4,73 @@
 #       - Cameron Simpson <cs@cskk.id.au> 22may2011
 #
 
+''' Mailfiler is my email message filing system.
+
+    It monitors multiple Maildir folders for new messages
+    and files them according to various easy to write rules.
+    Its use in described fully in the mailfiler(1cs) manual entry.
+
+    The rules files are broadly quite simple and described fully
+    in the mailfiler(5cs) manual entry.
+    The rules are normally single line rules of the form:
+
+        target,... label condition
+
+    The the rule always fires
+    then the condition may be omitted.
+
+    The targets may be
+    mail folders (file the message in the named folder),
+    assignment statements (set an environment variable),
+    email addresses (send the message to the specified address)
+    or some other special purpose actions.
+
+    The conditions are usually tests of the email address
+    including whether the address is a member of some group/alias
+    but may also test various things about the message headers.
+'''
+
 from __future__ import print_function
+from collections import namedtuple
+from copy import deepcopy
+from email import message_from_file
+from email.header import decode_header, make_header
+from email.utils import getaddresses
+from getopt import getopt, GetoptError
+from logging import DEBUG
+import os
+import os.path
+import re
+import sys
+import subprocess
+from tempfile import TemporaryFile
+from threading import Lock, RLock
+import time
+from time import sleep
+from cs.app.maildb import MailDB
+from cs.configutils import ConfigWatcher
+from cs.deco import cached
+import cs.env
+from cs.env import envsub
+from cs.excutils import LogExceptions
+from cs.filestate import FileState
+from cs.fileutils import abspath_from_file, longpath, Pathname
+import cs.lex
+from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
+                   get_qstr, match_tokens, get_delimited
+from cs.logutils import setup_logging, with_log, \
+                        debug, info, warning, error, exception, \
+                        LogTime
+from cs.mailutils import Maildir, message_addresses, modify_header, \
+                         shortpath, ismaildir, make_maildir
+from cs.obj import O
+from cs.pfx import Pfx
+from cs.py.func import prop
+from cs.py.modules import import_module_name
+from cs.py3 import unicode as u, StringTypes, ustr
+from cs.rfc2047 import unrfc2047
+from cs.seq import first
+from cs.threads import locked, locked_property
 
 DISTINFO = {
     'description': "email message filing system which monitors multiple inbound Maildir folders",
@@ -13,7 +79,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [
         'cs.app.maildb',
         'cs.configutils',
@@ -40,48 +106,6 @@ DISTINFO = {
     },
 }
 
-from collections import namedtuple
-from copy import deepcopy
-from email import message_from_file
-from email.header import decode_header, make_header
-from email.utils import getaddresses
-from getopt import getopt, GetoptError
-from logging import DEBUG
-import os
-import os.path
-import re
-import sys
-from time import sleep
-if sys.hexversion < 0x02060000: from sets import Set as set
-import subprocess
-from tempfile import TemporaryFile
-from threading import Lock, RLock
-import time
-from cs.app.maildb import MailDB
-from cs.configutils import ConfigWatcher
-from cs.deco import cached
-import cs.env
-from cs.env import envsub
-from cs.excutils import LogExceptions
-from cs.filestate import FileState
-from cs.fileutils import abspath_from_file, longpath, Pathname
-import cs.lex
-from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
-                   get_qstr, match_tokens, get_delimited
-from cs.logutils import setup_logging, with_log, \
-                        debug, info, warning, error, exception, \
-                        D, LogTime
-from cs.mailutils import Maildir, message_addresses, modify_header, \
-                         shortpath, ismaildir, make_maildir
-from cs.obj import O
-from cs.pfx import Pfx
-from cs.py.func import prop
-from cs.py.modules import import_module_name
-from cs.py3 import unicode as u, StringTypes, ustr
-from cs.rfc2047 import unrfc2047
-from cs.seq import first
-from cs.threads import locked, locked_property
-
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
 DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
@@ -90,6 +114,8 @@ DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
 def main(argv=None, stdin=None):
+  ''' Mailfiler main programme.
+  '''
   if argv is None:
     argv = sys.argv
   if stdin is None:
@@ -222,11 +248,15 @@ def scrub_header(value):
   return new_value
 
 class MailFiler(O):
+  ''' A mail filer.
+  '''
 
   def __init__(self, config_path, environ=None):
     ''' Initialise the MailFiler.
-        `config_path`: location of config file, default from DEFAULT_MAILFILER_RC.
-        `environ`: initial environment, default from os.environ.
+
+        Parameters:
+        * `config_path`: location of config file, default from `DEFAULT_MAILFILER_RC`.
+        * `environ`: initial environment, default from os.environ.
     '''
     if config_path is None:
       config_path = envsub(DEFAULT_MAILFILER_RC)
@@ -308,17 +338,31 @@ class MailFiler(O):
 
   @locked_property
   def rules_pattern(self):
+    ''' The filer's `.rules_pattern`.
+    '''
     pattern \
       = self._rules_pattern \
-      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
+      = current_value(
+          'MAILFILER_RULES_PATTERN',
+          self.cfg,
+          'rules_pattern',
+          DEFAULT_RULES_PATTERN,
+          self.environ)
     debug(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
   def rules_pattern(self, pattern):
+    ''' Set the filer's `.rules_pattern`.
+    '''
     self._rules_pattern = pattern
 
   def maildir_from_folderspec(self, folderspec):
-    return Pathname(longpath(folderspec, None,  ( (self.maildir_path + '/', '+'), )))
+    ''' Return the Maildir from `folderspec`.
+    '''
+    return Pathname(longpath(
+        folderspec, None,
+        ( (self.maildir_path + '/', '+'), )
+    ))
 
   def maildir_watcher(self, folderspec):
     ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
@@ -327,12 +371,11 @@ class MailFiler(O):
     watchers = self._maildir_watchers
     with self._lock:
       if folderpath not in watchers:
-        watchers[folderpath] = WatchedMaildir(folderpath,
-                                              self,
-                                              rules_path=envsub(
-                                                self.rules_pattern.format(
-                                                  maildir=folderpath))
-                                             )
+        watchers[folderpath] = WatchedMaildir(
+            folderpath,
+            self,
+            rules_path=envsub(self.rules_pattern.format(maildir=folderpath))
+        )
     return watchers[folderpath]
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
@@ -427,7 +470,7 @@ class MailFiler(O):
     '''
     Ts, offset = get_targets(targets, 0)
     if offset != len(targets):
-      raise ValueError("invalid target specifications: %r", targets)
+      raise ValueError("invalid target specifications: %r" % (targets,))
     filer = MessageFiler(self)
     filer.message = message_from_file(msgfp)
     filer.message_path = None
@@ -463,12 +506,12 @@ class MailFiler(O):
       return filer.file(M, wmdir.rules, wmdir.keypath(key))
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
-    ''' Return the Maildir derived from mdirpath.
-    '''
-    mdirpath = resolve_mail_path(mdirname, maildir_root)
-    if mdirpath not in maildir_cache:
-      maildir_cache[mdirpath] = Maildir(mdirpath, create=True)
-    return maildir_cache[mdirpath]
+  ''' Return the Maildir derived from mdirpath.
+  '''
+  mdirpath = resolve_mail_path(mdirname, maildir_root)
+  if mdirpath not in maildir_cache:
+    maildir_cache[mdirpath] = Maildir(mdirpath, create=True)
+  return maildir_cache[mdirpath]
 
 def resolve_mail_path(mdirpath, maildir_root):
   ''' Return the full path to the requested mail folder.
@@ -482,9 +525,13 @@ def resolve_mail_path(mdirpath, maildir_root):
 
 def save_to_folderpath(folderpath, M, message_path, flags):
   ''' Save the Message `M` to the resolved `folderpath`.
-      `message_path`: pathname of existing message file, allowing
-        hardlinking to new maildir if not None
-      `flags`: save flags as from MessageFiler.flags
+
+      Parameters:
+      * `folderpath`: the path to the target mail folder.
+      * `M`: the message to save.
+      * `message_path`: pathname of existing message file, allowing
+        hardlinking to new maildir if not `None`.
+      * `flags`: save flags as from MessageFiler.flags
   '''
   if not os.path.exists(folderpath):
     make_maildir(folderpath)
@@ -492,12 +539,18 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     # save to Maildir
     mdir = Maildir(folderpath)
     maildir_flags = ''
-    if flags.draft:   maildir_flags += 'D'
-    if flags.flagged: maildir_flags += 'F'
-    if flags.passed:  maildir_flags += 'P'
-    if flags.replied: maildir_flags += 'R'
-    if flags.seen:    maildir_flags += 'S'
-    if flags.trashed: maildir_flags += 'T'
+    if flags.draft:
+      maildir_flags += 'D'
+    if flags.flagged:
+      maildir_flags += 'F'
+    if flags.passed:
+      maildir_flags += 'P'
+    if flags.replied:
+      maildir_flags += 'R'
+    if flags.seen:
+      maildir_flags += 'S'
+    if flags.trashed:
+      maildir_flags += 'T'
     if message_path is None:
       savekey = mdir.save_message(M, flags=maildir_flags)
     else:
@@ -511,15 +564,21 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     # save to mbox
     status = ''
     x_status = ''
-    if flags.draft:   x_status += 'D'
-    if flags.flagged: x_status += 'F'
-    if flags.replied: status += 'R'
-    if flags.passed:  x_status += 'P'
-    if flags.seen:    x_status += 'S'
-    if flags.trashed: x_status += 'T'
-    if len(status) > 0:
+    if flags.draft:
+      x_status += 'D'
+    if flags.flagged:
+      x_status += 'F'
+    if flags.replied:
+      status += 'R'
+    if flags.passed:
+      x_status += 'P'
+    if flags.seen:
+      x_status += 'S'
+    if flags.trashed:
+      x_status += 'T'
+    if status:
       M['Status'] = status
-    if len(x_status) > 0:
+    if x_status:
       M['X-Status'] = x_status
     with LogExceptions():
       text = M.as_string(True).replace('\nFrom ', '\n>From ')
@@ -530,12 +589,13 @@ def save_to_folderpath(folderpath, M, message_path, flags):
 
 class MessageFiler(O):
   ''' A message filing object, filtering state information used during rule evaluation.
-      .maildb   Current MailDB.
-      .environ  Storage for variable settings.
-      .addresses(header)
-                Caching list of addresses from specified header.
+
+      Attributes:
+      * `.maildb`: Current MailDB.
+      * `.environ`: Storage for variable settings.
+      * `.addresses(header)`: Caching list of addresses from specified header.
   '''
- 
+
   maildirs = {}
 
   def __init__(self, context, environ=None):
@@ -601,9 +661,11 @@ class MessageFiler(O):
               T.apply(self)
 
       # use default destination if no save destinations chosen
-      if not self.save_to_folders \
-      and not self.save_to_addresses \
-      and not self.save_to_cmds:
+      if (
+          not self.save_to_folders
+          and not self.save_to_addresses
+          and not self.save_to_cmds
+      ):
         default_save = self.env('DEFAULT', '')
         if not default_save:
           error("no matching targets and no $DEFAULT")
@@ -681,7 +743,8 @@ class MessageFiler(O):
     return ok
 
   def modify(self, hdr, new_value, always=False):
-    ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+    ''' Modify the value of the named header `hdr`
+        to the new value `new_value` using cs.mailutils.modify_header.
         `new_value` may be a string or an iterable of strings.
         If headers were changed, forget self.message_path.
     '''
@@ -710,16 +773,24 @@ class MessageFiler(O):
 
   @property
   def maildb(self):
+    ''' The Mail Address database.
+    '''
     return self.context.maildb
 
   @property
   def msgiddb(self):
+    ''' The Mesaage-ID database.
+    '''
     return self.context.msgiddb
 
   def maildir(self, mdirpath):
+    ''' Return the Maildir for `mdirpath`.
+    '''
     return self.context.maildir(mdirpath, self.environ)
 
   def resolve(self, foldername):
+    ''' Resolve a mail `foldername` against the filer's `MAILDIR` attribute.
+    '''
     return resolve_mail_path(foldername, self.MAILDIR)
 
   @property
@@ -895,15 +966,14 @@ class MessageFiler(O):
         if msg_id is None:
           warning("message-id is None!")
         else:
-          msg_ids = [ msg_id_word for msg_id_word in msg_id.split() if len(msg_id_word) > 0 ]
+          msg_ids = [ msg_id_word for msg_id_word in msg_id.split() if msg_id_word ]
           if msg_ids:
             msg_id = msg_ids[0]
-            subargv.extend( ['-e',
-                              'term',
-                               '-e',
-                                'mutt-open-message',
-                                 '-f', first(self.save_to_folders), msg_id,
-                             '--'] )
+            subargv.extend( [
+                '-e', 'term', '-e',
+                'mutt-open-message', '-f', first(self.save_to_folders), msg_id,
+                '--'
+            ] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
     if xit != 0:
@@ -937,25 +1007,28 @@ re_ASSIGN_s = r'(%s)=' % (re_IDENTIFIER_s,)
 # indicating an address group name or an address ending in @domain
 
 # identifier
-re_WORD_s = '[a-z]\w+'
+re_WORD_s = r'[a-z]\w+'
 
 # GROUPNAME
-re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
+re_GROUPNAME_s = r'[A-Z][A-Z0-9_]+'
 
 # @domain
-re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
+re_atDOM_s = r'@[-\w]+(\.[-\w]+)+'
 
 # local-part@domain
-re_simpleADDRatDOM_s = '[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
+re_simpleADDRatDOM_s = r'[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
 
 # GROUPNAME or @domain
-re_GROUPNAMEorDOMorADDR_s = \
-    '(%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_simpleADDRatDOM_s)
+re_GROUPNAMEorDOMorADDR_s = (
+    '(%s|%s|%s)'
+    % (re_GROUPNAME_s, re_atDOM_s, re_simpleADDRatDOM_s)
+)
 
 # (GROUP[|GROUP...])
-re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
-                 % (re_GROUPNAME_s, re_GROUPNAME_s)
-               )
+re_INGROUP_s = (
+    r'\(\s*%s(\s*\|\s*%s)*\s*\)'
+    % (re_GROUPNAME_s, re_GROUPNAME_s)
+)
 
 # (GROUPorDOMorADDR[|GROUPorDOMorADDR...])
 re_INGROUPorDOMorADDR_s = \
@@ -1187,8 +1260,13 @@ def get_targets(s, offset):
 
 def get_target(s, offset, quoted=False):
   ''' Parse a single target specification from a string; return Target and new offset.
-      `quoted`: already inside quotes: do not expect comma or whitespace to
-        end the target specification
+
+      Parameters:
+      * `s`: the string to parse
+      * `offset`: the starting offset of the parse
+      * `quoted`: if true then the parser is already inside quotes:
+        do not expect comma or whitespace to end the target specification.
+        Default: `False`
   '''
   offset0 = offset
 
@@ -1225,11 +1303,13 @@ def get_target(s, offset, quoted=False):
   # F -- flag
   flag_letter = s[offset0]
   offset = offset + 1
-  if ( flag_letter.isupper()
-        and ( offset == len(s)
-           or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
-            )
-     ):
+  if (
+      flag_letter.isupper()
+      and (
+          offset == len(s)
+          or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
+      )
+  ):
     try:
       T = Target_SetFlag(flag_letter)
     except ValueError as e:
@@ -1269,8 +1349,7 @@ def get_target(s, offset, quoted=False):
     return T, offset
 
   # s/this/that/ -- modify subject:
-  tokens, offset = match_tokens(s, offset0,
-                                 ('s', re_NONALNUMWSP))
+  tokens, offset = match_tokens(s, offset0, ('s', re_NONALNUMWSP))
   if tokens:
     header_names = ('subject',)
     marker, m_delim = tokens
@@ -1314,13 +1393,17 @@ def get_target(s, offset, quoted=False):
     while arglist_offset < len(arglist):
       m = re_ARG.match(arglist, arglist_offset)
       if not m:
-        raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
+        raise ValueError(
+            "BUG: arglist %r did not match re_ARG (%s)"
+            % (arglist[arglist_offset:], re_ARG))
       arglist_offset = m.end()
       args.append(m.group(0))
       if arglist_offset >= len(arglist):
         break
       if arglist[arglist_offset] != ',':
-        raise ValueError("BUG: expected comma at %r" % (arglist[arglist_offset:],))
+        raise ValueError(
+            "BUG: expected comma at %r"
+            % (arglist[arglist_offset:],))
       arglist_offset += 1
       # allow trailing comma
       if arglist_offset >= len(arglist):
@@ -1345,12 +1428,16 @@ def get_target(s, offset, quoted=False):
   raise ValueError("syntax error")
 
 class Target_Assign(O):
+  ''' A filing target to set a filing state environment variable.
+  '''
 
   def __init__(self, varname, varexpr):
     self.varname = varname
     self.varexpr = varexpr
 
   def apply(self, filer):
+    ''' Apply the target by updating the filer environment.
+    '''
     varname = self.varname
     value = envsub(self.varexpr, filer.environ)
     filer.environ[varname] = value
@@ -1359,6 +1446,10 @@ class Target_Assign(O):
       ## TODO: self.logto(value)
 
 class Target_EnvSub(O):
+  ''' A filing target to delivery to a string
+      which is subject to environment subject to environment variable expansion
+      where the environment variables are derived from the filing state.
+  '''
 
   def __init__(self, target_expr):
     self.target_expr = target_expr
@@ -1375,14 +1466,22 @@ class Target_EnvSub(O):
     T.apply(filer)
 
 class Target_SetFlag(O):
+  ''' A filing target to apply a flag to a message.
+  '''
 
   def __init__(self, flag_letter):
-    if flag_letter == 'D':   flag_attr = 'draft'
-    elif flag_letter == 'F': flag_attr = 'flagged'
-    elif flag_letter == 'P': flag_attr = 'passed'
-    elif flag_letter == 'R': flag_attr = 'replied'
-    elif flag_letter == 'S': flag_attr = 'seen'
-    elif flag_letter == 'T': flag_attr = 'trashed'
+    if flag_letter == 'D':
+      flag_attr = 'draft'
+    elif flag_letter == 'F':
+      flag_attr = 'flagged'
+    elif flag_letter == 'P':
+      flag_attr = 'passed'
+    elif flag_letter == 'R':
+      flag_attr = 'replied'
+    elif flag_letter == 'S':
+      flag_attr = 'seen'
+    elif flag_letter == 'T':
+      flag_attr = 'trashed'
     else:
       raise ValueError("unsupported flag \"%s\"" % (flag_letter,))
     self.flag_attr = flag_attr
@@ -1391,6 +1490,9 @@ class Target_SetFlag(O):
     setattr(filer.flags, self.flag_attr, True)
 
 class Target_Substitution(O):
+  ''' A filing target to apply a regular expression string substitution
+      to message headers.
+  '''
 
   def __init__(self, header_names, subst_re, subst_replacement):
     self.header_names = header_names
@@ -1401,7 +1503,7 @@ class Target_Substitution(O):
     for header_name in self.header_names:
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
-      old_value = M.get(header_name, '').replace('\r','').replace('\n','')
+      old_value = M.get(header_name, '').replace('\r', '').replace('\n', '')
       m = self.subst_re.search(old_value)
       if m:
         env = {}
@@ -1410,7 +1512,7 @@ class Target_Substitution(O):
         # Strip CRLF per RFC2822 part 2.2.3 as we do for old_value above.
         for hname, hvalue in M.items():
           hname = hname.lower().replace('-', '_')
-          env[hname] = hvalue.replace('\r','').replace('\n','')
+          env[hname] = hvalue.replace('\r', '').replace('\n', '')
         # Override with named substitution values.
         env.update(m.groupdict())
         # Add numbered substitution values.
@@ -1426,6 +1528,8 @@ class Target_Substitution(O):
         filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
+  ''' A filing target to run a Python function against a message.
+  '''
 
   def __init__(self, header_names, funcname, args):
     self.header_names = header_names
@@ -1477,6 +1581,8 @@ class Target_Function(O):
           filer.modify(header_name, new_header_values)
 
 class Target_PipeLine(O):
+  ''' A filing target to pipe the message contents to a shell command.
+  '''
 
   def __init__(self, shcmd):
     self.shcmd = shcmd
@@ -1485,6 +1591,8 @@ class Target_PipeLine(O):
     filer.save_to_cmds.append( (self.shcmd, filer.process_environ()) )
 
 class Target_MailAddress(O):
+  ''' A filing target for an email address.
+  '''
 
   def __init__(self, address):
     self.address = address
@@ -1493,6 +1601,8 @@ class Target_MailAddress(O):
     filer.save_to_addresses.add(self.address)
 
 class Target_MailFolder(O):
+  ''' A filing target for a mail folder.
+  '''
 
   def __init__(self, mailfolder):
     self.mailfolder = mailfolder
@@ -1520,6 +1630,8 @@ class _Condition(O):
     return status
 
 class Condition_Regexp(_Condition):
+  ''' A condition testing headers against a regular expression.
+  '''
 
   def __init__(self, flags, header_names, atstart, regexp):
     _Condition.__init__(self, flags, header_names)
@@ -1533,6 +1645,8 @@ class Condition_Regexp(_Condition):
     return self.regexp.search(header_value)
 
 class Condition_AddressMatch(_Condition):
+  ''' A condition testing for the presence of an address.
+  '''
 
   def __init__(self, flags, header_names, addrkeys):
     _Condition.__init__(self, flags, header_names)
@@ -1547,6 +1661,8 @@ class Condition_AddressMatch(_Condition):
     return False
 
 class Condition_InGroups(_Condition):
+  ''' A condition testing messages addresses against address groups.
+  '''
 
   def __init__(self, flags, header_names, group_names):
     _Condition.__init__(self, flags, header_names)
@@ -1588,9 +1704,9 @@ class Condition_InGroups(_Condition):
               return True
           # look for named group in MESSAGE_ID.GROUPs
           elif msgid_node:
-              if group_name in msgid_node.GROUPs:
-                debug("match %s to (%s)", msgid, group_name)
-                return True
+            if group_name in msgid_node.GROUPs:
+              debug("match %s to (%s)", msgid, group_name)
+              return True
     else:
       # test is against addresses
       for address in filer.addresses(header_name):
@@ -1612,6 +1728,8 @@ class Condition_InGroups(_Condition):
     return False
 
 class Condition_HeaderFunction(_Condition):
+  ''' A condition testing the contents of a header.
+  '''
 
   def __init__(self, flags, header_names, funcname, test_string):
     _Condition.__init__(self, flags, header_names)
@@ -1627,17 +1745,31 @@ class Condition_HeaderFunction(_Condition):
     return self.test_func(filer, header_name, header_value)
 
   def test_func_contains(self, filer, header_name, header_value):
+    ''' Test if the rule's string is in the header.
+    '''
     return self.test_string in header_value
 
-_FilterReport = namedtuple('FilterReport',
-                          'rule matched saved_to ok_actions failed_actions')
+_FilterReport = namedtuple(
+    'FilterReport',
+    'rule matched saved_to ok_actions failed_actions')
 def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
+  ''' Create a FilterReport object.
+
+      Parameters:
+      * `rule`: the `Rule` on which to report
+      * `matched`: whether the rule was matched
+      * `saved_to`: where messages were filed
+      * `ok_actions`: actions which succeeded
+      * `failed_actions`: actions which failed
+  '''
   if not matched:
     if saved_to:
       raise RuntimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
 class Rule(O):
+  ''' A filing rule.
+  '''
 
   def __init__(self, filename, lineno):
     self.filename = filename
@@ -1651,12 +1783,17 @@ class Rule(O):
     return "%s:%d: %r %r" % (self.filename, self.lineno, self.targets, self.conditions)
 
   def __repr__(self):
-    return "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" \
-           % (self.filename, self.lineno, self.targets, self.conditions,
-             self.flags, self.label)
+    return (
+        "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)"
+        % (
+            self.filename, self.lineno, self.targets, self.conditions,
+            self.flags, self.label)
+    )
 
   @property
   def context(self):
+    ''' The rule context (filename:lineno).
+    '''
     return "%s:%d" % (shortpath(self.filename), self.lineno)
 
   def match(self, filer):
@@ -1724,27 +1861,39 @@ class WatchedMaildir(O):
               len(self.lurking))
 
   def close(self):
+    ''' Close the WatchedMaildir.
+    '''
     self.flush()
     self.mdir.close()
 
   @property
   def shortname(self):
+    ''' The shortname if the maildir path.
+    '''
     return self.mdir.shortname
 
   @property
   def path(self):
+    ''' The maildir path.
+    '''
     return self.mdir.path
 
   def keys(self, flush=False):
+    ''' Return the keys of the Maildir.
+    '''
     return self.mdir.keys(flush=flush)
 
   def __getitem__(self, key):
     return self.mdir[key]
 
   def keypath(self, key):
+    ''' Return the kypath for `key`.
+    '''
     return self.mdir.keypath(key)
 
   def remove(self, key):
+    ''' Remove `key` from the maildir.
+    '''
     return self.mdir.remove(key)
 
   def flush(self):
@@ -1754,10 +1903,14 @@ class WatchedMaildir(O):
     self.lurking = set()
 
   def lurk(self, key):
+    ''' Add `key` to the luking list.
+    '''
     info("lurk %s", key)
     self.lurking.add(key)
 
   def unlurk(self, key):
+    ''' Remove `key` from the lurking list.
+    '''
     info("unlurk %s", key)
     self.lurking.remove(key)
 
@@ -1766,7 +1919,7 @@ class WatchedMaildir(O):
     for path in self._rules_paths:
       try:
         S = FileState(path)
-      except OSError as e:
+      except OSError:
         states.append(None)
       else:
         states.append( (path, S.mtime, S.size, S.dev, S.ino) )
@@ -1775,6 +1928,8 @@ class WatchedMaildir(O):
   @prop
   @cached(sig_func=lambda md: md._rules_state())
   def rules(self):
+    ''' The `Rules` object for this `WatchedMaildir`.
+    '''
     # base file is at index 0
     path0 = self.rules_path
     R = Rules(path0)
