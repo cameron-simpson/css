@@ -29,6 +29,7 @@ DISTINFO = {
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
+
       If `parser` is missing or None, use SafeConfigParser (just
       ConfigParser in Python 3).
       Return the parser.
@@ -36,8 +37,7 @@ def load_config(config_path, parser=None):
   if parser is None:
     parser = ConfigParser
   CP = parser()
-  with open(config_path) as fp:
-    CP.readfp(fp)
+  CP.read([config_path])
   return CP
 
 class ConfigWatcher(Mapping):
@@ -51,6 +51,7 @@ class ConfigWatcher(Mapping):
       config_path = os.path.abspath(config_path)
     self._config__filename = config_path
     self._config_lock = self._lock
+    self._mapping = None
     self._watchers = {}
 
   def __str__(self):

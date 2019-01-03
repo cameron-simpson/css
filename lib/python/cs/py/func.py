@@ -6,8 +6,6 @@
 
 r'''
 Convenience facilities related to Python functions.
-
-* funcname: return a function's name, preferably __name__
 * funccite: cite a function (name and code location)
 * @prop: replacement for @property which turns internal AttributeErrors into RuntimeErrors
 * some decorators to verify the return types of functions
@@ -38,11 +36,14 @@ def funcname(func):
     return str(func)
 
 def funccite(func):
+  ''' Return a citation for a function (name and code location).
+  '''
   code = func.__code__
   return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
   ''' Call the named `method` on the object `o` if it exists.
+
       If it does not exist, return `default` (which defaults to None).
       Otherwise call getattr(o, method)(*a, **kw).
       `a` defaults to ().
@@ -59,7 +60,9 @@ def callmethod_if(o, method, default=None, a=None, kw=None):
   return m(*a, **kw)
 
 def prop(func):
-  ''' The builtin @property decorator lets internal AttributeErrors escape.
+  ''' A substitute for the builtin @property.
+
+      The builtin @property decorator lets internal AttributeErrors escape.
       While that can support properties that appear to exist conditionally,
       in practice this is almost never what I want, and it masks deeper errors.
       Hence this wrapper for @property that transmutes internal AttributeErrors
@@ -81,8 +84,16 @@ def prop(func):
         raise e2
   return property(wrapper)
 
-def derived_property(func, original_revision_name='_revision', lock_name='_lock', property_name=None, unset_object=None):
-  ''' A property which must be recomputed if the reference revision (attached to self) exceeds the snapshot revision.
+def derived_property(
+    func,
+    original_revision_name='_revision',
+    lock_name='_lock',
+    property_name=None,
+    unset_object=None
+):
+  ''' A property which must be recomputed
+      if the reference revision (attached to self)
+      exceeds the snapshot revision.
   '''
   if property_name is None:
     property_name = '_' + func.__name__
@@ -124,7 +135,8 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
   return property(property_value)
 
 def derived_from(property_name):
-  ''' A property which must be recomputed if the revision of another property exceeds the snapshot revision.
+  ''' A property which must be recomputed
+      if the revision of another property exceeds the snapshot revision.
   '''
   return partial(derived_property, original_revision_name='_' + property_name + '__revision')
 

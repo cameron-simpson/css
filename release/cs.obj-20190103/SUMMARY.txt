@@ -1,0 +1,2 @@
+New mixin class TrackedClassMixin to track all instances of a particular class.
+Documentation updates.

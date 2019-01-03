@@ -4,14 +4,14 @@
 # decoding in python 2 and 3.
 #       - Cameron Simpson <cs@cskk.id.au> 02may2013
 #
-# In python 2 the CSV reader reads 8 bit byte data and returns str objects;
-# these need to be decoded into unicode objects.
-# In python 3 the CSV reader reads an open text file and returns str
-# objects (== unicode).
-# So we provide csv_reader() generators to yield rows containing unicode.
-#
 
 ''' Utility functions for CSV files.
+
+    In python 2 the stdlib CSV reader reads 8 bit byte data and returns str objects;
+    these need to be decoded into unicode objects.
+    In python 3 the stdlib CSV reader reads an open text file and returns str
+    objects (== unicode).
+    So we provide `csv_reader()` generators to yield rows containing unicode.
 '''
 
 from __future__ import absolute_import, print_function
@@ -41,6 +41,7 @@ if sys.hexversion >= 0x03000000:
     ''' Read the file `fp` using csv.reader.
         `fp` may also be a filename.
         Yield the rows.
+
         Warning: _ignores_ the `encoding` and `errors` parameters
         because `fp` should already be decoded.
     '''
@@ -94,36 +95,37 @@ def csv_import(
   ''' Read CSV data where the first row contains column headers.
       Returns a row namedtuple factory and an iterable of instances.
 
-      `fp`: a file object containing CSV data, or the name of such a file
-      `class_name`: optional class name for the namedtuple subclass
+      Parameters:
+      * `fp`: a file object containing CSV data, or the name of such a file
+      * `class_name`: optional class name for the namedtuple subclass
         used for the row data.
-      `column_names`: optional iterable of column headings; if
+      * `column_names`: optional iterable of column headings; if
         provided then the file is not expected to have internal column
         headings
-      `computed`: optional keyword parameter providing a mapping
+      * `computed`: optional keyword parameter providing a mapping
         of str to functions of `self`; these strings are available
         via __getitem__
-      `preprocess`: optional keyword parameter providing a callable
+      * `preprocess`: optional keyword parameter providing a callable
         to modify CSV rows before they are converted into the namedtuple.
         It receives a context object an the data row. It may return
         the row (possibly modified), or None to drop the row.
-      `mixin`: an optional mixin class for the generated namedtuple subclass
+      * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties
 
       All other keyword paramaters are passed to csv_reader(). This
-      is a very thin shim around cs.mappings.named_column_tuples.
+      is a very thin shim around `cs.mappings.named_column_tuples`.
 
       Examples:
 
-        >>> cls, rows = csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB')
-        >>> cls     #doctest: +ELLIPSIS
-        <function named_row_tuple.<locals>.factory at ...>
-        >>> list(rows)
-        [Example_AB(a='1', b='2'), Example_AB(a='3', b='4')]
+            >>> cls, rows = csv_import(['a, b', '1,2', '3,4'], class_name='Example_AB')
+            >>> cls     #doctest: +ELLIPSIS
+            <function named_row_tuple.<locals>.factory at ...>
+            >>> list(rows)
+            [Example_AB(a='1', b='2'), Example_AB(a='3', b='4')]
 
-        >>> cls, rows = csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G '])
-        >>> list(rows)
-        [Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
+            >>> cls, rows = csv_import(['1,2', '3,4'], class_name='Example_DEFG', column_names=['D E', 'F G '])
+            >>> list(rows)
+            [Example_DEFG(d_e='1', f_g='2'), Example_DEFG(d_e='3', f_g='4')]
   '''
   return named_column_tuples(
       csv_reader(fp, **kw),
@@ -138,22 +140,24 @@ def xl_import(
     skip_rows=0,
     **kw):
   ''' Read the named `sheet_name` from the Excel XLSX file named
-      `filename` as for csv_import. Returns a row namedtuple factory
-      and an iterable of instances.
+      `filename` as for `csv_import`.
+      Returns a row namedtuple factory and an iterable of instances.
 
-      `workbook`: Excel work book from which to load the sheet; if
+      Parameters:
+      * `workbook`: Excel work book from which to load the sheet; if
         this is a str then the work book is obtained from
         openpyxl.load_workbook()
-      `sheet_name`: the name of the work book sheet whose data should be imported
+      * `sheet_name`: the name of the work book sheet whose data should be imported
+
       Other keyword parameters are as for cs.mappings.named_column_tuples.
 
-      NOTE: this function requires the openpyxl module to be available.
+      NOTE: this function requires the `openpyxl` module to be available.
   '''
   if isinstance(workbook, str):
     from openpyxl import load_workbook
-    filename = workbook
-    with Pfx(filename):
-      workbook = load_workbook(filename=filename, read_only=True)
+    wb_filename = workbook
+    with Pfx(wb_filename):
+      workbook = load_workbook(filename=wb_filename, read_only=True)
       return xl_import(workbook, sheet_name, skip_rows=skip_rows, **kw)
   else:
     return named_column_tuples(
@@ -179,12 +183,12 @@ if __name__ == '__main__':
       elif filename.endswith('.xlsx'):
         from openpyxl import load_workbook
         workbook = load_workbook(filename=filename, read_only=True)
-        for sheet_name in workbook.get_sheet_names():
-          with Pfx(sheet_name):
+        for wb_sheet_name in workbook.get_sheet_names():
+          with Pfx(wb_sheet_name):
             # presume row 1 in some kind of title and column names are row 2
-            cls, rows = xl_import(workbook, sheet_name, skip_rows=1)
+            cls, rows = xl_import(workbook, wb_sheet_name, skip_rows=1)
             for rownum, row in enumerate(rows, 1):
-              print(filename, sheet_name, rownum, row)
+              print(filename, wb_sheet_name, rownum, row)
       else:
         raise ValueError('not a .csv or .xlsx file')
     print()

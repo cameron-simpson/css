@@ -1,0 +1,2 @@
+X: trivial ANSI colour support via new `colour` keyword argument.
+New global X_discard, False unless sys.stderr.isatty.

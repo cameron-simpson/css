@@ -80,6 +80,7 @@ def setupterm(*args):
   import curses
   curses.setupterm(termstr, fd)
   _ti_setup = True
+  return True
 
 def statusline_bs(text, reverse=False, xpos=None, ypos=None):
   ''' Return a byte string to update the status line.

@@ -43,15 +43,16 @@ def decorator(deco, *da, **dkw):
       def wrapper(*a, **dkw2):
         dkw.update(dkw2)
         func, = a
+        dfunc = deco(func, **dkw)
+        dfunc.__doc__ = getattr(func, '__doc__', '')
         return deco(func, **dkw)
-      wrapper.__doc__ = getattr(func, '__doc__', '')
       return wrapper
     if len(da) > 1:
       raise ValueError("extra positional arguments after function: %r" % (da[1:],))
     func = da[0]
     dfunc = deco(func, **dkw)
     dfunc.__doc__ = getattr(func, '__doc__', '')
-    return fdunc
+    return dfunc
   return overdeco
 
 @decorator
