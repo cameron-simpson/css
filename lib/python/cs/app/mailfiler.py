@@ -93,6 +93,7 @@ DISTINFO = {
         'cs.mailutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.modules',
         'cs.py3',
         'cs.rfc2047',
