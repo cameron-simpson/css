@@ -9,6 +9,7 @@ from bisect import bisect_left
 from hashlib import sha1
 import sys
 from cs.binary import PacketField, BSUInt
+from cs.excutils import exc_fold
 from cs.lex import hexify, get_identifier
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs
@@ -23,6 +24,11 @@ class MissingHashcodeError(KeyError):
     self.hashcode = hashcode
   def __str__(self):
     return "missing hashcode: %s" % (self.hashcode,)
+
+def io_fail(func):
+  ''' Decorator to transmute a MissingHashcodeError into a return of False.
+  '''
+  return exc_fold(func, exc_types=(MissingHashcodeError,))
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
