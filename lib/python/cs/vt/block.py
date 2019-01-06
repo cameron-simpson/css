@@ -658,7 +658,7 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self):
+  def fsck(self, recurse=False):
     ''' Check this HashCodeBlock.
     '''
     ok = True
@@ -673,6 +673,10 @@ class HashCodeBlock(_Block):
         else:
           if len(self) != len(data):
             error("len(self)=%d, len(data)=%d", len(self), len(data))
+            ok = False
+          h = S.hash(data)
+          if h != hashcode:
+            error("hash(data):%s != self.hashcode:%s", h, hashcode)
             ok = False
     return ok
 
@@ -830,21 +834,20 @@ class _IndirectBlock(_Block):
         yield B.get_direct_data()[Bstart:Bend]
 
   @io_fail
-  def fsck(self):
+  def fsck(self, recurse=False):
     ''' Check this IndirectBlock.
     '''
     ok = True
-    suboffset = 0
-    for i, subB in enumerate(self.subblocks):
-      with Pfx("subblocks[%d]:%d..%d", i, suboffset, suboffset+len(subB)):
-        if not subB.fsck():
-          ok = False
-        suboffset += len(subB)
-    if suboffset != len(self):
-      error(
-          "length mismatch: len(self)=%d, sum(len(subblocks))=%d",
-          len(self), suboffset)
+    span = self.span
+    subspan = sum(subB.span for subB in self.subblocks)
+    if span != subspan:
+      error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
+    if recurse:
+      for subB in self.subblocks:
+        with Pfx(str(subB)):
+          if not subB.fsck(recurse=True):
+            ok = False
     return ok
 
 class RLEBlock(_Block):
@@ -897,6 +900,22 @@ class RLEBlock(_Block):
       raise ValueError("unexpected fields: %r" % (m,))
     return cls(span, octet), offset
 
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this RLEBlock.
+    '''
+    ok = True
+    if not isinstance(self.octet, bytes):
+      error("octet is not a bytes instance: type=%s", type(self.octet).__name__)
+      ok = False
+    elif len(self.octet) != 1:
+      error("len(self.octet) != 1: %d", len(self.octet))
+      ok = False
+    if self.span < 1:
+      error("span < 1: %d", self.span)
+      ok = False
+    return ok
+
 register_transcriber(RLEBlock)
 
 class LiteralBlock(_Block):
@@ -939,7 +958,7 @@ class LiteralBlock(_Block):
     yield self.data[start:end]
 
   @io_fail
-  def fsck(self):
+  def fsck(self, recurse=False):
     ''' Check this LiteralBlock.
     '''
     ok = True
@@ -1032,6 +1051,24 @@ class _SubBlock(_Block):
     return cls(block, suboffset, subspan), offset
 
 register_transcriber(_SubBlock)
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this SubBlock.
+    '''
+    ok = True
+    superB = self.superblock
+    suboffset = self.offset
+    span = self.span
+    if isinstance(superB, _SubBlock):
+      error("superblock is a subblock type: %s", type(superB).__name__)
+      ok = False
+    if suboffset < 0 or suboffset >= len(superB):
+      error("offset:%d out of range 0:%d", suboffset, len(superB))
+      ok = False
+    if span < 1 or span > len(superB) - suboffset:
+      error("span:%d out of range 0:%d", span, len(superB) - suboffset)
+      ok = False
+    return ok
 
 def verify_block(B, recurse=False, S=None):
   ''' Perform integrity checks on the Block `B`, yield error messages.
