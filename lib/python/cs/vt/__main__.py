@@ -405,7 +405,7 @@ class VTCmd:
           error("unsupported object type: %s", type(o))
           xit = 1
           continue
-        if fsck_func():
+        if fsck_func(recurse=True):
           info("OK")
         else:
           info("BAD")
