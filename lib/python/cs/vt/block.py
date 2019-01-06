@@ -948,7 +948,8 @@ class LiteralBlock(_Block):
     '''
     return self.data
 
-  @require(lambda self, start, end:
+  @require(
+      lambda self, start, end:
       0 <= start and (end is None or start <= end <= len(self)))
   def datafrom(self, start=0, end=None):
     ''' Yield data from this block.
@@ -976,16 +977,9 @@ def SubBlock(superB, suboffset, span, **kw):
       Returns am empty LiteralBlock if the span==0.
   '''
   with Pfx("SubBlock(suboffset=%d,span=%d,superB=%s)", suboffset, span, superB):
-    # check offset and span here because we trust them later
-    if suboffset < 0 or suboffset > len(superB):
-      raise ValueError("suboffset out of range")
-    if span < 0 or suboffset + span > len(superB):
-      raise ValueError("span(%d) out of range" % (span,))
     if span == 0:
-      ##warning("span==0, returning empty LiteralBlock")
       return LiteralBlock(b'')
     if suboffset == 0 and span == len(superB):
-      ##warning("covers full Block, returning original")
       return superB
     if isinstance(superB, _SubBlock):
       return _SubBlock(superB.superblock, suboffset + superB.offset, span)
@@ -998,15 +992,13 @@ class _SubBlock(_Block):
 
   transcribe_prefix = 'SubB'
 
+  @require(lambda superB, suboffset: 0 <= suboffset < len(superB))
+  @require(
+      lambda superB, suboffset, span:
+      span > 0 and suboffset + span < len(superB))
   def __init__(self, superB, suboffset, span, **kw):
     with Pfx("_SubBlock(suboffset=%d, span=%d)[len(superB)=%d]",
              suboffset, span, len(superB)):
-      if suboffset < 0 or suboffset >= len(superB):
-        raise ValueError('suboffset out of range 0-%d: %d' % (len(superB)-1, suboffset))
-      if span < 0 or suboffset+span > len(superB):
-        raise ValueError(
-            'span must be nonnegative and less than %d (suboffset=%d, len(superblock)=%d): %d'
-            % (len(superB)-suboffset, suboffset, len(superB), span))
       if suboffset == 0 and span == len(superB):
         raise RuntimeError('tried to make a SubBlock spanning all of of SuperB')
       _Block.__init__(self, BlockType.BT_SUBBLOCK, span, **kw)
