@@ -44,7 +44,6 @@ from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
-from .fsck import fsck_Block, fsck_Dir
 from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
 from .merge import merge
@@ -400,15 +399,13 @@ class VTCmd:
           error("unparsed text: %r", arg[offset:])
           xit = 1
           continue
-        if isBlock(o):
-          fsck_func = fsck_Block
-        elif isinstance(o, Dir):
-          fsck_func = fsck_Dir
-        else:
+        try:
+          fsck_func = o.fsck
+        except AttributeError:
           error("unsupported object type: %s", type(o))
           xit = 1
           continue
-        if fsck_func(o):
+        if fsck_func():
           info("OK")
         else:
           info("BAD")
