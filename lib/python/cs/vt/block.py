@@ -1042,7 +1042,6 @@ class _SubBlock(_Block):
         required=('block', 'offset', 'span'))
     return cls(block, suboffset, subspan), offset
 
-register_transcriber(_SubBlock)
   @io_fail
   def fsck(self, recurse=False):
     ''' Check this SubBlock.
@@ -1062,42 +1061,7 @@ register_transcriber(_SubBlock)
       ok = False
     return ok
 
-def verify_block(B, recurse=False, S=None):
-  ''' Perform integrity checks on the Block `B`, yield error messages.
-  '''
-  if S is None:
-    S = defaults.S
-  try:
-    hashcode = B.hashcode
-  except AttributeError:
-    hashcode = None
-  else:
-    if hashcode not in S:
-      yield str(B), "hashcode not in %s" % (S,)
-    else:
-      # compare the direct data versus the hashcode
-      if B.indirect:
-        bfr = B.superblock.datafrom()
-      else:
-        bfr = B.datafrom()
-      hashdata = b''.join(bfr)
-      # hash the data using the matching hash function
-      data_hashcode = hashcode.hashfunc(hashdata)
-      if hashcode != data_hashcode:
-        yield str(B), "hashcode(%s) does not match hashfunc of data(%s)" \
-                 % (hashcode, data_hashcode)
-      Sdata = S[hashcode]
-      if Sdata != hashdata:
-        yield str(B), "Block hashdata != S[%s]" % (hashcode,)
-  if B.indirect:
-    if recurse:
-      for subB in B.subblocks:
-        yield from verify_block(subB, recurse=True, S=S)
-  Blength = sum(len(chunk) for chunk in B.datafrom())
-  if B.span != Blength:
-    X("VERIFY BLOCK %s: B.span=%d, len(data)=%d",
-      B, B.span, Blength)
-    yield str(B), "span(%d) != len(data:%d)" % (B.span, Blength)
+register_transcriber(_SubBlock)
 
 if __name__ == '__main__':
   from .block_tests import selftest
