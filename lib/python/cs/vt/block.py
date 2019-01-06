@@ -45,13 +45,13 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext, RLock
-from .hash import HashCode
+from .hash import HashCode, io_fail
 from .transcribe import Transcriber, register as register_transcriber, parse
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
@@ -657,6 +657,25 @@ class HashCodeBlock(_Block):
     B = cls(hashcode=hashcode, span=span)
     return B, offset
 
+  @io_fail
+  def fsck(self):
+    ''' Check this HashCodeBlock.
+    '''
+    ok = True
+    hashcode = self.hashcode
+    with Pfx("%s", hashcode):
+      with defaults.S as S:
+        try:
+          data = S[hashcode]
+        except KeyError:
+          error("not in Store %s", S)
+          ok = False
+        else:
+          if len(self) != len(data):
+            error("len(self)=%d, len(data)=%d", len(self), len(data))
+            ok = False
+    return ok
+
 register_transcriber(HashCodeBlock, ('B', 'IB'))
 
 def Block(*, hashcode=None, data=None, span=None, added=False):
@@ -810,6 +829,24 @@ class _IndirectBlock(_Block):
         assert not B.indirect
         yield B.get_direct_data()[Bstart:Bend]
 
+  @io_fail
+  def fsck(self):
+    ''' Check this IndirectBlock.
+    '''
+    ok = True
+    suboffset = 0
+    for i, subB in enumerate(self.subblocks):
+      with Pfx("subblocks[%d]:%d..%d", i, suboffset, suboffset+len(subB)):
+        if not subB.fsck():
+          ok = False
+        suboffset += len(subB)
+    if suboffset != len(self):
+      error(
+          "length mismatch: len(self)=%d, sum(len(subblocks))=%d",
+          len(self), suboffset)
+      ok = False
+    return ok
+
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
       all of a specific value, typically NUL.
@@ -898,6 +935,17 @@ class LiteralBlock(_Block):
     if end is None:
       end = self.span
     yield self.data[start:end]
+
+  @io_fail
+  def fsck(self):
+    ''' Check this LiteralBlock.
+    '''
+    ok = True
+    data = self.data
+    if len(self) != len(data):
+      error("len(self)=%d, len(data)=%d", len(self), len(data))
+      ok = False
+    return ok
 
 register_transcriber(LiteralBlock)
 
