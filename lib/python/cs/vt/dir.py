@@ -892,12 +892,12 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     return self.block.pushto(S2, Q=Q, runstate=runstate)
 
   @io_fail
-  def fsck(self):
+  def fsck(self, recurse=False):
     ''' Inspect this FileDirent.
     '''
     self._check()
     B = self.block
-    return B.fsck()
+    return B.fsck(recurse=recurse)
 
 class Dir(_Dirent, DirLike):
   ''' A directory.
@@ -1296,29 +1296,16 @@ class Dir(_Dirent, DirLike):
     ''' Check this Dir.
     '''
     ok = True
-    if recurse:
-      if not self.fsck():
-        ok = False
-      for rpath, dirnames, filenames in self.walk():
-        with Pfx(rpath):
-          for dirname in sorted(dirnames):
-            try:
-              subD = D[dirname]
-            except KeyError as e:
-              error("not in D")
-            else:
-              subD.fsck()
-    else:
-      B = self.block
-      if not B.fsck():
-        ok = False
-      for name, E in self.items():
-        with Pfx(name):
-          if not _validname(name):
-            error("invalid name")
-            ok = False
-          if not E.fsck():
-            ok = False
+    B = self.block
+    if not B.fsck(recurse=recurse):
+      ok = False
+    for name, E in sorted(self.items()):
+      with Pfx(name):
+        if not _validname(name):
+          error("invalid name")
+          ok = False
+        if not E.fsck(recurse=recurse):
+          ok = False
     return ok
 
 if __name__ == '__main__':
