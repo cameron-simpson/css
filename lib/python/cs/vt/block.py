@@ -929,9 +929,11 @@ class LiteralBlock(_Block):
     '''
     return self.data
 
+  @require(lambda self, start, end:
+      0 <= start and (end is None or start <= end <= len(self)))
   def datafrom(self, start=0, end=None):
-    if start < 0 or end is not None and start > end:
-      raise ValueError("invalid start=%s (end=%s)" % (start, end))
+    ''' Yield data from this block.
+    '''
     if end is None:
       end = self.span
     yield self.data[start:end]
