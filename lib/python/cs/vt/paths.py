@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Operations on pathnames using a Venti store.
+# Operations on pathnames using a vt store.
 #       - Cameron Simpson <cs@cskk.id.au> 07may2013
 #
 
@@ -114,40 +114,6 @@ def resolve(rootD, subpath, do_mkdir=False):
       break
     subpaths.pop(0)
   return E, parent, subpaths
-
-def walk(rootD, topdown=True, yield_status=False):
-  ''' An analogue to os.walk to descend a vt Dir tree.
-      Yields Dir, relpath, dirnames, filenames for each directory in the tree.
-      The top directory (`rootD`) has the relpath ''.
-  '''
-  if not topdown:
-    raise ValueError("topdown must be true, got %r" % (topdown,))
-  ok = True
-  # queue of (Dir, relpath)
-  pending = [ (rootD, '') ]
-  while pending:
-    thisD, relpath = pending.pop(0)
-    dirnames = thisD.dirs()
-    filenames = thisD.files()
-    yield thisD, relpath, dirnames, filenames
-    with Pfx("walk(relpath=%r)", relpath):
-      for name in reversed(dirnames):
-        with Pfx("name=%r", name):
-          try:
-            subD = thisD.chdir1(name)
-          except KeyError as e:
-            if not yield_status:
-              raise
-            error("chdir1(%r): %s", name, e)
-            ok = False
-          else:
-            if relpath:
-              subpath = os.path.join(relpath, name)
-            else:
-              subpath = name
-            pending.append( (subD, subpath) )
-  if yield_status:
-    yield ok
 
 class DirLike(ABC):
   ''' Facilities offered by directory like objects.
