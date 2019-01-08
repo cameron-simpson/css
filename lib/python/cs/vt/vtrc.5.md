@@ -129,15 +129,15 @@ Parameters:
   primary comma separated list of Stores from which to read blocks
 
 `save2`:
-  comma separate list of Stores to which to save blocks
+  comma separated list of Stores to which to save blocks
   which failed to be saved to a Store from `save`
 
 `read2`:
   secondary comma separated list of Stores from which to read blocks
-  for blocks now found in `read`
+  for blocks not found in `read`
 
 `copy2`:
-  comma separate list of Stores to which to save blocks
+  comma separated list of Stores to which to save blocks
   which are obtained via `read2`
 
 #### `type = socket`
