@@ -70,8 +70,7 @@ usage="Usage: $cmd [options...] [op [args...]]
       If the session does not exist:
         a) run the supplied command if specified, otherwise \$SHELL.
         b) pass each keyline with a trailing carriage return.
-      If -d (detached) is supplied, to not attach to the session;
-        this is used by my rig-tm script to set up my default sessions.
+      If -d (detached) is supplied, do not attach to the session.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
