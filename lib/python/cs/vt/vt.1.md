@@ -544,7 +544,7 @@ Its parameters are as follows:
   A sequence of Stores to which to copy any data blocks
   obtained via the `read2` sequence.
 
-Example configuration file clauses:
+Example configuration file clause:
 
     [laptop]
     type = proxy

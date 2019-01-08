@@ -144,7 +144,7 @@ Every block reference is a `bsdata` length prefixed record:
       }
     }
 
-`flags` is a bit field holding the follow flags:
+`flags` is a bit field holding the following flags:
 
 `0x01` "INDIRECT":
   if set, the block data consist of a sequence of `blockref_record`s
@@ -214,7 +214,7 @@ with respect to the span covered by an index file
 plus the base offset of the span covered by the file.
 
 Bcause the hashcode of the top indirect block
-completely ditates its content,
+completely dictates its content,
 a blockmap index need only ever be constructed once per top block
 and may be kept persistently as a collection of blockmap files.
 
@@ -239,7 +239,7 @@ is a blockmap file for the first blockmap index
 of the top indirect block
 with SHA1 hashcode `06a86c1bb238cf58b34d8fe140b44818fd68728d`
 using index spans of `4294967296`
-(2^32, expressable with an unsigned 4 byte value in an index record).
+(2**32, expressable with an unsigned 4 byte value in an index record).
 
 If the top block spans more than 4294967296 bytes
 there will also be a `.../1.blockmap` file
@@ -434,7 +434,7 @@ with the following `rq_type` values and associated values:
 `0` "ADD":
   add the `payload` bytes as a data block.
   The response `payload` is a `hashcode_record`
-  containing the hashcode which indexed the data block.
+  containing the hashcode which indexes the data block.
 
 `1` "GET":
   fetch the data block whose hashcode is stored in the `payload`
@@ -467,9 +467,10 @@ with the following `rq_type` values and associated values:
   if the "reverse" flag is provided)
   and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
-  (or the highest hashocde if the "reverse" flag is provided).
+  (or the highest hashcode if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
   the response may be short of there are insufficient hashcodes in the Store.
+
   The response payload is the concatenation of the requested `hashcode_record` records.
 
 `5` "HASHCODES_HASH":
@@ -490,9 +491,10 @@ with the following `rq_type` values and associated values:
   if the "reverse" flag is provided)
   and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
-  (or the highest hashocde if the "reverse" flag is provided).
+  (or the highest hashcode if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
   the response may be short of there are insufficient hashcodes in the Store.
+
   The response payload is a `hashcode_record`
   containing the hashcode
   of the concatenation of the requested `hashcode_record` records.
