@@ -13,7 +13,7 @@ Convenience facilities related to Python functions.
 
 import sys
 from functools import partial
-from cs.py3 import unicode
+from cs.py3 import unicode, raise_from
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -71,16 +71,7 @@ def prop(func):
     try:
       return func(*a, **kw)
     except AttributeError as e:
-      e2 = RuntimeError("inner function %s raised %s" % (func, e))
-      if sys.version_info[0] >= 3:
-        try:
-          code = compile('raise e2 from e', __file__, 'single')
-        except SyntaxError:
-          raise e2
-        else:
-          eval(code, globals(), locals())
-      else:
-        raise e2
+      raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
   return property(wrapper)
 
 def derived_property(
@@ -131,7 +122,7 @@ def derived_property(
         ##debug("outside lock, already computed up to date %s", property_name)
         pass
     except AttributeError as e:
-      raise RuntimeError("AttributeError: %s" % (e,)) from e
+      raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
     return p
   return property(property_value)
 
