@@ -55,7 +55,7 @@ if sys.hexversion >= 0x03000000:
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
   from struct import pack, unpack
-  from ._for3 import raise3, exec_code, BytesFile, joinbytes
+  from ._for3 import raise3, raise_from, exec_code, BytesFile, joinbytes
 
 else:
 
@@ -73,7 +73,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-  from ._for2 import raise3, exec_code, ustr, \
+  from ._for2 import raise3, raise_from, exec_code, ustr, \
                         bytes, BytesFile, joinbytes, \
                         pack, unpack
 
