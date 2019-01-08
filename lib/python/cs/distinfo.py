@@ -229,6 +229,55 @@ def test_is_package(libdir, package_name):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
+def get_md_doc(
+    M,
+    sort_key=lambda key: key.lower(),
+    filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
+):
+  ''' Fetch the docstrings from a module and assemble a MarkDown document.
+  '''
+  if isinstance(M, str):
+    M = importlib.import_module(M)
+  Mname_prefix = M.__name__ + '.'
+  full_doc = M.__doc__
+  if full_doc:
+    full_doc = stripped_dedent(full_doc.strip())
+  else:
+    full_doc = ''
+  try:
+    doc_head, _ = full_doc.split('\n\n', 1)
+  except ValueError:
+    doc_head = full_doc
+  for Mname in sorted(dir(M), key=sort_key):
+    if not filter_key(Mname):
+      continue
+    o = getattr(M, Mname, None)
+    if getmodule(o) is not M:
+      # name imported from another module
+      continue
+    if not isclass(o) and not isfunction(o):
+      continue
+    odoc = o.__doc__
+    if odoc is None:
+      continue
+    odoc = stripped_dedent(odoc)
+    if isfunction(o):
+      sig = signature(o)
+      full_doc += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
+    elif isclass(o):
+      mro_names = []
+      for superclass in o.__mro__:
+        if superclass is not object and superclass is not o:
+          name = superclass.__name__
+          supermod = getmodule(superclass)
+          if supermod is not M:
+            name = supermod.__name__ + '.' + name
+          mro_names.append('`' + name + '`')
+      if mro_names:
+        odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
+      full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
+  return doc_head, full_doc
+
 class Package(O):
 
   def __init__(self, package_name):
@@ -305,48 +354,7 @@ class PyPI_Package(O):
     dinfo = dict(self.defaults)
     M = importlib.import_module(self.package_name)
     dinfo.update(M.DISTINFO)
-
-    full_doc = M.__doc__
-    if full_doc:
-      full_doc = stripped_dedent(full_doc.strip())
-    else:
-      full_doc = ''
-    try:
-      doc_head, _ = full_doc.split('\n\n', 1)
-    except ValueError:
-      doc_head = full_doc
-
-    Mname_prefix = M.__name__ + '.'
-    for Mname in sorted(dir(M), key=lambda s: s.lower()):
-      if Mname == 'DISTINFO':
-        continue
-      if Mname.startswith('_'):
-        continue
-      o = getattr(M, Mname, None)
-      if getmodule(o) is not M:
-        # name imported from another module
-        continue
-      if not isclass(o) and not isfunction(o):
-        continue
-      odoc = o.__doc__
-      if odoc is None:
-        continue
-      odoc = stripped_dedent(odoc)
-      if isfunction(o):
-        sig = signature(o)
-        full_doc += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
-      elif isclass(o):
-        mro_names = []
-        for superclass in o.__mro__:
-          if superclass is not object and superclass is not o:
-            name = superclass.__name__
-            supermod = getmodule(superclass)
-            if supermod is not M:
-              name = supermod.__name__ + '.' + name
-            mro_names.append('`' + name + '`')
-        if mro_names:
-          odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
-        full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
+    doc_head, full_doc = get_md_doc(M)
 
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description':
@@ -514,7 +522,8 @@ class PyPI_Package(O):
     return base
 
   def package_paths(self, package_name, libdir):
-    ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
+    ''' Generator to yield the file paths from a package
+        relative to the `libdir` subdirectory.
     '''
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):

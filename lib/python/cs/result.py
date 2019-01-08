@@ -59,9 +59,9 @@ except ImportError:
     Enum = None
 from functools import partial
 import sys
-from threading import Lock, Thread
+from threading import Lock
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
 
@@ -267,7 +267,7 @@ class Result(object):
     except BaseException:
       self.exc_info = sys.exc_info()
     except:
-      exception("%s: unexpected exception: %s", func, e)
+      exception("%s: unexpected exception: %r", func, sys.exc_info())
       self.exc_info = sys.exc_info()
     else:
       self.result = r
@@ -313,8 +313,9 @@ class Result(object):
         self.state = ResultState.ready
     else:
       if state == ResultState.ready:
-        warning("<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-                self, result, exc_info)
+        warning(
+            "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
+            self, result, exc_info)
         raise RuntimeError(
             "REPEATED _COMPLETE of %s: result=%r, exc_info=%r"
             % (self, result, exc_info)

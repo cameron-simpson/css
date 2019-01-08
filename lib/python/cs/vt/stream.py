@@ -27,6 +27,7 @@ from .hash import (
     decode_buffer as hash_from_buffer,
     HASHCLASS_BY_NAME,
     HashCodeField,
+    MissingHashcodeError,
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
@@ -269,9 +270,12 @@ class StreamStore(BasicStoreSync):
     return h
 
   def get(self, h):
-    ok, flags, payload = self.do(GetRequest(h))
+    try:
+      ok, flags, payload = self.do(GetRequest(h))
+    except StoreError as e:
+      raise MissingHashcodeError(str(e)) from e
     if not ok:
-      raise StoreError(
+      raise MissingHashcodeError(
           "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
           % (h, flags, payload))
     found = flags & 0x01

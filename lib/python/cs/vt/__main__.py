@@ -23,7 +23,6 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.env import envsub
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
@@ -34,9 +33,9 @@ from cs.resources import RunState
 from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
-from . import fromtext, defaults, DEFAULT_CONFIG_PATH
+from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, CopyModes
-from .block import BlockRecord
+from .block import isBlock
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
@@ -45,12 +44,11 @@ from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
-from .fsck import fsck_Block, fsck_dir
 from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
-from .paths import OSDir, OSFile, decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
+from .paths import OSDir, OSFile, dirent_dir, dirent_file, dirent_resolve
 from .server import serve_tcp, serve_socket
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
@@ -85,7 +83,7 @@ class VTCmd:
     cat filerefs...
     config
     dump {datafile.vtd|index.gdbm|index.lmdb}
-    fsck block blockref...
+    fsck object...
     import [-oW] path {-|archive.vt}
     init
     ls [-R] dirrefs...
@@ -329,7 +327,8 @@ class VTCmd:
     P.print_stats(sort='cumulative')
     return xit
 
-  def cmd_cat(self, args):
+  @staticmethod
+  def cmd_cat(args):
     ''' Concatentate the contents of the supplied filerefs to stdout.
     '''
     if not args:
@@ -346,7 +345,8 @@ class VTCmd:
     self.config.write(sys.stdout)
     return 0
 
-  def cmd_dump(self, args):
+  @staticmethod
+  def cmd_dump(args):
     ''' Dump various file types.
     '''
     if not args:
@@ -380,55 +380,40 @@ class VTCmd:
         warning("unsupported file type: %r", path)
     return 0
 
-  def cmd_fsck(self, args):
+  @staticmethod
+  def cmd_fsck(args):
     ''' Data structure inspection/repair.
     '''
     if not args:
-      raise GetoptError("missing fsck type")
-    fsck_type = args.pop(0)
-    with Pfx(fsck_type):
-      try:
-        fsck_op = {
-            "block": self.cmd_fsck_block,
-            "dir": self.cmd_fsck_dir,
-        }[fsck_type]
-      except KeyError:
-        raise GetoptError("unsupported fsck type")
-      return fsck_op()
-
-  def cmd_fsck_block(self, args):
-    ''' Inspect a single Block.
-        TODO: fromtext -> transcribe.
-    '''
+      raise GetoptError("missing fsck objects")
     xit = 0
-    if not args:
-      raise GetoptError("missing blockrefs")
-    for blockref in args:
-      with Pfx(blockref):
-        blockref_bs = fromtext(blockref)
-        B, offset = BlockRecord.value_from_bytes(blockref_bs)
-        if offset < len(blockref_bs):
-          raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
-        if not fsck_Block(B):
-          error("fsck failed")
+    for arg in args:
+      with Pfx(arg):
+        try:
+          o, offset = parse(arg)
+        except ValueError as e:
+          error("does not seem to be a transcription: %s", e)
+          xit = 1
+          continue
+        if offset != len(arg):
+          error("unparsed text: %r", arg[offset:])
+          xit = 1
+          continue
+        try:
+          fsck_func = o.fsck
+        except AttributeError:
+          error("unsupported object type: %s", type(o))
+          xit = 1
+          continue
+        if fsck_func(recurse=True):
+          info("OK")
+        else:
+          info("BAD")
           xit = 1
     return xit
 
-  def cmd_fsck_dir(self, args):
-    ''' Inspect a Dir.
-    '''
-    xit = 0
-    if not args:
-      raise GetoptError("missing dirents")
-    for dirent_txt in args:
-      with Pfx(dirent_txt):
-        D = decode_Dirent_text(dirent_txt)
-        if not fsck_dir(D):
-          error("fsck failed")
-          xit = 1
-    return xit
-
-  def cmd_import(self, args):
+  @staticmethod
+  def cmd_import(args):
     ''' Import paths into the Store, print top Dirent for each.
 
         TODO: hook into vt.merge.
@@ -537,7 +522,8 @@ class VTCmd:
       return 1
     return 0
 
-  def cmd_ls(self, args):
+  @staticmethod
+  def cmd_ls(args):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
     recurse = False
@@ -753,9 +739,10 @@ class VTCmd:
           xit = 1
     return xit
 
-  def cmd_pack(self, args):
-    ''' Replace the I<path> with an archive file I<path>B<.vt> referring
-        to the stored content of I<path>.
+  @staticmethod
+  def cmd_pack(args):
+    ''' Replace the _path_ with an archive file _path_`.vt`
+        referring to the stored content of _path_.
     '''
     if not args:
       raise GetoptError("missing path")
@@ -934,7 +921,8 @@ class VTCmd:
             % (address,))
     return 0
 
-  def cmd_test(self, args):
+  @staticmethod
+  def cmd_test(args):
     ''' Test various facilites.
     '''
     if not args:
@@ -959,10 +947,11 @@ class VTCmd:
         return 0
       raise GetoptError("unrecognised subcommand")
 
-  def cmd_unpack(self, args):
+  @staticmethod
+  def cmd_unpack(args):
     ''' Unpack the archive file _archive_`.vt` as _archive_.
     '''
-    if len(args) < 1:
+    if not args:
       raise GetoptError("missing archive name")
     arpath = args.pop(0)
     arbase, arext = splitext(arpath)
@@ -974,7 +963,7 @@ class VTCmd:
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):
-      when, source = Archive(arpath).last
+      _, source = Archive(arpath).last
       if source is None:
         error("no entries in archive")
         return 1

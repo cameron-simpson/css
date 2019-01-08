@@ -45,13 +45,13 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import texthexify, untexthexify, get_decimal_value
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
 from . import defaults, totext, RLock
-from .hash import HashCode
+from .hash import HashCode, io_fail
 from .transcribe import Transcriber, register as register_transcriber, parse
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
@@ -657,6 +657,29 @@ class HashCodeBlock(_Block):
     B = cls(hashcode=hashcode, span=span)
     return B, offset
 
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this HashCodeBlock.
+    '''
+    ok = True
+    hashcode = self.hashcode
+    with Pfx("%s", hashcode):
+      with defaults.S as S:
+        try:
+          data = S[hashcode]
+        except KeyError:
+          error("not in Store %s", S)
+          ok = False
+        else:
+          if len(self) != len(data):
+            error("len(self)=%d, len(data)=%d", len(self), len(data))
+            ok = False
+          h = S.hash(data)
+          if h != hashcode:
+            error("hash(data):%s != self.hashcode:%s", h, hashcode)
+            ok = False
+    return ok
+
 register_transcriber(HashCodeBlock, ('B', 'IB'))
 
 def Block(*, hashcode=None, data=None, span=None, added=False):
@@ -810,6 +833,23 @@ class _IndirectBlock(_Block):
         assert not B.indirect
         yield B.get_direct_data()[Bstart:Bend]
 
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this IndirectBlock.
+    '''
+    ok = True
+    span = self.span
+    subspan = sum(subB.span for subB in self.subblocks)
+    if span != subspan:
+      error("span:%d != sum(subblocks.span):%d", span, subspan)
+      ok = False
+    if recurse:
+      for subB in self.subblocks:
+        with Pfx(str(subB)):
+          if not subB.fsck(recurse=True):
+            ok = False
+    return ok
+
 class RLEBlock(_Block):
   ''' An RLEBlock is a Run Length Encoded block of `span` bytes
       all of a specific value, typically NUL.
@@ -860,6 +900,22 @@ class RLEBlock(_Block):
       raise ValueError("unexpected fields: %r" % (m,))
     return cls(span, octet), offset
 
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this RLEBlock.
+    '''
+    ok = True
+    if not isinstance(self.octet, bytes):
+      error("octet is not a bytes instance: type=%s", type(self.octet).__name__)
+      ok = False
+    elif len(self.octet) != 1:
+      error("len(self.octet) != 1: %d", len(self.octet))
+      ok = False
+    if self.span < 1:
+      error("span < 1: %d", self.span)
+      ok = False
+    return ok
+
 register_transcriber(RLEBlock)
 
 class LiteralBlock(_Block):
@@ -892,12 +948,26 @@ class LiteralBlock(_Block):
     '''
     return self.data
 
+  @require(
+      lambda self, start, end:
+      0 <= start and (end is None or start <= end <= len(self)))
   def datafrom(self, start=0, end=None):
-    if start < 0 or end is not None and start > end:
-      raise ValueError("invalid start=%s (end=%s)" % (start, end))
+    ''' Yield data from this block.
+    '''
     if end is None:
       end = self.span
     yield self.data[start:end]
+
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this LiteralBlock.
+    '''
+    ok = True
+    data = self.data
+    if len(self) != len(data):
+      error("len(self)=%d, len(data)=%d", len(self), len(data))
+      ok = False
+    return ok
 
 register_transcriber(LiteralBlock)
 
@@ -907,16 +977,9 @@ def SubBlock(superB, suboffset, span, **kw):
       Returns am empty LiteralBlock if the span==0.
   '''
   with Pfx("SubBlock(suboffset=%d,span=%d,superB=%s)", suboffset, span, superB):
-    # check offset and span here because we trust them later
-    if suboffset < 0 or suboffset > len(superB):
-      raise ValueError("suboffset out of range")
-    if span < 0 or suboffset + span > len(superB):
-      raise ValueError("span(%d) out of range" % (span,))
     if span == 0:
-      ##warning("span==0, returning empty LiteralBlock")
       return LiteralBlock(b'')
     if suboffset == 0 and span == len(superB):
-      ##warning("covers full Block, returning original")
       return superB
     if isinstance(superB, _SubBlock):
       return _SubBlock(superB.superblock, suboffset + superB.offset, span)
@@ -929,15 +992,13 @@ class _SubBlock(_Block):
 
   transcribe_prefix = 'SubB'
 
+  @require(lambda superB, suboffset: 0 <= suboffset < len(superB))
+  @require(
+      lambda superB, suboffset, span:
+      span > 0 and suboffset + span < len(superB))
   def __init__(self, superB, suboffset, span, **kw):
     with Pfx("_SubBlock(suboffset=%d, span=%d)[len(superB)=%d]",
              suboffset, span, len(superB)):
-      if suboffset < 0 or suboffset >= len(superB):
-        raise ValueError('suboffset out of range 0-%d: %d' % (len(superB)-1, suboffset))
-      if span < 0 or suboffset+span > len(superB):
-        raise ValueError(
-            'span must be nonnegative and less than %d (suboffset=%d, len(superblock)=%d): %d'
-            % (len(superB)-suboffset, suboffset, len(superB), span))
       if suboffset == 0 and span == len(superB):
         raise RuntimeError('tried to make a SubBlock spanning all of of SuperB')
       _Block.__init__(self, BlockType.BT_SUBBLOCK, span, **kw)
@@ -981,44 +1042,26 @@ class _SubBlock(_Block):
         required=('block', 'offset', 'span'))
     return cls(block, suboffset, subspan), offset
 
-register_transcriber(_SubBlock)
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this SubBlock.
+    '''
+    ok = True
+    superB = self.superblock
+    suboffset = self.offset
+    span = self.span
+    if isinstance(superB, _SubBlock):
+      error("superblock is a subblock type: %s", type(superB).__name__)
+      ok = False
+    if suboffset < 0 or suboffset >= len(superB):
+      error("offset:%d out of range 0:%d", suboffset, len(superB))
+      ok = False
+    if span < 1 or span > len(superB) - suboffset:
+      error("span:%d out of range 0:%d", span, len(superB) - suboffset)
+      ok = False
+    return ok
 
-def verify_block(B, recurse=False, S=None):
-  ''' Perform integrity checks on the Block `B`, yield error messages.
-  '''
-  if S is None:
-    S = defaults.S
-  try:
-    hashcode = B.hashcode
-  except AttributeError:
-    hashcode = None
-  else:
-    if hashcode not in S:
-      yield str(B), "hashcode not in %s" % (S,)
-    else:
-      # compare the direct data versus the hashcode
-      if B.indirect:
-        bfr = B.superblock.datafrom()
-      else:
-        bfr = B.datafrom()
-      hashdata = b''.join(bfr)
-      # hash the data using the matching hash function
-      data_hashcode = hashcode.hashfunc(hashdata)
-      if hashcode != data_hashcode:
-        yield str(B), "hashcode(%s) does not match hashfunc of data(%s)" \
-                 % (hashcode, data_hashcode)
-      Sdata = S[hashcode]
-      if Sdata != hashdata:
-        yield str(B), "Block hashdata != S[%s]" % (hashcode,)
-  if B.indirect:
-    if recurse:
-      for subB in B.subblocks:
-        yield from verify_block(subB, recurse=True, S=S)
-  Blength = sum(len(chunk) for chunk in B.datafrom())
-  if B.span != Blength:
-    X("VERIFY BLOCK %s: B.span=%d, len(data)=%d",
-      B, B.span, Blength)
-    yield str(B), "span(%d) != len(data:%d)" % (B.span, Blength)
+register_transcriber(_SubBlock)
 
 if __name__ == '__main__':
   from .block_tests import selftest

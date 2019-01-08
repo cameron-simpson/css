@@ -85,21 +85,21 @@ DEFAULT_BASEDIR = '~/.vt_stores'
 
 DEFAULT_CONFIG = {
     'GLOBAL': {
-      'basedir': DEFAULT_BASEDIR,
-      'blockmapdir': '[default]/blockmaps',
+        'basedir': DEFAULT_BASEDIR,
+        'blockmapdir': '[default]/blockmaps',
     },
     'default': {
-      'type': 'datadir',
-      'path': 'trove',
+        'type': 'datadir',
+        'path': 'trove',
     },
     'cache': {
-      'type': 'memory',
-      'max_data': '16 GiB',
+        'type': 'memory',
+        'max_data': '16 GiB',
     },
     'server': {
-      'type': 'datadir',
-      'path': 'trove',
-      'address': '~/.vt.sock',
+        'type': 'datadir',
+        'path': 'trove',
+        'address': '~/.vt.sock',
     },
 }
 

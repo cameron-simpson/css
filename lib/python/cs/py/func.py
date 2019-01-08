@@ -13,7 +13,6 @@ Convenience facilities related to Python functions.
 
 import sys
 from functools import partial
-from cs.excutils import transmute
 from cs.py3 import unicode
 
 DISTINFO = {
@@ -23,7 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.excutils', 'cs.py3'],
+    'install_requires': ['cs.py3'],
 }
 
 def funcname(func):
@@ -100,37 +99,39 @@ def derived_property(
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
   from cs.x import X
-  @transmute(AttributeError)
   def property_value(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset and up to date.
     '''
     # poll outside lock
-    p = getattr(self, property_name, unset_object)
-    p_revision = getattr(self, property_revision_name, 0)
-    o_revision = getattr(self, original_revision_name)
-    if p is unset_object or p_revision < o_revision:
-      with getattr(self, lock_name):
-        # repoll value inside lock
-        p = getattr(self, property_name, unset_object)
-        p_revision = getattr(self, property_revision_name, 0)
-        o_revision = getattr(self, original_revision_name)
-        if p is unset_object or p_revision < o_revision:
-          X("COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name, p_revision, o_revision)
-          p = func(self)
-          setattr(self, property_name, p)
-          X("COMPUTE .%s: set .%s to %s", property_name, property_revision_name, o_revision)
-          setattr(self, property_revision_name, o_revision)
-        else:
-          ##debug("inside lock, already computed up to date %s", property_name)
-          pass
-      X("property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
-        property_name,
-        getattr(self, property_revision_name),
-        getattr(self, original_revision_name))
-    else:
-      ##debug("outside lock, already computed up to date %s", property_name)
-      pass
+    try:
+      p = getattr(self, property_name, unset_object)
+      p_revision = getattr(self, property_revision_name, 0)
+      o_revision = getattr(self, original_revision_name)
+      if p is unset_object or p_revision < o_revision:
+        with getattr(self, lock_name):
+          # repoll value inside lock
+          p = getattr(self, property_name, unset_object)
+          p_revision = getattr(self, property_revision_name, 0)
+          o_revision = getattr(self, original_revision_name)
+          if p is unset_object or p_revision < o_revision:
+            X("COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name, p_revision, o_revision)
+            p = func(self)
+            setattr(self, property_name, p)
+            X("COMPUTE .%s: set .%s to %s", property_name, property_revision_name, o_revision)
+            setattr(self, property_revision_name, o_revision)
+          else:
+            ##debug("inside lock, already computed up to date %s", property_name)
+            pass
+        X("property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
+          property_name,
+          getattr(self, property_revision_name),
+          getattr(self, original_revision_name))
+      else:
+        ##debug("outside lock, already computed up to date %s", property_name)
+        pass
+    except AttributeError as e:
+      raise RuntimeError("AttributeError: %s" % (e,)) from e
     return p
   return property(property_value)
 

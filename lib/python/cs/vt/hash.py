@@ -9,6 +9,7 @@ from bisect import bisect_left
 from hashlib import sha1
 import sys
 from cs.binary import PacketField, BSUInt
+from cs.excutils import exc_fold
 from cs.lex import hexify, get_identifier
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs
@@ -23,6 +24,11 @@ class MissingHashcodeError(KeyError):
     self.hashcode = hashcode
   def __str__(self):
     return "missing hashcode: %s" % (self.hashcode,)
+
+def io_fail(func):
+  ''' Decorator to transmute a MissingHashcodeError into a return of False.
+  '''
+  return exc_fold(func, exc_types=(MissingHashcodeError,))
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
@@ -186,22 +192,25 @@ DEFAULT_HASHCLASS = Hash_SHA1
 
 class HashCodeUtilsMixin(object):
   ''' Utility methods for classes which use hashcodes as keys.
-      Subclasses will generally override .hashcodes_from, which
-        returns an iterator that yields hashcodes until none remains.
-        The default implementation presumes the class is iterable and
-        that that iteration yields hashcodes; this works for mappings,
-        for example. However, because of the need for sorted output
-        the default implementation is expensive. A subclass built on
-        some kind of database will often have an efficient key iteration
-        that can be used instead.
+
+      Subclasses will generally override `.hashcodes_from`,
+      which returns an iterator that yields hashcodes until none remains.
+      The default implementation presumes the class is iterable and
+      that that iteration yields hashcodes; this works for mappings,
+      for example. However, because of the need for sorted output
+      the default implementation is expensive. A subclass built on
+      some kind of database will often have an efficient ordered key
+      iteration that can be used instead.
+
       The other methods include:
-        .hashcodes, the big brother of hashcodes_from with more
-          options; the default implentation uses .hashcodes_from and
-          is roughly as efficient or inefficient. Classes like
-          StreamStore provide their own implementation, but this is
-          usually not necessary.
-        .hash_of_hashcodes, used for comparing Store contents efficiently
-        .hashcodes_missing, likewise
+      * `.hashcodes`:
+        the big brother of hashcodes_from with more options;
+        the default implentation uses `.hashcodes_from` and
+        is roughly as efficient or inefficient.
+        Classes like `StreamStore` provide their own implementation,
+        but this is usually not necessary.
+      * `.hash_of_hashcodes`: used for comparing Store contents efficiently
+      * `.hashcodes_missing`: likewise
   '''
 
   def hash_of_hashcodes(

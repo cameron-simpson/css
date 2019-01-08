@@ -10,6 +10,9 @@ Convenience facilities for managing exceptions.
 
 import sys
 import traceback
+from cs.deco import decorator
+from cs.logutils import error
+from cs.py.func import funcname
 
 DISTINFO = {
     'description': "Convenience facilities for managing exceptions.",
@@ -19,7 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
 }
 
 def return_exc_info(func, *args, **kwargs):
@@ -253,6 +256,23 @@ def try_logexc(e):
     if e:
       raise e
   f(e)
+
+@decorator
+def exc_fold(func, exc_types=None, exc_return=False):
+  def wrapped(*a, **kw):
+    try:
+      return func(*a, **kw)
+    except exc_types as e:
+      error("%s", e)
+      return exc_return
+  wrapped.__name__ = (
+      "@exc_fold[%r=>%r]%s"
+      % (exc_types, exc_return, funcname(func))
+  )
+  doc = getattr(func, '__doc__', '')
+  if doc:
+    wrapped.__doc__ = wrapped.__name__ + '\n' + doc
+  return wrapped
 
 if __name__ == '__main__':
   import cs.excutils_tests

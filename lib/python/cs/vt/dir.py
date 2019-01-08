@@ -28,6 +28,7 @@ from . import totext, PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
+from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
 from .transcribe import Transcriber, parse as parse_transcription, \
@@ -890,6 +891,14 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return self.block.pushto(S2, Q=Q, runstate=runstate)
 
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Inspect this FileDirent.
+    '''
+    self._check()
+    B = self.block
+    return B.fsck(recurse=recurse)
+
 class Dir(_Dirent, DirLike):
   ''' A directory.
 
@@ -987,7 +996,6 @@ class Dir(_Dirent, DirLike):
 
   @property
   @locked
-  @logexc
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
 
@@ -1282,6 +1290,23 @@ class Dir(_Dirent, DirLike):
     if T:
       Q.close()
       T.join()
+
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this Dir.
+    '''
+    ok = True
+    B = self.block
+    if not B.fsck(recurse=recurse):
+      ok = False
+    for name, E in sorted(self.items()):
+      with Pfx(name):
+        if not _validname(name):
+          error("invalid name")
+          ok = False
+        if not E.fsck(recurse=recurse):
+          ok = False
+    return ok
 
 if __name__ == '__main__':
   from .dir_tests import selftest
