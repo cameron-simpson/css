@@ -298,7 +298,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     return self.localpathto(self.state_localpath(self.hashclass))
 
-  def get_Archive(self, name=None):
+  def get_Archive(self, name=None, **kw):
     ''' Return the Archive named `name`.
 
         If `name` is omitted or `None`
@@ -315,7 +315,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         if not name or '.' in name:
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.statedirpath + '-' + name + '.vt'
-      return Archive(archivepath)
+      return Archive(archivepath, **kw)
 
   @property
   def indexbase(self):
@@ -458,7 +458,8 @@ class SqliteFilemap:
     self._lock = Lock()
     self.datadir = datadir
     self.path = path
-    self.conn = sqlite3.connect(path, check_same_thread=False)
+    with Pfx("connect(%r,...)", path):
+      self.conn = sqlite3.connect(path, check_same_thread=False)
     self.settings = {}
     self.n_to_DFstate = {}
     self.path_to_DFstate = {}
@@ -986,7 +987,8 @@ class PlatonicDir(_FilesDir):
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
     if meta_store is not None and archive is None:
-      archive = super().get_Archive()
+      # use the default archive
+      archive = self.get_Archive(missing_ok=True)
     elif archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
