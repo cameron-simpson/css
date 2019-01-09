@@ -1295,11 +1295,16 @@ class Dir(_Dirent, DirLike):
   def fsck(self, recurse=False):
     ''' Check this Dir.
     '''
+    runstate = defaults.runstate
     ok = True
     B = self.block
     if not B.fsck(recurse=recurse):
       ok = False
     for name, E in sorted(self.items()):
+      if runstate.cancelled:
+        error("cancelled")
+        ok = False
+        break
       with Pfx(name):
         if not _validname(name):
           error("invalid name")
