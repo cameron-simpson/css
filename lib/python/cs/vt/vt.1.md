@@ -48,22 +48,22 @@ and empty default Stores.
 
 ## OPTIONS
 
-`-C` *store*
+`-C` *cache_store*
 
   Specify the Store to use as a cache.
-  Specify `NONE` for no cache.
+  Specify `NONE` for no *cache_store*.
   The default cache
   comes from the environment variable `$VT_CACHE_STORE`,
   otherwise the configuration clause `[cache]`
-  defines the Store.
+  defines the *cache_store*.
 
-`-S` *store*
+`-S` *main_store*
 
   Specify the main Store to use.
-  The default main Store
+  The default *main_store*
   comes from the environment variable `$VT_STORE`,
   otherwise the configuration clause `[default]`
-  defines the main Store
+  defines the *main_store*
   except for the `serve` subcommand
   which uses `[server]` and ignores the `$VT_STORE` environment variable.
 
@@ -83,6 +83,17 @@ and empty default Stores.
 
   Verbose; not quiet.
   This is the default if the standard error output is a tty.
+
+If a *cache_store* and a *main_store* are both specified
+then access is via a proxy Store set up as:
+
+    proxy(
+        read=cache_store,
+        read2=main_store,
+        copy2=cache_store,
+        save=cache_store:main_store)
+
+Proxy Stores are described in the STORE TYPES section below.
 
 ## SUBCOMMANDS
 
@@ -533,7 +544,7 @@ Its parameters are as follows:
   A sequence of Stores to which to copy any data blocks
   obtained via the `read2` sequence.
 
-Example configuration file clauses:
+Example configuration file clause:
 
     [laptop]
     type = proxy
@@ -563,6 +574,16 @@ it is sought from the `[home_server]` Store.
 Any blocks retrieved from the home server
 via the `read2` sequence are copied into the local `[trove]`
 so that they are available locally in the future.
+
+## ENVIRONMENT
+
+`$VT_CONFIG`: the path to the configuration file. Default: `$HOME/.vtrc`
+
+`$VT_STORE`: the default Store specification.
+Default from the `[default]` clause of the configuration.
+
+`$VT_CACHE_STORE`: the default cache Store specification.
+Default from the `[cache]` clause of the configuration.
 
 ## SEE ALSO
 
