@@ -45,6 +45,7 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -526,6 +527,7 @@ class SqliteFilemap:
     ''' Insert a new path into the map.
         Return its DataFileState.
     '''
+    info("new path %r", shortpath(new_path))
     conn = self.conn
     with self._lock:
       c = self._execute(r'''
@@ -1063,10 +1065,18 @@ class PlatonicDir(_FilesDir):
       topdir = self.topdir
     else:
       warning("%s: no meta_store!", self)
+    disabled = False
     while not self.cancelled:
       time.sleep(self.DELAY_INTERSCAN)
       if self.flag_scan_disable:
+        if not disabled:
+          info("scan %r DISABLED", shortpath(datadirpath))
+          disabled = True
         continue
+      else:
+        if disabled:
+          info("scan %r ENABLED", shortpath(datadirpath))
+          disabled = False
       # scan for new datafiles
       with Pfx("%r", datadirpath):
         seen = set()
@@ -1133,7 +1143,6 @@ class PlatonicDir(_FilesDir):
                   filemap.del_path(rfilepath)
                   DFstate = None
                 if DFstate is None:
-                  XP("new DFstate")
                   DFstate = filemap.add_path(rfilepath)
                 try:
                   new_size = DFstate.stat_size(self.follow_symlinks)
