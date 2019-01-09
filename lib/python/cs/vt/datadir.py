@@ -701,8 +701,8 @@ class DataDir(_FilesDir):
         except TimeoutError:
           # lock taken, proceed to another file
           continue
-      WDF = DataFileWriter(DFstate.pathname)
-      break
+        WDF = DataFileWriter(DFstate.pathname)
+        break
     if WDF is None:
       # no suitable existing file, make a new one
       while True:
