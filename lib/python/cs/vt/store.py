@@ -803,7 +803,7 @@ class ProxyStore(BasicStoreSync):
   def get(self, h):
     ''' Fetch a block from the first Store which has it.
     '''
-    with Pfx("%s.get", type(self)):
+    with Pfx("%s.get", type(self).__name__):
       for stores in self.read, self.read2:
         for S, data, exc_info in self._multicall(stores, 'get_bg', (h,)):
           with Pfx("%s.get_bg(%s)", S, h):
