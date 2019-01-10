@@ -1306,7 +1306,7 @@ class Dir(_Dirent, DirLike):
         ok = False
         break
       with Pfx(name):
-        if not _validname(name):
+        if not self._validname(name):
           error("invalid name")
           ok = False
         if not E.fsck(recurse=recurse):
