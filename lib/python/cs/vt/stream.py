@@ -641,6 +641,13 @@ RqType.FLUSH.request_class = FlushRequest
 RqType.HASHCODES.request_class = HashCodesRequest
 RqType.HASHCODES_HASH.request_class = HashOfHashCodesRequest
 
+def CommandStore(shcmd, addif=False):
+  ''' Factory to return a StreamStore talking to a command.
+  '''
+  name = "StreamStore(%r)" % ("|" + shcmd, )
+  P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
+  return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
+
 if __name__ == '__main__':
   from .stream_tests import selftest
   selftest(sys.argv)

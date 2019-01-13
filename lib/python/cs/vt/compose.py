@@ -180,10 +180,3 @@ def get_token(s, offset):
   else:
     token, offset = get_qstr_or_identifier(s, offset)
   return token, offset
-
-def CommandStore(shcmd, addif=False):
-  ''' Factory to return a StreamStore talking to a command.
-  '''
-  name = "StreamStore(%r)" % ("|" + shcmd, )
-  P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
-  return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
