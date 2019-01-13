@@ -10,6 +10,7 @@
 from os.path import isdir
 from subprocess import Popen, PIPE
 from cs.lex import skipwhite, get_identifier, get_qstr
+from cs.lex import get_identifier, get_qstr, get_qstr_or_identifier
 from cs.pfx import Pfx
 from .convert import get_integer
 from .stream import StreamStore
@@ -168,13 +169,6 @@ def get_params(s, offset, endchar):
     value, offset = get_token(s, offset)
     params[param] = value
     first = False
-
-def get_qstr_or_identifier(s, offset):
-  ''' Parse q quoted string or an identifier.
-  '''
-  if s.startswith('"', offset):
-    return get_qstr(s, offset, q='"')
-  return get_identifier(s, offset)
 
 def get_token(s, offset):
   ''' Parse an integer value, an identifier or a quoted string.
