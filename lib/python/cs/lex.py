@@ -600,7 +600,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           chunk, offset = specials[seq](s, offset0)
           if offset < offset0 + 1:
             raise ValueError(
-                "special parser for %r at offset %d moved offset backwards" % (c, offset0))
+                "special parser for %r at offset %d moved offset backwards"
+                % (c, offset0))
           break
       if chunk is not None:
         chunks.append(chunk)
@@ -623,7 +624,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
       $x where "x" is a special character.
 
-      Paramaters:
+      Parameters:
       * `s`: the string with the variable reference
       * `offset`: the starting point for the reference
       * `default`: default value for missing environment variables;
