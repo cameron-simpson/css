@@ -1002,10 +1002,10 @@ class Dir(_Dirent, DirLike):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      warning(
-          "Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
-          id(self), self.name, self._block, self.changed)
-      stack_dump()
+      ##warning(
+      ##    "Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+      ##    id(self), self.name, self._block, self.changed)
+      ##stack_dump()
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
@@ -1295,13 +1295,18 @@ class Dir(_Dirent, DirLike):
   def fsck(self, recurse=False):
     ''' Check this Dir.
     '''
+    runstate = defaults.runstate
     ok = True
     B = self.block
     if not B.fsck(recurse=recurse):
       ok = False
     for name, E in sorted(self.items()):
+      if runstate.cancelled:
+        error("cancelled")
+        ok = False
+        break
       with Pfx(name):
-        if not _validname(name):
+        if not self._validname(name):
           error("invalid name")
           ok = False
         if not E.fsck(recurse=recurse):

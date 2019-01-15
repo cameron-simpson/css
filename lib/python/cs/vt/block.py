@@ -844,7 +844,12 @@ class _IndirectBlock(_Block):
       error("span:%d != sum(subblocks.span):%d", span, subspan)
       ok = False
     if recurse:
+      runstate = defaults.runstate
       for subB in self.subblocks:
+        if runstate.cancelled:
+          error("cancelled")
+          ok = False
+          break
         with Pfx(str(subB)):
           if not subB.fsck(recurse=True):
             ok = False

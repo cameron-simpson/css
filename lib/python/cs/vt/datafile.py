@@ -13,7 +13,9 @@ from enum import IntFlag
 from fcntl import flock, LOCK_EX, LOCK_UN
 import os
 from os import SEEK_END, \
-               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
+               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND, \
+               fstat
+from stat import S_ISREG
 import sys
 from zlib import compress, decompress
 from cs.binary import BSUInt, BSData, PacketField
@@ -111,6 +113,11 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     ''' Start up the DataFile: open the read and write file descriptors.
     '''
     rfd = os.open(self.pathname, O_RDONLY)
+    S = fstat(rfd)
+    if not S_ISREG(S.st_mode):
+      raise RuntimeError(
+          "fd %d: not a regular file: mode=0o%o: %r"
+          % (rfd, S.st_mode, self.pathname))
     self._rfd = rfd
     self._rlock = Lock()
 

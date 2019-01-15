@@ -912,8 +912,10 @@ class ReadMixin(object):
         # We need to retest on each iteration because other reads
         # may be interleaved, interfering with the buffer.
         if bfr is None or bfr.offset != offset:
-          if bfr is not None:
-            info("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
+          ##if bfr is not None:
+          ##  info(
+          ##      "ReadMixin.read: new bfr from offset=%d (old bfr was %s)",
+          ##      offset, bfr)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:

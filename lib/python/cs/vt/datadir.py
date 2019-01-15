@@ -45,6 +45,7 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -298,7 +299,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     return self.localpathto(self.state_localpath(self.hashclass))
 
-  def get_Archive(self, name=None):
+  def get_Archive(self, name=None, **kw):
     ''' Return the Archive named `name`.
 
         If `name` is omitted or `None`
@@ -315,7 +316,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         if not name or '.' in name:
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.statedirpath + '-' + name + '.vt'
-      return Archive(archivepath)
+      return Archive(archivepath, **kw)
 
   @property
   def indexbase(self):
@@ -458,7 +459,8 @@ class SqliteFilemap:
     self._lock = Lock()
     self.datadir = datadir
     self.path = path
-    self.conn = sqlite3.connect(path, check_same_thread=False)
+    with Pfx("connect(%r,...)", path):
+      self.conn = sqlite3.connect(path, check_same_thread=False)
     self.settings = {}
     self.n_to_DFstate = {}
     self.path_to_DFstate = {}
@@ -525,6 +527,7 @@ class SqliteFilemap:
     ''' Insert a new path into the map.
         Return its DataFileState.
     '''
+    info("new path %r", shortpath(new_path))
     conn = self.conn
     with self._lock:
       c = self._execute(r'''
@@ -698,8 +701,8 @@ class DataDir(_FilesDir):
         except TimeoutError:
           # lock taken, proceed to another file
           continue
-      WDF = DataFileWriter(DFstate.pathname)
-      break
+        WDF = DataFileWriter(DFstate.pathname)
+        break
     if WDF is None:
       # no suitable existing file, make a new one
       while True:
@@ -986,7 +989,8 @@ class PlatonicDir(_FilesDir):
     self.follow_symlinks = follow_symlinks
     self.meta_store = meta_store
     if meta_store is not None and archive is None:
-      archive = super().get_Archive()
+      # use the default archive
+      archive = self.get_Archive(missing_ok=True)
     elif archive is not None:
       if isinstance(archive, str):
         archive = Archive(archive)
@@ -1061,10 +1065,18 @@ class PlatonicDir(_FilesDir):
       topdir = self.topdir
     else:
       warning("%s: no meta_store!", self)
+    disabled = False
     while not self.cancelled:
       time.sleep(self.DELAY_INTERSCAN)
       if self.flag_scan_disable:
+        if not disabled:
+          info("scan %r DISABLED", shortpath(datadirpath))
+          disabled = True
         continue
+      else:
+        if disabled:
+          info("scan %r ENABLED", shortpath(datadirpath))
+          disabled = False
       # scan for new datafiles
       with Pfx("%r", datadirpath):
         seen = set()
@@ -1131,7 +1143,6 @@ class PlatonicDir(_FilesDir):
                   filemap.del_path(rfilepath)
                   DFstate = None
                 if DFstate is None:
-                  XP("new DFstate")
                   DFstate = filemap.add_path(rfilepath)
                 try:
                   new_size = DFstate.stat_size(self.follow_symlinks)

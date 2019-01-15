@@ -600,7 +600,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           chunk, offset = specials[seq](s, offset0)
           if offset < offset0 + 1:
             raise ValueError(
-                "special parser for %r at offset %d moved offset backwards" % (c, offset0))
+                "special parser for %r at offset %d moved offset backwards"
+                % (c, offset0))
           break
       if chunk is not None:
         chunks.append(chunk)
@@ -623,7 +624,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
       $x where "x" is a special character.
 
-      Paramaters:
+      Parameters:
       * `s`: the string with the variable reference
       * `offset`: the starting point for the reference
       * `default`: default value for missing environment variables;
@@ -681,6 +682,13 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   getvar = partial(
       get_envvar, environ=environ, default=default, specials=env_specials)
   return get_sloshed_text(s, delim, offset, specials={'$': getvar})
+
+def get_qstr_or_identifier(s, offset):
+  ''' Parse a double quoted string or an identifier.
+  '''
+  if s.startswith('"', offset):
+    return get_qstr(s, offset, q='"')
+  return get_identifier(s, offset)
 
 def get_delimited(s, offset, delim):
   ''' Collect text from the string `s` from position `offset` up

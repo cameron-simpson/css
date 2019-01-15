@@ -1069,9 +1069,9 @@ class Packet(PacketField):
                     field))
       for field_name in self.field_names:
         if field_name not in fields_spec:
-          raise ValueError(
-              "field %r is present but is not defined in self.PACKET_FIELDS: %r"
-              % (field_name, sorted(fields_spec.keys())))
+          warning(
+              "field %r is present but is not defined in self.PACKET_FIELDS: %r",
+              field_name, sorted(fields_spec.keys()))
 
   def __getattr__(self, attr):
     ''' Unknown attributes may be field names; return their value.
