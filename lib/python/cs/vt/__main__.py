@@ -23,6 +23,7 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
+from cs.excutils import logexc
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
@@ -35,9 +36,8 @@ import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, CopyModes
-from .block import isBlock
 from .blockify import blocked_chunks_of
-from .compose import get_store_spec
+from .compose import get_store_spec, get_clause_spec, get_clause_archive
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
@@ -366,7 +366,7 @@ class VTCmd:
             for DR in DF.scanfrom(0):
               data = DR.data
               hashcode = hashclass(data)
-              leadin = '%9d %16.16s' % (offset, hashcode)
+              leadin = '%9d %16.16s' % (DR.offset, hashcode)
               dump_chunk(data, leadin, max_width, one_line)
           except EOFError:
             pass
@@ -542,6 +542,61 @@ class VTCmd:
       ls(path, D, recurse, sys.stdout)
     return 0
 
+  def parse_special(self, special):
+    ''' Parse the mount command's special device.
+    '''
+    fsname = special
+    specialD = None
+    special_store = None
+    archive = None
+    if special.startswith('D{') and special.endswith('}'):
+      # D{dir}
+      specialD, offset = parse(special)
+      if offset != len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      if not isinstance(D, Dir):
+        raise ValueError(
+            "does not seem to be a Dir transcription, looks like a %s"
+            % (type(D),))
+      special_basename = D.name
+      if not readonly:
+        warning("setting readonly")
+        readonly = True
+    elif special.startswith('['):
+      if special.endswith(']'):
+        # expect "[clause]"
+        clause_name, offset = get_clause_spec(special)
+        archive_name = None
+        special_basename = clause_name
+      else:
+        # expect "[clause]archive"
+        clause_name, archive_name, offset = get_clause_archive(special)
+        special_basename = archive_name
+      if offset < len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      fsname = str(self.config) + special
+      try:
+        special_store = self.config[clause_name]
+      except KeyError:
+        raise ValueError("unknown config clause [%s]" % (clause_name,))
+      if archive_name is None:
+        special_basename = clause_name
+      else:
+        special_basename = archive_name
+      archive = special_store.get_Archive(archive_name)
+    else:
+      # pathname to archive file
+      archive = special
+      if not isfilepath(archive):
+        raise ValueError("not a file")
+      fsname = shortpath(realpath(archive))
+      spfx, sext = splitext(basename(special))
+      if spfx and sext == '.vt':
+        special_basename = spfx
+      else:
+        special_basename = special
+    return fsname, special_store, specialD, special_basename, archive
+
   def cmd_mount(self, args):
     ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
@@ -572,12 +627,8 @@ class VTCmd:
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
-    specialD = None     # becomes not None for a D{dir}
     mount_store = defaults.S
     # the special may derive directly from a config Store clause
-    special_store = None
-    special_basename = None
-    archive = None
     try:
       special = args.pop(0)
     except IndexError:
@@ -586,66 +637,33 @@ class VTCmd:
       badopts = True
     else:
       with Pfx("special %r", special):
-        fsname = special
-        if special.startswith('D{') and special.endswith('}'):
-          # D{dir}
-          try:
-            D, offset = parse(special)
-          except ValueError as e:
-            error("does not seem to be a Dir transcription: %s", e)
-          else:
-            if offset != len(special):
-              error("unparsed text: %r", special[offset:])
-            elif not isinstance(D, Dir):
-              error("does not seem to be a Dir transcription, looks like a %s", type(D))
-            else:
-              specialD = D
-          if specialD is None:
-            badopts = True
-          else:
-            special_basename = D.name
-            if not readonly:
-              warning("setting readonly")
-              readonly = True
-        elif special.startswith('[') and special.endswith(']'):
-          matched, type_, params, offset = get_store_spec(special)
-          if 'clause_name' not in params:
-            error("no clause name")
-            badopts = True
-          else:
-            fsname = str(self.config) + special
-            special_basename = special[1:-1].strip()
-            special_store = self.config.Store_from_spec(special)
-            X("special_store=%s", special_store)
-            if special_store is not mount_store:
-              warning(
-                  "mounting using Store from special %r instead of default: %s",
-                  special, mount_store)
-              mount_store = special_store
-            archive = self.config.archive(special_basename)
+        try:
+          fsname, special_store, specialD, special_basename, archive = \
+              self.parse_special(special)
+        except ValueError as e:
+          error("invalid: %s", e)
+          badopts = True
+          special_basename = None
         else:
-          # pathname to archive file
-          archive = special
-          if not isfilepath(archive):
-            error("not a file: %r", archive)
-            badopts = True
-          else:
-            fsname = shortpath(realpath(archive))
-            spfx, sext = splitext(basename(special))
-            if spfx and sext == '.vt':
-              special_basename = spfx
-            else:
-              special_basename = special
-    if special_basename is not None:
-      # Make the name for an explicit mount safer:
-      # no path components, no dots (thus no leading dots).
-      special_basename = special_basename.replace(os.sep, '_').replace('.', '_')
+          if special_basename is not None:
+            # Make the name for an explicit mount safer:
+            # no path components, no dots (thus no leading dots).
+            special_basename = \
+                special_basename.replace(os.sep, '_').replace('.', '_')
+          if special_store is not None and special_store is not mount_store:
+            warning(
+                "replacing default Store with Store from special %s ==> %s",
+                mount_store, special_store)
+            mount_store = special_store
     if args:
       mountpoint = args.pop(0)
     else:
       if special_basename is None:
-        error('missing mountpoint, and cannot infer mountpoint from special: %r', special)
-        badopts = True
+        if not badopts:
+          error(
+            'missing mountpoint, and cannot infer mountpoint from special: %r',
+            special)
+          badopts = True
       else:
         mountpoint = special_basename
     if args:
@@ -667,7 +685,9 @@ class VTCmd:
         E = specialD
       else:
         # pathname or Archive obtained from Store
-        if isinstance(archive, str):
+        if archive is None:
+          archive = special_store.get_Archive(archive_name)
+        elif isinstance(archive, str):
           archive = Archive(archive)
         if all_dates:
           E = Dir(mount_base)
@@ -710,7 +730,7 @@ class VTCmd:
             need_rmdir = True
           except OSError as e:
             if e.errno == errno.EEXIST:
-              error("mountpoint is not a directory", mountpoint)
+              error("mountpoint is not a directory")
               return 1
             raise
         T = None
