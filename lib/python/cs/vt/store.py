@@ -9,6 +9,7 @@
 
 from __future__ import with_statement
 from abc import ABC, abstractmethod
+from fnmatch import fnmatch
 from functools import partial
 from os.path import expanduser, isabs as isabspath
 import sys
@@ -384,12 +385,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       added_block = lambda B: None
       did_block = lambda B: None
     else:
-      def added_block(B):
+      def added_block(_):
         ''' Advance the Block total.
         '''
         with lock:
           block_progress.total += 1
-      def did_block(B):
+      def did_block(_):
         ''' Advance the Block progress counter.
         '''
         with lock:
@@ -646,11 +647,22 @@ class ProxyStore(BasicStoreSync):
       any data obtained from `read2` are copied into the `copy2` Stores;
       in this way remote data become locally saved.
 
+      Archives may be made available with the `archives` parameter.
+      This is an iterable of `(glob,Store)`.
+      This supports obtaining an Archive by name
+      from the first Store whose glob matches the name.
+
       TODO: replay and purge the spool? probably better as a separate
-      pushto operation ("vt despool spool_store upstream_store").
+      pushto operation ("vt -S spool_store pushto upstream_store").
   '''
 
-  def __init__(self, name, save, read, *, save2=(), read2=(), copy2=(), **kw):
+  def __init__(
+      self, name,
+      save, read,
+      *,
+      save2=(), read2=(), copy2=(), archives=(),
+      **kw
+  ):
     ''' Initialise a ProxyStore.
 
         Parameters:
@@ -663,6 +675,7 @@ class ProxyStore(BasicStoreSync):
           would be higher latency upstream Stores.
         * `copy2`: optional iterable of Stores to receive copies
           of data obtained via `read2` Stores.
+        * `archives`: search path for archive names
     '''
     BasicStoreSync.__init__(self, name, **kw)
     self.save = frozenset(save)
@@ -670,6 +683,10 @@ class ProxyStore(BasicStoreSync):
     self.save2 = frozenset(save2)
     self.read2 = frozenset(read2)
     self.copy2 = frozenset(copy2)
+    self.archive_path = tuple(*archives)
+    for _, S in self.archive_path:
+      if not hasattr(S, 'get_Archive'):
+        raise ValueError("%s: no get_Archive method" % (S,))
     self._attrs.update(save=save, read=read)
     if save2:
       self._attrs.update(save2=save2)
@@ -678,6 +695,15 @@ class ProxyStore(BasicStoreSync):
     if copy2:
       self._attrs.update(copy2=copy2)
     self.readonly = len(self.save) == 0
+
+  def get_Archive(self, name, mapping=None, missing_ok=False):
+    ''' Obtain the named Archive from a Store in the archives list.
+    '''
+    with Pfx("%s.get_Archive(%r)", self, name):
+      for fnptn, S in self.archive_path:
+        if fnmatch(name, fnptn):
+          return S.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
+      raise KeyError("no such Archive")
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
@@ -879,8 +905,14 @@ class DataDirStore(MappingStore):
     '''
     return self._datadir.localpathto(rpath)
 
+  def get_Archive(self, name=None, mapping=None, missing_ok=False):
+    ''' DataDirStore Archives are associated with the internal DataDir.
+    '''
+    return self._datadir.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
+
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
+
       This is needed because if a meta_store is specified then it
       must be included as a block source in addition to the core
       platonic Store.
@@ -933,10 +965,10 @@ class _PlatonicStore(MappingStore):
     self._datadir.close()
     super().shutdown()
 
-  def get_Archive(self, archive_name=None):
-    ''' PlatonicStore Archive are stored in the internal DataDir.
+  def get_Archive(self, name=None, mapping=None, missing_ok=False):
+    ''' PlatonicStore Archives are associated with the internal DataDir.
     '''
-    return self._datadir.get_Archive(archive_name)
+    return self._datadir.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
 
 class _ProgressStoreTemplateMapping(object):
 
