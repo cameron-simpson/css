@@ -160,8 +160,6 @@ class Inode(Transcriber, NS):
       * `refcount`: the number of Dir references to this Dirent
   '''
 
-  transcribe_prefix = 'Ino'
-
   def __init__(self, inum, E, refcount=1):
     NS.__init__(self)
     self.inum = inum
