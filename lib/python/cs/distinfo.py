@@ -534,7 +534,7 @@ class PyPI_Package(O):
       if pathexists(test_path):
         yield test_subpath
     else:
-      # packages - all .py files in directory
+      # packages - all .py and .md files in directory
       # warning about unexpected other files
       libprefix = libdir + os.path.sep
       for dirpath, dirnames, filenames in os.walk(joinpath(libdir, package_subpath)):
