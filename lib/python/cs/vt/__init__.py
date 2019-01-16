@@ -23,7 +23,6 @@ from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
-from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -181,11 +180,6 @@ class _Defaults(threading.local, StackableValues):
     return self.stack('runstate', new_runstate)
 
 defaults = _Defaults()
-
-def fromtext(s):
-  ''' Return raw byte array from text/hexadecimal string.
-  '''
-  return untexthexify(s)
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
