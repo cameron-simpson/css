@@ -23,7 +23,6 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.excutils import logexc
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
@@ -35,7 +34,7 @@ from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
-from .archive import Archive, CopyModes
+from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec, get_clause_spec, get_clause_archive
 from .config import Config, Store
@@ -543,7 +542,7 @@ class VTCmd:
         ls(path, D, recurse, sys.stdout)
     return 0
 
-  def parse_special(self, special):
+  def parse_special(self, special, readonly):
     ''' Parse the mount command's special device.
     '''
     fsname = special
@@ -555,11 +554,11 @@ class VTCmd:
       specialD, offset = parse(special)
       if offset != len(special):
         raise ValueError("unparsed text: %r" % (special[offset:],))
-      if not isinstance(D, Dir):
+      if not isinstance(specialD, Dir):
         raise ValueError(
             "does not seem to be a Dir transcription, looks like a %s"
-            % (type(D),))
-      special_basename = D.name
+            % (type(specialD),))
+      special_basename = specialD.name
       if not readonly:
         warning("setting readonly")
         readonly = True
@@ -596,7 +595,7 @@ class VTCmd:
         special_basename = spfx
       else:
         special_basename = special
-    return fsname, special_store, specialD, special_basename, archive
+    return fsname, readonly, special_store, specialD, special_basename, archive
 
   def cmd_mount(self, args):
     ''' Mount the specified special on the specified mountpoint directory.
@@ -639,8 +638,8 @@ class VTCmd:
     else:
       with Pfx("special %r", special):
         try:
-          fsname, special_store, specialD, special_basename, archive = \
-              self.parse_special(special)
+          fsname, readonly, special_store, specialD, special_basename, archive = \
+              self.parse_special(special, readonly)
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
@@ -662,8 +661,8 @@ class VTCmd:
       if special_basename is None:
         if not badopts:
           error(
-            'missing mountpoint, and cannot infer mountpoint from special: %r',
-            special)
+              'missing mountpoint, and cannot infer mountpoint from special: %r',
+              special)
           badopts = True
       else:
         mountpoint = special_basename
@@ -687,9 +686,8 @@ class VTCmd:
       else:
         # pathname or Archive obtained from Store
         if archive is None:
-          archive = special_store.get_Archive(archive_name)
-        elif isinstance(archive, str):
-          archive = Archive(archive)
+          warning("no Archive, writing to stdout")
+          archive = FileOutputArchive(sys.stdout)
         if all_dates:
           E = Dir(mount_base)
           for when, subD in archive:
