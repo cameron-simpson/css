@@ -6,6 +6,7 @@
 from __future__ import print_function
 from functools import lru_cache
 import json
+from math import isclose
 import os
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
@@ -236,6 +237,13 @@ class Meta(dict, Transcriber):
 
   def __repr__(self):
     return ':'.join( (type(self).__name__, str(self)) )
+
+  def __eq__(self, other):
+    d1 = self._as_dict()
+    m1 = d1.pop('m', 0.0)
+    d2 = other._as_dict()
+    m2 = d2.pop('m', 0.0)
+    return isclose(m1, m2) and d1 == d2
 
   def textencode(self):
     ''' Return the encoding of this Meta as text.
