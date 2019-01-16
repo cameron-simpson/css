@@ -62,7 +62,6 @@ DISTINFO = {
         'cs.cache',
         'cs.debug',
         'cs.deco',
-        'cs.env',
         'cs.excutils',
         'cs.fileutils',
         'cs.inttypes',
