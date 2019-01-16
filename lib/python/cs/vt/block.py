@@ -50,7 +50,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from cs.x import X
-from . import defaults, totext, RLock
+from . import defaults, RLock
 from .hash import HashCode, io_fail
 from .transcribe import Transcriber, register as register_transcriber, parse
 
@@ -475,12 +475,6 @@ class _Block(Transcriber, ABC):
     '''
     from .blockify import top_block_for
     return top_block_for(self.spliced(start, end, new_block))
-
-  def textencode(self):
-    ''' Transcribe this Block's binary encoding as text.
-        TODO: Obsolete, remove.
-    '''
-    return totext(self.encode())
 
   def open(self, mode="rb"):
     ''' Open the block as a file.
