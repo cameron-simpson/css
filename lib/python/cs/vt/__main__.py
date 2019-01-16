@@ -48,7 +48,7 @@ from .hash import DEFAULT_HASHCLASS
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
-from .paths import OSDir, OSFile, dirent_dir, dirent_file, dirent_resolve
+from .paths import OSDir, OSFile, path_resolve
 from .server import serve_tcp, serve_socket
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
@@ -534,12 +534,13 @@ class VTCmd:
       raise GetoptError("missing dirrefs")
     first = True
     for path in args:
-      if first:
-        first = False
-      else:
-        print()
-      D = dirent_dir(path)
-      ls(path, D, recurse, sys.stdout)
+      with Pfx(path):
+        if first:
+          first = False
+        else:
+          print()
+        D = parse(path)
+        ls(path, D, recurse, sys.stdout)
     return 0
 
   def parse_special(self, special):
@@ -1051,7 +1052,7 @@ def cat(path, fp=None):
     with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
       cat(path, bfp)
   else:
-    F = dirent_file(path)
+    F = path_resolve(path)
     block = F.block
     for B in block.leaves:
       fp.write(B.data)
@@ -1061,11 +1062,7 @@ def dump(path, fp=None):
   '''
   if fp is None:
     fp = sys.stdout
-  E, subname, unresolved = dirent_resolve(path)
-  if unresolved:
-    warning("%r: unresolved components: %r", path, unresolved)
-  if subname:
-    E = E[subname]
+  E = path_resolve(path)
   dump_Block(E.block, fp)
 
 if __name__ == '__main__':
