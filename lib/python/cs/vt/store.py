@@ -32,7 +32,18 @@ from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin, MissingHashcodeError
 class StoreError(Exception):
   ''' Raised by Store operation failures.
   '''
-  pass
+
+  def __init__(self, message, **kw):
+    super().__init__(message)
+    for k, v in kw.items():
+      setattr(self, k, v)
+
+  def __str__(self):
+    s = repr(self)
+    for k in dir(self):
+      if k and k[0].isalpha() and k not in ('args', 'with_traceback'):
+        s += ":%s=%r" % (k, getattr(self, k))
+    return s
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
