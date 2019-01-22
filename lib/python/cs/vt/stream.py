@@ -212,13 +212,13 @@ class StreamStore(BasicStoreSync):
         retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
       except ClosedError as e:
         self._conn = None
-        raise StoreError("connection closed: %s" % (e,)) from e
+        raise StoreError("connection closed: %s" % (e,), request=rq) from e
       except CancellationError as e:
-        raise StoreError("request cancelled: %s" % (e,)) from e
+        raise StoreError("request cancelled: %s" % (e,), request=rq) from e
       else:
         if retval is None:
-          raise StoreError("NO RESPONSE from %s" % (rq,))
       return retval
+          raise StoreError("NO RESPONSE", request=rq)
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
