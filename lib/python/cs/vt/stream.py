@@ -203,6 +203,8 @@ class StreamStore(BasicStoreSync):
 
   def do(self, rq):
     ''' Wrapper for self._conn.do to catch and report failed autoconnection.
+        Raises StoreError on protocol failure or not `ok` responses.
+        Returns `(flags,payload)` otherwise.
     '''
     with Pfx("%s.do(%s)", self, rq):
       conn = self.connection()
@@ -217,8 +219,14 @@ class StreamStore(BasicStoreSync):
         raise StoreError("request cancelled: %s" % (e,), request=rq) from e
       else:
         if retval is None:
-      return retval
           raise StoreError("NO RESPONSE", request=rq)
+        ok, flags, payload = retval
+        if not ok:
+          raise StoreError(
+              "NOT OK response",
+              request=rq, flags=flags, payload=payload)
+        return flags, payload
+      raise RuntimeError("NOTREACHED")
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
@@ -254,11 +262,7 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    ok, flags, payload = self.do(AddRequest(data))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from add(data=%d bytes): flags=0x%0x, payload=%r"
-          % (len(data), flags, payload))
+    flags, payload = self.do(AddRequest(data))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise StoreError("extra payload data after hashcode: %r" % (payload[offset:],))
@@ -271,13 +275,9 @@ class StreamStore(BasicStoreSync):
 
   def get(self, h):
     try:
-      ok, flags, payload = self.do(GetRequest(h))
+      flags, payload = self.do(GetRequest(h))
     except StoreError as e:
       raise MissingHashcodeError(str(e)) from e
-    if not ok:
-      raise MissingHashcodeError(
-          "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
-          % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -292,11 +292,7 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a Result for collection.
     '''
-    ok, flags, payload = self.do(ContainsRequest(h))
-    if not ok:
-      raise ValueError(
-          "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
-          % (h, flags, payload))
+    flags, payload = self.do(ContainsRequest(h))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -307,7 +303,7 @@ class StreamStore(BasicStoreSync):
     return found
 
   def flush(self):
-    _, flags, payload = self.do(FlushRequest())
+    flags, payload = self.do(FlushRequest())
     assert flags == 0
     assert not payload
     local_store = self.local_store
@@ -332,14 +328,10 @@ class StreamStore(BasicStoreSync):
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-    ok, flags, payload = self.do(HashCodesRequest(
+    flags, payload = self.do(HashCodesRequest(
         hashclass=self.hashclass,
         start_hashcode=start_hashcode,
         reverse=reverse, after=after, length=length))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
-          % (start_hashcode, flags, payload))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     offset = 0
@@ -361,14 +353,10 @@ class StreamStore(BasicStoreSync):
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     if hashclass is None:
       hashclass = self.hashclass
-    ok, flags, payload = self.do(HashOfHashCodesRequest(
+    flags, payload = self.do(HashOfHashCodesRequest(
         hashclass=hashclass,
         start_hashcode=start_hashcode,
         reverse=reverse, after=after, length=length))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
-          % (flags, payload))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     hashcode, offset = hash_decode(payload, 0)
