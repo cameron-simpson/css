@@ -18,6 +18,7 @@ import errno
 import os
 from os.path import realpath, isfile
 import time
+from cs.binary import Packet, BSString
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
@@ -27,8 +28,34 @@ from cs.py.func import prop
 from .compose import get_clause_archive
 from .dir import _Dirent
 from .meta import NOUSERID, NOGROUPID
+from .transcribe import parse
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
+
+class ArchiveEntry(Packet):
+  ''' An Archive entry record.
+  '''
+
+  def __init__(self, when, dirent):
+    super().__init__(when=when, dirent=dirent)
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Parse the `when` and `dirent` values from `bfr`.
+    '''
+    when = BSString.from_buffer(bfr)
+    when = float(when)
+    entry = BSString.from_buffer(bfr)
+    entry = parse(entry)
+    if not isinstance(entry, _Dirent):
+      raise ValueError("expected _Dirent, got %s" % (type(entry).__name,))
+    return cls(when=when, dirent=entry)
+
+  def transcribe(self):
+    ''' Transcribe the `when` and `dirent` fields.
+    '''
+    yield BSString(str(self.when)).transcribe()
+    yield BSString(str(self.dirent)).transcribe()
 
 # shared mapping of archive paths to Archive instances
 _ARCHIVES = {}
@@ -76,7 +103,7 @@ def Archive(path, mapping=None, missing_ok=False, weird_ok=False, config=None):
     mapping[path] = A = FilePathArchive(path)
   return A
 
-class _Archive(ABC):
+class BaseArchive(ABC):
   ''' Abstract base class for StoreArchive and FileArchive.
   '''
 
@@ -122,14 +149,14 @@ class _Archive(ABC):
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
-        yield when, E
+        yield ArchiveEntry(when=when, dirent=E)
 
   @staticmethod
   def read(fp, first_lineno=1):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in _Archive.parse(fp, first_lineno=first_lineno):
+    for when, E in BaseArchive.parse(fp, first_lineno=first_lineno):
       return when, E
     return None, None
 
@@ -207,7 +234,7 @@ class _Archive(ABC):
             notify, E, when, source, e)
     return s
 
-class FilePathArchive(_Archive):
+class FilePathArchive(BaseArchive):
   ''' Manager for an archive.vt file.
   '''
 
