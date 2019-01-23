@@ -11,6 +11,8 @@
 
 from __future__ import with_statement
 from enum import IntEnum
+from functools import lru_cache
+from subprocess import Popen, PIPE
 import sys
 import time
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
@@ -19,9 +21,12 @@ from cs.excutils import logexc
 from cs.logutils import warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx
+from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError
 from cs.threads import locked
+from .archive import BaseArchive
+from .dir import _Dirent
 from .hash import (
     decode as hash_decode,
     decode_buffer as hash_from_buffer,
@@ -31,6 +36,7 @@ from .hash import (
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
+from .transcribe import parse
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -41,6 +47,9 @@ class RqType(IntEnum):
   FLUSH = 3             # flush local and remote servers
   HASHCODES = 4         # (hashcode,length) -> hashcodes
   HASHCODES_HASH = 5    # (hashcode,length) -> hashcode of hashcodes
+  ARCHIVE_LAST = 6      # archive_name -> (when,E)
+  ARCHIVE_UPDATE = 7    # (archive_name,when,E)
+  ARCHIVE_LIST = 8      # (count,archive_name) -> (when,E)...
 
 class StreamStore(BasicStoreSync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -107,6 +116,8 @@ class StreamStore(BasicStoreSync):
         raise ValueError("connect is not None and one of recv or send is not None")
       self.connect = connect
       self._conn = None
+    # caching method
+    self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
 
   @property
   def local_store(self):
@@ -388,6 +399,72 @@ class StreamStore(BasicStoreSync):
       start_hashcode = hashcode
       after = True
 
+  def raw_get_Archive(self, archive_name):
+    ''' Factory to return a StreamStoreArchive for `archive_name`.
+    '''
+    return StreamStoreArchive(self, archive_name)
+
+class StreamStoreArchive(BaseArchive):
+  ''' An Archive associates with this StreamStore.
+
+      Its methods proxy requests to the archive name at the remote end.
+  '''
+
+  def __init__(self, S, archive_name):
+    super().__init__()
+    self.S = S
+    self.archive_name = archive_name
+
+  def __str__(self):
+    return "%s(%s,%r)" % (type(self).__name__, self.S, self.archive_name)
+
+  @prop
+  def last(self):
+    ''' The last Archive entry (when, E) or (None, None).
+    '''
+    with Pfx("%s.last", self):
+      try:
+        flags, payload = self.S.do(ArchiveLastRequest(self.archive_name))
+      except StoreError as e:
+        warning("%s, returning (None, None)", e)
+        return None, None
+      found = flags & 0x01
+      if not found:
+        return None, None
+      bfr = CornuCopyBuffer.from_bytes(payload)
+      when = BSString.value_from_buffer(bfr)
+      when = float(when)
+      E = BSString.value_from_buffer(bfr)
+      E = parse(E)
+      if not isinstance(E, _Dirent):
+        raise ValueError("not a _Dirent: %r" % (E,))
+      return when, E
+
+  def __iter__(self):
+    _, payload = self.S.do(ArchiveListRequest(self.archive_name))
+    bfr = CornuCopyBuffer([payload])
+    while not bfr.at_eof():
+      when = BSString.value_from_buffer(bfr)
+      when = float(when)
+      E = BSString.value_from_buffer(bfr)
+      E = parse(E)
+      if not isinstance(E, _Dirent):
+        raise ValueError("not a _Dirent: %r" % (E,))
+      yield when, E
+
+  def update(self, E, *, when=None, previous=None, force=False, source=None):
+    ''' Save the supplied Dirent `E` with timestamp `when`.
+        Return the Dirent transcription.
+        Raises `StoreError` if the request fails.
+
+        Parameters:
+        * `E`: the Dirent to save.
+        * `when`: the POSIX timestamp for the save, default now.
+        * `source`: optional source indicator for the update, default None
+    '''
+    self.S.do(ArchiveUpdateRequest(self.archive_name, E, when))
+    return str(E)
+
 ####################################################################
 # Request packet definitions here.
 # The RqType enum is defined below these, associating the packet
@@ -621,6 +698,101 @@ class HashOfHashCodesRequest(HashCodesRequest):
     if final_hashcode:
       payload += final_hashcode.encode()
     return payload
+
+class ArchiveLastRequest(VTPacket):
+  ''' Return the last entry in a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_LAST
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return BSString.value_from_buffer(bfr)
+
+  def transcribe(self):
+    ''' Return the serialised hashcode.
+    '''
+    return BSString.transcribe_value(self.value)
+
+  def do(self, stream):
+    ''' Return data from the local store by hashcode.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.value)
+    when, E = archive.last
+    if E is None:
+      return 0
+    return (
+        1,
+        BSString.transcribe_value(str(when))
+        + BSString.transcribe_value(str(E))
+    )
+
+class ArchiveListRequest(VTPacket):
+  ''' List the entries in a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_LIST
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return BSString.value_from_buffer(bfr)
+
+  def transcribe(self):
+    ''' Return the serialised hashcode.
+    '''
+    return BSString.transcribe_value(self.value)
+
+  def do(self, stream):
+    ''' Return data from the local store by hashcode.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.value)
+    return b''.join([
+        ( BSString.transcribe_value(str(when))
+          + BSString.transcribe_value(str(E))
+        )
+        for when, E in archive
+    ])
+
+class ArchiveUpdateRequest(VTPacket):
+  ''' Add an entry to a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_LIST
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return BSString.value_from_buffer(bfr)
+
+  def transcribe(self):
+    ''' Return the serialised hashcode.
+    '''
+    return BSString.transcribe_value(self.value)
+
+  def do(self, stream):
+    ''' Return data from the local store by hashcode.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.value)
+    return b''.join([
+        ( BSString.transcribe_value(str(when))
+          + BSString.transcribe_value(str(E))
+        )
+        for when, E in archive
+    ])
 
 RqType.ADD.request_class = AddRequest
 RqType.GET.request_class = GetRequest
