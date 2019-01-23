@@ -316,7 +316,6 @@ class Portfwd(FlaggedMixin):
       else:
         for parsed_item in parsed:
           option = parsed_item.pop(0)
-          values = options[option]
           if parsed_item:
             value, = parsed_item
             options[option].append(value)
@@ -341,21 +340,21 @@ class Portfwd(FlaggedMixin):
     '''
     options = self.ssh_options()
     for localforward in options['localforward']:
-        local, remote = localforward.split(None, 1)
-        if '/' in local:
-          with Pfx("remove %r", local):
-            try:
-              os.remove(local)
-            except OSError as e:
-              if e.errno == errno.ENOENT:
-                pass
-              else:
-                raise
+      local, remote = localforward.split(None, 1)
+      if '/' in local:
+        with Pfx("remove %r", local):
+          try:
+            os.remove(local)
+          except OSError as e:
+            if e.errno == errno.ENOENT:
+              pass
             else:
-              info("removed")
+              raise
+          else:
+            info("removed")
     if (
-        options['controlmaster'] == ['true',]
-        and options['controlpath'] != ['none',]
+        options['controlmaster'] == ['true', ]
+        and options['controlpath'] != ['none', ]
     ):
       controlpath, = options['controlpath']
       with Pfx("remove %r", controlpath):

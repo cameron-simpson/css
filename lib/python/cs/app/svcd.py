@@ -54,7 +54,7 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, debug
+from cs.logutils import setup_logging, warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.sh import quotecmd
@@ -131,7 +131,7 @@ USAGE = '''Usage:
           Run test and related commands as the specified username.
     -x    Trace execution.'''
 
-def main(argv=None, environ=None):
+def main(argv=None):
   ''' Command line main programme.
   '''
   if argv is None:
