@@ -320,6 +320,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           if dirpath.startswith('['):
             endpos = dirpath.find(']', 1)
             if endpos < 0:
+              # TODO: "GLOBAL" ???
               warning('[GLOBAL].blockmapdir: starts with "[" but no "]": %r', dirpath)
             else:
               clausename = dirpath[1:endpos].strip()
