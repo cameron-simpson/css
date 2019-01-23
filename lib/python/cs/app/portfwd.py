@@ -302,24 +302,25 @@ class Portfwd(FlaggedMixin):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
-    argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
-    P = pipefrom(argv)
-    options = defaultdict(list)
-    parsed = [
-        line.strip().split(None, 1)
-        for line in P.stdout
-    ]
-    retcode = P.wait()
-    if retcode != 0:
-      error("%r: non-zero return code: %s", argv, retcode)
-    else:
-      for parsed_item in parsed:
-        option = parsed_item.pop(0)
-        values = options[option]
-        if parsed_item:
-          value, = parsed_item
-          options[option].append(value)
-    return options
+    with Pfx("ssh_options(%r)", self.target):
+      argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
+      P = pipefrom(argv)
+      options = defaultdict(list)
+      parsed = [
+          line.strip().split(None, 1)
+          for line in P.stdout
+      ]
+      retcode = P.wait()
+      if retcode != 0:
+        error("%r: non-zero return code: %s", argv, retcode)
+      else:
+        for parsed_item in parsed:
+          option = parsed_item.pop(0)
+          values = options[option]
+          if parsed_item:
+            value, = parsed_item
+            options[option].append(value)
+      return options
 
   @prop
   def ssh_localcommand(self):
