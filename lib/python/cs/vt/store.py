@@ -300,19 +300,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
   ##########################################################################
   # Archive support.
-  def add_archive(self, name, archive):
-    ''' Add an `archive` by `name`.
+  def get_Archive(self, archive_name):
+    ''' Fetch the named Archive or `None`.
     '''
-    archives = self._archives
-    with self._lock:
-      if name in archives:
-        raise KeyError("archive named %r already exists" % (name,))
-      archives[name] = archive
-
-  def get_archive(self, name):
-    ''' Fetch the named archive or None.
-    '''
-    return self._archives.get(name)
+    return None
 
   ##########################################################################
   # Blockmaps.
