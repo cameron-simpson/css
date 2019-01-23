@@ -516,7 +516,11 @@ class SvcD(FlaggedMixin, object):
                 stop = True
               next_test_time = now() + self.test_rate
             if not stop and self.sig_func is not None:
-              new_sig = self.sig_func()
+              try:
+                new_sig = self.sig_func()
+              except Exception as e:
+                exception("sig_func: %s", e)
+                new_sig = None
               if new_sig is not None:
                 if old_sig is None:
                   # initial signature probe
