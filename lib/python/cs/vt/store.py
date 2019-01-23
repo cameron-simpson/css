@@ -422,7 +422,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       S1 = self
       S1.open()
       S2.open()
-      pending = set()
+      pending_blocks = {}   # mapping of Result to Block
       def worker(name, Q, S1, S2, sem):
         ''' This is the worker function which pushes Blocks from
             the Queue to the second Store.
@@ -461,14 +461,14 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                 addR = S2._defer(addblock, S1, S2, h, B)
                 Xs("<")
                 with lock:
-                  pending.add(addR)
+                  pending_blocks[addR] = B
                 def after_add(addR):
                   ''' Forget that `addR` is pending.
                       This will be called after `addR` completes.
                   '''
                   Xs(">")
                   with lock:
-                    pending.remove(addR)
+                    B = pending_blocks.pop(addR)
                   did_block(B)
                   did_bytes(B)
                   Xs("}")
@@ -476,7 +476,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                 addR.notify(after_add)
             X("PUSHTO: NO MORE BLOCKS")
             with lock:
-              outstanding = list(pending)
+              outstanding = list(pending_blocks.keys())
             X("PUSHTO: %d outstanding, waiting...", len(outstanding))
             for R in outstanding:
               R.join()
