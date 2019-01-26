@@ -15,7 +15,7 @@ from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Semaphore
 from cs.later import Later, SubLater
-from cs.logutils import warning, error
+from cs.logutils import warning, error, info
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.py.func import prop, funcname
@@ -300,9 +300,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
   ##########################################################################
   # Archive support.
-  def get_Archive(self, archive_name):
+  def get_Archive(self, archive_name, missing_ok=False):
     ''' Fetch the named Archive or `None`.
     '''
+    warning("no get_Archive for %s", type(self).__name__)
     return None
 
   ##########################################################################
@@ -686,8 +687,8 @@ class ProxyStore(BasicStoreSync):
     self.save2 = frozenset(save2)
     self.read2 = frozenset(read2)
     self.copy2 = frozenset(copy2)
-    self.archive_path = tuple(*archives)
-    for _, S in self.archive_path:
+    self.archive_path = tuple(archives)
+    for S, _ in self.archive_path:
       if not hasattr(S, 'get_Archive'):
         raise ValueError("%s: no get_Archive method" % (S,))
     self._attrs.update(save=save, read=read)
@@ -699,13 +700,16 @@ class ProxyStore(BasicStoreSync):
       self._attrs.update(copy2=copy2)
     self.readonly = len(self.save) == 0
 
-  def get_Archive(self, name, mapping=None, missing_ok=False):
+  def get_Archive(self, name, missing_ok=False):
     ''' Obtain the named Archive from a Store in the archives list.
     '''
     with Pfx("%s.get_Archive(%r)", self, name):
-      for fnptn, S in self.archive_path:
+      for S, fnptn in self.archive_path:
         if fnmatch(name, fnptn):
-          return S.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
+          info(
+              "%s.get_Archive(%r): matched %r, fetching from %r",
+              self.name, name, fnptn, S.name)
+          return S.get_Archive(name, missing_ok=missing_ok)
       raise KeyError("no such Archive")
 
   def __str__(self):
@@ -715,8 +719,12 @@ class ProxyStore(BasicStoreSync):
     super().startup()
     for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.open()
+    for S, _ in self.archive_path:
+      S.open()
 
   def shutdown(self):
+    for S, _ in self.archive_path:
+      S.close()
     for S in self.save | self.read | self.save2 | self.read2 | self.copy2:
       S.close()
     super().shutdown()
@@ -908,10 +916,10 @@ class DataDirStore(MappingStore):
     '''
     return self._datadir.localpathto(rpath)
 
-  def get_Archive(self, name=None, mapping=None, missing_ok=False):
+  def get_Archive(self, name=None, missing_ok=False):
     ''' DataDirStore Archives are associated with the internal DataDir.
     '''
-    return self._datadir.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
+    return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
 def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
   ''' Factory function for platonic Stores.
@@ -968,10 +976,10 @@ class _PlatonicStore(MappingStore):
     self._datadir.close()
     super().shutdown()
 
-  def get_Archive(self, name=None, mapping=None, missing_ok=False):
+  def get_Archive(self, name=None, missing_ok=False):
     ''' PlatonicStore Archives are associated with the internal DataDir.
     '''
-    return self._datadir.get_Archive(name, mapping=mapping, missing_ok=missing_ok)
+    return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
 class _ProgressStoreTemplateMapping(object):
 
