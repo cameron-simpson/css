@@ -491,6 +491,23 @@ class SqliteFilemap:
   def _execute(self, sql, *a):
     return self.conn.execute(sql, *a)
 
+  def _modify(self, sql, *a, return_cursor=False):
+    sql = sql.strip()
+    conn = self.conn
+    try:
+      c = self._execute(sql, *a)
+    except (
+        sqlite3.OperationalError,
+        sqlite3.IntegrityError,
+    ) as e:
+      error("%s: %s [SQL=%r %r]", type(e).__name__, e, sql, a)
+      conn.rollback()
+    else:
+      conn.commit()
+      if return_cursor:
+        return c
+      c.close()
+
   def filenums(self):
     ''' Return the active DFstate filenums.
     '''
@@ -528,16 +545,21 @@ class SqliteFilemap:
         Return its DataFileState.
     '''
     info("new path %r", shortpath(new_path))
-    conn = self.conn
-    with self._lock:
-      c = self._execute(r'''
-          INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)
-      ''', (new_path, 0))
-      n = c.lastrowid
-      conn.commit()
-      self._map(new_path, n, indexed_to=indexed_to)
-      c.close()
-    return self.n_to_DFstate[n]
+    with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
+      conn = self.conn
+      with self._lock:
+        c = self._modify(r'''
+            INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)
+        ''', (new_path, 0), return_cursor=True)
+        if c:
+          n = c.lastrowid
+          self._map(new_path, n, indexed_to=indexed_to)
+          c.close()
+        else:
+          # TODO: look up the path=>(n,indexed_to) as fallback
+          error("FAILED")
+          return None
+      return self.n_to_DFstate[n]
 
   def del_path(self, old_path):
     ''' Forget the information for `old_path`.
@@ -548,11 +570,9 @@ class SqliteFilemap:
     DFstate = self.path_to_DFstate[old_path]
     conn = self.conn
     with self._lock:
-      c = self._execute(r'''
+      self._modify(r'''
           UPDATE filemap SET path=NULL, indexed_to=NULL where id = ?
       ''', (DFstate.filenum,))
-      conn.commit()
-      c.close()
     del self.n_to_DFstate[DFstate.filenum]
     del self.path_to_DFstate[old_path]
 
@@ -582,11 +602,9 @@ class SqliteFilemap:
     DFstate = self.n_to_DFstate[n]
     conn = self.conn
     with self._lock:
-      c = self._execute(r'''
+      self._modify(r'''
           UPDATE filemap SET indexed_to = ? WHERE id = ?
       ''', (new_indexed_to, n))
-      conn.commit()
-      c.close()
     DFstate.indexed_to = new_indexed_to
 
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
