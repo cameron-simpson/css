@@ -8,8 +8,12 @@
 '''
 
 from os.path import isdir
-from subprocess import Popen, PIPE
-from cs.lex import get_identifier, get_qstr, get_qstr_or_identifier
+from cs.lex import (
+    get_identifier,
+    get_other_chars,
+    get_qstr,
+    get_qstr_or_identifier,
+)
 from cs.pfx import Pfx
 from .convert import get_integer
 
@@ -55,6 +59,51 @@ def parse_store_specs(s, offset=0):
               "expected comma ',', found unexpected separator: %r"
               % (sep,))
     return store_specs
+
+def get_archive_path_entry(s, offset=0, stopchars=None):
+  ''' Parse `[`*clause_name*`]`*ptn*,
+      return `(`*clause_name*`,`*ptn*`,`*new_offset*`)`.
+
+      Parameters:
+      * `s`: the string to parse.
+      * `offset`: the start position of the parse, default: `0`.
+      * `stopchars`: characters which should terminate the parse,
+        default: `' \t\r\n'`
+  '''
+  if stopchars is None:
+    stopchars = ' \t\t\n'
+  if not s.startswith('[', offset):
+    raise ValueError("missing clause")
+  clause_name, offset = get_clause_spec(s, offset)
+  ptn, offset = get_other_chars(s, offset=offset, stopchars=stopchars)
+  if not ptn:
+    raise ValueError("missing pattern")
+  return clause_name, ptn, offset
+
+def get_archive_path(s, offset=0, stopchars=None):
+  ''' Parse a comma separated list of archive path entries:
+      `[`*clause_name*`]`*ptn*`,`...
+      and return a list of `(`*clause_name*`,`*ptn*`)`
+      and the new offset.
+
+      Parameters:
+      * `s`: the string to parse.
+      * `offset`: the start position of the parse, default: `0`.
+      * `stopchars`: characters which should terminate the parse,
+        default: `' \t\r\n'`
+  '''
+  if stopchars is None:
+    stopchars = ' \t\t\n'
+  entries = []
+  while offset < len(s):
+    clause_name, ptn, offset = get_archive_path_entry(
+        s, offset=offset, stopchars=stopchars + ',')
+    entries.append( (clause_name, ptn) )
+    if not s.startswith(',', offset):
+      break
+    while s.startswith(',', offset):
+      offset += 1
+  return entries, offset
 
 def get_store_spec(s, offset=0):
   ''' Get a single Store specification from a string.
