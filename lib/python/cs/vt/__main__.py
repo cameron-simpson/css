@@ -68,7 +68,7 @@ class VTCmd:
               Default: from $VT_CACHE_STORE or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
-                /path/to/dir    GDBMStore
+                /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
               Default from $VT_STORE, or "[default]", except for
@@ -275,7 +275,8 @@ class VTCmd:
               read=(cacheS,),
               read2=(S,),
               copy2=(cacheS,),
-              save=(cacheS, S)
+              save=(cacheS, S),
+              archives=( (S, '*'), ),
           )
           S.config = self.config
       ##X("MAIN CMD_OP S:")
@@ -566,7 +567,7 @@ class VTCmd:
       if special.endswith(']'):
         # expect "[clause]"
         clause_name, offset = get_clause_spec(special)
-        archive_name = None
+        archive_name = ''
         special_basename = clause_name
       else:
         # expect "[clause]archive"
@@ -579,7 +580,7 @@ class VTCmd:
         special_store = self.config[clause_name]
       except KeyError:
         raise ValueError("unknown config clause [%s]" % (clause_name,))
-      if archive_name is None:
+      if archive_name is None or not archive_name:
         special_basename = clause_name
       else:
         special_basename = archive_name
@@ -694,7 +695,7 @@ class VTCmd:
             E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
           try:
-            when, E = archive.last
+            entry = archive.last
           except OSError as e:
             error("can't access special: %s", e)
             return 1
@@ -702,6 +703,8 @@ class VTCmd:
             error("invalid contents: %s", e)
             return 1
           # no "last entry" (==> first use) - make an empty directory
+          when = entry.when
+          E = entry.dirent
           if E is None:
             E = Dir(mount_base)
             X("cmd_mount: new E=%r", E)
