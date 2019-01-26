@@ -1,3 +1,4 @@
+doco for [clause]archive archive references and proxystore archive paths
 archives to support NDJSON state lines, thus UUIDs and other metadata
 autocreate basic .vtrc, and put one in the vtrc manual entry and vt.1
 .stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
