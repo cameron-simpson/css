@@ -25,7 +25,7 @@ from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError
 from cs.threads import locked
-from .archive import BaseArchive
+from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
 from .hash import (
     decode as hash_decode,
@@ -399,7 +399,7 @@ class StreamStore(BasicStoreSync):
       start_hashcode = hashcode
       after = True
 
-  def raw_get_Archive(self, archive_name):
+  def raw_get_Archive(self, archive_name, missing_ok=False):
     ''' Factory to return a StreamStoreArchive for `archive_name`.
     '''
     return StreamStoreArchive(self, archive_name)
@@ -427,18 +427,13 @@ class StreamStoreArchive(BaseArchive):
         flags, payload = self.S.do(ArchiveLastRequest(self.archive_name))
       except StoreError as e:
         warning("%s, returning (None, None)", e)
-        return None, None
+        return ArchiveEntry(None, None)
       found = flags & 0x01
       if not found:
-        return None, None
+        return ArchiveEntry(None, None)
       bfr = CornuCopyBuffer.from_bytes(payload)
-      when = BSString.value_from_buffer(bfr)
-      when = float(when)
-      E = BSString.value_from_buffer(bfr)
-      E = parse(E)
-      if not isinstance(E, _Dirent):
-        raise ValueError("not a _Dirent: %r" % (E,))
-      return when, E
+      entry = ArchiveEntry.from_buffer(bfr)
+      return entry
 
   def __iter__(self):
     _, payload = self.S.do(ArchiveListRequest(self.archive_name))
@@ -462,7 +457,10 @@ class StreamStoreArchive(BaseArchive):
         * `when`: the POSIX timestamp for the save, default now.
         * `source`: optional source indicator for the update, default None
     '''
-    self.S.do(ArchiveUpdateRequest(self.archive_name, E, when))
+    assert E is not None
+    if when is None:
+      when = time.time()
+    self.S.do(ArchiveUpdateRequest(self.archive_name, ArchiveEntry(when, E)))
     return str(E)
 
 ####################################################################
@@ -723,13 +721,12 @@ class ArchiveLastRequest(VTPacket):
     if local_store is None:
       raise ValueError("no local_store, request rejected")
     archive = local_store.get_Archive(self.value)
-    when, E = archive.last
-    if E is None:
+    entry = archive.last
+    if entry.dirent is None:
       return 0
     return (
         1,
-        BSString.transcribe_value(str(when))
-        + BSString.transcribe_value(str(E))
+        bytes(entry)
     )
 
 class ArchiveListRequest(VTPacket):
@@ -745,40 +742,45 @@ class ArchiveListRequest(VTPacket):
     return BSString.value_from_buffer(bfr)
 
   def transcribe(self):
-    ''' Return the serialised hashcode.
+    ''' Return the archive name serialised.
     '''
     return BSString.transcribe_value(self.value)
 
   def do(self, stream):
-    ''' Return data from the local store by hashcode.
+    ''' Return ArchiveEntry transcriptions from the named Archive.
     '''
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
     archive = local_store.get_Archive(self.value)
-    return b''.join([
-        ( BSString.transcribe_value(str(when))
-          + BSString.transcribe_value(str(E))
-        )
-        for when, E in archive
-    ])
+    return b''.join( bytes(entry) for entry in archive )
 
 class ArchiveUpdateRequest(VTPacket):
   ''' Add an entry to a remote Archive.
   '''
 
-  RQTYPE = RqType.ARCHIVE_LIST
+  RQTYPE = RqType.ARCHIVE_UPDATE
 
-  @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def __init__(self, archive_name, entry, flags=0):
+    super().__init__(None)
+    self.flags = flags
+    self.archive_name = archive_name
+    self.entry = entry
+    assert isinstance(entry, ArchiveEntry), "entry has type %s" % (type(entry),)
+
+  @classmethod
+  def from_buffer(cls, bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return BSString.value_from_buffer(bfr)
+    archive_name = BSString.value_from_buffer(bfr)
+    entry = ArchiveEntry.from_buffer(bfr)
+    return cls(archive_name=archive_name, entry=entry, flags=flags)
 
   def transcribe(self):
-    ''' Return the serialised hashcode.
+    ''' Return the serialised archive_name and new entry.
     '''
-    return BSString.transcribe_value(self.value)
+    yield BSString.transcribe_value(self.archive_name)
+    yield self.entry.transcribe()
 
   def do(self, stream):
     ''' Return data from the local store by hashcode.
@@ -786,13 +788,9 @@ class ArchiveUpdateRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    archive = local_store.get_Archive(self.value)
-    return b''.join([
-        ( BSString.transcribe_value(str(when))
-          + BSString.transcribe_value(str(E))
-        )
-        for when, E in archive
-    ])
+    archive = local_store.get_Archive(self.archive_name)
+    entry = self.entry
+    archive.update(entry.dirent, when=entry.when)
 
 RqType.ADD.request_class = AddRequest
 RqType.GET.request_class = GetRequest
@@ -800,6 +798,9 @@ RqType.CONTAINS.request_class = ContainsRequest
 RqType.FLUSH.request_class = FlushRequest
 RqType.HASHCODES.request_class = HashCodesRequest
 RqType.HASHCODES_HASH.request_class = HashOfHashCodesRequest
+RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
+RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
+RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
