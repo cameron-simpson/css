@@ -19,7 +19,7 @@ from cs.result import Result
 from . import Lock, DEFAULT_CONFIG
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
-from .compose import parse_store_specs
+from .compose import parse_store_specs, get_archive_path
 from .convert import get_integer, \
     convert_param_int, convert_param_scaled_int, \
     convert_param_path
@@ -394,6 +394,7 @@ class Config:
       save2=None,
       read2=None,
       copy2=None,
+      archives=(),
   ):
     ''' Construct a ProxyStore.
     '''
@@ -433,11 +434,21 @@ class Config:
       copy2_stores = self.Stores_from_spec(copy2)
     else:
       copy2_stores = copy2
+    if isinstance(archives, str):
+      archive_path, offset = get_archive_path(archives)
+      if offset < len(archives):
+        raise ValueError("unparsed archive path: %r" % (archives[offset:],))
+      archives = []
+      for clause_name, ptn in archive_path:
+        with Pfx("[%s]%s", clause_name, ptn):
+          AS = self[clause_name]
+          archives.append( (AS, ptn) )
     S = ProxyStore(
         store_name,
         save_stores, read_stores,
         save2=save2_stores, read2=read2_stores,
         copy2=copy2_stores,
+        archives=archives,
     )
     S.readonly = readonly
     return S
