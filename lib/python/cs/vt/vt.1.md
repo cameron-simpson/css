@@ -40,6 +40,27 @@ notably via the following subcommands:
 
 These and other subcommands are detailed below.
 
+The remaining object encountered is the "archive",
+which is simply a text file
+containing a record of file tree top directories.
+Conventionally these files have a `.vt` suffix.
+The `pack` subcommand creates or updates these,
+`unpack` command` extracts these,
+the `mount` subcommand mounts these
+and updates the archive which changes on unmount.
+
+Archives are referenced in two ways:
+
+* *path*`.vt`: as a plain pathname to a file ending in `.vt`
+* `[`*clause*`]`*name*: indicating an archive associated
+  with a Store.
+  The *name* is optional, as Stores have a default archive file,
+  but otherwise should be an identifier.
+
+The latter form accesses an archive file associated with a Store
+and provide convenient access to file trees from that Store.
+The *name* is optional as each Store has a default archive.
+
 ## GETTING STARTED
 
 Run the command `vt init`;
@@ -510,9 +531,8 @@ used as backing storage for vt file trees offering that data.
 Like a datadir Store
 it has a `data` subdirectory pointing at the regular files
 containing the data to be served.
-These pointers are normally symbolic links
-to whatever reference trees
-are to be offered.
+Typically this just contains symbolic links
+to whatever reference trees are to be offered.
 
 The Store scans new files as they appear in the reference trees
 and maintains an index of block hashcodes referring
@@ -551,6 +571,15 @@ Its parameters are as follows:
   A sequence of Stores to which to copy any data blocks
   obtained via the `read2` sequence.
 
+`archives`
+  A comma separated list of `[`*clause*`]`*ptn* items
+  associating Stores with filename glob patterns *ptn*.
+  Looking up a `[`*clause*`]`*name* archive reference
+  via a ProxyStore
+  matches *name* against the *ptn* glob
+  and passes the lookup to the first Store
+  whose *ptn* patches the *name*.
+
 Example configuration file clause:
 
     [laptop]
@@ -560,6 +589,7 @@ Example configuration file clause:
     read = [trove],[ideal],[spool]
     read2 = [home_server]
     copy2 = [trove]
+    archives = [ideal]ideal,[trove]*
 
 This clause is for a laptop with limited storage.
 Saves are stored to its `[trove]`,
@@ -581,6 +611,11 @@ it is sought from the `[home_server]` Store.
 Any blocks retrieved from the home server
 via the `read2` sequence are copied into the local `[trove]`
 so that they are available locally in the future.
+
+An archive loopup for the name `ideal` is obtained via the `[ideal]` Store
+and all other names are obtained via the `[trove]` Store.
+Note that this only controls where archive files are found;
+any block lookup follows the normal flow of the ProxyStore.
 
 ## ENVIRONMENT
 
