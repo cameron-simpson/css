@@ -139,8 +139,8 @@ Proxy Stores are described in the STORE TYPES section below.
 
   The *special* specifies the directory contents.
   It may be *path*`.vt`:
-  a vt(5) archive file - the latest entry is mounted
-  and the default mount location is *path*;
+  a vt(5) archive file - the latest entry is mounted;
+  a `[`*clause*`]`*archive* archive reference;
   a content directory specification
   recognised by a leading `D{` and a trailing `}`
   (see CONTENT REFERENCES below).
@@ -149,6 +149,13 @@ Proxy Stores are described in the STORE TYPES section below.
   on which to mount the content specified by *special*.
   If the directory does not exist it will be created
   and it will be removed after unmount.
+  If omitted the *mountpoint* will inferred from the *special*:
+  for a vt(5) archive file path, the basename of *path*;
+  for a `[`*clause*`]`*archive*
+  it will be *archive* unless that is empty
+  in which case it will be *clause*;
+  for a content directory specification
+  the name of the directory.
 
   If the *subpath* is specified,
   that subtree of *special* will be presented on the mount point.
@@ -200,7 +207,7 @@ Proxy Stores are described in the STORE TYPES section below.
 
 `unpack` *path*`.vt`
 
-  Fetch the last refererence from the archive file *path*`.vt`
+  Fetch the last reference from the archive file *path*`.vt`
   and copy the contents out as the directory *path*.
 
 ## STORE SPECIFICATIONS
