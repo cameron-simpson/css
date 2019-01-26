@@ -310,10 +310,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         The `name` may not be empty or contain a dot.
     '''
     with Pfx("%s.get_Archive", self):
-      if name is None:
+      if name is None or not name:
         archivepath = self.statedirpath + '.vt'
       else:
-        if not name or '.' in name:
+        if '.' in name:
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.statedirpath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
@@ -1001,7 +1001,7 @@ class PlatonicDir(_FilesDir):
     if self.meta_store is not None:
       self.meta_store.open()
       archive = self.archive
-      _, D = archive.last
+      D = archive.last.dirent
       if D is None:
         info("%r: no archive entries, create empty topdir Dir", archive)
         D = Dir('.')
