@@ -45,7 +45,6 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -194,7 +193,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def init(self):
     ''' Initialise the data dir if not present.
     '''
-    X("FILESDIR INIT")
     statedirpath = self.statedirpath
     if not isdirpath(statedirpath):
       info("mkdir %r", statedirpath)
