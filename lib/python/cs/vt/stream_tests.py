@@ -12,7 +12,7 @@ import sys
 import unittest
 from cs.x import X
 from .hash import DEFAULT_HASHCLASS
-from .hash_tests import HashUtilDict, _TestHashCodeUtils
+from .hash_tests import HashUtilDict
 from .store import MappingStore
 from .store_tests import TestStore
 from .stream import StreamStore
@@ -45,8 +45,6 @@ class TestStreamStore(TestStore, unittest.TestCase):
   ''' Test a stream in non-addif mode.
   '''
 
-  hashclass = DEFAULT_HASHCLASS
-
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=False)
 
@@ -63,8 +61,6 @@ class TestStreamStoreAddIf(TestStore, unittest.TestCase):
   ''' test a stream in addif mode.
   '''
 
-  hashclass = DEFAULT_HASHCLASS
-
   def _init_Store(self):
     self.S, self.remote_S = make_stream_store(self.hashclass, addif=True)
 
@@ -76,27 +72,6 @@ class TestStreamStoreAddIf(TestStore, unittest.TestCase):
   def tearDown(self):
     self.remote_S.close()
     TestStore.tearDown(self)
-
-##@unittest.skip("too noisy")
-class TestHashCodeUtilsStreamStore(_TestHashCodeUtils, unittest.TestCase):
-  ''' Test HashUtils on a StreamStore on a HashUtilDict.
-  '''
-  ADDIF_MODE = False
-  hashclass = DEFAULT_HASHCLASS
-  def MAP_FACTORY(self):
-    S, remote_S = make_stream_store(self.hashclass, self.ADDIF_MODE)
-    remote_S.open()
-    self.remote_S = remote_S
-    return S
-
-  def tearDown(self):
-    self.remote_S.close()
-    _TestHashCodeUtils.tearDown(self)
-
-class TestHashCodeUtilsStreamStoreAddIf(TestHashCodeUtilsStreamStore):
-  ''' Test HashUtils on a StreamStore on a HashUtilDict with addif=True.
-  '''
-  ADDIF_MODE = True
 
 def selftest(argv):
   ''' Run the unit tests.
