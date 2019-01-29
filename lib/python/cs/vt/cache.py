@@ -121,6 +121,9 @@ class FileCacheStore(BasicStoreSync):
     '''
     pass
 
+  def __iter__(self):
+    return iter(self.keys())
+
   def keys(self):
     return self.cache.keys()
 
@@ -248,7 +251,9 @@ class FileDataMappingProxy(RunStateMixin):
       yield h
       seen.add(h)
     saved = self.saved
-    for h in saved:
+    with self._lock:
+      saved_keys = list(saved.keys())
+    for h in saved_keys:
       if h not in seen and self._getref(h):
         yield h
         seen.add(h)
