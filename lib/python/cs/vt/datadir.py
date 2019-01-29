@@ -37,7 +37,7 @@ from cs.fileutils import (
     shortpath,
     TimeoutError)
 from cs.logutils import debug, info, warning, error, exception
-from cs.pfx import Pfx, PfxThread as Thread, XP
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
@@ -194,6 +194,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def init(self):
     ''' Initialise the data dir if not present.
     '''
+    X("FILESDIR INIT")
     statedirpath = self.statedirpath
     if not isdirpath(statedirpath):
       info("mkdir %r", statedirpath)
@@ -507,6 +508,7 @@ class SqliteFilemap:
       if return_cursor:
         return c
       c.close()
+    return None
 
   def filenums(self):
     ''' Return the active DFstate filenums.
@@ -546,7 +548,6 @@ class SqliteFilemap:
     '''
     info("new path %r", shortpath(new_path))
     with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
-      conn = self.conn
       with self._lock:
         c = self._modify(r'''
             INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)
@@ -568,7 +569,6 @@ class SqliteFilemap:
         `path` and `indexed_to` to NULL.
     '''
     DFstate = self.path_to_DFstate[old_path]
-    conn = self.conn
     with self._lock:
       self._modify(r'''
           UPDATE filemap SET path=NULL, indexed_to=NULL where id = ?
@@ -600,7 +600,6 @@ class SqliteFilemap:
     ''' Update the `indexed_to` value for path `n`.
     '''
     DFstate = self.n_to_DFstate[n]
-    conn = self.conn
     with self._lock:
       self._modify(r'''
           UPDATE filemap SET indexed_to = ? WHERE id = ?
