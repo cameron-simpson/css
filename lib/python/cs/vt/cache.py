@@ -9,9 +9,9 @@
 
 from __future__ import with_statement
 from collections import namedtuple
-import sys
 from tempfile import TemporaryFile
 from threading import Thread
+from icontract import require
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error, warning
 from cs.queues import IterableQueue
@@ -20,7 +20,7 @@ from cs.result import Result
 from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
 from .hash import DEFAULT_HASHCLASS
-from .store import BasicStoreSync, MappingStore
+from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
 DEFAULT_MAX_CACHEFILES = 3
@@ -34,6 +34,9 @@ class FileCacheStore(BasicStoreSync):
       which does the heavy lifting of storing data.
   '''
 
+  @require(lambda name: isinstance(name, str))
+  @require(lambda backend: backend is None or isinstance(backend, _BasicStoreCommon))
+  @require(lambda dirpath: isinstance(dirpath, str))
   def __init__(
       self,
       name, backend, dirpath,
@@ -159,7 +162,9 @@ class FileDataMappingProxy(RunStateMixin):
   '''
 
   def __init__(
-      self, backend, dirpath=None,
+      self, backend,
+      *,
+      dirpath=None,
       max_cachefile_size=None, max_cachefiles=None,
       runstate=None,
   ):
@@ -601,7 +606,3 @@ class BlockCache:
         bm = tempf.append_block(block, self.runstate)
         blockmaps[h] = bm
     return bm
-
-if __name__ == '__main__':
-  from .cache_tests import selftest
-  selftest(sys.argv)
