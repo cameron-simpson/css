@@ -559,6 +559,11 @@ class MappingStore(BasicStoreSync):
       closemap()
     super().shutdown()
 
+  def init(self):
+    ''' Mapping stores need no static setup.
+    '''
+    pass
+
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
       mapping = self.mapping
