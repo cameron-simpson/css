@@ -8,14 +8,12 @@
 '''
 
 from hashlib import sha1
-from itertools import accumulate
 import random
 import sys
 import unittest
 from cs.binary_tests import _TestPacketFields
-from .randutils import rand0, randbool, randblock
-from . import _TestAdditionsMixin, hash as hash_module
-from .hash import Hash_SHA1, decode as decode_hash, HashUtilDict
+from . import hash as hash_module
+from .hash import Hash_SHA1, decode as decode_hash
 from .transcribe import Transcriber, parse
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
