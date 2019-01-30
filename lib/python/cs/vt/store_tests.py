@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Tests for Stores.
+'''
+
 from itertools import accumulate
 import random
 import sys
@@ -14,7 +17,7 @@ from .randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
-from .hash import HashUtilDict, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 ##from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore, DataDirStore
 
@@ -51,7 +54,8 @@ def multitest(method):
   '''
   def testMethod(self):
     for subtest, S in get_test_stores(
-        prefix=method.__module__ + '.' + method.__name__):
+        prefix=method.__module__ + '.' + method.__name__
+    ):
       with self.subTest(test_store=S, **subtest):
         self.S = S
         self.hashclass = subtest['hashclass']
@@ -82,16 +86,27 @@ def hcutest(method):
   return testHCUMethod
 
 class TestStore(unittest.TestCase, _TestAdditionsMixin):
+  ''' Tests for Stores.
+  '''
 
   hashclass = DEFAULT_HASHCLASS
 
+  def __init__(self, *a, **kw):
+    super().__init__(*a, **kw)
+    self.S = None
+    self.keys1 = None
+
   @multitest
   def test00empty(self):
+    ''' Test that a new STore is empty.
+    '''
     S = self.S
     self.assertLen(S, 0)
 
   @multitest
   def test01add_new_block(self):
+    ''' Add a block and check that it worked.
+    '''
     S = self.S
     self.assertLen(S, 0)
     size = random.randint(127, 16384)
@@ -112,6 +127,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
 
   @multitest
   def test02add_get(self):
+    ''' Add random chunks, get them back.
+    '''
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
@@ -303,44 +320,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
         M2missing = set(M2.hashcodes_missing(M1))
         KS2missing = KS1 - KS2
         self.assertEqual(M2missing, KS2missing)
-
-##class TestMappingStore(TestStore, unittest.TestCase):
-##
-##  def _init_Store(self):
-##    self.S = MappingStore("TestMappingStore", {}, hashclass=self.hashclass)
-##
-##class TestProgressStore(TestStore, unittest.TestCase):
-##
-##  def _init_Store(self):
-##    M = MappingStore("TestProgressStore", {}, hashclass=self.hashclass)
-##    MO = M.open()
-##    P = ProgressStore("ProgressMappingStore", MO)
-##    self.S = P.open()
-##
-##class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
-##  ''' Test HashUtils on a MappingStore on a plain dict.
-##  '''
-##  MAP_FACTORY = lambda self: MappingStore("TestHashCodeUtilsMappingStoreDict", {}, hashclass=DEFAULT_HASHCLASS)
-##
-##class TestHashCodeUtilsMappingStoreHashUtilDict(_TestHashCodeUtils, unittest.TestCase):
-##  ''' Test HashUtils on a MappingStore on a HashUtilDict.
-##  '''
-##  MAP_FACTORY = lambda self: MappingStore("TestHashCodeUtilsMappingStoreHashUtilDict", HashUtilDict(), hashclass=DEFAULT_HASHCLASS)
-##
-##try:
-##  import kyotocabinet
-##except ImportError:
-##  pass
-##else:
-##  class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
-##    INDEX_CLASS = KyotoIndex
-##  class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
-##    ''' Hook to test hashcode utils against KyotoCabinet.
-##    '''
-##    MAP_FACTORY = lambda self: DataDirStore(
-##        "TestHashCodeUtilsDataDirStoreKyotoStore",
-##        self.mktmpdir(), hashclass=DEFAULT_HASHCLASS, indexclass=KyotoIndex,
-##        rollover=200000)
 
 def selftest(argv):
   ''' Run the unit tests.
