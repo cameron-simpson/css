@@ -54,7 +54,7 @@ import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, debug
+from cs.logutils import setup_logging, warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.sh import quotecmd
@@ -131,7 +131,7 @@ USAGE = '''Usage:
           Run test and related commands as the specified username.
     -x    Trace execution.'''
 
-def main(argv=None, environ=None):
+def main(argv=None):
   ''' Command line main programme.
   '''
   if argv is None:
@@ -516,7 +516,11 @@ class SvcD(FlaggedMixin, object):
                 stop = True
               next_test_time = now() + self.test_rate
             if not stop and self.sig_func is not None:
-              new_sig = self.sig_func()
+              try:
+                new_sig = self.sig_func()
+              except Exception as e:
+                exception("sig_func: %s", e)
+                new_sig = None
               if new_sig is not None:
                 if old_sig is None:
                   # initial signature probe

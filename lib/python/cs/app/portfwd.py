@@ -302,24 +302,24 @@ class Portfwd(FlaggedMixin):
     ''' Return a defaultdict(list) of `{option: values}`
         representing the ssh configuration.
     '''
-    argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
-    P = pipefrom(argv)
-    options = defaultdict(list)
-    parsed = [
-        line.strip().split(None, 1)
-        for line in P.stdout
-    ]
-    retcode = P.wait()
-    if retcode != 0:
-      error("%r: non-zero return code: %s", argv, retcode)
-    else:
-      for parsed_item in parsed:
-        option = parsed_item.pop(0)
-        values = options[option]
-        if parsed_item:
-          value, = parsed_item
-          options[option].append(value)
-    return options
+    with Pfx("ssh_options(%r)", self.target):
+      argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
+      P = pipefrom(argv)
+      options = defaultdict(list)
+      parsed = [
+          line.strip().split(None, 1)
+          for line in P.stdout
+      ]
+      retcode = P.wait()
+      if retcode != 0:
+        error("%r: non-zero return code: %s", argv, retcode)
+      else:
+        for parsed_item in parsed:
+          option = parsed_item.pop(0)
+          if parsed_item:
+            value, = parsed_item
+            options[option].append(value)
+      return options
 
   @prop
   def ssh_localcommand(self):
@@ -340,21 +340,21 @@ class Portfwd(FlaggedMixin):
     '''
     options = self.ssh_options()
     for localforward in options['localforward']:
-        local, remote = localforward.split(None, 1)
-        if '/' in local:
-          with Pfx("remove %r", local):
-            try:
-              os.remove(local)
-            except OSError as e:
-              if e.errno == errno.ENOENT:
-                pass
-              else:
-                raise
+      local, remote = localforward.split(None, 1)
+      if '/' in local:
+        with Pfx("remove %r", local):
+          try:
+            os.remove(local)
+          except OSError as e:
+            if e.errno == errno.ENOENT:
+              pass
             else:
-              info("removed")
+              raise
+          else:
+            info("removed")
     if (
-        options['controlmaster'] == ['true',]
-        and options['controlpath'] != ['none',]
+        options['controlmaster'] == ['true', ]
+        and options['controlpath'] != ['none', ]
     ):
       controlpath, = options['controlpath']
       with Pfx("remove %r", controlpath):

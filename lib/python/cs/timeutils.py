@@ -5,7 +5,6 @@
 '''
 
 from __future__ import print_function
-import builtins
 import datetime
 import time
 
@@ -21,8 +20,15 @@ DISTINFO = {
 }
 
 try:
-  TimeoutError = builtins.TimeoutError
-except AttributeError:
+  import builtins
+except ImportError:
+  TimeoutError = None
+else:
+  try:
+    TimeoutError = builtins.TimeoutError
+  except AttributeError:
+    TimeoutError = None
+if TimeoutError is None:
   class TimeoutError(Exception):
     ''' A TimeoutError.
     '''
