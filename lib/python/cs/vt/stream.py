@@ -15,6 +15,7 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 import sys
 import time
+from icontract import require
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
@@ -31,6 +32,7 @@ from .hash import (
     decode as hash_decode,
     decode_buffer as hash_from_buffer,
     HASHCLASS_BY_NAME,
+    HashCode,
     HashCodeField,
     MissingHashcodeError,
 )
@@ -118,6 +120,11 @@ class StreamStore(BasicStoreSync):
       self._conn = None
     # caching method
     self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
+
+  def init(self):
+    ''' Initialise store prior to any use.
+    '''
+    pass
 
   @property
   def local_store(self):
@@ -569,7 +576,8 @@ class FlushRequest(VTPacket):
 
   RQTYPE = RqType.FLUSH
 
-  def __init__(self):
+  @require(lambda value: value is None)
+  def __init__(self, value=None):
     super().__init__(None)
 
   @staticmethod
@@ -577,6 +585,9 @@ class FlushRequest(VTPacket):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return None
+
+  def transcribe(self):
+    pass
 
   @staticmethod
   def do(stream):
@@ -593,23 +604,20 @@ class HashCodesRequest(Packet):
 
   RQTYPE = RqType.HASHCODES
 
+  @require(lambda reverse: isinstance(reverse, bool))
+  @require(lambda after: isinstance(after, bool))
+  @require(lambda hashclass: issubclass(hashclass, HashCode))
+  @require(lambda after, start_hashcode: not after or start_hashcode is not None)
   def __init__(
       self,
+      *,
       reverse=False, after=False,
       hashclass=None,
       start_hashcode=None,
       length=None,
   ):
-    assert isinstance(reverse, bool)
-    assert isinstance(after, bool)
-    if hashclass is None:
-      raise ValueError("missing hashclass")
     if length is None:
       length = 0
-    if after and start_hashcode is None:
-      raise ValueError(
-          "after=%s but start_hashcode=%s"
-          % (after, start_hashcode))
     self.reverse = reverse
     self.after = after
     super().__init__(
