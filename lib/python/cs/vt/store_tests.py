@@ -239,19 +239,21 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     ks = sorted(KS1)
     for reverse in False, True:
       for start_hashcode in [None] + ks + [h2]:
-        with self.subTest(M1type=type(M1), reverse=reverse, start_hashcode=start_hashcode):
-          with self.subTest(start_hashcode=start_hashcode):
-            hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
-                                        reverse=reverse))
-            self.assertIsOrdered(hs, reverse=reverse, strict=True)
-            if reverse:
-              ksrev = reversed(ks)
-              hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
-            else:
-              hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
-            hs = list(sorted(hs))
-            hs2 = list(sorted(hs2))
-            self.assertEqual(hs, hs2)
+        with self.subTest(
+            M1type=type(M1).__name__, reverse=reverse,
+            start_hashcode=start_hashcode
+        ):
+          hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
+                                      reverse=reverse))
+          self.assertIsOrdered(hs, reverse=reverse, strict=True)
+          if reverse:
+            ksrev = reversed(ks)
+            hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
+          else:
+            hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
+          hs = list(sorted(hs))
+          hs2 = list(sorted(hs2))
+          self.assertEqual(hs, hs2)
 
   @multitest
   @hcutest
