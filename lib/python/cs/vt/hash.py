@@ -17,7 +17,8 @@ from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
 class MissingHashcodeError(KeyError):
-  ''' Subclass of KeyError raised when accessing a hashcode is not present in the Store.
+  ''' Subclass of KeyError
+      raised when accessing a hashcode is not present in the Store.
   '''
   def __init__(self, hashcode):
     KeyError.__init__(self, str(hashcode))
@@ -246,14 +247,19 @@ class HashCodeUtilsMixin(object):
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
+
         This implementation starts by fetching and sorting all the
         keys, so for large mappings this implementation is memory
         expensive and also runtime expensive if only a few hashcodes
         are desired.
-        `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
-                          if None start the sequences from the smallest
-                          hashcode or from the largest if `reverse` is true
-        `reverse`: yield hashcodes in reverse order (counting down instead of up).
+
+        Paramaters:
+        * `start_hashcode`: starting hashcode;
+          the returned hashcodes are `>=start_hashcode`;
+          if None start the sequences from the smallest hashcode
+          or from the largest if `reverse` is true
+        * `reverse`: yield hashcodes in reverse order
+          (counting down instead of up).
     '''
     hashclass = self.hashclass
     if start_hashcode is not None:
@@ -301,14 +307,18 @@ class HashCodeUtilsMixin(object):
         ndx += 1
 
   def hashcodes(self, start_hashcode=None, reverse=False, after=False, length=None):
-    ''' Generator yielding up to `length` hashcodes >=`start_hashcode`.
-        This relies on .hashcodes_from as the source of hashcodes.
-        `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
-                          if None start the sequences from the smallest
-                          hashcode or from the largest if `reverse` is true
-        `reverse`: yield hashcodes in reverse order (counting down instead of up).
-        `after`: skip the first hashcode if it is equal to `start_hashcode`
-        `length`: the maximum number of hashcodes to yield
+    ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
+        This relies on `.hashcodes_from` as the source of hashcodes.
+
+        Parameters:
+        * `start_hashcode`: starting hashcode;
+          the returned hashcodes are `>=start_hashcode`;
+          if None start the sequences from the smallest hashcode
+          or from the largest if `reverse` is true
+        * `reverse`: yield hashcodes in reverse order
+            (counting down instead of up).
+        * `after`: skip the first hashcode if it is equal to `start_hashcode`
+        * `length`: the maximum number of hashcodes to yield
     '''
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
