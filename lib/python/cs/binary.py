@@ -133,11 +133,11 @@ elif sys.version_info[1] < 6:
       file=sys.stderr)
 
 def flatten(chunks):
-  ''' Flatten `chunks` into an iterable of bytes instances.
+  ''' Flatten `chunks` into an iterable of `bytes` instances.
 
       This exists to allow subclass methods to easily return ASCII
-      strings or bytes or iterables or even None, in turn allowing
-      them to simply return their superclass' chunks iterators
+      strings or bytes or iterables or even `None`, in turn allowing
+      them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
   '''
   if chunks is None:
@@ -156,7 +156,10 @@ class PacketField(ABC):
   ''' A record for an individual packet field.
   '''
 
-  def __init__(self, value):
+  def __init__(self, value=None):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
     self.value = value
 
   @property
@@ -215,7 +218,9 @@ class PacketField(ABC):
         This default implementation instantiates the instance from
         the value returned by `cls.value_from_buffer(bfr, **kw)`.
     '''
-    return cls(cls.value_from_buffer(bfr, **kw))
+    value = cls.value_from_buffer(bfr, **kw)
+    return cls(value)
+    ##return cls(cls.value_from_buffer(bfr, **kw))
 
   @staticmethod
   def value_from_buffer(bfr, **kw):
