@@ -8,6 +8,7 @@
 '''
 
 from itertools import accumulate
+import os
 import random
 import sys
 import tempfile
@@ -20,6 +21,7 @@ from .index import class_names as get_index_names, class_by_name as get_index_by
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 ##from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore, DataDirStore
+from .stream import StreamStore
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
@@ -48,6 +50,27 @@ def get_test_stores(prefix):
       yield subtest, FileCacheStore(
           'FileCacheStore', MappingStore('MappingStore', {}), tmpdirpath,
           **subtest)
+    for addif in False, True:
+      subtest = {
+          "hashclass": hashclass,
+          "addif": addif,
+      }
+      local_store = MappingStore("MappingStore", {})
+      upstream_rd, upstream_wr = os.pipe()
+      downstream_rd, downstream_wr = os.pipe()
+      remote_S = StreamStore(
+          "remote_S",
+          upstream_rd, downstream_wr,
+          local_store=local_store, addif=addif, hashclass=hashclass
+      )
+      S = StreamStore(
+          "S",
+          downstream_rd, upstream_wr,
+          addif=addif, hashclass=hashclass
+      )
+      with local_store:
+        with remote_S:
+          yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
