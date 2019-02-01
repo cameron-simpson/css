@@ -20,6 +20,7 @@ from .cache import FileCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 ##from .hash_tests import _TestHashCodeUtils
+from .socket import TCPStoreServer, TCPClientStore
 from .store import MappingStore, DataDirStore
 from .stream import StreamStore
 
@@ -29,9 +30,10 @@ def get_test_stores(prefix):
   # test all Store types against all the hash classes
   for hashclass_name in sorted(HASHCLASS_BY_NAME.keys()):
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
+    # MappingStore
     subtest = {'hashclass': hashclass}
     yield subtest, MappingStore('MappingStore', mapping={})
-    # test DataDirStores against the supported index classes
+    # DataDirStore
     for index_name in get_index_names():
       indexclass = get_index_by_name(index_name)
       subtest = {
@@ -45,11 +47,13 @@ def get_test_stores(prefix):
     subtest = {
         'hashclass': hashclass,
     }
+    # FileCacheStore
     T = tempfile.TemporaryDirectory(prefix=prefix)
     with T as tmpdirpath:
       yield subtest, FileCacheStore(
           'FileCacheStore', MappingStore('MappingStore', {}), tmpdirpath,
           **subtest)
+    # StreamStore
     for addif in False, True:
       subtest = {
           "hashclass": hashclass,
@@ -68,6 +72,29 @@ def get_test_stores(prefix):
           downstream_rd, upstream_wr,
           addif=addif, hashclass=hashclass
       )
+      with local_store:
+        with remote_S:
+          yield subtest, S
+    # TCPClientStore
+    for addif in False, True:
+      subtest = {
+          "hashclass": hashclass,
+          "addif": addif,
+      }
+      local_store = MappingStore("MappingStore", {})
+      base_port = 9999
+      while True:
+        bind_addr = ('127.0.0.1', base_port)
+        try:
+          remote_S = TCPStoreServer(bind_addr, local_store=local_store)
+        except OSError as e:
+          if e.errno == errno.EADDRINUSE:
+            base_port += 1
+          else:
+            raise
+        else:
+          break
+      S = TCPClientStore(None, bind_addr)
       with local_store:
         with remote_S:
           yield subtest, S
