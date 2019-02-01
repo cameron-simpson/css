@@ -1,3 +1,4 @@
+Hash_SHA256 or Hash_SHA512 for the exercise and for test coverage, particularly code which may assume the wrong hashclass
 store_test for SocketClientStore
 doco for [clause]archive archive references and proxystore archive paths
 archives to support NDJSON state lines, thus UUIDs and other metadata
