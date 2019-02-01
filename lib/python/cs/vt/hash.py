@@ -58,15 +58,16 @@ class HashCodeField(PacketField):
 decode_buffer = HashCodeField.value_from_buffer
 decode = HashCodeField.value_from_bytes
 
-def hash_of_byteses(bss):
-  ''' Compute a `Hash_SHA1` from the bytes of the supplied `hashcodes`.
+def hash_of_byteses(bss, hashclass):
+  ''' Compute a `HashCode` from an iterable of bytes.
 
-      This underlies the mechanism for comparing remote Stores.
+      This underlies the mechanism for comparing remote Stores,
+      which is based on the `hash_of_hashcodes` method.
   '''
-  H = sha1()
+  H = hashclass.HASHFUNC()
   for bs in bss:
     H.update(bs)
-  return Hash_SHA1.from_chunk(H.digest())
+  return hashclass.from_chunk(H.digest())
 
 class HashCode(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
@@ -234,7 +235,7 @@ class HashCodeUtilsMixin(object):
       h_final = hs[-1]
     else:
       h_final = None
-    return hash_of_byteses(hs), h_final
+    return hash_of_byteses(hs, hashclass=self.hashclass), h_final
 
   def hashcodes_missing(self, other, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
