@@ -7,8 +7,10 @@
 ''' Tests for Stores.
 '''
 
+import errno
 from itertools import accumulate
 import os
+from os.path import join as joinpath
 import random
 import sys
 import tempfile
@@ -19,8 +21,10 @@ from . import _TestAdditionsMixin
 from .cache import FileCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
-##from .hash_tests import _TestHashCodeUtils
-from .socket import TCPStoreServer, TCPClientStore
+from .socket import (
+    TCPStoreServer, TCPClientStore,
+    UNIXSocketStoreServer, UNIXSocketClientStore
+)
 from .store import MappingStore, DataDirStore
 from .stream import StreamStore
 
@@ -98,6 +102,21 @@ def get_test_stores(prefix):
       with local_store:
         with remote_S:
           yield subtest, S
+    # UNIXSocketClientStore
+    for addif in False, True:
+      subtest = {
+          "hashclass": hashclass,
+          "addif": addif,
+      }
+      local_store = MappingStore("MappingStore", {})
+      T = tempfile.TemporaryDirectory(prefix=prefix)
+      with T as tmpdirpath:
+        socket_path = joinpath(tmpdirpath, 'sock')
+        remote_S = UNIXSocketStoreServer(socket_path, local_store=local_store)
+        S = UNIXSocketClientStore(None, socket_path, addif=addif)
+        with local_store:
+          with remote_S:
+            yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
