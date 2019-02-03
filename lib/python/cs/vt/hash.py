@@ -6,7 +6,7 @@
 
 from binascii import unhexlify
 from bisect import bisect_left
-from hashlib import sha1
+from hashlib import sha1, sha256
 import sys
 from cs.binary import PacketField, BSUInt
 from cs.excutils import exc_fold
@@ -33,6 +33,7 @@ def io_fail(func):
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
+HASH_SHA256_T = 1
 
 class HashCodeField(PacketField):
   ''' A PacketField for parsing and transcibing hashcodes.
@@ -176,6 +177,17 @@ class Hash_SHA1(HashCode):
   HASHENUM_BS = put_bs(HASHENUM)
   HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
 
+class Hash_SHA256(HashCode):
+  ''' A hash class for SHA256.
+  '''
+  __slots__ = ()
+  HASHFUNC = sha256
+  HASHNAME = 'sha256'
+  HASHLEN = 32
+  HASHENUM = HASH_SHA256_T
+  HASHENUM_BS = put_bs(HASHENUM)
+  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+
 HASHCLASS_BY_NAME = {}
 
 def register_hashclass(klass):
@@ -189,6 +201,7 @@ def register_hashclass(klass):
   HASHCLASS_BY_NAME[hashname] = klass
 
 register_hashclass(Hash_SHA1)
+register_hashclass(Hash_SHA256)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
