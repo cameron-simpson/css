@@ -115,7 +115,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
         runstate = RunState(name)
       MultiOpenMixin.__init__(self, lock=lock)
       RunStateMixin.__init__(self, runstate=runstate)
-      self._attrs = {}
+      self._str_attrs = {}
       self.name = name
       self._capacity = capacity
       self.hashclass = hashclass
@@ -131,7 +131,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
-    for attr, val in sorted(self._attrs.items()):
+    for attr, val in sorted(self._str_attrs.items()):
       params.append(attr + '=' + str(val))
     return "%s:%s(%s)" % (
         self.__class__.__name__, self.hashclass.HASHNAME,
@@ -537,7 +537,7 @@ class MappingStore(BasicStoreSync):
   def __init__(self, name, mapping, **kw):
     BasicStoreSync.__init__(self, name, **kw)
     self.mapping = mapping
-    self._attrs.update(mapping=mapping)
+    self._str_attrs.update(mapping=type(mapping).__name__)
 
   def startup(self):
     super().startup()
@@ -696,13 +696,13 @@ class ProxyStore(BasicStoreSync):
     for S, _ in self.archive_path:
       if not hasattr(S, 'get_Archive'):
         raise ValueError("%s: no get_Archive method" % (S,))
-    self._attrs.update(save=save, read=read)
+    self._str_attrs.update(save=save, read=read)
     if save2:
-      self._attrs.update(save2=save2)
+      self._str_attrs.update(save2=save2)
     if read2:
-      self._attrs.update(read2=read2)
+      self._str_attrs.update(read2=read2)
     if copy2:
-      self._attrs.update(copy2=copy2)
+      self._str_attrs.update(copy2=copy2)
     self.readonly = len(self.save) == 0
 
   def get_Archive(self, name, missing_ok=False):

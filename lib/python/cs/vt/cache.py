@@ -68,7 +68,7 @@ class FileCacheStore(BasicStoreSync):
       hashclass = DEFAULT_HASHCLASS
       warning("%s:%r: using default hashclass: %s", type(self), name, hashclass)
     super().__init__(name, runstate=runstate, **kw)
-    self._attrs.update(backend=backend)
+    self._str_attrs.update(backend=backend)
     self._backend = backend
     self.hashclass = hashclass
     self.cache = FileDataMappingProxy(
@@ -77,7 +77,7 @@ class FileCacheStore(BasicStoreSync):
         max_cachefiles=max_cachefiles,
         runstate=runstate,
     )
-    self._attrs.update(
+    self._str_attrs.update(
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
     )
@@ -101,7 +101,7 @@ class FileCacheStore(BasicStoreSync):
         old_backend.close()
       self._backend = new_backend
       self.cache.backend = new_backend
-      self._attrs.update(backend=new_backend)
+      self._str_attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
 
