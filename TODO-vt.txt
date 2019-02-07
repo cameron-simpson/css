@@ -1,3 +1,4 @@
+vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
 stats on stream packet stuffing/flushing
 streaming Store.pushto method based on hash_of_hashcodes and streaming .add
 Hash_SHA256 or Hash_SHA512 for the exercise and for test coverage, particularly code which may assume the wrong hashclass
