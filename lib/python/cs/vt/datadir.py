@@ -25,7 +25,6 @@ import sys
 import time
 from types import SimpleNamespace
 from uuid import uuid4
-from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.excutils import logexc
@@ -49,13 +48,15 @@ from cs.units import transcribe_bytes_geek
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
-from .blockify import top_block_for, blocked_chunks_of, spliced_blocks, DEFAULT_SCAN_SIZE
+from .blockify import (
+    DEFAULT_SCAN_SIZE,
+    blocked_chunks_of,
+    spliced_blocks,
+    top_block_for
+)
 from .datafile import DataFileReader, DataFileWriter, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
-from .hash import (
-    DEFAULT_HASHCLASS,
-    HashCode, HashCodeUtilsMixin, MissingHashcodeError
-)
+from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass
 from .parsers import scanner_from_filename
 
@@ -225,10 +226,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._filemap = SqliteFilemap(self, self.statefilepath)
     hashname = self.hashname
     self.index = self.indexclass(
-            self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
-            self.hashclass,
-            self.index_entry_class.from_bytes,
-            lock=self._lock)
+        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
+        self.hashclass,
+        self.index_entry_class.from_bytes,
+        lock=self._lock)
     self.index.open()
     self.runstate.start()
     # cache of open DataFiles
