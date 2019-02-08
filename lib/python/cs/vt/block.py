@@ -49,7 +49,6 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
-from cs.x import X
 from . import defaults, RLock
 from .hash import HashCode, io_fail
 from .transcribe import Transcriber, register as register_transcriber, parse
@@ -167,7 +166,6 @@ class BlockRecord(PacketField):
     span = B.span
     if is_indirect:
       # aside from the span, everything else comes from the superblock
-      ##X("INDIRECT: B(%s) => B.superblock(%s)", B, B.superblock)
       B = B.superblock
     block_type = B.type
     assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
@@ -189,7 +187,6 @@ class BlockRecord(PacketField):
     elif block_type == BlockType.BT_LITERAL:
       transcription.append(B.data)
     elif block_type == BlockType.BT_SUBBLOCK:
-      ##X("TRANSCRIBE: B=%r", B)
       transcription.append(BSUInt.transcribe_value(B.offset))
       transcription.append(BlockRecord.transcribe_value(B.superblock))
     else:
@@ -668,7 +665,7 @@ class HashCodeBlock(_Block):
           if len(self) != len(data):
             error("len(self)=%d, len(data)=%d", len(self), len(data))
             ok = False
-          h = S.hash(data)
+          h = S.hash(data, type(hashcode))
           if h != hashcode:
             error("hash(data):%s != self.hashcode:%s", h, hashcode)
             ok = False
