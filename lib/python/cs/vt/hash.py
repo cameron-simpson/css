@@ -102,6 +102,7 @@ class HashCode(bytes, Transcriber):
 
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
+
         If we ever have a variable length hash function,
         hash bytes will have to include that information.
     '''
@@ -234,8 +235,8 @@ class HashCodeUtilsMixin(object):
   '''
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hash_of_hashcodes(
       self,
       *,
@@ -275,8 +276,8 @@ class HashCodeUtilsMixin(object):
         window_size=window_size, hashclass=hashclass)
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes_from(self, *, start_hashcode=None, reverse=False, hashclass=None):
     ''' Default generator yielding hashcodes from this object until none remains.
 
@@ -339,8 +340,8 @@ class HashCodeUtilsMixin(object):
         ndx += 1
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes(
       self, *,
       start_hashcode=None, hashclass=None,
@@ -378,7 +379,8 @@ class HashCodeUtilsMixin(object):
         return
     first = True
     for hashcode in self.hashcodes_from(
-        start_hashcode=start_hashcode, hashclass=hashclass, reverse=reverse):
+        start_hashcode=start_hashcode, hashclass=hashclass, reverse=reverse
+    ):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -391,8 +393,8 @@ class HashCodeUtilsMixin(object):
           break
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes_bg(
       self, *,
       start_hashcode=None, hashclass=None,
