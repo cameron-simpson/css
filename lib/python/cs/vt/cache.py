@@ -13,13 +13,12 @@ from tempfile import TemporaryFile
 from threading import Thread
 from icontract import require
 from cs.fileutils import RWFileBlockCache, datafrom_fd
-from cs.logutils import error, warning
+from cs.logutils import error
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
-from .hash import DEFAULT_HASHCLASS
 from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
 
 DEFAULT_CACHEFILE_HIGHWATER = MAX_FILE_SIZE
@@ -165,7 +164,7 @@ class FileDataMappingProxy(RunStateMixin):
       runstate=None,
   ):
     ''' Initialise the cache.
-        
+
         Parameters:
         * `backend`: mapping underlying us
         * `dirpath`: directory to store cache files
