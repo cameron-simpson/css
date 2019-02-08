@@ -8,6 +8,7 @@ from binascii import unhexlify
 from bisect import bisect_left
 from hashlib import sha1, sha256
 import sys
+from icontract import require
 from cs.binary import PacketField, BSUInt
 from cs.excutils import exc_fold
 from cs.lex import hexify, get_identifier
@@ -232,37 +233,51 @@ class HashCodeUtilsMixin(object):
       * `.hashcodes_missing`: likewise
   '''
 
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
   def hash_of_hashcodes(
       self,
-      start_hashcode=None,
+      *,
+      start_hashcode=None, hashclass=None,
       reverse=None, after=False, length=None
   ):
     ''' Return a hash of the hashcodes requested and the last
         hashcode (or None if no hashcodes matched); used for comparing
         remote Stores.
     '''
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     hs = list(
         self.hashcodes(
-            start_hashcode=start_hashcode,
+            start_hashcode=start_hashcode, hashclass=hashclass,
             reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
     else:
       h_final = None
-    return hash_of_byteses(hs, hashclass=self.hashclass), h_final
+    return hash_of_byteses(hs, hashclass=hashclass), h_final
 
-  def hashcodes_missing(self, other, window_size=None):
+  def hashcodes_missing(self, other, *, window_size=None, hashclass=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
         Note that a StreamStore overrides this with a call to
         missing_hashcodes_by_checksum to reduce bandwidth.
     '''
-    return missing_hashcodes(self, other, window_size=window_size)
+    return missing_hashcodes(
+        self, other,
+        window_size=window_size, hashclass=hashclass)
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
+  def hashcodes_from(self, *, start_hashcode=None, reverse=False, hashclass=None):
     ''' Default generator yielding hashcodes from this object until none remains.
 
         This implementation starts by fetching and sorting all the
@@ -278,12 +293,12 @@ class HashCodeUtilsMixin(object):
         * `reverse`: yield hashcodes in reverse order
           (counting down instead of up).
     '''
-    hashclass = self.hashclass
-    if start_hashcode is not None:
-      if not isinstance(start_hashcode, hashclass):
-        raise TypeError("hashclass %s does not match start_hashcode %r"
-                        % (hashclass, start_hashcode))
-    ks = sorted(hashcode for hashcode in iter(self) if isinstance(hashcode, hashclass))
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
+    ks = sorted( hashcode for hashcode in self.keys(hashclass) )
     if not ks:
       return
     if start_hashcode is None:
@@ -323,7 +338,14 @@ class HashCodeUtilsMixin(object):
       else:
         ndx += 1
 
-  def hashcodes(self, start_hashcode=None, reverse=False, after=False, length=None):
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
+  def hashcodes(
+      self, *,
+      start_hashcode=None, hashclass=None,
+      reverse=False, after=False, length=None
+  ):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
 
@@ -337,6 +359,11 @@ class HashCodeUtilsMixin(object):
         * `after`: skip the first hashcode if it is equal to `start_hashcode`
         * `length`: the maximum number of hashcodes to yield
     '''
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
@@ -350,8 +377,8 @@ class HashCodeUtilsMixin(object):
       if nhashcodes == 0:
         return
     first = True
-    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
-                                        reverse=reverse):
+    for hashcode in self.hashcodes_from(
+        start_hashcode=start_hashcode, hashclass=hashclass, reverse=reverse):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -363,7 +390,14 @@ class HashCodeUtilsMixin(object):
         if length < 1:
           break
 
-  def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
+  def hashcodes_bg(
+      self, *,
+      start_hashcode=None, hashclass=None,
+      reverse=None, after=False, length=None
+  ):
     ''' Background a hashcodes call.
     '''
     return self._defer(
