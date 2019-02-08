@@ -13,7 +13,6 @@ from __future__ import with_statement
 from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
-import sys
 import time
 from icontract import require
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
@@ -330,8 +329,8 @@ class StreamStore(BasicStoreSync):
     return missing_hashcodes_by_checksum(self, other, **kw)
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes(
       self,
       start_hashcode=None, hashclass=None,
@@ -363,8 +362,8 @@ class StreamStore(BasicStoreSync):
     return hashary
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hash_of_hashcodes(
       self,
       start_hashcode=None, hashclass=None,
@@ -398,10 +397,11 @@ class StreamStore(BasicStoreSync):
     return hashcode, h_final
 
   @require(lambda start_hashcode, hashclass:
-      start_hashcode is None or hashclass is None
-      or isinstance(start_hashcode, hashclass))
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes_from(self, start_hashcode=None, hashclass=None, reverse=False):
-    ''' Unbounded sequence of hashcodes obtained by successive calls to self.hashcodes.
+    ''' Unbounded sequence of hashcodes
+        obtained by successive calls to self.hashcodes.
     '''
     if hashclass is None:
       if start_hashcode is None:
@@ -844,7 +844,3 @@ def CommandStore(shcmd, addif=False):
   name = "StreamStore(%r)" % ("|" + shcmd, )
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
-
-if __name__ == '__main__':
-  from .stream_tests import selftest
-  selftest(sys.argv)
