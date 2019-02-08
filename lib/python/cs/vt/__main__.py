@@ -43,7 +43,7 @@ from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
-from .hash import DEFAULT_HASHCLASS
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
@@ -76,6 +76,7 @@ class VTCmd:
               and ignores $VT_STORE.
     -f config Config file. Default from $VT_CONFIG, otherwise ''' \
     + DEFAULT_CONFIG_PATH + '''
+    -h hashclass Hashclass for Stores.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
   Subcommands:
@@ -145,9 +146,10 @@ class VTCmd:
     store_spec = None
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
+    hashname = os.environ.get('VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME)
 
     try:
-      opts, args = getopt(args, 'C:S:f:qv')
+        opts, args = getopt(args, 'C:S:f:h:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
@@ -164,6 +166,8 @@ class VTCmd:
         store_spec = val
       elif opt == '-f':
         config_path = val
+      elif opt == '-h':
+        hashname = val
       elif opt == '-q':
         # quiet: not verbose
         self.verbose = False
@@ -173,6 +177,17 @@ class VTCmd:
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
 
+    self.hashname = hashname
+    hashclass = None
+    if hashname is not None:
+      try:
+        hashclass = HASHCLASS_BY_NAME[hashname]
+      except KeyError:
+        error(
+            "unrecognised hashname %r: I know %r",
+            hashname, sorted(HASHCLASS_BY_NAME.keys()))
+        badopts = True
+    self.hashclass = hashclass
     self.config_path = config_path
     self.store_spec = store_spec
     self.cache_store_spec = cache_store_spec
