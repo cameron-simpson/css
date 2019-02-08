@@ -402,7 +402,7 @@ class HashCodeUtilsMixin(object):
     '''
     return self._defer(
         self.hashcodes,
-        start_hashcode=start_hashcode,
+        start_hashcode=start_hashcode, hashclass=hashclass,
         reverse=reverse, after=after, length=length)
 
 class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
