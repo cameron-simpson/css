@@ -25,6 +25,7 @@ import sys
 import time
 from types import SimpleNamespace
 from uuid import uuid4
+from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.excutils import logexc
@@ -135,7 +136,9 @@ class DataFileState(SimpleNamespace):
     yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
 
 class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin, Mapping):
-  ''' Base class for locally stored data in files.
+  ''' Base class indexing locally stored data in files.
+      This class is hashclass specific;
+      the utilising Store keeps one of these for each supported hashclass.
 
       There are two main subclasses of this at present:
 
@@ -148,11 +151,11 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.sqlite'
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
-  DATA_SUBDIR = 'data'
 
   def __init__(
       self,
-      statedirpath, hashclass,
+      statedirpath,
+      hashclass,
       *,
       indexclass=None,
       flags=None, flag_prefix=None,
@@ -163,7 +166,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `statedirpath`: a directory containing state information about the
           DataFiles; this is the index-state.csv file and the associated
           index dbm-ish files.
-        * `hashclass`: the hash class used to index chunk contents.
+        * `hashclass`: the hashclass used for indexing
         * `indexclass`: the IndexClass providing the index to chunks in the
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
@@ -178,7 +181,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         and closed down by the `shutdown` method.
     '''
     assert isinstance(statedirpath, str)
-    assert issubclass(hashclass, HashCode)
+    assert issubclass(hashclass, HashCode), "hashclass=%r" % (hashclass,)
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
     if flags is None:
@@ -189,16 +192,17 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       if flag_prefix is None:
         raise ValueError("flags provided but no flag_prefix")
     FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
-    self.statedirpath = statedirpath
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
     self.hashclass = hashclass
+    self.hashname = hashclass.HASHNAME
+    self.statedirpath = statedirpath
+    self.statefilepath = joinpath(
+        statedirpath,
+        self.STATE_FILENAME_FORMAT.format(hashname=self.hashname))
     if indexclass is None:
       indexclass = choose_indexclass(self.indexbase)
     self.indexclass = indexclass
     self._filemap = None
     self._unindexed = None
-    self.index = None
     self._cache = None
     self._indexQ = None
     self._index_Thread = None
@@ -208,10 +212,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
   def __repr__(self):
-    return ( '%s(statedirpath=%r,hashclass=%s,indexclass=%s)'
+    return ( '%s(statedirpath=%r,indexclass=%s)'
              % (self.__class__.__name__,
                 self.statedirpath,
-                self.hashclass.HASHNAME,
                 self.indexclass)
            )
 
@@ -220,20 +223,21 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     self._unindexed = {}
     self._filemap = SqliteFilemap(self, self.statefilepath)
+    hashname = self.hashname
+    self.index = self.indexclass(
+            self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
+            self.hashclass,
+            self.index_entry_class.from_bytes,
+            lock=self._lock)
+    self.index.open()
     self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(
         maxsize=4,
         on_remove=lambda k, datafile: datafile.close()
     )
-    # open dbm index
-    self.index = self.indexclass(
-        self.indexbasepath, self.hashclass,
-        self.index_entry_class.from_bytes,
-        lock=self._lock)
-    self.index.open()
-    # set up indexing thread
-    # map individual hashcodes to locations before being persistently stored
+    # Set up indexing thread.
+    # Map individual hashcodes to locations before being persistently stored.
     # This lets us add data, stash the location in _unindexed and
     # drop the location onto the _indexQ for persistent storage in
     # the index asynchronously.
@@ -276,7 +280,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.index.close()
     self.runstate.stop()
 
-  def localpathto(self, rpath):
+  def pathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the statedirpath.
     '''
     return joinpath(self.statedirpath, rpath)
@@ -284,18 +288,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def datapathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the datadirpath.
     '''
-    return joinpath(self.statedirpath, self.DATA_SUBDIR, rpath)
-
-  def state_localpath(self, hashclass):
-    ''' Compute the filename of the statefile for the specified `hashclass`.
-    '''
-    return self.STATE_FILENAME_FORMAT.format(hashname=hashclass.HASHNAME)
-
-  @property
-  def statefilepath(self):
-    ''' Return the path to the state file.
-    '''
-    return self.localpathto(self.state_localpath(self.hashclass))
+    return self.pathto(joinpath('data', rpath))
 
   def get_Archive(self, name=None, **kw):
     ''' Return the Archive named `name`.
@@ -315,18 +308,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.statedirpath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
-
-  @property
-  def indexbase(self):
-    ''' Basename of the index.
-    '''
-    return self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashclass.HASHNAME)
-
-  @property
-  def indexbasepath(self):
-    ''' Pathname of the index.
-    '''
-    return self.localpathto(self.indexbase)
 
   def _queue_index(self, hashcode, entry, post_offset):
     if not isinstance(entry, self.index_entry_class):
@@ -385,10 +366,11 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.index.flush()
 
   def __setitem__(self, hashcode, data):
-    h = self.add(data)
+    h = self.add(data, type(hashcode))
     if hashcode != h:
-      raise ValueError('hashcode %s does not match data, data added under %s instead'
-                       % (hashcode, h))
+      raise ValueError(
+          'supplied hashcode %s does not match data, data added under %s instead'
+          % (hashcode, h))
 
   def __len__(self):
     return len(self.index)
@@ -418,8 +400,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    if not isinstance(hashcode, self.hashclass):
-      raise ValueError("hashcode %r is not a %s" % (hashcode, self.hashclass))
     unindexed = self._unindexed
     try:
       entry = unindexed[hashcode]
@@ -644,7 +624,8 @@ class DataDir(_FilesDir):
 
   def __init__(
       self,
-      statedirpath, hashclass,
+      statedirpath,
+      hashclass,
       *,
       rollover=None,
       **kw
@@ -655,7 +636,6 @@ class DataDir(_FilesDir):
         * `statedirpath`: a directory containing state information about the
           DataFiles; this is the index-state.csv file and the associated
           index dbm-ish files.
-        * `hashclass`: the hash class used to index chunk contents.
         * `indexclass`: the IndexClass providing the index to chunks in the
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
@@ -755,7 +735,7 @@ class DataDir(_FilesDir):
       self._write_DF = None
       self._write_lockpath = None
 
-  def add(self, data):
+  def add(self, data, hashclass):
     ''' Add the supplied data chunk to the current save DataFile,
         return the hashcode.
         Roll the internal state over to a new file if the current
@@ -798,7 +778,7 @@ class DataDir(_FilesDir):
     '''
     filemap = self._filemap
     indexQ = self._indexQ
-    datadirpath = joinpath(self.statedirpath, self.DATA_SUBDIR)
+    datadirpath = self.pathto('data')
     while not self.cancelled:
       if self.flag_scan_disable:
         time.sleep(1)
@@ -1076,7 +1056,7 @@ class PlatonicDir(_FilesDir):
     meta_store = self.meta_store
     filemap = self._filemap
     indexQ = self._indexQ
-    datadirpath = joinpath(self.statedirpath, self.DATA_SUBDIR)
+    datadirpath = self.pathto('data')
     if meta_store is not None:
       topdir = self.topdir
     else:
