@@ -14,13 +14,12 @@ from socketserver import TCPServer, UnixStreamServer, \
 import sys
 from threading import Thread
 from cs.excutils import logexc
-from cs.logutils import info, warning
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
-from cs.x import X
 from . import defaults
 from .stream import StreamStore
 
@@ -177,7 +176,6 @@ class TCPClientStore(StreamStore):
 
   def _tcp_connect(self):
     with Pfx("connect %r", self.sock_bind_addr):
-      X("TCP CONNECT to %r ...", self.sock_bind_addr)
       if self.sock:
         warning("self.sock already set, leaking: %s", self.sock)
       # TODO: IPv6 support
@@ -188,7 +186,6 @@ class TCPClientStore(StreamStore):
         self.sock.close()
         self.sock = None
         raise
-      X("TCP CONNECT to %r: CONNECTED", self.sock_bind_addr)
       return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
 
   @logexc
@@ -252,7 +249,6 @@ class UNIXSocketClientStore(StreamStore):
 
   def _unixsock_connect(self):
     with Pfx("connect %r", self.socket_path):
-      info("UNIX SOCKET CONNECT to %r", self.socket_path)
       assert not self.sock, "self.sock=%s" % (self.sock,)
       self.sock = socket(AF_UNIX)
       with Pfx("connect(%r)", self.socket_path):
