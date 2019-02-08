@@ -200,7 +200,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         statedirpath,
         self.STATE_FILENAME_FORMAT.format(hashname=self.hashname))
     if indexclass is None:
-      indexclass = choose_indexclass(self.indexbase)
+      indexclass = choose_indexclass(
+          self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashname))
     self.indexclass = indexclass
     self._filemap = None
     self._unindexed = None
