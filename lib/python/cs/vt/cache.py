@@ -321,10 +321,10 @@ class FileDataMappingProxy(RunStateMixin):
         if backend:
           self.backend[h] = data
 
-def MemoryCacheStore(name, max_data):
+def MemoryCacheStore(name, max_data, hashclass=None):
   ''' Factory to make a MappingStore of a MemoryCacheMapping.
   '''
-  return MappingStore(name, MemoryCacheMapping(max_data))
+  return MappingStore(name, MemoryCacheMapping(max_data), hashclass=hashclass)
 
 class MemoryCacheMapping:
   ''' A lossy MT-safe in-memory mapping of hashcode->data.
@@ -405,6 +405,14 @@ class MemoryCacheMapping:
               if used_data <= max_data:
                 break
             self._skip_flush = 32
+
+  def keys(self):
+    ''' Return an iterator over the mapping;
+        required for use of HashCodeUtilsMixin.hashcodes_from.
+    '''
+    return self.mapping.keys()
+
+  __iter__ = keys
 
 class BlockMapping:
   ''' A Block's contents mapped onto a temporary file.
