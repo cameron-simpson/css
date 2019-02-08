@@ -20,13 +20,16 @@ from .randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
-from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .hash import HASHCLASS_BY_NAME
 from .socket import (
     TCPStoreServer, TCPClientStore,
     UNIXSocketStoreServer, UNIXSocketClientStore
 )
-from .store import MappingStore, DataDirStore
+from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
+
+# test all classes if empty, just the listed classes if not empty
+STORE_CLASS_TESTS = ()  ## (ProxyStore,)
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
@@ -36,7 +39,7 @@ def get_test_stores(prefix):
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
     # MappingStore
     subtest = {'hashclass': hashclass}
-    yield subtest, MappingStore('MappingStore', mapping={})
+    yield subtest, MappingStore('MappingStore', mapping={}, hashclass=hashclass)
     # DataDirStore
     for index_name in get_index_names():
       indexclass = get_index_by_name(index_name)
@@ -63,7 +66,7 @@ def get_test_stores(prefix):
           "hashclass": hashclass,
           "addif": addif,
       }
-      local_store = MappingStore("MappingStore", {})
+      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
       upstream_rd, upstream_wr = os.pipe()
       downstream_rd, downstream_wr = os.pipe()
       remote_S = StreamStore(
@@ -85,7 +88,7 @@ def get_test_stores(prefix):
           "hashclass": hashclass,
           "addif": addif,
       }
-      local_store = MappingStore("MappingStore", {})
+      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
       base_port = 9999
       while True:
         bind_addr = ('127.0.0.1', base_port)
@@ -98,7 +101,7 @@ def get_test_stores(prefix):
             raise
         else:
           break
-      S = TCPClientStore(None, bind_addr)
+      S = TCPClientStore(None, bind_addr, **subtest)
       with local_store:
         with remote_S:
           yield subtest, S
@@ -108,15 +111,27 @@ def get_test_stores(prefix):
           "hashclass": hashclass,
           "addif": addif,
       }
-      local_store = MappingStore("MappingStore", {})
+      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
       T = tempfile.TemporaryDirectory(prefix=prefix)
       with T as tmpdirpath:
         socket_path = joinpath(tmpdirpath, 'sock')
         remote_S = UNIXSocketStoreServer(socket_path, local_store=local_store)
-        S = UNIXSocketClientStore(None, socket_path, addif=addif)
+        S = UNIXSocketClientStore(None, socket_path, **subtest)
         with local_store:
           with remote_S:
             yield subtest, S
+    # ProxyStore
+    subtest = {
+        "hashclass": hashclass,
+    }
+    main1 = MappingStore("main1", {}, hashclass=hashclass)
+    main2 = MappingStore("main2", {}, hashclass=hashclass)
+    save2 = MappingStore("save2", {}, hashclass=hashclass)
+    S = ProxyStore(
+        "ProxyStore", (main1, main2), (main2, save2),
+        hashclass=hashclass,
+        save2=(save2,))
+    yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
@@ -125,6 +140,8 @@ def multitest(method):
     for subtest, S in get_test_stores(
         prefix=method.__module__ + '.' + method.__name__
     ):
+      if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
+        continue
       with self.subTest(test_store=S, **subtest):
         self.S = S
         self.hashclass = subtest['hashclass']
@@ -158,8 +175,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
 
-  hashclass = DEFAULT_HASHCLASS
-
   def __init__(self, *a, **kw):
     super().__init__(*a, **kw)
     self.S = None
@@ -176,23 +191,27 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   def test01add_new_block(self):
     ''' Add a block and check that it worked.
     '''
+    n_added = 0
     S = self.S
-    self.assertLen(S, 0)
-    size = random.randint(127, 16384)
-    data = randblock(size)
+    self.assertLen(S, n_added)
     # compute block hash but do not store
-    h = S.hash(data)
-    self.assertLen(S, 0)
-    ok = S.contains(h)
-    self.assertFalse(ok)
-    self.assertNotIn(h, S)
-    # now add the block
-    h2 = S.add(data)
-    self.assertEqual(h, h2)
-    self.assertLen(S, 1)
-    ok = S.contains(h)
-    self.assertTrue(ok)
-    self.assertIn(h, S)
+    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()):
+      with self.subTest(hashname=hashname):
+        size = random.randint(127, 16384)
+        data = randblock(size)
+        h = S.hash(data, hashclass)
+        self.assertLen(S, n_added)
+        ok = S.contains(h)
+        self.assertFalse(ok)
+        self.assertNotIn(h, S)
+        # now add the block
+        h2 = S.add(data, type(h))
+        n_added += 1
+        self.assertEqual(h, h2)
+        self.assertLen(S, n_added)
+        ok = S.contains(h)
+        self.assertTrue(ok)
+        self.assertIn(h, S)
 
   @multitest
   def test02add_get(self):
@@ -201,14 +220,18 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
-    for _ in range(16):
-      size = random.randint(127, 16384)
-      data = randblock(size)
-      h = S.hash(data)
-      h2 = S.add(data)
-      self.assertEqual(h, h2)
-      random_chunk_map[h] = data
-    self.assertLen(S, 16)
+    n_added = 0
+    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()):
+      with self.subTest(hashname=hashname):
+        for _ in range(16):
+          size = random.randint(127, 16384)
+          data = randblock(size)
+          h = S.hash(data, hashclass)
+          h2 = S.add(data, type(h))
+          n_added += 1
+          self.assertEqual(h, h2)
+          random_chunk_map[h] = data
+        self.assertLen(S, n_added)
     for h in random_chunk_map:
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
@@ -250,7 +273,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       KS1.add(h)
     # make a block not in the map
     data2 = randblock(rand0(8193))
-    h2 = self.hashclass.from_chunk(data2)
+    h2 = self.S.hash(data2)
     self.assertNotIn(h2, KS1, "abort test: %s in previous blocks" % (h2,))
     #
     # extract hashes, check results
@@ -368,7 +391,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       data = randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
-    with MappingStore("M2MappingStore", mapping={}) as M2:
+    with MappingStore("M2MappingStore", mapping={}, hashclass=M1.hashclass) as M2:
       KS2 = set()
       # construct M2 as a mix of M1 and random new blocks
       for _ in range(16):
