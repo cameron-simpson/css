@@ -42,7 +42,6 @@ class FileCacheStore(BasicStoreSync):
       name, backend, dirpath,
       max_cachefile_size=None, max_cachefiles=None,
       runstate=None,
-      hashclass=None,
       **kw
   ):
     ''' Initialise the FileCacheStore.
@@ -53,24 +52,14 @@ class FileCacheStore(BasicStoreSync):
           property .backend may be switched to another Store at any
           time
         * `dirpath`: directory to hold the cache files
-        * `hashclass`: hash class for data chunks;
-          if the `backend`
+
+        Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
     if backend:
       backend.open()
-      if hashclass is None:
-        hashclass = backend.hashclass
-      elif hashclass is not backend.hashclass:
-        raise ValueError(
-            "supplied hashclass %s does not match backend hashclass %s from %s"
-            % (hashclass, backend.hashclass, backend))
-    else:
-      hashclass = DEFAULT_HASHCLASS
-      warning("%s:%r: using default hashclass: %s", type(self), name, hashclass)
     super().__init__(name, runstate=runstate, **kw)
     self._str_attrs.update(backend=backend)
     self._backend = backend
-    self.hashclass = hashclass
     self.cache = FileDataMappingProxy(
         backend, dirpath=dirpath,
         max_cachefile_size=max_cachefile_size,
@@ -121,23 +110,27 @@ class FileCacheStore(BasicStoreSync):
     '''
     pass
 
-  def __iter__(self):
-    return iter(self.keys())
+  def keys(self, hashclass=None):
+    if hashclass is None:
+      hashclass = self.hashclass
+    return (
+        h for h in self.cache.keys() if type(h) is hashclass
+    )
 
-  def keys(self):
-    return self.cache.keys()
+  def __iter__(self):
+    return self.keys()
 
   def contains(self, h):
     return h in self.cache
 
-  def add(self, data):
-    h = self.hashclass.from_chunk(data)
+  def add(self, data, hashclass=None):
+    h = self.hash(data, hashclass)
     self.cache[h] = data
     return h
 
   # add is deliberately very fast; just return a completed Result directly
-  def add_bg(self, data):
-    return Result(result=self.add(data))
+  def add_bg(self, data, hashclass=None):
+    return Result(result=self.add(data, hashclass))
 
   def get(self, h):
     try:
@@ -172,12 +165,14 @@ class FileDataMappingProxy(RunStateMixin):
       runstate=None,
   ):
     ''' Initialise the cache.
-        `backend`: mapping underlying us
-        `dirpath`: directory to store cache files
-        `max_cachefile_size`: maximum cache file size; a new cache
+        
+        Parameters:
+        * `backend`: mapping underlying us
+        * `dirpath`: directory to store cache files
+        * `max_cachefile_size`: maximum cache file size; a new cache
           file is created if this is exceeded; default:
           DEFAULT_CACHEFILE_HIGHWATER
-        `max_cachefiles`: number of cache files to keep around; no
+        * `max_cachefiles`: number of cache files to keep around; no
           more than this many cache files are kept at a time; default:
           DEFAULT_MAX_CACHEFILES
     '''
@@ -243,7 +238,7 @@ class FileDataMappingProxy(RunStateMixin):
       return h in backend
     return False
 
-  def keys(self):
+  def keys(self, hashclass=None):
     ''' Mapping method for .keys.
     '''
     seen = set()
