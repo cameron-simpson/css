@@ -11,13 +11,7 @@ from __future__ import with_statement
 from abc import ABC, abstractmethod
 from fnmatch import fnmatch
 from functools import partial
-from icontract import require
-from os.path import (
-    expanduser,
-    isabs as isabspath,
-    isdir as isdirpath,
-    join as joinpath
-)
+from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Semaphore
 from icontract import require
@@ -70,9 +64,13 @@ class _PerHashclassMapping:
     self.factory = factory
 
   def open(self):
+    ''' Stub open method to match close.
+    '''
     pass
 
   def close(self):
+    ''' Close the mapping by closing all the submappings.
+    '''
     for mapping in self._mappings.values():
       mapping.close()
 
@@ -98,6 +96,8 @@ class _PerHashclassMapping:
     return hashcode in self.mapping_for_hashclass(type(hashcode))
 
   def keys(self, hashclass=None):
+    ''' Return an iterable of hashcodes of type `hashclass`.
+    '''
     if hashclass is None:
       hashclass = self.default_hashclass
     return self.mapping_for_hashclass(hashclass).keys()
