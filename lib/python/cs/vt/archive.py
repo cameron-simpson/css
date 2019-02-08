@@ -261,7 +261,7 @@ class FilePathArchive(BaseArchive):
         s = self.write(fp, E, when=when, etc=etc)
     return s
 
-class FileOutputArchive(FilePathArchive):
+class FileOutputArchive(BaseArchive):
   ''' An Archive which just writes updates to an open file.
   '''
 
