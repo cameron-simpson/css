@@ -105,6 +105,9 @@ class _PerHashclassMapping:
   def __iter__(self):
     return iter(self.keys())
 
+  def get_Archive(self, name, **kw):
+    return self.mapping_for_hashclass(self.default_hashclass).get_Archive(name, **kw)
+
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -1043,7 +1046,7 @@ class DataDirStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
-def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
+def PlatonicStore(name, statedirpath, *a, meta_store=None, hashclass=None, **kw):
   ''' Factory function for platonic Stores.
 
       This is needed because if a meta_store is specified then it
@@ -1051,12 +1054,13 @@ def PlatonicStore(name, statedirpath, *a, meta_store=None, **kw):
       platonic Store.
   '''
   if meta_store is None:
-    return _PlatonicStore(name, statedirpath, *a, **kw)
-  PS = _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, **kw)
+    return _PlatonicStore(name, statedirpath, *a, hashclass=hashclass, **kw)
+  PS = _PlatonicStore(name, statedirpath, *a, meta_store=meta_store, hashclass=hashclass, **kw)
   S = ProxyStore(
       name,
       save=(),
-      read=(PS, meta_store)
+      read=(PS, meta_store),
+      hashclass=hashclass,
   )
   S.get_Archive = PS.get_Archive
   return S
@@ -1088,7 +1092,7 @@ class _PlatonicStore(MappingStore):
             flag_prefix=flag_prefix,
             **kw,
         ),
-        hashclass)
+        hashclass, lock)
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
     self.readonly = True
 
