@@ -66,6 +66,20 @@ DEFAULT_ROLLOVER = MAX_FILE_SIZE
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
 
+def init_datadir(basedir):
+  ''' Init a directory and its "data" subdirectory.
+  '''
+  if not isdirpath(basedir):
+    info("mkdir %r", basedir)
+    with Pfx("mkdir(%r)", basedir):
+      os.mkdir(basedir)
+  # create the data subdir if missing
+  datadirpath = joinpath(basedir, 'data')
+  if not isdirpath(datadirpath):
+    info("mkdir %r", datadirpath)
+    with Pfx("mkdir(%r)", datadirpath):
+      os.mkdir(datadirpath)
+
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file in use by a files based data dir.
 
@@ -189,21 +203,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._indexQ = None
     self._index_Thread = None
     self._monitor_Thread = None
-
-  def init(self):
-    ''' Initialise the data dir if not present.
-    '''
-    statedirpath = self.statedirpath
-    if not isdirpath(statedirpath):
-      info("mkdir %r", statedirpath)
-      with Pfx("mkdir(%r)", statedirpath):
-        os.mkdir(statedirpath)
-    # create the data subdir if missing
-    datadirpath = joinpath(statedirpath, self.DATA_SUBDIR)
-    if not isdirpath(datadirpath):
-      info("mkdir %r", datadirpath)
-      with Pfx("mkdir(%r)", datadirpath):
-        os.mkdir(datadirpath)
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
