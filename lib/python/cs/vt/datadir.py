@@ -510,12 +510,14 @@ class SqliteFilemap:
   def filenums(self):
     ''' Return the active DFstate filenums.
     '''
-    return self.n_to_DFstate.keys()
+    with self._lock:
+      return list(self.n_to_DFstate.keys())
 
   def items(self):
     ''' Return the active (n, DFstate) pairs.
     '''
-    return self.n_to_DFstate.items()
+    with self._lock:
+      return list(self.n_to_DFstate.items())
 
   def _map(self, path, n, indexed_to=0):
     ''' Add a DataFileState for `path` and `n` to the mapping.
