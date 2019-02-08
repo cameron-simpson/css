@@ -16,10 +16,10 @@ from subprocess import Popen, PIPE
 import sys
 import time
 from icontract import require
-from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
+from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
-from cs.logutils import warning, error
+from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -32,6 +32,7 @@ from .hash import (
     decode as hash_decode,
     decode_buffer as hash_from_buffer,
     HASHCLASS_BY_NAME,
+    HASHCLASS_BY_ENUM,
     HashCode,
     HashCodeField,
     MissingHashcodeError,
@@ -92,16 +93,12 @@ class StreamStore(BasicStoreSync):
         * `local_store`: optional local Store for serving requests from the peer.
         * `exports`: a mapping of name=>Store providing requestable Stores
 
-        Other keyword arguments are passed to BasicStoreSync.__init__.
+        Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
     super().__init__('StreamStore:%s' % (name,), **kw)
     self.mode_addif = addif
     self._local_store = local_store
     self.exports = exports
-    if local_store is not None:
-      if local_store.hashclass is not self.hashclass:
-        raise ValueError("local_store.hashclass %s is not self.hashclass %s"
-                         % (local_store.hashclass, self.hashclass))
     # parameters controlling connection hysteresis
     self._conn_attempt_last = 0.0
     self._conn_attempt_delay = 1.0
@@ -204,13 +201,13 @@ class StreamStore(BasicStoreSync):
 
   @locked
   def _packet_disconnect(self, conn):
-    warning("PacketConnection DISCONNECT notification: %s", conn)
+    debug("PacketConnection DISCONNECT notification: %s", conn)
     oconn = self._conn
     if oconn is conn:
       self._conn = None
       self._conn_attemp_last = time.time()
     else:
-      warning("disconnect of %s, but that is not the current connection, ignoring", conn)
+      debug("disconnect of %s, but that is not the current connection, ignoring", conn)
 
   def join(self):
     ''' Wait for the PacketConnection to shut down.
@@ -274,13 +271,12 @@ class StreamStore(BasicStoreSync):
     rq = self.decode_request(rq_type, flags, payload)
     return rq.do(self)
 
-  def add(self, data):
-    hashclass = self.hashclass
-    h = hashclass.from_chunk(data)
+  def add(self, data, hashclass=None):
+    h = self.hash(data, hashclass)
     if self.mode_addif:
       if self.contains(h):
         return h
-    flags, payload = self.do(AddRequest(data))
+    flags, payload = self.do(AddRequest(data, type(h)))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise StoreError("extra payload data after hashcode: %r" % (payload[offset:],))
@@ -328,16 +324,24 @@ class StreamStore(BasicStoreSync):
     if local_store is not None:
       local_store.flush()
 
-  def hashcodes_missing(self, other, window_size=None):
+  def hashcodes_missing(self, other, **kw):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
     '''
-    return missing_hashcodes_by_checksum(self, other, window_size=window_size)
+    return missing_hashcodes_by_checksum(self, other, **kw)
 
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
   def hashcodes(
       self,
-      start_hashcode=None,
+      start_hashcode=None, hashclass=None,
       reverse=False, after=False, length=None
   ):
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
@@ -347,8 +351,7 @@ class StreamStore(BasicStoreSync):
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     flags, payload = self.do(HashCodesRequest(
-        hashclass=self.hashclass,
-        start_hashcode=start_hashcode,
+        start_hashcode=start_hashcode, hashclass=hashclass,
         reverse=reverse, after=after, length=length))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
@@ -359,12 +362,19 @@ class StreamStore(BasicStoreSync):
       hashary.append(hashcode)
     return hashary
 
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
   def hash_of_hashcodes(
       self,
-      hashclass=None,
-      start_hashcode=None,
+      start_hashcode=None, hashclass=None,
       reverse=False, after=False, length=None
   ):
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
@@ -372,8 +382,7 @@ class StreamStore(BasicStoreSync):
     if hashclass is None:
       hashclass = self.hashclass
     flags, payload = self.do(HashOfHashCodesRequest(
-        hashclass=hashclass,
-        start_hashcode=start_hashcode,
+        start_hashcode=start_hashcode, hashclass=hashclass,
         reverse=reverse, after=after, length=length))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
@@ -388,16 +397,23 @@ class StreamStore(BasicStoreSync):
             % (hashcode, h_final, payload[offset:]))
     return hashcode, h_final
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  @require(lambda start_hashcode, hashclass:
+      start_hashcode is None or hashclass is None
+      or isinstance(start_hashcode, hashclass))
+  def hashcodes_from(self, start_hashcode=None, hashclass=None, reverse=False):
     ''' Unbounded sequence of hashcodes obtained by successive calls to self.hashcodes.
     '''
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     length = 64
     after = False
     while True:
-      hashcodes = self.hashcodes(start_hashcode=start_hashcode,
-                                 reverse=reverse,
-                                 after=after,
-                                 length=length)
+      hashcodes = self.hashcodes(
+          start_hashcode=start_hashcode, hashclass=hashclass,
+          reverse=reverse, after=after, length=length)
       if not hashcodes:
         return
       for hashcode in hashcodes:
@@ -493,19 +509,31 @@ class AddRequest(VTPacket):
 
   RQTYPE = RqType.ADD
 
+  def __init__(self, data, hashclass):
+    super().__init__(None)
+    self.data = data
+    self.hashclass = hashclass
+
   def __str__(self):
-    return "%s(%d:%r...)" % (type(self).__name__, len(self.value), self.value[:16])
+    return "%s(%s,%d:%r...)" % (
+        type(self).__name__,
+        type(self.hashclass).__name__, len(self.data), self.data[:16]
+    )
 
   @classmethod
-  def value_from_buffer(cls, bfr, flags=0):
+  def from_buffer(cls, bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return b''.join(bfr)
+    hashenum = BSUInt.value_from_buffer(bfr)
+    hashclass = HASHCLASS_BY_ENUM[hashenum]
+    data = BSData.value_from_buffer(bfr)
+    return cls(data, hashclass)
 
   def transcribe(self):
     ''' Return the payload as is.
     '''
-    return self.value
+    yield self.hashclass.HASHENUM_BS
+    yield BSData.transcribe_value(self.data)
 
   def do(self, stream):
     ''' Add data to the local store, return hashcode.
@@ -513,7 +541,7 @@ class AddRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    return local_store.add(self.value).encode()
+    return local_store.add(self.data, self.hashclass).encode()
 
 class GetRequest(VTPacket):
   ''' A get(hashcode) request, returning the associated bytes.
