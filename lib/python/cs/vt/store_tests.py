@@ -18,7 +18,7 @@ import unittest
 from cs.logutils import setup_logging
 from .randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
-from .cache import FileCacheStore
+from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HASHCLASS_BY_NAME
 from .socket import (
@@ -39,7 +39,9 @@ def get_test_stores(prefix):
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
     # MappingStore
     subtest = {'hashclass': hashclass}
-    yield subtest, MappingStore('MappingStore', mapping={}, hashclass=hashclass)
+    yield subtest, MappingStore('MappingStore', mapping={}, **subtest)
+    # MemoryCacheStore
+    yield subtest, MemoryCacheStore('MemoryCacheStore', 1024*1024*1024, **subtest)
     # DataDirStore
     for index_name in get_index_names():
       indexclass = get_index_by_name(index_name)
