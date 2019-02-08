@@ -44,10 +44,7 @@ class HashCodeField(PacketField):
     ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
     '''
     hashenum = BSUInt.value_from_buffer(bfr)
-    if hashenum == HASH_SHA1_T:
-      hashcls = Hash_SHA1
-    else:
-      raise ValueError("unsupported hashenum %d" % (hashenum,))
+    hashcls = HASHCLASS_BY_ENUM[hashenum]
     return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
 
   @staticmethod
@@ -189,6 +186,7 @@ class Hash_SHA256(HashCode):
   HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
 
 HASHCLASS_BY_NAME = {}
+HASHCLASS_BY_ENUM = {}
 
 def register_hashclass(klass):
   ''' Register a hash class for lookup elsewhere.
@@ -198,7 +196,13 @@ def register_hashclass(klass):
     raise ValueError(
         'cannot register hash class %s: hashname %r already registered to %s'
         % (klass, hashname, HASHCLASS_BY_NAME[hashname]))
+  hashenum = klass.HASHENUM
+  if hashenum in HASHCLASS_BY_ENUM:
+    raise ValueError(
+        'cannot register hash class %s: hashenum %r already registered to %s'
+        % (klass, hashenum, HASHCLASS_BY_NAME[hashenum]))
   HASHCLASS_BY_NAME[hashname] = klass
+  HASHCLASS_BY_ENUM[hashenum] = klass
 
 register_hashclass(Hash_SHA1)
 register_hashclass(Hash_SHA256)
