@@ -51,7 +51,6 @@ def oserror(errno_, msg, *a):
 # for the known names in the errno module.
 def mkOSfunc(M, Ename):
   Evalue = getattr(errno, Ename)
-  X("DEFINE OS_%s", Ename)
   setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
 M = getmodule(oserror)
 for Ename in dir(errno):
@@ -62,9 +61,7 @@ def mkOSfuncEINVAL(M, Ename):
   setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a))
 for Ename in 'ENOATTR',:
   if not hasattr(errno, Ename):
-    X("DEFINE dummy OS_%s", Ename)
     mkOSfuncEINVAL(M, Ename)
-X("dir(%s): %r", M, dir(M))
 del M
 
 class FileHandle:
