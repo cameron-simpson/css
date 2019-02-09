@@ -1063,6 +1063,7 @@ class PlatonicDir(_FilesDir):
       topdir = self.topdir
     else:
       warning("%s: no meta_store!", self)
+    updated = False
     disabled = False
     while not self.cancelled:
       time.sleep(self.DELAY_INTERSCAN)
@@ -1192,6 +1193,17 @@ class PlatonicDir(_FilesDir):
                     DFstate.scanned_to = post_offset
                     if self.cancelled or self.flag_scan_disable:
                       break
+                  if meta_store is not None:
+                    blockQ.close()
+                    try:
+                      top_block = R()
+                    except MissingHashcodeError as e:
+                      error("missing data, forcing rescan: %s", e)
+                      DFstate.scanned_to = 0
+                    else:
+                      E.block = top_block
+                      D.changed = True
+                      updated = True
                   elapsed = time.time() - scan_start
                   scanned = DFstate.scanned_to - scan_from
                   if elapsed > 0:
@@ -1209,20 +1221,13 @@ class PlatonicDir(_FilesDir):
                         DFstate.scanned_to,
                         transcribe_bytes_geek(scanned),
                         transcribe_bytes_geek(scan_rate))
-                  if meta_store is not None:
-                    blockQ.close()
-                    try:
-                      top_block = R()
-                    except MissingHashcodeError as e:
-                      error("missing data, forcing rescan: %s", e)
-                      DFstate.scanned_to = 0
-                    else:
-                      E.block = top_block
-                      D.changed = True
-                      self.sync_meta()
                   # stall after a file scan, briefly, to limit impact
                   if elapsed > 0:
                     time.sleep(min(elapsed, self.DELAY_INTRASCAN))
+            # update the archive after updating from a directory
+            if updated and meta_store is not None:
+              self.sync_meta()
+              updated = False
       self.flush()
 
   @staticmethod
