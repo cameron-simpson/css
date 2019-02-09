@@ -108,6 +108,9 @@ class _PerHashclassMapping:
   def get_Archive(self, name, **kw):
     return self.mapping_for_hashclass(self.default_hashclass).get_Archive(name, **kw)
 
+  def pathto(self, rpath):
+    return self.mapping_for_hashclass(self.default_hashclass).pathto(rpath)
+
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
@@ -418,13 +421,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                           dirpath[:endpos+1], dirpath)
                       rdirpath = None
                     if rdirpath:
-                      dirpath = S.localpathto(rdirpath)
+                      dirpath = S.pathto(rdirpath)
           else:
             # TODO: generic handler for Store subpaths needed
             if not isabspath(dirpath):
               dirpath = expanduser(dirpath)
               if not isabspath(dirpath):
-                dirpath = S.localpathto(dirpath)
+                dirpath = S.pathto(dirpath)
       return dirpath
 
   @blockmapdir.setter
@@ -1036,10 +1039,10 @@ class DataDirStore(MappingStore):
     '''
     init_datadir(self.statedirpath)
 
-  def localpathto(self, rpath):
+  def pathto(self, rpath):
     ''' Compute the full path from a relative path.
     '''
-    return self._datadir.localpathto(rpath)
+    return self._datadir.pathto(rpath)
 
   def get_Archive(self, name=None, missing_ok=False):
     ''' DataDirStore Archives are associated with the internal DataDir.
