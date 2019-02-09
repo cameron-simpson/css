@@ -402,6 +402,7 @@ class FileSystem(object):
     else:
       mntE = E
     self.mntE = mntE
+    self.is_darwin = os.uname().sysname == 'Darwin'
     self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
@@ -636,7 +637,10 @@ class FileSystem(object):
     if xattr is None:
       ##if xattr_name == 'com.apple.FinderInfo':
       ##  OS_ENOTSUP("inum %d: no xattr %r, pretend not supported", inum, xattr_name)
-      OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      if self.is_darwin:
+        OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      else:
+        OS_ENODATA("inum %d: no xattr %r", inum, xattr_name)
     return xattr
 
   def removexattr(self, inum, xattr_name):
