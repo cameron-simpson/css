@@ -1,3 +1,4 @@
+vt.1 doc -h option and $VT_HASHCLASS
 vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
 stats on stream packet stuffing/flushing
 streaming Store.pushto method based on hash_of_hashcodes and streaming .add
