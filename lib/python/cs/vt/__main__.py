@@ -508,34 +508,39 @@ class VTCmd:
   def cmd_init(self, args):
     ''' Install a default config and initialise the configured datadir Stores.
     '''
+    xit = 0
     if args:
       raise GetoptError("extra arguments: %r" % (args,))
     config = self.config
     config_path = config.path
-    try:
-      if not pathexists(config_path):
-        info("write %r", config_path)
-        with Pfx(config_path):
-          with open(config_path, 'w') as cfg:
-            self.config.write(cfg)
-      basedir = config.basedir
-      if not isdirpath(basedir):
-        with Pfx("basedir"):
-          info("mkdir %r", basedir)
-          with Pfx("mkdir(%r)", basedir):
+    if not pathexists(config_path):
+      info("write %r", config_path)
+      with Pfx(config_path):
+        with open(config_path, 'w') as cfg:
+          self.config.write(cfg)
+    basedir = config.basedir
+    if not isdirpath(basedir):
+      with Pfx("basedir"):
+        info("mkdir %r", basedir)
+        with Pfx("mkdir(%r)", basedir):
+          try:
             os.mkdir(basedir)
-      for clause_name, clause in sorted(config.map.items()):
-        with Pfx("%s[%s]", shortpath(config_path), clause_name):
-          if clause_name == 'GLOBAL':
-            continue
-          store_type = clause.get('type')
-          if store_type == 'datadir':
-            S = config[clause_name]
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    for clause_name, clause in sorted(config.map.items()):
+      with Pfx("%s[%s]", shortpath(config_path), clause_name):
+        if clause_name == 'GLOBAL':
+          continue
+        store_type = clause.get('type')
+        if store_type == 'datadir':
+          S = config[clause_name]
+          try:
             S.init()
-    except OSError as e:
-      error("init failed: %s", e)
-      return 1
-    return 0
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    return xit
 
   @staticmethod
   def cmd_ls(args):
