@@ -116,7 +116,7 @@ class BaseArchive(ABC):
       for entry in self:
         last_entry = entry
       if last_entry is None:
-        return None, None
+        return ArchiveEntry(None, None)
       self._last = last_entry
     return last_entry
 
@@ -147,9 +147,9 @@ class BaseArchive(ABC):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in BaseArchive.parse(fp, first_lineno=first_lineno):
-      return when, E
-    return None, None
+    for entry in BaseArchive.parse(fp, first_lineno=first_lineno):
+      return entry
+    return ArchiveEntry(None, None)
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
