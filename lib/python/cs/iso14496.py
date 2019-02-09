@@ -71,7 +71,7 @@ def main(argv):
             parsee = sys.stdin.fileno()
           else:
             parsee = spec
-          over_box = parse(parsee)
+          over_box, = parse(parsee)
           over_box.dump()
     elif op == 'extract':
       skip_header = False
@@ -429,7 +429,7 @@ class Box(Packet):
       # advance over the remaining data, optionally keeping it
       self.unparsed_offset = bfr_tail.offset
       if (
-          bfr_tail.at_eof()
+          not bfr_tail.at_eof()
           if end_offset is Ellipsis
           else end_offset > bfr_tail.offset
       ):
