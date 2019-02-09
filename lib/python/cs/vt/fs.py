@@ -8,6 +8,7 @@
 '''
 
 import errno
+from inspect import getmodule
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
 import shlex
@@ -44,15 +45,27 @@ def oserror(errno_, msg, *a):
   warning("raise OSError(%s): %s", errno_, msg)
   raise OSError(errno_, msg)
 
-OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
-OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
-OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
-OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
-OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
-OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
-OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
-OS_ENOTSUP = lambda msg, *a: oserror(errno.ENOTSUP, msg, *a)
-OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
+# Generate OS_E* functions to raise custom OSErrors.
+# This generates a suite of functions like this:
+#  OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
+# for the known names in the errno module.
+def mkOSfunc(M, Ename):
+  Evalue = getattr(errno, Ename)
+  X("DEFINE OS_%s", Ename)
+  setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
+M = getmodule(oserror)
+for Ename in dir(errno):
+  if Ename.startswith('E'):
+    mkOSfunc(M, Ename)
+# Generate dummy functions for missing symbols which we use.
+def mkOSfuncEINVAL(M, Ename):
+  setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a))
+for Ename in 'ENOATTR',:
+  if not hasattr(errno, Ename):
+    X("DEFINE dummy OS_%s", Ename)
+    mkOSfuncEINVAL(M, Ename)
+X("dir(%s): %r", M, dir(M))
+del M
 
 class FileHandle:
   ''' Filesystem state for an open file.
