@@ -11,26 +11,34 @@
 
 from __future__ import with_statement
 from enum import IntEnum
-import sys
+from functools import lru_cache
+from subprocess import Popen, PIPE
 import time
-from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt
+from icontract import require
+from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
-from cs.logutils import warning, error
+from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx
+from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError
 from cs.threads import locked
+from .archive import BaseArchive, ArchiveEntry
+from .dir import _Dirent
 from .hash import (
     decode as hash_decode,
     decode_buffer as hash_from_buffer,
     HASHCLASS_BY_NAME,
+    HASHCLASS_BY_ENUM,
+    HashCode,
     HashCodeField,
     MissingHashcodeError,
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
+from .transcribe import parse
 
 class RqType(IntEnum):
   ''' Packet opcode values.
@@ -41,6 +49,9 @@ class RqType(IntEnum):
   FLUSH = 3             # flush local and remote servers
   HASHCODES = 4         # (hashcode,length) -> hashcodes
   HASHCODES_HASH = 5    # (hashcode,length) -> hashcode of hashcodes
+  ARCHIVE_LAST = 6      # archive_name -> (when,E)
+  ARCHIVE_UPDATE = 7    # (archive_name,when,E)
+  ARCHIVE_LIST = 8      # (count,archive_name) -> (when,E)...
 
 class StreamStore(BasicStoreSync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -81,16 +92,12 @@ class StreamStore(BasicStoreSync):
         * `local_store`: optional local Store for serving requests from the peer.
         * `exports`: a mapping of name=>Store providing requestable Stores
 
-        Other keyword arguments are passed to BasicStoreSync.__init__.
+        Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
     super().__init__('StreamStore:%s' % (name,), **kw)
     self.mode_addif = addif
     self._local_store = local_store
     self.exports = exports
-    if local_store is not None:
-      if local_store.hashclass is not self.hashclass:
-        raise ValueError("local_store.hashclass %s is not self.hashclass %s"
-                         % (local_store.hashclass, self.hashclass))
     # parameters controlling connection hysteresis
     self._conn_attempt_last = 0.0
     self._conn_attempt_delay = 1.0
@@ -107,6 +114,13 @@ class StreamStore(BasicStoreSync):
         raise ValueError("connect is not None and one of recv or send is not None")
       self.connect = connect
       self._conn = None
+    # caching method
+    self.get_Archive = lru_cache(maxsize=64)(self.raw_get_Archive)
+
+  def init(self):
+    ''' Initialise store prior to any use.
+    '''
+    pass
 
   @property
   def local_store(self):
@@ -186,13 +200,13 @@ class StreamStore(BasicStoreSync):
 
   @locked
   def _packet_disconnect(self, conn):
-    warning("PacketConnection DISCONNECT notification: %s", conn)
+    debug("PacketConnection DISCONNECT notification: %s", conn)
     oconn = self._conn
     if oconn is conn:
       self._conn = None
       self._conn_attemp_last = time.time()
     else:
-      warning("disconnect of %s, but that is not the current connection, ignoring", conn)
+      debug("disconnect of %s, but that is not the current connection, ignoring", conn)
 
   def join(self):
     ''' Wait for the PacketConnection to shut down.
@@ -203,6 +217,8 @@ class StreamStore(BasicStoreSync):
 
   def do(self, rq):
     ''' Wrapper for self._conn.do to catch and report failed autoconnection.
+        Raises StoreError on protocol failure or not `ok` responses.
+        Returns `(flags,payload)` otherwise.
     '''
     with Pfx("%s.do(%s)", self, rq):
       conn = self.connection()
@@ -212,13 +228,19 @@ class StreamStore(BasicStoreSync):
         retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
       except ClosedError as e:
         self._conn = None
-        raise StoreError("connection closed: %s" % (e,)) from e
+        raise StoreError("connection closed: %s" % (e,), request=rq) from e
       except CancellationError as e:
-        raise StoreError("request cancelled: %s" % (e,)) from e
+        raise StoreError("request cancelled: %s" % (e,), request=rq) from e
       else:
         if retval is None:
-          raise StoreError("NO RESPONSE from %s" % (rq,))
-      return retval
+          raise StoreError("NO RESPONSE", request=rq)
+        ok, flags, payload = retval
+        if not ok:
+          raise StoreError(
+              "NOT OK response",
+              request=rq, flags=flags, payload=payload)
+        return flags, payload
+      raise RuntimeError("NOTREACHED")
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
@@ -248,17 +270,12 @@ class StreamStore(BasicStoreSync):
     rq = self.decode_request(rq_type, flags, payload)
     return rq.do(self)
 
-  def add(self, data):
-    hashclass = self.hashclass
-    h = hashclass.from_chunk(data)
+  def add(self, data, hashclass=None):
+    h = self.hash(data, hashclass)
     if self.mode_addif:
       if self.contains(h):
         return h
-    ok, flags, payload = self.do(AddRequest(data))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from add(data=%d bytes): flags=0x%0x, payload=%r"
-          % (len(data), flags, payload))
+    flags, payload = self.do(AddRequest(data, type(h)))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise StoreError("extra payload data after hashcode: %r" % (payload[offset:],))
@@ -271,13 +288,9 @@ class StreamStore(BasicStoreSync):
 
   def get(self, h):
     try:
-      ok, flags, payload = self.do(GetRequest(h))
+      flags, payload = self.do(GetRequest(h))
     except StoreError as e:
       raise MissingHashcodeError(str(e)) from e
-    if not ok:
-      raise MissingHashcodeError(
-          "NOT OK response from get(h=%s): flags=0x%0x, payload=%r"
-          % (h, flags, payload))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -292,11 +305,7 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a Result for collection.
     '''
-    ok, flags, payload = self.do(ContainsRequest(h))
-    if not ok:
-      raise ValueError(
-          "NOT OK response from contains(h=%s): flags=0x%0x, payload=%r"
-          % (h, flags, payload))
+    flags, payload = self.do(ContainsRequest(h))
     found = flags & 0x01
     if found:
       flags &= ~0x01
@@ -307,23 +316,31 @@ class StreamStore(BasicStoreSync):
     return found
 
   def flush(self):
-    _, flags, payload = self.do(FlushRequest())
+    flags, payload = self.do(FlushRequest())
     assert flags == 0
     assert not payload
     local_store = self.local_store
     if local_store is not None:
       local_store.flush()
 
-  def hashcodes_missing(self, other, window_size=None):
+  def hashcodes_missing(self, other, **kw):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
     '''
-    return missing_hashcodes_by_checksum(self, other, window_size=window_size)
+    return missing_hashcodes_by_checksum(self, other, **kw)
 
+  @require(lambda start_hashcode, hashclass:
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hashcodes(
       self,
-      start_hashcode=None,
+      start_hashcode=None, hashclass=None,
       reverse=False, after=False, length=None
   ):
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
@@ -332,14 +349,9 @@ class StreamStore(BasicStoreSync):
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
-    ok, flags, payload = self.do(HashCodesRequest(
-        hashclass=self.hashclass,
-        start_hashcode=start_hashcode,
+    flags, payload = self.do(HashCodesRequest(
+        start_hashcode=start_hashcode, hashclass=hashclass,
         reverse=reverse, after=after, length=length))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from hashcodes(h=%s): flags=0x%0x, payload=%r"
-          % (start_hashcode, flags, payload))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     offset = 0
@@ -349,26 +361,28 @@ class StreamStore(BasicStoreSync):
       hashary.append(hashcode)
     return hashary
 
+  @require(lambda start_hashcode, hashclass:
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
   def hash_of_hashcodes(
       self,
-      hashclass=None,
-      start_hashcode=None,
+      start_hashcode=None, hashclass=None,
       reverse=False, after=False, length=None
   ):
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
       raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     if hashclass is None:
       hashclass = self.hashclass
-    ok, flags, payload = self.do(HashOfHashCodesRequest(
-        hashclass=hashclass,
-        start_hashcode=start_hashcode,
+    flags, payload = self.do(HashOfHashCodesRequest(
+        start_hashcode=start_hashcode, hashclass=hashclass,
         reverse=reverse, after=after, length=length))
-    if not ok:
-      raise StoreError(
-          "NOT OK response from hash_of_hashcodes: flags=0x%0x, payload=%r"
-          % (flags, payload))
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
     hashcode, offset = hash_decode(payload, 0)
@@ -382,16 +396,24 @@ class StreamStore(BasicStoreSync):
             % (hashcode, h_final, payload[offset:]))
     return hashcode, h_final
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
-    ''' Unbounded sequence of hashcodes obtained by successive calls to self.hashcodes.
+  @require(lambda start_hashcode, hashclass:
+           start_hashcode is None or hashclass is None
+           or isinstance(start_hashcode, hashclass))
+  def hashcodes_from(self, start_hashcode=None, hashclass=None, reverse=False):
+    ''' Unbounded sequence of hashcodes
+        obtained by successive calls to self.hashcodes.
     '''
+    if hashclass is None:
+      if start_hashcode is None:
+        hashclass = self.hashclass
+      else:
+        hashclass = type(start_hashcode)
     length = 64
     after = False
     while True:
-      hashcodes = self.hashcodes(start_hashcode=start_hashcode,
-                                 reverse=reverse,
-                                 after=after,
-                                 length=length)
+      hashcodes = self.hashcodes(
+          start_hashcode=start_hashcode, hashclass=hashclass,
+          reverse=reverse, after=after, length=length)
       if not hashcodes:
         return
       for hashcode in hashcodes:
@@ -399,6 +421,70 @@ class StreamStore(BasicStoreSync):
       # set the resume point: after the last yielded hashcode
       start_hashcode = hashcode
       after = True
+
+  def raw_get_Archive(self, archive_name, missing_ok=False):
+    ''' Factory to return a StreamStoreArchive for `archive_name`.
+    '''
+    return StreamStoreArchive(self, archive_name)
+
+class StreamStoreArchive(BaseArchive):
+  ''' An Archive associates with this StreamStore.
+
+      Its methods proxy requests to the archive name at the remote end.
+  '''
+
+  def __init__(self, S, archive_name):
+    super().__init__()
+    self.S = S
+    self.archive_name = archive_name
+
+  def __str__(self):
+    return "%s(%s,%r)" % (type(self).__name__, self.S, self.archive_name)
+
+  @prop
+  def last(self):
+    ''' The last Archive entry (when, E) or (None, None).
+    '''
+    with Pfx("%s.last", self):
+      try:
+        flags, payload = self.S.do(ArchiveLastRequest(self.archive_name))
+      except StoreError as e:
+        warning("%s, returning (None, None)", e)
+        return ArchiveEntry(None, None)
+      found = flags & 0x01
+      if not found:
+        return ArchiveEntry(None, None)
+      bfr = CornuCopyBuffer.from_bytes(payload)
+      entry = ArchiveEntry.from_buffer(bfr)
+      return entry
+
+  def __iter__(self):
+    _, payload = self.S.do(ArchiveListRequest(self.archive_name))
+    bfr = CornuCopyBuffer([payload])
+    while not bfr.at_eof():
+      when = BSString.value_from_buffer(bfr)
+      when = float(when)
+      E = BSString.value_from_buffer(bfr)
+      E = parse(E)
+      if not isinstance(E, _Dirent):
+        raise ValueError("not a _Dirent: %r" % (E,))
+      yield when, E
+
+  def update(self, E, *, when=None, previous=None, force=False, source=None):
+    ''' Save the supplied Dirent `E` with timestamp `when`.
+        Return the Dirent transcription.
+        Raises `StoreError` if the request fails.
+
+        Parameters:
+        * `E`: the Dirent to save.
+        * `when`: the POSIX timestamp for the save, default now.
+        * `source`: optional source indicator for the update, default None
+    '''
+    assert E is not None
+    if when is None:
+      when = time.time()
+    self.S.do(ArchiveUpdateRequest(self.archive_name, ArchiveEntry(when, E)))
+    return str(E)
 
 ####################################################################
 # Request packet definitions here.
@@ -423,19 +509,31 @@ class AddRequest(VTPacket):
 
   RQTYPE = RqType.ADD
 
+  def __init__(self, data, hashclass):
+    super().__init__(None)
+    self.data = data
+    self.hashclass = hashclass
+
   def __str__(self):
-    return "%s(%d:%r...)" % (type(self).__name__, len(self.value), self.value[:16])
+    return "%s(%s,%d:%r...)" % (
+        type(self).__name__,
+        type(self.hashclass).__name__, len(self.data), self.data[:16]
+    )
 
   @classmethod
-  def value_from_buffer(cls, bfr, flags=0):
+  def from_buffer(cls, bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return b''.join(bfr)
+    hashenum = BSUInt.value_from_buffer(bfr)
+    hashclass = HASHCLASS_BY_ENUM[hashenum]
+    data = BSData.value_from_buffer(bfr)
+    return cls(data, hashclass)
 
   def transcribe(self):
     ''' Return the payload as is.
     '''
-    return self.value
+    yield self.hashclass.HASHENUM_BS
+    yield BSData.transcribe_value(self.data)
 
   def do(self, stream):
     ''' Add data to the local store, return hashcode.
@@ -443,7 +541,7 @@ class AddRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    return local_store.add(self.value).encode()
+    return local_store.add(self.data, self.hashclass).encode()
 
 class GetRequest(VTPacket):
   ''' A get(hashcode) request, returning the associated bytes.
@@ -506,7 +604,8 @@ class FlushRequest(VTPacket):
 
   RQTYPE = RqType.FLUSH
 
-  def __init__(self):
+  @require(lambda value: value is None)
+  def __init__(self, value=None):
     super().__init__(None)
 
   @staticmethod
@@ -514,6 +613,9 @@ class FlushRequest(VTPacket):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return None
+
+  def transcribe(self):
+    pass
 
   @staticmethod
   def do(stream):
@@ -530,23 +632,20 @@ class HashCodesRequest(Packet):
 
   RQTYPE = RqType.HASHCODES
 
+  @require(lambda reverse: isinstance(reverse, bool))
+  @require(lambda after: isinstance(after, bool))
+  @require(lambda hashclass: issubclass(hashclass, HashCode))
+  @require(lambda after, start_hashcode: not after or start_hashcode is not None)
   def __init__(
       self,
+      *,
       reverse=False, after=False,
       hashclass=None,
       start_hashcode=None,
       length=None,
   ):
-    assert isinstance(reverse, bool)
-    assert isinstance(after, bool)
-    if hashclass is None:
-      raise ValueError("missing hashclass")
     if length is None:
       length = 0
-    if after and start_hashcode is None:
-      raise ValueError(
-          "after=%s but start_hashcode=%s"
-          % (after, start_hashcode))
     self.reverse = reverse
     self.after = after
     super().__init__(
@@ -634,12 +733,110 @@ class HashOfHashCodesRequest(HashCodesRequest):
       payload += final_hashcode.encode()
     return payload
 
+class ArchiveLastRequest(VTPacket):
+  ''' Return the last entry in a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_LAST
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return BSString.value_from_buffer(bfr)
+
+  def transcribe(self):
+    ''' Return the serialised hashcode.
+    '''
+    return BSString.transcribe_value(self.value)
+
+  def do(self, stream):
+    ''' Return data from the local store by hashcode.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.value)
+    entry = archive.last
+    if entry.dirent is None:
+      return 0
+    return (
+        1,
+        bytes(entry)
+    )
+
+class ArchiveListRequest(VTPacket):
+  ''' List the entries in a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_LIST
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return BSString.value_from_buffer(bfr)
+
+  def transcribe(self):
+    ''' Return the archive name serialised.
+    '''
+    return BSString.transcribe_value(self.value)
+
+  def do(self, stream):
+    ''' Return ArchiveEntry transcriptions from the named Archive.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.value)
+    return b''.join( bytes(entry) for entry in archive )
+
+class ArchiveUpdateRequest(VTPacket):
+  ''' Add an entry to a remote Archive.
+  '''
+
+  RQTYPE = RqType.ARCHIVE_UPDATE
+
+  def __init__(self, archive_name, entry, flags=0):
+    super().__init__(None)
+    self.flags = flags
+    self.archive_name = archive_name
+    self.entry = entry
+    assert isinstance(entry, ArchiveEntry), "entry has type %s" % (type(entry),)
+
+  @classmethod
+  def from_buffer(cls, bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    archive_name = BSString.value_from_buffer(bfr)
+    entry = ArchiveEntry.from_buffer(bfr)
+    return cls(archive_name=archive_name, entry=entry, flags=flags)
+
+  def transcribe(self):
+    ''' Return the serialised archive_name and new entry.
+    '''
+    yield BSString.transcribe_value(self.archive_name)
+    yield self.entry.transcribe()
+
+  def do(self, stream):
+    ''' Return data from the local store by hashcode.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    archive = local_store.get_Archive(self.archive_name)
+    entry = self.entry
+    archive.update(entry.dirent, when=entry.when)
+
 RqType.ADD.request_class = AddRequest
 RqType.GET.request_class = GetRequest
 RqType.CONTAINS.request_class = ContainsRequest
 RqType.FLUSH.request_class = FlushRequest
 RqType.HASHCODES.request_class = HashCodesRequest
 RqType.HASHCODES_HASH.request_class = HashOfHashCodesRequest
+RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
+RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
+RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
@@ -647,7 +844,3 @@ def CommandStore(shcmd, addif=False):
   name = "StreamStore(%r)" % ("|" + shcmd, )
   P = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
   return StreamStore(name, P.stdin, P.stdout, local_store=None, addif=addif)
-
-if __name__ == '__main__':
-  from .stream_tests import selftest
-  selftest(sys.argv)

@@ -16,7 +16,7 @@ from . import totext, block as block_module
 from .block import Block, \
     IndirectBlock, \
     RLEBlock, LiteralBlock, SubBlock, \
-    verify_block, BlockType, \
+    BlockType, \
     BlockRecord
 from .store import MappingStore
 
@@ -45,10 +45,7 @@ class TestAll(unittest.TestCase):
       BR2, offset = BlockRecord.from_bytes(BRbs)
       self.assertEqual(offset, len(BRbs))
       self.assertEqual(BR, BR2)
-      for err in verify_block(B):
-        raise ValueError("verify_block(%s): %s" % (B, err))
-      errs = list(verify_block(B, **kw))
-      self.assertEqual(errs, [])
+      self.assertTrue(B.fsck(recurse=True))
 
   def _make_random_Block(self, block_type=None, size=None, leaf_only=False):
     with self.subTest(

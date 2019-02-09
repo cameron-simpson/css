@@ -23,7 +23,6 @@ import sys
 from threading import Thread
 from time import sleep
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.excutils import logexc
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
@@ -35,7 +34,7 @@ from cs.tty import statusline, ttysize
 import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
-from .archive import Archive, CopyModes
+from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec, get_clause_spec, get_clause_archive
 from .config import Config, Store
@@ -44,11 +43,11 @@ from .datadir import DataDirIndexEntry
 from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
-from .hash import DEFAULT_HASHCLASS
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
-from .paths import OSDir, OSFile, dirent_dir, dirent_file, dirent_resolve
+from .paths import OSDir, OSFile, path_resolve
 from .server import serve_tcp, serve_socket
 from .store import ProgressStore, ProxyStore
 from .transcribe import parse
@@ -69,7 +68,7 @@ class VTCmd:
               Default: from $VT_CACHE_STORE or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
-                /path/to/dir    GDBMStore
+                /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
               Default from $VT_STORE, or "[default]", except for
@@ -77,6 +76,7 @@ class VTCmd:
               and ignores $VT_STORE.
     -f config Config file. Default from $VT_CONFIG, otherwise ''' \
     + DEFAULT_CONFIG_PATH + '''
+    -h hashclass Hashclass for Stores.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
   Subcommands:
@@ -146,9 +146,10 @@ class VTCmd:
     store_spec = None
     cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
     dflt_log = os.environ.get('VT_LOGFILE')
+    hashname = os.environ.get('VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME)
 
     try:
-      opts, args = getopt(args, 'C:S:f:qv')
+        opts, args = getopt(args, 'C:S:f:h:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
@@ -165,6 +166,8 @@ class VTCmd:
         store_spec = val
       elif opt == '-f':
         config_path = val
+      elif opt == '-h':
+        hashname = val
       elif opt == '-q':
         # quiet: not verbose
         self.verbose = False
@@ -174,6 +177,17 @@ class VTCmd:
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
 
+    self.hashname = hashname
+    hashclass = None
+    if hashname is not None:
+      try:
+        hashclass = HASHCLASS_BY_NAME[hashname]
+      except KeyError:
+        error(
+            "unrecognised hashname %r: I know %r",
+            hashname, sorted(HASHCLASS_BY_NAME.keys()))
+        badopts = True
+    self.hashclass = hashclass
     self.config_path = config_path
     self.store_spec = store_spec
     self.cache_store_spec = cache_store_spec
@@ -276,7 +290,8 @@ class VTCmd:
               read=(cacheS,),
               read2=(S,),
               copy2=(cacheS,),
-              save=(cacheS, S)
+              save=(cacheS, S),
+              archives=( (S, '*'), ),
           )
           S.config = self.config
       ##X("MAIN CMD_OP S:")
@@ -534,15 +549,16 @@ class VTCmd:
       raise GetoptError("missing dirrefs")
     first = True
     for path in args:
-      if first:
-        first = False
-      else:
-        print()
-      D = dirent_dir(path)
-      ls(path, D, recurse, sys.stdout)
+      with Pfx(path):
+        if first:
+          first = False
+        else:
+          print()
+        D = parse(path)
+        ls(path, D, recurse, sys.stdout)
     return 0
 
-  def parse_special(self, special):
+  def parse_special(self, special, readonly):
     ''' Parse the mount command's special device.
     '''
     fsname = special
@@ -554,11 +570,11 @@ class VTCmd:
       specialD, offset = parse(special)
       if offset != len(special):
         raise ValueError("unparsed text: %r" % (special[offset:],))
-      if not isinstance(D, Dir):
+      if not isinstance(specialD, Dir):
         raise ValueError(
             "does not seem to be a Dir transcription, looks like a %s"
-            % (type(D),))
-      special_basename = D.name
+            % (type(specialD),))
+      special_basename = specialD.name
       if not readonly:
         warning("setting readonly")
         readonly = True
@@ -566,7 +582,7 @@ class VTCmd:
       if special.endswith(']'):
         # expect "[clause]"
         clause_name, offset = get_clause_spec(special)
-        archive_name = None
+        archive_name = ''
         special_basename = clause_name
       else:
         # expect "[clause]archive"
@@ -579,7 +595,7 @@ class VTCmd:
         special_store = self.config[clause_name]
       except KeyError:
         raise ValueError("unknown config clause [%s]" % (clause_name,))
-      if archive_name is None:
+      if archive_name is None or not archive_name:
         special_basename = clause_name
       else:
         special_basename = archive_name
@@ -595,7 +611,7 @@ class VTCmd:
         special_basename = spfx
       else:
         special_basename = special
-    return fsname, special_store, specialD, special_basename, archive
+    return fsname, readonly, special_store, specialD, special_basename, archive
 
   def cmd_mount(self, args):
     ''' Mount the specified special on the specified mountpoint directory.
@@ -638,8 +654,8 @@ class VTCmd:
     else:
       with Pfx("special %r", special):
         try:
-          fsname, special_store, specialD, special_basename, archive = \
-              self.parse_special(special)
+          fsname, readonly, special_store, specialD, special_basename, archive = \
+              self.parse_special(special, readonly)
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
@@ -661,8 +677,8 @@ class VTCmd:
       if special_basename is None:
         if not badopts:
           error(
-            'missing mountpoint, and cannot infer mountpoint from special: %r',
-            special)
+              'missing mountpoint, and cannot infer mountpoint from special: %r',
+              special)
           badopts = True
       else:
         mountpoint = special_basename
@@ -686,16 +702,15 @@ class VTCmd:
       else:
         # pathname or Archive obtained from Store
         if archive is None:
-          archive = special_store.get_Archive(archive_name)
-        elif isinstance(archive, str):
-          archive = Archive(archive)
+          warning("no Archive, writing to stdout")
+          archive = FileOutputArchive(sys.stdout)
         if all_dates:
           E = Dir(mount_base)
           for when, subD in archive:
             E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
           try:
-            when, E = archive.last
+            entry = archive.last
           except OSError as e:
             error("can't access special: %s", e)
             return 1
@@ -703,6 +718,8 @@ class VTCmd:
             error("invalid contents: %s", e)
             return 1
           # no "last entry" (==> first use) - make an empty directory
+          when = entry.when
+          E = entry.dirent
           if E is None:
             E = Dir(mount_base)
             X("cmd_mount: new E=%r", E)
@@ -1051,7 +1068,7 @@ def cat(path, fp=None):
     with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
       cat(path, bfp)
   else:
-    F = dirent_file(path)
+    F = path_resolve(path)
     block = F.block
     for B in block.leaves:
       fp.write(B.data)
@@ -1061,11 +1078,7 @@ def dump(path, fp=None):
   '''
   if fp is None:
     fp = sys.stdout
-  E, subname, unresolved = dirent_resolve(path)
-  if unresolved:
-    warning("%r: unresolved components: %r", path, unresolved)
-  if subname:
-    E = E[subname]
+  E = path_resolve(path)
   dump_Block(E.block, fp)
 
 if __name__ == '__main__':

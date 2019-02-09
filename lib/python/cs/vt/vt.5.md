@@ -77,6 +77,9 @@ as length prefixed data.
 `bsstring`: length prefixed `utf-8` text data:
   a `bsdata` whose data block is the `utf-8` encoding of a string value.
 
+`bssfloat`: textual floating point value:
+  a `bsstring` containing the textual representation of a floaing point value.
+
 ### Block Files (.vtd)
 
 Block files with the `.vtd` file extension
@@ -498,6 +501,38 @@ with the following `rq_type` values and associated values:
   The response payload is a `hashcode_record`
   containing the hashcode
   of the concatenation of the requested `hashcode_record` records.
+
+`6` "ARCHIVE_LAST":
+  request the last archive entry of a named archive:
+
+    archive_last_request {
+      archive_name: bsstring
+    }
+
+  The response will have `flags==0` if there are no entries
+  or `flags==1` if there are entries.
+  In the latter case the payload will consist of the entry timestamp
+  as a `bssfloat` with the UNIX time of the entry
+  and the binary transcription of the directory.
+
+`7` "ARCHIVE_LIST":
+  request all the archive entries of a named archive:
+
+    archive_list_request {
+      archive_name: bsstring
+    }
+
+  The payload will be the concatenation of the archive entries
+  transcribed as for "ARCHIVE_LAST".
+
+`8` "ARCHIVE_UPDATE":
+  submit a new archive entry to append to a named archive:
+
+    archive_update_request {
+      archive_name: bsstring
+      when: bssfloat
+      dirent: binary_directory
+    }
 
 ## SEE ALSO
 

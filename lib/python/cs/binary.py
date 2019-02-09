@@ -34,6 +34,7 @@
     * `Packet`: a `PacketField` subclass for parsing multiple
       `PacketFields` into a larger structure with ordered named
       fields.
+      The fields themselves may be `Packet`s for complex structures.
 
     You don't need to make fields only from binary data; because
     `PacketField.__init__` takes a post parse value, you can also
@@ -68,6 +69,38 @@
       and copying memory.
       See the `cs.buffer` module for further detail.
 
+    When parsing a complex structure
+    one must choose between subclassing `PacketField` or `Packet`.
+    An effective guideline is the degree of substructure.
+
+    A `Packet` is designed for deeper structures;
+    all of its attributes are themselves `PacketField`s
+    (or `Packets`, which are `PacketField` subclasses).
+    The leaves of this hierarchy will be `PacketFields`,
+    whose attributes are ordinary types.
+
+    By contrast, a `PacketField`'s attributes are "flat" values:
+    the plain post-parse value, such as a `str` or an `int`
+    or some other conventional Python type.
+
+    The base case for `PacketField`
+    is a single such value, named `.value`,
+    and the natural implementation
+    is to provide a `.value_from_buffer` method
+    which returns the basic single value
+    and the corresponding `.transcribe_value` method
+    to return or yield its binary form
+    (directly or in pieces respectively).
+
+    However,
+    you can handle multiple attributes with this class
+    by instead implementing:
+    * `__init__`: to compose an instance from post-parse values
+      (and thus from scratch rather than parsed from existing binary data)
+    * `from_buffer`: class method to parse the values
+      from a ` CornuCopyBuffer` and call the class constructor
+    * `transcribe`: to return or yield the binary form of the attributes
+
     Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
@@ -100,17 +133,17 @@ elif sys.version_info[1] < 6:
       file=sys.stderr)
 
 def flatten(chunks):
-  ''' Flatten `chunks` into an iterable of bytes instances.
+  ''' Flatten `chunks` into an iterable of `bytes` instances.
 
       This exists to allow subclass methods to easily return ASCII
-      strings or bytes or iterables or even None, in turn allowing
-      them to simply return their superclass' chunks iterators
+      strings or bytes or iterables or even `None`, in turn allowing
+      them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
   '''
   if chunks is None:
     pass
   elif isinstance(chunks, (bytes, memoryview)):
-    if len(chunks) > 0:
+    if chunks:
       yield chunks
   elif isinstance(chunks, str):
     yield chunks.encode('ascii')
@@ -123,7 +156,10 @@ class PacketField(ABC):
   ''' A record for an individual packet field.
   '''
 
-  def __init__(self, value):
+  def __init__(self, value=None):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
     self.value = value
 
   @property
@@ -182,7 +218,9 @@ class PacketField(ABC):
         This default implementation instantiates the instance from
         the value returned by `cls.value_from_buffer(bfr, **kw)`.
     '''
-    return cls(cls.value_from_buffer(bfr, **kw))
+    value = cls.value_from_buffer(bfr, **kw)
+    return cls(value)
+    ##return cls(cls.value_from_buffer(bfr, **kw))
 
   @staticmethod
   def value_from_buffer(bfr, **kw):
@@ -711,6 +749,16 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
+Float64BE = struct_field('>d', 'Float64BE')
+Float64BE.TEST_CASES = (
+    (0.0, b'\0\0\0\0\0\0\0\0'),
+    (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
+)
+Float64LE = struct_field('<d', 'Float64LE')
+Float64LE.TEST_CASES = (
+    (0.0, b'\0\0\0\0\0\0\0\0'),
+    (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
+)
 
 class BSUInt(PacketField):
   ''' A binary serialsed unsigned int.
@@ -797,11 +845,6 @@ class BSString(PacketField):
     super().__init__(s)
     self.encoding = encoding
 
-  @classmethod
-  def from_buffer(cls, bfr, encoding='utf-8', **kw):
-    s = cls.value_from_buffer(bfr, encoding=encoding, **kw)
-    return cls(s, encoding=encoding)
-
   @staticmethod
   def value_from_buffer(bfr, encoding='utf-8', errors='strict'):
     ''' Parse a run length encoded string from `bfr`.
@@ -813,11 +856,35 @@ class BSString(PacketField):
 
   @staticmethod
   def transcribe_value(s, encoding='utf-8'):
+    ''' Transcribe a string.
+    '''
     payload = s.encode(encoding)
     return b''.join( (
         BSUInt.transcribe_value(len(payload)),
         payload
     ) )
+
+class BSSFloat(PacketField):
+  ''' A float transcribed as a BSString of str(float).
+  '''
+
+  TEST_CASES = (
+      (0.0, b'\x030.0'),
+      (0.1, b'\x030.1'),
+  )
+
+  @classmethod
+  def value_from_buffer(cls, bfr, **kw):
+    ''' Parse a BSSFloat from a buffer and return the float.
+    '''
+    s = BSString.value_from_buffer(bfr, **kw)
+    return float(s)
+
+  @staticmethod
+  def transcribe_value(f):
+    ''' Transcribe a float.
+    '''
+    return BSString.transcribe_value(str(f))
 
 class ListField(PacketField):
   ''' A field which is a list of other fields.
@@ -1069,9 +1136,11 @@ class Packet(PacketField):
                     field))
       for field_name in self.field_names:
         if field_name not in fields_spec:
-          warning(
-              "field %r is present but is not defined in self.PACKET_FIELDS: %r",
-              field_name, sorted(fields_spec.keys()))
+          print(
+              "%s.self_check:"
+              " field %r is present but is not defined"
+              " in self.PACKET_FIELDS: %r"
+              % (type(self).__name__, field_name, sorted(fields_spec.keys())))
 
   def __getattr__(self, attr):
     ''' Unknown attributes may be field names; return their value.

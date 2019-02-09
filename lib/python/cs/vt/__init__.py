@@ -7,29 +7,45 @@
     *NOTE*: pre-Alpha; alpha release following soon once the packaging
     is complete.
 
+    The package provides the `vt` command to access
+    these facilities from the command line.
+
+    This system has two main components:
+    * Stores: storage areas of variable sized data blocks
+      indexed by the cryptographic hashcode of their content
+    * Dirents: references to filesystem entities
+      containing hashcode based references to the content
+
+    These are logically disconnected.
+    Dirents are not associated with particular Stores;
+    it is it sufficient to have access to any Store
+    containing the required blocks.
+
+    The other common entity is the Archive,
+    which is just a text file containing
+    a timestamped log of revisions of a Dirent.
+    These can be mounted as a FUSE filesystem,
+    and the `vt pack` command simply stores
+    a directory tree into the current Store,
+    and records the stored reference in an Archive file.
+
     See also the Plan 9 Venti system:
     (http://library.pantek.com/general/plan9.documents/venti/venti.html,
-    http://en.wikipedia.org/wiki/Venti).
+    http://en.wikipedia.org/wiki/Venti)
+    which is also based on variable sized blocks.
 '''
 
-from collections import namedtuple
 import os
 from string import ascii_letters, digits
 import tempfile
 import threading
-from threading import (
-    Lock as threading_Lock,
-    RLock as threading_RLock,
-    current_thread,
-)
-from cs.lex import texthexify, untexthexify
+from cs.lex import texthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
-from cs.py.stack import caller, stack_dump
+from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
-from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -46,7 +62,6 @@ DISTINFO = {
         'cs.cache',
         'cs.debug',
         'cs.deco',
-        'cs.env',
         'cs.excutils',
         'cs.fileutils',
         'cs.inttypes',
@@ -105,6 +120,7 @@ DEFAULT_CONFIG = {
 
 # intercept Lock and RLock
 if False:
+  from .debug import DebuggingLock
   def RLock():
     ''' Obtain a recursive DebuggingLock.
     '''
@@ -116,6 +132,10 @@ if False:
   # monkey patch MultiOpenMixin
   cs.resources._mom_lockclass = RLock
 else:
+  from threading import (
+      Lock as threading_Lock,
+      RLock as threading_RLock,
+  )
   Lock = threading_Lock
   RLock = threading_RLock
 
@@ -183,11 +203,6 @@ class _Defaults(threading.local, StackableValues):
 
 defaults = _Defaults()
 
-def fromtext(s):
-  ''' Return raw byte array from text/hexadecimal string.
-  '''
-  return untexthexify(s)
-
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
 # characters used for metadata, notably including the double quote
@@ -232,76 +247,3 @@ class _TestAdditionsMixin:
     self.assertTrue(
         isordered(s, reverse, strict),
         "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
-
-LockContext = namedtuple("LockContext", "caller thread")
-
-class DebuggingLock(object):
-  ''' A wrapper for a threading Lock or RLock
-      to notice contention and report contending uses.
-  '''
-
-  def __init__(self, recursive=False):
-    self.recursive = recursive
-    self.trace_acquire = False
-    self._lock = threading_RLock() if recursive else threading_Lock()
-    self._held = None
-
-  def __repr__(self):
-    return "%s(lock=%r,held=%s)" % (type(self).__name__, self._lock, self._held)
-
-  def acquire(self, timeout=-1, _caller=None):
-    ''' Acquire the lock and note the caller who takes it.
-    '''
-    if _caller is None:
-      _caller = caller()
-    lock = self._lock
-    hold = LockContext(_caller, current_thread())
-    if timeout != -1:
-      warning(
-          "%s:%d: lock %s: timeout=%s",
-          hold.caller.filename, hold.caller.lineno,
-          lock, timeout)
-    contended = False
-    if True:
-      if lock.acquire(0):
-        lock.release()
-      else:
-        contended = True
-        held = self._held
-        warning(
-            "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
-            hold.caller.filename, hold.caller.lineno,
-            lock,
-            held.thread, held.caller.filename, held.caller.lineno)
-    acquired = lock.acquire(timeout=timeout)
-    if contended:
-      warning(
-          "%s:%d: lock %s: %s",
-          hold.caller.filename, hold.caller.lineno,
-          lock,
-          "acquired" if acquired else "timed out")
-    self._held = hold
-    if acquired and self.trace_acquire:
-      X("ACQUIRED %r", self)
-      stack_dump()
-    return acquired
-
-  def release(self):
-    ''' Release the lock and forget who took it.
-    '''
-    self._held = None
-    self._lock.release()
-
-  def __enter__(self):
-    ##X("%s.ENTER...", type(self).__name__)
-    self.acquire(_caller=caller())
-    ##X("%s.ENTER: acquired, returning self", type(self).__name__)
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    self.release()
-    return False
-
-  def _is_owned(self):
-    lock = self._lock
-    return lock._is_owned()

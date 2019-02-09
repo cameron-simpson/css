@@ -12,8 +12,8 @@ import sys
 import unittest
 from .randutils import randbool
 from .dir import FileDirent, Dir, _Dirent
-from .paths import decode_Dirent_text
 from .store import MappingStore
+from .transcribe import parse
 
 class TestAll(unittest.TestCase):
   ''' Tests for _Dirent and subclasses.
@@ -37,9 +37,10 @@ class TestAll(unittest.TestCase):
     D2, offset = _Dirent.from_bytes(encoded)
     self.assertEqual(offset, len(encoded))
     self.assertEqual(D, D2)
-    text_encoded = D.textencode()
-    D2 = decode_Dirent_text(text_encoded)
-    self.assertEqual(D, D2)
+    Ds = str(D)
+    D2, offset = parse(Ds)
+    self.assertEqual(offset, len(Ds))
+    self.assertEqual(D, D2, "%s != %s" % (str(D), str(D2)))
 
   def test00FileDirent(self):
     ''' Trite FileDirent test.

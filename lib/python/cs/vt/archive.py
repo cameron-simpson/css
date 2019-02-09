@@ -16,8 +16,10 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 import errno
 import os
-from os.path import realpath, isfile
+from os.path import isfile
 import time
+from icontract import require
+from cs.binary import PacketField, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl
@@ -25,15 +27,41 @@ from cs.logutils import warning, exception, debug
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
 from .compose import get_clause_archive
-from .dir import _Dirent
+from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
-# shared mapping of archive paths to Archive instances
-_ARCHIVES = {}
+class ArchiveEntry(PacketField):
+  ''' An Archive entry record.
+  '''
 
-def Archive(path, mapping=None, missing_ok=False, weird_ok=False, config=None):
+  @require(lambda when: when is None or isinstance(when, float))
+  @require(lambda dirent: dirent is None or isinstance(dirent, _Dirent))
+  @require(lambda when, dirent: (
+      (when is None and dirent is None)
+      or
+      (when is not None and dirent is not None)))
+  def __init__(self, when, dirent):
+    super().__init__(None)
+    self.when = when
+    self.dirent = dirent
+
+  @classmethod
+  def from_buffer(cls, bfr, **kw):
+    ''' Parse the `when` and `dirent` values from `bfr`.
+    '''
+    when = BSSFloat.value_from_buffer(bfr)
+    dirent = DirentRecord.value_from_buffer(bfr)
+    return cls(when, dirent, **kw)
+
+  def transcribe(self):
+    ''' Transcribe the `when` and `dirent` fields.
+    '''
+    yield BSSFloat(self.when).transcribe()
+    yield DirentRecord(self.dirent).transcribe()
+
+def Archive(path, missing_ok=False, weird_ok=False, config=None):
   ''' Return an Archive from the specification `path`.
 
       If the `path` begins with `'['`
@@ -46,11 +74,7 @@ def Archive(path, mapping=None, missing_ok=False, weird_ok=False, config=None):
       where *clausename* is a configuration clause name
       and *name* is an identifier used to specify an Archive
       associated with the Store.
-
-      For pathnames this maintains a mapping of issued Archives
-      in order to reuse that same Archive for a given path.
   '''
-  global _ARCHIVES
   if path.startswith('['):
     # expect "[clausename]name"
     clause_name, archive_name, offset = get_clause_archive(path)
@@ -59,7 +83,7 @@ def Archive(path, mapping=None, missing_ok=False, weird_ok=False, config=None):
           "unparsed text after archive name: %r"
           % (path[offset:],))
     S = config[clause_name]
-    return S.get_Archive(archive_name, mapping=mapping, missing_ok=missing_ok)
+    return S.get_Archive(archive_name, missing_ok=missing_ok)
   # otherwise a file pathname
   if not path.endswith('.vt'):
     if weird_ok:
@@ -68,15 +92,9 @@ def Archive(path, mapping=None, missing_ok=False, weird_ok=False, config=None):
       raise ValueError("invalid Archive path (should end in '.vt'): %r" % (path,))
   if not missing_ok and not isfile(path):
     raise ValueError("not a file: %r" % (path,))
-  if mapping is None:
-    mapping = _ARCHIVES
-  path = realpath(path)
-  A = mapping.get(path)
-  if A is None:
-    mapping[path] = A = FilePathArchive(path)
-  return A
+  return FilePathArchive(path)
 
-class _Archive(ABC):
+class BaseArchive(ABC):
   ''' Abstract base class for StoreArchive and FileArchive.
   '''
 
@@ -91,7 +109,7 @@ class _Archive(ABC):
 
   @prop
   def last(self):
-    ''' The last (unixtime, Dirent) from the Archive, or (None, None).
+    ''' The last ArchiveEntry from the Archive, or ArchiveEntry(None,None).
     '''
     last_entry = self._last
     if last_entry is None:
@@ -122,14 +140,14 @@ class _Archive(ABC):
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
-        yield when, E
+        yield ArchiveEntry(when, E)
 
   @staticmethod
   def read(fp, first_lineno=1):
     ''' Read the next entry from an open archive file, return (when, E).
         Return (None, None) at EOF.
     '''
-    for when, E in _Archive.parse(fp, first_lineno=first_lineno):
+    for when, E in BaseArchive.parse(fp, first_lineno=first_lineno):
       return when, E
     return None, None
 
@@ -163,7 +181,6 @@ class _Archive(ABC):
     fp.flush()
     return Es
 
-  @abstractmethod
   def append(self, E, when, etc):
     ''' The append method should add an update to the Archive.
     '''
@@ -207,7 +224,7 @@ class _Archive(ABC):
             notify, E, when, source, e)
     return s
 
-class FilePathArchive(_Archive):
+class FilePathArchive(BaseArchive):
   ''' Manager for an archive.vt file.
   '''
 
@@ -229,11 +246,7 @@ class FilePathArchive(_Archive):
     with Pfx(path):
       try:
         with open(path) as fp:
-          entries = self.parse(fp)
-          for when, E in entries:
-            if when is None and E is None:
-              break
-            yield when, E
+          yield from self.parse(fp)
       except OSError as e:
         if e.errno == errno.ENOENT:
           return
@@ -248,7 +261,7 @@ class FilePathArchive(_Archive):
         s = self.write(fp, E, when=when, etc=etc)
     return s
 
-class FileOutputArchive(FilePathArchive):
+class FileOutputArchive(BaseArchive):
   ''' An Archive which just writes updates to an open file.
   '''
 

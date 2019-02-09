@@ -24,7 +24,7 @@ from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked
-from . import totext, PATHSEP, defaults, RLock
+from . import PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
@@ -469,11 +469,6 @@ class _Dirent(Transcriber):
     ''' Is this an indirect _Dirent?
     '''
     return self.type == DirentType.INDIRECT
-
-  def textencode(self):
-    ''' Serialise the dirent as text.
-    '''
-    return totext(self.encode())
 
   @property
   def size(self):
