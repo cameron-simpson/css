@@ -159,7 +159,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       hashclass,
       *,
       indexclass=None,
-      flags=None, flag_prefix=None,
+      flags=None, flags_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
 
@@ -173,8 +173,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
         * `flags`: optional Flags object for control; if specified then
-          `flag_prefix` is also required
-        * `flag_prefix`: prefix for control flag names
+          `flags_prefix` is also required
+        * `flags_prefix`: prefix for control flag names
 
         Note that __init__ only saves the settings such as the `indexclass`
         and ensures that requisite directories exist.
@@ -186,13 +186,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
     if flags is None:
-      if flag_prefix is None:
+      if flags_prefix is None:
         flags = DummyFlags()
-        flag_prefix = 'DUMMY'
+        flags_prefix = 'DUMMY'
     else:
-      if flag_prefix is None:
-        raise ValueError("flags provided but no flag_prefix")
-    FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
+      if flags_prefix is None:
+        raise ValueError("flags provided but no flags_prefix")
+    FlaggedMixin.__init__(self, flags=flags, prefix=flags_prefix)
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
     self.statedirpath = statedirpath

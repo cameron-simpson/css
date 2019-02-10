@@ -1077,7 +1077,7 @@ class _PlatonicStore(MappingStore):
       *,
       hashclass=None, indexclass=None,
       follow_symlinks=False, archive=None, meta_store=None,
-      flag_prefix=None,
+      flags_prefix=None,
       lock=None,
       **kw
   ):
@@ -1092,7 +1092,7 @@ class _PlatonicStore(MappingStore):
             self.statedirpath, hcls,
             follow_symlinks=follow_symlinks,
             archive=archive, meta_store=meta_store,
-            flag_prefix=flag_prefix,
+            flags_prefix=flags_prefix,
             **kw,
         ),
         hashclass, lock)
