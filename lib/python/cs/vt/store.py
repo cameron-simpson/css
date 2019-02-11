@@ -1075,8 +1075,9 @@ class _PlatonicStore(MappingStore):
   def __init__(
       self, name, statedirpath,
       *,
-      hashclass=None, indexclass=None,
-      follow_symlinks=False, archive=None, meta_store=None,
+      hashclass=None,
+      indexclass=None, follow_symlinks=False,
+      archive=None, meta_store=None,
       flags_prefix=None,
       lock=None,
       **kw
@@ -1090,7 +1091,7 @@ class _PlatonicStore(MappingStore):
     self._datadir = _PerHashclassMapping(
         lambda hcls: PlatonicDir(
             self.statedirpath, hcls,
-            follow_symlinks=follow_symlinks,
+            indexclass=indexclass, follow_symlinks=follow_symlinks,
             archive=archive, meta_store=meta_store,
             flags_prefix=flags_prefix,
             **kw,
