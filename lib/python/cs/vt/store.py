@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Basic Store classes.
+''' Various Store classes.
 '''
 
 from __future__ import with_statement
@@ -76,6 +76,7 @@ class _PerHashclassMapping:
 
   def mapping_for_hashclass(self, hashclass):
     ''' Return the DataDir for the specified `hashclass`.
+        This proxies to the internal mapping.
     '''
     mappings = self._mappings
     with self._lock:
@@ -97,6 +98,7 @@ class _PerHashclassMapping:
 
   def keys(self, hashclass=None):
     ''' Return an iterable of hashcodes of type `hashclass`.
+        This proxies to the internal mapping.
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
@@ -106,9 +108,15 @@ class _PerHashclassMapping:
     return iter(self.keys())
 
   def get_Archive(self, name, **kw):
+    ''' Return the `Archive` named `name`.
+        This proxies to the internal mapping.
+    '''
     return self.mapping_for_hashclass(self.default_hashclass).get_Archive(name, **kw)
 
   def pathto(self, rpath):
+    ''' Return the full path for `rpath`.
+        This proxies to the internal mapping.
+    '''
     return self.mapping_for_hashclass(self.default_hashclass).pathto(rpath)
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
