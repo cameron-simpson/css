@@ -660,7 +660,7 @@ class UpdHandler(StreamHandler):
     if strm is None:
       strm = sys.stderr
     if nl_level is None:
-      nl_level = logging.WARNING
+      nl_level = logging.INFO
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
