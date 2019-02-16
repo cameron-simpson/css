@@ -11,9 +11,9 @@ The logging package is very useful, but a little painful to use.
 This package provides low impact logging setup and some extremely
 useful if unconventional context hooks for logging.
 
-The logging verbosity output format has different defaults based
-on whether an output log file is a tty and whether the environment
-variable $DEBUG is set, and to what.
+The default logging verbosity output format has different defaults
+based on whether an output log file is a tty
+and whether the environment variable $DEBUG is set, and to what.
 
 On terminals warnings and errors get ANSI colouring.
 
@@ -417,7 +417,14 @@ def D(msg, *args):
 
 def status(msg, *args, **kwargs):
   ''' Write a message to the terminal's status line.
-      If there is no status line use the xterm title bar sequence :-(
+
+      Parameters:
+      * `msg`: message string
+      * `args`: if not empty, the message is %-formatted with `args`
+      * `file`: optional keyword argument specifying the output file.
+        Default: `sys.stderr`.
+
+      Hack: if there is no status line use the xterm title bar sequence :-(
   '''
   if args:
     msg = msg % args
@@ -629,10 +636,11 @@ class UpdHandler(StreamHandler):
     ''' Initialise the UpdHandler.
 
         Parameters:
-        * `strm`: the output stream, default sys.stderr.
+        * `strm`: the output stream, default `sys.stderr`.
         * `nl_level`: the logging level at which conventional line-of-text
           output is written; log messages of a lower level go via the
-          update-the-current-line method. Default is logging.WARNING.
+          update-the-current-line method.
+          Default: `logging.WARNING`.
         * `ansi_mode`: if `None`, set from `strm.isatty()`.
           A true value causes the handler to colour certain logging levels
           using ANSI terminal sequences.
