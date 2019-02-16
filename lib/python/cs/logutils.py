@@ -581,6 +581,16 @@ def trace(msg, *args, **kwargs):
   '''
   log(trace_level, msg, *args, **kwargs)
 
+def upd(msg, *args):
+  ''' If we're using an UpdHandler,
+      update the status line otherwise write an info message.
+  '''
+  _upd = loginfo.upd
+  if _upd:
+    _upd.out(msg, *args)
+  else:
+    info(msg, *args)
+
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
