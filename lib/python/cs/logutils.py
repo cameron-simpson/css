@@ -428,11 +428,13 @@ def status(msg, *args, **kwargs):
   '''
   if args:
     msg = msg % args
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
+  f = kwargs.pop('file', None)
+  if kwargs:
+    raise ValueError("unexpected keyword arguments: %r" % (kwargs,))
+  if f is None:
+    f = sys.stderr
   try:
-    has_ansi_status = file.has_ansi_status
+    has_ansi_status = f.has_ansi_status
   except AttributeError:
     try:
       import curses
@@ -453,13 +455,13 @@ def status(msg, *args, **kwargs):
       else:
         warning('status: hs=%s, presuming false', has_status)
         has_ansi_status = None
-    file.has_ansi_status = has_ansi_status
+    f.has_ansi_status = has_ansi_status
   if has_ansi_status:
     msg = has_ansi_status[0] + msg + has_ansi_status[1]
   else:
     msg = '\033]0;' + msg + '\007'
-  file.write(msg)
-  file.flush()
+  f.write(msg)
+  f.flush()
 
 def add_logfile(filename, logger=None, mode='a',
                 encoding=None, delay=False, format=None, no_prefix=False):
