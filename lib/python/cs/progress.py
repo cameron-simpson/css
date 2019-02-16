@@ -12,7 +12,7 @@ import functools
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
-from cs.units import transcribe_time
+from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
 DISTINFO = {
     'description': "A progress tracker with methods for throughput, ETA and update notification",
@@ -385,13 +385,21 @@ class Progress(object):
     ''' A progress string of the form *label*`: ==>  ETA '*time*.
     '''
     ratio = self.ratio
-    remaining = int(self.remaining_time)
+    remaining = self.remaining_time
+    if remaining:
+      remaining = int(remaining)
     if ratio is None:
       if remaining is None:
         return label + ': ETA unknown'
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
-    left = label + ': '
+    left = (
+        label
+        + ': '
+        + transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1)
+        + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+        + ' '
+    )
     right = ' ETA ' + transcribe_time(remaining)
     arrow_width = width - len(left) - len(right)
     if arrow_width < 1:
