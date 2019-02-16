@@ -670,16 +670,23 @@ class UpdHandler(StreamHandler):
     self.__lock = Lock()
 
   def emit(self, logrec):
-    with self.__lock:
       if logrec.levelno >= self.nl_level:
         if self.__ansi_mode:
           if logrec.levelno >= logging.ERROR:
             logrec.msg = colourise(logrec.msg, 'red')
           elif logrec.levelno >= logging.WARN:
             logrec.msg = colourise(logrec.msg, 'yellow')
-        self.upd.without(StreamHandler.emit, self, logrec)
+        with self.__lock:
+          self.upd.without(StreamHandler.emit, self, logrec)
       else:
-        self.upd.out(logrec.getMessage())
+        with self.__lock:
+          self.upd.out(logrec.getMessage())
+
+  def upd(msg, *a):
+    if a:
+      msg = msg % a
+    with self.__lock:
+      self.upd.out(msg)
 
   def flush(self):
     return self.upd.flush()
