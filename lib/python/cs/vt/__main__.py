@@ -218,11 +218,28 @@ class VTCmd:
       signal(SIGINT, sig_handler)
       signal(SIGQUIT, sig_handler)
 
+      # start the status ticker
+      if sys.stderr.isatty():
+        rows, cols = ttysize(2)
+        status_width = cols - 2
+        self.progress = Progress(total=0)
+        def ticker():
+          while not self.runstate.cancelled:
+            upd(self.progress.status("LABEL", status_width))
+            sleep(0.25)
+        ticker = Thread(name='status-line', target=ticker)
+        ticker.daemon = True
+        ticker.start()
+      else:
+        ticker = None
+
       try:
         xit = self.cmd_op(args, op=subcmd)
       except GetoptError as e:
         error("%s", e)
         badopts = True
+
+      self.runstate.cancel()
 
       if badopts:
         sys.stderr.write(usage)
@@ -294,30 +311,10 @@ class VTCmd:
       ##X("MAIN CMD_OP S:")
       ##dump_Store(S)
       defaults.push_Ss(S)
-      # start the status ticker
-      if False and sys.stdout.isatty():
-        X("wrap in a ProgressStore")
-        run_ticker = True
-        S = ProgressStore("ProgressStore(%s)" % (S,), S)
-        def ticker():
-          old_text = ''
-          while run_ticker:
-            text = S.status_text()
-            if text != old_text:
-              statusline(text)
-              old_text = text
-            sleep(0.25)
-        T = Thread(name='%s-status-line' % (S,), target=ticker)
-        T.daemon = True
-        T.start()
-      else:
-        run_ticker = False
       with S:
         xit = op_func(args)
       if cacheS:
         cacheS.backend = None
-      if run_ticker:
-        run_ticker = False
       return xit
 
   def cmd_profile(self, *a, **kw):
