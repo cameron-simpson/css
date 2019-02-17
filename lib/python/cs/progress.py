@@ -382,7 +382,8 @@ class Progress(object):
     return time.time() + remaining
 
   def status(self, label, width):
-    ''' A progress string of the form *label*`: ==>  ETA '*time*.
+    ''' A progress string of the form
+        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
     '''
     ratio = self.ratio
     remaining = self.remaining_time
