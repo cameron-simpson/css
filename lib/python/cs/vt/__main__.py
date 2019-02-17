@@ -194,9 +194,6 @@ class VTCmd:
 
     if self.verbose:
       loginfo.level = logging.INFO
-      upd = loginfo.upd
-      if upd is not None:
-        upd.nl_level = logging.INFO
 
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
