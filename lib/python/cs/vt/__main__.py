@@ -867,14 +867,11 @@ class VTCmd:
         for obj_spec in args:
           with Pfx(obj_spec):
             try:
-              obj = parse(obj_spec)
+              obj = self._parse_pushable(obj_spec)
             except ValueError as e:
               raise GetoptError("unparsed: %s" % (e,)) from e
-            try:
-              pushto = obj.pushto
-            except AttributeError:
-              raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-            pushto(S2, runstate=defaults.runstate)
+            pushto = obj.pushto
+            pushto(S2, runstate=defaults.runstate, progress=self.progress)
     return 0
 
   def cmd_pushto(self, args):
@@ -895,14 +892,11 @@ class VTCmd:
       for obj_spec in args:
         with Pfx(obj_spec):
           try:
-            obj = parse(obj_spec)
+            obj = self._parse_pushable(obj_spec)
           except ValueError as e:
             raise GetoptError("unparsed: %s" % (e,)) from e
-          try:
-            pushto = obj.pushto
-          except AttributeError:
-            raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-          pushto(S2, runstate=defaults.runstate)
+          pushto = obj.pushto
+          pushto(S2, runstate=defaults.runstate, progress=self.progress)
     return 0
 
   def cmd_serve(self, args):
