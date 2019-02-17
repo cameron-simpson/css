@@ -129,36 +129,6 @@ Proxy Stores are described in the STORE TYPES section below.
   Create the directories for any missing local datadir Stores
   from the configuration.
 
-`pullfrom` *other_store* *objects*...
-
-  Pull blocks from the Store *other_store*
-  into the default Store
-  to cover the supplied *objects*.
-  This ensures that the default Store
-  contains all the Blocks related to each *object*.
-  Each *object* may be a content reference
-  such as a content directory specification,
-  but may also be the pathname of a "datadir" Store
-  or a `.vtd` data file;
-  in this latter case the Blocks come directly
-  from the Store or data file respectively
-  instead of from *other_store*.
-
-`pushto` *other_store* *objects*...
-
-  Push blocks from the default Store
-  to the Store *other_store*
-  to cover the supplied *objects*.
-  This ensures that *other_store*
-  contains all the Blocks related to each *object*.
-  Each *object* may be a content reference
-  such as a content directory specification,
-  but may also be the pathname of a "datadir" Store
-  or a `.vtd` data file;
-  in this latter case the Blocks come directly
-  from the Store or data file respectively
-  instead of from the default Store.
-
 `mount` [*option*...] *special* [*mountpoint* [*subpath*]]
 
   Mount the storage specified by *special* on *mountpoint*
@@ -217,20 +187,35 @@ Proxy Stores are described in the STORE TYPES section below.
   record the reference to the copy in the file *path*`.vt`,
   remove *path*.
 
-`pullfrom` *other-store* *reference*...
+`pullfrom` *other_store* *objects*...
 
-  For each content *reference*
-  ensure that the main Store contains all the blocks
-  from *other-store*
-  required by *reference*.
+  Pull blocks from the Store *other_store*
+  into the default Store
+  to cover the supplied *objects*.
+  This ensures that the default Store
+  contains all the Blocks related to each *object*.
+  Each *object* may be a content reference
+  such as a content directory specification,
+  but may also be the pathname of a "datadir" Store
+  or a `.vtd` data file;
+  in this latter case the Blocks come directly
+  from the Store or data file respectively
+  instead of from *other_store*.
 
-`pushto` *other-store* *reference*...
+`pushto` *other_store* *objects*...
 
-  The converse of `pullfrom`.
-  For each content *reference*
-  ensure that *other-store* contains all the blocks
-  from the main Store
-  required by *reference*.
+  Push blocks from the default Store
+  to the Store *other_store*
+  to cover the supplied *objects*.
+  This ensures that *other_store*
+  contains all the Blocks related to each *object*.
+  Each *object* may be a content reference
+  such as a content directory specification,
+  but may also be the pathname of a "datadir" Store
+  or a `.vtd` data file;
+  in this latter case the Blocks come directly
+  from the Store or data file respectively
+  instead of from the default Store.
 
 `serve` [*address*]
 
