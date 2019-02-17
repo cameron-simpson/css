@@ -26,17 +26,22 @@ from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
-from cs.logutils import exception, error, warning, info, debug, \
+from cs.logutils import exception, error, warning, info, upd, debug, \
                         setup_logging, logTo, loginfo
 from cs.pfx import Pfx
+from cs.progress import Progress
 from cs.resources import RunState
-from cs.tty import statusline, ttysize
+from cs.tty import ttysize
 import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
-from .compose import get_store_spec, get_clause_spec, get_clause_archive
+from .compose import (
+    get_clause_archive,
+    get_clause_spec,
+    get_store_spec
+)
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
@@ -49,7 +54,7 @@ from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
 from .server import serve_tcp, serve_socket
-from .store import ProgressStore, ProxyStore
+from .store import ProxyStore, DataDirStore
 from .transcribe import parse
 
 def main(*a, **kw):
@@ -149,7 +154,7 @@ class VTCmd:
     hashname = os.environ.get('VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME)
 
     try:
-        opts, args = getopt(args, 'C:S:f:h:qv')
+      opts, args = getopt(args, 'C:S:f:h:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
@@ -220,7 +225,7 @@ class VTCmd:
 
       # start the status ticker
       if sys.stderr.isatty():
-        rows, cols = ttysize(2)
+        _, cols = ttysize(2)
         status_width = cols - 2
         self.progress = Progress(total=0)
         def ticker():
@@ -835,7 +840,7 @@ class VTCmd:
         # try an object transcription eg "D{...}"
         try:
           obj, offset = parse(s)
-        except ValueError as e:
+        except ValueError:
           # fall back: relative path to .vtd file
           if s.endswith('.vtd') and isfilepath(s):
             # /path/to/datafile.vtd
@@ -843,9 +848,10 @@ class VTCmd:
             obj.open()
           else:
             raise
-    try:
-      pushto = obj.pushto
-    except AttributeError:
+        else:
+          if offset < len(s):
+            raise ValueError("uncomplete parse, unparsed: %r" % (s[offset:],))
+    if not hasattr(obj, 'pushto'):
       raise ValueError("not pushable")
     return obj
 
