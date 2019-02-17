@@ -855,6 +855,20 @@ class VTCmd:
       raise ValueError("not pushable")
     return obj
 
+  def _push(self, srcS, dstS, pushables):
+    ''' Push data from the source Store `srcS` to destination Store `dstS`
+        to ensure that `dstS` has all the Blocks needs to support
+        the `pushables`.
+    '''
+    with Pfx("%s => %s", srcS.name, dstS.name):
+      with srcS:
+        for pushable in pushables:
+          info("push %s ==> %s", pushable, dstS)
+          with Pfx(str(pushable)):
+            pushable.pushto(
+                dstS, runstate=defaults.runstate, progress=self.progress)
+    return 0
+
   def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
 
@@ -862,23 +876,21 @@ class VTCmd:
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S1spec = args.pop(0)
+    srcSspec = args.pop(0)
     if not args:
       raise GetoptError("missing objects")
-    with Pfx("other_store %r", S1spec):
-      S1 = Store(S1spec, self.config)
-    S2 = defaults.S
-    with Pfx("%s => %s", S1.name, S2.name):
-      with S1:
-        for obj_spec in args:
-          with Pfx(obj_spec):
-            try:
-              obj = self._parse_pushable(obj_spec)
-            except ValueError as e:
-              raise GetoptError("unparsed: %s" % (e,)) from e
-            pushto = obj.pushto
-            pushto(S2, runstate=defaults.runstate, progress=self.progress)
-    return 0
+    with Pfx("other_store %r", srcSspec):
+      srcS = Store(srcSspec, self.config)
+    dstS = defaults.S
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
 
   def cmd_pushto(self, args):
     ''' Push something to a secondary Store,
@@ -888,22 +900,21 @@ class VTCmd:
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S2spec = args.pop(0)
+    srcS = defaults.S
+    dstSspec = args.pop(0)
     if not args:
       raise GetoptError("missing objects")
-    with Pfx("other_store %r", S2spec):
-      S2 = Store(S2spec, self.config)
-    S1 = defaults.S
-    with Pfx("%s => %s", S1.name, S2spec):
-      for obj_spec in args:
-        with Pfx(obj_spec):
-          try:
-            obj = self._parse_pushable(obj_spec)
-          except ValueError as e:
-            raise GetoptError("unparsed: %s" % (e,)) from e
-          pushto = obj.pushto
-          pushto(S2, runstate=defaults.runstate, progress=self.progress)
-    return 0
+    with Pfx("other_store %r", dstSspec):
+      dstS = Store(dstSspec, self.config)
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
 
   def cmd_serve(self, args):
     ''' Start a service daemon listening on a TCP port
