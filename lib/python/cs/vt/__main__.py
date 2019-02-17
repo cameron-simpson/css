@@ -814,6 +814,44 @@ class VTCmd:
         os.remove(ospath)
     return 0
 
+  def _parse_pushable(self, s):
+    ''' Parse an object specification and return the object.
+    '''
+    obj = None
+    if s.startswith('/'):
+      # a path, hopefully a datadir or a .vtd file
+      if isdirpath(s) and isdirpath(joinpath(s, 'data')):
+        # /path/to/datadir
+        obj = DataDirStore(s, s)
+      elif s.endswith('.vtd') and isfilepath(s):
+        # /path/to/datafile.vtd
+        obj = DataFileReader(s)
+        obj.open()
+      # TODO: /path/to/archive.vt
+      else:
+        raise ValueError("path is neither a DataDir nor a data file")
+    else:
+      # try a Store specification
+      try:
+        obj = Store(s, self.config)
+      except ValueError:
+        # try an object transcription eg "D{...}"
+        try:
+          obj, offset = parse(s)
+        except ValueError as e:
+          # fall back: relative path to .vtd file
+          if s.endswith('.vtd') and isfilepath(s):
+            # /path/to/datafile.vtd
+            obj = DataFileReader(s)
+            obj.open()
+          else:
+            raise
+    try:
+      pushto = obj.pushto
+    except AttributeError:
+      raise ValueError("not pushable")
+    return obj
+
   def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
 
