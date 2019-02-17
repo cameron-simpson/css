@@ -863,7 +863,6 @@ class VTCmd:
     with Pfx("%s => %s", srcS.name, dstS.name):
       with srcS:
         for pushable in pushables:
-          info("push %s ==> %s", pushable, dstS)
           with Pfx(str(pushable)):
             pushable.pushto(
                 dstS, runstate=defaults.runstate, progress=self.progress)
