@@ -128,6 +128,9 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     self._rfd = None
     self._rlock = None
 
+  def __len__(self):
+    return os.fstat(self._rfd).st_size
+
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
     '''
@@ -170,6 +173,34 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
         DataFile starting from `offset`, default 0.
     '''
     return self.scanbuffer(self.bufferfrom(offset))
+
+  def pushto(self, S2, runstate=None, offset=0, hashclass=None, progress=None):
+    ''' Push the Blocks from this DataFile to the Store `S2`.
+
+        Note that if the target store is a DataDirStore
+        it is faster and simpler to move/copy the .vtd file
+        into its `data` subdirectory directly.
+        Of course, that may introduce redundant block copies.
+
+        Parameters:
+        * `S2`: the secondary Store to receive Blocks.
+        * `runstate`: optional RunState used to cancel operation.
+        * `offset`: starting offset, default `0`.
+        * `hashclass`: optional hash class, default from `S2`
+    '''
+    if hashclass is None:
+      hashclass = S2.hashclass
+    with S2:
+      if progress:
+        progress.total += len(self) - offset
+      for DR, post_offset in self.scanfrom(offset=offset):
+        if runstate and runstate.cancelled:
+          break
+        if progress:
+          progress += post_offset - offset
+        data = DR.data
+        S2.add(data, hashclass=hashclass)
+        offset = post_offset
 
 class DataFileWriter(MultiOpenMixin):
   ''' Append access to a data file, storing data chunks in compressed form.
