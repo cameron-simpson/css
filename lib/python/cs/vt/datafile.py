@@ -18,6 +18,7 @@ from os import SEEK_END, \
 from stat import S_ISREG
 import sys
 from zlib import compress, decompress
+from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import warning
@@ -174,7 +175,8 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     '''
     return self.scanbuffer(self.bufferfrom(offset))
 
-  def pushto(self, S2, runstate=None, offset=0, hashclass=None, progress=None):
+  @require(lambda self, offset: offset >= 0 and offset <= len(self))
+  def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
     ''' Push the Blocks from this DataFile to the Store `S2`.
 
         Note that if the target store is a DataDirStore
@@ -183,24 +185,18 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
         Of course, that may introduce redundant block copies.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks.
-        * `runstate`: optional RunState used to cancel operation.
+        * `Q`: queue on which to put blocks
         * `offset`: starting offset, default `0`.
-        * `hashclass`: optional hash class, default from `S2`
+        * `runstate`: optional RunState used to cancel operation.
     '''
-    if hashclass is None:
-      hashclass = S2.hashclass
-    with S2:
-      if progress:
-        progress.total += len(self) - offset
-      for DR, post_offset in self.scanfrom(offset=offset):
-        if runstate and runstate.cancelled:
-          break
-        if progress:
-          progress += post_offset - offset
-        data = DR.data
-        S2.add(data, hashclass=hashclass)
-        offset = post_offset
+    if progress:
+      progress.total += len(self) - offset
+    for DR, _ in self.scanfrom(offset=offset):
+      if runstate and runstate.cancelled:
+        return False
+      data = DR.data
+      Q.put(data)
+    return True
 
 class DataFileWriter(MultiOpenMixin):
   ''' Append access to a data file, storing data chunks in compressed form.
