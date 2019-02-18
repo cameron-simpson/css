@@ -485,14 +485,14 @@ class _Block(Transcriber, ABC):
     raise ValueError(
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,))
 
-  def pushto(self, S2, Q=None, runstate=None):
+  def pushto_queue(self, Q, runstate=None, progress=None):
     ''' Push this Block and any implied subblocks to the Store `S2`.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks
         * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
+        * `progress`: optional Progress to update its total
 
         If `Q` is supplied, this method will return as soon as all
         the relevant Blocks have been pushed i.e. possibly before
@@ -506,24 +506,17 @@ class _Block(Transcriber, ABC):
         that the final Store shutdown of `S2` will wait for outstanding
         operations anyway.
     '''
-    S1 = defaults.S
-    if Q is None:
-      # create a Queue and a worker Thread
-      Q, T = S1.pushto(S2)
-    else:
-      # use an existing Queue, no Thread to wait for
-      T = None
-    Q.put(self)
-    if self.indirect:
-      # recurse, reusing the Queue
-      for subB in self.subblocks:
-        if runstate and runstate.cancelled:
-          warning("pushto(%s) cancelled", self)
-          break
-        subB.pushto(S2, Q, runstate=runstate)
-    if T:
-      Q.close()
-      T.join()
+    with defaults.S:
+      if progress:
+        progress.total += len(self)
+      Q.put(self)
+      if self.indirect:
+        # recurse, reusing the Queue
+        for subB in self.subblocks:
+          if runstate and runstate.cancelled:
+            warning("%s: push cancelled", self)
+            break
+          subB.pushto_queue(Q, runstate=runstate, progress=progress)
 
 @lru_cache(maxsize=1024*1024, typed=True)
 def get_HashCodeBlock(hashcode):
