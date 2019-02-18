@@ -1,3 +1,4 @@
+cs.vtfuse: fsyncdir: sync this Dir downward, but "unsynced" version of ancestor Dirs?
 vt.1 doc -h option and $VT_HASHCLASS
 vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
 stats on stream packet stuffing/flushing
