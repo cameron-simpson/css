@@ -224,19 +224,21 @@ class VTCmd:
       signal(SIGQUIT, sig_handler)
 
       # start the status ticker
+      self.status_label = self.cmd
       if sys.stderr.isatty():
         _, cols = ttysize(2)
         status_width = cols - 2
         self.progress = Progress(total=0)
         def ticker():
           while not self.runstate.cancelled:
-            upd(self.progress.status("LABEL", status_width))
+            upd(self.progress.status(self.status_label, status_width))
             sleep(0.25)
         ticker = Thread(name='status-line', target=ticker)
         ticker.daemon = True
         ticker.start()
       else:
         ticker = None
+        self.progress = None
 
       try:
         xit = self.cmd_op(args, op=subcmd)
@@ -851,7 +853,7 @@ class VTCmd:
         else:
           if offset < len(s):
             raise ValueError("uncomplete parse, unparsed: %r" % (s[offset:],))
-    if not hasattr(obj, 'pushto'):
+    if not hasattr(obj, 'pushto_queue'):
       raise ValueError("not pushable")
     return obj
 
@@ -860,13 +862,25 @@ class VTCmd:
         to ensure that `dstS` has all the Blocks needs to support
         the `pushables`.
     '''
+    xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
-      with srcS:
-        for pushable in pushables:
-          with Pfx(str(pushable)):
-            pushable.pushto(
-                dstS, runstate=defaults.runstate, progress=self.progress)
-    return 0
+      Q, T = srcS.pushto(dstS, progress=self.progress)
+      old_status_label = self.status_label
+      for pushable in pushables:
+        if self.runstate.cancelled:
+          xit = 1
+          break
+        with Pfx(str(pushable)):
+          self.status_label = Pfx._state.cur.umark
+          if not pushable.pushto_queue(
+              Q, runstate=defaults.runstate, progress=self.progress
+          ):
+            error("push failed")
+            xit = 1
+      self.status_label = old_status_label
+      Q.close()
+      T.join()
+      return xit
 
   def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
