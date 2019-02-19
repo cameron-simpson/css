@@ -658,6 +658,8 @@ class MappingStore(BasicStoreSync):
   def contains(self, h):
     return h in self.mapping
 
+  __contains__ = contains
+
   def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
     '''
