@@ -873,18 +873,18 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto(self, S2, Q=None, runstate=None):
-    ''' Push the Block with the file contents to the Store `S2`.
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push the Block with the file contents to a queue.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks
         * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
+        * `progress`: optional Progress to update its total
 
-        Semantics are as for cs.vt.block.Block.pushto.
+        Semantics are as for `cs.vt.block.Block.pushto_queue`.
     '''
-    return self.block.pushto(S2, Q=Q, runstate=runstate)
+    return self.block.pushto_queue(Q, runstate=runstate, progress=progress)
 
   @io_fail
   def fsck(self, recurse=False):
@@ -1255,36 +1255,26 @@ class Dir(_Dirent, DirLike):
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto(self, S2, Q=None, runstate=None):
-    ''' Push the Dir Blocks to the Store `S2`.
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push the Dir Blocks to a queue.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks
-        * `Q`: optional preexisting Queue, which itself should have
-          come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
+        * `progress`: optional Progress to update its total
 
-        This pushes the Dir's Block encoding to `S2` and then
-        recursively pushes each Dirent's Block data to `S2`.
+        This pushes the Dir's Block encoding to the queue
+        and then recursively pushes each Dirent's Block data to the queue.
     '''
-    if Q is None:
-      # create a Queue and a worker Thread
-      Q, T = defaults.S.pushto(S2)
-    else:
-      # use an existing Queue, no Thread to wait for
-      T = None
     B = self.block
     # push the Dir block data
-    B.pushto(S2, Q=Q, runstate=runstate)
+    B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
     for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
       if runstate and runstate.cancelled:
-        warning("pushto(%s) cancelled", self)
-        break
-      E.pushto(S2, Q=Q, runstate=runstate)
-    if T:
-      Q.close()
-      T.join()
+        warning("push cancelled")
+        return False
+      E.pushto_queue(Q, runstate=runstate, progress=progress)
+    return True
 
   @io_fail
   def fsck(self, recurse=False):
