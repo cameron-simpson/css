@@ -487,39 +487,54 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of HashCodeBlock or byte-like objects
+        * `blocks`: an iterable of Blocks or byte-like objects;
+          each item may also be a tuple of (block-or-bytes, length)
+          in which case the supplied length will be used for progress reporting
+          instead of the 
     '''
     with Pfx("%s: worker", name):
       lock = Lock()
       with srcS:
         pending_blocks = {}   # mapping of Result to Block
         for block in blocks:
-          if not isinstance(
-              block,
-              (bytes, bytearray, memoryview, HashCodeBlock, _IndirectBlock)):
-            # silently pass known literals - they do not need to be Stored
-            if not isinstance(block, (LiteralBlock,)):
-              error("do not know how to push a %s", type(block))
-            continue
+          block_type = type(block)
+          if block_type is tuple:
+            try:
+              block1, length = block
+            except TypeError as e:
+              error("cannot unpack %s into Block and length: %s", type(block), e)
+              continue
+            else:
+              block = block1
+              block_type = type(block)
+          else:
+            length = None
           sem.acquire()
           # worker function to add a block conditionally
           @logexc
-          def add_block(srcS, dstS, block, progress):
+          def add_block(srcS, dstS, block, length, progress):
             # add block content if not already present in dstS
-            if isinstance(block, (HashCodeBlock, _IndirectBlock)):
+            try:
+              h = block.hashcode
+            except AttributeError:
+              # presume bytes-like or unStored Block type
+              try:
+                h = srcS.hash(block)
+              except TypeError:
+                warning("ignore object of type %s", type(block))
+                return
+              if h not in dstS:
+                dstS[h] = block
+            else:
               # get the hashcode, only get the data if required
               h = block.hashcode
               if h not in dstS:
                 dstS[h] = block.get_direct_data()
-            else:
-              # presume bytes-like
-              data = block
-              h = srcS.hash(data)
-              if h not in dstS:
-                dstS[h] = data
             if progress:
-              progress += len(block)
-          addR = bg_result(add_block, srcS, dstS, block, progress)
+              if length is None:
+                length = len(block)
+              progress += length
+          addR = bg_result(add_block, srcS, dstS, block, length, progress)
           with lock:
             pending_blocks[addR] = block
           # cleanup function
