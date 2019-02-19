@@ -497,8 +497,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       with srcS:
         pending_blocks = {}   # mapping of Result to Block
         for block in blocks:
-          block_type = type(block)
-          if block_type is tuple:
+          if type(block) is tuple:
             try:
               block1, length = block
             except TypeError as e:
@@ -506,7 +505,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
               continue
             else:
               block = block1
-              block_type = type(block)
           else:
             length = None
           sem.acquire()
