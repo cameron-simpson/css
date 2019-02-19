@@ -872,9 +872,11 @@ class VTCmd:
           break
         with Pfx(str(pushable)):
           self.status_label = Pfx._state.cur.umark
-          if not pushable.pushto_queue(
+          pushed_ok = pushable.pushto_queue(
               Q, runstate=defaults.runstate, progress=self.progress
-          ):
+          )
+          assert isinstance(pushed_ok, bool)
+          if not pushed_ok:
             error("push failed")
             xit = 1
       self.status_label = old_status_label
