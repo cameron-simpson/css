@@ -401,11 +401,14 @@ class Progress(object):
         + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
         + ' '
     )
-    right = ' ETA ' + transcribe_time(remaining)
+    if remaining is None:
+      right = 'ETA unknown'
+    else:
+      right = ' ETA ' + transcribe_time(remaining)
     arrow_width = width - len(left) - len(right)
     if arrow_width < 1:
       # no roow for an arrow
-      return label + ': ETA ' + transcribe_time(remaining)
+      return label + ':' + right
     if ratio <= 0:
       arrow = ''
     elif ratio < 1.0:
