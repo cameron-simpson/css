@@ -28,7 +28,7 @@ from cs.seq import Seq
 from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults, Lock, RLock
-from .block import HashCodeBlock
+from .block import HashCodeBlock, _IndirectBlock, LiteralBlock
 from .datadir import DataDir, PlatonicDir, init_datadir
 from .hash import (
     HashCode,
@@ -494,15 +494,19 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
       with srcS:
         pending_blocks = {}   # mapping of Result to Block
         for block in blocks:
-          if not isinstance(block, (bytes, bytearray, memoryview, HashCodeBlock)):
-            error("do not know how to push a %s", type(block))
+          if not isinstance(
+              block,
+              (bytes, bytearray, memoryview, HashCodeBlock, _IndirectBlock)):
+            # silently pass known literals - they do not need to be Stored
+            if not isinstance(block, (LiteralBlock,)):
+              error("do not know how to push a %s", type(block))
             continue
           sem.acquire()
           # worker function to add a block conditionally
           @logexc
           def add_block(srcS, dstS, block, progress):
             # add block content if not already present in dstS
-            if isinstance(block, HashCodeBlock):
+            if isinstance(block, (HashCodeBlock, _IndirectBlock)):
               # get the hashcode, only get the data if required
               h = block.hashcode
               if h not in dstS:
@@ -530,9 +534,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
           addR.notify(after_add_block)
         with lock:
           outstanding = list(pending_blocks.keys())
-        X("PUSHQ: %d outstanding, waiting...", len(outstanding))
-        for R in outstanding:
-          R.join()
+        if outstanding:
+          info("PUSHQ: %d outstanding, waiting...", len(outstanding))
+          for R in outstanding:
+            R.join()
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations
