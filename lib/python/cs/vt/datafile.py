@@ -191,11 +191,12 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     '''
     if progress:
       progress.total += len(self) - offset
-    for DR, _ in self.scanfrom(offset=offset):
+    for DR, post_offset in self.scanfrom(offset=offset):
       if runstate and runstate.cancelled:
         return False
       data = DR.data
-      Q.put(data)
+      Q.put( (data, post_offset - offset) )
+      offset = post_offset
     return True
 
 class DataFileWriter(MultiOpenMixin):
