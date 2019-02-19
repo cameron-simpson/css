@@ -486,19 +486,13 @@ class _Block(Transcriber, ABC):
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,))
 
   def pushto_queue(self, Q, runstate=None, progress=None):
-    ''' Push this Block and any implied subblocks to the Store `S2`.
+    ''' Push this Block and any implied subblocks to a queue.
 
         Parameters:
         * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
         * `progress`: optional Progress to update its total
-
-        If `Q` is supplied, this method will return as soon as all
-        the relevant Blocks have been pushed i.e. possibly before
-        delivery is complete. If `Q` is not supplied, a new Queue
-        is allocated; after all Blocks have been pushed the Queue
-        is closed and its worker waited for.
 
         TODO: optional `no_wait` parameter to control waiting,
         default False, which would support closing the Queue but
