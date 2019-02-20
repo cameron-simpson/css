@@ -23,7 +23,7 @@ DISTINFO = {
     ],
 }
 
-def decorator(deco, *da, **dkw):
+def decorator(deco):
   ''' Wrapper for decorator functions to support optional keyword arguments.
 
       Examples:
