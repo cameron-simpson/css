@@ -234,6 +234,19 @@ def truthy(value):
 
 class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
+
+      This defines the following attributes on instances:
+      * `flags`: the `Flags` instance providing the flag values
+      * `flags_prefix`: the prefix for the flags of interest.
+      * `flagname_`*name*: the full name within `.flags`
+        of the flag referred to as *name*.
+        This is `.flags_prefix + '_' + `*name*
+        if `.flags_prefix` is not empty,
+        or just *name* otherwise.
+     * `flag_`*name*: the value from `.flags`
+        of the flag referred to as *name*.
+        This is a setable attribute
+        with changes propagated to `.flags`.
   '''
 
   def __init__(self, flags=None, debug=None, prefix=None):
@@ -252,7 +265,7 @@ class FlaggedMixin(object):
       if debug is not None:
         flags.debug = debug
     self.flags = flags
-    self.__flag_prefix = prefix
+    self.flags_prefix = prefix
 
   def __flagname(self, suffix):
     ''' Compute a flag name from `suffix`.
@@ -261,7 +274,7 @@ class FlaggedMixin(object):
         `suffix` of 'bah' with a .name attribute of 'foo' returns
         'FOO_BAH'.
     '''
-    name = self.__flag_prefix
+    name = self.flags_prefix
     if name is None:
       name = getattr(self, 'name', None)
     if name is None:

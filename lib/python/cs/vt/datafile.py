@@ -18,6 +18,7 @@ from os import SEEK_END, \
 from stat import S_ISREG
 import sys
 from zlib import compress, decompress
+from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import warning
@@ -128,6 +129,9 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     self._rfd = None
     self._rlock = None
 
+  def __len__(self):
+    return os.fstat(self._rfd).st_size
+
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
     '''
@@ -170,6 +174,30 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
         DataFile starting from `offset`, default 0.
     '''
     return self.scanbuffer(self.bufferfrom(offset))
+
+  @require(lambda self, offset: offset >= 0 and offset <= len(self))
+  def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
+    ''' Push the Blocks from this DataFile to the Store `S2`.
+
+        Note that if the target store is a DataDirStore
+        it is faster and simpler to move/copy the .vtd file
+        into its `data` subdirectory directly.
+        Of course, that may introduce redundant block copies.
+
+        Parameters:
+        * `Q`: queue on which to put blocks
+        * `offset`: starting offset, default `0`.
+        * `runstate`: optional RunState used to cancel operation.
+    '''
+    if progress:
+      progress.total += len(self) - offset
+    for DR, post_offset in self.scanfrom(offset=offset):
+      if runstate and runstate.cancelled:
+        return False
+      data = DR.data
+      Q.put( (data, post_offset - offset) )
+      offset = post_offset
+    return True
 
 class DataFileWriter(MultiOpenMixin):
   ''' Append access to a data file, storing data chunks in compressed form.

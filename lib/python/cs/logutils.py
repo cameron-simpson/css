@@ -11,9 +11,9 @@ The logging package is very useful, but a little painful to use.
 This package provides low impact logging setup and some extremely
 useful if unconventional context hooks for logging.
 
-The logging verbosity output format has different defaults based
-on whether an output log file is a tty and whether the environment
-variable $DEBUG is set, and to what.
+The default logging verbosity output format has different defaults
+based on whether an output log file is a tty
+and whether the environment variable $DEBUG is set, and to what.
 
 On terminals warnings and errors get ANSI colouring.
 
@@ -417,15 +417,24 @@ def D(msg, *args):
 
 def status(msg, *args, **kwargs):
   ''' Write a message to the terminal's status line.
-      If there is no status line use the xterm title bar sequence :-(
+
+      Parameters:
+      * `msg`: message string
+      * `args`: if not empty, the message is %-formatted with `args`
+      * `file`: optional keyword argument specifying the output file.
+        Default: `sys.stderr`.
+
+      Hack: if there is no status line use the xterm title bar sequence :-(
   '''
   if args:
     msg = msg % args
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
+  f = kwargs.pop('file', None)
+  if kwargs:
+    raise ValueError("unexpected keyword arguments: %r" % (kwargs,))
+  if f is None:
+    f = sys.stderr
   try:
-    has_ansi_status = file.has_ansi_status
+    has_ansi_status = f.has_ansi_status
   except AttributeError:
     try:
       import curses
@@ -446,13 +455,13 @@ def status(msg, *args, **kwargs):
       else:
         warning('status: hs=%s, presuming false', has_status)
         has_ansi_status = None
-    file.has_ansi_status = has_ansi_status
+    f.has_ansi_status = has_ansi_status
   if has_ansi_status:
     msg = has_ansi_status[0] + msg + has_ansi_status[1]
   else:
     msg = '\033]0;' + msg + '\007'
-  file.write(msg)
-  file.flush()
+  f.write(msg)
+  f.flush()
 
 def add_logfile(filename, logger=None, mode='a',
                 encoding=None, delay=False, format=None, no_prefix=False):
@@ -572,6 +581,16 @@ def trace(msg, *args, **kwargs):
   '''
   log(trace_level, msg, *args, **kwargs)
 
+def upd(msg, *args):
+  ''' If we're using an UpdHandler,
+      update the status line otherwise write an info message.
+  '''
+  _upd = loginfo.upd
+  if _upd:
+    _upd.out(msg, *args)
+  else:
+    info(msg, *args)
+
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
@@ -629,10 +648,11 @@ class UpdHandler(StreamHandler):
     ''' Initialise the UpdHandler.
 
         Parameters:
-        * `strm`: the output stream, default sys.stderr.
+        * `strm`: the output stream, default `sys.stderr`.
         * `nl_level`: the logging level at which conventional line-of-text
           output is written; log messages of a lower level go via the
-          update-the-current-line method. Default is logging.WARNING.
+          update-the-current-line method.
+          Default: `logging.WARNING`.
         * `ansi_mode`: if `None`, set from `strm.isatty()`.
           A true value causes the handler to colour certain logging levels
           using ANSI terminal sequences.
@@ -640,7 +660,7 @@ class UpdHandler(StreamHandler):
     if strm is None:
       strm = sys.stderr
     if nl_level is None:
-      nl_level = logging.WARNING
+      nl_level = logging.INFO
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
@@ -650,18 +670,36 @@ class UpdHandler(StreamHandler):
     self.__lock = Lock()
 
   def emit(self, logrec):
-    with self.__lock:
-      if logrec.levelno >= self.nl_level:
-        if self.__ansi_mode:
-          if logrec.levelno >= logging.ERROR:
-            logrec.msg = colourise(logrec.msg, 'red')
-          elif logrec.levelno >= logging.WARN:
-            logrec.msg = colourise(logrec.msg, 'yellow')
+    ''' Emit a LogRecord `logrec`.
+
+        For log levels at or above `self.nl_level` write a distinct line
+        to the output stream, possible colourised.
+
+        For log levels below `self.nl_level` update the status text.
+    '''
+    if logrec.levelno >= self.nl_level:
+      if self.__ansi_mode:
+        if logrec.levelno >= logging.ERROR:
+          logrec.msg = colourise(logrec.msg, 'red')
+        elif logrec.levelno >= logging.WARN:
+          logrec.msg = colourise(logrec.msg, 'yellow')
+      with self.__lock:
         self.upd.without(StreamHandler.emit, self, logrec)
-      else:
+    else:
+      with self.__lock:
         self.upd.out(logrec.getMessage())
 
+  def upd(self, msg, *a):
+    ''' Update the status text.
+    '''
+    if a:
+      msg = msg % a
+    with self.__lock:
+      self.upd.out(msg)
+
   def flush(self):
+    ''' Flush the update status.
+    '''
     return self.upd.flush()
 
 if __name__ == '__main__':

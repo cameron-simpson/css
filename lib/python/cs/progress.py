@@ -12,6 +12,7 @@ import functools
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
+from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
 DISTINFO = {
     'description': "A progress tracker with methods for throughput, ETA and update notification",
@@ -21,7 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.seq'],
+    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units'],
 }
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
@@ -127,18 +128,6 @@ class Progress(object):
     ''' int(Progress) returns the current position.
     '''
     return self.position
-
-  def __iadd__(self, incr):
-    ''' In place add advances the position.
-    '''
-    self.position = self.position + incr
-    return self
-
-  def __isub__(self, decr):
-    ''' In place subtraction retards the position.
-    '''
-    self.position = self.position - decr
-    return self
 
   def __eq__(self, other):
     ''' A Progress is equal to another object `other`
@@ -264,6 +253,22 @@ class Progress(object):
     self.advance(delta)
     return self
 
+  def __isub__(self, delta):
+    ''' Operator -= form of advance().
+
+        >>> P = Progress()
+        >>> P.position
+        0
+        >>> P += 4
+        >>> P.position
+        4
+        >>> P -= 4
+        >>> P.position
+        0
+    '''
+    self.advance(-delta)
+    return self
+
   def _flush(self, oldest=None):
     if oldest is None:
       window = self.throughput_window
@@ -287,7 +292,8 @@ class Progress(object):
 
   @property
   def throughput(self):
-    ''' Compute current overall throughput.
+    ''' Compute current overall throughput per second.
+
         If self.throughput_window is not None,
         calls self.self.throughput_recent(throughput_window).
     '''
@@ -310,7 +316,8 @@ class Progress(object):
     return float(consumed) / elapsed
 
   def throughput_recent(self, time_window):
-    ''' Recent throughput within a time window.
+    ''' Recent throughput per second within a time window in seconds.
+
         The time span overlapping the start of the window is included
         on a flat pro rata basis.
     '''
@@ -349,7 +356,8 @@ class Progress(object):
 
   @property
   def remaining_time(self):
-    ''' Return the projected time remaining to end based on the current throughput and the total.
+    ''' The projected time remaining to end
+        based on the current throughput and the total.
     '''
     total = self.total
     if total is None:
@@ -366,12 +374,53 @@ class Progress(object):
 
   @property
   def eta(self):
-    ''' Return the projected time of completion.
+    ''' The projected time of completion.
     '''
     remaining = self.remaining_time
     if remaining is None:
       return None
     return time.time() + remaining
+
+  def status(self, label, width):
+    ''' A progress string of the form
+        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+    '''
+    ratio = self.ratio
+    remaining = self.remaining_time
+    if remaining:
+      remaining = int(remaining)
+    if ratio is None:
+      if remaining is None:
+        return label + ': ETA unknown'
+      return label + ': ETA ' + transcribe_time(remaining)
+    # "label: ==>  ETA xs"
+    left = (
+        label
+        + ': '
+        + transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1)
+        + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+        + ' '
+    )
+    if remaining is None:
+      right = 'ETA unknown'
+    else:
+      right = ' ETA ' + transcribe_time(remaining)
+    arrow_width = width - len(left) - len(right)
+    if arrow_width < 1:
+      # no roow for an arrow
+      return label + ':' + right
+    if ratio <= 0:
+      arrow = ''
+    elif ratio < 1.0:
+      arrow_len = arrow_width * ratio
+      if arrow_len < 1:
+        arrow = '>'
+      else:
+        arrow = '=' * int(arrow_len - 1) + '>'
+    else:
+      arrow = '=' * arrow_width
+    arrow_field = arrow + ' ' * (arrow_width - len(arrow))
+    return left + arrow_field + right
 
 if __name__ == '__main__':
   from cs.debug import selftest

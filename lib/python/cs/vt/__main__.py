@@ -26,17 +26,22 @@ from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
-from cs.logutils import exception, error, warning, info, debug, \
+from cs.logutils import exception, error, warning, info, upd, debug, \
                         setup_logging, logTo, loginfo
 from cs.pfx import Pfx
+from cs.progress import Progress
 from cs.resources import RunState
-from cs.tty import statusline, ttysize
+from cs.tty import ttysize
 import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
-from .compose import get_store_spec, get_clause_spec, get_clause_archive
+from .compose import (
+    get_clause_archive,
+    get_clause_spec,
+    get_store_spec
+)
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
@@ -49,7 +54,7 @@ from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
 from .server import serve_tcp, serve_socket
-from .store import ProgressStore, ProxyStore
+from .store import ProxyStore, DataDirStore
 from .transcribe import parse
 
 def main(*a, **kw):
@@ -149,7 +154,7 @@ class VTCmd:
     hashname = os.environ.get('VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME)
 
     try:
-        opts, args = getopt(args, 'C:S:f:h:qv')
+      opts, args = getopt(args, 'C:S:f:h:qv')
     except GetoptError as e:
       error("unrecognised option: %s: %s", e.opt, e.msg)
       badopts = True
@@ -194,9 +199,6 @@ class VTCmd:
 
     if self.verbose:
       loginfo.level = logging.INFO
-      upd = loginfo.upd
-      if upd is not None:
-        upd.nl_level = logging.INFO
 
     if dflt_log is not None:
       logTo(dflt_log, delay=True)
@@ -221,11 +223,30 @@ class VTCmd:
       signal(SIGINT, sig_handler)
       signal(SIGQUIT, sig_handler)
 
+      # start the status ticker
+      self.status_label = self.cmd
+      if sys.stderr.isatty():
+        _, cols = ttysize(2)
+        status_width = cols - 2
+        self.progress = Progress(total=0)
+        def ticker():
+          while not self.runstate.cancelled:
+            upd(self.progress.status(self.status_label, status_width))
+            sleep(0.25)
+        ticker = Thread(name='status-line', target=ticker)
+        ticker.daemon = True
+        ticker.start()
+      else:
+        ticker = None
+        self.progress = None
+
       try:
         xit = self.cmd_op(args, op=subcmd)
       except GetoptError as e:
         error("%s", e)
         badopts = True
+
+      self.runstate.cancel()
 
       if badopts:
         sys.stderr.write(usage)
@@ -297,30 +318,10 @@ class VTCmd:
       ##X("MAIN CMD_OP S:")
       ##dump_Store(S)
       defaults.push_Ss(S)
-      # start the status ticker
-      if False and sys.stdout.isatty():
-        X("wrap in a ProgressStore")
-        run_ticker = True
-        S = ProgressStore("ProgressStore(%s)" % (S,), S)
-        def ticker():
-          old_text = ''
-          while run_ticker:
-            text = S.status_text()
-            if text != old_text:
-              statusline(text)
-              old_text = text
-            sleep(0.25)
-        T = Thread(name='%s-status-line' % (S,), target=ticker)
-        T.daemon = True
-        T.start()
-      else:
-        run_ticker = False
       with S:
         xit = op_func(args)
       if cacheS:
         cacheS.backend = None
-      if run_ticker:
-        run_ticker = False
       return xit
 
   def cmd_profile(self, *a, **kw):
@@ -508,34 +509,39 @@ class VTCmd:
   def cmd_init(self, args):
     ''' Install a default config and initialise the configured datadir Stores.
     '''
+    xit = 0
     if args:
       raise GetoptError("extra arguments: %r" % (args,))
     config = self.config
     config_path = config.path
-    try:
-      if not pathexists(config_path):
-        info("write %r", config_path)
-        with Pfx(config_path):
-          with open(config_path, 'w') as cfg:
-            self.config.write(cfg)
-      basedir = config.basedir
-      if not isdirpath(basedir):
-        with Pfx("basedir"):
-          info("mkdir %r", basedir)
-          with Pfx("mkdir(%r)", basedir):
+    if not pathexists(config_path):
+      info("write %r", config_path)
+      with Pfx(config_path):
+        with open(config_path, 'w') as cfg:
+          self.config.write(cfg)
+    basedir = config.basedir
+    if not isdirpath(basedir):
+      with Pfx("basedir"):
+        info("mkdir %r", basedir)
+        with Pfx("mkdir(%r)", basedir):
+          try:
             os.mkdir(basedir)
-      for clause_name, clause in sorted(config.map.items()):
-        with Pfx("%s[%s]", shortpath(config_path), clause_name):
-          if clause_name == 'GLOBAL':
-            continue
-          store_type = clause.get('type')
-          if store_type == 'datadir':
-            S = config[clause_name]
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    for clause_name, clause in sorted(config.map.items()):
+      with Pfx("%s[%s]", shortpath(config_path), clause_name):
+        if clause_name == 'GLOBAL':
+          continue
+        store_type = clause.get('type')
+        if store_type == 'datadir':
+          S = config[clause_name]
+          try:
             S.init()
-    except OSError as e:
-      error("init failed: %s", e)
-      return 1
-    return 0
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    return xit
 
   @staticmethod
   def cmd_ls(args):
@@ -812,6 +818,72 @@ class VTCmd:
         os.remove(ospath)
     return 0
 
+  def _parse_pushable(self, s):
+    ''' Parse an object specification and return the object.
+    '''
+    obj = None
+    if s.startswith('/'):
+      # a path, hopefully a datadir or a .vtd file
+      if isdirpath(s) and isdirpath(joinpath(s, 'data')):
+        # /path/to/datadir
+        obj = DataDirStore(s, s)
+      elif s.endswith('.vtd') and isfilepath(s):
+        # /path/to/datafile.vtd
+        obj = DataFileReader(s)
+        obj.open()
+      # TODO: /path/to/archive.vt
+      else:
+        raise ValueError("path is neither a DataDir nor a data file")
+    else:
+      # try a Store specification
+      try:
+        obj = Store(s, self.config)
+      except ValueError:
+        # try an object transcription eg "D{...}"
+        try:
+          obj, offset = parse(s)
+        except ValueError:
+          # fall back: relative path to .vtd file
+          if s.endswith('.vtd') and isfilepath(s):
+            # /path/to/datafile.vtd
+            obj = DataFileReader(s)
+            obj.open()
+          else:
+            raise
+        else:
+          if offset < len(s):
+            raise ValueError("uncomplete parse, unparsed: %r" % (s[offset:],))
+    if not hasattr(obj, 'pushto_queue'):
+      raise ValueError("not pushable")
+    return obj
+
+  def _push(self, srcS, dstS, pushables):
+    ''' Push data from the source Store `srcS` to destination Store `dstS`
+        to ensure that `dstS` has all the Blocks needs to support
+        the `pushables`.
+    '''
+    xit = 0
+    with Pfx("%s => %s", srcS.name, dstS.name):
+      Q, T = srcS.pushto(dstS, progress=self.progress)
+      old_status_label = self.status_label
+      for pushable in pushables:
+        if self.runstate.cancelled:
+          xit = 1
+          break
+        with Pfx(str(pushable)):
+          self.status_label = Pfx._state.cur.umark
+          pushed_ok = pushable.pushto_queue(
+              Q, runstate=defaults.runstate, progress=self.progress
+          )
+          assert isinstance(pushed_ok, bool)
+          if not pushed_ok:
+            error("push failed")
+            xit = 1
+      self.status_label = old_status_label
+      Q.close()
+      T.join()
+      return xit
+
   def cmd_pullfrom(self, args):
     ''' Pull missing content from other Stores.
 
@@ -819,26 +891,21 @@ class VTCmd:
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S1spec = args.pop(0)
+    srcSspec = args.pop(0)
     if not args:
       raise GetoptError("missing objects")
-    with Pfx("other_store %r", S1spec):
-      S1 = Store(S1spec, self.config)
-    S2 = defaults.S
-    with Pfx("%s => %s", S1.name, S2.name):
-      with S1:
-        for obj_spec in args:
-          with Pfx(obj_spec):
-            try:
-              obj = parse(obj_spec)
-            except ValueError as e:
-              raise GetoptError("unparsed: %s" % (e,)) from e
-            try:
-              pushto = obj.pushto
-            except AttributeError:
-              raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-            pushto(S2, runstate=defaults.runstate)
-    return 0
+    with Pfx("other_store %r", srcSspec):
+      srcS = Store(srcSspec, self.config)
+    dstS = defaults.S
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
 
   def cmd_pushto(self, args):
     ''' Push something to a secondary Store,
@@ -848,25 +915,21 @@ class VTCmd:
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S2spec = args.pop(0)
+    srcS = defaults.S
+    dstSspec = args.pop(0)
     if not args:
       raise GetoptError("missing objects")
-    with Pfx("other_store %r", S2spec):
-      S2 = Store(S2spec, self.config)
-    S1 = defaults.S
-    with Pfx("%s => %s", S1.name, S2spec):
-      for obj_spec in args:
-        with Pfx(obj_spec):
-          try:
-            obj = parse(obj_spec)
-          except ValueError as e:
-            raise GetoptError("unparsed: %s" % (e,)) from e
-          try:
-            pushto = obj.pushto
-          except AttributeError:
-            raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-          pushto(S2, runstate=defaults.runstate)
-    return 0
+    with Pfx("other_store %r", dstSspec):
+      dstS = Store(dstSspec, self.config)
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
 
   def cmd_serve(self, args):
     ''' Start a service daemon listening on a TCP port

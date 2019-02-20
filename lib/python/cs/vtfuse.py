@@ -66,6 +66,9 @@ XATTR_REPLACE  = 0x0004
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
+# notional I/O blocksize for stat.st_blksize
+FS_IO_BLOCKSIZE = 4096
+
 def main(argv=None):
   ''' Run the "mount" subcommand of the vt(1) command.
   '''
@@ -332,8 +335,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
     EA.st_gid = gid
     ## EA.st_rdev
     EA.st_size = st.st_size
-    ## EA.st_blksize
-    ## EA.st_blocks
+    EA.st_blksize = FS_IO_BLOCKSIZE
+    EA.st_blocks = (st.st_size + 511) // 512
     EA.st_atime_ns = int(st.st_atime * 1000000000)
     EA.st_ctime_ns = int(st.st_ctime * 1000000000)
     EA.st_mtime_ns = int(st.st_mtime * 1000000000)

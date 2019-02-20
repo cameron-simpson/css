@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Basic Store classes.
+''' Various Store classes.
 '''
 
 from __future__ import with_statement
@@ -15,6 +15,7 @@ from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Semaphore
 from icontract import require
+from cs.excutils import logexc
 from cs.later import Later, SubLater
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx
@@ -22,11 +23,12 @@ from cs.progress import Progress
 from cs.py.func import prop, funcname
 from cs.queues import Channel, IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin, RunState
-from cs.result import report
+from cs.result import report, bg as bg_result
 from cs.seq import Seq
-from cs.threads import bg
+from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults, Lock, RLock
+from .block import HashCodeBlock, _IndirectBlock, LiteralBlock
 from .datadir import DataDir, PlatonicDir, init_datadir
 from .hash import (
     HashCode,
@@ -76,6 +78,7 @@ class _PerHashclassMapping:
 
   def mapping_for_hashclass(self, hashclass):
     ''' Return the DataDir for the specified `hashclass`.
+        This proxies to the internal mapping.
     '''
     mappings = self._mappings
     with self._lock:
@@ -97,6 +100,7 @@ class _PerHashclassMapping:
 
   def keys(self, hashclass=None):
     ''' Return an iterable of hashcodes of type `hashclass`.
+        This proxies to the internal mapping.
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
@@ -106,7 +110,16 @@ class _PerHashclassMapping:
     return iter(self.keys())
 
   def get_Archive(self, name, **kw):
+    ''' Return the `Archive` named `name`.
+        This proxies to the internal mapping.
+    '''
     return self.mapping_for_hashclass(self.default_hashclass).get_Archive(name, **kw)
+
+  def pathto(self, rpath):
+    ''' Return the full path for `rpath`.
+        This proxies to the internal mapping.
+    '''
+    return self.mapping_for_hashclass(self.default_hashclass).pathto(rpath)
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
@@ -418,13 +431,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
                           dirpath[:endpos+1], dirpath)
                       rdirpath = None
                     if rdirpath:
-                      dirpath = S.localpathto(rdirpath)
+                      dirpath = S.pathto(rdirpath)
           else:
             # TODO: generic handler for Store subpaths needed
             if not isabspath(dirpath):
               dirpath = expanduser(dirpath)
               if not isabspath(dirpath):
-                dirpath = S.localpathto(dirpath)
+                dirpath = S.pathto(dirpath)
       return dirpath
 
   @blockmapdir.setter
@@ -433,131 +446,111 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin, ABC):
     '''
     self._blockmapdir = dirpath
 
+  @require(lambda capacity: capacity >= 1)
   def pushto(
-      self, S2,
-      capacity=1024, block_progress=None, bytes_progress=None
+      self, dstS,
+      *,
+      capacity=64, hashclass=None, progress=None
   ):
-    ''' Allocate a Queue for Blocks to push from this Store to another Store `S2`.
-        Return (Q, T) where `Q` is the new Queue and `T` is the
+    ''' Allocate a Queue for Blocks to push from this Store to another Store `dstS`.
+        Return `(Q,T)` where `Q` is the new Queue and `T` is the
         Thread processing the Queue.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks.
+        * `dstS`: the secondary Store to receive Blocks.
         * `capacity`: the Queue capacity, arbitrary default 1024.
-        * `block_progress`: an optional Progress counting submitted and completed Blocks.
-        * `bytes_progress`: an optional Progress counting submitted and completed data bytes.
+        * `progress`: an optional Progress counting submitted and completed data bytes.
 
         Once called, the caller can then .put Blocks onto the Queue.
         When finished, call Q.close() to indicate end of Blocks and
         T.join() to wait for the processing completion.
     '''
-    if capacity < 1:
-      raise ValueError("capacity must be >= 1, got: %r" % (capacity,))
-    lock = Lock()
     sem = Semaphore(capacity)
     ##sem = Semaphore(1)
-    if block_progress is None:
-      added_block = lambda B: None
-      did_block = lambda B: None
-    else:
-      def added_block(_):
-        ''' Advance the Block total.
-        '''
-        with lock:
-          block_progress.total += 1
-      def did_block(_):
-        ''' Advance the Block progress counter.
-        '''
-        with lock:
-          block_progress.position += 1
-    if bytes_progress is None:
-      added_bytes = lambda B: None
-      did_bytes = lambda B: None
-    else:
-      def added_bytes(B):
-        ''' Advance the bytes total.
-        '''
-        with lock:
-          bytes_progress.total += B.span
-      def did_bytes(B):
-        ''' Advance the bytes progress counter.
-        '''
-        with lock:
-          bytes_progress.position += B.span
-    def Xs(s):
-      ''' Terse inline string debug output.
-      '''
-      print(s, file=sys.stderr, end='', flush=True)
-    X("NEW PUSHTO %r ==> %r", self.name, S2.name)
-    name = "%s.pushto(%s)" % (self.name, S2.name)
+    name = "%s.pushto(%s)" % (self.name, dstS.name)
     with Pfx(name):
       Q = IterableQueue(capacity=capacity, name=name)
-      S1 = self
-      S1.open()
-      S2.open()
-      pending_blocks = {}   # mapping of Result to Block
-      def worker(name, Q, S1, S2, sem):
-        ''' This is the worker function which pushes Blocks from
-            the Queue to the second Store.
-        '''
-        X("START PUSHTO PROCESSING...")
-        with Pfx("%s: worker", name):
-          with S1:
-            for B in Q:
-              Xs("B")
-              added_block(B)
-              added_bytes(B)
-              with Pfx("%s", B):
-                try:
-                  h = B.hashcode
-                except AttributeError:
-                  warning("not a hashcode Block, skipping")
-                  did_block(B)
-                  did_bytes(B)
-                  continue
-                def addblock(S1, S2, h, B):
-                  ''' Add the Block `B` to `S2` if not present.
-                  '''
-                  Xs("?")
-                  if S2.contains(h):
-                    return False
-                  try:
-                    data = S1[h]
-                  except KeyError as e:
-                    error("missing %s[%s]: %s", S1.name, h, e)
-                    return None
-                  Xs("+")
-                  S2.add(data)
-                  return True
-                Xs("{")
-                sem.acquire()
-                addR = S2._defer(addblock, S1, S2, h, B)
-                Xs("<")
-                with lock:
-                  pending_blocks[addR] = B
-                def after_add(addR):
-                  ''' Forget that `addR` is pending.
-                      This will be called after `addR` completes.
-                  '''
-                  Xs(">")
-                  with lock:
-                    B = pending_blocks.pop(addR)
-                  did_block(B)
-                  did_bytes(B)
-                  Xs("}")
-                  sem.release()
-                addR.notify(after_add)
-            X("PUSHTO: NO MORE BLOCKS")
-            with lock:
-              outstanding = list(pending_blocks.keys())
-            X("PUSHTO: %d outstanding, waiting...", len(outstanding))
-            for R in outstanding:
-              R.join()
-          S2.close()
-          S1.close()
-        X("PUSHTO: PROCESSING THREAD COMPLETES")
-      T = bg(partial(worker, name, Q, S1, S2, sem))
+      srcS = self
+      srcS.open()
+      dstS.open()
+      T = bg_thread(
+          lambda: (
+              self.push_blocks(name, Q, srcS, dstS, sem, progress),
+              srcS.close(), dstS.close()
+          ))
       return Q, T
+
+  @staticmethod
+  def push_blocks(name, blocks, srcS, dstS, sem, progress):
+    ''' This is a worker function which pushes Blocks or bytes from
+        the supplied iterable `blocks` to the second Store.
+
+        Parameters:
+        * `name`: name for this worker instance
+        * `blocks`: an iterable of Blocks or byte-like objects;
+          each item may also be a tuple of (block-or-bytes, length)
+          in which case the supplied length will be used for progress reporting
+          instead of the 
+    '''
+    with Pfx("%s: worker", name):
+      lock = Lock()
+      with srcS:
+        pending_blocks = {}   # mapping of Result to Block
+        for block in blocks:
+          if type(block) is tuple:
+            try:
+              block1, length = block
+            except TypeError as e:
+              error("cannot unpack %s into Block and length: %s", type(block), e)
+              continue
+            else:
+              block = block1
+          else:
+            length = None
+          sem.acquire()
+          # worker function to add a block conditionally
+          @logexc
+          def add_block(srcS, dstS, block, length, progress):
+            # add block content if not already present in dstS
+            try:
+              h = block.hashcode
+            except AttributeError:
+              # presume bytes-like or unStored Block type
+              try:
+                h = srcS.hash(block)
+              except TypeError:
+                warning("ignore object of type %s", type(block))
+                return
+              if h not in dstS:
+                dstS[h] = block
+            else:
+              # get the hashcode, only get the data if required
+              h = block.hashcode
+              if h not in dstS:
+                dstS[h] = block.get_direct_data()
+            if progress:
+              if length is None:
+                length = len(block)
+              progress += length
+          addR = bg_result(add_block, srcS, dstS, block, length, progress)
+          with lock:
+            pending_blocks[addR] = block
+          # cleanup function
+          @logexc
+          def after_add_block(addR):
+            ''' Forget that `addR` is pending.
+                This will be called after `addR` completes.
+            '''
+            with lock:
+              B = pending_blocks.pop(addR)
+            sem.release()
+          addR.notify(after_add_block)
+        with lock:
+          outstanding = list(pending_blocks.keys())
+        if outstanding:
+          info("PUSHQ: %d outstanding, waiting...", len(outstanding))
+          for R in outstanding:
+            R.join()
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations
@@ -662,6 +655,8 @@ class MappingStore(BasicStoreSync):
 
   def contains(self, h):
     return h in self.mapping
+
+  __contains__ = contains
 
   def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
@@ -976,7 +971,7 @@ class ProxyStore(BasicStoreSync):
       Q.put(None)
     busy = 0
     for S in self.read:
-      bg(partial(keys_from, S))
+      bg_thread(partial(keys_from, S))
       busy += 1
     for h in Q:
       if h is None:
@@ -1036,10 +1031,10 @@ class DataDirStore(MappingStore):
     '''
     init_datadir(self.statedirpath)
 
-  def localpathto(self, rpath):
+  def pathto(self, rpath):
     ''' Compute the full path from a relative path.
     '''
-    return self._datadir.localpathto(rpath)
+    return self._datadir.pathto(rpath)
 
   def get_Archive(self, name=None, missing_ok=False):
     ''' DataDirStore Archives are associated with the internal DataDir.
@@ -1072,9 +1067,10 @@ class _PlatonicStore(MappingStore):
   def __init__(
       self, name, statedirpath,
       *,
-      hashclass=None, indexclass=None,
-      follow_symlinks=False, archive=None, meta_store=None,
-      flag_prefix=None,
+      hashclass=None,
+      indexclass=None, follow_symlinks=False,
+      archive=None, meta_store=None,
+      flags_prefix=None,
       lock=None,
       **kw
   ):
@@ -1087,9 +1083,9 @@ class _PlatonicStore(MappingStore):
     self._datadir = _PerHashclassMapping(
         lambda hcls: PlatonicDir(
             self.statedirpath, hcls,
-            follow_symlinks=follow_symlinks,
+            indexclass=indexclass, follow_symlinks=follow_symlinks,
             archive=archive, meta_store=meta_store,
-            flag_prefix=flag_prefix,
+            flags_prefix=flags_prefix,
             **kw,
         ),
         hashclass, lock)

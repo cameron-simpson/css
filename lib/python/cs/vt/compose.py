@@ -225,8 +225,25 @@ def get_params(s, offset):
       offset += 1
   return params, offset + 1
 
-def get_token(s, offset):
+def get_token(s, offset=0):
   ''' Parse an integer value, an identifier or a quoted string.
+      Return the parsed value and the new `offset`.
+
+      Note: because integers may include a unit scale,
+      following whitespace is also consumed if there is no unit.
+
+      Examples:
+
+              >>> get_token('9  ')
+              (9, 3)
+              >>> get_token('99  ')
+              (99, 4)
+              >>> get_token('99k  ')
+              (99000, 3)
+              >>> get_token('fred  ')
+              ('fred', 4)
+              >>> get_token('"joe",')
+              ('joe', 5)
   '''
   if offset == len(s):
     raise ValueError("unexpected end of string, expected token")

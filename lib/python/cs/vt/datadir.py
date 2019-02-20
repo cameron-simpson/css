@@ -159,7 +159,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       hashclass,
       *,
       indexclass=None,
-      flags=None, flag_prefix=None,
+      flags=None, flags_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
 
@@ -173,8 +173,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
         * `flags`: optional Flags object for control; if specified then
-          `flag_prefix` is also required
-        * `flag_prefix`: prefix for control flag names
+          `flags_prefix` is also required
+        * `flags_prefix`: prefix for control flag names
 
         Note that __init__ only saves the settings such as the `indexclass`
         and ensures that requisite directories exist.
@@ -186,13 +186,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self, lock=RLock())
     if flags is None:
-      if flag_prefix is None:
+      if flags_prefix is None:
         flags = DummyFlags()
-        flag_prefix = 'DUMMY'
+        flags_prefix = 'DUMMY'
     else:
-      if flag_prefix is None:
-        raise ValueError("flags provided but no flag_prefix")
-    FlaggedMixin.__init__(self, flags=flags, prefix=flag_prefix)
+      if flags_prefix is None:
+        raise ValueError("flags provided but no flags_prefix")
+    FlaggedMixin.__init__(self, flags=flags, prefix=flags_prefix)
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
     self.statedirpath = statedirpath
@@ -1063,6 +1063,7 @@ class PlatonicDir(_FilesDir):
       topdir = self.topdir
     else:
       warning("%s: no meta_store!", self)
+    updated = False
     disabled = False
     while not self.cancelled:
       time.sleep(self.DELAY_INTERSCAN)
@@ -1192,6 +1193,17 @@ class PlatonicDir(_FilesDir):
                     DFstate.scanned_to = post_offset
                     if self.cancelled or self.flag_scan_disable:
                       break
+                  if meta_store is not None:
+                    blockQ.close()
+                    try:
+                      top_block = R()
+                    except MissingHashcodeError as e:
+                      error("missing data, forcing rescan: %s", e)
+                      DFstate.scanned_to = 0
+                    else:
+                      E.block = top_block
+                      D.changed = True
+                      updated = True
                   elapsed = time.time() - scan_start
                   scanned = DFstate.scanned_to - scan_from
                   if elapsed > 0:
@@ -1209,20 +1221,13 @@ class PlatonicDir(_FilesDir):
                         DFstate.scanned_to,
                         transcribe_bytes_geek(scanned),
                         transcribe_bytes_geek(scan_rate))
-                  if meta_store is not None:
-                    blockQ.close()
-                    try:
-                      top_block = R()
-                    except MissingHashcodeError as e:
-                      error("missing data, forcing rescan: %s", e)
-                      DFstate.scanned_to = 0
-                    else:
-                      E.block = top_block
-                      D.changed = True
-                      self.sync_meta()
                   # stall after a file scan, briefly, to limit impact
                   if elapsed > 0:
                     time.sleep(min(elapsed, self.DELAY_INTRASCAN))
+            # update the archive after updating from a directory
+            if updated and meta_store is not None:
+              self.sync_meta()
+              updated = False
       self.flush()
 
   @staticmethod

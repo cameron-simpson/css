@@ -7,9 +7,9 @@
 Functions for decomposing nonnegative integers according to various unit scales.
 
 Presupplied scales:
-* `BINARY_BYTES_SCALE`: Units of (B)ytes, KiB, MiB, GiB etc.
-* `DECIMAL_BYTES_SCALE`: Units of (B)ytes, KB, MB, GB etc.
-* `DECIMAL_SCALE`: Unit prefixes K, M, G etc.
+* `BINARY_BYTES_SCALE`: Binary units of (B)ytes, KiB, MiB, GiB etc.
+* `DECIMAL_BYTES_SCALE`: Decimal units of (B)ytes, KB, MB, GB etc.
+* `DECIMAL_SCALE`: Unit suffixes K, M, G etc.
 * `TIME_SCALE`: Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
 '''
 
@@ -24,7 +24,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.lex'],
 }
 
 TIME_SCALE = (
