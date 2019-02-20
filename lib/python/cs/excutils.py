@@ -259,6 +259,8 @@ def try_logexc(e):
 
 @decorator
 def exc_fold(func, exc_types=None, exc_return=False):
+  ''' Decorator to catch specific exception types and return a defined default value.
+  '''
   def wrapped(*a, **kw):
     try:
       return func(*a, **kw)
