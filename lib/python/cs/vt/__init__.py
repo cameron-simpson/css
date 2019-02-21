@@ -50,8 +50,7 @@ from cs.resources import RunState
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        ##"Development Status :: 3 - Alpha",
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
