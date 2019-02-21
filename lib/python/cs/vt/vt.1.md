@@ -131,6 +131,9 @@ Proxy Stores are described in the STORE TYPES section below.
 
 `mount` [*option*...] *special* [*mountpoint* [*subpath*]]
 
+  *Note*: the mount facility requires the `llfuse` Python module
+  which is not an automatic requirement of the `cs.vt` package.
+
   Mount the storage specified by *special* on *mountpoint*
   presenting the directory tree from *subpath* downwards
   at the mount point.

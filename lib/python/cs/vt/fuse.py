@@ -21,37 +21,12 @@ import sys
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
-from cs.vt import defaults
-from cs.vt.__main__ import main as vt_main
-from cs.vt.dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
-from cs.vt.fs import FileHandle, FileSystem
-from cs.vt.store import MissingHashcodeError
 from cs.x import X
+from . import defaults
+from .dir import Dir, FileDirent, SymlinkDirent, IndirectDirent
+from .fs import FileHandle, FileSystem
+from .store import MissingHashcodeError
 import llfuse
-
-DISTINFO = {
-    'keywords': ["python3"],
-    'classifiers': [
-        ##"Development Status :: 3 - Alpha",
-        "Development Status :: 2 - Pre-Alpha",
-        "Environment :: Console",
-        "Programming Language :: Python :: 3",
-        "Topic :: System :: Filesystems",
-    ],
-    'install_requires': [
-        'cs.excutils',
-        'cs.logutils',
-        'cs.pfx',
-        'cs.vt',
-        'cs.x',
-        'llfuse',
-    ],
-    'entry_points': {
-        'console_scripts': [
-            'mount.vtfs = cs.vtfuse:main',
-        ],
-    },
-}
 
 FuseOSError = llfuse.FUSEError
 
@@ -68,11 +43,6 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 
 # notional I/O blocksize for stat.st_blksize
 FS_IO_BLOCKSIZE = 4096
-
-def main(argv=None):
-  ''' Run the "mount" subcommand of the vt(1) command.
-  '''
-  return vt_main(argv, subcmd='mount')
 
 def mount(
     mnt, E,

@@ -50,10 +50,10 @@ from cs.resources import RunState
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
-        ##"Development Status :: 3 - Alpha",
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Programming Language :: Python :: 3",
+        "Topic :: System :: Filesystems",
     ],
     'install_requires': [
         'cs.buffer',
@@ -85,11 +85,13 @@ DISTINFO = {
         'cs.tty',
         'cs.units',
         'cs.x',
+        'icontract',
         'lmdb',
     ],
     'entry_points': {
         'console_scripts': [
             'vt = cs.vt.__main__:main',
+            'mount.vtfs = cs.vt.__main__:mount_vtfs',
         ],
     },
 }
