@@ -4,9 +4,6 @@
     variable sized blocks, arbitrarily sized data and utilising some
     domain knowledge to aid efficient block boundary selection.
 
-    *NOTE*: pre-Alpha; alpha release following soon once the packaging
-    is complete.
-
     The package provides the `vt` command to access
     these facilities from the command line.
 
