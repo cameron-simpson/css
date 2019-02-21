@@ -35,7 +35,20 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Networking",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx'],
+    'install_requires': [
+        'cs.binary',
+        'cs.buffer',
+        'cs.excutils',
+        'cs.later',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.predicate',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads'
+    ]
 }
 
 # default pause before flush to allow for additional packet data to arrive
