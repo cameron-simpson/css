@@ -85,11 +85,13 @@ DISTINFO = {
         'cs.tty',
         'cs.units',
         'cs.x',
+        'icontract',
         'lmdb',
     ],
     'entry_points': {
         'console_scripts': [
             'vt = cs.vt.__main__:main',
+            'mount.vtfs = cs.vt.__main__:mount_vtfs',
         ],
     },
 }
