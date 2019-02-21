@@ -62,6 +62,11 @@ def main(*a, **kw):
   '''
   return VTCmd().main(*a, **kw)
 
+def mount_vtfs(argv=None):
+  ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
+  '''
+  return main(argv, subcmd='mount')
+
 class VTCmd:
   ''' A main programme instance.
   '''
@@ -739,9 +744,9 @@ class VTCmd:
         E.name = mount_base
       # import vtfuse before doing anything with side effects
       try:
-        from cs.vtfuse import mount, umount
+        from .fuse import mount, umount
       except ImportError as e:
-        error("required module cs.vtfuse not available: %s", e)
+        error("FUSE support not configured: %s", e)
         return 1
       with Pfx(mountpoint):
         need_rmdir = False
