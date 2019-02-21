@@ -53,6 +53,7 @@ DISTINFO = {
         "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Programming Language :: Python :: 3",
+        "Topic :: System :: Filesystems",
     ],
     'install_requires': [
         'cs.buffer',
