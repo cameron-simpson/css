@@ -16,7 +16,7 @@ dldir=${DL:-$HOME/dl}/v
 when=
 proxy=${https_proxy:-''}
 ydlopts=
-target_fmt=
+target_fmt=mp4
 
 badopts=
 
