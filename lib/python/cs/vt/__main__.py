@@ -127,6 +127,7 @@ class VTCmd:
     global loginfo
     if argv is None:
       argv = sys.argv
+    argv = list(argv)
     self.argv = argv
     if environ is None:
       environ = os.environ
