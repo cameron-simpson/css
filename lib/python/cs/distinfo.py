@@ -379,6 +379,13 @@ class PyPI_Package(O):
                  ):
         dinfo['classifiers'].append(classifier_value)
 
+    # derive some stuff from the classifiers
+    for classifier in dinfo['classifiers']:
+      parts = classifier.split(' :: ')
+      topic = parts[0]
+      if topic == 'License':
+        license = parts[-1]
+
     ispkg = self.is_package(self.package_name)
     if ispkg:
       # stash the package in a top level directory of that name
@@ -387,9 +394,11 @@ class PyPI_Package(O):
     else:
       dinfo['py_modules'] = [self.package_name]
 
-    for kw, value in (('name', self.pypi_package_name),
-                      ('version', self.pypi_package_version),
-                      ):
+    for kw, value in (
+        ('license', license),
+        ('name', self.pypi_package_name),
+        ('version', self.pypi_package_version),
+    ):
       if value is None:
         warning("_prep: no value for %r", kw)
       else:
@@ -403,7 +412,7 @@ class PyPI_Package(O):
     self.distinfo = dinfo
     for kw in ('name',
                'description', 'author', 'author_email', 'version',
-               'url',
+               'license', 'url',
               ):
       if kw not in dinfo:
         error('no %r in distinfo', kw)
