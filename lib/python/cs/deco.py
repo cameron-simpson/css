@@ -115,29 +115,36 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
     first = getattr(self, firstpoll_attr, True)
     setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
-    # see if we should use the cached value
-    if poll_delay is not None and not first:
-      # too early to check the signature function?
-      now = time.time()
-      lastpoll = getattr(self, lastpoll_attr, None)
-      if (
-          value0 is not unset_value
-          and lastpoll is not None
-          and now - lastpoll < poll_delay
-      ):
+    if not first and value0 is not unset_value:
+      # see if we should use the cached value
+      if poll_delay is None and sig_func is None:
         return value0
-      setattr(self, lastpoll_attr, now)
-    if sig_func is not None:
+      if poll_delay is not None:
+        # too early to check the signature function?
+        now = time.time()
+        lastpoll = getattr(self, lastpoll_attr, None)
+        if lastpoll is not None and now - lastpoll < poll_delay:
+          # still valid, return the value
+          return value0
+        setattr(self, lastpoll_attr, now)
+      # no poll_delay or poll expired
+      if sig_func is None:
+        # no sig func
+        return value0
       # see if the signature is unchanged
       sig0 = getattr(self, sig_attr, None)
       try:
         sig = sig_func(self)
       except Exception as e:
+        # signature function fails, use the cache
         from cs.logutils import exception
         exception("%s.%s: sig func %s(self): %s", self, attr, sig_func, e)
         return value0
       if sig0 is not None and sig0 == sig:
+        # signature unchanged
         return value0
+      # update signature
+      setattr(self, sig_attr, sig)
     # compute the current value
     try:
       value = func(self, *a, **kw)
