@@ -48,6 +48,8 @@ else
   if [ $# = 0 ]
   then
     echo "$cmd: $op: missing name" >&2
+    echo " Names from $SVC_CONFIG:" >&2
+    awk '/^[^#]/ { print(" ", $2) }' "$SVC_CONFIG" | sort -u
     badopts=1
   else
     name=$1
