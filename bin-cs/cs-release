@@ -37,6 +37,7 @@ from cs.py.func import prop
 from cs.x import X
 
 PYLIBTOP = 'lib/python'
+MODULE_PREFIX = 'cs.'
 
 # defaults for packages without their own specifics
 DISTINFO_DEFAULTS = {
@@ -94,8 +95,8 @@ def main(argv):
     if name in ("ls", "check"):
       op = name
       name = None
-    elif not name.startswith('cs.'):
-      error("invalid module name, should start with 'cs.': %r", name)
+    elif not name.startswith(MODULE_PREFIX):
+      error("invalid module name, should start with %r: %r", MODULE_PREFIX, name)
       badopts = True
 
   if badopts:
@@ -113,7 +114,7 @@ def main(argv):
     names = [
         name
         for name in sorted(vcs.release_prefixes())
-        if name.startswith('cs.')
+        if name.startswith(MODULE_PREFIX)
     ]
   else:
     names = (name,)
@@ -128,8 +129,8 @@ def main(argv):
             verbose = True
           else:
             verbose = True
-          if not name.startswith('cs.'):
-            warning('skipping, not a "cs." module name')
+          if not name.startswith(MODULE_PREFIX):
+            warning('skipping, not a %r module name', MODULE_PREFIX)
           else:
             ok = False
             if not pkg.check_basic(quiet=not verbose):
@@ -507,7 +508,7 @@ class Package:
           if import_name == self.name:
             ##info("SKIP self %r", import_name)
             continue
-          if not import_name.startswith('cs.'):
+          if not import_name.startswith(MODULE_PREFIX):
             ##info("SKIP non-cs %r", import_name)
             continue
           M = self.modules[import_name]
@@ -759,7 +760,7 @@ class Module(object):
       pkg_prefix = pkg_name + '.'
     # check imports against install_requires
     for name in sorted(self.imported_names):
-      if not name.startswith('cs.'):
+      if not name.startswith(MODULE_PREFIX):
         M = self.modules[name]
         Mpath = getattr(M.module, '__file__', None)
         if Mpath and '/site-ackages/' in Mpath:
