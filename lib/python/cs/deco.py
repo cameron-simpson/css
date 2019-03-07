@@ -53,6 +53,7 @@ def decorator(deco):
     dfunc = deco(func, **dkw)
     dfunc.__doc__ = getattr(func, '__doc__', '')
     return dfunc
+  overdeco.__doc__ = getattr(deco, '__doc__', '')
   return overdeco
 
 @decorator
