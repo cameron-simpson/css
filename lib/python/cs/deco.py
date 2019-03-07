@@ -59,7 +59,7 @@ def decorator(deco):
 def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
-      The revision supports the @revised decorator.
+      The revision supports the `@revised` decorator.
 
       This decorator may be used in 2 modes.
       Directly:
@@ -78,16 +78,16 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
       * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
-        Default: None, meaning no poll delay.
+        Default: `None`, meaning no poll delay.
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
-        expected the instance (self) as its first parameter.
-        Default: None, meaning no signature function. The first
-        computed value will be kept and never updated.
+        expected the instance (`self`) as its first parameter.
+        Default: `None`, meaning no signature function;
+        the first computed value will be kept and never updated.
       * `unset_value`: the value to return before the method has been
         called successfully.
-        Default: None.
+        Default: `None`.
 
       If the method raises an exception, this will be logged and
       the method will return the previously cached value.
