@@ -36,6 +36,7 @@ from cs.logutils import setup_logging, info, warning, error
 from cs.obj import O
 from cs.pfx import Pfx
 import cs.sh
+from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
 URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
@@ -357,7 +358,7 @@ class PyPI_Package(O):
     doc_head, full_doc = get_md_doc(M)
 
     # fill in some missing info if it can be inferred
-    for field in 'description', 'long_description':
+    for field in 'description', 'long_description', 'include_package_data':
       if field in dinfo:
         continue
       if field == 'description':
@@ -367,6 +368,8 @@ class PyPI_Package(O):
         dinfo[field] = full_doc
         if 'long_description_content_type' not in dinfo:
           dinfo['long_description_content_type'] = 'text/markdown'
+      elif field == 'include_package_data':
+        dinfo[field] = True
 
     dinfo['package_dir'] = {'': self.libdir}
 
@@ -428,7 +431,7 @@ class PyPI_Package(O):
 
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with open(manifest_path, "w") as mfp:
-       # TODO: support extra files
+      # TODO: support extra files
       subpaths = self.copyin(pkg_dir)
       for subpath in subpaths:
         with Pfx(subpath):
@@ -446,15 +449,19 @@ class PyPI_Package(O):
                 with Pfx(mddst):
                   with open(mddst, 'w') as mddstf:
                     runcmd(['md2man-roff', mdsrc], stdout=mddstf)
+              mfp.write('include ' + subpath + '\n')
+              mfp.write('include ' + prefix + '\n')
+          elif ext == '.c':
+            mfp.write('include ' + subpath + '\n')
       # create README.rst
-      with open('README.rst', 'w') as fp:
+      readme_path = joinpath(pkg_dir, 'README.md')
+      with open(readme_path, 'w') as fp:
         print(distinfo['description'], file=fp)
-        print('=' * len(distinfo['description']), file=fp)
+        print('', file=fp)
         long_desc = distinfo.get('long_description', '')
         if long_desc:
           print(file=fp)
           print(long_desc, file=fp)
-      mfp.write('include README.rst\n')
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(joinpath(pkg_dir, 'setup.py'))
@@ -537,10 +544,7 @@ class PyPI_Package(O):
           prefix, ext = splitext(filename)
           if ext == '.pyc':
             continue
-          if ext == '.py':
-            yield joinpath(dirpath[len(libprefix):], filename)
-            continue
-          if ext == '.md':
+          if ext in ('.py', '.md', '.c'):
             yield joinpath(dirpath[len(libprefix):], filename)
             continue
           warning("skipping %s", joinpath(dirpath, filename))
