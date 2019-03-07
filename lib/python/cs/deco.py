@@ -83,7 +83,7 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
-        expected the instance (`self`) as its first parameter.
+        expects the instance (`self`) as its first parameter.
         Default: `None`, meaning no signature function;
         the first computed value will be kept and never updated.
       * `unset_value`: the value to return before the method has been
