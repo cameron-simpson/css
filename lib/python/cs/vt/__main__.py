@@ -127,6 +127,7 @@ class VTCmd:
     global loginfo
     if argv is None:
       argv = sys.argv
+    argv = list(argv)
     self.argv = argv
     if environ is None:
       environ = os.environ
@@ -655,6 +656,7 @@ class VTCmd:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
     mount_store = defaults.S
+    special_basename = None
     # the special may derive directly from a config Store clause
     try:
       special = args.pop(0)
@@ -670,7 +672,6 @@ class VTCmd:
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
-          special_basename = None
         else:
           if special_basename is not None:
             # Make the name for an explicit mount safer:

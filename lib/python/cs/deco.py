@@ -53,13 +53,14 @@ def decorator(deco):
     dfunc = deco(func, **dkw)
     dfunc.__doc__ = getattr(func, '__doc__', '')
     return dfunc
+  overdeco.__doc__ = getattr(deco, '__doc__', '')
   return overdeco
 
 @decorator
 def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
-      The revision supports the @revised decorator.
+      The revision supports the `@revised` decorator.
 
       This decorator may be used in 2 modes.
       Directly:
@@ -78,16 +79,16 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
       * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
-        Default: None, meaning no poll delay.
+        Default: `None`, meaning no poll delay.
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
-        expected the instance (self) as its first parameter.
-        Default: None, meaning no signature function. The first
-        computed value will be kept and never updated.
+        expects the instance (`self`) as its first parameter.
+        Default: `None`, meaning no signature function;
+        the first computed value will be kept and never updated.
       * `unset_value`: the value to return before the method has been
         called successfully.
-        Default: None.
+        Default: `None`.
 
       If the method raises an exception, this will be logged and
       the method will return the previously cached value.
@@ -95,7 +96,7 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
       An example use of this decorator might be to keep a "live"
       configuration data structure, parsed from a configuration
       file which might be modified after the program starts. One
-      might provide a signature function which called os.stat() on
+      might provide a signature function which called `os.stat()` on
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
@@ -115,29 +116,36 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
     first = getattr(self, firstpoll_attr, True)
     setattr(self, firstpoll_attr, False)
     value0 = getattr(self, val_attr, unset_value)
-    # see if we should use the cached value
-    if poll_delay is not None and not first:
-      # too early to check the signature function?
-      now = time.time()
-      lastpoll = getattr(self, lastpoll_attr, None)
-      if (
-          value0 is not unset_value
-          and lastpoll is not None
-          and now - lastpoll < poll_delay
-      ):
+    if not first and value0 is not unset_value:
+      # see if we should use the cached value
+      if poll_delay is None and sig_func is None:
         return value0
-      setattr(self, lastpoll_attr, now)
-    if sig_func is not None:
+      if poll_delay is not None:
+        # too early to check the signature function?
+        now = time.time()
+        lastpoll = getattr(self, lastpoll_attr, None)
+        if lastpoll is not None and now - lastpoll < poll_delay:
+          # still valid, return the value
+          return value0
+        setattr(self, lastpoll_attr, now)
+      # no poll_delay or poll expired
+      if sig_func is None:
+        # no sig func
+        return value0
       # see if the signature is unchanged
       sig0 = getattr(self, sig_attr, None)
       try:
         sig = sig_func(self)
       except Exception as e:
+        # signature function fails, use the cache
         from cs.logutils import exception
         exception("%s.%s: sig func %s(self): %s", self, attr, sig_func, e)
         return value0
       if sig0 is not None and sig0 == sig:
+        # signature unchanged
         return value0
+      # update signature
+      setattr(self, sig_attr, sig)
     # compute the current value
     try:
       value = func(self, *a, **kw)
@@ -162,7 +170,8 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
 
 @decorator
 def strable(func, open_func=None):
-  ''' Decorator for functions which may accept a str instead of their core type.
+  ''' Decorator for functions which may accept a `str`
+      instead of their core type.
 
       Parameters:
       * `func`: the function to decorate
@@ -172,7 +181,7 @@ def strable(func, open_func=None):
 
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
-      be called with a filename. If the first argument is a str
+      be called with a filename. If the first argument is a `str`
       then that file is opened and the function called with the
       open file.
 
