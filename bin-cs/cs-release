@@ -127,7 +127,7 @@ def main(argv):
             argv.pop(0)
             verbose = True
           else:
-            verbose = False
+            verbose = True
           if not name.startswith('cs.'):
             warning('skipping, not a "cs." module name')
           else:
@@ -192,11 +192,12 @@ def main(argv):
           print(name, next_suffix)
         elif op == 'pypi':
           # upload latest release to pypi
-          N.submit_pypi(force=force)
+          tag = pkg.latest_release_tag()
+          pkg.submit_pypi(force=force)
         elif op == 'release':
           # issue new release tag
           print("new release for %s ..." % (name,))
-          outstanding = N.uncommitted()
+          outstanding = list(pkg.uncommitted_paths())
           if outstanding:
             print("uncommitted changes exist for these files:")
             for path in sorted(outstanding):
@@ -205,7 +206,7 @@ def main(argv):
             if not ask("Proceed with release anyway"):
               error("aborting release at user request")
               return 1
-          changes = list(N.log_since())
+          changes = list(pkg.log_since())
           if not changes:
             if force:
               warning("no changes since last release, making release anyway")
@@ -222,7 +223,7 @@ def main(argv):
             error("empty release message, not making new release")
             xit = 1
           else:
-            next_tag = N.next_release_tag()
+            next_tag = pkg.next_release_tag()
             if not ask("Confirm new release for %r as %r" % (name, next_tag)):
               error("aborting release at user request")
               xit = 1
@@ -238,7 +239,7 @@ def main(argv):
               with Pfx(changes_filename):
                 with open(changes_filename, 'w') as cfp:
                   for files, firstline in changes:
-                    print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+                    print(' '.join(files) + ': ' + firstline, file=cfp)
               vcs.add_files(summary_filename, changes_filename)
               vcs.commit('Release information for %s.\nSummary:\n%s'
                          % (next_tag, release_message),
@@ -319,9 +320,43 @@ class Package:
       next_suffix = today + '.1'
     return self.name + '-' + next_suffix
 
+  def last_upload_key(self, target='pypi'):
+    return "%s-css-%s" % (target, self.name)
+
   def last_upload_suffix(self, target='pypi'):
-    lastvalue_key = "%s-css-%s" % (target, self.name)
+    lastvalue_key = self.last_upload_key(target=target)
     return self.state.last_values.get(lastvalue_key, None)
+
+  def submit_pypi(self, force=False):
+    return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
+
+  def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+    ''' Submit the latest release of this package to PyPI.
+    '''
+    if not self.check_uptodate():
+      warning("check fails")
+      if force:
+        warning("submitting anyway")
+      else:
+        return
+    with Pfx(pypi_flavour):
+      tag = self.latest_release_tag()
+      latest_prefix, latest_suffix = tag.split('-', 1)
+      last_pypi_suffix = self.last_upload_suffix(pypi_flavour)
+      if latest_suffix == last_pypi_suffix:
+        info("already released %r", last_suffix)
+        if force:
+          warning("submitting anyway")
+        else:
+          return
+      with Pfx(
+          "%s->%r",
+          repr(last_pypi_suffix) if last_pypi_suffix else '',
+          latest_suffix):
+        defaults = dict(DISTINFO_DEFAULTS)
+        PKG = PyPI_Package(pypi_url, self.name, latest_suffix, defaults=defaults)
+        PKG.upload()
+        self.state.last_values[self.last_upload_key()] = latest_suffix
 
   @prop
   def basename(self):
@@ -399,12 +434,18 @@ class Package:
       if tag is None:
         tag = self.latest_release_tag()
         if tag is None:
-          warning("no release tags, starting from the beginning")
           tag = "0"
+          warning(f"no release tags, starting from revision {tag}")
       paths = list(self.paths())
       for files, firstline in self.vcs.log_since(tag, paths):
         files = [ filename for filename in files if filename in paths ]
         yield files, firstline
+
+  def uncommitted_paths(self):
+    ''' Generator yielding paths relevant to this package
+        with uncommitted changes.
+    '''
+    return self.vcs.uncommitted(set(self.paths()))
 
   @cached
   def check_basic(self, quiet=False):
@@ -447,10 +488,9 @@ class Package:
     paths = list(self.paths())
     if not self.check_basic(quiet=quiet):
       ok = False
-    tag = self.latest_release_tag() or "0"
-    unreleased_logs = list(self.log_since(tag))
+    unreleased_logs = list(self.log_since())
     if not unreleased_logs:
-      quiet or warning("no unreleased commits since revision %s", tag)
+      quiet or warning("no unreleased commits")
       ok = False
     changed_paths = [
         changed_path
@@ -886,10 +926,10 @@ class VCS_Hg(VCS):
     '''
     self.hg_cmd('commit', '-m', message, '--', *paths)
 
-  def uncommitted(self):
+  def uncommitted(self, paths=()):
     ''' Generator yielding uncommitted but tracked paths.
     '''
-    with self._pipefrom('status') as hgfp:
+    with self._pipefrom('status', '--', *paths) as hgfp:
       for hgline in hgfp:
         s, path = hgline.rstrip().split(' ', 1)
         if s != '?':
