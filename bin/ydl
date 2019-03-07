@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$0
-usage="Usage: $0 [hh:mm{am,pm}] URLs..."
+usage="Usage: $0 [mp4|mkv] [hh:mm{am,pm}] URLs..."
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -16,6 +16,7 @@ dldir=${DL:-$HOME/dl}/v
 when=
 proxy=${https_proxy:-''}
 ydlopts=
+target_fmt=mp4
 
 badopts=
 
@@ -26,7 +27,8 @@ do
         when=$1
         shift
         ;;
-    mp4)ydlopts="$ydlopts --format $1 --merge-output-format $1"
+    mp4|mkv)
+        target_fmt=$1
         shift
         ;;
     *)  break ;;
@@ -40,6 +42,8 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$target_fmt" ] || ydlopts="$ydlopts --merge-output-format $target_fmt"
 
 set -- --proxy "$proxy" $ydlopts "$@"
 [ -d "$dldir" ] || $trace mkdir -p "$dldir"

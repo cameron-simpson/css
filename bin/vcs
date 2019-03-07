@@ -140,6 +140,24 @@ case "$op" in
                     hg status -C ${1+"$@"} ;;
       tags,git)     [ $# -gt 0 ] || set -- -l; git tag "$@" ;;
       tags,hg)      hg tags ${1+"$@"} ;;
+      up,git|update,git)
+                    if [ $# = 1 ]
+                    then
+                      git co "$1"
+                    else
+                      echo "$cmd: $op: expected a single revision" >&2
+                      badopts=1
+                    fi
+                    ;;
+      up,hg|update,hg)
+                    if [ $# = 1 ]
+                    then
+                      hg update -r "$1"
+                    else
+                      echo "$cmd: $op: expected a single revision" >&2
+                      badopts=1
+                    fi
+                    ;;
       *)            echo "$cmd: unrecognised command for $vcs_type: $op" >&2
                     badopts=1
                     ;;
