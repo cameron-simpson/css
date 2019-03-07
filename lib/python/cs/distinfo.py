@@ -408,22 +408,6 @@ class PyPI_Package(O):
       if kw not in dinfo:
         error('no %r in distinfo', kw)
 
-  def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
-    ''' Return a path based on a `package_name` (default self.package_name).
-        `prefix_dir`: if supplied, prefixed to the returned relative path.
-        `up`: if true, discard the last component of the package name before
-        computing the path.
-    '''
-    if package_name is None:
-      package_name = self.package_name
-    package_paths = package_name.split('.')
-    if up:
-      package_paths = package_paths[:-1]
-    rpath = joinpath(*package_paths)
-    if prefix_dir:
-      rpath = joinpath(prefix_dir, rpath)
-    return rpath
-
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
         If `pkg_dir` is not supplied, create a temporary directory.
