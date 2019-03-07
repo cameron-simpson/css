@@ -1,3 +1,4 @@
+@cached: cache generators
 replace cs.env.envsub with os.path.expandvars
 portfwd: changes to match svcd changes
 svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
