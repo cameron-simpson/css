@@ -95,7 +95,7 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
       An example use of this decorator might be to keep a "live"
       configuration data structure, parsed from a configuration
       file which might be modified after the program starts. One
-      might provide a signature function which called os.stat() on
+      might provide a signature function which called `os.stat()` on
       the file to check for changes before invoking a full read and
       parse of the file.
   '''
@@ -169,7 +169,8 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
 
 @decorator
 def strable(func, open_func=None):
-  ''' Decorator for functions which may accept a str instead of their core type.
+  ''' Decorator for functions which may accept a `str`
+      instead of their core type.
 
       Parameters:
       * `func`: the function to decorate
@@ -179,7 +180,7 @@ def strable(func, open_func=None):
 
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
-      be called with a filename. If the first argument is a str
+      be called with a filename. If the first argument is a `str`
       then that file is opened and the function called with the
       open file.
 
