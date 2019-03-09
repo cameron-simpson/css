@@ -462,7 +462,7 @@ class Package:
 
   @cached
   def check_imports(self, quiet=False):
-    ''' Check that this package's imported modules are ok
+    ''' Check that this package's imported modules are ok.
     '''
     ok = True
     M = self.module
@@ -499,6 +499,7 @@ class Package:
       ok = False
     with Pfx("out of date requirements"):
       checked_packages = set()
+      import_names = sorted(self.module.imported_names)
       for import_name in sorted(self.module.imported_names):
         with Pfx(import_name):
           if import_name == self.name:
@@ -524,6 +525,7 @@ class Package:
     ''' Check that this package has is up to date:
         * there are no commits since the latest release
         * there are no uncommited changes awaiting commit
+        * all the required modules are up to date
     '''
     ok = True
     paths = list(self.paths())
@@ -724,7 +726,7 @@ class Module(object):
     return self.DISTINFO.get('install_requires')
 
   def check(self, silent=False):
-    ''' Sanity check a package.
+    ''' Sanity check this module.
     '''
     if self._check_status is not None:
       return self._check_status
@@ -735,7 +737,7 @@ class Module(object):
     return self._check_status
 
   def _check(self, silent):
-    distinfo = self.DISTINFO
+    distinfo = self.module.DISTINFO
     if not distinfo:
       return False
     ok = True
@@ -795,10 +797,15 @@ class Module(object):
     subnames = set()
     for path in self.paths():
       for name in self.directly_imported_names(self.name, path):
-        if name in subnames:
-          continue
         subnames.add(name)
     return subnames
+
+  def imported_modules(self, prefix=MODULE_PREFIX):
+    ''' Generator yielding directly imported Modules.
+    '''
+    for name in sorted(self.imported_names):
+      if name.startswith(prefix) and name != self.name:
+        yield self.modules[name]
 
   def directly_imported_names(self, module_name, filename, silent=False):
     ''' Yield the module names mentioned by "import" statements
@@ -891,7 +898,8 @@ class VCS_Hg(VCS):
       tags = set()
       for tagline in hgfp:
         tag, _ = tagline.split(None, 1)
-        yield tag
+        tags.add(tag)
+    return tags
 
   def tag(self, tag_name, revision=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
