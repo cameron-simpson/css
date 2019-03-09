@@ -466,13 +466,9 @@ class Package:
     '''
     ok = True
     M = self.module
-    for submodule in sorted(M.imported_names):
-      with Pfx(submodule):
-        if submodule == self.name:
-          continue
-        if not submodule.startswith('cs.'):
-          continue
-        if not M.check(silent=True):
+    for subM in M.imported_modules():
+      with Pfx(subM):
+        if not subM.check(silent=quiet):
           quiet or warning("module NOT OK")
           ok = False
     return ok
