@@ -1,0 +1,3 @@
+lib/python/cs/deco.py: cs.deco: @cached: on exception from main function, raise if cache not yet filled, issue warning otherwise
+lib/python/cs/deco.py: cs.deco: @cached: tidier import, supply Pfx context for wrapper function
+lib/python/cs/deco.py: cs.deco: @cached: docstring improvements
