@@ -49,6 +49,7 @@ USAGE = '''Usage: %s [-f] cs.module [op]
   The default op is "check".
   Supported ops:
     check       Check simple things about a module's DISTINFO map.
+    export      Export a setup.py ready package tree.
     last        Report last release issued.
     log         Changelog from last release to now.
     ls          List latest release prefixes.
@@ -187,6 +188,9 @@ def main(argv):
             if k.startswith("pypi-css-cs."):
               print(k[9:], lv[k])
           return 0
+        elif op == 'export':
+          path = pkg.export()
+          print(path)
         elif op == 'next':
           next_prefix, next_suffix = pkg.next_release_tag().split('-')
           assert next_prefix == pkg.name
@@ -358,6 +362,18 @@ class Package:
         PKG = PyPI_Package(pypi_url, self.name, latest_suffix, defaults=defaults)
         PKG.upload()
         self.state.last_values[self.last_upload_key()] = latest_suffix
+
+  def export(self):
+    tag = self.latest_release_tag()
+    latest_prefix, latest_suffix = tag.split('-', 1)
+    pkg_dir = "%s-%s" % (self.name, latest_suffix)
+    print('create %s ...' % (pkg_dir,))
+    with Pfx("mkdir(%s)", pkg_dir):
+      os.mkdir(pkg_dir)
+    defaults = dict(DISTINFO_DEFAULTS)
+    PKG = PyPI_Package(URL_PYPI_PROD, self.name, latest_suffix, defaults=defaults)
+    PKG.make_package(pkg_dir)
+    return pkg_dir
 
   @prop
   def basename(self):
