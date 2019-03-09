@@ -44,14 +44,18 @@ from cs.binary import (
     flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
-from cs.lex import texthexify, untexthexify, get_decimal_value
+from cs.lex import untexthexify, get_decimal_value
 from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.threads import locked
 from . import defaults, RLock
 from .hash import HashCode, io_fail
-from .transcribe import Transcriber, register as register_transcriber, parse
+from .transcribe import (
+    Transcriber,
+    register as register_transcriber,
+    hexify, parse
+)
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
 F_BLOCK_TYPED = 0x02        # block type provided, otherwise BT_HASHCODE
@@ -914,7 +918,7 @@ class LiteralBlock(_Block):
   def transcribe_inner(self, T, fp):
     ''' Transcribe the block data in texthexified form.
     '''
-    fp.write(texthexify(self.data))
+    fp.write(hexify(self.data))
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
