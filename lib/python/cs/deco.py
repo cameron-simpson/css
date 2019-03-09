@@ -10,6 +10,10 @@ Assorted decorator functions.
 
 import time
 from cs.pfx import Pfx
+try:
+  from cs.logutils import exception
+except ImportError:
+  from logging import warning
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -60,7 +64,9 @@ def decorator(deco):
 def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
-      The revision supports the `@revised` decorator.
+
+      The cached values are stored on the instance (`self`).
+      The revision counter supports the `@revised` decorator.
 
       This decorator may be used in 2 modes.
       Directly:
@@ -91,7 +97,12 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
         Default: `None`.
 
       If the method raises an exception, this will be logged and
-      the method will return the previously cached value.
+      the method will return the previously cached value,
+      unless there is not yet a cached value
+      in which case the exception will raise.
+
+      If the signature function raises an exception
+      then a log message is issued and the signature is considered unchanged.
 
       An example use of this decorator might be to keep a "live"
       configuration data structure, parsed from a configuration
@@ -113,58 +124,59 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
   firstpoll_attr = val_attr + '__firstpoll'
 
   def wrapper(self, *a, **kw):
-    first = getattr(self, firstpoll_attr, True)
-    setattr(self, firstpoll_attr, False)
-    value0 = getattr(self, val_attr, unset_value)
-    if not first and value0 is not unset_value:
-      # see if we should use the cached value
-      if poll_delay is None and sig_func is None:
-        return value0
-      if poll_delay is not None:
-        # too early to check the signature function?
-        now = time.time()
-        lastpoll = getattr(self, lastpoll_attr, None)
-        if lastpoll is not None and now - lastpoll < poll_delay:
-          # still valid, return the value
+    with Pfx("%s.%s", self, attr):
+      first = getattr(self, firstpoll_attr, True)
+      setattr(self, firstpoll_attr, False)
+      value0 = getattr(self, val_attr, unset_value)
+      if not first and value0 is not unset_value:
+        # see if we should use the cached value
+        if poll_delay is None and sig_func is None:
           return value0
-        setattr(self, lastpoll_attr, now)
-      # no poll_delay or poll expired
-      if sig_func is None:
-        # no sig func
-        return value0
-      # see if the signature is unchanged
-      sig0 = getattr(self, sig_attr, None)
+        if poll_delay is not None:
+          # too early to check the signature function?
+          now = time.time()
+          lastpoll = getattr(self, lastpoll_attr, None)
+          if lastpoll is not None and now - lastpoll < poll_delay:
+            # still valid, return the value
+            return value0
+          setattr(self, lastpoll_attr, now)
+        # no poll_delay or poll expired
+        if sig_func is None:
+          # no sig func
+          return value0
+        # see if the signature is unchanged
+        sig0 = getattr(self, sig_attr, None)
+        try:
+          sig = sig_func(self)
+        except Exception as e:
+          # signature function fails, use the cache
+          warning("sig func %s(self): %s", sig_func, e, exc_info=True)
+          return value0
+        if sig0 is not None and sig0 == sig:
+          # signature unchanged
+          return value0
+        # update signature
+        setattr(self, sig_attr, sig)
+      # compute the current value
       try:
-        sig = sig_func(self)
+        value = func(self, *a, **kw)
       except Exception as e:
-        # signature function fails, use the cache
-        from cs.logutils import exception
-        exception("%s.%s: sig func %s(self): %s", self, attr, sig_func, e)
+        if value0 is unset_value:
+          raise
+        warning("exception calling %s(self): %s", func, e, exc_info=True)
         return value0
-      if sig0 is not None and sig0 == sig:
-        # signature unchanged
-        return value0
-      # update signature
-      setattr(self, sig_attr, sig)
-    # compute the current value
-    try:
-      value = func(self, *a, **kw)
-    except Exception as e:
-      from cs.logutils import exception
-      exception("%s.%s: value func %s(*%r,**%r): %s", self, attr, func, a, kw, e)
-      return value0
-    setattr(self, val_attr, value)
-    if sig_func is not None:
-      setattr(self, sig_attr, sig)
-    # bump revision if the value changes
-    # noncomparable values are always presumed changed
-    try:
-      changed = value0 is unset_value or value != value0
-    except TypeError:
-      changed = True
-    if changed:
-      setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
-    return value
+      setattr(self, val_attr, value)
+      if sig_func is not None:
+        setattr(self, sig_attr, sig)
+      # bump revision if the value changes
+      # noncomparable values are always presumed changed
+      try:
+        changed = value0 is unset_value or value != value0
+      except TypeError:
+        changed = True
+      if changed:
+        setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
+      return value
 
   return wrapper
 
