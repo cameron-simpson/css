@@ -150,8 +150,10 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
     try:
       value = func(self, *a, **kw)
     except Exception as e:
-      from cs.logutils import exception
-      exception("%s.%s: value func %s(*%r,**%r): %s", self, attr, func, a, kw, e)
+      if value0 is unset_value:
+        raise
+      from cs.logutils import warning
+      warning("exception calling %s(self): %s", func, e, exc_info=True)
       return value0
     setattr(self, val_attr, value)
     if sig_func is not None:
