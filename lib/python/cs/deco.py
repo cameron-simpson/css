@@ -64,7 +64,9 @@ def decorator(deco):
 def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
-      The revision supports the `@revised` decorator.
+
+      The cached values are stored on the instance (`self`).
+      The revision counter supports the `@revised` decorator.
 
       This decorator may be used in 2 modes.
       Directly:
@@ -95,7 +97,12 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
         Default: `None`.
 
       If the method raises an exception, this will be logged and
-      the method will return the previously cached value.
+      the method will return the previously cached value,
+      unless there is not yet a cached value
+      in which case the exception will raise.
+
+      If the signature function raises an exception
+      then a log message is issued and the signature is considered unchanged.
 
       An example use of this decorator might be to keep a "live"
       configuration data structure, parsed from a configuration
