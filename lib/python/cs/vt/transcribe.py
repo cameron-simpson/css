@@ -31,6 +31,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple, OrderedDict
 from io import StringIO
 import json
+from string import ascii_letters, digits
 import sys
 from uuid import UUID
 from cs.deco import decorator
@@ -38,6 +39,18 @@ from cs.lex import get_identifier, is_identifier, \
                    get_decimal_or_float_value, get_qstr, \
                    texthexify
 from cs.pfx import Pfx
+
+# Characters that may appear in text sections of a texthexify result.
+# Because we transcribe Dir blocks this way it includes some common
+# characters used for metadata, notably including the double quote
+# because it is heavily using in JSON.
+# It does NOT include '/' because these appear at the start of paths.
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*'
+
+def hexify(data):
+  ''' Represent a byte sequence as a hex/text string.
+  '''
+  return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
 class Transcriber(ABC):
   ''' Abstract base class for objects which can be used with the Transcribe class.
@@ -118,7 +131,7 @@ class Transcribe:
         float: lambda f: "%f" % f,
         str: json.dumps,
         bool: lambda v: '1' if v else '0',
-        bytes: texthexify,
+        bytes: hexify,
         dict: lambda m: json.dumps(m, separators=(',', ':')),
         UUID: lambda u: 'U{' + str(u) + '}',
     }

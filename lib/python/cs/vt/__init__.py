@@ -40,10 +40,8 @@
 '''
 
 import os
-from string import ascii_letters, digits
 import tempfile
 import threading
-from cs.lex import texthexify
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
 from cs.py.stack import stack_dump
@@ -208,18 +206,6 @@ class _Defaults(threading.local, StackableValues):
     return self.stack('runstate', new_runstate)
 
 defaults = _Defaults()
-
-# Characters that may appear in text sections of a texthexify result.
-# Because we transcribe Dir blocks this way it includes some common
-# characters used for metadata, notably including the double quote
-# because it is heavily using in JSON.
-# It does NOT include '/' because these appear at the start of paths.
-_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{"}*'
-
-def totext(data):
-  ''' Represent a byte sequence as a hex/text string.
-  '''
-  return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
 class _TestAdditionsMixin:
   ''' Some common methods uses in tests.

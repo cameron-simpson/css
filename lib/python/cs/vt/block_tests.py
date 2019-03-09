@@ -12,13 +12,14 @@ from random import choice
 import unittest
 from cs.binary_tests import _TestPacketFields
 from .randutils import rand0, randblock
-from . import totext, block as block_module
+from . import block as block_module
 from .block import Block, \
     IndirectBlock, \
     RLEBlock, LiteralBlock, SubBlock, \
     BlockType, \
     BlockRecord
 from .store import MappingStore
+from .transcribe import hexify
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
   ''' Hook to test the hash PacketFields.
@@ -151,7 +152,7 @@ class TestAll(unittest.TestCase):
           IB2data = IB2.get_spanned_data()
           self.assertEqual(
               IBdata, IB2data,
-              "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
+              "IB:  %s\nIB2: %s" % (hexify(IBdata), hexify(IB2data)))
           for _ in range(32):
             with self.subTest(loop2=_):
               start = rand0(len(IB) + 1)

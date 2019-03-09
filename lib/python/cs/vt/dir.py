@@ -19,7 +19,6 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
-from cs.lex import texthexify
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
@@ -31,8 +30,11 @@ from .file import RWBlockFile
 from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import Transcriber, parse as parse_transcription, \
-                        register as register_transcriber
+from .transcribe import (
+    Transcriber, parse as parse_transcription,
+    register as register_transcriber,
+    hexify
+)
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -594,7 +596,7 @@ class InvalidDirent(_Dirent):
     self.chunk = chunk
 
   def __str__(self):
-    return '<InvalidDirent:%s>' % (texthexify(self.chunk),)
+    return '<InvalidDirent:%s>' % (hexify(self.chunk),)
 
   def encode(self):
     ''' Return the original data chunk.
