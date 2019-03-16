@@ -61,7 +61,7 @@ do
   if [ -z "$type" ]
   then
     case "$srcfile" in
-      *.json | *.go | *.php | *.py )
+      *.js | *.json | *.go | *.php | *.py )
         type=$( expr "x$srcfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
         ;;
       *.pl | *.pm )
@@ -90,6 +90,9 @@ do
   then  type=${type}${pymode}
   fi
   case "$type" in
+    go) $trace gofmt -w "$srcfile" ;;
+    js) $trace prettier --write "$srcfile" ;;
+    php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
     py2)$trace py2 -m yapf -i "$srcfile" ;;
     py3)$trace py3 -m yapf -i "$srcfile" ;;
     *)echo "$cmd: $srcfile: no formatter (type=$type)" >&2 ;;
