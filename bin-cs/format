@@ -9,6 +9,7 @@ set -ue
 trace=
 [ -t 2 ] && trace=set-x
 
+flagfile=
 pymode=3
 
 cmd=$0
@@ -17,7 +18,11 @@ usage="Usage: $cmd [-2] [-3] filenames...
   -3    Use Python 3 for Python formatting.
   -n    No action. Recite format commands.
   -q    Quiet. Do not display format commands.
-  -x    trace execution. Dsiplay format commands to stderr."
+  -t flagfile
+        Locate the nearest flagfile from the current directory and
+        cancel the format if it is empty. Also cancel if no such
+        file is found.
+  -x    Trace execution. Dsiplay format commands to stderr."
 
 badopts=
 
@@ -28,6 +33,7 @@ do
     -3) pymode=3 ;;
     -n) trace=echo ;;
     -q) trace= ;;
+    -t) flagfile=$2; shift ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -44,6 +50,15 @@ done
 }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# require nonempty flagfile in directory tree
+[ -z "$flagfile" ] || {
+  case "$flagfile" in
+    ./* | /* ) ;;
+    *)  flagfile=$( findup "$flagfile" ) || exit 0 ;;
+  esac
+  [ -s "$flagfile" ] || exit 0
+}
 
 xit=0
 
