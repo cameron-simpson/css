@@ -1,0 +1,2 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: utility and convenience facilities for working with SQLAlchemy
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: prep for PyPI release.
