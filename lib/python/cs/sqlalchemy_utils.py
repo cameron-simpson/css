@@ -1,12 +1,27 @@
 #!/usr/bin/env python
 
-''' Assorted utility cfunctions to support working with SQLAlchemy.
+''' Assorted utility functions to support working with SQLAlchemy.
 '''
 
 from contextlib import contextmanager
 from sqlalchemy.ext.declarative import declarative_base
 from cs.py.func import funcname
-from cs.x import X
+
+DISTINFO = {
+    'description':
+    'Assorted utility functions to support working with SQLAlchemy.',
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: Database",
+    ],
+    'install_requires': [
+        'sqlalchemy',
+        'cs.py.func',
+    ],
+}
 
 def with_session(func, *a, orm=None, session=None, **kw):
   ''' Call `func(*a,session=session,**kw)`, creating a session if required.
