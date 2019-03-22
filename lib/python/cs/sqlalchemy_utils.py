@@ -94,7 +94,7 @@ class ORM:
       new_session.close()
 
   @staticmethod
-  def orm_auto_session(method):
+  def auto_session(method):
     ''' Decorator to run a method in a session derived from this ORM
         if a session is not presupplied.
     '''
@@ -104,6 +104,6 @@ class ORM:
       '''
       return with_session(method, self, *a, session=session, orm=self, **kw)
 
-    wrapper.__name__ = "@ORM.orm_auto_session(%s)" % (funcname(method,),)
+    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method,),)
     wrapper.__doc__ = method.__doc__
     return wrapper
