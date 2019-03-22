@@ -37,7 +37,10 @@ def funcname(func):
 def funccite(func):
   ''' Return a citation for a function (name and code location).
   '''
-  code = func.__code__
+  try:
+    code = func.__code__
+  except AttributeError:
+    return "%s[no.__code__]" % (repr(func),)
   return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
