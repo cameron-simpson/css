@@ -258,11 +258,11 @@ def observable_class(property_names, only_unequal=False):
     # push the per instance initialisation
     old_init = cls.__init__
 
-    def new_init(self):
+    def new_init(self, *a, **kw):
       ''' New init, much like the old init...
       '''
       self._observable_class__observers = defaultdict(set)
-      old_init(self)
+      old_init(self, *a, **kw)
 
     cls.__init__ = new_init
 
