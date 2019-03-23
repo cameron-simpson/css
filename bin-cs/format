@@ -16,6 +16,7 @@ cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
   -2    Use Python 2 for Python formatting.
   -3    Use Python 3 for Python formatting.
+  (Default python mode: $pymode)
   -n    No action. Recite format commands.
   -q    Quiet. Do not display format commands.
   -t flagfile
