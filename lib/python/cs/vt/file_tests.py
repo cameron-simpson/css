@@ -35,7 +35,13 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     self.backed_fp = self.vt_file._file
     self.assertEqual(B2, self.vt_file._backing_block)
     bfp = self.backed_fp
-    self.assertEqual(bfp.front_range.end, 0, "bfp(id=%d).front_range.end should be 0, range is: %s" % (id(bfp), bfp.front_range,))
+    self.assertEqual(
+        bfp.front_range.end, 0,
+        "bfp(id=%d).front_range.end should be 0, range is: %s" % (
+            id(bfp),
+            bfp.front_range,
+        )
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)

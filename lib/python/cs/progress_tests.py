@@ -12,7 +12,9 @@ from .progress import Progress
 class TestProgress(unittest.TestCase):
 
   def test00basic(self):
-    P = Progress(total=1000, start=3, position=4, start_time=100, throughput_window=60)
+    P = Progress(
+        total=1000, start=3, position=4, start_time=100, throughput_window=60
+    )
     self.assertEqual(P.position, 4)
     self.assertEqual(P.start, 3)
     self.assertEqual(P.start_time, 100)

@@ -22,8 +22,8 @@ from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
 from .hash import HASHCLASS_BY_NAME
 from .socket import (
-    TCPStoreServer, TCPClientStore,
-    UNIXSocketStoreServer, UNIXSocketClientStore
+    TCPStoreServer, TCPClientStore, UNIXSocketStoreServer,
+    UNIXSocketClientStore
 )
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
@@ -41,7 +41,9 @@ def get_test_stores(prefix):
     subtest = {'hashclass': hashclass}
     yield subtest, MappingStore('MappingStore', mapping={}, **subtest)
     # MemoryCacheStore
-    yield subtest, MemoryCacheStore('MemoryCacheStore', 1024*1024*1024, **subtest)
+    yield subtest, MemoryCacheStore(
+        'MemoryCacheStore', 1024 * 1024 * 1024, **subtest
+    )
     # DataDirStore
     for index_name in get_index_names():
       indexclass = get_index_by_name(index_name)
@@ -61,7 +63,8 @@ def get_test_stores(prefix):
     with T as tmpdirpath:
       yield subtest, FileCacheStore(
           'FileCacheStore', MappingStore('MappingStore', {}), tmpdirpath,
-          **subtest)
+          **subtest
+      )
     # StreamStore
     for addif in False, True:
       subtest = {
@@ -73,13 +76,14 @@ def get_test_stores(prefix):
       downstream_rd, downstream_wr = os.pipe()
       remote_S = StreamStore(
           "remote_S",
-          upstream_rd, downstream_wr,
-          local_store=local_store, addif=addif, hashclass=hashclass
+          upstream_rd,
+          downstream_wr,
+          local_store=local_store,
+          addif=addif,
+          hashclass=hashclass
       )
       S = StreamStore(
-          "S",
-          downstream_rd, upstream_wr,
-          addif=addif, hashclass=hashclass
+          "S", downstream_rd, upstream_wr, addif=addif, hashclass=hashclass
       )
       with local_store:
         with remote_S:
@@ -132,16 +136,17 @@ def get_test_stores(prefix):
     S = ProxyStore(
         "ProxyStore", (main1, main2), (main2, save2),
         hashclass=hashclass,
-        save2=(save2,))
+        save2=(save2,)
+    )
     yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
   '''
+
   def testMethod(self):
     for subtest, S in get_test_stores(
-        prefix=method.__module__ + '.' + method.__name__
-    ):
+        prefix=method.__module__ + '.' + method.__name__):
       if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
         continue
       with self.subTest(test_store=S, **subtest):
@@ -151,11 +156,13 @@ def multitest(method):
         with self.S:
           method(self)
           S.flush()
+
   return testMethod
 
 def hcutest(method):
   ''' Decorator to perform additional setup for HashCodeUtils test methods.
   '''
+
   def testHCUMethod(self):
     self.maxDiff = 16384
     self.keys1 = set()
@@ -171,6 +178,7 @@ def hcutest(method):
       else:
         self.has_keys = True
     method(self)
+
   return testHCUMethod
 
 class TestStore(unittest.TestCase, _TestAdditionsMixin):
@@ -197,7 +205,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, n_added)
     # compute block hash but do not store
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()):
+    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
+                                                     ):
       with self.subTest(hashname=hashname):
         size = random.randint(127, 16384)
         data = randblock(size)
@@ -223,7 +232,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.assertLen(S, 0)
     random_chunk_map = {}
     n_added = 0
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()):
+    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
+                                                     ):
       with self.subTest(hashname=hashname):
         for _ in range(16):
           size = random.randint(127, 16384)
@@ -283,18 +293,24 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     ks = sorted(KS1)
     for reverse in False, True:
       for start_hashcode in [None] + ks + [h2]:
-        with self.subTest(
-            M1type=type(M1).__name__, reverse=reverse,
-            start_hashcode=start_hashcode
-        ):
-          hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
-                                      reverse=reverse))
+        with self.subTest(M1type=type(M1).__name__, reverse=reverse,
+                          start_hashcode=start_hashcode):
+          hs = list(
+              M1.hashcodes_from(
+                  start_hashcode=start_hashcode, reverse=reverse
+              )
+          )
           self.assertIsOrdered(hs, reverse=reverse, strict=True)
           if reverse:
             ksrev = reversed(ks)
-            hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
+            hs2 = [
+                h for h in ksrev
+                if start_hashcode is None or h <= start_hashcode
+            ]
           else:
-            hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
+            hs2 = [
+                h for h in ks if start_hashcode is None or h >= start_hashcode
+            ]
           hs = list(sorted(hs))
           hs2 = list(sorted(hs2))
           self.assertEqual(hs, hs2)
@@ -314,8 +330,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertNotIn(h, KS1)
       KS1.add(h)
       self.assertIn(h, KS1)
-      self.assertLen(M1, n+1)
-      self.assertEqual(len(KS1), n+1)
+      self.assertLen(M1, n + 1)
+      self.assertEqual(len(KS1), n + 1)
       self.assertEqual(set(iter(M1)), KS1)
       self.assertEqual(set(M1.hashcodes()), KS1)
     # asking for 0 hashcodes is forbidden
@@ -335,7 +351,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
               continue
           else:
             start_hashcode = None
-          hs = list(M1.hashcodes(start_hashcode=start_hashcode, after=after, length=n))
+          hs = list(
+              M1.hashcodes(
+                  start_hashcode=start_hashcode, after=after, length=n
+              )
+          )
           self.assertIsOrdered(hs, False)
           hn = min(n, 15 if after else 16)
           self.assertEqual(len(hs), hn)
@@ -353,7 +373,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
             n = step_size
           with self.subTest(
               start_hashcode=start_hashcode,
-              keys_offset=keys_offset, n=n,
+              keys_offset=keys_offset,
+              n=n,
           ):
             after = start_hashcode is not None
             hs = list(
@@ -361,7 +382,9 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
                     start_hashcode=start_hashcode,
                     length=n,
                     reverse=False,
-                    after=after))
+                    after=after
+                )
+            )
             # verify that no key has been seen before
             for h in hs:
               self.assertNotIn(h, seen)
@@ -393,7 +416,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       data = randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
-    with MappingStore("M2MappingStore", mapping={}, hashclass=M1.hashclass) as M2:
+    with MappingStore("M2MappingStore", mapping={},
+                      hashclass=M1.hashclass) as M2:
       KS2 = set()
       # construct M2 as a mix of M1 and random new blocks
       for _ in range(16):

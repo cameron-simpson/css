@@ -74,12 +74,13 @@ class TestAll(unittest.TestCase):
         last_qoffset = 0
         for qoffset in Q:
           self.assertIsInstance(
-              qoffset, int,
-              'scanner must yield only ints, received %s:%r'
-              % (type(qoffset), qoffset))
+              qoffset, int, 'scanner must yield only ints, received %s:%r' %
+              (type(qoffset), qoffset)
+          )
           self.assertTrue(
               last_qoffset <= qoffset,
-              "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset))
+              "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset)
+          )
           last_qoffset = qoffset
 
   def test02blocked_chunks_of(self):
@@ -89,13 +90,11 @@ class TestAll(unittest.TestCase):
         ##None,
         ##scan_text,
         ##scan_mp3,
-        scan_mp4,
-    ):
+        scan_mp4,):
       scanner_desc = 'None' if scanner is None else scanner.__name__
       for input_desc, input_chunks in (
           ##('random data', self.random_data),
-          ('100 x ' + __file__, [ self.mycode for _ in range(100) ]),
-      ):
+          ('100 x ' + __file__, [self.mycode for _ in range(100)]),):
         testfile = None
         rfp = None
         if scanner is scan_mp3:
@@ -110,8 +109,7 @@ class TestAll(unittest.TestCase):
             input_desc = testfile
           else:
             X("%s: no %s in %s", scanner, testfile, os.getcwd())
-        with self.subTest("blocked_chunks_of",
-                          scanner=scanner_desc,
+        with self.subTest("blocked_chunks_of", scanner=scanner_desc,
                           source=input_desc):
           if True:
             source_chunks = input_chunks
@@ -121,7 +119,10 @@ class TestAll(unittest.TestCase):
             src_total = 0
             for chunk in source_chunks:
               src_total += len(chunk)
-            X("%d source chunks, %d bytes in total", len(source_chunks), src_total)
+            X(
+                "%d source chunks, %d bytes in total", len(source_chunks),
+                src_total
+            )
           chunk_total = 0
           nchunks = 0
           all_chunks = []
@@ -129,38 +130,42 @@ class TestAll(unittest.TestCase):
           offset = 0
           chunky_scanner = chunky(scanner) if scanner else None
           histogram = defaultdict(int)
-          for chunk in blocked_chunks_of(source_chunks, chunky_scanner, histogram=histogram):
+          for chunk in blocked_chunks_of(source_chunks, chunky_scanner,
+                                         histogram=histogram):
             nchunks += 1
             chunk_total += len(chunk)
             all_chunks.append(chunk)
             offset += len(chunk)
             # the pending.flush operation can return short blocks
             ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE)
-            self.assertTrue(len(chunk) <= MAX_BLOCKSIZE,
-                            "len(chunk)=%d > MAX_BLOCKSIZE=%d"
-                            % (len(chunk), MAX_BLOCKSIZE))
+            self.assertTrue(
+                len(chunk) <= MAX_BLOCKSIZE, "len(chunk)=%d > MAX_BLOCKSIZE=%d"
+                % (len(chunk), MAX_BLOCKSIZE)
+            )
             if src_total is not None:
-              self.assertTrue(chunk_total <= src_total,
-                              "chunk_total:%d > src_total:%d"
-                              % (chunk_total, src_total))
+              self.assertTrue(
+                  chunk_total <= src_total,
+                  "chunk_total:%d > src_total:%d" % (chunk_total, src_total)
+              )
           end_time = time.time()
-          X("%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
-            input_desc, scanner_desc,
-            nchunks, end_time-start_time, chunk_total,
-            float(chunk_total) / (end_time-start_time))
-          X("    %d offsets from scanner, %d offsets from hash scan",
-            histogram['offsets_from_scanner'],
-            histogram['offsets_from_hash_scan'])
+          X(
+              "%s|%s: received %d chunks in %gs, %d bytes at %g B/s",
+              input_desc, scanner_desc, nchunks, end_time - start_time,
+              chunk_total,
+              float(chunk_total) / (end_time - start_time)
+          )
+          X(
+              "    %d offsets from scanner, %d offsets from hash scan",
+              histogram['offsets_from_scanner'],
+              histogram['offsets_from_hash_scan']
+          )
           if src_total is not None:
             self.assertEqual(src_total, chunk_total)
-            self.assertEqual(b''.join(source_chunks),
-                             b''.join(all_chunks))
+            self.assertEqual(b''.join(source_chunks), b''.join(all_chunks))
           if False:
-            for hits, size in sorted([
-                (hits, size)
-                for size, hits in histogram.items()
-                if isinstance(size, int)
-            ]):
+            for hits, size in sorted([(hits, size)
+                                      for size, hits in histogram.items()
+                                      if isinstance(size, int)]):
               if hits > 1:
                 X("size %d: %d", size, hits)
         if rfp is not None:
@@ -174,14 +179,15 @@ class TestAll(unittest.TestCase):
       data = self.fp.read()
       blocks = list(blockify([data]))
       ##X("blocks=%r", blocks)
-      data2 = b''.join( chain(*[ B.datafrom() for B in blocks ]) )
+      data2 = b''.join(chain(*[B.datafrom() for B in blocks]))
       self.assertEqual(
-          len(data), len(data2),
-          "data mismatch: len(data)=%d, len(data2)=%d"
-          % (len(data), len(data2)))
+          len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" %
+          (len(data), len(data2))
+      )
       self.assertEqual(
           data, data2,
-          "data mismatch: data and data2 same length but contents differ")
+          "data mismatch: data and data2 same length but contents differ"
+      )
 
 def selftest(argv):
   ''' Run the unit tests.

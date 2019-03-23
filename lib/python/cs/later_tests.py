@@ -21,13 +21,16 @@ class TestLater(unittest.TestCase):
 
   @staticmethod
   def _f(x):
-    return x*2
+    return x * 2
+
   @staticmethod
   def _delay(n):
     sleep(n)
     return n
+
   class _Bang(Exception):
     pass
+
   @staticmethod
   def _bang():
     raise TestLater._Bang()
@@ -64,7 +67,10 @@ class TestLater(unittest.TestCase):
     y = LF2()
     again = time.time()
     elapsed = again - now
-    self.assertTrue(elapsed < 3, "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again))
+    self.assertTrue(
+        elapsed < 3,
+        "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again)
+    )
 
   def test02three(self):
     # three sleep(2), two in parallel, one delayed
@@ -118,7 +124,7 @@ class TestLater(unittest.TestCase):
       LF1 = L3.defer(self._delay, 3)
       LF2 = L3.defer(self._delay, 2)
       LF3 = L3.defer(self._delay, 1)
-      results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
+      results = [LF() for LF in report((LF1, LF2, LF3))]
       self.assertEqual(results, [1, 2, 3])
 
   def test09pipeline_00noop(self):
@@ -126,21 +132,23 @@ class TestLater(unittest.TestCase):
     '''
     with Later(1) as L:
       items = ['a', 'b', 'c', 'g', 'f', 'e']
-      P = L.pipeline([ (FUNC_ONE_TO_ONE, lambda x:x) ], items)
+      P = L.pipeline([(FUNC_ONE_TO_ONE, lambda x: x)], items)
       result = list(P.outQ)
-      self.assertEqual( items, result )
+      self.assertEqual(items, result)
 
   def test09pipeline_01idenitity(self):
     ''' Run a single stage one to many no-op pipeline.
     '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
+
     def func(x):
       yield x
-    P = L.pipeline([ (FUNC_ONE_TO_MANY, func) ], items)
+
+    P = L.pipeline([(FUNC_ONE_TO_MANY, func)], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
-    self.assertEqual( items, result )
+    self.assertEqual(items, result)
 
   def test09pipeline_02double(self):
     ''' Run a single stage one to many pipeline.
@@ -148,15 +156,17 @@ class TestLater(unittest.TestCase):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'a', 'b', 'b', 'c', 'c', 'g', 'g', 'f', 'f', 'e', 'e']
+
     def func(x):
       yield x
       yield x
-    P = L.pipeline([ (FUNC_ONE_TO_MANY, func) ], items)
+
+    P = L.pipeline([(FUNC_ONE_TO_MANY, func)], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
     # values may be interleaved due to parallelism
-    self.assertEqual( len(result), len(expected) )
-    self.assertEqual( sorted(result), sorted(expected) )
+    self.assertEqual(len(result), len(expected))
+    self.assertEqual(sorted(result), sorted(expected))
 
   def test09pipeline_03a_sort(self):
     ''' Run a single stage many to many pipeline doing a sort.
@@ -164,12 +174,14 @@ class TestLater(unittest.TestCase):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
+
     def func(x):
       return sorted(x)
-    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+
+    P = L.pipeline([(FUNC_MANY_TO_MANY, func)], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
-    self.assertEqual( result, expected )
+    self.assertEqual(result, expected)
 
   def test09pipeline_03b_set(self):
     ''' Run a single stage man to many pipeline.
@@ -177,12 +189,14 @@ class TestLater(unittest.TestCase):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
+
     def func(x):
       return set(x)
-    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+
+    P = L.pipeline([(FUNC_MANY_TO_MANY, func)], items)
     self.assertIsNot(P.outQ, items)
     result = set(P.outQ)
-    self.assertEqual( result, set(items) )
+    self.assertEqual(result, set(items))
 
   def test09pipeline_04select(self):
     ''' Run a single stage selection pipeline.
@@ -191,34 +205,60 @@ class TestLater(unittest.TestCase):
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     want = ('a', 'f', 'c')
     expected = ['a', 'c', 'f']
+
     def wanted(x):
       return x in want
-    P = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
+
+    P = L.pipeline([(FUNC_SELECTOR, wanted)], items)
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
-    self.assertEqual( result, expected )
+    self.assertEqual(result, expected)
 
   def test09pipeline_05two_by_two_by_sort(self):
     ''' Run a 3 stage pipeline with some fan out.
     '''
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
-    expected = [ 'a', 'a', 'a', 'a',
-                 'b', 'b', 'b', 'b',
-                 'c', 'c', 'c', 'c',
-                 'e', 'e', 'e', 'e',
-                 'f', 'f', 'f', 'f',
-                 'g', 'g', 'g', 'g',
-               ]
+    expected = [
+        'a',
+        'a',
+        'a',
+        'a',
+        'b',
+        'b',
+        'b',
+        'b',
+        'c',
+        'c',
+        'c',
+        'c',
+        'e',
+        'e',
+        'e',
+        'e',
+        'f',
+        'f',
+        'f',
+        'f',
+        'g',
+        'g',
+        'g',
+        'g',
+    ]
+
     def double(x):
       yield x
       yield x
-    P = L.pipeline([ (FUNC_ONE_TO_MANY, double),
-                     (FUNC_ONE_TO_MANY, double),
-                     (FUNC_MANY_TO_MANY, sorted) ], items)
+
+    P = L.pipeline(
+        [
+            (FUNC_ONE_TO_MANY, double), (FUNC_ONE_TO_MANY, double),
+            (FUNC_MANY_TO_MANY, sorted)
+        ], items
+    )
     self.assertIsNot(P.outQ, items)
     result = list(P.outQ)
-    self.assertEqual( result, expected )
+    self.assertEqual(result, expected)
 
 def selftest(argv):
   ''' Run unit tests for cs.later.

@@ -34,7 +34,9 @@ class TestDataFile(unittest.TestCase):
 
   def setUp(self):
     random.seed()
-    tfd, pathname = tempfile.mkstemp(prefix="datafile-test", suffix=".vtd", dir='.')
+    tfd, pathname = tempfile.mkstemp(
+        prefix="datafile-test", suffix=".vtd", dir='.'
+    )
     os.close(tfd)
     self.pathname = pathname
     self.wdatafile = DataFileWriter(pathname)

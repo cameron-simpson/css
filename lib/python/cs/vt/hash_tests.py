@@ -38,13 +38,13 @@ class TestHashing(unittest.TestCase):
     ''' Test the SHA1 hash function.
     '''
     for _ in range(10):
-      rs = bytes( random.randint(0, 255) for _ in range(100) )
+      rs = bytes(random.randint(0, 255) for _ in range(100))
       H = Hash_SHA1.from_chunk(rs)
-      self.assertEqual( sha1(rs).digest(), bytes(H) )
-      self.assertTrue( isinstance(H, Transcriber))
+      self.assertEqual(sha1(rs).digest(), bytes(H))
+      self.assertTrue(isinstance(H, Transcriber))
       Hs = str(H)
       H2, offset = parse(Hs)
-      self.assertTrue( offset == len(Hs) )
+      self.assertTrue(offset == len(Hs))
       self.assertEqual(H, H2)
       # bytes(hash_num + hash_bytes)
       Hencode = H.encode()

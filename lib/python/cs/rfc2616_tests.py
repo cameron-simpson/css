@@ -21,12 +21,14 @@ class TestRFC2616(unittest.TestCase):
     self.assertRaises(ValueError, get_lws, '\r\nx')
 
   def _test_parse_chunk_line1(self, bline, result):
-    self.assertEqual( parse_chunk_line1(bline), result )
+    self.assertEqual(parse_chunk_line1(bline), result)
 
   def test00parse_chunk_line1(self):
-    self._test_parse_chunk_line1( b'1\r\n', (1, []))
-    self._test_parse_chunk_line1( b'2;x=y\r\n', (2, [('x','y')]))
-    self._test_parse_chunk_line1( b'3;x=y;z="qstr"\r\n', (3, [('x','y'),('z','qstr')]))
+    self._test_parse_chunk_line1(b'1\r\n', (1, []))
+    self._test_parse_chunk_line1(b'2;x=y\r\n', (2, [('x', 'y')]))
+    self._test_parse_chunk_line1(
+        b'3;x=y;z="qstr"\r\n', (3, [('x', 'y'), ('z', 'qstr')])
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
