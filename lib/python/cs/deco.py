@@ -8,10 +8,11 @@ r'''
 Assorted decorator functions.
 '''
 
+from collections import defaultdict
 import time
 from cs.pfx import Pfx
 try:
-  from cs.logutils import exception
+  from cs.logutils import warning
 except ImportError:
   from logging import warning
 
@@ -42,26 +43,34 @@ def decorator(deco):
           def func2(...):
             ...
   '''
+
   def overdeco(*da, **dkw):
     if not da:
+
       def wrapper(*a, **dkw2):
         dkw.update(dkw2)
         func, = a
         dfunc = deco(func, **dkw)
         dfunc.__doc__ = getattr(func, '__doc__', '')
         return dfunc
+
       return wrapper
     if len(da) > 1:
-      raise ValueError("extra positional arguments after function: %r" % (da[1:],))
+      raise ValueError(
+          "extra positional arguments after function: %r" % (da[1:],)
+      )
     func = da[0]
     dfunc = deco(func, **dkw)
     dfunc.__doc__ = getattr(func, '__doc__', '')
     return dfunc
+
   overdeco.__doc__ = getattr(deco, '__doc__', '')
   return overdeco
 
 @decorator
-def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None):
+def cached(
+    func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
+):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
 
@@ -114,7 +123,9 @@ def cached(func, attr_name=None, poll_delay=None, sig_func=None, unset_value=Non
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
-    raise ValueError("invalid poll_delay, should be >0, got: %r" % (poll_delay,))
+    raise ValueError(
+        "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
+    )
 
   attr = attr_name if attr_name else func.__name__
   val_attr = '_' + attr
@@ -212,19 +223,116 @@ def strable(func, open_func=None):
   '''
   if open_func is None:
     open_func = open
+
   def accepts_str(arg, *a, **kw):
     if isinstance(arg, str):
       with Pfx(arg):
         with open_func(arg) as opened:
           return func(opened, *a, **kw)
     return func(arg, *a, **kw)
+
   return accepts_str
 
+def observable_class(property_names, only_unequal=False):
+  ''' Class decorator to make various instance attributes observable.
+
+      Parameters:
+      * `property_names`:
+        an interable of instance property names to set up as
+        observable properties. As a special case a single `str` can
+        be supplied of only one attribute is to be observed.
+      * `only_unequal`:
+        only call the observers if the new property value is not
+        equal to the previous proerty value. This requires property
+        values to be comparable for inequality.
+        Default: `False`, meaning that all updates will be reported.
+  '''
+
+  if isinstance(property_names, str):
+    property_names = (property_names,)
+
+  def make_observable_class(cls):
+    ''' Annotate the class `cls` with observable properties.
+    '''
+
+    # push the per instance initialisation
+    old_init = cls.__init__
+
+    def new_init(self, *a, **kw):
+      ''' New init, much like the old init...
+      '''
+      self._observable_class__observers = defaultdict(set)
+      old_init(self, *a, **kw)
+
+    cls.__init__ = new_init
+
+    def add_observer(self, attr, observer):
+      ''' Add an observer on `.attr` to this instance.
+      '''
+      self._observable_class__observers[attr].add(observer)
+
+    cls.add_observer = add_observer
+
+    def remove_observer(self, attr, observer):
+      ''' Remove an observer on `.attr` from this instance.
+      '''
+      self._observable_class__observers[attr].remove(observer)
+
+    cls.remove_observer = remove_observer
+
+    def make_property(cls, attr):
+      ''' make `cls.attr` into a property which reports setattr events.
+      '''
+      val_attr = '_' + attr
+
+      def getter(self):
+        return getattr(self, val_attr)
+
+      getter.__name__ = attr
+      get_prop = property(getter)
+      setattr(cls, attr, get_prop)
+
+      def setter(self, new_value):
+        ''' Set the attribute value and tell all the observers.
+        '''
+        old_value = getattr(self, val_attr, None)
+        setattr(self, val_attr, new_value)
+        if not only_unequal or old_value != new_value:
+          for observer in self._observable_class__observers[attr]:
+            try:
+              observer(self, attr, new_value)
+            except Exception as e:
+              warning(
+                  "%s.%s=%r: observer %s(...) raises: %s",
+                  self,
+                  val_attr,
+                  new_value,
+                  observer,
+                  e,
+                  exc_info=True
+              )
+
+      setter.__name__ = attr
+      set_prop = get_prop.setter(setter)
+      setattr(cls, attr, set_prop)
+
+    for property_name in property_names:
+      if hasattr(cls, property_name):
+        raise ValueError("%s.%s already exists" % (cls, property_name))
+      make_property(cls, property_name)
+
+    return cls
+
+  return make_observable_class
+
 if __name__ == '__main__':
+
   class Foo:
+
     @cached(poll_delay=2)
     def x(self, y):
       return str(y)
+
   F = Foo()
   y = F.x(1)
   print("F.x() ==>", y)

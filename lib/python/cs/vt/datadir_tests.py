@@ -26,10 +26,8 @@ def mktmpdir(flavour=None):
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
-      tempfile.mkdtemp(
-          prefix="datadir-test",
-          suffix=".dir",
-          dir='.'))
+      tempfile.mkdtemp(prefix="datadir-test", suffix=".dir", dir='.')
+  )
 
 class TestDataDir(unittest.TestCase):
 
@@ -68,7 +66,8 @@ class TestDataDir(unittest.TestCase):
         self.indexdirpath,
         self.hashclass,
         indexclass=self.indexclass,
-        rollover=self.rollover)
+        rollover=self.rollover
+    )
 
   def tearDown(self):
     self.datadir.close()
@@ -164,7 +163,11 @@ def selftest(argv):
     hashclass = HASHCLASS_BY_NAME[hashname]
     for indexname in sorted(indexclass_names()):
       indexclass = indexclass_by_name(indexname)
-      suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
+      suite.addTest(
+          multitest_suite(
+              TestDataDir, hashclass=hashclass, indexclass=indexclass
+          )
+      )
   runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)
   ##if False:

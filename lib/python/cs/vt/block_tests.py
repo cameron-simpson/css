@@ -49,10 +49,8 @@ class TestAll(unittest.TestCase):
       self.assertTrue(B.fsck(recurse=True))
 
   def _make_random_Block(self, block_type=None, size=None, leaf_only=False):
-    with self.subTest(
-        task="_make_random_Block",
-        block_type=block_type, size=size, leaf_only=leaf_only
-    ):
+    with self.subTest(task="_make_random_Block", block_type=block_type,
+                      size=size, leaf_only=leaf_only):
       if block_type is None:
         choices = [
             BlockType.BT_HASHCODE,
@@ -67,7 +65,8 @@ class TestAll(unittest.TestCase):
         size = rand0(16385)
       with self.subTest(
           subtask="instantiate",
-          block_type=block_type, size=size,
+          block_type=block_type,
+          size=size,
       ):
         if block_type == BlockType.BT_INDIRECT:
           subblocks = [self._make_random_Block() for _ in range(rand0(8))]
@@ -100,9 +99,11 @@ class TestAll(unittest.TestCase):
         else:
           raise ValueError("unknow block type")
         self.assertEqual(
-            B.type, block_type,
-            "new Block is wrong type: %r, should be %r"
-            % (B.type, block_type,))
+            B.type, block_type, "new Block is wrong type: %r, should be %r" % (
+                B.type,
+                block_type,
+            )
+        )
         self._verify_block(B)
       return B
 
@@ -141,7 +142,8 @@ class TestAll(unittest.TestCase):
           IBspan = IB.span
           self.assertEqual(
               IBspan, total_length,
-              "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
+              "IBspan(%d) != total_length(%d)" % (IB.span, total_length)
+          )
           IBH = IB.superblock.hashcode
           IBdata = IB.get_spanned_data()
           self.assertEqual(len(IBdata), total_length)
@@ -152,7 +154,8 @@ class TestAll(unittest.TestCase):
           IB2data = IB2.get_spanned_data()
           self.assertEqual(
               IBdata, IB2data,
-              "IB:  %s\nIB2: %s" % (hexify(IBdata), hexify(IB2data)))
+              "IB:  %s\nIB2: %s" % (hexify(IBdata), hexify(IB2data))
+          )
           for _ in range(32):
             with self.subTest(loop2=_):
               start = rand0(len(IB) + 1)
@@ -165,12 +168,14 @@ class TestAll(unittest.TestCase):
                 self.assertEqual(len(chunk1a), length)
                 self.assertEqual(
                     chunk1, chunk1a,
-                    "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end))
+                    "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end)
+                )
                 chunk2 = IB2[start:end]
                 self.assertEqual(len(chunk2), length)
                 self.assertEqual(
                     chunk1, chunk2,
-                    "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end))
+                    "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end)
+                )
 
   def test02RoundTripSingleBlock(self):
     ''' Generate various block types, serialise then deserialise each.
@@ -187,16 +192,17 @@ class TestAll(unittest.TestCase):
           B2, offset = BlockRecord.value_from_bytes(Bserial)
           self.assertEqual(
               offset, len(Bserial),
-              "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial)))
+              "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial))
+          )
           self._verify_block(B2)
           if block_type != BlockType.BT_INDIRECT:
             self.assertEqual(B.type, B2.type, "block types differ")
             self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
           self.assertEqual(B.span, B2.span, "span lengths differ")
           self.assertEqual(
-                  B.get_spanned_data(),
-                  B2.get_spanned_data(),
-                  "spanned data differ")
+              B.get_spanned_data(), B2.get_spanned_data(),
+              "spanned data differ"
+          )
           Btype = B2.type
           if Btype == BlockType.BT_INDIRECT:
             self.assertTrue(B.indirect)
@@ -214,7 +220,8 @@ class TestAll(unittest.TestCase):
               self._verify_block(B2.superblock)
             else:
               raise unittest.SkipTest(
-                  "no type specific tests for Block type %r" % (block_type,))
+                  "no type specific tests for Block type %r" % (block_type,)
+              )
 
 def selftest(argv):
   ''' Run the unit tests.

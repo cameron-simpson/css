@@ -298,7 +298,6 @@ class Pfx(object):
                   value = [ prefixify(value[0]) ] + list(value[1:])
             setattr(exc_value, attr, value)
             did_prefix = True
-            break
         if not did_prefix:
           print(
               "warning: %s: %s:%s: message not prefixed"

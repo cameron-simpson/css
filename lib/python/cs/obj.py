@@ -145,10 +145,9 @@ def O_str(o, no_recurse=False, seen=None):
       if id(pvalue) in seen:
         desc = "<%s>" % (type(pvalue).__name__,)
       else:
-        desc = "%s=%s" % (pattr,
-                          O_str(pvalue,
-                                no_recurse=no_recurse,
-                                seen=seen))
+        desc = "%s=%s" % (
+            pattr, O_str(pvalue, no_recurse=no_recurse, seen=seen)
+        )
       attrdesc_strs.append(desc)
   s = "<%s %s>" % (o.__class__.__name__, ",".join(attrdesc_strs))
   seen.remove(id(o))

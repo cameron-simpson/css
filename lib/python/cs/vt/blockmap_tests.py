@@ -45,7 +45,7 @@ class TestAll(unittest.TestCase):
           ##flat_data = bytes(randint(1, 16384))
           top_block = HashCodeBlock(data=flat_data)
         else:
-          top_block, flat_data = self._gen_data(depth-1, width)
+          top_block, flat_data = self._gen_data(depth - 1, width)
         subblocks.append(top_block)
         subchunks.append(flat_data)
       if width == 1:
@@ -57,7 +57,7 @@ class TestAll(unittest.TestCase):
     '''
     with self.S:
       for depth in 0, 1, 2, 3:
-        for width in 1, 2, 7:   # , 17:
+        for width in 1, 2, 7:  # , 17:
           X("gen depth=%d, width=%d ...", depth, width)
           top_block, flat_data = self._gen_data(depth, width)
           if not isinstance(top_block, _IndirectBlock):
@@ -72,14 +72,14 @@ class TestAll(unittest.TestCase):
               self.assertEqual(flat_data, bmap.data(0, len(flat_data)))
               X("full data cmp DONE")
               for _ in range(16):
-                start = randint(0, len(flat_data)-1)
+                start = randint(0, len(flat_data) - 1)
                 end = randint(start, len(flat_data))
                 X("compare [%d:%d]...", start, end)
                 self.assertEqual(
-                    flat_data[start:end],
-                    bmap.data(start, end-start),
-                    'flat_data[%d:%s] != bmap.data(%d, %d)'
-                    % (start, end, start, end-start))
+                    flat_data[start:end], bmap.data(start, end - start),
+                    'flat_data[%d:%s] != bmap.data(%d, %d)' %
+                    (start, end, start, end - start)
+                )
 
 def selftest(argv):
   ''' Run the unit tests.

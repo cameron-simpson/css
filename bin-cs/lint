@@ -92,7 +92,7 @@ do
     esac
   fi
   [ -n "$type" ] || {
-    echo "$cmd: $lintfile: unknown type (magic=$magic)" >&2
+    echo "$cmd: $lintfile: skipping unknown type (magic=$magic)" >&2
     continue
   }
 

@@ -16,7 +16,7 @@ dldir=${DL:-$HOME/dl}/v
 when=
 proxy=${https_proxy:-''}
 ydlopts=
-target_fmt=mp4
+target_fmt=
 
 badopts=
 
@@ -27,7 +27,7 @@ do
         when=$1
         shift
         ;;
-    mp4|mkv)
+    ''|mp4|mkv)
         target_fmt=$1
         shift
         ;;
