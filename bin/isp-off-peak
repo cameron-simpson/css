@@ -7,6 +7,7 @@
 set -ue
 
 dflt_flagnames='ROUTE_DEFAULT ISP_OFF_PEAK !DOWNLOAD_DISABLED'
+delay=37
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-F flagnames] [-x] [--] [command [args...]]
@@ -24,6 +25,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    [0-9]*) delay=$1 ;;
     -F) flagnames=$2; shift ;;
     -x) trace=set-x ;;
     --) shift; break ;;
@@ -37,6 +39,6 @@ done
 
 [ $# = 0 ] && exec $trace flag -t $flagnames
 
-[ -z "$flagnames" ] || $trace await flag -t $flagnames
+[ -z "$flagnames" ] || $trace await $delay flag -t $flagnames
 
 exec $trace "$@"
