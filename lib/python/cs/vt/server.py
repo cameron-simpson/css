@@ -4,6 +4,9 @@
 # - Cameron Simpson <cs@cskk.id.au> 30may2018
 #
 
+''' Server stub functions.
+'''
+
 from .socket import TCPStoreServer, UNIXSocketStoreServer
 
 def serve_tcp(bind_addr, exports=None, runstate=None):

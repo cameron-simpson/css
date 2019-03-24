@@ -34,6 +34,7 @@
     * `Packet`: a `PacketField` subclass for parsing multiple
       `PacketFields` into a larger structure with ordered named
       fields.
+      The fields themselves may be `Packet`s for complex structures.
 
     You don't need to make fields only from binary data; because
     `PacketField.__init__` takes a post parse value, you can also
@@ -57,7 +58,7 @@
       `flatten(field.transcribe())` or via the convenience
       `field.transcribe_flat()` method which calls `flatten` itself.
     * a `CornuCopyBuffer` is an easy to use wrapper for parsing any
-      iterable of chunks, which may come from almost any source.  
+      iterable of chunks, which may come from almost any source.
       It has a bunch of convenient factories including:
       `from_bytes`, make a buffer from a chunk;
       `from_fd`, make a buffer from a file descriptor;
@@ -65,14 +66,46 @@
       `from_mmap`, make a buffer from a file descriptor using a
       memory map (the `mmap` module) of the file, so that chunks
       can use the file itself as backing store instead of allocating
-      and copying memory.  
+      and copying memory.
       See the `cs.buffer` module for further detail.
+
+    When parsing a complex structure
+    one must choose between subclassing `PacketField` or `Packet`.
+    An effective guideline is the degree of substructure.
+
+    A `Packet` is designed for deeper structures;
+    all of its attributes are themselves `PacketField`s
+    (or `Packets`, which are `PacketField` subclasses).
+    The leaves of this hierarchy will be `PacketFields`,
+    whose attributes are ordinary types.
+
+    By contrast, a `PacketField`'s attributes are "flat" values:
+    the plain post-parse value, such as a `str` or an `int`
+    or some other conventional Python type.
+
+    The base case for `PacketField`
+    is a single such value, named `.value`,
+    and the natural implementation
+    is to provide a `.value_from_buffer` method
+    which returns the basic single value
+    and the corresponding `.transcribe_value` method
+    to return or yield its binary form
+    (directly or in pieces respectively).
+
+    However,
+    you can handle multiple attributes with this class
+    by instead implementing:
+    * `__init__`: to compose an instance from post-parse values
+      (and thus from scratch rather than parsed from existing binary data)
+    * `from_buffer`: class method to parse the values
+      from a ` CornuCopyBuffer` and call the class constructor
+    * `transcribe`: to return or yield the binary form of the attributes
 
     Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
 from __future__ import print_function
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import namedtuple
 from struct import Struct
 import sys
@@ -100,17 +133,18 @@ elif sys.version_info[1] < 6:
       file=sys.stderr)
 
 def flatten(chunks):
-  ''' Flatten `chunks` into an iterable of bytes instances.
+  ''' Flatten `chunks` into an iterable of `bytes` instances.
 
       This exists to allow subclass methods to easily return ASCII
-      strings or bytes or iterables or even None, in turn allowing
-      them to simply return their superclass' chunks iterators
+      strings or bytes or iterables or even `None`, in turn allowing
+      them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
   '''
   if chunks is None:
     pass
   elif isinstance(chunks, (bytes, memoryview)):
-    yield chunks
+    if chunks:
+      yield chunks
   elif isinstance(chunks, str):
     yield chunks.encode('ascii')
   else:
@@ -122,7 +156,10 @@ class PacketField(ABC):
   ''' A record for an individual packet field.
   '''
 
-  def __init__(self, value):
+  def __init__(self, value=None):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
     self.value = value
 
   @property
@@ -134,6 +171,9 @@ class PacketField(ABC):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.value_s)
 
+  def __eq__(self, other):
+    return type(self) is type(other) and self.value == other.value
+
   def __bytes__(self):
     return b''.join(flatten(self.transcribe()))
 
@@ -144,9 +184,14 @@ class PacketField(ABC):
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
-    ''' Factory to return a PacketField instance from bytes.
+    ''' Factory to return a `PacketField` instance parsed from the
+        bytes `bs` starting at `offset`.
+        Returns the new `PacketField` and the post parse offset.
 
-        This relies on the class' from_buffer(CornuCopyBuffer) method.
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_buffer` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
     field = cls.from_buffer(bfr)
@@ -154,34 +199,94 @@ class PacketField(ABC):
     return field, post_offset
 
   @classmethod
-  @abstractmethod
+  def value_from_bytes(cls, bs, offset=0, length=None):
+    ''' Return a value parsed from the bytes `bs` starting at `offset`.
+        Returns the new value and the post parse offset.
+
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_bytes` method for the parse.
+    '''
+    field, offset = cls.from_bytes(bs, offset=offset, length=length)
+    return field.value, offset
+
+  @classmethod
   def from_buffer(cls, bfr, **kw):
     ''' Factory to return a PacketField instance from a CornuCopyBuffer.
-    '''
-    raise NotImplementedError("no from_buffer method")
 
-  @abstractmethod
+        This default implementation instantiates the instance from
+        the value returned by `cls.value_from_buffer(bfr, **kw)`.
+    '''
+    value = cls.value_from_buffer(bfr, **kw)
+    return cls(value)
+    ##return cls(cls.value_from_buffer(bfr, **kw))
+
+  @staticmethod
+  def value_from_buffer(bfr, **kw):
+    ''' Function to parse and return the core value from a CornuCopyBuffer.
+
+        For single value fields it is enough to implement this method.
+    '''
+    raise NotImplementedError("no value_from_buffer method")
+
+  @classmethod
+  def parse_buffer(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw)
+
+  @classmethod
+  def parse_buffer_values(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls.value`
+        from the buffer `bfr` until end of input.
+    '''
+    while not bfr.at_eof():
+      yield cls.from_buffer(bfr, **kw).value
+
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
 
         This may directly return:
-        * a `bytes` or `memryview` holding the binary data
+        * a `bytes` or `memoryview` holding the binary data
         * `None`: indicating no binary data
         * `str`: indicating the ASCII encoding of the string
-          * an iterable of these things (including further iterables)
+        * an iterable of these things (including further iterables)
           to support trivially transcribing via other fields'
           `transcribe` methods
 
         Callers will usually call `flatten` on the output of this
         method, or use the convenience `transcribe_flat` method
         which calls `flatten` for them.
+
+        This default implementation is for single value fields and
+        just calls `self.transcribe_value(self.value)`.
     '''
-    raise NotImplementedError("no transcribe method")
+    yield self.transcribe_value(self.value)
+
+  @staticmethod
+  def transcribe_value(value):
+    ''' For simple PacketFields, return a bytes transcription of a
+        value suitable for the `.value` attribute.
+
+        For example, the `BSUInt` subclass stores a `int` as its
+        `.value` and exposes its serialisation method, suitable for
+        any `int`, as `transcribe_value`.
+    '''
+    raise NotImplementedError("no transcribe_value method")
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.
     '''
     return flatten(self.transcribe())
+
+  @classmethod
+  def transcribe_value_flat(cls, value):
+    ''' Return a flat iterable of chunks transcribing `value`.
+    '''
+    return flatten(cls.transcribe_value(value))
 
 class EmptyPacketField(PacketField):
   ''' An empty data field, used as a placeholder for optional
@@ -189,6 +294,11 @@ class EmptyPacketField(PacketField):
 
       The singleton `EmptyField` is a predefined instance.
   '''
+
+  TEST_CASES = (
+      b'',
+      ({}, b''),
+  )
 
   def __init__(self):
     super().__init__(None)
@@ -207,8 +317,13 @@ class UTF8NULField(PacketField):
   ''' A NUL terminated UTF-8 string.
   '''
 
+  TEST_CASES = (
+      b'123\0',
+      ('123', {}, b'123\0'),
+  )
+
   @classmethod
-  def from_buffer(cls, bfr):
+  def value_from_buffer(cls, bfr):
     ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
     '''
     # probe for the terminating NUL
@@ -228,7 +343,7 @@ class UTF8NULField(PacketField):
         utf8_bs = utf8_bs.tobytes()
       utf8 = utf8_bs.decode('utf-8')
     bfr.take(1)
-    return cls(utf8)
+    return utf8
 
   def transcribe(self):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
@@ -240,6 +355,10 @@ class BytesField(PacketField):
   ''' A field of bytes.
   '''
 
+  TEST_CASES = (
+      ##(b'1234', {'length': 4}, b'1234'),
+  )
+
   @property
   def value_s(self):
     ''' The repr() of the bytes.
@@ -250,12 +369,12 @@ class BytesField(PacketField):
     return repr(bs)
 
   @classmethod
-  def from_buffer(cls, bfr, length):
+  def value_from_buffer(cls, bfr, length=None):
     ''' Parse a BytesField of length `length` from `bfr`.
     '''
     if length < 0:
       raise ValueError("length(%d) < 0" % (length,))
-    return cls(bfr.take(length))
+    return bfr.take(length)
 
   def transcribe(self):
     ''' A BytesField is its own transcription.
@@ -272,10 +391,10 @@ def fixed_bytes_field(length, class_name=None):
     ''' A field whose value is simply a fixed length bytes chunk.
     '''
     @classmethod
-    def from_buffer(cls, bfr):
+    def value_from_buffer(cls, bfr):
       ''' Obtain fixed bytes from the buffer.
       '''
-      return BytesField.from_buffer(bfr, length)
+      return bfr.take(length)
   if class_name is None:
     class_name = FixedBytesField.__name__ + '_' + str(length)
   FixedBytesField.__name__ = class_name
@@ -465,7 +584,7 @@ class BytesRunField(PacketField):
     length = self.length
     bytes_value = self.bytes_value
     bs256 = self._bytes_256(bytes_value)
-    with length >= 256:
+    while length >= 256:
       yield bs256
       length -= 256
     if length > 0:
@@ -510,17 +629,18 @@ def struct_field(struct_format, class_name):
       def __repr__(self):
         return "%s(%r)" % (type(self).__name__, self.value)
       @classmethod
-      def from_buffer(cls, bfr):
+      def value_from_buffer(cls, bfr):
         ''' Parse a value from the bytes `bs` at `offset`, default 0.
             Return a PacketField instance and the new offset.
         '''
         bs = bfr.take(struct.size)
         value, = struct.unpack(bs)
-        return cls(value)
-      def transcribe(self):
-        ''' Transcribe the value back into bytes.
+        return value
+      @staticmethod
+      def transcribe_value(value):
+        ''' Transcribe a value back into bytes.
         '''
-        return struct.pack(self.value)
+        return struct.pack(value)
     StructField.__name__ = class_name
     StructField.__doc__ = (
         'A PacketField which parses and transcribes the struct format `%r`.'
@@ -533,16 +653,238 @@ def struct_field(struct_format, class_name):
 
 # various common values
 UInt8 = struct_field('B', 'UInt8')
+UInt8.TEST_CASES = (
+    (0, b'\0'),
+    (65, b'A'),
+)
 Int16BE = struct_field('>h', 'Int16BE')
+Int16BE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\0\1'),
+    (32767, b'\x7f\xff'),
+    (-1, b'\xff\xff'),
+    (-32768, b'\x80\x00'),
+)
 Int16LE = struct_field('<h', 'Int16LE')
+Int16LE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\1\0'),
+    (32767, b'\xff\x7f'),
+    (-1, b'\xff\xff'),
+    (-32768, b'\x00\x80'),
+)
 Int32BE = struct_field('>l', 'Int32BE')
+Int32BE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\0\0\0\1'),
+    (2147483647, b'\x7f\xff\xff\xff'),
+    (-1, b'\xff\xff\xff\xff'),
+    (-2147483648, b'\x80\x00\x00\x00'),
+)
 Int32LE = struct_field('<l', 'Int32LE')
+Int32LE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\1\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f'),
+    (-1, b'\xff\xff\xff\xff'),
+    (-2147483648, b'\x00\x00\x00\x80'),
+)
 UInt16BE = struct_field('>H', 'UInt16BE')
+UInt16BE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\0\1'),
+    (32767, b'\x7f\xff'),
+    (32768, b'\x80\x00'),
+    (65535, b'\xff\xff'),
+)
 UInt16LE = struct_field('<H', 'UInt16LE')
+UInt16LE.TEST_CASES = (
+    (0, b'\0\0'),
+    (1, b'\1\0'),
+    (32767, b'\xff\x7f'),
+    (32768, b'\x00\x80'),
+    (65535, b'\xff\xff'),
+)
 UInt32BE = struct_field('>L', 'UInt32BE')
+UInt32BE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\0\0\0\1'),
+    (2147483647, b'\x7f\xff\xff\xff'),
+    (2147483648, b'\x80\x00\x00\x00'),
+    (4294967294, b'\xff\xff\xff\xfe'),
+    (4294967295, b'\xff\xff\xff\xff'),
+)
 UInt32LE = struct_field('<L', 'UInt32LE')
+UInt32LE.TEST_CASES = (
+    (0, b'\0\0\0\0'),
+    (1, b'\1\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f'),
+    (2147483648, b'\x00\x00\x00\x80'),
+    (4294967294, b'\xfe\xff\xff\xff'),
+    (4294967295, b'\xff\xff\xff\xff'),
+)
 UInt64BE = struct_field('>Q', 'UInt64BE')
+UInt64BE.TEST_CASES = (
+    (0, b'\0\0\0\0\0\0\0\0'),
+    (1, b'\0\0\0\0\0\0\0\1'),
+    (2147483647, b'\0\0\0\0\x7f\xff\xff\xff'),
+    (2147483648, b'\0\0\0\0\x80\x00\x00\x00'),
+    (4294967295, b'\0\0\0\0\xff\xff\xff\xff'),
+    (4294967296, b'\0\0\0\1\x00\x00\x00\x00'),
+    (9223372036854775807, b'\x7f\xff\xff\xff\xff\xff\xff\xff'),
+    (9223372036854775808, b'\x80\x00\x00\x00\x00\x00\x00\x00'),
+    (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
+    (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
+)
 UInt64LE = struct_field('<Q', 'UInt64LE')
+UInt64LE.TEST_CASES = (
+    (0, b'\0\0\0\0\0\0\0\0'),
+    (1, b'\1\0\0\0\0\0\0\0'),
+    (2147483647, b'\xff\xff\xff\x7f\0\0\0\0'),
+    (2147483648, b'\0\0\0\x80\0\0\0\0'),
+    (4294967295, b'\xff\xff\xff\xff\0\0\0\0'),
+    (4294967296, b'\0\0\0\0\1\0\0\0'),
+    (9223372036854775807, b'\xff\xff\xff\xff\xff\xff\xff\x7f'),
+    (9223372036854775808, b'\x00\x00\x00\x00\x00\x00\x00\x80'),
+    (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
+    (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
+)
+Float64BE = struct_field('>d', 'Float64BE')
+Float64BE.TEST_CASES = (
+    (0.0, b'\0\0\0\0\0\0\0\0'),
+    (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
+)
+Float64LE = struct_field('<d', 'Float64LE')
+Float64LE.TEST_CASES = (
+    (0.0, b'\0\0\0\0\0\0\0\0'),
+    (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
+)
+
+class BSUInt(PacketField):
+  ''' A binary serialsed unsigned int.
+
+      This uses a big endian byte encoding where continuation octets
+      have their high bit set. The bits contributing to the value
+      are in the low order 7 bits.
+  '''
+
+  TEST_CASES = (
+      (0, b'\0'),
+      (1, b'\1'),
+      (127, b'\x7f'),
+      (128, b'\x81\00'),
+      (255, b'\x81\x7f'),
+      (16383, b'\xff\x7f'),
+      (16384, b'\x81\x80\x00'),
+  )
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    ''' Parse an extensible byte serialised unsigned int from a buffer.
+
+        Continuation octets have their high bit set.
+        The value is big-endian.
+
+        This is the go for reading from a stream. If you already have
+        a bare bytes instance then `cs.serialise.get_uint` may be better.
+    '''
+    n = 0
+    b = 0x80
+    while b & 0x80:
+      bs = bfr.take(1)
+      b = bs[0]
+      n = (n << 7) | (b & 0x7f)
+    return n
+
+  @staticmethod
+  def transcribe_value(n):
+    ''' Encode an unsigned int as an entensible byte serialised octet
+        sequence for decode. Return the bytes object.
+    '''
+    bs = [ n & 0x7f ]
+    n >>= 7
+    while n > 0:
+      bs.append( 0x80 | (n & 0x7f) )
+      n >>= 7
+    return bytes(reversed(bs))
+
+class BSData(PacketField):
+  ''' A run length encoded data chunk, with the length encoded as a BSUInt.
+  '''
+
+  TEST_CASES = (
+      (b'', b'\x00'),
+      (b'A', b'\x01A'),
+  )
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    return bfr.take(BSUInt.value_from_buffer(bfr))
+
+  def transcribe(self):
+    ''' Transcribe the payload length and then the payload.
+    '''
+    payload = self.value
+    yield BSUInt.transcribe_value(len(payload))
+    yield payload
+
+  @classmethod
+  def transcribe_value(cls, data):
+    return b''.join(cls(data).transcribe())
+
+class BSString(PacketField):
+  ''' A run length encoded string, with the length encoded as a BSUInt.
+  '''
+
+  TEST_CASES = (
+      ('', b'\x00'),
+      ('A', b'\x01A'),
+  )
+
+  def __init__(self, s, encoding='utf-8'):
+    super().__init__(s)
+    self.encoding = encoding
+
+  @staticmethod
+  def value_from_buffer(bfr, encoding='utf-8', errors='strict'):
+    ''' Parse a run length encoded string from `bfr`.
+    '''
+    bs = bfr.take(BSUInt.value_from_buffer(bfr))
+    if isinstance(bs, memoryview):
+      bs = bs.tobytes()
+    return bs.decode(encoding=encoding, errors=errors)
+
+  @staticmethod
+  def transcribe_value(s, encoding='utf-8'):
+    ''' Transcribe a string.
+    '''
+    payload = s.encode(encoding)
+    return b''.join( (
+        BSUInt.transcribe_value(len(payload)),
+        payload
+    ) )
+
+class BSSFloat(PacketField):
+  ''' A float transcribed as a BSString of str(float).
+  '''
+
+  TEST_CASES = (
+      (0.0, b'\x030.0'),
+      (0.1, b'\x030.1'),
+  )
+
+  @classmethod
+  def value_from_buffer(cls, bfr, **kw):
+    ''' Parse a BSSFloat from a buffer and return the float.
+    '''
+    s = BSString.value_from_buffer(bfr, **kw)
+    return float(s)
+
+  @staticmethod
+  def transcribe_value(f):
+    ''' Transcribe a float.
+    '''
+    return BSString.transcribe_value(str(f))
 
 class ListField(PacketField):
   ''' A field which is a list of other fields.
@@ -643,6 +985,22 @@ def structtuple(class_name, struct_format, subvalue_names):
       struct_format,
       subvalue_names=subvalue_names,
       class_name=class_name)
+
+_TestStructTuple = structtuple(
+    '_TestStructTuple',
+    '>hHlLqQ',
+    'short ushort long ulong quad uquad')
+_TestStructTuple.TEST_CASES = (
+    b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+    ( (-1, 2, -2, 4, -3, 8), ),
+    ##    ({  'short': -1,
+    ##        'ushort': 2,
+    ##        'long': -2,
+    ##        'ulong': 4,
+    ##        'quad': -3,
+    ##        'uquad': 8,
+    ##    },),
+)
 
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
@@ -778,9 +1136,11 @@ class Packet(PacketField):
                     field))
       for field_name in self.field_names:
         if field_name not in fields_spec:
-          raise ValueError(
-              "field %r is present but is not defined in self.PACKET_FIELDS: %r"
-              % (field_name, sorted(fields_spec.keys())))
+          print(
+              "%s.self_check:"
+              " field %r is present but is not defined"
+              " in self.PACKET_FIELDS: %r"
+              % (type(self).__name__, field_name, sorted(fields_spec.keys())))
 
   def __getattr__(self, attr):
     ''' Unknown attributes may be field names; return their value.
@@ -801,8 +1161,7 @@ class Packet(PacketField):
     '''
     for field in self.fields:
       if field is not None:
-        for bs in flatten(field.transcribe()):
-          yield bs
+        yield field.transcribe()
 
   def add_from_bytes(self, field_name, bs, factory, offset=0, length=None, **kw):
     ''' Add a new PacketField named `field_name` parsed from the

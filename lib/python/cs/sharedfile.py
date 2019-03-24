@@ -31,8 +31,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.filestate', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.range', 'cs.timeutils'],
+    ],
+    'install_requires': [
+        'cs.filestate',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.range',
+        'cs.timeutils',
+    ],
 }
 
 DEFAULT_POLL_INTERVAL = 1.0
@@ -42,12 +49,15 @@ DEFAULT_TAIL_PAUSE = 0.25
 @contextmanager
 def lockfile(path, ext=None, poll_interval=None, timeout=None):
   ''' A context manager which takes and holds a lock file.
-      `path`: the base associated with the lock file.
-      `ext`: the extension to the base used to construct the lock file name.
-             Default: ".lock"
-      `timeout`: maximum time to wait before failing,
-                 default None (wait forever).
-      `poll_interval`: polling frequency when timeout is not 0.
+
+      Parameters:
+      * `path`: the base associated with the lock file.
+      * `ext`:
+        the extension to the base used to construct the lock file name.
+        Default: `".lock"`
+      * `timeout`: maximum time to wait before failing,
+        default None (wait forever).
+      * `poll_interval`: polling frequency when timeout is not 0.
   '''
   if poll_interval is None:
     poll_interval = DEFAULT_POLL_INTERVAL
@@ -105,24 +115,23 @@ class SharedAppendFile(object):
   ''' A base class to share a modifiable file between multiple users.
 
       The use case was driven from the shared CSV files used by
-      cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
+      `cs.nodedb.csvdb.Backend_CSVFile`, where multiple users can
       read from a common CSV file, and coordinate updates with a
       lock file.
 
       This presents the following interfaces:
+      * `__iter__`: yields data chunks from the underlying file up
+        to EOF; it blocks no more than reading from the file does.
+        Note that multiple iterators share the same read pointer.
 
-        __iter__: yields data chunks from the underlying file up
-          to EOF; it block no more than reading from the file does.
-          Note that multiple iterators share the same read pointer.
+      * `open`: a context manager returning a writable file for writing
+        updates to the file; it blocks reads from this instance
+        (though not, of course, by other users of the file) and
+        arranges that users of `__iter__` do not receive their own
+        written data, thus arranging that `__iter__` returns only
+        foreign file updates.
 
-        open: a context manager returning a writable file for writing
-          updates to the file; it blocks reads from this instance
-          (though not, of course, by other users of the file) and
-          arranges that users of __iter__ do not receive their own
-          written data, thus arranging that __iter__ returns only
-          foreign file updates.
-
-      Subclasses would normally override __iter__ to parse the
+      Subclasses would normally override `__iter__` to parse the
       received data into their natural records.
   '''
 
@@ -130,15 +139,17 @@ class SharedAppendFile(object):
                read_only=False, write_only=False, binary=False, newline=None,
                lock_ext=None, lock_timeout=None, poll_interval=None):
     ''' Initialise this SharedAppendFile.
-        `pathname`: the pathname of the file to open.
-        `read_only`: set to true if we will not write updates.
-        `write_only`: set to true if we will not read updates.
-        `binary`: if the file is to be opened in binary mode, otherwise text mode.
-        'newline`: passed to open()
-        `lock_ext`: lock file extension.
-        `lock_timeout`: maxmimum time to wait for obtaining the lock file.
-        `poll_interval`: poll time when taking a lock file,
-            default DEFAULT_POLL_INTERVAL
+
+        Parameters:
+        * `pathname`: the pathname of the file to open.
+        * `read_only`: set to true if we will not write updates.
+        * `write_only`: set to true if we will not read updates.
+        * `binary`: if the file is to be opened in binary mode, otherwise text mode.
+        * 'newline`: passed to `open()`
+        * `lock_ext`: lock file extension.
+        * `lock_timeout`: maxmimum time to wait for obtaining the lock file.
+        * `poll_interval`: poll time when taking a lock file,
+          default `DEFAULT_POLL_INTERVAL`
     '''
     with Pfx("SharedAppendFile(%r): __init__", pathname):
       if poll_interval is None:
@@ -178,7 +189,7 @@ class SharedAppendFile(object):
       warning("multiple close of %s", self)
     self.closed = True
 
-  def _readopen(self, skip_to_end=False):
+  def _readopen(self):
     ''' Open the file for read.
     '''
     assert not self.write_only
@@ -202,13 +213,15 @@ class SharedAppendFile(object):
 
   def __iter__(self):
     ''' Iterate over the file, yielding data chunks until EOF.
+
         This skips data written to the file by this instance so that
         the data chunks returned are always foreign updates.
         Note that all iterators share the same file offset pointer.
 
         Usage:
-          for chunk in f:
-            ... process chunk ...
+
+            for chunk in f:
+                ... process chunk ...
     '''
     assert not self.write_only
     while True:
@@ -238,8 +251,9 @@ class SharedAppendFile(object):
         This arranges that multiple instances can coordinate writes.
 
         Usage:
-          with self._lockfile():
-            ... write data ...
+
+            with self._lockfile():
+                ... write data ...
     '''
     return lockfile(self.pathname,
                     ext=self.lock_ext,
@@ -269,6 +283,7 @@ class SharedAppendFile(object):
 
   def tail(self):
     ''' A generator returning data chunks from the file indefinitely.
+
         This supports writing monitors for file updates.
         Note that this, like other iterators, shares the same file offset pointer.
         Also note that it calls the class' iterator, so that if a
@@ -276,8 +291,9 @@ class SharedAppendFile(object):
         those records will also be returned from tail.
 
         Usage:
-          for chunk in f:
-            ... process chunk ...
+
+            for chunk in f:
+                ... process chunk ...
     '''
     while True:
       for item in self:
@@ -300,11 +316,14 @@ class SharedAppendFile(object):
   @contextmanager
   def rewrite(self):
     ''' Context manager for rewriting the file.
+
         This writes data to a new file which is then renamed onto the original.
         After the switch, the read pointer is set to the end of the new file.
+
         Usage:
-          with f.rewrite() as wfp:
-            ... write data to wfp ...
+
+            with f.rewrite() as wfp:
+                ... write data to wfp ...
     '''
     with self._readlock:
       with self.open() as _:
@@ -318,7 +337,7 @@ class SharedAppendFile(object):
           os.rename(tmpfp, self.pathname)
 
 class SharedAppendLines(SharedAppendFile):
-  ''' A line oriented subclass of SharedAppendFile.
+  ''' A line oriented subclass of `SharedAppendFile`.
   '''
 
   def __init__(self, *a, **kw):

@@ -33,6 +33,18 @@ pmFromMan(manf) = lib/$(manf FP :|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
+##  pymanmods = cs.vt
+##  pymansrcs = $( "$((pymanmods :|\.|/|))/*.?.md" EG )
+##  pymanmoddirs = $(pymansrcs DU)
+##  pymandst(src) = $(MANDIR)/man$(src FPS)/$(src FP)
+##  pymandsts = $( '$$(pymandst("$((pymansrcs))"))' EE )
+##  pymansrc(dst) = $
+##  
+##  _t:
+##      echo $(pymansrcs)
+##      echo $(pymanmoddirs)
+##      echo $(pymandsts)
+
 subdirs = $('*/.' GD)
 allscripts = $('bin/*' GF !/\./ +"bin/rc.mobile" F)
 

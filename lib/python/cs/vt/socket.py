@@ -14,13 +14,12 @@ from socketserver import TCPServer, UnixStreamServer, \
 import sys
 from threading import Thread
 from cs.excutils import logexc
-from cs.logutils import info, warning, exception
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.resources import RunStateMixin
 from cs.socketutils import OpenSocket
-from cs.x import X
 from . import defaults
 from .stream import StreamStore
 
@@ -28,13 +27,30 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
   ''' The basis for TCPStoreServer and UNIXSocketStoreServer.
   '''
 
-  def __init__(self, *, exports=None, runstate=None):
+  def __init__(self, *, exports=None, runstate=None, local_store=None):
     ''' Initialise the server.
+
+        Parameters:
+        * `exports`: optional mapping of str=>Store
+        * `runstate`: option control RunState
+        * `local_store`: optional default Store
+
+        `exports` is a mapping of Stores which this server may present;
+        the default Store has key `''`.
+
+        If `local_store` is not None, `exports['']` is set to
+        `local_store` otherwise to `defaults.S`.
+        It is an error to provide both `local_store` and a prefilled
+        `exports['']`.
     '''
     if exports is None:
       exports = {}
-    elif not exports:
-      raise ValueError("empty exports: %r" % (exports,))
+    if local_store is not None:
+      if '' in exports:
+        raise ValueError(
+            "both local_store=%s and exports['']=%s provided"
+            % (local_store, exports['']))
+      exports[''] = local_store
     if '' not in exports:
       exports[''] = defaults.S
     MultiOpenMixin.__init__(self)
@@ -119,7 +135,8 @@ class _TCPServer(ThreadingMixIn, TCPServer):
   def __init__(self, store_server, bind_addr):
     with Pfx(
         "%s.__init__(store_server=%s, bind_addr=%r)",
-        type(self).__name__, store_server, bind_addr):
+        type(self).__name__, store_server, bind_addr
+    ):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.store_server = store_server
@@ -155,10 +172,10 @@ class TCPClientStore(StreamStore):
     StreamStore.shutdown(self)
     if self.sock:
       self.sock.close()
+      self.sock = None
 
   def _tcp_connect(self):
     with Pfx("connect %r", self.sock_bind_addr):
-      X("TCP CONNECT to %r ...", self.sock_bind_addr)
       if self.sock:
         warning("self.sock already set, leaking: %s", self.sock)
       # TODO: IPv6 support
@@ -169,15 +186,25 @@ class TCPClientStore(StreamStore):
         self.sock.close()
         self.sock = None
         raise
-      X("TCP CONNECT to %r: CONNECTED", self.sock_bind_addr)
       return OpenSocket(self.sock, False), OpenSocket(self.sock, True)
+
+  @logexc
+  def _packet_disconnect(self, conn):
+    ''' On disconnect, close the socket as well.
+    '''
+    super()._packet_disconnect(conn)
+    sock = self.sock
+    if sock:
+      self.sock = None
+      sock.close()
 
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, store_server, socket_path, exports=None):
     with Pfx(
         "%s.__init__(store_server=%s, socket_path=%r)",
-        type(self), store_server, socket_path):
+        type(self), store_server, socket_path
+    ):
       UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
       self.store_server = store_server
       self.socket_path = socket_path
@@ -222,13 +249,12 @@ class UNIXSocketClientStore(StreamStore):
 
   def _unixsock_connect(self):
     with Pfx("connect %r", self.socket_path):
-      info("UNIX SOCKET CONNECT to %r", self.socket_path)
       assert not self.sock, "self.sock=%s" % (self.sock,)
       self.sock = socket(AF_UNIX)
       with Pfx("connect(%r)", self.socket_path):
         try:
           self.sock.connect(self.socket_path)
-        except OSError as e:
+        except OSError:
           self.sock.close()
           self.sock = None
           raise

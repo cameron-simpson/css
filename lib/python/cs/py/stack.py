@@ -1,9 +1,12 @@
 #!/usr/bin/python
 #
-# I find the supplied python traceback facilities quite awkward.
-# These functions provide convenient facilities.
-#       - Cameron Simpson <cs@cskk.id.au> 14apr2014
-#
+''' I find the supplied python traceback facilities quite awkward.
+    These functions provide convenient facilities.
+'''
+
+from collections import namedtuple
+import sys
+from traceback import extract_stack
 
 DISTINFO = {
     'description': "Convenience functions for the python execution stack.",
@@ -12,17 +15,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [],
 }
-
-import sys
-from collections import namedtuple
-from traceback import extract_stack
 
 _Frame = namedtuple('Frame', 'filename lineno funcname linetext')
 
 class Frame(_Frame):
+  ''' Namedtuple for stack frame contents.
+  '''
   def __str__(self):
     return "%s:%d: %s" % (self.filename, self.lineno, self.linetext)
 
@@ -31,13 +32,15 @@ def frames():
   '''
   return [ Frame(*f) for f in extract_stack()[:-1] ]
 
-def caller():
-  ''' Return the frame of the caller's caller.
+def caller(frame_index=-3):
+  ''' Return the `Frame` of the caller's caller.
+
+      Useful `frame_index` values:
+      * `-1`: caller, this function
+      * `-2`: invoker, who wants to know the caller
+      * `-3`: the calling function of the invoker
   '''
-  # -1: caller, this function
-  # -2: invoker, who wants to know the caller
-  # -3: the calling function of the invoker
-  return Frame(*frames()[-3])
+  return Frame(*frames()[frame_index])
 
 def stack_dump(fp=None, indent=0, Fs=None):
   ''' Recite current or supplied stack to `fp`, default sys.stderr.

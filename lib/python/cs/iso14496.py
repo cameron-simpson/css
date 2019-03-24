@@ -71,7 +71,7 @@ def main(argv):
             parsee = sys.stdin.fileno()
           else:
             parsee = spec
-          over_box = parse(parsee)
+          over_box, = parse(parsee)
           over_box.dump()
     elif op == 'extract':
       skip_header = False
@@ -143,7 +143,7 @@ class BoxHeader(Packet):
 
   # speculative max size that will fit in the UInt32BE box_size
   # with room for bigger sizes in the optional UInt64BE length field
-  MAX_BOX_SIZE_32 = 2 ^ 32 -8
+  MAX_BOX_SIZE_32 = 2 ^ 32 - 8
 
   PACKET_FIELDS = {
       'box_size': UInt32BE,
@@ -429,7 +429,7 @@ class Box(Packet):
       # advance over the remaining data, optionally keeping it
       self.unparsed_offset = bfr_tail.offset
       if (
-          bfr_tail.at_eof()
+          not bfr_tail.at_eof()
           if end_offset is Ellipsis
           else end_offset > bfr_tail.offset
       ):
@@ -1577,23 +1577,28 @@ def parse_file(fp, **kw):
   return parse_buffer(CornuCopyBuffer.from_file(fp), **kw)
 
 def parse_chunks(chunks, **kw):
-  ''' Parse an ISO14496 stream from the iterator of data `chunks`, yield top level Boxes.
+  ''' Parse an ISO14496 stream from the iterator of data `chunks`,
+      yield top level Boxes.
 
-      `chunks`: an iterator yielding bytes objects
-      `discard_data`: whether to discard unparsed data, default False
-      `copy_offsets`: callable to receive BoxBody offsets
+      Parameters:
+      * `chunks`: an iterator yielding bytes objects
+      * `discard_data`: whether to discard unparsed data, default False
+      * `copy_offsets`: callable to receive BoxBody offsets
   '''
   return parse_buffer(CornuCopyBuffer(chunks), **kw)
 
 def parse_buffer(bfr, copy_offsets=None, **kw):
-  ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`, yield top level Boxes.
-      `bfr`: a CornuCopyBuffer provided the stream data, preferably seekable
-      `discard_data`: whether to discard unparsed data, default False
-      `copy_offsets`: callable to receive Box offsets
+  ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`,
+      yield top level Boxes.
+
+      Parameters:
+      * `bfr`: a CornuCopyBuffer provided the stream data, preferably seekable
+      * `discard_data`: whether to discard unparsed data, default False
+      * `copy_offsets`: callable to receive Box offsets
   '''
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
-  return OverBox.from_buffer(bfr, **kw)
+  yield OverBox.from_buffer(bfr, **kw)
 
 def dump_box(B, indent='', fp=None, crop_length=170):
   ''' Recursively dump a Box.

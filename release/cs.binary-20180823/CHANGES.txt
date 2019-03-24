@@ -1,0 +1,15 @@
+  lib/python/cs/binary.py: cs.binary: slightly improve the description
+  lib/python/cs/binary.py: cs.binary: new BSUInt and BSData PacketField subclasses implementing the binary serialisation of cs.serialise get_bs and get_bsdata
+  lib/python/cs/binary.py: cs.binary: Packet.transcribe: simplification, avoiding unnecessary call to flatten (transcribe's result isn't flattened)
+  lib/python/cs/binary.py: cs.binary: present new `value_from_buffer` class method for simple fields to parse out the value - the inner of `from_buffer`; expose static method `transcribe_value` for simple fields so that the transcription can be accessed without instantiating an instance; new BSString subclass; assorted related changes
+  lib/python/cs/binary.py: cs.binary: docstring improvements
+  lib/python/cs/binary.py: cs.binary: PacketField: new value_from_bytes class method to do a bare parse of the value from a bytes
+  lib/python/cs/binary.py: cs.binary: BSString: new transcribe_value method to do a bare string transcription
+  lib/python/cs/binary.py: cs.binary: bugfixes shown up by cs.serialise unit tests :-(
+  lib/python/cs/binary.py: cs.binary: drop unused import
+  lib/python/cs/binary.py: merge venti ==> media: pull in the cs.binary and csbuffer updates
+  lib/python/cs/binary.py: cs.binary: EmptyPacketField: trivial bytes->EmptyPacketField->bytes round trip test case
+  lib/python/cs/binary.py: cs.binary: bugfix BytesRunField.transcribe; tweak BytesField.value_from_buffer; define __eq__ for PacketFields as same type and same value
+  lib/python/cs/binary.py: cs.binary: add a lot of TEST_CASES for the classes
+  lib/python/cs/binary.py: cs.binary: rough test for structtuple
+  lib/python/cs/binary.py: merge venti ==> media
