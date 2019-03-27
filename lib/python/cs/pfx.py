@@ -47,7 +47,8 @@ from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
 DISTINFO = {
-    'description': "Easy context prefixes for messages.",
+    'description':
+    "Easy context prefixes for messages.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -85,9 +86,12 @@ def pfx(func):
           @pfx
           def f(...):
   '''
+
   def wrapped(*args, **kwargs):
     with Pfx(func.__name__):
       return func(*args, **kwargs)
+
+  wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
   return wrapped
 
 def pfxtag(tag, loggers=None):
@@ -100,15 +104,19 @@ def pfxtag(tag, loggers=None):
           @pfxtag(tag)
           def f(...):
   '''
+
   def wrap(func):
     if tag is None:
       wraptag = func.__name__
     else:
       wraptag = tag
+
     def wrapped(*args, **kwargs):
       with Pfx(wraptag, loggers=loggers):
         return func(*args, **kwargs)
+
     return wrapped
+
   return wrap
 
 class _PfxThreadState(threading.local):
@@ -183,9 +191,12 @@ def gen(func):
       stack is reapplied to the current stack (which may have
       changed) and the generator continued.
   '''
+
   def wrapper(*a, **kw):
     if not isgeneratorfunction(func):
-      raise ValueError("@gen: generatior function required, received %s" % (func,))
+      raise ValueError(
+          "@gen: generatior function required, received %s" % (func,)
+      )
     # commence the generator
     g = func(*a, **kw)
     # note the current Thread's Pfx stack
@@ -212,6 +223,7 @@ def gen(func):
       # reapply the in-generator Pfx stack
       stack.extend(saved)
       del saved
+
   wrapper.__name__ = "@Pfx.gen(%s)" % (func.__name__,)
   fdoc = func.__doc__
   wrapper.__doc__ = wrapper.__name__ + ":\n" + fdoc if fdoc else ''
@@ -247,7 +259,7 @@ class Pfx(object):
     self._loggers = None
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
-        loggers = (loggers, )
+        loggers = (loggers,)
       self.logto(loggers)
 
   def __enter__(self):
@@ -265,6 +277,7 @@ class Pfx(object):
         _state.raise_needs_prefix = False
         # now hack the exception attributes
         current_prefix = self._state.prefix
+
         def prefixify(text):
           if not isinstance(text, StringTypes):
             ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
@@ -273,6 +286,7 @@ class Pfx(object):
           return current_prefix \
               + ': ' \
               + ustr(text, errors='replace').replace('\n', '\n' + current_prefix)
+
         did_prefix = False
         for attr in 'args', 'message', 'msg', 'reason':
           try:
@@ -289,20 +303,22 @@ class Pfx(object):
                 print(
                     "warning: %s: %s.%s: " % (current_prefix, exc_value, attr),
                     prefixify("do not know how to prefixify: %r" % (value,)),
-                    file=sys.stderr)
+                    file=sys.stderr
+                )
                 continue
               else:
                 if vlen < 1:
-                  value = [ prefixify(repr(value)) ]
+                  value = [prefixify(repr(value))]
                 else:
-                  value = [ prefixify(value[0]) ] + list(value[1:])
+                  value = [prefixify(value[0])] + list(value[1:])
             setattr(exc_value, attr, value)
             did_prefix = True
         if not did_prefix:
           print(
-              "warning: %s: %s:%s: message not prefixed"
-              % (current_prefix, type(exc_value).__name__, exc_value),
-              file=sys.stderr)
+              "warning: %s: %s:%s: message not prefixed" %
+              (current_prefix, type(exc_value).__name__, exc_value),
+              file=sys.stderr
+          )
     _state.pop()
     if _state.trace:
       _state.trace(_state.prefix)
@@ -345,9 +361,11 @@ class Pfx(object):
         WorkerThreadPool, Later, and futures.
     '''
     pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
+
     def pfxfunc():
       with pfx2:
         return func(*a, **kw)
+
     return pfxfunc
 
   @property
@@ -373,6 +391,7 @@ class Pfx(object):
     '''
     for L in self.loggers:
       L.exception(msg, *args)
+
   def log(self, level, msg, *args, **kwargs):
     ''' Log a message at an arbitrary log level to this Pfx's loggers.
     '''
@@ -382,24 +401,31 @@ class Pfx(object):
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
         print(
-            "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s"
-            % (self._state.prefix, L, msg, args, kwargs, e), file=sys.stderr)
+            "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" %
+            (self._state.prefix, L, msg, args, kwargs, e),
+            file=sys.stderr
+        )
+
   def debug(self, msg, *args, **kwargs):
     ''' Emit a debug log message.
     '''
     self.log(logging.DEBUG, msg, *args, **kwargs)
+
   def info(self, msg, *args, **kwargs):
     ''' Emit an info log message.
     '''
     self.log(logging.INFO, msg, *args, **kwargs)
+
   def warning(self, msg, *args, **kwargs):
     ''' Emit a warning log message.
     '''
     self.log(logging.WARNING, msg, *args, **kwargs)
+
   def error(self, msg, *args, **kwargs):
     ''' Emit an error log message.
     '''
     self.log(logging.ERROR, msg, *args, **kwargs)
+
   def critical(self, msg, *args, **kwargs):
     ''' Emit a critical log message.
     '''
@@ -431,20 +457,22 @@ class PfxCallInfo(Pfx):
   def __init__(self):
     import traceback
     grandcaller, caller, _ = traceback.extract_stack(None, 3)
-    Pfx.__init__(self,
-                 "at %s:%d %s(), called from %s:%d %s()",
-                 caller[0], caller[1], caller[2],
-                 grandcaller[0], grandcaller[1], grandcaller[2])
+    Pfx.__init__(
+        self, "at %s:%d %s(), called from %s:%d %s()", caller[0], caller[1],
+        caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
+    )
 
 def PfxThread(target=None, **kw):
   ''' Factory function returning a Thread
       which presents the current prefix as context.
   '''
   current_prefix = prefix()
+
   def run(*a, **kw):
     with Pfx(current_prefix):
       if target is not None:
         target(*a, **kw)
+
   return threading.Thread(target=run, **kw)
 
 def XP(msg, *args, **kwargs):
