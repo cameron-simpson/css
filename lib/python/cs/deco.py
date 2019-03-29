@@ -280,6 +280,27 @@ def observable_class(property_names, only_unequal=False):
 
     cls.remove_observer = remove_observer
 
+    def report_observation(self, attr):
+      ''' Notify all the observers of the current value of `attr`.
+      '''
+      val_attr = '_' + attr
+      value = getattr(self, val_attr, None)
+      for observer in self._observable_class__observers[attr]:
+        try:
+          observer(self, attr, value)
+        except Exception as e:
+          warning(
+              "%s.%s=%r: observer %s(...) raises: %s",
+              self,
+              val_attr,
+              value,
+              observer,
+              e,
+              exc_info=True
+          )
+
+    cls.report_observation = report_observation
+
     def make_property(cls, attr):
       ''' make `cls.attr` into a property which reports setattr events.
       '''
@@ -298,19 +319,7 @@ def observable_class(property_names, only_unequal=False):
         old_value = getattr(self, val_attr, None)
         setattr(self, val_attr, new_value)
         if not only_unequal or old_value != new_value:
-          for observer in self._observable_class__observers[attr]:
-            try:
-              observer(self, attr, new_value)
-            except Exception as e:
-              warning(
-                  "%s.%s=%r: observer %s(...) raises: %s",
-                  self,
-                  val_attr,
-                  new_value,
-                  observer,
-                  e,
-                  exc_info=True
-              )
+          self.report_observation(attr)
 
       setter.__name__ = attr
       set_prop = get_prop.setter(setter)
