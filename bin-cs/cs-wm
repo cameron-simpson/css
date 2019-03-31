@@ -28,7 +28,10 @@ PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
 export PATH PYTHONPATH
 
 set -x
-exec fvwm -cmd "PipeRead cs-fvwmrc" ## ${1+"$@"}
+case ${VVNC_DEFAULT:-} in
+  ?*)   exec twm ;;
+  *)    exec fvwm -cmd "PipeRead cs-fvwmrc" ;;  ## ${1+"$@"}
+esac
 
 ### set up FVWM log/fifo vars
 ##eval `rigfvwmvars`
