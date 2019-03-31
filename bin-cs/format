@@ -52,21 +52,14 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# require nonempty flagfile in directory tree
-[ -z "$flagfile" ] || {
-  case "$flagfile" in
-    ./* | /* ) ;;
-    *)  flagfile=$( findup "$flagfile" ) || exit 0 ;;
-  esac
-  [ -s "$flagfile" ] || exit 0
-}
-
 xit=0
 
 for srcfile
 do
   type=
   magic=
+
+  # support leading "type:" prefix to $srcfile
   case "$srcfile" in
     [a-z]*:*)
       type=$( expr "x$srcfile" : 'x\([a-z][^:]*\):.*' )
@@ -74,6 +67,25 @@ do
       [ -f "$tail" ] && srcfile=$tail
       ;;
   esac
+
+  # Require nonempty flagfile in $srcfile directory tree.
+  # Note: works from the directory of the file in order to accomodate
+  # trees symlinked in.
+  [ -z "$flagfile" ] || {
+    srcdir=$( dirname "$srcfile" )
+    case "$flagfile" in
+      ./* | /* ) ;;
+      *)  flagfile=$(
+            set -ue
+            cd "$srcdir"
+            unset PWD
+            findup "$flagfile"
+          ) || continue ;;
+    esac
+    [ -s "$flagfile" ] || continue
+  }
+
+  # try to sniff the type if unspecified
   if [ -z "$type" ]
   then
     case "$srcfile" in
