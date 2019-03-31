@@ -8,17 +8,18 @@
 from builtins import bytes
 
 DISTINFO = {
-    'description': "python 3 specific support for cs.py3 module",
+    'description':
+    "python 3 specific support for cs.py3 module",
     'keywords': ["python2"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [],
 }
 
 def raise3(exc_type, exc_value, exc_traceback):
-  raise exc_type(exc_value).with_traceback(exc_traceback)
+  raise exc_value.with_traceback(exc_traceback)
 
 def raise_from(e1, from_e2):
   raise e1 from from_e2
