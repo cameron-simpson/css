@@ -250,8 +250,8 @@ class Result(object):
       self._complete(None, exc_info)
 
   def raise_(self, exc=None):
-    ''' Convenience wrapper for self.exc_info to store an exception result `exc`.
-        If `exc` is omitted or None, use sys.exc_info().
+    ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
+        If `exc` is omitted or `None`, use `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -262,9 +262,9 @@ class Result(object):
         self.exc_info = sys.exc_info()
 
   def call(self, func, *a, **kw):
-    ''' Have the Result call `func(*a,**kw)` and store its values as
-        self.result.
-        If `func` raises an exception, store it as self.exc_info.
+    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+        `self.result`.
+        If `func` raises an exception, store it as `self.exc_info`.
     '''
     try:
       r = func(*a, **kw)
@@ -371,7 +371,17 @@ class Result(object):
       return result
     return default
 
-  def __call__(self):
+  def __call__(self, *a, **kw):
+    ''' Call the result: wait for it to be ready and then return or raise.
+
+        You can optionally supply a callable and arguments,
+        in which case `callable(*args,**kwargs)` will be called
+        via `Result.call` and the results applied to this Result.
+    '''
+    if a:
+      if not self.pending:
+        raise RuntimeError("calling complete %s" % (type(self).__name__,))
+      self.call(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
       raise CancellationError(self)
