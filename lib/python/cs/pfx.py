@@ -343,7 +343,9 @@ class Pfx(object):
         try:
           u = u % self.mark_args
         except TypeError as e:
-          X("FORMAT CONVERSION: %s: %r %% %r", e, u, self.mark_args)
+          logging.warning(
+              "FORMAT CONVERSION: %s: %r %% %r",
+              e, u, self.mark_args,exc_info=True)
           u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
