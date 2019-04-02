@@ -177,7 +177,7 @@ def cached(
         warning("exception calling %s(self): %s", func, e, exc_info=True)
         return value0
       setattr(self, val_attr, value)
-      if sig_func is not None:
+      if sig_func is not None and not first:
         setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
