@@ -1856,9 +1856,9 @@ class WatchedMaildir(O):
     warning("%d rules", len(self.rules))
 
   def __str__(self):
-    return "<WatchedMaildir modes=%s, %d rules, %d lurking>" \
+    return "<WatchedMaildir modes=%s, %s rules, %d lurking>" \
            % (self.shortname,
-              len(self._rules),
+              "NO" if self._rules is None else len(self._rules),
               len(self.lurking))
 
   def close(self):
