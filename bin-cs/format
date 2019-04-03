@@ -13,17 +13,17 @@ flagfile=
 pymode=3
 
 cmd=$0
-usage="Usage: $cmd [-2] [-3] filenames...
+usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
   -2    Use Python 2 for Python formatting.
   -3    Use Python 3 for Python formatting.
   (Default python mode: $pymode)
   -n    No action. Recite format commands.
   -q    Quiet. Do not display format commands.
   -t flagfile
-        Locate the nearest flagfile from the current directory and
-        cancel the format if it is empty. Also cancel if no such
+        Locate the nearest flagfile from each file's directory and cancel the
+        format of that file if the flagfile is empty. Also cancel if no such
         file is found.
-  -x    Trace execution. Dsiplay format commands to stderr."
+  -x    Trace execution. Display format commands to stderr."
 
 badopts=
 
