@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
 from cs.py.func import funcname
-from cs.x import X
 
 DISTINFO = {
     'description':
@@ -20,6 +19,7 @@ DISTINFO = {
         "Topic :: Database",
     ],
     'install_requires': [
+        'icontract',
         'sqlalchemy',
         'cs.py.func',
     ],
@@ -121,10 +121,6 @@ def orm_auto_session(method):
   def wrapper(self, *a, session=None, **kw):
     ''' Prepare a session if one is not supplied.
     '''
-    ##X(
-    ##    "orm_auto_session(%s): wrapper: method=%r,self=%r,a=%r,session=%r,kw=%r",
-    ##    method, self, method, a, session, kw
-    ##)
     return with_session(method, self, *a, session=session, orm=self.orm, **kw)
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
