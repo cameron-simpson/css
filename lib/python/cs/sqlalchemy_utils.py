@@ -4,8 +4,10 @@
 '''
 
 from contextlib import contextmanager
+from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
 from cs.py.func import funcname
+from cs.x import X
 
 DISTINFO = {
     'description':
@@ -23,6 +25,7 @@ DISTINFO = {
     ],
 }
 
+@require(lambda orm, session: orm is not None or session is not None)
 def with_session(func, *a, orm=None, session=None, **kw):
   ''' Call `func(*a,session=session,**kw)`, creating a session if required.
 
@@ -52,6 +55,7 @@ def auto_session(func):
   ''' Decorator to run a function in a session is not presupplied.
   '''
 
+  @require(lambda orm, session: orm is not None or session is not None)
   def wrapper(*a, orm=None, session=None, **kw):
     ''' Prepare a session if one is not supplied.
     '''
@@ -107,3 +111,22 @@ class ORM:
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method,),)
     wrapper.__doc__ = method.__doc__
     return wrapper
+
+def orm_auto_session(method):
+  ''' Decorator to run a method in a session derived from `self.orm`
+      if a session is not presupplied.
+      Intended to assist classes with a `.orm` attribute.
+  '''
+
+  def wrapper(self, *a, session=None, **kw):
+    ''' Prepare a session if one is not supplied.
+    '''
+    ##X(
+    ##    "orm_auto_session(%s): wrapper: method=%r,self=%r,a=%r,session=%r,kw=%r",
+    ##    method, self, method, a, session, kw
+    ##)
+    return with_session(method, self, *a, session=session, orm=self.orm, **kw)
+
+  wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
+  wrapper.__doc__ = method.__doc__
+  return wrapper
