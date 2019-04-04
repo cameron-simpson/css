@@ -9,6 +9,7 @@ Assorted decorator functions.
 '''
 
 from collections import defaultdict
+import sys
 import time
 from cs.pfx import Pfx
 try:
@@ -27,6 +28,26 @@ DISTINFO = {
         'cs.pfx',
     ],
 }
+
+def fmtdoc(func):
+  ''' Decorator to replace a function's docstring with that string
+      formatted against the function's module's __dict__.
+
+      This supports simple formatted docstrings:
+
+          ENVVAR_NAME = 'FUNC_DEFAULT'
+
+          @fmtdoc
+          def func():
+              """Do something with os.environ[{ENVVAR_NAME}]."""
+              print(os.environ[ENVVAR_NAME])
+
+      This gives `func` this docstring:
+
+          Do something with os.environ[FUNC_DEFAULT].
+  '''
+  func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
+  return func
 
 def decorator(deco):
   ''' Wrapper for decorator functions to support optional keyword arguments.
