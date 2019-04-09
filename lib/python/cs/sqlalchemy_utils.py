@@ -71,15 +71,15 @@ class ORM:
       This defines a `.Base` attribute which is a new `DeclarativeBase`
       and provides various Session related convenience methods.
 
-      Subclasses must define their private `._Session` factory in
+      Subclasses must define their own `.Session` factory in
       their own `__init__`, for example:
 
-          self._Session = sessionmaker(bind=engine)
+          self.Session = sessionmaker(bind=engine)
   '''
 
   def __init__(self):
     self.Base = declarative_base()
-    self._Session = None
+    self.Session = None
 
   @contextmanager
   def session(self):
@@ -87,7 +87,7 @@ class ORM:
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
-    new_session = self._Session()
+    new_session = self.Session()
     try:
       yield new_session
       new_session.commit()
