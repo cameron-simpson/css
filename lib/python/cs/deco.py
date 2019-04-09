@@ -45,6 +45,10 @@ def fmtdoc(func):
       This gives `func` this docstring:
 
           Do something with os.environ[FUNC_DEFAULT].
+
+      *Warning*: this decorator is intended for wiring "constants"
+      into docstrings, not for dynamic values. Use for other types
+      of values should be considered with trepidation.
   '''
   func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
   return func
