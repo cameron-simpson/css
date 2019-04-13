@@ -285,7 +285,7 @@ class Pfx(object):
             return text
           return current_prefix \
               + ': ' \
-              + ustr(text, errors='replace').replace('\n', '\n' + current_prefix)
+              + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
 
         did_prefix = False
         for attr in 'args', 'message', 'msg', 'reason':
@@ -479,7 +479,7 @@ def PfxThread(target=None, **kw):
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
-      which prefixes the message with the currrent Pfx prefix.
+      which prefixes the message with the current Pfx prefix.
   '''
   file = kwargs.pop('file', None)
   if file is None:
