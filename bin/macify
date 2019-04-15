@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python -tt
 #
 # Prepare filenames for transport to a MacOSX machine # by converting Latin-1
 # encoded filenames into UTF-8 Normal Form D encoded filenames.

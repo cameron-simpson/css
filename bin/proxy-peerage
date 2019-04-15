@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Emit configuration lines computed from my proxy peerage file.
 #   - Cameron Simpson <cs@cskk.id.au> 09sep2015

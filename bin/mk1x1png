@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python -tt
 #
 # Construct a 1x1 PNG file.
 #       - Cameron Simpson <cs@cskk.id.au> 05dec2006

@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python -tt
 #
 # Query my dlog.
 #       - Cameron Simpson <cs@cskk.id.au> 14dec2005
