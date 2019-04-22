@@ -58,6 +58,7 @@ except ImportError:
   except ImportError:
     Enum = None
 from functools import partial
+from icontract import require
 import sys
 from threading import Lock
 from cs.logutils import exception, error, warning, debug
@@ -75,7 +76,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
 }
 
 if Enum:
@@ -261,6 +262,7 @@ class Result(object):
       except:
         self.exc_info = sys.exc_info()
 
+  @require(lambda self: self.state == ResultState.pending)
   def call(self, func, *a, **kw):
     ''' Have the `Result` call `func(*a,**kw)` and store its return value as
         `self.result`.
@@ -299,6 +301,7 @@ class Result(object):
     T.start()
     return T
 
+  @require(lambda self: self.state in (ResultState.pending, ResultState.running))
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
