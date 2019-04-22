@@ -285,20 +285,12 @@ class Result(object):
 
         The Result must be in "pending" state, and transitions to "running".
     '''
-    with self._lock:
-      state = self.state
-      if state != ResultState.pending:
-        raise RuntimeError(
-            "<%s>.state is not pending, rejecting background function call of %s"
-            % (self, func)
-        )
-      T = Thread(
-          name="<%s>.bg(func=%s,...)" % (self, func),
-          target=self.call,
-          args=[func] + list(a),
-          kwargs=kw
-      )
-      self.state = ResultState.running
+    T = Thread(
+        name="<%s>.bg(func=%s,...)" % (self, func),
+        target=self.call,
+        args=[func] + list(a),
+        kwargs=kw
+    )
     T.start()
     return T
 
