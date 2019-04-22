@@ -484,7 +484,7 @@ def after(Rs, R, func, *a, **kw):
       subR.notify(count_down)
   return R
 
-class OnDemandFunction(Result):
+class OnDemandResult(Result):
   ''' Wrap a callable, run it when required.
   '''
 
@@ -515,6 +515,8 @@ class OnDemandFunction(Result):
     else:
       self.result = result
     return result
+
+OnDemandFunction = OnDemandResult
 
 if __name__ == '__main__':
   import cs.result_tests
