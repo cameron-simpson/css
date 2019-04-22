@@ -268,6 +268,7 @@ class Result(object):
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
+    self.state = ResultState.running
     try:
       r = func(*a, **kw)
     except BaseException:
