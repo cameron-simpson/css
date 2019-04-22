@@ -196,6 +196,7 @@ class EpisodeInfo(NS):
         `offset`: the starting offset of the information, default 0.
     '''
     with Pfx("parse_filename_part: %r", s):
+      start_offset = offset
       fields = {}
       while offset < len(s):
         offset0 = offset
@@ -211,9 +212,15 @@ class EpisodeInfo(NS):
           else:
             fields[defn.name] = value
             break
-        # parse fals, stop trying for more information
+        # parse fails, stop trying for more information
         if offset == offset0:
           break
+      if offset == start_offset:
+        # no component info, try other things
+        if len(s) == 4 and s.isdigit() and s.startswith(('19','20')):
+          fields['year'] = int(s)
+        elif len(s) == 6 and s[1:-1].isdigit() and s.startswith(('19','20'), 1):
+          fields['year'] = int(s[1:-1])
       return fields, offset
 
   @prop
