@@ -134,6 +134,7 @@ class EpisodeInfo(NS):
       EpisodeDatumDefn('part', 'p'),
       EpisodeDatumDefn('scene', 'sc'),
       EpisodeDatumDefn('extra', 'x'),
+      EpisodeDatumDefn('extra', 'ex'),
   ]
 
   def __init__(self, series=None, episode=None, part=None, scene=None):
