@@ -32,6 +32,7 @@ I also like a media filename to contain enough infomation
 to identify the file contents in a compact and human readable form.
 '''
 
+from __future__ import print_function
 from collections import namedtuple, defaultdict
 from os.path import basename, splitext
 from pprint import pformat
@@ -271,9 +272,7 @@ def pathname_info(pathname):
   '''
   info=defaultdict(list)
   name, ext = splitext(basename(pathname))
-  print(pathname)
   for part, fields in parse_name(name):
-    print(" ", part, repr(fields))
     if fields:
       for field, value in fields.items():
         if field in info:
