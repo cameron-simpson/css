@@ -44,8 +44,9 @@ def with_session(func, *a, orm=None, session=None, **kw):
       the keyword parameter `session` to support nested calls.
   '''
   if session:
-    # run the function in the supplied session
-    return func(*a, session=session, **kw)
+    # run the function nside a savepoint in the supplied session
+    with session.begin_nested():
+      return func(*a, session=session, **kw)
   if not orm:
     raise ValueError("no orm supplied from which to make a session")
   with orm.session() as new_session:
