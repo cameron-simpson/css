@@ -294,7 +294,7 @@ class Result(object):
     T.start()
     return T
 
-  @require(lambda self: self.state in (ResultState.pending, ResultState.running))
+  @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
