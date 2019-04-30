@@ -9,6 +9,7 @@ Assorted decorator functions.
 '''
 
 from collections import defaultdict
+import sys
 import time
 from cs.pfx import Pfx
 try:
@@ -27,6 +28,30 @@ DISTINFO = {
         'cs.pfx',
     ],
 }
+
+def fmtdoc(func):
+  ''' Decorator to replace a function's docstring with that string
+      formatted against the function's module's __dict__.
+
+      This supports simple formatted docstrings:
+
+          ENVVAR_NAME = 'FUNC_DEFAULT'
+
+          @fmtdoc
+          def func():
+              """Do something with os.environ[{ENVVAR_NAME}]."""
+              print(os.environ[ENVVAR_NAME])
+
+      This gives `func` this docstring:
+
+          Do something with os.environ[FUNC_DEFAULT].
+
+      *Warning*: this decorator is intended for wiring "constants"
+      into docstrings, not for dynamic values. Use for other types
+      of values should be considered with trepidation.
+  '''
+  func.__doc__ = func.__doc__.format(**sys.modules[func.__module__].__dict__)
+  return func
 
 def decorator(deco):
   ''' Wrapper for decorator functions to support optional keyword arguments.
@@ -177,7 +202,7 @@ def cached(
         warning("exception calling %s(self): %s", func, e, exc_info=True)
         return value0
       setattr(self, val_attr, value)
-      if sig_func is not None:
+      if sig_func is not None and not first:
         setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
@@ -280,6 +305,27 @@ def observable_class(property_names, only_unequal=False):
 
     cls.remove_observer = remove_observer
 
+    def report_observation(self, attr):
+      ''' Notify all the observers of the current value of `attr`.
+      '''
+      val_attr = '_' + attr
+      value = getattr(self, val_attr, None)
+      for observer in self._observable_class__observers[attr]:
+        try:
+          observer(self, attr, value)
+        except Exception as e:
+          warning(
+              "%s.%s=%r: observer %s(...) raises: %s",
+              self,
+              val_attr,
+              value,
+              observer,
+              e,
+              exc_info=True
+          )
+
+    cls.report_observation = report_observation
+
     def make_property(cls, attr):
       ''' make `cls.attr` into a property which reports setattr events.
       '''
@@ -298,19 +344,7 @@ def observable_class(property_names, only_unequal=False):
         old_value = getattr(self, val_attr, None)
         setattr(self, val_attr, new_value)
         if not only_unequal or old_value != new_value:
-          for observer in self._observable_class__observers[attr]:
-            try:
-              observer(self, attr, new_value)
-            except Exception as e:
-              warning(
-                  "%s.%s=%r: observer %s(...) raises: %s",
-                  self,
-                  val_attr,
-                  new_value,
-                  observer,
-                  e,
-                  exc_info=True
-              )
+          self.report_observation(attr)
 
       setter.__name__ = attr
       set_prop = get_prop.setter(setter)

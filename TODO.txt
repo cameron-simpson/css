@@ -1,3 +1,5 @@
+cs.result: attach a RunState and use it for the .state property - support attach in __init__ to use an existing runstate
+rc/shell/fn-vcs: move repeated-commit check into hg() and git() functions
 @cached: cache generators
 replace cs.env.envsub with os.path.expandvars
 portfwd: changes to match svcd changes

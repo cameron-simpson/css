@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python -tt
 #
 # Flickr tool.
 #       - Cameron Simpson <cs@cskk.id.au> 18dec2007

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Apply a configuration patch to a file, writing the patched config
 # to the standard output.

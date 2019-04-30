@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
 from cs.py.func import funcname
 
@@ -18,11 +19,13 @@ DISTINFO = {
         "Topic :: Database",
     ],
     'install_requires': [
+        'icontract',
         'sqlalchemy',
         'cs.py.func',
     ],
 }
 
+@require(lambda orm, session: orm is not None or session is not None)
 def with_session(func, *a, orm=None, session=None, **kw):
   ''' Call `func(*a,session=session,**kw)`, creating a session if required.
 
@@ -41,8 +44,9 @@ def with_session(func, *a, orm=None, session=None, **kw):
       the keyword parameter `session` to support nested calls.
   '''
   if session:
-    # run the function in the supplied session
-    return func(*a, session=session, **kw)
+    # run the function nside a savepoint in the supplied session
+    with session.begin_nested():
+      return func(*a, session=session, **kw)
   if not orm:
     raise ValueError("no orm supplied from which to make a session")
   with orm.session() as new_session:
@@ -52,6 +56,7 @@ def auto_session(func):
   ''' Decorator to run a function in a session is not presupplied.
   '''
 
+  @require(lambda orm, session: orm is not None or session is not None)
   def wrapper(*a, orm=None, session=None, **kw):
     ''' Prepare a session if one is not supplied.
     '''
@@ -67,15 +72,15 @@ class ORM:
       This defines a `.Base` attribute which is a new `DeclarativeBase`
       and provides various Session related convenience methods.
 
-      Subclasses must define their private `._Session` factory in
+      Subclasses must define their own `.Session` factory in
       their own `__init__`, for example:
 
-          self._Session = sessionmaker(bind=engine)
+          self.Session = sessionmaker(bind=engine)
   '''
 
   def __init__(self):
     self.Base = declarative_base()
-    self._Session = None
+    self.Session = None
 
   @contextmanager
   def session(self):
@@ -83,7 +88,7 @@ class ORM:
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
-    new_session = self._Session()
+    new_session = self.Session()
     try:
       yield new_session
       new_session.commit()
@@ -107,3 +112,18 @@ class ORM:
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method,),)
     wrapper.__doc__ = method.__doc__
     return wrapper
+
+def orm_auto_session(method):
+  ''' Decorator to run a method in a session derived from `self.orm`
+      if a session is not presupplied.
+      Intended to assist classes with a `.orm` attribute.
+  '''
+
+  def wrapper(self, *a, session=None, **kw):
+    ''' Prepare a session if one is not supplied.
+    '''
+    return with_session(method, self, *a, session=session, orm=self.orm, **kw)
+
+  wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
+  wrapper.__doc__ = method.__doc__
+  return wrapper

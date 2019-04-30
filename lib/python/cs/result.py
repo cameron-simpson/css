@@ -58,6 +58,7 @@ except ImportError:
   except ImportError:
     Enum = None
 from functools import partial
+from icontract import require
 import sys
 from threading import Lock
 from cs.logutils import exception, error, warning, debug
@@ -75,7 +76,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
 }
 
 if Enum:
@@ -250,8 +251,8 @@ class Result(object):
       self._complete(None, exc_info)
 
   def raise_(self, exc=None):
-    ''' Convenience wrapper for self.exc_info to store an exception result `exc`.
-        If `exc` is omitted or None, use sys.exc_info().
+    ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
+        If `exc` is omitted or `None`, use `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -261,11 +262,13 @@ class Result(object):
       except:
         self.exc_info = sys.exc_info()
 
+  @require(lambda self: self.state == ResultState.pending)
   def call(self, func, *a, **kw):
-    ''' Have the Result call `func(*a,**kw)` and store its values as
-        self.result.
-        If `func` raises an exception, store it as self.exc_info.
+    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+        `self.result`.
+        If `func` raises an exception, store it as `self.exc_info`.
     '''
+    self.state = ResultState.running
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -282,23 +285,16 @@ class Result(object):
 
         The Result must be in "pending" state, and transitions to "running".
     '''
-    with self._lock:
-      state = self.state
-      if state != ResultState.pending:
-        raise RuntimeError(
-            "<%s>.state is not pending, rejecting background function call of %s"
-            % (self, func)
-        )
-      T = Thread(
-          name="<%s>.bg(func=%s,...)" % (self, func),
-          target=self.call,
-          args=[func] + list(a),
-          kwargs=kw
-      )
-      self.state = ResultState.running
+    T = Thread(
+        name="<%s>.bg(func=%s,...)" % (self, func),
+        target=self.call,
+        args=[func] + list(a),
+        kwargs=kw
+    )
     T.start()
     return T
 
+  @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
@@ -371,7 +367,17 @@ class Result(object):
       return result
     return default
 
-  def __call__(self):
+  def __call__(self, *a, **kw):
+    ''' Call the result: wait for it to be ready and then return or raise.
+
+        You can optionally supply a callable and arguments,
+        in which case `callable(*args,**kwargs)` will be called
+        via `Result.call` and the results applied to this Result.
+    '''
+    if a:
+      if not self.pending:
+        raise RuntimeError("calling complete %s" % (type(self).__name__,))
+      self.call(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
       raise CancellationError(self)
@@ -478,7 +484,7 @@ def after(Rs, R, func, *a, **kw):
       subR.notify(count_down)
   return R
 
-class OnDemandFunction(Result):
+class OnDemandResult(Result):
   ''' Wrap a callable, run it when required.
   '''
 
@@ -509,6 +515,8 @@ class OnDemandFunction(Result):
     else:
       self.result = result
     return result
+
+OnDemandFunction = OnDemandResult
 
 if __name__ == '__main__':
   import cs.result_tests

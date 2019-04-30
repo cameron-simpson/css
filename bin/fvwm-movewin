@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python -tt
 #
 # Emit a raise/resize/[animated]move as specified.
 #       - Cameron Simpson <cs@cskk.id.au> 01jun2007

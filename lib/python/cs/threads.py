@@ -40,17 +40,19 @@ DISTINFO = {
     ],
 }
 
-def bg(func, daemon=None, name=None):
+def bg(func, daemon=None, name=None, no_start=False):
   ''' Dispatch the callable `func` in its own Thread; return the Thread.
 
       Parameters:
       * `daemon`: optional argument specifying the .daemon attribute.
       * `name`: optional argument specifying the Thread name.
+      * `no_start`: optional argument, default `False`.
+        If true, do not start the Thread.
   '''
   T = Thread(name=name, target=func)
   if daemon is not None:
     T.daemon = daemon
-  T.start()
+  no_start or T.start()
   return T
 
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')

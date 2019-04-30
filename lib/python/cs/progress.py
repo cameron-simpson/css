@@ -87,7 +87,7 @@ class Progress(object):
         * `total`: expected completion value, default None.
     '''
     if name is None:
-      name = '-'.join( ( str(type(self)), str(seq())) )
+      name = '-'.join((type(self).__name__, str(seq())))
     now = time.time()
     if position is None:
       position = 0
