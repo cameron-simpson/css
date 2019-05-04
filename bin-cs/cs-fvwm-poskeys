@@ -1,4 +1,4 @@
-#!/usr/bin/env python -tt
+#!/usr/bin/env python
 #
 # Emit positioning key bindings for FVWM.
 #       - Cameron Simpson <cs@cskk.id.au> 20oct2007

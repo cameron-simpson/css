@@ -1,4 +1,4 @@
-#!/usr/bin/env python -tt
+#!/usr/bin/env python
 #
 # Read UNIX mbox format on stdin, write messages to the named maildir.
 #       - Cameron Simpson <cs@cskk.id.au> 08nov2006

@@ -1,4 +1,4 @@
-#!/usr/bin/env python -tt
+#!/usr/bin/env python
 #
 # Convert my categories file to procmail recipes.
 # Note that these days I use mailfiler(1cs), which operates on these
