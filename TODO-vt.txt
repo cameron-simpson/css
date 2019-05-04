@@ -1,3 +1,4 @@
+maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
 http interface: hash based URLs to return a long or infinite expiry as their content is fixed
 http interface: ETag to be the appropriate hashcode with hashtype prefix in double quotes, honour If-None-Match: "hashtype:hashcode" and return 304 not modified on match
 report lmdb use of sys.argv at import time, figure out what it is doing
