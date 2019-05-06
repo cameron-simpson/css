@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Apply a configuration patch to a file, writing the patched config
 # to the standard output.
@@ -11,7 +11,7 @@ from __future__ import with_statement, print_function
 import sys
 import os.path
 import getopt
-from StringIO import StringIO
+from io import StringIO
 from cs.fileutils import rewrite
 from cs.logutils import setup_logging, error, Pfx
 
@@ -44,7 +44,7 @@ def main(argv):
 
   try:
     opts, args = getopt.getopt(sys.argv[1:],'#ADIio:O/:')
-  except getopt.GetoptError, e:
+  except getopt.GetoptError as e:
     error("%s", e)
     badopts = True
     args = []
@@ -133,7 +133,7 @@ def writeConfigData(output, configFile, patchLines, keywords, settings):
 
   for line in configFile:
     if not line.endswith('\n'):
-      raise ValueError, "unexpected EOF"
+      raise ValueError("unexpected EOF")
     words = line.strip().split(settings.sep)
     if len(words) > 0:
       word1 = words[0]
@@ -163,7 +163,7 @@ def readPatchData(fp, settings):
   keywords={}
   for line in fp:
     if not line.endswith('\n'):
-      raise ValueError, "missing EOF"
+      raise ValueError("missing EOF")
     patchLines.append(line)
     line = line.strip()
     if len(line) == 0 or line[0] == '#':
