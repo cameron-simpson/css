@@ -16,7 +16,7 @@
 
         target,... label condition
 
-    The the rule always fires
+    If the rule should always fire
     then the condition may be omitted.
 
     The targets may be
@@ -25,9 +25,9 @@
     email addresses (send the message to the specified address)
     or some other special purpose actions.
 
-    The conditions are usually tests of the email address
-    including whether the address is a member of some group/alias
-    but may also test various things about the message headers.
+    The conditions are usually tests of the header email addresses
+    including whether an address is a member of some group/alias
+    but may also test various other things about the message headers.
 '''
 
 from __future__ import print_function
@@ -79,6 +79,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
+        "Topic :: Communications :: Email :: Filters",
     ],
     'install_requires': [
         'cs.app.maildb',
