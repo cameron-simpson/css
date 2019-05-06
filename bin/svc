@@ -148,7 +148,7 @@ do
       if [ "x$rc_op" = xservice ]
       then
         case "$op" in
-          start)    shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd" ;;
+          start)    shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd &" ;;
           stop|enable|disable|restart)
                     shcmd="svcd $op \"\$SVC_NAME\"" ;;
           *)        continue ;;
