@@ -14,7 +14,6 @@
 # Python 3 - no longer worth supporting ancient Python 2 dialects (i.e. python2.4 on RHEL5). - cameron 07may2019
 #
 
-from getopt import getopt, GetoptError
 import os
 import os.path
 import pwd
@@ -47,7 +46,7 @@ def main(argv):
       for var, value in filevars(varfile):
         environ._definitions[var] = value
 
-  if len(args) == 0:
+  if not args:
     args = ('var *',)
 
   named_vars = set()
@@ -130,6 +129,8 @@ def filevars(path):
   return items
 
 def setvar(var, value, environ, named_vars):
+  ''' Set the value of `var`.
+  '''
   if value is None:
     try:
       value = environ[var]
@@ -144,6 +145,8 @@ def setvar(var, value, environ, named_vars):
   return value
 
 def doCommand(argv, environ, named_vars):
+  ''' Process a setting directive.
+  '''
   op = argv[0]
   argv = argv[1:]
   if op == 'addprefix':
@@ -191,7 +194,7 @@ def doCommand(argv, environ, named_vars):
         envpath = environ['ENVPATH']
         if envpath is None:
           raise ValueError(
-              "BAD ENVPATH: environ= %s %r", type(environ), environ
+              "BAD ENVPATH: environ=%s:%r" % (type(environ), environ)
           )
         for path in envpath.split(':'):
           fpath = os.path.join(path, arg)
@@ -213,11 +216,10 @@ def doCommand(argv, environ, named_vars):
     error("unsupported operation: %s", op)
 
 def doFile(path, environ, named_vars):
+  ''' Process a settings file.
+  '''
   with Pfx(path):
-    oline = ""
-    lineno = 0
-    for line in open(path):
-      lineno += 1
+    for lineno, line in enumerate(open(path), 1):
       with Pfx("%d", lineno):
         if not line.endswith('\n'):
           error("unexpected EOF - missing newline")
@@ -238,6 +240,8 @@ def doFile(path, environ, named_vars):
           doCommand(line.split(), environ, named_vars)
 
 def cleanpath(path, sep=':'):
+  ''' Scrub missing directories from a path.
+  '''
   keep = []
   for subpath in path.split(sep):
     if subpath not in keep and os.path.exists(subpath):
@@ -245,6 +249,8 @@ def cleanpath(path, sep=':'):
   return sep.join(keep)
 
 class EnvMapping(object):
+  ''' An autopopulating mapping of computed environment variables.
+  '''
 
   def __init__(self, baseenv=None):
     self._defined = {}
@@ -253,12 +259,16 @@ class EnvMapping(object):
     self._definitions = {}
 
   def keys(self):
+    ''' The mapping keys.
+    '''
     ks = set()
     ks.update(self._defined.keys())
     ks.update(self._definitions.keys())
     return ks
 
   def get(self, var, default=None):
+    ''' Fetch the value of a variable or `None`.
+    '''
     value = self[var]
     if value is None:
       warning(
@@ -359,6 +369,7 @@ class EnvMapping(object):
       if opsys == "linux":
         return "linux"
       raise ValueError('%s: unknown vendor for OS=%s' % (var, opsys))
+    return None
 
   def _exts(self):
     ''' Generator yielding
