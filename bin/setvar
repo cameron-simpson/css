@@ -48,7 +48,7 @@ def main(argv):
         environ._definitions[var] = value
 
   if len(args) == 0:
-    args=('var *',)
+    args = ('var *',)
 
   named_vars = set()
   for arg in args:
@@ -75,12 +75,15 @@ def main(argv):
       print("%s=%s; export %s;" % (var, cs.sh.quotestr(value), var))
 
 class Pfx(object):
+
   def __init__(self, msg, *a):
     self.msg = msg
     self.args = a
+
   def __enter__(self):
     global prefixes
-    prefixes.append( (self.msg, self.args) )
+    prefixes.append((self.msg, self.args))
+
   def __exit__(self, *a):
     prefixes.pop()
 
@@ -88,7 +91,7 @@ def error(msg, *a):
   errmsg(msg, *a)
 
 def warning(msg, *a):
-  errmsg('warning: '+msg, *a)
+  errmsg('warning: ' + msg, *a)
 
 def errmsg(msg, *a):
   global cmd, prefixes
@@ -102,7 +105,7 @@ def errmsg(msg, *a):
       msgs.append(prefix)
     msgs.append(msg)
     msg = ': '.join(msgs)
-  sys.stderr.write(cmd+': '+msg+'\n')
+  sys.stderr.write(cmd + ': ' + msg + '\n')
 
 def filevars(path):
   ''' Return a list of (var, value) tuples from the specific file.
@@ -123,7 +126,7 @@ def filevars(path):
             var, value = line.split('=', 1)
           except ValueError:
             raise ValueError('missing "="')
-          items.append( (var, value) )
+          items.append((var, value))
   return items
 
 def setvar(var, value, environ, named_vars):
@@ -147,38 +150,36 @@ def doCommand(argv, environ, named_vars):
     for arg in argv:
       arg = envsub(arg, environ=environ, default='')
       if not os.path.isabs(arg):
-        arg=os.path.join('/opt',arg)
-      setvar('PATH',
-             '%s:%s/bin:%s/sbin' % (environ['PATH'], arg, arg),
-             environ,
-             named_vars)
-      setvar('MANPATH',
-             '%s:%s/man:%s/share/man' % (environ['MANPATH'], arg, arg),
-             environ,
-             named_vars)
-      setvar('PERL5LIB',
-             '%s:%s/lib/perl5:%s/lib/perl5/vendor_perl'
-             % (environ['PERL5LIB'], arg, arg),
-             environ,
-             named_vars)
+        arg = os.path.join('/opt', arg)
+      setvar(
+          'PATH', '%s:%s/bin:%s/sbin' % (environ['PATH'], arg, arg), environ,
+          named_vars
+      )
+      setvar(
+          'MANPATH', '%s:%s/man:%s/share/man' % (environ['MANPATH'], arg, arg),
+          environ, named_vars
+      )
+      setvar(
+          'PERL5LIB', '%s:%s/lib/perl5:%s/lib/perl5/vendor_perl' %
+          (environ['PERL5LIB'], arg, arg), environ, named_vars
+      )
   elif op == 'insprefix':
     for arg in reversed(argv):
       arg = envsub(arg, environ=environ, default='')
       if not os.path.isabs(arg):
-        arg=os.path.join('/opt',arg)
-      setvar('PATH',
-             '%s/bin:%s/sbin:%s' % (arg, arg, environ['PATH']),
-             environ,
-             named_vars)
-      setvar('MANPATH',
-             '%s/man:%s/share/man:%s' % (arg, arg, environ['MANPATH']),
-             environ,
-             named_vars)
-      setvar('PERL5LIB',
-             '%s/lib/perl5:%s/lib/perl5/vendor_perl:%s'
-             % (arg, arg, environ['PERL5LIB']),
-             environ,
-             named_vars)
+        arg = os.path.join('/opt', arg)
+      setvar(
+          'PATH', '%s/bin:%s/sbin:%s' % (arg, arg, environ['PATH']), environ,
+          named_vars
+      )
+      setvar(
+          'MANPATH', '%s/man:%s/share/man:%s' % (arg, arg, environ['MANPATH']),
+          environ, named_vars
+      )
+      setvar(
+          'PERL5LIB', '%s/lib/perl5:%s/lib/perl5/vendor_perl:%s' %
+          (arg, arg, environ['PERL5LIB']), environ, named_vars
+      )
   elif op == 'python':
     pycmd = ' '.join(argv)
     eval(pycmd)
@@ -189,7 +190,9 @@ def doCommand(argv, environ, named_vars):
       else:
         envpath = environ['ENVPATH']
         if envpath is None:
-          raise ValueError("BAD ENVPATH: environ= %s %r", type(environ), environ)
+          raise ValueError(
+              "BAD ENVPATH: environ= %s %r", type(environ), environ
+          )
         for path in envpath.split(':'):
           fpath = os.path.join(path, arg)
           if os.path.isfile(fpath):
@@ -198,7 +201,7 @@ def doCommand(argv, environ, named_vars):
   elif op == 'var':
     for arg in argv:
       if arg == '*':
-        varlist = sorted(set( get_identifier(v)[0] for v in environ.keys() ))
+        varlist = sorted(set(get_identifier(v)[0] for v in environ.keys()))
       else:
         varlist = envsub(arg, environ=environ, default='').split(' ')
       for var in varlist:
@@ -211,7 +214,7 @@ def doCommand(argv, environ, named_vars):
 
 def doFile(path, environ, named_vars):
   with Pfx(path):
-    oline=""
+    oline = ""
     lineno = 0
     for line in open(path):
       lineno += 1
@@ -227,10 +230,10 @@ def doFile(path, environ, named_vars):
           error("no var= or command")
           continue
         if offset < len(line) and line[offset] == '=':
-          setvar(word1,
-                 envsub(line[offset+1:], environ, default=''),
-                 environ,
-                 named_vars)
+          setvar(
+              word1, envsub(line[offset + 1:], environ, default=''), environ,
+              named_vars
+          )
         else:
           doCommand(line.split(), environ, named_vars)
 
@@ -258,7 +261,9 @@ class EnvMapping(object):
   def get(self, var, default=None):
     value = self[var]
     if value is None:
-      warning("no value computed for $%s, returning default (%r)", var, default)
+      warning(
+          "no value computed for $%s, returning default (%r)", var, default
+      )
       value = default
     return value
 
@@ -316,11 +321,11 @@ class EnvMapping(object):
     if var == "HOSTDOMAIN":
       hostname = self['HOSTNAME']
       if '.' in hostname:
-        host, hostdomain = hostname.split('.',1)
+        host, hostdomain = hostname.split('.', 1)
         return hostdomain
       raise ValueError("%s: no '.' in $HOSTNAME: %s" % (var, hostname))
     if var == "HOSTNAME":
-      val=os.popen('exec hostname').read()
+      val = os.popen('exec hostname').read()
       if val.endswith('\n'):
         return val[:-1]
       raise ValueError("%s: no result from 'hostname' command" % (var,))
