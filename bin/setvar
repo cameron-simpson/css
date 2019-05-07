@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Script to compute various environment parameters.
 # Must be sourced, and defines the shell function setvar() as a consequence.
@@ -11,15 +11,14 @@
 # Added -f to force resetting variables. - cameron, 11jan1994
 # Generalisation. - cameron, 02dec1998
 # Python recode, syntax change, bootstrap. - cameron 23mar2008
+# Python 3 - no longer worth supporting ancient Python 2 dialects (i.e. python2.4 on RHEL5). - cameron 07may2019
 #
 
-from __future__ import with_statement
 from getopt import getopt, GetoptError
 import os
 import os.path
 import pwd
 import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.env import envsub
 from cs.lex import get_identifier
 import cs.sh
@@ -69,11 +68,11 @@ def main(argv):
   for var in sorted(named_vars):
     try:
       value = environ[var]
-    except ValueError, e:
+    except ValueError as e:
       error("cannot define $%s: %s", var, e)
       raise
     else:
-      print "%s=%s; export %s;" % (var, cs.sh.quotestr(value), var)
+      print("%s=%s; export %s;" % (var, cs.sh.quotestr(value), var))
 
 class Pfx(object):
   def __init__(self, msg, *a):
@@ -205,7 +204,7 @@ def doCommand(argv, environ, named_vars):
       for var in varlist:
         try:
           setvar(var, None, environ, named_vars)
-        except ValueError, e:
+        except ValueError as e:
           error("%s: %s", var, e)
   else:
     error("unsupported operation: %s", op)
