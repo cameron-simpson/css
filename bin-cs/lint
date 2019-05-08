@@ -48,8 +48,8 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case $pymode in
-  2)    pep8=pep8 pyflakes=$pyflakes2 pylint=$pylint2 ;;
-  3)    pep8=pep8 pyflakes=$pyflakes3 pylint=$pylint3 ;;
+  2)    python=python2 pep8=pep8 pyflakes=$pyflakes2 pylint=$pylint2 ;;
+  3)    python=python3 pep8=pep8 pyflakes=$pyflakes3 pylint=$pylint3 ;;
   *)    echo "$cmd: unsupported \$pymode \"$pymode\"" >&2
         exit 1
         ;;
@@ -109,7 +109,7 @@ do
       } || xit=1
       ;;
     py)
-      if $trace python3 -m py_compile "$lintfile"
+      if $trace $python -m py_compile "$lintfile"
       then
         $trace $pyflakes "$lintfile" || xit=1
         $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
@@ -119,7 +119,7 @@ do
       fi
       ;;
     py2)
-      if $trace python -m py_compile "$lintfile"
+      if $trace python2 -m py_compile "$lintfile"
       then
         $trace $pyflakes2 "$lintfile" || xit=1
         $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
