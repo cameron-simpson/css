@@ -308,16 +308,13 @@ class MegaRAID(O):
     '''
     cmd_append("megacli " + " ".join(megacli_args))
     M = O(adapters={})
-    o = None
     A = None
     V = None
     SP = None
     DG = None
     DRV = None
     o = None
-    mlineno = 0
-    for line in self.readcmd(*megacli_args):
-      mlineno += 1
+    for mlineno, line in enumerate(self.readcmd(*megacli_args), 1):
       if not line.endswith('\n'):
         raise ValueError("%d: missing newline" % (mlineno,))
       line = line.rstrip()
