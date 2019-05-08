@@ -343,6 +343,8 @@ class MegaRAID(O):
       elif line.endswith(':'):
         heading = line[:-1]
         info = ''
+      elif ':' in line:
+        heading, info = line.split(':', 1)
       else:
         warning("unparsed line: %s", line)
         continue
