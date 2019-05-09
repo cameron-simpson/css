@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Lock the screen. - Cameron Simpson <cs@cskk.id.au>
+#
+
+if [ "x$OS" = xdarwin ]
+then
+  brightness 0
+  osx-screen-saver
+  ##osx-login-screen
+else
+  [ -n "$DISPLAY" ] || { echo "$0: no \$DISPLAY" >&2; return 1; }
+  ifpid xcompmgr-$DISPLAY && killpidfile xcompmgr-$DISPLAY
+  nice xlock -mode swarm
+  rig-xcompmgr
+fi

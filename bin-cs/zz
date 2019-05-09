@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Sleep the machine. - Cameron Simpson <cs@cskk.id.au>
+
+pf -d
+sync
+if [ "x$OS" = xdarwin ]
+then
+  pmset sleepnow
+else
+  set-x sudo hibernate \
+  || { echo "Hibernate fails, exit status $?" >&2
+       return 1
+     }
+fi
