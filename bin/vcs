@@ -11,7 +11,7 @@ set -ue
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
 : ${VCS_FORMAT_GLOG_GIT:='%<(25)%ae %s%n%ci %h<-%p%d%n'}
-: ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
+: ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(activebookmark,"","","@{activebookmark}")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [-V vcs_type] [command [args...]]
@@ -89,6 +89,12 @@ case "$op" in
       fi
       branch=$("$0" -V "$type" branch)
       printf 'top %s\ntype %s\nbranch %s\n' "$topdir" "$type" "$branch"
+      case "$type" in
+        hg)
+          bookmark=$(hg bookmark | sed -n '/^ \* /!d; s///; s/ .*//; p')
+          printf 'bookmark %s\n' "$bookmark"
+          ;;
+      esac
     fi
     ;;
   top)
@@ -134,6 +140,24 @@ case "$op" in
                     hg status -C ${1+"$@"} ;;
       tags,git)     [ $# -gt 0 ] || set -- -l; git tag "$@" ;;
       tags,hg)      hg tags ${1+"$@"} ;;
+      up,git|update,git)
+                    if [ $# = 1 ]
+                    then
+                      git co "$1"
+                    else
+                      echo "$cmd: $op: expected a single revision" >&2
+                      badopts=1
+                    fi
+                    ;;
+      up,hg|update,hg)
+                    if [ $# = 1 ]
+                    then
+                      hg update -r "$1"
+                    else
+                      echo "$cmd: $op: expected a single revision" >&2
+                      badopts=1
+                    fi
+                    ;;
       *)            echo "$cmd: unrecognised command for $vcs_type: $op" >&2
                     badopts=1
                     ;;

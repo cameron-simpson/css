@@ -6,32 +6,13 @@
 
 r'''
 Convenience facilities for managing exceptions.
-
-Presents:
-
-* return_exc_info: call supplied function with arguments, return either (function_result, None) or (None, exc_info) if an exception was raised.
-
-* @returns_exc_info, a decorator for a function which wraps in it return_exc_info.
-
-* @noexc, a decorator for a function whose exceptions should never escape; instead they are logged. The initial use case was inside logging functions, where I have had a failed logging action abort a program. Obviously this is a decorator which should see very little use.
-
-* @noexc_gen, a decorator for generators with similar effect to @noexc for ordinary functions.
-
-* NoExceptions, a context manager to intercept most exceptions
-
-* LogExceptions, a context manager to log exceptions
-
-* @logexc, a decorator to make a function log exceptions it raises
-
-* @transmute, a decorator to transmute an inner exception to another exception type
-
-* @unattributable, a decorator to transmute inner AttributeError into a RuntimeError
-
-* @unimplemented, a decorator to make a method raise NotImplementedError
 '''
 
 import sys
 import traceback
+from cs.deco import decorator
+from cs.logutils import error
+from cs.py.func import funcname
 
 DISTINFO = {
     'description': "Convenience facilities for managing exceptions.",
@@ -41,17 +22,17 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
 }
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
-      Return:
-        func_return, None
-      in the case of successful operation and:
-        None, exc_info
-      in the case of an exception. `exc_info` is a 3-tuple of
-      exc_type, exc_value, exc_traceback as returned by sys.exc_info().
+      Return `(func_return, None)`
+      in the case of successful operation
+      and `(None, exc_info)` in the case of an exception.
+
+      `exc_info` is a 3-tuple of `(exc_type, exc_value, exc_traceback)`
+      as returned by `sys.exc_info()`.
       If you need to protect a whole suite and would rather not move it
       into its own function, consider the NoExceptions context manager.
   '''
@@ -64,12 +45,13 @@ def return_exc_info(func, *args, **kwargs):
 def returns_exc_info(func):
   ''' Decorator function to wrap functions whose exceptions should be caught,
       such as inside event loops or worker threads.
-      It causes a function to return:
-        func_return, None
-      in the case of successful operation and:
-        None, exc_info
-      in the case of an exception. `exc_info` is a 3-tuple of
-      exc_type, exc_value, exc_traceback as returned by sys.exc_info().
+
+      It causes a function to return `(func_return, None)`
+      in the case of successful operation
+      and `(None, exc_info)` in the case of an exception.
+
+      `exc_info` is a 3-tuple of `(exc_type, exc_value, exc_traceback)`
+      as returned by `sys.exc_info()`.
   '''
   def returns_exc_info_wrapper(*args, **kwargs):
     return return_exc_info(func, *args, **kwargs)
@@ -78,6 +60,7 @@ def returns_exc_info(func):
 def noexc(func):
   ''' Decorator to wrap a function which should never raise an exception.
       Instead, any raised exception is attempted to be logged.
+
       A significant side effect is of course that if the function raises an
       exception it now returns None.
       My primary use case is actually to wrap logging functions,
@@ -88,7 +71,7 @@ def noexc(func):
     from cs.x import X
     try:
       return func(*args, **kwargs)
-    except Exception as e:
+    except Exception:
       try:
         exception(
             "exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
@@ -104,6 +87,7 @@ def noexc(func):
 def noexc_gen(func):
   ''' Decorator to wrap a generator which should never raise an exception.
       Instead, any raised exception is attempted to be logged and iteration ends.
+
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
@@ -133,7 +117,7 @@ def noexc_gen(func):
         try:
           exception("exception calling next(%s(*%s, **(%s))): %s",
                     func.__name__, args, kwargs, e)
-        except Exception as e2:
+        except Exception:
           try:
             X("exception calling next(%s(*%s, **(%s))): %s",
               func.__name__, args, kwargs, e)
@@ -147,10 +131,12 @@ def noexc_gen(func):
 
 def transmute(exc_from, exc_to=None):
   ''' Decorator to transmute an inner exception to another exception type.
+
       The motivating use case is properties in a class with a
       __getattr__ method; if some inner operation of the property
       function raises AttributeError then the property is bypassed
       in favour of __getattr__. Confusion ensues.
+
       In principle this can be an issue with any exception raised
       from "deeper" in the call chain, which can be mistaken for a
       "shallow" exception raise by the function itself.
@@ -168,22 +154,24 @@ def transmute(exc_from, exc_to=None):
   return transmutor
 
 def unattributable(func):
+  ''' Decorator to transmute AttributeError into a RuntimeError.
+  '''
   return transmute(AttributeError, RuntimeError)(func)
 
 def safe_property(func):
+  ''' Substitute for @property which lets AttributeErrors escape as RuntimeErrors.
+  '''
   return property(unattributable(func))
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
-
   def unimplemented_wrapper(self, *a, **kw):
     raise NotImplementedError(
         "%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
   return unimplemented_wrapper
 
 class NoExceptions(object):
-
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
@@ -228,13 +216,21 @@ def LogExceptions(conceal=False):
   return NoExceptions(handler)
 
 def logexc(func):
+  ''' Decorator to log exceptions and reraise.
+  '''
   def logexc_wrapper(*a, **kw):
     with LogExceptions():
       return func(*a, **kw)
-  logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
+  try:
+    name = func.__name__
+  except AttributeError:
+    name = str(func)
+  logexc_wrapper.__name__ = 'logexc(%s)' % (name,)
   return logexc_wrapper
 
 def logexc_gen(genfunc):
+  ''' Decorator to log exceptions and reraise for generators.
+  '''
   def logexc_gen_wrapper(*a, **kw):
     with LogExceptions():
       it = genfunc(*a, **kw)
@@ -260,6 +256,25 @@ def try_logexc(e):
     if e:
       raise e
   f(e)
+
+@decorator
+def exc_fold(func, exc_types=None, exc_return=False):
+  ''' Decorator to catch specific exception types and return a defined default value.
+  '''
+  def wrapped(*a, **kw):
+    try:
+      return func(*a, **kw)
+    except exc_types as e:
+      error("%s", e)
+      return exc_return
+  wrapped.__name__ = (
+      "@exc_fold[%r=>%r]%s"
+      % (exc_types, exc_return, funcname(func))
+  )
+  doc = getattr(func, '__doc__', '')
+  if doc:
+    wrapped.__doc__ = wrapped.__name__ + '\n' + doc
+  return wrapped
 
 if __name__ == '__main__':
   import cs.excutils_tests

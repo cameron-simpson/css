@@ -8,7 +8,7 @@ r'''
 Manage persistent ssh tunnels and port forwards.
 
 Portfwd runs a collection of ssh tunnel commands persistently,
-each it its own `cs.app.svcd <https://pypi.org/project/cs.app.svcd>`_ instance
+each in its own `cs.app.svcd <https://pypi.org/project/cs.app.svcd>`_ instance
 with all the visibility and process control that SvcD brings.
 
 It reads tunnel preconditions from special comments within the ssh config file.
@@ -17,7 +17,7 @@ as the SvcD signature function
 thus restarting particular ssh tunnels when their specific configuration changes.
 It has an "automatic" mode (the -A option)
 which monitors the desired list of tunnels
-from status expressed via `cs.app.flag <https://pypi.org/project/cs.app.flag>`_
+from statuses expressed via `cs.app.flag <https://pypi.org/project/cs.app.flag>`_
 which allows live addition or removal of tunnels as needed.
 '''
 
@@ -100,6 +100,8 @@ in each Host claus with the group name appended.
 Example: "Host home ALL"'''
 
 def main(argv=None, environ=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   if environ is None:
@@ -205,7 +207,9 @@ def main(argv=None, environ=None):
     return 0
 
   running = True
-  def signal_handler(signum, frame):
+  def signal_handler(*_):
+    ''' Action on signal receipt: stop the portfwds and wait, then exit(1).
+    '''
     PFs.stop()
     PFs.wait()
     sys.exit(1)
@@ -220,8 +224,14 @@ def main(argv=None, environ=None):
   return 0
 
 class Portfwd(FlaggedMixin):
+  ''' A ssh tunnel built on a SvcD.
+  '''
 
-  def __init__(self, target, ssh_config=None, conditions=(), test_shcmd=None, trace=False, verbose=False, flags=None):
+  def __init__(
+      self,
+      target, ssh_config=None, conditions=(),
+      test_shcmd=None, trace=False, verbose=False, flags=None
+  ):
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     self.test_shcmd = test_shcmd
@@ -233,51 +243,83 @@ class Portfwd(FlaggedMixin):
     self.svcd_name = 'portfwd-' + target
     self.group_name = 'PORTFWD ' + target.upper()
     self.flag_connected = False
-    def on_reap():
-      self.flag_connected = False
     self.svcd = SvcD(
-        self.ssh_argv,
+        self.ssh_argv(),
         name=self.svcd_name,
         group_name=self.group_name,
         flags=self.flags,
         trace=trace,
-        sig_func=self.sig_func,
+        sig_func=self.ssh_options,
         test_func=self.test_func,
         test_flags={
             'PORTFWD_DISABLE': False,
             'PORTFWD_SSH_READY': True,
             'ROUTE_DEFAULT': True,
         },
-        on_reap=on_reap
+        on_spawn=self.on_spawn,
+        on_reap=self.on_reap
     )
 
   def __str__(self):
-    return "Portfwd %s %s" % (self.target, shq(self.ssh_argv))
+    return "Portfwd %s %s" % (self.target, shq(self.ssh_argv()))
 
   def start(self):
+    ''' Call the service start method.
+    '''
     self.svcd.start()
 
   def stop(self):
+    ''' Call the service stop method.
+    '''
     self.svcd.stop()
 
   def wait(self):
-    xit = self.svcd.wait()
-    return xit
+    ''' Call the service wait method.
+    '''
+    self.svcd.wait()
 
-  @prop
-  def ssh_argv(self):
+  def ssh_argv(self, bare=False):
+    ''' An ssh command line argument list.
+
+        `bare`: just to command and options, no trailing "--".
+    '''
     argv = ['ssh']
     if self.verbose:
       argv.append('-v')
     if self.ssh_config:
       argv.extend(['-F', self.ssh_config])
-    argv.extend([ '-N', '-T',
-                  '-o', 'ExitOnForwardFailure=yes',
-                  '-o', 'PermitLocalCommand=yes',
-                  '-o', 'LocalCommand=' + self.ssh_localcommand,
-                  '--',
-                  self.target ])
+    argv.extend([
+        '-N', '-T',
+        '-o', 'ExitOnForwardFailure=yes',
+        '-o', 'PermitLocalCommand=yes',
+        '-o', 'LocalCommand=' + self.ssh_localcommand,
+    ])
+    if not bare:
+      argv.extend(['--', self.target])
     return argv
+
+  def ssh_options(self):
+    ''' Return a defaultdict(list) of `{option: values}`
+        representing the ssh configuration.
+    '''
+    with Pfx("ssh_options(%r)", self.target):
+      argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
+      P = pipefrom(argv)
+      options = defaultdict(list)
+      parsed = [
+          line.strip().split(None, 1)
+          for line in P.stdout
+      ]
+      retcode = P.wait()
+      if retcode != 0:
+        error("%r: non-zero return code: %s", argv, retcode)
+      else:
+        for parsed_item in parsed:
+          option = parsed_item.pop(0)
+          if parsed_item:
+            value, = parsed_item
+            options[option].append(value)
+      return options
 
   @prop
   def ssh_localcommand(self):
@@ -291,23 +333,49 @@ class Portfwd(FlaggedMixin):
     shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
     return shcmd
 
-  def sig_func(self):
-    ''' Signature function, returning the ssh options for this target.
+  def on_spawn(self):
+    ''' Actions to perform before commencing the ssh tunnel.
+
+        Initially remove local socket paths.
     '''
-    ssh_argv = ['ssh']
-    if self.ssh_config:
-      ssh_argv.extend(['-F', self.ssh_config])
-    ssh_argv.extend(['-G', '-T'])
-    ssh_argv.append(self.target)
-    ssh_proc = pipefrom(ssh_argv)
-    ssh_options = ssh_proc.stdout.read()
-    ssh_retcode = ssh_proc.wait()
-    if ssh_retcode != 0:
-      error("%r: non-zero return code: %s", ssh_argv, ssh_retcode)
-      return None
-    return ssh_options
+    options = self.ssh_options()
+    for localforward in options['localforward']:
+      local, remote = localforward.split(None, 1)
+      if '/' in local:
+        with Pfx("remove %r", local):
+          try:
+            os.remove(local)
+          except OSError as e:
+            if e.errno == errno.ENOENT:
+              pass
+            else:
+              raise
+          else:
+            info("removed")
+    if (
+        options['controlmaster'] == ['true', ]
+        and options['controlpath'] != ['none', ]
+    ):
+      controlpath, = options['controlpath']
+      with Pfx("remove %r", controlpath):
+        try:
+          os.remove(controlpath)
+        except OSError as e:
+          if e.errno == errno.ENOENT:
+            pass
+          else:
+            raise
+        else:
+          info("removed")
+
+  def on_reap(self):
+    ''' Actions to perform after the ssh tunnel exits.
+    '''
+    self.flag_connected = False
 
   def test_func(self):
+    ''' Servuice test function: probe all the conditions.
+    '''
     for condition in self.conditions:
       if not condition.probe():
         if self.verbose:
@@ -321,6 +389,8 @@ class Portfwd(FlaggedMixin):
     return True
 
 class Portfwds(object):
+  ''' A collection of Portfwd instances and associate control methods.
+  '''
 
   def __init__(self, ssh_config=None, environ=None, target_list=None,
                auto_mode=None, trace=False, verbose=False, flags=None):
@@ -368,6 +438,8 @@ class Portfwds(object):
     return P
 
   def start(self):
+    ''' Start all nonrunning targets, stop all running nonrequired targets.
+    '''
     required = self.targets_required()
     for target in required:
       P = self.forward(target)
@@ -384,10 +456,14 @@ class Portfwds(object):
         del self.targets_running[target]
 
   def stop(self):
+    ''' Stop all running targets.
+    '''
     for P in self.targets_running.values():
       P.stop()
 
   def wait(self):
+    ''' Wait for all running targets to stop.
+    '''
     while self.targets_running:
       targets = sorted(self.targets_running.keys())
       for target in targets:
@@ -399,6 +475,11 @@ class Portfwds(object):
           del self.targets_running[target]
 
   def targets_required(self):
+    ''' The concrete list of targets.
+
+        Computed from the target spec and, if in auto mode, the
+        PORTFWD_*_AUTO flags.
+    '''
     targets = set()
     for spec in self.target_list:
       targets.update(self.resolve_target_spec(spec))
@@ -418,6 +499,8 @@ class Portfwds(object):
 
   @prop
   def ssh_config(self):
+    ''' The path to the ssh configuration file.
+    '''
     cfg = self._ssh_config
     if cfg is None:
       cfg = envsub('$HOME/.ssh/config-pf')
@@ -517,6 +600,8 @@ def Condition(portfwd, op, invert, *args):
   raise ValueError("unsupported op")
 
 class _PortfwdCondition(object):
+  ''' Base class for port forward conditions.
+  '''
 
   def __init__(self, portfwd, invert):
     self.portfwd = portfwd
@@ -531,6 +616,7 @@ class _PortfwdCondition(object):
             for attr in sorted(self._attrnames)
         )
     )
+
   def __bool__(self):
     if self.test():
       return not self.invert
@@ -539,16 +625,22 @@ class _PortfwdCondition(object):
   __nonzero__ = __bool__
 
   def shcmd(self):
+    ''' The test argv as a shell command.
+    '''
     cmd = ' '.join(shq(self.test_argv))
     if self.invert:
       cmd = 'if ' + cmd + '; then false; else true; fi'
     return cmd
 
   def probe(self):
+    ''' Probe the condition: run the test function, optionally invert the result.
+    '''
     result = self.test()
     return not result if self.invert else result
 
 class FlagCondition(_PortfwdCondition):
+  ''' A flag based condition.
+  '''
 
   _attrnames = ['flag']
 
@@ -558,6 +650,8 @@ class FlagCondition(_PortfwdCondition):
 
   @prop
   def test_argv(self):
+    ''' Argv for testing a flag.
+    '''
     return ['flag', self.flag]
 
   def test(self, trace=False):
@@ -568,6 +662,8 @@ class FlagCondition(_PortfwdCondition):
     return self.portfwd.flags[self.flag]
 
 class PingCondition(_PortfwdCondition):
+  ''' A ping based condition.
+  '''
 
   _attrnames = ['ping_target']
 
@@ -578,14 +674,18 @@ class PingCondition(_PortfwdCondition):
 
   @prop
   def test_argv(self):
+    ''' Test argv for ping.
+    '''
     return self.ping_argv
 
   def test(self, trace=False):
+    ''' Ping the target as a test.
+    '''
     if trace:
       info("run %r", self.ping_argv)
     retcode = subprocess.call(
-                self.ping_argv,
-                stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
+        self.ping_argv,
+        stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
     return retcode == 0
 
 if __name__ == '__main__':

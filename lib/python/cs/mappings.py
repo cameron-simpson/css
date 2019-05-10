@@ -2,16 +2,14 @@
 
 ''' Facilities for mappings and objects associated with mappings.
 
-    In particular:
-
-    - named_column_tuple(column_names), a function returning a factory
-        for namedtuples subclasses derived from the supplied column
-        names
-
-    - named_column_tuples(rows), a function returning a namedtuple
-        factory and an iterable of instances containing the row data
-
-    These are used by the csv_import and xl_import functions from cs.csvutils.
+    In particular `named_column_tuple(column_names)`,
+    a function returning a factory
+    for namedtuples subclasses derived from the supplied column names,
+    and `named_column_tuples(rows)`,
+    a function returning a namedtuple factory and an iterable of instances
+    containing the row data.
+    These are used by the `csv_import` and `xl_import` functions
+    from `cs.csvutils`.
 '''
 
 from collections import defaultdict, namedtuple
@@ -38,40 +36,42 @@ DISTINFO = {
 def named_row_tuple(*column_names, **kw):
   ''' Return a namedtuple subclass factory derived from `column_names`.
 
-      `column_names`: an iterable of str, such as the heading columns
+      Parameters:
+      * `column_names`: an iterable of `str`, such as the heading columns
         of a CSV export
-      `class_name`: optional keyword parameter specifying the class name
-      `computed`: optional keyword parameter providing a mapping
-        of str to functions of `self`; these strings are available
-        via __getitem__
-      `mixin`: an optional mixin class for the generated namedtuple subclass
+      * `class_name`: optional keyword parameter specifying the class name
+      * `computed`: optional keyword parameter providing a mapping
+        of `str` to functions of `self`; these strings are available
+        via `__getitem__`
+      * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties
 
       The tuple's attributes are computed by converting all runs
-      of nonalphanumerics (as defined by the re module's "\\W"
-      sequence) to an underscore, lowercasing and then stripping
+      of nonalphanumerics
+      (as defined by the `re` module's "\\W" sequence)
+      to an underscore, lowercasing and then stripping
       leading and trailing underscores.
 
       In addition to the normal numeric indices, the tuple may
       also be indexed by the attribute names or the column names.
 
       The new class has the following additional attributes:
-      `attributes_`: the attribute names of each tuple in order
-      `names_`: the originating name strings
-      `name_attributes_`: the computed attribute names corresponding to the
+      * `attributes_`: the attribute names of each tuple in order
+      * `names_`: the originating name strings
+      * `name_attributes_`: the computed attribute names corresponding to the
         `names`; there may be empty strings in this list
-      `attr_of_`: a mapping of column name to attribute name
-      `name_of_`: a mapping of attribute name to column name
-      `index_of_`: a mapping of column names and attributes their tuple indices
+      * `attr_of_`: a mapping of column name to attribute name
+      * `name_of_`: a mapping of attribute name to column name
+      * `index_of_`: a mapping of column names and attributes their tuple indices
 
-      Examples::
+      Examples:
 
-        >>> T = named_row_tuple('Column 1', '', 'Column 3', ' Column 4', 'Column 5 ', '', '', class_name='Example')
-        >>> T.attributes_
-        ['column_1', 'column_3', 'column_4', 'column_5']
-        >>> row = T('val1', 'dropped', 'val3', 4, 5, 6, 7)
-        >>> row
-        Example(column_1='val1', column_3='val3', column_4=4, column_5=5)
+          >>> T = named_row_tuple('Column 1', '', 'Column 3', ' Column 4', 'Column 5 ', '', '', class_name='Example')
+          >>> T.attributes_
+          ['column_1', 'column_3', 'column_4', 'column_5']
+          >>> row = T('val1', 'dropped', 'val3', 4, 5, 6, 7)
+          >>> row
+          Example(column_1='val1', column_3='val3', column_4=4, column_5=5)
   '''
   class_name = kw.pop('class_name', None)
   computed = kw.pop('computed', None)
@@ -103,15 +103,15 @@ def named_row_tuple(*column_names, **kw):
         also be indexed by the attribute names or the column names.
 
         The class has the following attributes:
-        `attributes_`: the attribute names of each tuple in order
-        `computed_`: a mapping of str to functions of `self`; these
-          values are also available via __getitem__
-        `names_`: the originating name strings
-        `name_attributes_`: the computed attribute names corresponding to the
+        * `attributes_`: the attribute names of each tuple in order
+        * `computed_`: a mapping of str to functions of `self`; these
+          values are also available via `__getitem__`
+        * `names_`: the originating name strings
+        * `name_attributes_`: the computed attribute names corresponding to the
           `names`; there may be empty strings in this list
-        `attr_of_`: a mapping of column name to attribute name
-        `name_of_`: a mapping of attribute name to column name
-        `index_of_`: a mapping of column names and attributes their tuple indices
+        * `attr_of_`: a mapping of column name to attribute name
+        * `name_of_`: a mapping of attribute name to column name
+        * `index_of_`: a mapping of column names and attributes their tuple indices
     '''
 
     attributes_ = attributes
@@ -127,6 +127,7 @@ def named_row_tuple(*column_names, **kw):
         attr_of_[name] = attr
         name_of_[attr] = name
         index_of_[name] = i
+        i += 1
     del i, name, attr
     index_of_.update( (s, i) for i, s in enumerate(attributes_) )
 
@@ -143,6 +144,7 @@ def named_row_tuple(*column_names, **kw):
             func = self.computed_.get(key)
             if func is not None:
               return func(self)
+            raise RuntimeError("no method or func for key %r" % (key,))
           else:
             return method()
       else:
@@ -190,30 +192,33 @@ def named_column_tuples(
     mixin=None
 ):
   ''' Process an iterable of data rows, usually with the first row being
-      column names.  Returns a generated namedtuple factory and an iterable
+      column names.
+      Return a generated namedtuple factory and an iterable
       of instances of the namedtuples for each row.
 
-      `rows`: an iterable of rows, each an iterable of data values.
-      `class_name`: option class name for the namedtuple class
-      `column_names`: optional iterable of column names used as the basis for
+      Parameters:
+      * `rows`: an iterable of rows, each an iterable of data values.
+      * `class_name`: option class name for the namedtuple class
+      * `column_names`: optional iterable of column names used as the basis for
         the namedtuple. If this is not provided then the first row from
         `rows` is taken to be the column names.
-      `computed`: optional mapping of str to functions of `self`
-      `preprocess`: optional callable to modify CSV rows before
+      * `computed`: optional mapping of str to functions of `self`
+      * `preprocess`: optional callable to modify CSV rows before
         they are converted into the namedtuple.  It receives a context
         object an the data row.
         It should return the row (possibly modified), or None to drop the
         row.
-        The context object has the following attributes:
-          .cls      attribute with the generated namedtuple subclass;
-                    this is useful for obtaining things like the column named
-                    or column indices; this is None when preprocessing the
-                    header row, if any
-          .index    attribute with the row's enumeration, which counts from 0
-          .previous the previously accepted row's namedtuple, or None
-                    if there is no previous row
-      `mixin`: an optional mixin class for the generated namedtuple subclass
+      * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties
+
+      The context object passed to `preprocess` has the following attributes:
+      * `.cls`: attribute with the generated namedtuple subclass;
+        this is useful for obtaining things like the column names
+        or column indices;
+        this is `None` when preprocessing the header row, if any
+      * `.index`: attribute with the row's enumeration, which counts from 0
+      * `.previous`: the previously accepted row's namedtuple,
+        or `None` if there is no previous row
 
       Rows may be flat iterables in the same order as the column
       names or mappings keyed on the column names.
@@ -228,77 +233,77 @@ def named_column_tuples(
       or punctuation turned into single underscores; trailing
       underscores then get dropped.
 
-      Basic example::
+      Basic example:
 
-        >>> data1 = [
-        ...   ('a', 'b', 'c'),
-        ...   (1, 11, "one"),
-        ...   (2, 22, "two"),
-        ... ]
-        >>> cls, rows = named_column_tuples(data1)
-        >>> print(list(rows))
-        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
+          >>> data1 = [
+          ...   ('a', 'b', 'c'),
+          ...   (1, 11, "one"),
+          ...   (2, 22, "two"),
+          ... ]
+          >>> cls, rows = named_column_tuples(data1)
+          >>> print(list(rows))
+          [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
-      Human readable column headings::
+      Human readable column headings:
 
-        >>> data1 = [
-        ...   ('Index', 'Value Found', 'Descriptive Text'),
-        ...   (1, 11, "one"),
-        ...   (2, 22, "two"),
-        ... ]
-        >>> cls, rows = named_column_tuples(data1)
-        >>> print(list(rows))
-        [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
+          >>> data1 = [
+          ...   ('Index', 'Value Found', 'Descriptive Text'),
+          ...   (1, 11, "one"),
+          ...   (2, 22, "two"),
+          ... ]
+          >>> cls, rows = named_column_tuples(data1)
+          >>> print(list(rows))
+          [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
 
-      Rows which are mappings::
+      Rows which are mappings:
 
-        >>> data1 = [
-        ...   ('a', 'b', 'c'),
-        ...   (1, 11, "one"),
-        ...   {'a': 2, 'c': "two", 'b': 22},
-        ... ]
-        >>> cls, rows = named_column_tuples(data1)
-        >>> print(list(rows))
-        [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
+          >>> data1 = [
+          ...   ('a', 'b', 'c'),
+          ...   (1, 11, "one"),
+          ...   {'a': 2, 'c': "two", 'b': 22},
+          ... ]
+          >>> cls, rows = named_column_tuples(data1)
+          >>> print(list(rows))
+          [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
-      CSV export with unused padding columns::
+      CSV export with unused padding columns:
 
-        >>> data1 = [
-        ...   ('a', 'b', 'c', '', ''),
-        ...   (1, 11, "one"),
-        ...   {'a': 2, 'c': "two", 'b': 22},
-        ...   [3, 11, "three", '', 'dropped'],
-        ... ]
-        >>> cls, rows = named_column_tuples(data1, 'CSV_Row')
-        >>> print(list(rows))
-        [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
+          >>> data1 = [
+          ...   ('a', 'b', 'c', '', ''),
+          ...   (1, 11, "one"),
+          ...   {'a': 2, 'c': "two", 'b': 22},
+          ...   [3, 11, "three", '', 'dropped'],
+          ... ]
+          >>> cls, rows = named_column_tuples(data1, 'CSV_Row')
+          >>> print(list(rows))
+          [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
-      A mixin class providing a test1 method and a test2 property:
+      A mixin class providing a `test1` method and a `test2` property:
 
-        >>> class Mixin(object):
-        ...   def test1(self):
-        ...     return "test1"
-        ...   @property
-        ...   def test2(self):
-        ...     return "test2"
-        >>> data1 = [
-        ...   ('a', 'b', 'c'),
-        ...   (1, 11, "one"),
-        ...   {'a': 2, 'c': "two", 'b': 22},
-        ... ]
-        >>> cls, rows = named_column_tuples(data1, mixin=Mixin)
-        >>> rows = list(rows)
-        >>> rows[0].test1()
-        'test1'
-        >>> rows[0].test2
-        'test2'
+          >>> class Mixin(object):
+          ...   def test1(self):
+          ...     return "test1"
+          ...   @property
+          ...   def test2(self):
+          ...     return "test2"
+          >>> data1 = [
+          ...   ('a', 'b', 'c'),
+          ...   (1, 11, "one"),
+          ...   {'a': 2, 'c': "two", 'b': 22},
+          ... ]
+          >>> cls, rows = named_column_tuples(data1, mixin=Mixin)
+          >>> rows = list(rows)
+          >>> rows[0].test1()
+          'test1'
+          >>> rows[0].test2
+          'test2'
 
   '''
   gen = _named_column_tuples(
-    rows,
-    class_name=class_name, column_names=column_names,
-    computed=computed, preprocess=preprocess,
-    mixin=mixin)
+      rows,
+      class_name=class_name, column_names=column_names,
+      computed=computed, preprocess=preprocess,
+      mixin=mixin)
   cls = next(gen)
   return cls, gen
 
@@ -347,11 +352,15 @@ def _named_column_tuples(
     previous = named_row
 
 class SeqMapUC_Attrs(object):
-  ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)
-      to tuples. Attributes matching such a key return the first element
+  ''' A wrapper for a mapping from keys
+      (matching the regular expression `^[A-Z][A-Z_0-9]*$`)
+      to tuples.
+
+      Attributes matching such a key return the first element
       of the sequence (and requires the sequence to have exactly on element).
-      An attribute FOOs or FOOes (ending in a literal 's' or 'es', a plural)
-      returns the sequence (FOO must be a key of the mapping).
+      An attribute `FOOs` or `FOOes`
+      (ending in a literal 's' or 'es', a plural)
+      returns the sequence (`FOO` must be a key of the mapping).
   '''
   def __init__(self, M, keepEmpty=False):
     self.__M = M
@@ -409,7 +418,7 @@ class SeqMapUC_Attrs(object):
       del self.__M[k]
 
 class UC_Sequence(list):
-  ''' A tuple-of-nodes on which .ATTRs indirection can be done,
+  ''' A tuple-of-nodes on which `.ATTRs` indirection can be done,
       yielding another tuple-of-nodes or tuple-of-values.
   '''
   def __init__(self, Ns):
@@ -422,7 +431,7 @@ class UC_Sequence(list):
     if k is None or not plural:
       return list.__getattr__(self, attr)
     values = tuple(self.__attrvals(attr))
-    if len(values) > 0 and not isNode(values[0]):
+    if values and not isNode(values[0]):
       return values
     return _Nodes(values)
 
@@ -432,25 +441,27 @@ class UC_Sequence(list):
         yield v
 
 class AttributableList(list):
-  ''' An AttributableList maps unimplemented attributes onto the list members
-      and returns you a new AttributableList with the results, ready for a
-      further dereference.
+  ''' An `AttributableList` maps unimplemented attributes
+      onto the list members and returns you a new `AttributableList`
+      with the results, ready for a further dereference.
 
       Example:
 
-        >>> class C(object):
-        ...   def __init__(self, i):
-        ...     self.i = i
-        >>> Cs = [ C(1), C(2), C(3) ]
-        >>> AL = AttributableList( Cs )
-        >>> print(AL.i)
-        [1, 2, 3]
+          >>> class C(object):
+          ...   def __init__(self, i):
+          ...     self.i = i
+          >>> Cs = [ C(1), C(2), C(3) ]
+          >>> AL = AttributableList( Cs )
+          >>> print(AL.i)
+          [1, 2, 3]
   '''
 
   def __init__(self, initlist=None, strict=False):
     ''' Initialise the list.
+
         The optional parameter `initlist` initialises the list
         as for a normal list.
+
         The optional parameter `strict`, if true, causes list elements
         lacking the attribute to raise an AttributeError. If false,
         list elements without the attribute are omitted from the results.
@@ -478,29 +489,32 @@ class AttributableList(list):
 class MethodicalList(AttributableList):
   ''' A MethodicalList subclasses a list and maps unimplemented attributes
       into a callable which calls the corresponding method on each list members
-      and returns you a new MethodicalList with the results, ready for a
+      and returns you a new `MethodicalList` with the results, ready for a
       further dereference.
 
       Example:
-        >>> n = 1
-        >>> class C(object):
-        ...   def __init__(self):
-        ...     global n
-        ...     self.n = n
-        ...     n += 1
-        ...   def x(self):
-        ...     return self.n
-        ...
-        >>> Cs=[ C(), C(), C() ]
-        >>> ML = MethodicalList( Cs )
-        >>> print(ML.x())
-        [1, 2, 3]
+
+          >>> n = 1
+          >>> class C(object):
+          ...   def __init__(self):
+          ...     global n
+          ...     self.n = n
+          ...     n += 1
+          ...   def x(self):
+          ...     return self.n
+          ...
+          >>> Cs=[ C(), C(), C() ]
+          >>> ML = MethodicalList( Cs )
+          >>> print(ML.x())
+          [1, 2, 3]
   '''
 
   def __init__(self, initlist=None, strict=False):
     ''' Initialise the list.
+
         The optional parameter `initlist` initialises the list
         as for a normal list.
+
         The optional parameter `strict`, if true, causes list elements
         lacking the attribute to raise an AttributeError. If false,
         list elements without the attribute are omitted from the results.
@@ -526,7 +540,7 @@ class MethodicalList(AttributableList):
 
 class FallbackDict(defaultdict):
   ''' A dictlike object that inherits from another dictlike object;
-      this is a convenience subclass of defaultdict.
+      this is a convenience subclass of `defaultdict`.
   '''
 
   def __init__(self, otherdict):
@@ -542,14 +556,18 @@ class FallbackDict(defaultdict):
 
 class MappingChain(object):
   ''' A mapping interface to a sequence of mappings.
-      It does not support __setitem__ at present; that is expected
-      to be managed via the backing mappings.
+
+      It does not support `__setitem__` at present;
+      that is expected to be managed via the backing mappings.
   '''
 
   def __init__(self, mappings=None, get_mappings=None):
     ''' Initialise the MappingChain.
-        `mappings`: initial sequence of mappings, default None.
-        `get_mappings`: callable to obtain the initial sequence of
+
+        Parameters:
+        * `mappings`: initial sequence of mappings, default None.
+        * `get_mappings`: callable to obtain the initial sequence of
+
         Exactly one of `mappings` or `get_mappings` must be provided.
     '''
     if mappings is not None:
@@ -613,8 +631,8 @@ class SeenSet(object):
       # create file if missing, also tests access permission
       with open(backing_path, "a"):
         pass
-      self._backing_file = SharedAppendLines(backing_path,
-                                             importer=self._add_foreign_line)
+      self._backing_file = SharedAppendLines(
+          backing_path, importer=self._add_foreign_line)
       self._backing_file.ready()
 
   def _add_foreign_line(self, line):
@@ -628,10 +646,13 @@ class SeenSet(object):
 
   def add(self, s, foreign=False):
     ''' Add the value `s` to the set.
-        `s`: the value to add
-        `foreign`: default False: whether the value came from an
-          outside source, usually a third party addition to the backing
-          file; this prevents appending the value to the backing file
+
+        Parameters:
+        * `s`: the value to add
+        * `foreign`: default `False`:
+          whether the value came from an outside source,
+          usually a third party addition to the backing file;
+          this prevents appending the value to the backing file.
     '''
     # avoid needlessly extending the backing file
     if s in self.set:
@@ -648,34 +669,36 @@ class StackableValues(object):
       available as an attribute.
 
       Note that names conflicting with methods are not available
-      as attributes and must be accessed via __getitem__. As a
-      matter of practice, in addition to the mapping methods, avoid
-      names which are verbs or which begin with an underscore.
+      as attributes and must be accessed via `__getitem__`.
+      As a matter of practice, in addition to the mapping methods,
+      avoid names which are verbs or which begin with an underscore.
 
-      >>> S = StackableValues()
-      >>> print(S)
-      StackableValues()
-      >>> S.push('x', 1)
-      >>> print(S)
-      StackableValues(x=1)
-      >>> print(S.x)
-      1
-      >>> S.push('x', 2)
-      >>> print(S.x)
-      2
-      >>> S.x = 3
-      >>> print(S.x)
-      3
-      >>> S.pop('x')
-      3
-      >>> print(S.x)
-      1
-      >>> with S.stack('x', 4):
-      ...   print(S.x)
-      ...
-      4
-      >>> print(S.x)
-      1
+      Example:
+
+          >>> S = StackableValues()
+          >>> print(S)
+          StackableValues()
+          >>> S.push('x', 1)
+          >>> print(S)
+          StackableValues(x=1)
+          >>> print(S.x)
+          1
+          >>> S.push('x', 2)
+          >>> print(S.x)
+          2
+          >>> S.x = 3
+          >>> print(S.x)
+          3
+          >>> S.pop('x')
+          3
+          >>> print(S.x)
+          1
+          >>> with S.stack('x', 4):
+          ...   print(S.x)
+          ...
+          4
+          >>> print(S.x)
+          1
   '''
 
   def __init__(self):
@@ -738,6 +761,8 @@ class StackableValues(object):
     return v
 
   def __setattr__(self, attr, value):
+    ''' For nonunderscore attributes, replace the top element of the stack.
+    '''
     if attr.startswith('_'):
       self.__dict__[attr] = value
     else:
@@ -751,13 +776,21 @@ class StackableValues(object):
         vs[-1] = value
 
   def __getitem__(self, key):
-    ''' Return the top value for `key` or raise KeyError.
+    ''' Return the top value for `key` or raise `KeyError`.
     '''
     vs = self._values[key]
     try:
       v = vs[-1]
     except IndexError:
-      raise KeyError(key)
+      try:
+        fallback_func = self._fallback
+      except AttributeError:
+        # no fallback function
+        raise KeyError(key)
+      try:
+        return fallback_func(key)
+      except Exception as e:
+        raise KeyError("fallback for %r fails: %s" % (key, e)) from e
     return v
 
   def get(self, key, default=None):

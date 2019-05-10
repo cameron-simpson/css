@@ -11,6 +11,7 @@ from collections import namedtuple
 import errno
 import os
 import sys
+from time import sleep
 from threading import Lock
 from cs.binary import PacketField, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
@@ -24,6 +25,34 @@ from cs.resources import not_closed, ClosedError
 from cs.result import Result
 from cs.seq import seq, Seq
 from cs.threads import locked
+
+DISTINFO = {
+    'description': "general purpose bidirectional packet stream connection",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: System :: Networking",
+    ],
+    'install_requires': [
+        'cs.binary',
+        'cs.buffer',
+        'cs.excutils',
+        'cs.later',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.predicate',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads'
+    ]
+}
+
+# default pause before flush to allow for additional packet data to arrive
+DEFAULT_PACKET_GRACE = 0.01
 
 class Packet(PacketField):
   ''' A protocol packet.
@@ -135,7 +164,7 @@ class PacketConnection(object):
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
         * `request_handler`: an optional callable accepting
-          (`rq_type`, `flags`, `payload`).  
+          (`rq_type`, `flags`, `payload`).
           The request_handler may return one of 5 values on success:
           * `None`: response will be 0 flags and an empty payload.
           * `int`: flags only. Response will be the flags and an empty payload.
@@ -173,23 +202,21 @@ class PacketConnection(object):
     self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
-    self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
+    self.packet_grace = DEFAULT_PACKET_GRACE
     # dispatch Thread to process received packets
     self._recv_thread = Thread(
         target=self._receive_loop,
         name="%s[_receive_loop]" % (self.name,))
-    self._recv_thread.daemon = True
     self._recv_thread.start()
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
     self._send_thread = Thread(
         target=self._send_loop,
         name="%s[_send]" % (self.name,))
-    self._send_thread.daemon = True
     self._send_thread.start()
     # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()
@@ -200,6 +227,8 @@ class PacketConnection(object):
 
   def shutdown(self, block=False):
     ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
+
+        Parameters:
         `block`: block for outstanding requests, default False.
     '''
     with Pfx("SHUTDOWN %s", self):
@@ -219,15 +248,11 @@ class PacketConnection(object):
       self._sendQ.close(enforce_final_close=True)
       self._send_thread.join()
       # we do not wait for the receiver - anyone hanging on outstaning
-      # requests will get them as they come in, and in thoery a network
+      # requests will get them as they come in, and in theory a network
       # disconnect might leave the receiver hanging anyway
+      self._later.close()
       if block:
-        self._later.wait_outstanding(until_idle=True)
-        self._later.close(enforce_final_close=True)
-        if not self._later.closed:
-          raise RuntimeError("%s: ._later not closed! %r" % (self, self._later))
-      else:
-        self._later.close()
+        self._later.wait()
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -351,7 +376,8 @@ class PacketConnection(object):
 
   @not_closed
   def do(self, *a, **kw):
-    ''' Synchronous request. Calls the `Result` returned from the request.
+    ''' Synchronous request.
+        Calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
 
@@ -434,7 +460,7 @@ class PacketConnection(object):
                       channel, tag, self.request_handler,
                       rq_type, flags, payload)
                   self._running.add(LF)
-                  LF.notify(lambda LF: self._running.remove(LF))
+                  LF.notify(self._running.remove)
           else:
             with Pfx("response[%d:%d]", channel, tag):
               # response: get state of matching pending request, remove state
@@ -459,7 +485,7 @@ class PacketConnection(object):
                     # decode payload
                     try:
                       result = decode_response(flags, payload)
-                    except Exception as e:
+                    except Exception:
                       R.exc_info = sys.exc_info()
                     else:
                       R.result = (True, flags, result)
@@ -494,7 +520,16 @@ class PacketConnection(object):
             for bs in P.transcribe_flat():
               fp.write(bs)
             if Q.empty():
-              fp.flush()
+              # no immediately ready further packets: flush the output buffer
+              grace = self.packet_grace
+              if grace > 0:
+                # allow a little time for further Packets to queue
+                sleep(grace)
+                if Q.empty():
+                  # still nothing
+                  fp.flush()
+              else:
+                fp.flush()
           except OSError as e:
             if e.errno == errno.EPIPE:
               warning("remote end closed")

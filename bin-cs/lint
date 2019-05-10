@@ -11,12 +11,13 @@ trace=
 
 pymode=3
 pyflakes2=pyflakes-2.7
-pyflakes3=pyflakes-3.6
+pyflakes3='py3 -m pyflakes'
 pylint2=pylint-2.7
-pylint3=pylint-3.6
+pylint3='py3 -m pylint'
 pep8_ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E501,E731,W503
-pylint_disable=bad-whitespace,invalid-name
+pylint_disable=bad-whitespace,invalid-name,useless-object-inheritance
 pylintrc=$( findup .pylintrc || echo "$HOME/.pylintrc" )
+shellcheck_exclusions=SC1007
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
@@ -47,8 +48,8 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case $pymode in
-  2)    pep8=pep8 pyflakes=$pyflakes2 pylint=$pylint2 ;;
-  3)    pep8=pep8 pyflakes=$pyflakes3 pylint=$pylint3 ;;
+  2)    python=python2 pep8=pep8 pyflakes=$pyflakes2 pylint=$pylint2 ;;
+  3)    python=python3 pep8=pep8 pyflakes=$pyflakes3 pylint=$pylint3 ;;
   *)    echo "$cmd: unsupported \$pymode \"$pymode\"" >&2
         exit 1
         ;;
@@ -85,13 +86,13 @@ do
   then
     case "$magic" in
       *'perl script'*)          type=pl ;;
-      *'python script'* | *'python3 script'* )
+      *[Pp]'ython script'* | *'python3 script'* )
                                 type=py ;;
       *'POSIX shell script'*)   type=sh ;;
     esac
   fi
   [ -n "$type" ] || {
-    echo "$cmd: $lintfile: unknown type (magic=$magic)" >&2
+    echo "$cmd: $lintfile: skipping unknown type (magic=$magic)" >&2
     continue
   }
 
@@ -108,7 +109,7 @@ do
       } || xit=1
       ;;
     py)
-      if $trace python3 -m py_compile "$lintfile"
+      if $trace $python -m py_compile "$lintfile"
       then
         $trace $pyflakes "$lintfile" || xit=1
         $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
@@ -118,7 +119,7 @@ do
       fi
       ;;
     py2)
-      if $trace python -m py_compile "$lintfile"
+      if $trace python2 -m py_compile "$lintfile"
       then
         $trace $pyflakes2 "$lintfile" || xit=1
         $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
@@ -128,7 +129,7 @@ do
       fi
       ;;
     sh)
-      $trace shellcheck -s sh "$lintfile" || xit=1
+      $trace shellcheck "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
       ;;
     *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
       ;;

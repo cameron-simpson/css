@@ -10,12 +10,28 @@
 import os
 import errno
 import socket
-from cs.logutils import warning
+from cs.logutils import debug, warning
 from cs.pfx import Pfx
 
+DISTINFO = {
+    'description': "some utilities for network sockets",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: System :: Networking",
+    ],
+    'install_requires': ['cs.logutils', 'cs.pfx'],
+}
+
 def bind_next_port(sock, host, base_port):
-  ''' Bind a the socket `sock` to the first free (`host`, port); return the port.
-      `base_port`: the first port number to try.
+  ''' Bind the socket `sock` to the first free `(host,port)`; return the port.
+
+      Parameters:
+      * `sock`: open socket.
+      * `host`: target host address.
+      * `base_port`: the first port number to try.
   '''
   while True:
     try:
@@ -80,13 +96,11 @@ class OpenSocket(object):
             ##info("%s", e)
             pass
           elif e.errno == errno.EBADF:
-            warning("closed: %s", e)
+            debug("%s", e)
           else:
-            warning("UNEXPECTED ERROR 1: %s:%r", type(e), e)
             raise
-        except Exception as e:
-          warning("UNEXPECTED ERROR 2: %s:%r", type(e), e)
-        self._close()
+        finally:
+          self._close()
 
   def __del__(self):
     self._close()

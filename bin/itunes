@@ -23,7 +23,8 @@ queuefile=$VARLOG/itunes-dl-queue.log
 
 trace=
 echo=:
-[ -t 2 ] && { echo=eecho trace=set-x; }
+date=:
+[ -t 2 ] && { date=date echo=eecho trace=set-x; }
 
 opts=
 
@@ -112,7 +113,10 @@ download(){
         ;;
     esac
   done
-  [ -z "$flagnames" ] || $trace await flag -t $flagnames
+  [ -z "$flagnames" ] || {
+    $trace await flag -t $flagnames
+    $date >&2
+  }
   $trace \
     lock "$cmd-download" \
     $trace \

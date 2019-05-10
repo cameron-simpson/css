@@ -11,8 +11,8 @@ import shutil
 import sys
 import tempfile
 import unittest
-from cs.randutils import rand0, randblock
-from .datadir import DataDir, DataDir_from_spec, DataDirIndexEntry
+from .randutils import rand0, randblock
+from .datadir import DataDir, DataDirIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import class_names as indexclass_names, class_by_name as indexclass_by_name
 
@@ -26,10 +26,8 @@ def mktmpdir(flavour=None):
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
-      tempfile.mkdtemp(
-          prefix="datadir-test",
-          suffix=".dir",
-          dir='.'))
+      tempfile.mkdtemp(prefix="datadir-test", suffix=".dir", dir='.')
+  )
 
 class TestDataDir(unittest.TestCase):
 
@@ -59,13 +57,17 @@ class TestDataDir(unittest.TestCase):
       self.do_remove_datadirpath = True
     else:
       self.do_remove_datadirpath = False
-    self.datadir = DataDir(self.indexdirpath,
-                           self.datadirpath,
-                           self.hashclass,
-                           indexclass=self.indexclass,
-                           rollover=self.rollover)
-    random.seed()
+    self.datadir = self._open_default_datadir()
     self.datadir.open()
+    random.seed()
+
+  def _open_default_datadir(self):
+    return DataDir(
+        self.indexdirpath,
+        self.hashclass,
+        indexclass=self.indexclass,
+        rollover=self.rollover
+    )
 
   def tearDown(self):
     self.datadir.close()
@@ -129,17 +131,14 @@ class TestDataDir(unittest.TestCase):
           odata = by_hash[hashcode]
           data = D[hashcode]
           self.assertEqual(data, odata)
-      datadir_spec = D.spec()
     # explicitly close the DataDir and reopen
     # this is because the test framework normally does the outermost open/close
     # and therefore the datadir index lock is still sitting aroung
     D.close()
-    D = self.datadir = DataDir_from_spec(datadir_spec)
-    self.assertEqual(datadir_spec, D.spec())
+    D = self.datadir = self._open_default_datadir()
     D.open()
     # reopen the DataDir
     with D:
-      self.assertEqual(datadir_spec, D.spec())
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
       for n, hashcode in enumerate(hashcodes):
@@ -164,7 +163,11 @@ def selftest(argv):
     hashclass = HASHCLASS_BY_NAME[hashname]
     for indexname in sorted(indexclass_names()):
       indexclass = indexclass_by_name(indexname)
-      suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
+      suite.addTest(
+          multitest_suite(
+              TestDataDir, hashclass=hashclass, indexclass=indexclass
+          )
+      )
   runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)
   ##if False:

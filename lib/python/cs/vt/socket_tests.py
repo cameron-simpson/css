@@ -22,11 +22,13 @@ BASE_PORT = 9999
 def make_tcp_store():
   global BASE_PORT
   base_port = BASE_PORT
-  mapping_S = MappingStore("tcp_tests.make_tcp_store.mapping_S", HashUtilDict())
+  mapping_S = MappingStore(
+      "tcp_tests.make_tcp_store.mapping_S", HashUtilDict()
+  )
   while True:
     bind_addr = (BIND_HOST, base_port)
     try:
-      remote_S = TCPStoreServer(bind_addr, mapping_S)
+      remote_S = TCPStoreServer(bind_addr, local_store=mapping_S)
     except OSError as e:
       if e.errno == errno.EADDRINUSE:
         base_port += 1

@@ -1,12 +1,19 @@
+cs.app.megacli: after fixup, copy to megacli_legacy as py2, upgrade megacli to python 3, update module docstrings to explain and reference
+mcli: alarm control, locate control
+cs.result: attach a RunState and use it for the .state property - support attach in __init__ to use an existing runstate
+rc/shell/fn-vcs: move repeated-commit check into hg() and git() functions
+@cached: cache generators
+replace cs.env.envsub with os.path.expandvars
+portfwd: changes to match svcd changes
+svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
+make cs.distinfo just do a Package class, split out PyPI stuff into cs.app.pypi.PyPI(PKG, base urls...)
 drop lib/python/cs/testdata/cs.mailutils/maildir, too big
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
-cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
-cs-release: drop description from DISTINFO, use module docstring, construct README file from docstrings or builtin help if one is missing
 mappings: named tuple rows: omit columns with empty names - common in spreadsheet exports and breaks namedtuples
 iso14496: parser for mdat section - how to know the audio/video format?
 cs.flags: put a lock around all accesses
 SvcD to subclass RunStateMixin?
-Results to inherit from RunStateMixin
+Results to inherit from RunStateMixin?
 SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
 SvcD/Portfwd: cleanup mode polling pid files to kill former processes
 take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources

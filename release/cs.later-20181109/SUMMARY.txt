@@ -1,0 +1,3 @@
+Updates for cs.asynchron renamed to cs.result.
+Later: no longer subclass MultiOpenMixin, users now call close to end submission, shutdown to terminate activity and wait to await finalisation.
+Clean lint, add docstrings, minor bugfixes.

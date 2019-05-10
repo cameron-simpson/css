@@ -15,7 +15,10 @@ do
   shift
 done
 
-[ $# -gt 0 ] || set -- *
+[ $# -gt 0 ] || {
+  echo "Usage: $0 filenames..."
+  exit 2
+}
 
 set -x
 exec frename $rnopts -- \

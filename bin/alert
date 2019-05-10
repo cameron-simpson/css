@@ -58,7 +58,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -A) ALERT_TO=$2; shift ;;
+    -A) alert_to=$2; shift ;;
     -c) colour=$2; shift ;;
     -e) shift
         firstarg=1
@@ -122,14 +122,14 @@ to_log=
 to_desktop=
 to_dlog=
 to_stderr=
-for alert_to in $ALERT_TO
+for alert_target in $alert_to
 do
-  case $alert_to in
+  case $alert_target in
     log)        to_log=1 ;;
     desktop)    to_desktop=1 ;;
     dlog)       to_dlog=1 ;;
     stderr)     to_stderr=1 ;;
-    *)          echo "$cmd: unsupported alert_to target ignored: $alert_to" >&2 ;;
+    *)          echo "$cmd: unsupported alert_to target ignored: $alert_target" >&2 ;;
   esac
 done
 

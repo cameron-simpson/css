@@ -25,13 +25,13 @@ class Test_LRU_Cache(unittest.TestCase):
     check(C)
     self.assertEqual(C, {})
     C[1] = 2
-    self.assertEqual(C, {1:2})
+    self.assertEqual(C, {1: 2})
     check(C)
     C[3] = 4
-    self.assertEqual(C, {1:2, 3:4})
+    self.assertEqual(C, {1: 2, 3: 4})
     check(C)
     C[5] = 6
-    self.assertEqual(C, {3:4, 5:6})
+    self.assertEqual(C, {3: 4, 5: 6})
     check(C)
     C.flush()
     self.assertEqual(C, {})

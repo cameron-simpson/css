@@ -28,14 +28,16 @@ from cs.x import X
 from . import defaults
 from .block import HashCodeBlock
 
-# the record format uses 4 byte integer offsets
-# to this is the maximum (and default) scale for the mmory maps
+# The record format uses 4 byte integer offsets
+# so this is the maximum (and default) scale for the memory maps.
 OFFSET_SCALE = 2 ** 32
 
 OFF_STRUCT = Struct('<L')
 
 _MapEntry = namedtuple('MapEntry', 'index offset span hashcode')
 class MapEntry(_MapEntry):
+  ''' A blockmap entry (index, offset, span, hashcode) and related properties.
+  '''
 
   @prop
   def leaf(self):
@@ -50,7 +52,8 @@ class MapEntry(_MapEntry):
     return self.leaf.data
 
 class MappedFD:
-  ''' Manage a memory map of the contents of a file representing a block's backing leaf content.
+  ''' Manage a memory map of the contents of a file
+      representing a block's backing leaf content.
 
       The file contains records (offset, hashcode) in offset order,
       being the starting offset of a leaf block relative to the
@@ -113,11 +116,11 @@ class MappedFD:
     if offset < 0 or offset >= OFFSET_SCALE:
       raise ValueError("offset(%s) out of range 0:%s" % (offset, OFFSET_SCALE))
     i = bisect_right(self, offset)
-    assert i > 0 and i <= len(self)
+    assert 0 < i <= len(self)
     i -= 1
     entry = self.entry(i)
     if offset < entry.offset or offset >= entry.offset + entry.span:
-      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset)
+      X("submap.locate(offset=%d): entry=%s OUT OF RANGE", offset, entry)
       entry = MapEntry(-1, None, None, None)
     return entry
 
@@ -208,7 +211,7 @@ class BlockMap(RunStateMixin):
       X("BlockMap: set blockmapdir to %r (was None)", blockmapdir)
     else:
       X("BlockMap: supplied blockmapdir=%r", blockmapdir)
-    RunStateMixin.__init__(self)
+    RunStateMixin.__init__(self, "BlockMap")
     from .block import _IndirectBlock
     if not isinstance(block, _IndirectBlock):
       raise TypeError("block needs to be a _IndirectBlock, got a %s instead" % (type(block),))
@@ -248,12 +251,16 @@ class BlockMap(RunStateMixin):
       self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
       self._worker.start()
+    else:
+      self._worker = None
 
   def join(self):
     ''' Wait for the worker to complete.
     '''
     self.runstate.cancel()
-    self._worker.join()
+    worker = self._worker
+    if worker is not None:
+      self._worker.join()
 
   def __del__(self):
     ''' Release resources on object deletion.
@@ -290,7 +297,7 @@ class BlockMap(RunStateMixin):
       submap_path = None
       nleaves = 0
       while offset < blocklen and not runstate.cancelled:
-        for leaf, start, length in block.slices(offset):
+        for leaf, start, length in block.slices(offset, len(block)):
           if runstate.cancelled:
             break
           if start > 0:
@@ -354,7 +361,9 @@ class BlockMap(RunStateMixin):
           offset += leaf.span
           nleaves += 1
           if nleaves % 4096 == 0:
-            X("LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves, runstate.run_time, nleaves // runstate.run_time)
+            X(
+                "LOAD MAPS: processed %d leaves in %gs (%d leaves/s)",
+                nleaves, runstate.run_time, nleaves // runstate.run_time)
       X("LOAD MAPS: leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
@@ -380,18 +389,25 @@ class BlockMap(RunStateMixin):
       assert isinstance(submap, MappedFD), \
           "maps[%d] is not a MappedFD: %r; maps=%r" % (i, type(submap), self.maps)
 
-  def chunks(self, offset, span=None):
+  def datafrom(self, offset=0, span=None):
     ''' Generator yielding data from [offset:offset+span] from the relevant leaves.
-        `offset`: starting offset within `self.block`
-        `span`: number of bytes to cover; if omitted or None, the
-          span runs to the end of self.block
+
+        Parameters:
+        * `offset`: starting offset within `self.block`, default `0`
+        * `span`: number of bytes to cover; if omitted or None, the
+          span runs to the end of `self.block`
     '''
     for leaf, start, end in self.slices(offset, span):
       assert start < end
+      assert start >= 0
+      assert end <= len(leaf)
       yield leaf[start:end]
 
+  # TODO: accept start,end instead of start,span like other slices methods
   def slices(self, offset, span=None):
     ''' Generator yielding (leaf, start, end) from [offset:offset+span].
+
+        Parameters:
         `offset`: starting offset within `self.block`
         `span`: number of bytes to cover; if omitted or None, the
           span runs to the end of self.block
@@ -430,7 +446,7 @@ class BlockMap(RunStateMixin):
       submap_base = submap_index * mapsize
       while span > 0 and entry:
         entry_offset = submap_base + entry.offset
-        assert entry_offset <= offset and entry_offset + entry.span > offset
+        assert entry_offset <= offset < entry_offset + entry.span
         leaf = entry.leaf
         leaf_start = offset - entry_offset
         leaf_subspan = min(entry.span - leaf_start, span)
@@ -448,14 +464,22 @@ class BlockMap(RunStateMixin):
   def data(self, offset, span):
     ''' Return the data from [offset:offset+span] as a single bytes object.
     '''
-    return b''.join(self.chunks(offset, span))
+    return b''.join(self.datafrom(offset, span))
 
   def __getitem__(self, index):
     ''' Return a single byte from the BlockMap.
     '''
     if isinstance(index, int):
-      return self.data(index, 1)
-    raise RuntimeError("need to implement slices")
+      return next(self.datafrom(index))[0]
+    if index.step is not None and index.step != 1:
+      raise ValueError("invalid slice: step=%s" % (index.step,))
+    start = 0 if index.start is None else index.start
+    span = None if index.stop is None else index.stop - start
+    if span < 0:
+      raise ValueError("invalid span: stop(%s) < start(%s)" % (index.stop, index.start))
+    if span == 0:
+      return b''
+    return b''.join(self.datafrom(start, span))
 
 if __name__ == '__main__':
   from .blockmap_tests import selftest

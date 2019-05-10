@@ -58,25 +58,29 @@ except ImportError:
   except ImportError:
     Enum = None
 from functools import partial
+from icontract import require
 import sys
-from threading import Lock, Thread
+from threading import Lock
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
 
 DISTINFO = {
-    'description': "Result and friends: callable objects which will receive a value at a later point in time.",
+    'description':
+    "Result and friends: callable objects which will receive a value"
+    " at a later point in time.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.pfx', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
 }
 
 if Enum:
+
   class ResultState(Enum):
     ''' State tokens for Results.
     '''
@@ -85,6 +89,7 @@ if Enum:
     ready = 'ready'
     cancelled = 'cancelled'
 else:
+
   class ResultState(object):
     ''' State tokens for Results.
     '''
@@ -135,6 +140,7 @@ class Result(object):
 
   def __str__(self):
     return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
+
   __repr__ = __str__
 
   def __del__(self):
@@ -189,12 +195,13 @@ class Result(object):
         return False
       if state == ResultState.running or state == ResultState.pending:
         # in progress or not commenced - change state to cancelled and fall through to ._complete
-        state = ResultState.cancelled
+        self.state = ResultState.cancelled
       else:
         # state error
         raise RuntimeError(
-            "<%s>.state not one of (pending, cancelled, running, ready): %r"
-            % (self, state))
+            "<%s>.state not one of (pending, cancelled, running, ready): %r" %
+            (self, state)
+        )
       self._complete(None, None)
     return True
 
@@ -244,8 +251,8 @@ class Result(object):
       self._complete(None, exc_info)
 
   def raise_(self, exc=None):
-    ''' Convenience wrapper for self.exc_info to store an exception result `exc`.
-        If `exc` is omitted or None, use sys.exc_info().
+    ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
+        If `exc` is omitted or `None`, use `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -255,14 +262,19 @@ class Result(object):
       except:
         self.exc_info = sys.exc_info()
 
+  @require(lambda self: self.state == ResultState.pending)
   def call(self, func, *a, **kw):
-    ''' Have the Result call `func(*a,**kw)` and store its values as
-        self.result.
-        If `func` raises an exception, store it as self.exc_info.
+    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+        `self.result`.
+        If `func` raises an exception, store it as `self.exc_info`.
     '''
+    self.state = ResultState.running
     try:
       r = func(*a, **kw)
     except BaseException:
+      self.exc_info = sys.exc_info()
+    except:
+      exception("%s: unexpected exception: %r", func, sys.exc_info())
       self.exc_info = sys.exc_info()
     else:
       self.result = r
@@ -273,20 +285,16 @@ class Result(object):
 
         The Result must be in "pending" state, and transitions to "running".
     '''
-    with self._lock:
-      state = self.state
-      if state != ResultState.pending:
-        raise RuntimeError(
-            "<%s>.state is not pending, rejecting background function call of %s"
-            % (self, func))
-      T = Thread(
-          name="<%s>.bg(func=%s,...)" % (self, func),
-          target=self.call,
-          args=[func] + list(a), kwargs=kw)
-      self.state = ResultState.running
+    T = Thread(
+        name="<%s>.bg(func=%s,...)" % (self, func),
+        target=self.call,
+        args=[func] + list(a),
+        kwargs=kw
+    )
     T.start()
     return T
 
+  @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
@@ -294,29 +302,29 @@ class Result(object):
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
-          "one of (result, exc_info) must be None, got (%r, %r)"
-          % (result, exc_info))
+          "one of (result, exc_info) must be None, got (%r, %r)" %
+          (result, exc_info)
+      )
     state = self.state
-    if (
-        state == ResultState.cancelled
-        or state == ResultState.running
-        or state == ResultState.pending
-    ):
+    if (state == ResultState.cancelled or state == ResultState.running
+        or state == ResultState.pending):
       self._result = result
       self._exc_info = exc_info
       if state != ResultState.cancelled:
         self.state = ResultState.ready
     else:
       if state == ResultState.ready:
-        warning("<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-                self, result, exc_info)
+        warning(
+            "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
+            self, result, exc_info
+        )
         raise RuntimeError(
-            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r"
-            % (self, result, exc_info)
+            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
+            (self, result, exc_info)
         )
       raise RuntimeError(
-          "<%s>.state is not one of (cancelled, running, pending, ready): %r"
-          % (self, state)
+          "<%s>.state is not one of (cancelled, running, pending, ready): %r" %
+          (self, state)
       )
     self._get_lock.release()
     notifiers = self.notifiers
@@ -327,7 +335,8 @@ class Result(object):
         notifier(self)
       except Exception as e:
         exception(
-            "%s._complete: calling notifier %s: exc=%s", self, notifier, e)
+            "%s._complete: calling notifier %s: exc=%s", self, notifier, e
+        )
       else:
         self.collected = True
 
@@ -358,7 +367,17 @@ class Result(object):
       return result
     return default
 
-  def __call__(self):
+  def __call__(self, *a, **kw):
+    ''' Call the result: wait for it to be ready and then return or raise.
+
+        You can optionally supply a callable and arguments,
+        in which case `callable(*args,**kwargs)` will be called
+        via `Result.call` and the results applied to this Result.
+    '''
+    if a:
+      if not self.pending:
+        raise RuntimeError("calling complete %s" % (type(self).__name__,))
+      self.call(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
       raise CancellationError(self)
@@ -382,6 +401,7 @@ class Result(object):
   def with_result(self, submitter, prefix=None):
     ''' On completion without an exception, call `submitter(self.result)` or report exception.
     '''
+
     def notifier(R):
       ''' Wrapper for `submitter`.
       '''
@@ -395,6 +415,7 @@ class Result(object):
       else:
         error("exception: %r", exc_info)
       return None
+
     self.notify(notifier)
 
 def bg(func, *a, **kw):
@@ -431,14 +452,19 @@ def after(Rs, R, func, *a, **kw):
   if R is None:
     R = Result("after-%d" % (seq(),))
   elif not isinstance(R, Result):
-    raise TypeError("after(Rs, R, func, ...): expected Result for R, got %r" % (R,))
+    raise TypeError(
+        "after(Rs, R, func, ...): expected Result for R, got %r" % (R,)
+    )
   lock = Lock()
   Rs = list(Rs)
   count = len(Rs)
   if count == 0:
     R.call(func, *a, **kw)
   else:
-    countery = [count]  # to stop "count" looking like a local var inside the closure
+    countery = [
+        count
+    ]  # to stop "count" looking like a local var inside the closure
+
     def count_down(_):
       ''' Notification function to submit `func` after sufficient invocations.
       '''
@@ -452,14 +478,14 @@ def after(Rs, R, func, *a, **kw):
         R.call(func, *a, **kw)
       else:
         raise RuntimeError("count < 0: %d" % (count,))
+
     # submit the notifications
     for subR in Rs:
       subR.notify(count_down)
   return R
 
-class _PendingFunction(Result):
-  ''' An Result with a callable used to obtain its result.
-      Since nothing triggers the function call this is an abstract class.
+class OnDemandResult(Result):
+  ''' Wrap a callable, run it when required.
   '''
 
   def __init__(self, func, *a, **kw):
@@ -467,10 +493,6 @@ class _PendingFunction(Result):
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
-
-class OnDemandFunction(_PendingFunction):
-  ''' Wrap a callable, run it when required.
-  '''
 
   def __call__(self):
     with self._lock:
@@ -480,7 +502,9 @@ class OnDemandFunction(_PendingFunction):
       if state == ResultState.pending:
         self.state = ResultState.running
       else:
-        raise RuntimeError("state should be ResultState.pending but is %s" % (self.state,))
+        raise RuntimeError(
+            "state should be ResultState.pending but is %s" % (self.state,)
+        )
     result, exc_info = None, None
     try:
       result = self.func()
@@ -491,6 +515,8 @@ class OnDemandFunction(_PendingFunction):
     else:
       self.result = result
     return result
+
+OnDemandFunction = OnDemandResult
 
 if __name__ == '__main__':
   import cs.result_tests

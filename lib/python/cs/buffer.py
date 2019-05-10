@@ -9,6 +9,7 @@
     an automatically refilling buffer to support parsing of data streams.
 '''
 
+from __future__ import print_function
 import os
 from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
@@ -284,6 +285,8 @@ class CornuCopyBuffer(object):
         *Warning*: this will fetch from the `input_data` if the buffer
         is empty and so it may block.
     '''
+    if self.buf:
+      return False
     self.extend(1, short_ok=True)
     return len(self) == 0
 
@@ -520,8 +523,8 @@ class CornuCopyBuffer(object):
             if short_ok:
               break
             raise EOFError(
-                "insufficient chunks: skipto:%d but only reached %d"
-                % (new_offset, offset)
+                "insufficient chunks: toskip:%d but only reached %d"
+                % (toskip, offset)
             )
           # TODO: an empty chunk from input_data indicates "not
           #   yet" from a nonblocking tailing file - some kind of
