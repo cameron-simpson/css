@@ -75,4 +75,10 @@ time set-x makemkvcon info --noscan --decrypt --noscan -r "$src" \
     : ${outdir:=$outdir_base/$blu_disc_label}
     set-x mkdir "$outdir"
     time set-x makemkvcon mkv  --noscan --decrypt --cache=1024 -r "$src" all "$outdir"
+    # report
+    cd "$outdir"
+    for mkv in *.mkv
+    do
+      pfx "$blu_disc_label/$mkv" ffmpeg -i "$mkv" 2>&1 | fgrep Duration:
+    done
 }
