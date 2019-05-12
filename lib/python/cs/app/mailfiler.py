@@ -116,6 +116,8 @@ DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
 DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
+SELF_FOLDER = '.'
+
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
@@ -462,6 +464,10 @@ class MailFiler(O):
             debug("skip lurking key")
             skipped += 1
             continue
+          if key in wmdir.filed:
+            debug("skip already filed key")
+            skipped += 1
+            continue
           nmsgs += 1
           with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
             ok = self.file_wmdir_key(wmdir, key)
@@ -522,7 +528,11 @@ class MailFiler(O):
     with LogTime("file key %s", key, threshold=1.0, level=DEBUG):
       M = wmdir[key]
       filer = MessageFiler(self)
-      return filer.file(M, wmdir.rules, wmdir.keypath(key))
+      ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
+      if ok:
+        if filer.save_to_self:
+          wmdir.filed.add(key)
+      return ok
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
   ''' Return the Maildir derived from mdirpath.
@@ -641,6 +651,7 @@ class MessageFiler(O):
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
+    self.save_to_self = False
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -1686,8 +1697,12 @@ class Target_MailFolder(O):
     self.mailfolder = mailfolder
 
   def apply(self, filer):
-    mailpath = filer.resolve(self.mailfolder)
-    filer.save_to_folders.add(mailpath)
+    mailfolder = self.mailfolder
+    if mailfolder == SELF_FOLDER:
+      filer.save_to_self = True
+    else:
+      mailpath = filer.resolve(self.mailfolder)
+      filer.save_to_folders.add(mailpath)
 
 class _Condition(O):
 
@@ -1936,6 +1951,7 @@ class WatchedMaildir(O):
     self._rules_paths = [rules_path]
     self._rules_lock = Lock()
     self.lurking = set()
+    self.filed = set()
     self.flush()
     warning("%d rules", len(self.rules))
 
