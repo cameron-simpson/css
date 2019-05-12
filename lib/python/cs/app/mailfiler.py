@@ -477,11 +477,11 @@ class MailFiler(O):
       with LogTime("all keys") as all_keys_time:
         for key in list(wmdir.keys(flush=True)):
           if key in wmdir.lurking:
-            debug("skip lurking key")
+            info("skip lurking key %r", key)
             skipped += 1
             continue
           if key in wmdir.filed:
-            debug("skip already filed key")
+            debug("skip already filed key %r", key)
             skipped += 1
             continue
           nmsgs += 1
@@ -490,6 +490,9 @@ class MailFiler(O):
             if not ok:
               warning("NOT OK, lurking key %s", key)
               wmdir.lurk(key)
+              continue
+            if key in wmdir.filed:
+              info("message remains in this folder")
               continue
             if no_remove:
               info("no_remove: message not removed, lurking key %s", key)
@@ -722,14 +725,22 @@ class MessageFiler(O):
       # use default destination if no save destinations chosen
       if (not self.save_to_folders and not self.save_to_addresses
           and not self.save_to_cmds):
-        default_save = self.env('DEFAULT', '')
-        if not default_save:
+        default_targets = self.env('DEFAULT', '')
+        if not default_targets:
           error("no matching targets and no $DEFAULT")
           return False
-        if '@' in default_save:
-          self.save_to_addresses.add(default_save)
+        try:
+          Ts, offset = get_targets(default_targets, 0)
+          offset = skipwhite(default_targets, offset)
+          if offset < len(default_targets):
+            raise ValueError(
+                'unparsed $DEFAULT text: %r' % default_targets[offset:]
+            )
+        except Exception as e:
+          error('parsing $DEFAULT: %s', e)
         else:
-          self.save_to_folders.add(self.resolve(default_save))
+          for T in Ts:
+            T.apply(self)
 
       # apply labels
       if self.labels:
