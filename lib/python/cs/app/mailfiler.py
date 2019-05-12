@@ -356,8 +356,8 @@ class MailFiler(O):
     ''' The filer's `.rules_pattern`.
     '''
     pattern \
-      = self._rules_pattern \
-      = current_value(
+        = self._rules_pattern \
+        = current_value(
           'MAILFILER_RULES_PATTERN',
           self.cfg,
           'rules_pattern',
@@ -971,7 +971,7 @@ class MessageFiler(O):
   def format_message(self, M, fmt):
     ''' Compute the alert message for the message `M` using the supplied format string `fmt`.
     '''
-    hmap = dict([(k.lower().replace('-', '_'), M[k]) for k in M.keys()])
+    hmap = {k.lower().replace('-', '_'): M[k] for k in M.keys()}
     subj = unrfc2047(M.get('subject', '')).strip()
     if subj:
       hmap['subject'] = subj
@@ -1620,7 +1620,7 @@ class Target_Function(O):
       func = scrub_header
     else:
       raise ValueError(
-          "no simply named functions defined yet: %r", self.funcname
+          "no simply named functions defined yet: %r" % (self.funcname,)
       )
 
     # evaluate the arguments and then call the function
@@ -1820,6 +1820,8 @@ class Condition_HeaderFunction(_Condition):
       raise ValueError("invalid header function .%s()" % (funcname,))
 
   def test_value(self, filer, header_name, header_value):
+    ''' Test the header value against to test function.
+    '''
     return self.test_func(filer, header_name, header_value)
 
   def test_func_contains(self, filer, header_name, header_value):
