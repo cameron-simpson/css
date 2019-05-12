@@ -8,7 +8,7 @@
 
     It monitors multiple Maildir folders for new messages
     and files them according to various easy to write rules.
-    Its use in described fully in the mailfiler(1cs) manual entry.
+    Its use is described fully in the mailfiler(1cs) manual entry.
 
     The rules files are broadly quite simple and described fully
     in the mailfiler(5cs) manual entry.
@@ -49,7 +49,7 @@ import time
 from time import sleep
 from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
-from cs.deco import cached
+from cs.deco import cached, fmtdoc
 import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
@@ -264,7 +264,7 @@ class MailFiler(O):
 
         Parameters:
         * `config_path`: location of config file, default from `DEFAULT_MAILFILER_RC`.
-        * `environ`: initial environment, default from os.environ.
+        * `environ`: initial environment, default from `os.environ`.
     '''
     if config_path is None:
       config_path = envsub(DEFAULT_MAILFILER_RC)
@@ -286,13 +286,19 @@ class MailFiler(O):
 
   @property
   def cfg(self):
+    ''' The [DEFAULT] configuration section.
+    '''
     return self._cfg['DEFAULT']
 
   def subcfg(self, section_name):
+    ''' Return a section of the configuration.
+    '''
     return self._cfg[section_name]
 
   @property
   def cfg_monitor(self):
+    ''' The [monitor] configuration section.
+    '''
     return self.subcfg('monitor')
 
   @locked_property
@@ -306,11 +312,15 @@ class MailFiler(O):
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
+    ''' The path to the email address database.
+    '''
     self._maildb_path = path
     self._maildb = None
 
   @locked_property
   def maildb(self):
+    ''' The email address database.
+    '''
     path = self.maildb_path
     info("MailFiler: reload maildb %s", shortpath(path))
     return MailDB(path, readonly=False)
@@ -331,16 +341,22 @@ class MailFiler(O):
   @msgiddb_path.setter
   @locked
   def msgiddb_path(self, path):
+    ''' The path to the Message-ID database.
+    '''
     self._msgiddb_path = path
     self._msgiddb = None
 
   @locked_property
   def msgiddb(self):
+    ''' The Message-ID database.
+    '''
     return NodeDBFromURL(self.msgiddb_path)
 
   @property
   @locked
   def maildir_path(self):
+    ''' The base Maildir path.
+    '''
     path = self._maildir_path
     if path is None:
       path = current_value(
@@ -360,11 +376,11 @@ class MailFiler(O):
     pattern \
         = self._rules_pattern \
         = current_value(
-          'MAILFILER_RULES_PATTERN',
-          self.cfg,
-          'rules_pattern',
-          DEFAULT_RULES_PATTERN,
-          self.environ)
+            'MAILFILER_RULES_PATTERN',
+            self.cfg,
+            'rules_pattern',
+            DEFAULT_RULES_PATTERN,
+            self.environ)
     debug(".rules_pattern=%r", pattern)
     return pattern
 
@@ -504,7 +520,8 @@ class MailFiler(O):
     filer.save_message()
     return 0
 
-  def report(self, msgfp):
+  @staticmethod
+  def report(msgfp):
     ''' Implementation for command line "report" function: report on message.
     '''
     message = message_from_file(msgfp)
@@ -655,7 +672,7 @@ class MessageFiler(O):
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
-        If specified and not None, the `message_path` parameter
+        If specified and not `None`, the `message_path` parameter
         specifies the filename of the message, supporting hard linking
         the message into a Maildir.
     '''
@@ -874,6 +891,8 @@ class MessageFiler(O):
 
   @property
   def MAILDIR(self):
+    ''' The base folder for Maildirs.
+    '''
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
   def learn_header_addresses(self, header_names, *group_names):
@@ -1527,7 +1546,7 @@ class Target_EnvSub(O):
     self.target_expr = target_expr
 
   def apply(self, filer):
-    ''' Perform environment substituion on target string and then
+    ''' Perform environment substitution on target string and then
         deliver to resulting string.
     '''
     target = envsub(self.target_expr, filer.environ)
@@ -1559,6 +1578,9 @@ class Target_SetFlag(O):
     self.flag_attr = flag_attr
 
   def apply(self, filer):
+    ''' Apply this target:
+        set a flag on the message.
+    '''
     setattr(filer.flags, self.flag_attr, True)
 
 class Target_Substitution(O):
@@ -1572,6 +1594,9 @@ class Target_Substitution(O):
     self.subst_replacement = subst_replacement
 
   def apply(self, filer):
+    ''' Apply this target:
+        apply a regexp substitution to the message headers.
+    '''
     for header_name in self.header_names:
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
@@ -1616,6 +1641,9 @@ class Target_Function(O):
     self.args = args
 
   def apply(self, filer):
+    ''' Apply this target:
+        run the Python function against the message.
+    '''
     if '.' in self.funcname:
       module_name, func_name = self.funcname.rsplit('.', 1)
       func = import_module_name(module_name, func_name)
@@ -1677,6 +1705,9 @@ class Target_PipeLine(O):
     self.shcmd = shcmd
 
   def apply(self, filer):
+    ''' Apply this target:
+        append `self.shcmd` to the list of save commands.
+    '''
     filer.save_to_cmds.append((self.shcmd, filer.process_environ()))
 
 class Target_MailAddress(O):
@@ -1687,6 +1718,9 @@ class Target_MailAddress(O):
     self.address = address
 
   def apply(self, filer):
+    ''' Apply this target:
+        add `self.address` to the set of target forwarding email addresses.
+    '''
     filer.save_to_addresses.add(self.address)
 
 class Target_MailFolder(O):
@@ -1696,7 +1730,13 @@ class Target_MailFolder(O):
   def __init__(self, mailfolder):
     self.mailfolder = mailfolder
 
+  @fmtdoc
   def apply(self, filer):
+    ''' Apply this target:
+        if the folder name is {SELF_FOLDER!r}
+        mark the filer as saving to the source folder,
+        otherwise add the resolved folder name to the set of target folders.
+    '''
     mailfolder = self.mailfolder
     if mailfolder == SELF_FOLDER:
       filer.save_to_self = True
@@ -1711,6 +1751,8 @@ class _Condition(O):
     self.header_names = header_names
 
   def match(self, filer):
+    ''' Test this condition against all the relevant headers.
+    '''
     status = False
     M = filer.message
     for header_name in self.header_names:
@@ -1733,6 +1775,8 @@ class Condition_Regexp(_Condition):
     self.regexptxt = regexp
 
   def test_value(self, filer, header_name, header_value):
+    ''' Test this condition against a header value.
+    '''
     if self.atstart:
       return self.regexp.match(header_value)
     return self.regexp.search(header_value)
@@ -1746,6 +1790,8 @@ class Condition_AddressMatch(_Condition):
     self.addrkeys = tuple(k for k in addrkeys if len(k) > 0)
 
   def test_value(self, filer, header_name, header_value):
+    ''' Test this condition against a header value.
+    '''
     for address in filer.addresses(header_name):
       address_lc = address.lower()
       for key in self.addrkeys:
@@ -1762,6 +1808,8 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
+    ''' Test this condition against a header value.
+    '''
     # choose to test message-ids or addresses
     if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
       # test is against message-ids
