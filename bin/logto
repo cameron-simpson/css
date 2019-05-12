@@ -1,4 +1,4 @@
-#!/usr/bin/env python -tt
+#!/usr/bin/env python
 #
 # Append standard input to a log file.
 # Rotate the file on receiving SIGHUP.

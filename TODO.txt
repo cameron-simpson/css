@@ -1,3 +1,5 @@
+cs.app.megacli: after fixup, copy to megacli_legacy as py2, upgrade megacli to python 3, update module docstrings to explain and reference
+mcli: alarm control, locate control
 cs.result: attach a RunState and use it for the .state property - support attach in __init__ to use an existing runstate
 rc/shell/fn-vcs: move repeated-commit check into hg() and git() functions
 @cached: cache generators

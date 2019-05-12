@@ -1,4 +1,4 @@
-#!/usr/bin/env python -tt
+#!/usr/bin/env python
 #
 # {...} meta command for nesting quoted stuff.
 #       - Cameron Simpson <cs@cskk.id.au> 14sep2007

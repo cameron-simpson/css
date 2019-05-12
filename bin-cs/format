@@ -104,7 +104,7 @@ do
   then
     case "$magic" in
       *'perl script'*)          type=pl ;;
-      *'python script'* | *'python3 script'* )
+      *[Pp]'ython script'* | *'python3 script'* )
                                 type=py ;;
       *'POSIX shell script'*)   type=sh ;;
     esac
