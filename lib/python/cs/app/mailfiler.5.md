@@ -64,13 +64,19 @@ such as a variable assignment or a message header modification.
 The action targets are applied as they are encountered in matching rules.
 The deliverable targets are accrued for delivery at the end of the rules.
 
-If no deliverable targets have been accrued then the default target,
-specified by the `$DEFAULT` environment variable, is used.
+If no deliverable targets have been accrued then the default targets,
+specified by the `$DEFAULT` environment variable, are used.
 There is no default for `$DEFAULT`;
 if it is not specified the message is not considered to be successfully delivered.
 Most rules files commence with a definition of the default delivery target, for example:
 
     DEFAULT=unmatched
+
+For folders whose rules are exceptions
+i.e. they specify messages to be filed elsewhere,
+while nonmatching messages remain in the folder, use:
+
+    DEFAULT=.
 
 The message must be successfully handed to all targets of all matching
 rules for the filter run to be considered successfully filtered.
@@ -265,7 +271,7 @@ This is a Python format string, by default:
 
 `ALERT_TARGETS`, additional implied targets to be used if an alert was issued.
 
-`DEFAULT`, default delivery target
+`DEFAULT`, default delivery targets
 if no rule with a delivery target has been matched.
 See the Targets section above.
 Note that this is considered *after* any `$ALERT_TARGETS` have been added.
@@ -275,12 +281,23 @@ Note that this is considered *after* any `$ALERT_TARGETS` have been added.
 ### No Loop Detection
 
 There is no loop detection for folders.
-It is possible to file from folder A to folder B and have a rule for folder B which in turn files to A; this will process the message indefinitely (once per pass).
+It is possible to file from folder A to folder B
+and have a rule for folder B which in turn files to A;
+this will process the message indefinitely (once per pass).
 
 However, a message which fails to file is noted and never reprocessed.
 This allows the user to fix the rules and then refile the message by hand,
 for example by using mutt to save the offending message to the same folder.
 The refiled message will be seen as new and processed anew.
+
+Also, it is possible to leave messages in the source folder by specifying a target of `.`
+to indicate the current folder;
+in this case the message is not considered on subsequent passes, avoiding a loop.
+The conventional arrange for this it to use:
+
+    DEFAULT=.
+
+at the start of the rules for such a folder.
 
 ### Assignments Are Rule Targets
 
