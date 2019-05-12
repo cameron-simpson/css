@@ -33,7 +33,6 @@ cs.py.func: find out why eval causes syntax error with raise e from e2
 vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
 portfwd ARP_ADDR check for local networks
 colourise command highlighing multiple regexps and line ranges
-mailfiler: prepend received lines on pickup and filing
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
 e: sort entries
