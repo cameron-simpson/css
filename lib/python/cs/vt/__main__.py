@@ -629,6 +629,11 @@ class VTCmd:
     ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
     '''
+    try:
+      from .fuse import mount, umount
+    except ImportError as e:
+      error("FUSE support not configured: %s", e)
+      return 1
     badopts = False
     all_dates = False
     append_only = False
@@ -743,12 +748,6 @@ class VTCmd:
       if E.name == '.':
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
-      # import vtfuse before doing anything with side effects
-      try:
-        from .fuse import mount, umount
-      except ImportError as e:
-        error("FUSE support not configured: %s", e)
-        return 1
       with Pfx(mountpoint):
         need_rmdir = False
         if not isdirpath(mountpoint):

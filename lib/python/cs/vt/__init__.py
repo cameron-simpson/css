@@ -96,6 +96,9 @@ DISTINFO = {
             'mount.vtfs = cs.vt.__main__:mount_vtfs',
         ],
     },
+    'extras_requires'={
+        'FUSE': ['llfuse'],
+    },
 }
 
 DEFAULT_CONFIG_PATH = '~/.vtrc'
