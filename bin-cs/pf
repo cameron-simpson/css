@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+# Wrapper for portfwd command. - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cmd=$0
+usage="Usage:
+    $cmd {-d|disable} [portfwd-names...]  Disable portfwds.
+    $cmd {-e|enable} [portfwd-named...]   Enable portfwds.
+    $cmd add portfwd-name...              Add portfwd to the auto list.
+    $cmd remove portfwd-name...           Remove portfwd from the auto list.
+    $cmd debug [portfwd-names...]         Turn on debug mode for the named portfwds.
+    $cmd restart {ALL|portfwd-names...}   Restart the named portfwds.
+    $cmd scrub                            Remove tunnel sockets and PORTFWD state flags.
+    $cmd start                            Scrub them kick off \"portfwd -A\"."
+
+portfwd_connected(){
+  connected | sed -n 's/^PORTFWD_\(.*\)_CONNECTED/\1/p' | tr '[A-Z_]' '[a-z-]'
+}
+
+portfwd_running(){
+  running | sed -n 's/^PORTFWD_\(.*\)_RUNNING/\1/p' | tr '[A-Z_]' '[a-z-]'
+}
+
+portfwd_auto(){
+  flag -q | sed -n 's/^PORTFWD_\(.*\)_AUTO/\1/p' | tr '[A-Z_]' '[a-z-]'
+}
+
+fq(){
+  flag -q | grep -i "${1-.}"
+}
+
+connected(){
+	fq '_CONNECTED$'
+}
+
+[ $# = 0 ] && { portfwd_connected; exit $?; }
+
+arg1=$1; shift
+case $arg1 in
+  -d|disable)
+        remaining(){
+          if [ $# = 0 ]
+          then
+            portfwd_connected
+          else
+            portfwd_connected \
+            | tr '\012' ' ' \
+            | \
+            { read -r conns
+              for match
+              do  case " $conns " in
+                    *" $match "*)
+                      echo "$match"
+                      ;;
+                  esac
+              done
+            }
+          fi
+        }
+        conns=$( remaining ${1+"$@"} )
+        set-x portfwd -d ${1+"$@"}
+        while [ -n "$conns" ]
+        do  necho $conns ...
+            while sleep 1
+                  nconns=$( remaining ${1+"$@"} )
+                  [ "x$nconns" = "x$conns" ]
+            do  necho .
+            done
+            echo
+            conns=$nconns
+        done
+        ;;
+  -e|enable)
+        set-x portfwd -e "$@"
+        ;;
+  auto) portfwd_auto ;;
+  add)  for name; do flag -v "portfwd_${name}_auto" 1; done ;;
+  remove)
+        for name; do flag -v "portfwd_${name}_auto" 0; done ;;
+  debug)
+        if [ $# = 0 ]
+        then
+          echo "Please choose connections to debug from running portfwds:"
+          portfwd_running
+        else
+          for name
+          do
+            flag=portfwd_${name}_debug
+            if flag "$flag"
+            then  flag -v "$flag" 0
+            else  flag -v "$flag" 1
+            fi
+          done
+        fi
+        ;;
+  restart)
+        if [ $# = 0 ]
+        then
+          echo "Please choose connections to restart or ALL."
+          echo "Current connections:"
+          portfwd_connected
+        else
+          for name
+          do
+            case "$name" in
+              ALL)  for pfname in $(portfwd_connected)
+                    do  set-x svcd restart "portfwd-$pfname"
+                    done
+                    ;;
+              *)    set-x svcd restart "portfwd-$name"
+                    ;;
+            esac
+          done
+        fi
+        ;;
+  scrub)set-x rm ~/.sshctrl-pf* ~/var/portfwd/sshctrl*
+        set-x rm ~/var/flags/PORTFWD_*_{CONNECTED,RUNNING,RESTART}
+        ;;
+  start)"$0" scrub
+        { portfwd -A || alert PORTFWD: portfwd ABORTED ; } &
+        ;;
+  *)    echo "$usage" >&2
+        echo "Current portfwds:" >&2
+        portfwd_connected >&2
+        exit 2
+        ;;
+esac
