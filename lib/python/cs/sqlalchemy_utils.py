@@ -6,7 +6,7 @@
 from contextlib import contextmanager
 from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
-from cs.py.func import funcname
+from cs.py.func import funccite, funcname
 
 DISTINFO = {
     'description':
@@ -62,7 +62,7 @@ def auto_session(func):
     '''
     return with_session(func, *a, orm=orm, session=session, **kw)
 
-  wrapper.__name__ = "@auto_session(%s)" % (funcname(func,),)
+  wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
   wrapper.__doc__ = func.__doc__
   return wrapper
 
