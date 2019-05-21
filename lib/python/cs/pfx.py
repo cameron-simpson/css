@@ -311,7 +311,15 @@ class Pfx(object):
                   value = [prefixify(repr(value))]
                 else:
                   value = [prefixify(value[0])] + list(value[1:])
-            setattr(exc_value, attr, value)
+            try:
+              setattr(exc_value, attr, value)
+            except AttributeError as e:
+              print(
+                  "warning: %s: %s.%s: cannot set to %r: %s" %
+                  (current_prefix, exc_value, attr, value, e),
+                  file=sys.stderr
+              )
+              continue
             did_prefix = True
         if not did_prefix:
           print(
@@ -345,7 +353,11 @@ class Pfx(object):
         except TypeError as e:
           logging.warning(
               "FORMAT CONVERSION: %s: %r %% %r",
-              e, u, self.mark_args,exc_info=True)
+              e,
+              u,
+              self.mark_args,
+              exc_info=True
+          )
           u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
