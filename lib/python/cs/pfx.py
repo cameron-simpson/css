@@ -34,7 +34,7 @@ and exception messages like:
 which lets one put just the relevant complaint in exception and log
 messages and get useful calling context on the output.
 This does make for wordier logs and exceptions
-but used with a little discretion produces far more debugable results.
+but used with a little discretion produces far more debuggable results.
 '''
 
 from __future__ import print_function
@@ -246,6 +246,21 @@ class Pfx(object):
           true, this message forms the base of the message prefixes;
           existing prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
+
+        *Note*:
+        the `mark` and `args` are only combined if the `Pfx` instance gets used,
+        for example for logging or to annotate an exception.
+        Otherwise, they are not combined.
+        Therefore the values interpolated are as they are when the `Pfx` is used,
+        not necessarily as they were when the `Pfx` was created.
+        If `args` is subject to change and you require the original values,
+        apply them to `mark` immediately, for example:
+
+            with Pfx('message %s ...' % (arg1, arg2, ...)):
+
+        This is a bit more expensive, and the common usage is:
+
+            with Pfx('message %s ...', arg1, arg2, ...):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
