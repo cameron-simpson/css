@@ -29,7 +29,7 @@ portfwd_auto(){
 }
 
 fq(){
-  flag -q | grep -i "${1-.}"
+  flag -q | { grep -i "${1-.}" || :; }
 }
 
 connected(){
@@ -47,7 +47,7 @@ case $arg1 in
             portfwd_connected
           else
             portfwd_connected \
-            | tr '\012' ' ' \
+            | { tr '\012' ' '; echo; } \
             | \
             { read -r conns
               for match
