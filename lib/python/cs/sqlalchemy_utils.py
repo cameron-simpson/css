@@ -55,7 +55,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
     return func(*a, session=new_session, **kw)
 
 def auto_session(func):
-  ''' Decorator to run a function in a session is not presupplied.
+  ''' Decorator to run a function in a session if one is not presupplied.
   '''
 
   @require(lambda orm, session: orm is not None or session is not None)
@@ -173,21 +173,21 @@ def find_json_field(column_value, field_name, *, infill=False):
 
       Examples:
 
-          >>> find_json_field({'a':{'b':{}}},'a.b')
+          >>> find_json_field({'a':{'b':{}}}, 'a.b')
           ({'a': {'b': {}}}, {'b': {}}, 'b')
-          >>> find_json_field({'a':{}},'a.b')
+          >>> find_json_field({'a':{}}, 'a.b')
           ({'a': {}}, {}, 'b')
-          >>> find_json_field({'a':{'b':{}}},'a.b.c.d')
+          >>> find_json_field({'a':{'b':{}}}, 'a.b.c.d')
           Traceback (most recent call last):
               ...
           KeyError: 'a.b.c'
-          >>> find_json_field({'a':{'b':{}}},'a.b.c.d', infill=True)
+          >>> find_json_field({'a':{'b':{}}}, 'a.b.c.d', infill=True)
           ({'a': {'b': {'c': {}}}}, {}, 'd')
           >>> find_json_field(None, 'a.b.c.d')
           Traceback (most recent call last):
               ...
           KeyError: 'a'
-          >>> find_json_field(None,'a.b.c.d', infill=True)
+          >>> find_json_field(None, 'a.b.c.d', infill=True)
           ({'a': {'b': {'c': {}}}}, {}, 'd')
   '''
   field_parts = field_name.split('.')
