@@ -54,43 +54,43 @@ def fmtdoc(func):
   return func
 
 def decorator(deco):
-  ''' Wrapper for decorator functions to support optional keyword arguments.
+  ''' Wrapper for decorator functions to support optional arguments.
+      The actual decorator function ends up being called as:
+
+          deco(func, *da, **dkw)
+
+      allowing `da` and `dkw` to affect the bahviour of the decorator `deco`.
 
       Examples:
 
           @decorator
-          def dec(func, **dkw):
-            ...
-          @dec
+          def deco(func, *da, kw=None):
+            ... decorate func subject to the values of da and kw
+          @deco
           def func1(...):
             ...
-          @dec(foo='bah')
+          @deco('foo', arg2='bah')
           def func2(...):
             ...
   '''
 
-  def overdeco(*da, **dkw):
-    if not da:
-
-      def wrapper(*a, **dkw2):
-        dkw.update(dkw2)
-        func, = a
-        dfunc = deco(func, **dkw)
-        dfunc.__doc__ = getattr(func, '__doc__', '')
-        return dfunc
-
-      return wrapper
-    if len(da) > 1:
-      raise ValueError(
-          "extra positional arguments after function: %r" % (da[1:],)
-      )
-    func = da[0]
-    dfunc = deco(func, **dkw)
-    dfunc.__doc__ = getattr(func, '__doc__', '')
-    return dfunc
-
-  overdeco.__doc__ = getattr(deco, '__doc__', '')
-  return overdeco
+  def metadeco(*da, **dkw):
+    # if there's exactly one callable position argument
+    # then it is the target function: call deco(func).
+    if len(da) == 1 and callable(da[0]) and not dkw:
+      func = da[0]
+      decorated = deco(func)
+      decorated.__doc__ = getattr(func, '__doc__', '')
+      return decorated
+    # otherwise we collect the arguments supplied
+    # and return a function which takes a callable
+    # and returns deco(func, *da, **kw).
+    def overdeco(func):
+      decorated = deco(func, *da, **dkw)
+      decorated.__doc__ = getattr(func, '__doc__', '')
+      return decorated
+    return overdeco
+  return metadeco
 
 @decorator
 def cached(
