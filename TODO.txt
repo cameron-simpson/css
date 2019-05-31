@@ -1,3 +1,4 @@
+@decorator: maybe support @deco(callable,*a,**kw)?
 @mapattr class decorator to map .foo to .bah.this.that... with get/set support
 cs.deco: @decorator: does not seem to propagate __doc__ to wrapper functions from inner function - needs debugging
 man pages not included in PyPI packages, for example cs.app.mailfiler
