@@ -75,6 +75,11 @@ def decorator(deco):
   '''
 
   def metadeco(*da, **dkw):
+    # TODO: general handling of first-argument-callable
+    # to support func2 = deco(func1, args..., kwargs...).
+    # Currently this must be done as:
+    # func2=deco(args..., kwargs...)(func1)
+    #
     # if there's exactly one callable position argument
     # then it is the target function: call deco(func).
     if len(da) == 1 and callable(da[0]) and not dkw:
