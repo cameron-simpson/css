@@ -1,3 +1,4 @@
+@decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
 @decorator: maybe support @deco(callable,*a,**kw)?
 @mapattr class decorator to map .foo to .bah.this.that... with get/set support
 cs.deco: @decorator: does not seem to propagate __doc__ to wrapper functions from inner function - needs debugging
