@@ -58,8 +58,20 @@ fi \
   then set-x perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)"[^>]*>[^<]*</a>; $& [$1];gi'
   else cat
   fi \
-| if :
-  then  set-x lynx -stdin -dump
-  else  set-x w3m $w3cols -dump -T text/html
+| if flag UNHTML_USE_W3M
+  then  set-x w3m $w3cols -dump -T text/html -graph \
+            -o color=TRUE \
+            -o basic_color=green \
+            -o anchor_color=yellow \
+            -o image_color=white \
+            -o display_link=TRUE \
+            -o display_link_number=TRUE \
+            -o display_ins_del=TRUE \
+            -o ignore_null_img_alt=FALSE \
+            -o indent_incr=2 \
+            -o pseudo_inlines=TRUE \
+            -o tabstop=2 \
+            -o graph
+  else  set-x lynx -stdin -dump
   fi \
 | LC_ALL=C sed 's/[     ][      ]*$//'
