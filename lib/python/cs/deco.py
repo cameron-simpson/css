@@ -31,7 +31,7 @@ DISTINFO = {
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module's __dict__.
+      formatted against the function's module's `__dict__`.
 
       This supports simple formatted docstrings:
 
@@ -59,7 +59,7 @@ def decorator(deco):
 
           deco(func, *da, **dkw)
 
-      allowing `da` and `dkw` to affect the bahviour of the decorator `deco`.
+      allowing `da` and `dkw` to affect the behaviour of the decorator `deco`.
 
       Examples:
 
@@ -94,7 +94,10 @@ def decorator(deco):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
       return decorated
+
     return overdeco
+
+  metadeco.__doc__ = getattr(deco, '__doc__', '')
   return metadeco
 
 @decorator
