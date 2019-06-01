@@ -1,3 +1,4 @@
+cs-release: latest release tag comment in top of generated distinfo
 @decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
 @decorator: maybe support @deco(callable,*a,**kw)?
 @mapattr class decorator to map .foo to .bah.this.that... with get/set support
