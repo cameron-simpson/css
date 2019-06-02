@@ -224,7 +224,7 @@ def main(argv=None, environ=None):
   return 0
 
 class Portfwd(FlaggedMixin):
-  ''' A ssh tunnel built on a SvcD.
+  ''' An ssh tunnel built on a SvcD.
   '''
 
   def __init__(
@@ -232,6 +232,21 @@ class Portfwd(FlaggedMixin):
       target, ssh_config=None, conditions=(),
       test_shcmd=None, trace=False, verbose=False, flags=None
   ):
+    ''' Initialise the Portfwd.
+
+        Parameters:
+        * `target`: the tunnel name, and also the name of the ssh configuration used
+        * `ssh_config`: ssh configuration file if not the default
+        * `conditions`: an iterable of `Condition`s
+          which must hold before the tunnel is set up;
+          the tunnel also aborts if these cease to hold
+        * `test_shcmd`: a shell command which must succeed
+          before the tunnel is set up;
+          the tunnel also aborts if this command subsequently fails
+        * `trace`: issue tracing messages; default `False`
+        * `verbose`: be verbose; default `False`
+        * `flags`: optional preexisting `Flags` instance
+    '''
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     self.test_shcmd = test_shcmd
@@ -389,7 +404,7 @@ class Portfwd(FlaggedMixin):
     return True
 
 class Portfwds(object):
-  ''' A collection of Portfwd instances and associate control methods.
+  ''' A collection of Portfwd instances and associated control methods.
   '''
 
   def __init__(self, ssh_config=None, environ=None, target_list=None,
