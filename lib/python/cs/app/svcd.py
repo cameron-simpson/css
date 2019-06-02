@@ -80,15 +80,13 @@ DISTINFO = {
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': [
-            'svcd = cs.app.svcd:main'
-        ],
+        'console_scripts': ['svcd = cs.app.svcd:main'],
     },
 }
 
-TEST_RATE = 7       # frequency of polling of test condition
-KILL_TIME = 5       # how long to wait for a terminated process to exit
-RESTART_DELAY = 3   # delay be restart of an exited process
+TEST_RATE = 7  # frequency of polling of test condition
+KILL_TIME = 5  # how long to wait for a terminated process to exit
+RESTART_DELAY = 3  # delay be restart of an exited process
 
 USAGE = '''Usage:
   {cmd} disable names...
@@ -174,7 +172,7 @@ def main(argv=None):
     lock_name = None
     name = None
     svc_pidfile = None  # pid file for the service process
-    mypidfile = None    # pid file for the svcd
+    mypidfile = None  # pid file for the svcd
     quiet = False
     sig_shcmd = None
     test_shcmd = None
@@ -249,8 +247,9 @@ def main(argv=None):
   if sig_shcmd is None:
     sig_func = None
   else:
+
     def sig_func():
-      argv = ['sh', ( '-xc' if trace else '-c' ), sig_shcmd]
+      argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
       if test_uid != uid:
         su_shcmd = 'exec ' + quotecmd(argv)
         if trace:
@@ -263,26 +262,40 @@ def main(argv=None):
         warning("returncode %s from %r", returncode, sig_shcmd)
         sig_text = None
       return sig_text
+
   if test_shcmd is None:
     test_func = None
   else:
+
     def test_func():
       argv = ['sh', '-c', test_shcmd]
       if test_uid != uid:
         argv = ['su', test_username, 'exec ' + quotecmd(argv)]
       return callproc(argv, stdin=DEVNULL) == 0
+
   if run_uid != uid:
     argv = ['su', run_username, 'exec ' + quotecmd(argv)]
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(argv, name=name, pidfile=svc_pidfile, sig_func=sig_func,
-           test_flags=test_flags, test_func=test_func, test_rate=test_rate,
-           once=once, quiet=quiet, trace=trace)
+  S = SvcD(
+      argv,
+      name=name,
+      pidfile=svc_pidfile,
+      sig_func=sig_func,
+      test_flags=test_flags,
+      test_func=test_func,
+      test_rate=test_rate,
+      once=once,
+      quiet=quiet,
+      trace=trace
+  )
+
   def signal_handler(*_):
     S.stop()
     S.wait()
     S.flag_stop = False
     sys.exit(1)
+
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
   signal(SIGTERM, signal_handler)
@@ -372,9 +385,9 @@ class SvcD(FlaggedMixin, object):
     self.trace = trace
     self.on_spawn = on_spawn
     self.on_reap = on_reap
-    self.active = False     # flag to end the monitor Thread
-    self.subp = None        # current subprocess
-    self.monitor = None     # monitoring Thread
+    self.active = False  # flag to end the monitor Thread
+    self.subp = None  # current subprocess
+    self.monitor = None  # monitoring Thread
     self.pidfile = pidfile
     self.sig_func = sig_func
 
@@ -433,7 +446,10 @@ class SvcD(FlaggedMixin, object):
       return
     if a:
       msg = msg % a
-    alert_argv = ['alert', '-g', self.group_name, 'SVCD %s: %s' % (self.name, msg)]
+    alert_argv = [
+        'alert', '-g', self.group_name,
+        'SVCD %s: %s' % (self.name, msg)
+    ]
     if self.trace:
       info("alert: %s: %s" % (self.name, msg))
     Popen(alert_argv, stdin=DEVNULL)
@@ -488,6 +504,7 @@ class SvcD(FlaggedMixin, object):
     ''' Start the subprocess and its monitor.
     '''
     with Pfx("SvcD.start(%s)", self):
+
       def monitor():
         old_sig = None
         next_test_time = now()
@@ -536,7 +553,9 @@ class SvcD(FlaggedMixin, object):
                   except TypeError as e:
                     warning(
                         "type error comparing old_sig %s with new_sig %s: %s",
-                        type(old_sig), type(new_sig), e,
+                        type(old_sig),
+                        type(new_sig),
+                        e,
                     )
                     old_sig = new_sig
                   else:
@@ -549,7 +568,8 @@ class SvcD(FlaggedMixin, object):
           sleep(1)
         if self.subp is not None:
           self._kill_subproc()
-      T = Thread(name=str(self)+':monitor', target=monitor)
+
+      T = Thread(name=str(self) + ':monitor', target=monitor)
       if self.flag_stop:
         warning("clear flag %s before starting thread", self.flagname_stop)
         self.flag_stop = False
