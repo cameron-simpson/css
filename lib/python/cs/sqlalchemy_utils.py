@@ -30,6 +30,8 @@ DISTINFO = {
 @require(lambda orm, session: orm is not None or session is not None)
 def with_session(func, *a, orm=None, session=None, **kw):
   ''' Call `func(*a,session=session,**kw)`, creating a session if required.
+      The function `func` runs within a transaction,
+      nested if the session already exists.
 
       This is the inner mechanism of `@auto_session` and
       `ORM.auto_session_method`.
@@ -38,11 +40,14 @@ def with_session(func, *a, orm=None, session=None, **kw):
       * `func`: the function to call
       * `a`: the positional parameters
       * `orm`: optional ORM class with a `.session()` context manager method
+        such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
-      a context manager. The `session` is also passed to `func` as
+      a context manager.
+
+      The `session` is also passed to `func` as
       the keyword parameter `session` to support nested calls.
   '''
   if session:
@@ -56,6 +61,8 @@ def with_session(func, *a, orm=None, session=None, **kw):
 
 def auto_session(func):
   ''' Decorator to run a function in a session if one is not presupplied.
+      The function `func` runs within a transaction,
+      nested if the session already exists.
   '''
 
   @require(lambda orm, session: orm is not None or session is not None)
@@ -86,7 +93,7 @@ class ORM:
 
   @contextmanager
   def session(self):
-    ''' Context manager to issue a new session and shut it down.
+    ''' Context manager to issue a new session and close it down.
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
