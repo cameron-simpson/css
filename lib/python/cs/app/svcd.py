@@ -49,7 +49,11 @@ import os
 from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, PIPE, DEVNULL, call as callproc
+from subprocess import Popen, PIPE, call as callproc
+try:
+  from subprocess import DEVULL
+except ImportError:
+  DEVNULL = open(os.devnull, 'rb')
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
@@ -65,6 +69,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
+        "Topic :: Utilities",
     ],
     'install_requires': [
         'cs.app.flag',
