@@ -279,8 +279,8 @@ def get_md_doc(
       init_method = o.__dict__.get('__init__', None)
       if init_method:
         init_doc = getattr(init_method, '__doc__', None)
-        init_doc = stripped_dedent(init_doc)
         if init_doc:
+          init_doc = stripped_dedent(init_doc)
           msig = signature(init_method)
           odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
       full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
