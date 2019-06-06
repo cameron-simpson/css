@@ -347,7 +347,6 @@ class Flags(MutableMapping, FlaggedMixin):
     if flagdir is None:
       flagdir = FLAGDIR(environ=environ)
     self.dirpath = flagdir
-    self.debug = debug
     self._old_flags = {}
 
   def __repr__(self):
@@ -357,7 +356,8 @@ class Flags(MutableMapping, FlaggedMixin):
     ''' Ensure the flag directory exists.
     '''
     if not os.path.isdir(self.dirpath):
-      os.makedirs(self.dirpath)
+      with Pfx("makedirs(%r)", self.dirpath):
+        os.makedirs(self.dirpath)
 
   def _flagpath(self, k):
     ''' Compute the pathname of the flag backing file.
