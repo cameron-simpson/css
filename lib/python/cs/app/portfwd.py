@@ -391,28 +391,47 @@ class Portfwd(FlaggedMixin):
   def test_func(self):
     ''' Servuice test function: probe all the conditions.
     '''
-    for condition in self.conditions:
-      if not condition.probe():
-        if self.verbose:
-          info('failed precondition: %s', condition)
-        return False
-    if self.test_shcmd:
-      shcmd_ok = os.system(self.test_shcmd) == 0
-      if not shcmd_ok:
-        info('failed shell command: %r', self.test_shcmd)
-        return False
-    return True
+    with Pfx("%s[%s].test_func", type(self).__name__, self.name):
+      for condition in self.conditions:
+        with Pfx("precondition %s", condition):
+          if not condition.probe():
+            if self.verbose:
+              info('FAILED')
+            return False
+      if self.test_shcmd:
+        with Pfx("test_shcmd %r", self.test_shcmd):
+          shcmd_ok = os.system(self.test_shcmd) == 0
+          if not shcmd_ok:
+            info('FAILED')
+            return False
+      return True
 
 class Portfwds(object):
-  ''' A collection of Portfwd instances and associated control methods.
+  ''' A collection of `Portfwd` instances and associated control methods.
   '''
 
   def __init__(self, ssh_config=None, environ=None, target_list=None,
                auto_mode=None, trace=False, verbose=False, flags=None):
+    ''' Initialise the `Portfwds` instance.
+
+        Parameters:
+        * `ssh_config`: the ssh configuration file if not the default
+        * `environ`: the environment mapping to use;
+          default: `os.environ`
+        * `target_list`: an iterable of `Portfwd` target names
+        * `auto_mode`: also derive target names
+          from the set of true `PORTFWD_`*name*`_AUTO` flags
+        * `trace`: trace mode, default `False`
+        * `verbose`: verbose mode, default `False`
+        * `flags`: the `cs.app.flags.Flags` instance to use,
+          default is to construct a new one
+    '''
     if environ is None:
       environ = os.environ
     if target_list is None:
       target_list = []
+    else:
+      target_list = list(target_list)
     if auto_mode is None:
       auto_mode = False
     if flags is None:
