@@ -73,12 +73,9 @@ DISTINFO = {
     ],
     'install_requires': ['cs.env', 'cs.lex', 'cs.pfx'],
     'entry_points': {
-        'console_scripts': [
-            'flagset = cs.app.flag:main_flagset'
-        ],
+        'console_scripts': ['flagset = cs.app.flag:main_flagset'],
     },
 }
-
 
 FLAG_USAGE = '''Usage:
   %s            Recite all flag values.
@@ -111,8 +108,9 @@ def main(argv=None):
       else:
         value = argv.pop(0)
         if argv:
-          raise GetoptError("unexpected values after key value: %s"
-                            % (' '.join(argv),))
+          raise GetoptError(
+              "unexpected values after key value: %s" % (' '.join(argv),)
+          )
         F[k] = truthy(value)
   except GetoptError as e:
     print("%s: warning: %s" % (cmd, e), file=sys.stderr)
@@ -153,7 +151,9 @@ def main_flagset(argv=None, stdin=None):
     prefix = argv.pop(0)
     if not prefix:
       raise GetoptError("invalid empty prefix")
-    all_names = sorted([ flagname for flagname in F if flagname.startswith(prefix) ])
+    all_names = sorted(
+        [flagname for flagname in F if flagname.startswith(prefix)]
+    )
     if not argv:
       # print current flag values
       for flagname in all_names:
@@ -174,11 +174,13 @@ def main_flagset(argv=None, stdin=None):
         value = False
         omitted = True
       else:
-        raise GetoptError("invalid operator, expected one of set, set-all, clear, clear-all")
+        raise GetoptError(
+            "invalid operator, expected one of set, set-all, clear, clear-all"
+        )
       updates = []
       if argv:
         for flagname in argv:
-          updates.append( (flagname, value) )
+          updates.append((flagname, value))
       else:
         for lineno, line in enumerate(stdin, 1):
           with Pfx("%s:%d" % (stdin, lineno)):
@@ -297,7 +299,7 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       if flagname:
         return self.flags[flagname]
-    raise AttributeError("FlaggedMixin: no %r" % ('.' + attr, ))
+    raise AttributeError("FlaggedMixin: no %r" % ('.' + attr,))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.
@@ -328,6 +330,7 @@ class Flags(MutableMapping, FlaggedMixin):
         * `debug`: debug mode, default `False`
     '''
     MutableMapping.__init__(self)
+
     @contextmanager
     def mutex():
       ''' Mutex context manager.
@@ -339,6 +342,7 @@ class Flags(MutableMapping, FlaggedMixin):
       finally:
         if lock:
           lock.release()
+
     self._mutex = mutex
     if debug is None:
       debug = False
@@ -454,13 +458,14 @@ class Flags(MutableMapping, FlaggedMixin):
           default `False`.
           Set this to `None` to leave unmentioned flags alone.
     '''
-    all_names = set( name for name in self if name.startswith(prefix) )
+    all_names = set(name for name in self if name.startswith(prefix))
     named = set()
     for flagname, flagvalue in updates:
       if not flagname.startswith(prefix):
         raise ValueError(
-            "update flag %r does not start with prefix %r"
-            % (flagname, prefix))
+            "update flag %r does not start with prefix %r" %
+            (flagname, prefix)
+        )
       self[flagname] = flagvalue
       named.add(flagname)
     if omitted_value is not None:
