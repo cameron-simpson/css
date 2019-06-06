@@ -209,13 +209,13 @@ def truthy(value):
   ''' Decide whether a value is considered true.
 
       Strings are converted to:
-      * `'0'`: False
-      * `'1'`: True
-      * `'true'`: True (case insensitive)
-      * `'false'`: False (case insensitive)
-      * Other values are unchanged.
+      * `'0'`: `False`
+      * `'1'`: `True`
+      * `'true'`: `True` (case insensitive)
+      * `'false'`: `False` (case insensitive)
+      * other string values are unchanged.
 
-      Other types are converted with bool().
+      Other types are converted with `bool()`.
   '''
   if isinstance(value, str):
     if value == '0':
@@ -236,7 +236,7 @@ class FlaggedMixin(object):
   ''' A mixin class adding flag_* and flagname_* attributes.
 
       This defines the following attributes on instances:
-      * `flags`: the `Flags` instance providing the flag values
+      * `flags`: the `Flags` instance providing the flag values.
       * `flags_prefix`: the prefix for the flags of interest.
       * `flagname_`*name*: the full name within `.flags`
         of the flag referred to as *name*.
@@ -254,10 +254,11 @@ class FlaggedMixin(object):
 
         Parameters:
         * `flags`: optional parameter;
-          if None defaults to a new default `Flags()`.
-        * `prefix`: optional prefix; if not proveded the prefix is
-          derived from the objects .name attribute, or is empty if
-          there is no .name
+          if `None` defaults to a new default `Flags()`.
+        * `prefix`: optional prefix;
+          if not provided the prefix is derived
+          from the object's `.name` attribute,
+          or is empty if there is no `.name`
     '''
     if flags is None:
       flags = Flags(debug=debug)
@@ -315,6 +316,17 @@ class Flags(MutableMapping, FlaggedMixin):
   '''
 
   def __init__(self, flagdir=None, environ=None, lock=None, debug=None):
+    ''' Initialise the `Flags` instance.
+
+        Parameters:
+        * `flagdir`: the directory holding flag state files;
+          if omitted use the value from `cs.env.FLAGDIR(environ)`
+        * `environ`: the environment mapping to use,
+          default `os.environ`
+        * `lock`: a `Lock`like mutex to control multithreaded access;
+          if omitted no locking is down
+        * `debug`: debug mode, default `False`
+    '''
     MutableMapping.__init__(self)
     @contextmanager
     def mutex():
@@ -349,7 +361,7 @@ class Flags(MutableMapping, FlaggedMixin):
 
   def _flagpath(self, k):
     ''' Compute the pathname of the flag backing file.
-        Raise KeyError on invalid flag names.
+        Raise `KeyError` on an invalid flag names.
     '''
     if not k:
       raise KeyError(k)
@@ -401,8 +413,8 @@ class Flags(MutableMapping, FlaggedMixin):
   def __setitem__(self, k, value):
     ''' Set the flag value.
 
-        If true, write "1\n" to the flag file.
-        If false, remove the flag file.
+        If true, write `"1\n"` to the flag file.
+        If false, truncate the flag file.
     '''
     if truthy(value):
       value = True
@@ -437,10 +449,10 @@ class Flags(MutableMapping, FlaggedMixin):
 
         Parameters:
         * `prefix`: common prefix for updated flags.
-        * `updates`: iterable of `(flagname, flagvalue)`.
+        * `updates`: iterable of `(flagname,flagvalue)`.
         * `omitted_value`: value to be assigned to any unmentioned flags,
           default `False`.
-          Set this to None to leave unmentioned flags alone.
+          Set this to `None` to leave unmentioned flags alone.
     '''
     all_names = set( name for name in self if name.startswith(prefix) )
     named = set()
