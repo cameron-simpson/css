@@ -268,10 +268,14 @@ def main(argv=None):
   else:
 
     def test_func():
-      argv = ['sh', '-c', test_shcmd]
-      if test_uid != uid:
-        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
-      return callproc(argv, stdin=DEVNULL) == 0
+      with Pfx("main.test_func: shcmd=%r", test_shcmd):
+        argv = ['sh', '-c', test_shcmd]
+        if test_uid != uid:
+          argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+        shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
+        if not quiet:
+          info("exit status != 0")
+        return shcmd_ok
 
   if run_uid != uid:
     argv = ['su', run_username, 'exec ' + quotecmd(argv)]
@@ -410,13 +414,13 @@ class SvcD(FlaggedMixin, object):
     ''' Test whther the service should run.
 
         In order:
-        * True if the override flag is true.
-        * False if the disable flag is true.
-        * False if any of the specified test flags are false.
-        * False if the test function fails.
-        * Otherwise true.
+        * `True` if the override flag is true.
+        * `False` if the disable flag is true.
+        * `False` if any of the specified test flags are false.
+        * `False` if the test function fails.
+        * Otherwise `True`.
     '''
-    with Pfx("%s: test", self.name):
+    with Pfx("%s[%s].test", type(self).__name__, self.name):
       if self.flag_override:
         self.dbg("flag_override true -> True")
         return True
