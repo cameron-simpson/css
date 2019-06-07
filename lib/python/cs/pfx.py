@@ -324,7 +324,10 @@ class Pfx(object):
                 except TypeError:
                   print(
                       "warning: %s: %s.%s: " % (current_prefix, e, attr),
-                      prefixify("do not know how to prefixify: %s:%r" % (type(value),value)),
+                      prefixify(
+                          "do not know how to prefixify: %s:%r" %
+                          (type(value), value)
+                      ),
                       file=sys.stderr
                   )
                   continue
