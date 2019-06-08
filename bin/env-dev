@@ -50,12 +50,13 @@ fi
 case "$devdir" in /*) ;; *) devdir=$(cd "$devdir" && pwd) ;; esac
 venvdir=$devdir/venv
 
-[ ! -f "$venvdir/bin/activate" ] || . "$venvdir/bin/activate"
+# just causes lots of trouble
+##[ ! -f "$venvdir/bin/activate" ] || . "$venvdir/bin/activate"
 
 ENV_DEV_DIR=$devdir
-PYTHONPATH=$devdir/lib/python:${PYTHONPATH:+:$PYTHONPATH}
+PYTHONPATH=$devdir/lib/python${PYTHONPATH:+:$PYTHONPATH}
 PERL5LIB=$devdir/lib/perl5${PERL5LIB:+:$PERL5LIB}
-MANPATH=$devdir/man:$MANPATH
+MANPATH=$devdir/man${MANPATH:+:$MANPATH}
 LD_LIBRARY_PATH=$devdir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 PATH=$devdir/bin:$venvdir/bin:$PATH
 export ENV_DEV_DIR PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH

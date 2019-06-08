@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Unpack the contents of a dbm file to stdout.
 #       - Cameron Simpson <cs@cskk.id.au> 15aug2007

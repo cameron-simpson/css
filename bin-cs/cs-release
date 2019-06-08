@@ -349,7 +349,7 @@ class Package:
       latest_prefix, latest_suffix = tag.split('-', 1)
       last_pypi_suffix = self.last_upload_suffix(pypi_flavour)
       if latest_suffix == last_pypi_suffix:
-        info("already released %r", last_suffix)
+        info("already released %r", last_pypi_suffix)
         if force:
           warning("submitting anyway")
         else:

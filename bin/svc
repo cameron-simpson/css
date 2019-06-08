@@ -22,7 +22,10 @@ set -ue
 : ${SVC_CONFIG:=$HOME/.svcrc}
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd {disable|enable|restart|start|stop} name"
+usage="Usage: $cmd [{disable|enable|ls|restart|start|stop} [name]]
+  If name is omitted a numbered list of service names is recited.
+  If name is numeric then the corresponding service name  is chosen
+    from the list."
 
 badopts=
 
@@ -33,40 +36,100 @@ trace=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing op" >&2
-  badopts=1
+  op=ls
 else
   op=$1
   shift
-  case "$op" in
-    disable|enable|restart|start|stop)
-        ;;
-    *)  echo "$cmd: unrecognised op: $op" >&2
-        badopts=1
-        ;;
-  esac
-  if [ $# = 0 ]
-  then
-    echo "$cmd: $op: missing name" >&2
-    echo " Names from $SVC_CONFIG:" >&2
-    awk '/^[^#]/ { print(" ", $2) }' "$SVC_CONFIG" | sort -u
-    badopts=1
-  else
-    name=$1
-    shift
-  fi
 fi
 
-if [ $# -gt 0 ]
-then
-  echo "$cmd: extra arguments: $*" >&2
-  badopts=1
-fi
+cmd="$cmd: $op"
+
+case "$op" in
+  disable|enable|ls|restart|start|stop)
+      [ $# -gt 0 ] || op=ls
+      case "$op" in
+        ls) ;;
+        *)  name=$1
+            shift
+            if [ $# -gt 0 ]
+            then
+              echo "$cmd: extra arguments: $*" >&2
+              badopts=1
+            fi
+            ;;
+      esac
+      ;;
+  *)  echo "$cmd: unrecognised op" >&2
+      badopts=1
+      ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# process config file
+service_names(){
+  awk '/^[^#]/ { print($2) }' "$SVC_CONFIG" | sort -u | awk '{ print(NR, $0)}'
+}
+
+resolve_name(){
+  [ $# = 1 ] || {
+    echo "Usage: service_from_number name-or-number" >&2
+    exit 2
+  }
+  ( name=$1
+    case "$name" in
+      [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
+        new_name=$(
+          service_names | awk -v "n=$name" 'NR == n { print($2); exit; }'
+        )
+        if [ -n "$new_name" ]
+        then
+          echo "$cmd: $name => $new_name" >&2
+          name=$new_name
+        else
+          echo "$cmd: $name: no matching service name" >&2
+          return 1
+        fi
+        ;;
+    esac
+    echo "$name"
+  )
+}
+
+# special case operations: ls
+case "$op" in
+  ls)
+    xit=0
+    if [ $# = 0 ]
+    then
+      service_names
+    else
+      for name
+      do
+        name=$( resolve_name "$name" ) || { xit=1; continue; }
+        while read -r rc_op rc_ptn rc_shcmd
+        do
+          # skip comments and blank lines
+          case "$rc_op" in
+            \#* | '')
+              continue
+              ;;
+          esac
+          # check for a match on the name
+          case "$name" in
+            $rc_ptn)
+              echo "$name: $rc_op $rc_ptn $rc_shcmd"
+              ;;
+          esac
+        done <"$SVC_CONFIG"
+      done
+    fi
+    exit $xit
+    ;;
+esac
+
+# normal operations: scan config file for action
 shcmd=
+name=$( resolve_name "$name" ) || exit 1
 while read -r rc_op rc_ptn rc_shcmd
 do
   # skip comments, blank lines and config for other ops
@@ -74,7 +137,7 @@ do
     \#* | '')
       continue
       ;;
-    "$op")
+    service | "$op")
       ;;
     *)continue
       ;;
@@ -82,9 +145,20 @@ do
   # check for a match on the name
   case "$name" in
     $rc_ptn)
-      shcmd=$rc_shcmd
+      if [ "x$rc_op" = xservice ]
+      then
+        case "$op" in
+          start)    shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd &" ;;
+          stop|enable|disable|restart)
+                    shcmd="svcd $op \"\$SVC_NAME\"" ;;
+          *)        continue ;;
+        esac
+      else
+        shcmd=$rc_shcmd
+      fi
       ;;
   esac
+  [ -z "$shcmd" ] || break
 done <"$SVC_CONFIG"
 
 if [ -z "$shcmd" ]
