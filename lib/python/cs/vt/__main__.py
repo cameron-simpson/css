@@ -37,11 +37,7 @@ from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
-from .compose import (
-    get_clause_archive,
-    get_clause_spec,
-    get_store_spec
-)
+from .compose import (get_clause_archive, get_clause_spec, get_store_spec)
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
@@ -150,7 +146,9 @@ class VTCmd:
 
     badopts = False
 
-    setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
+    setup_logging(
+        cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose
+    )
     ####cs.x.X_logger = logging.getLogger()
 
     config_path = os.environ.get('VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH))
@@ -195,8 +193,9 @@ class VTCmd:
         hashclass = HASHCLASS_BY_NAME[hashname]
       except KeyError:
         error(
-            "unrecognised hashname %r: I know %r",
-            hashname, sorted(HASHCLASS_BY_NAME.keys()))
+            "unrecognised hashname %r: I know %r", hashname,
+            sorted(HASHCLASS_BY_NAME.keys())
+        )
         badopts = True
     self.hashclass = hashclass
     self.config_path = config_path
@@ -225,6 +224,7 @@ class VTCmd:
         self.runstate.cancel()
         if sig == SIGQUIT:
           sys.exit(1)
+
       signal(SIGHUP, sig_handler)
       signal(SIGINT, sig_handler)
       signal(SIGQUIT, sig_handler)
@@ -235,10 +235,12 @@ class VTCmd:
         _, cols = ttysize(2)
         status_width = cols - 2
         self.progress = Progress(total=0)
+
         def ticker():
           while not self.runstate.cancelled:
             upd(self.progress.status(self.status_label, status_width))
             sleep(0.25)
+
         ticker = Thread(name='status-line', target=ticker)
         ticker.daemon = True
         ticker.start()
@@ -296,10 +298,16 @@ class VTCmd:
         # set up the primary Store using the main programme RunState for control
         S = Store(self.store_spec, self.config, runstate=self.runstate)
       except ValueError as e:
-        raise GetoptError("unusable Store specification: %s: %s" % (self.store_spec, e))
+        raise GetoptError(
+            "unusable Store specification: %s: %s" % (self.store_spec, e)
+        )
       except Exception as e:
-        exception("UNEXPECTED EXCEPTION: can't open store %r: %s", self.store_spec, e)
-        raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
+        exception(
+            "UNEXPECTED EXCEPTION: can't open store %r: %s", self.store_spec, e
+        )
+        raise GetoptError(
+            "unusable Store specification: %s" % (self.store_spec,)
+        )
       defaults.push_Ss(S)
       if self.cache_store_spec is None:
         cacheS = None
@@ -309,8 +317,8 @@ class VTCmd:
         except Exception as e:
           exception("can't open cache store %r: %s", self.cache_store_spec, e)
           raise GetoptError(
-              "unusable Store specification: %s"
-              % (self.cache_store_spec,))
+              "unusable Store specification: %s" % (self.cache_store_spec,)
+          )
         else:
           S = ProxyStore(
               "%s:%s" % (cacheS.name, S.name),
@@ -318,7 +326,7 @@ class VTCmd:
               read2=(S,),
               copy2=(cacheS,),
               save=(cacheS, S),
-              archives=( (S, '*'), ),
+              archives=((S, '*'),),
           )
           S.config = self.config
       ##X("MAIN CMD_OP S:")
@@ -394,7 +402,9 @@ class VTCmd:
             pass
       elif path.endswith('.lmdb'):
         print(path)
-        lmdb = LMDBIndex(path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes)
+        lmdb = LMDBIndex(
+            path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes
+        )
         with lmdb:
           for hashcode, entry in lmdb.items():
             print(hashcode, entry)
@@ -584,8 +594,9 @@ class VTCmd:
         raise ValueError("unparsed text: %r" % (special[offset:],))
       if not isinstance(specialD, Dir):
         raise ValueError(
-            "does not seem to be a Dir transcription, looks like a %s"
-            % (type(specialD),))
+            "does not seem to be a Dir transcription, looks like a %s" %
+            (type(specialD),)
+        )
       special_basename = specialD.name
       if not readonly:
         warning("setting readonly")
@@ -686,7 +697,8 @@ class VTCmd:
           if special_store is not None and special_store is not mount_store:
             warning(
                 "replacing default Store with Store from special %s ==> %s",
-                mount_store, special_store)
+                mount_store, special_store
+            )
             mount_store = special_store
     if args:
       mountpoint = args.pop(0)
@@ -695,7 +707,8 @@ class VTCmd:
         if not badopts:
           error(
               'missing mountpoint, and cannot infer mountpoint from special: %r',
-              special)
+              special
+          )
           badopts = True
       else:
         mountpoint = special_basename
@@ -764,10 +777,15 @@ class VTCmd:
         T = None
         try:
           T = mount(
-              mountpoint, E,
-              S=mount_store, archive=archive, subpath=subpath,
-              readonly=readonly, append_only=append_only,
-              fsname=fsname)
+              mountpoint,
+              E,
+              S=mount_store,
+              archive=archive,
+              subpath=subpath,
+              readonly=readonly,
+              append_only=append_only,
+              fsname=fsname
+          )
           cs.x.X_via_tty = True
         except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
@@ -956,8 +974,8 @@ class VTCmd:
         clause = self.config.get_clause('server')
       except KeyError:
         raise GetoptError(
-            "no [server] clause to implement address %r"
-            % (address,))
+            "no [server] clause to implement address %r" % (address,)
+        )
       try:
         address = clause['address']
       except KeyError:
@@ -978,24 +996,25 @@ class VTCmd:
               raise GetoptError("missing colon after name")
             offset += 1
             try:
-              parsed, type_, params, offset = get_store_spec(named_store_spec, offset)
+              parsed, type_, params, offset = get_store_spec(
+                  named_store_spec, offset
+              )
             except ValueError as e:
               raise GetoptError(
-                  "invalid Store specification after \"name:\": %s"
-                  % (e,)) from e
+                  "invalid Store specification after \"name:\": %s" % (e,)
+              ) from e
             if offset < len(named_store_spec):
               raise GetoptError(
-                  "extra text after storespec: %r"
-                  % (named_store_spec[offset:],))
+                  "extra text after storespec: %r" %
+                  (named_store_spec[offset:],)
+              )
             namedS = self.config.new_Store(parsed, type_, params)
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
     if address == '-':
       from .stream import StreamStore
-      remoteS = StreamStore(
-          "serve -", sys.stdin, sys.stdout,
-          exports=exports)
+      remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
       remoteS.join()
     elif '/' in address:
       # path/to/socket
@@ -1003,27 +1022,29 @@ class VTCmd:
       X("serve via UNIX socket at %r", address)
       with defaults.S:
         srv = serve_socket(
-            socket_path=socket_path,
-            exports=exports,
-            runstate=self.runstate)
+            socket_path=socket_path, exports=exports, runstate=self.runstate
+        )
       srv.join()
     else:
       # [host]:port
       cpos = address.rfind(':')
       if cpos >= 0:
         host = address[:cpos]
-        port = address[cpos+1:]
+        port = address[cpos + 1:]
         if not host:
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
-          srv = serve_tcp(bind_addr=(host, port), exports=exports, runstate=self.runstate)
+          srv = serve_tcp(
+              bind_addr=(host, port), exports=exports, runstate=self.runstate
+          )
         srv.join()
       else:
         raise GetoptError(
             "invalid serve argument,"
             " I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r"
-            % (address,))
+            % (address,)
+        )
     return 0
 
   @staticmethod
@@ -1096,8 +1117,9 @@ def lsDirent(fp, E, name):
   else:
     detail = hexify(h)
   fp.write(
-      "%c %-41s %s %6d %s\n"
-      % (('d' if E.isdir else 'f'), detail, t, st_size, name))
+      "%c %-41s %s %6d %s\n" %
+      (('d' if E.isdir else 'f'), detail, t, st_size, name)
+  )
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.
@@ -1109,7 +1131,7 @@ def ls(path, D, recurse, fp=None):
   fp.write(":\n")
   if not recurse:
     debug("ls(): getting dirs and files...")
-    names = D.dirs()+D.files()
+    names = D.dirs() + D.files()
     debug("ls(): got dirs and files = %s" % (names,))
     names.sort()
     for name in names:

@@ -23,8 +23,10 @@ def dump_Block(block, indent=''):
   if block.indirect:
     indent += '  '
     subblocks = block.subblocks
-    X("%sindirect %d subblocks, span %d bytes",
-      indent, len(subblocks), len(block))
+    X(
+        "%sindirect %d subblocks, span %d bytes", indent, len(subblocks),
+        len(block)
+    )
     for B in subblocks:
       dump_Block(B, indent=indent)
 
@@ -57,8 +59,7 @@ def dump_chunk(data, leadin, max_width=None, one_line=False):
     chunk = data[doff:doff2]
     hex_text = hexlify(chunk).decode('utf-8')
     txt_text = ''.join(
-        c if c.isprintable() else '.'
-        for c in chunk.decode('iso8859-1')
+        c if c.isprintable() else '.' for c in chunk.decode('iso8859-1')
     )
     print(leadin, txt_text, hex_text)
     if one_line:
@@ -82,7 +83,10 @@ def dump_Store(S, indent=''):
       backends = getattr(S, attr)
       if backends:
         backends = sorted(backends, key=lambda S: S.name)
-        X("%s%s = %s", indent, attr, ','.join(backend.name for backend in backends))
+        X(
+            "%s%s = %s", indent, attr,
+            ','.join(backend.name for backend in backends)
+        )
         for backend in backends:
           dump_Store(backend, indent + '  ')
   elif isinstance(S, MappingStore):
@@ -105,7 +109,9 @@ class DebuggingLock(object):
     self._held = None
 
   def __repr__(self):
-    return "%s(lock=%r,held=%s)" % (type(self).__name__, self._lock, self._held)
+    return "%s(lock=%r,held=%s)" % (
+        type(self).__name__, self._lock, self._held
+    )
 
   def acquire(self, timeout=-1, _caller=None):
     ''' Acquire the lock and note the caller who takes it.
@@ -116,9 +122,9 @@ class DebuggingLock(object):
     hold = _LockContext(_caller, current_thread())
     if timeout != -1:
       warning(
-          "%s:%d: lock %s: timeout=%s",
-          hold.caller.filename, hold.caller.lineno,
-          lock, timeout)
+          "%s:%d: lock %s: timeout=%s", hold.caller.filename,
+          hold.caller.lineno, lock, timeout
+      )
     contended = False
     if True:
       if lock.acquire(0):
@@ -128,16 +134,15 @@ class DebuggingLock(object):
         held = self._held
         warning(
             "%s:%d: lock %s: waiting for contended lock, held by %s:%s:%d",
-            hold.caller.filename, hold.caller.lineno,
-            lock,
-            held.thread, held.caller.filename, held.caller.lineno)
+            hold.caller.filename, hold.caller.lineno, lock, held.thread,
+            held.caller.filename, held.caller.lineno
+        )
     acquired = lock.acquire(timeout=timeout)
     if contended:
       warning(
-          "%s:%d: lock %s: %s",
-          hold.caller.filename, hold.caller.lineno,
-          lock,
-          "acquired" if acquired else "timed out")
+          "%s:%d: lock %s: %s", hold.caller.filename, hold.caller.lineno, lock,
+          "acquired" if acquired else "timed out"
+      )
     self._held = hold
     if acquired and self.trace_acquire:
       X("ACQUIRED %r", self)

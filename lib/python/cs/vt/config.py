@@ -104,10 +104,7 @@ class Config:
       except KeyError:
         raise ValueError("missing type field in clause")
       S = self.new_Store(
-          store_name,
-          store_type,
-          clause,
-          clause_name=clause_name
+          store_name, store_type, clause, clause_name=clause_name
       )
       R.result = S
     return S
@@ -140,11 +137,7 @@ class Config:
   def archive(self, archivename):
     ''' Return the Archive named `archivename`.
     '''
-    if (
-        not archivename
-        or '.' in archivename
-        or '/' in archivename
-    ):
+    if (not archivename or '.' in archivename or '/' in archivename):
       raise ValueError("invalid archive name: %r" % (archivename,))
     arpath = joinpath(self.basedir, archivename + '.vt')
     return Archive(arpath)
@@ -172,8 +165,12 @@ class Config:
         # multiple stores: save to the front store, read first from the
         # front store then from the rest
         S = ProxyStore(
-            store_spec, stores[0:1], stores[0:1],
-            read2=stores[1:], hashclass=hashclass)
+            store_spec,
+            stores[0:1],
+            stores[0:1],
+            read2=stores[1:],
+            hashclass=hashclass
+        )
       if runstate is not None:
         S.runstate = runstate
       return S
@@ -187,15 +184,17 @@ class Config:
       raise ValueError("empty Store specification: %r" % (store_specs,))
     stores = [
         self.new_Store(store_text, store_type, params, hashclass=hashclass)
-        for store_text, store_type, params
-        in store_specs
+        for store_text, store_type, params in store_specs
     ]
     return stores
 
-  def new_Store(self, store_name, store_type, params, clause_name=None, hashclass=None):
+  def new_Store(
+      self, store_name, store_type, params, clause_name=None, hashclass=None
+  ):
     ''' Construct a store given its specification.
     '''
-    with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
+    with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type,
+             params):
       if not isinstance(params, dict):
         params = dict(params)
       if hashclass is not None:
@@ -239,7 +238,7 @@ class Config:
 
   def config_Store(
       self,
-      _,    # store_name, unused
+      _,  # store_name, unused
       *,
       type_=None,
       clause_name=None,
@@ -256,7 +255,8 @@ class Config:
 
   def datadir_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -284,7 +284,8 @@ class Config:
 
   def filecache_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -321,7 +322,9 @@ class Config:
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
     return FileCacheStore(
-        store_name, backend_store, path,
+        store_name,
+        backend_store,
+        path,
         max_cachefile_size=max_file_size,
         max_cachefiles=max_files,
         hashclass=hashclass,
@@ -329,7 +332,8 @@ class Config:
 
   def memory_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       max_data=None,
@@ -345,7 +349,8 @@ class Config:
 
   def platonic_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -386,10 +391,13 @@ class Config:
     if isinstance(archive, str):
       archive = longpath(archive)
     return PlatonicStore(
-        store_name, path,
-        hashclass=hashclass, indexclass=None,
+        store_name,
+        path,
+        hashclass=hashclass,
+        indexclass=None,
         follow_symlinks=follow_symlinks,
-        meta_store=meta_store, archive=archive,
+        meta_store=meta_store,
+        archive=archive,
         flags_prefix='VT_' + clause_name,
     )
 
@@ -452,11 +460,13 @@ class Config:
       for clause_name, ptn in archive_path:
         with Pfx("[%s]%s", clause_name, ptn):
           AS = self[clause_name]
-          archives.append( (AS, ptn) )
+          archives.append((AS, ptn))
     S = ProxyStore(
         store_name,
-        save_stores, read_stores,
-        save2=save2_stores, read2=read2_stores,
+        save_stores,
+        read_stores,
+        save2=save2_stores,
+        read2=read2_stores,
         copy2=copy2_stores,
         archives=archives,
         hashclass=hashclass,

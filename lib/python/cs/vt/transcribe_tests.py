@@ -37,8 +37,8 @@ class TestTranscribe(unittest.TestCase):
         '"de\\f"',
         '"gh\\\"i"',
         uuid4(),
-        Hash_SHA1.from_chunk(bytes(
-            random.randint(0, 255) for _ in range(100))),
+        Hash_SHA1.from_chunk(bytes(random.randint(0, 255)
+                                   for _ in range(100))),
     ):
       s = T.transcribe_s(o, None)
       self.assertIsInstance(s, str)
