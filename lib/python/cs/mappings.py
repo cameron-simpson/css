@@ -684,6 +684,7 @@ class StackableValues(object):
           >>> print(S.x)
           1
           >>> S.push('x', 2)
+          1
           >>> print(S.x)
           2
           >>> S.x = 3
@@ -699,10 +700,14 @@ class StackableValues(object):
           4
           >>> print(S.x)
           1
+          >>> S.update(x=5)
+          {'x': 1}
   '''
 
-  def __init__(self):
+  def __init__(self, *ms, **kw):
     self._values = defaultdict(list)
+    if ms or kw:
+      self.update(*ms, **kw)
 
   def __str__(self):
     return (
@@ -718,7 +723,7 @@ class StackableValues(object):
         "%s(%s)"
         % (
             type(self),
-            ','.join( "%r=%r" % (k, v) for k, v in sorted(self.items()) )
+            ','.join( "%r=%r" % (k, v) for k, v in self.items() )
         )
     )
 
@@ -750,7 +755,11 @@ class StackableValues(object):
         yield key, v
 
   def __getattr__(self, attr):
-    ''' Present the top value of key `attr` as an attribute.
+    ''' Convenience: present the top value of key `attr` as an attribute.
+
+        Note that attributes `push`, `pop` and the mapping method names
+        are shadowed by the instance methods
+        and should be accessed with the traditional `[]` key dereference.
     '''
     if attr.startswith('_'):
       raise AttributeError(attr)
@@ -804,8 +813,13 @@ class StackableValues(object):
 
   def push(self, key, value):
     ''' Push a new `value` for `key`.
+        Return the previous value
+        or `None` if this is the first value for `key`.
     '''
+    vs = self._values.get(key, [])
+    v = vs[-1] if vs else None
     self._values[key].append(value)
+    return v
 
   def pop(self, key):
     ''' Pop and return the latest value for `key`.
@@ -816,6 +830,25 @@ class StackableValues(object):
     except IndexError:
       raise KeyError(key)
     return v
+
+  def update(self, *ms, **kw):
+    ''' Update the mapping like `dict.update` method.
+        Return a mapping with the preupdate values
+        of the updated keys.
+    '''
+    ovs = []
+    for m in ms:
+      try:
+        mkeys = m.keys
+      except AttributeError:
+        for k, v in m:
+          ovs.append((k, self.push(k, v)))
+      else:
+        for k in mkeys():
+          ovs.append((k, self.push(k, m[k])))
+    for k, v in kw.items():
+      ovs.append((k, self.push(k, kw[k])))
+    return dict(reversed(ovs))
 
   @contextmanager
   def stack(self, key, value):
