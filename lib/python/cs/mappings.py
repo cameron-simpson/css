@@ -856,13 +856,15 @@ class StackableValues(object):
       else:
         for k in mkeys():
           ovs.append((k, self.push(k, m[k])))
-    for k, v in kw.items():
+    for k in kw:
       ovs.append((k, self.push(k, kw[k])))
     return dict(reversed(ovs))
 
   @contextmanager
-  def stack(self, key, value):
-    ''' Context manager which pushes and pops a new `value` for `key`.
+  def stack(self, *a, **kw):
+    ''' Context manager which saves and restores the current state.
+        Any parameters are passed to `update()` after the save
+        but before the yield.
     '''
     self.push(key, value)
     try:
