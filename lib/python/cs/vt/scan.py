@@ -21,6 +21,7 @@ try:
   from ._scan import scanbuf
 except ImportError:
   warning("building _scan from _scan.c")
+
   def do_setup():
     ''' Run distutils.core.setup from the top of the lib tree.
         Side effect: changes directory, needs undoing.
@@ -30,6 +31,7 @@ except ImportError:
     return setup(
         ext_modules=[Extension("cs.vt._scan", [joinpath(pkgdir, '_scan.c')])],
     )
+
   ### delay, seemingly needed to make the C version look "new"
   ##sleep(2)
   oargv = sys.argv
@@ -53,14 +55,15 @@ except ImportError:
 
 if scanbuf is None:
   warning("using pure Python scanbuf")
+
   def scanbuf(hash_value, chunk):
     ''' Pure Python scanbuf if there's no C version.
     '''
     offsets = []
     for offset, b in enumerate(chunk):
       hash_value = (
-          ( ( hash_value & 0x001fffff ) << 7 )
-          | ( ( b & 0x7f )^( (b & 0x80)>>7 ) )
+          ((hash_value & 0x001fffff) << 7)
+          | ((b & 0x7f) ^ ((b & 0x80) >> 7))
       )
       if hash_value % 4093 == 4091:
         offsets.append(offset)
@@ -69,6 +72,7 @@ if scanbuf is None:
 if False:
   # debugging wrapper
   scanbuf0 = scanbuf
+
   def scanbuf(h, data):
     ''' Debugging scan function.
     '''

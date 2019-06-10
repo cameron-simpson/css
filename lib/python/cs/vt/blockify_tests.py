@@ -139,8 +139,9 @@ class TestAll(unittest.TestCase):
             # the pending.flush operation can return short blocks
             ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE)
             self.assertTrue(
-                len(chunk) <= MAX_BLOCKSIZE, "len(chunk)=%d > MAX_BLOCKSIZE=%d"
-                % (len(chunk), MAX_BLOCKSIZE)
+                len(chunk) <= MAX_BLOCKSIZE,
+                "len(chunk)=%d > MAX_BLOCKSIZE=%d" %
+                (len(chunk), MAX_BLOCKSIZE)
             )
             if src_total is not None:
               self.assertTrue(

@@ -18,8 +18,8 @@ from .block import Block, IndirectBlock
 from .scan import scanbuf
 
 # constraints on the chunk sizes yields from blocked_chunks_of
-MIN_BLOCKSIZE = 80          # less than this seems silly
-MAX_BLOCKSIZE = 16383       # fits in 2 octets BS-encoded
+MIN_BLOCKSIZE = 80  # less than this seems silly
+MAX_BLOCKSIZE = 16383  # fits in 2 octets BS-encoded
 
 # default read size for file scans
 DEFAULT_SCAN_SIZE = 1024 * 1024
@@ -55,7 +55,7 @@ def top_block_for(blocks):
       return topblock
 
     # add a layer of indirection and repeat
-    blocks = indirect_blocks(chain( ( topblock, nexttopblock ), blocks ))
+    blocks = indirect_blocks(chain((topblock, nexttopblock), blocks))
 
   raise RuntimeError("SHOULD NEVER BE REACHED")
 
@@ -74,7 +74,8 @@ def indirect_blocks(blocks):
         # do not yield empty indirect block, flag logic error instead
         warning(
             "no pending subblocks at flush, presumably len(block.encode()) %d > MAX_BLOCKSIZE %d",
-            len(enc), MAX_BLOCKSIZE)
+            len(enc), MAX_BLOCKSIZE
+        )
       else:
         yield IndirectBlock(subblocks)
         subblocks = []
@@ -94,14 +95,15 @@ def indirect_blocks(blocks):
 def blockify(chunks, scanner=None, min_block=None, max_block=None):
   ''' Wrapper for blocked_chunks_of which yields Blocks from the data chunks.
   '''
-  for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block, max_block=max_block):
+  for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block,
+                                 max_block=max_block):
     yield Block(data=chunk)
 
 def spliced_blocks(B, new_blocks):
   ''' Splice an iterable of (offset, Block) into the data of the Block `B`.
       Yield high level blocks.
   '''
-  upto = 0      # data span yielded so far
+  upto = 0  # data span yielded so far
   for offset, newB in new_blocks:
     if offset > upto:
       yield from B.top_blocks(upto, offset)
@@ -153,7 +155,8 @@ class _PendingBuffer:
 def blocked_chunks_of(
     chunks,
     scanner=None,
-    min_block=None, max_block=None,
+    min_block=None,
+    max_block=None,
     histogram=None,
 ):
   ''' Generator which connects to a scanner of a chunk stream in
@@ -185,11 +188,12 @@ def blocked_chunks_of(
       raise ValueError("rejecting min_block < 8: %s" % (min_block,))
     if max_block is None:
       max_block = MAX_BLOCKSIZE
-    elif max_block >= 1024*1024:
+    elif max_block >= 1024 * 1024:
       raise ValueError("rejecting max_block >= 1024*1024: %s" % (max_block,))
     if min_block >= max_block:
-      raise ValueError("rejecting min_block:%d >= max_block:%d"
-                       % (min_block, max_block))
+      raise ValueError(
+          "rejecting min_block:%d >= max_block:%d" % (min_block, max_block)
+      )
     # obtain iterator of chunks; this avoids accidentally reusing the chunks
     # if for example chunks is a sequence
     chunk_iter = iter(chunks)
@@ -212,6 +216,7 @@ def blocked_chunks_of(
       # When the scanner terminates, any remaining chunks are also copied to the queue.
       parseQ = IterableQueue()
       chunk_iter = tee(chunk_iter, parseQ)
+
       def run_parser():
         ''' Thread body to run the supplied scanner against the input data.
         '''
@@ -221,7 +226,9 @@ def blocked_chunks_of(
           for offset in scanner(bfr):
             # the scanner should yield only offsets, not chunks and offsets
             if not isinstance(offset, int):
-              warning("discarding non-int from scanner %s: %s", scanner, offset)
+              warning(
+                  "discarding non-int from scanner %s: %s", scanner, offset
+              )
             else:
               parseQ.put(offset)
         except Exception as e:
@@ -231,15 +238,17 @@ def blocked_chunks_of(
           pass
         # end of offsets and chunks
         parseQ.close()
+
       PfxThread(target=run_parser).run()
     # inbound chunks and offsets
-    in_offsets = []     # heap of unprocessed edge offsets
+    in_offsets = []  # heap of unprocessed edge offsets
     # prime `available_chunk` with the first data chunk, ready for get_next_chunk
     try:
       available_chunk = next(parseQ)
     except StopIteration:
       # no data! just return
       return
+
     def get_next_chunk():
       ''' Fetch and return the next data chunk from the `parseQ`.
           Return None at end of input.
@@ -275,9 +284,11 @@ def blocked_chunks_of(
             available_chunk = item
             break
       return next_chunk
+
     last_offset = None
     first_possible_point = None
     max_possible_point = None
+
     def recompute_offsets():
       ''' Recompute relevant offsets from the block parameters.
           The first_possible_point is last_offset+min_block,
@@ -289,12 +300,13 @@ def blocked_chunks_of(
       '''
       nonlocal last_offset, first_possible_point, max_possible_point
       first_possible_point = last_offset + min_block
-      max_possible_point   = last_offset + max_block
+      max_possible_point = last_offset + max_block
       ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, max_possible_point=%d",
       ##  last_offset, first_possible_point, max_possible_point)
+
     # prepare initial state
-    last_offset = 0         # latest released boundary
-    recompute_offsets()     # compute first_possible_point and max_possible_point
+    last_offset = 0  # latest released boundary
+    recompute_offsets()  # compute first_possible_point and max_possible_point
     hash_value = 0
     offset = 0
     chunk0 = None
@@ -315,8 +327,8 @@ def blocked_chunks_of(
       chunk = memoryview(chunk)
       chunk_end_offset = offset + len(chunk)
       # process current chunk
-      advance_by = 0    # how much data to add to the pending buffer
-      release = False   # whether we hit a boundary ==> flush the buffer
+      advance_by = 0  # how much data to add to the pending buffer
+      release = False  # whether we hit a boundary ==> flush the buffer
       while chunk:
         if advance_by > 0:
           # advance through this chunk
@@ -340,7 +352,7 @@ def blocked_chunks_of(
             last_offset = pending.offset
             recompute_offsets()
           if release:
-            release = False   # becomes true if we should flush after taking data
+            release = False  # becomes true if we should flush after taking data
             # yield the current pending data
             for out_chunk in pending.flush():
               yield out_chunk

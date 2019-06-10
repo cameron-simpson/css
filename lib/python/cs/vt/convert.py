@@ -15,9 +15,7 @@ def get_integer(s, offset):
   ''' Parse an integer followed by an optional scale and return computed value.
   '''
   return multiparse_units(
-      s,
-      (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE),
-      offset
+      s, (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE), offset
   )
 
 def scaled_value(s):
@@ -58,4 +56,6 @@ def expand_path(path, basedir=None):
 def convert_param_path(params, key, basedir=None):
   ''' Convert a path parameter to an absolute pathname.
   '''
-  return convert_param(params, key, decoder=partial(expand_path, basedir=basedir))
+  return convert_param(
+      params, key, decoder=partial(expand_path, basedir=basedir)
+  )

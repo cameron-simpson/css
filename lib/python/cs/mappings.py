@@ -23,14 +23,16 @@ from cs.py3 import StringTypes
 from cs.seq import the
 
 DISTINFO = {
-    'description': "Facilities for mappings and objects associated with mappings.",
+    'description':
+    "Facilities for mappings and objects associated with mappings.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.sharedfile', 'cs.lex', 'cs.logutils', 'cs.py3', 'cs.seq' ],
+    'install_requires':
+    ['cs.sharedfile', 'cs.lex', 'cs.logutils', 'cs.py3', 'cs.seq'],
 }
 
 def named_row_tuple(*column_names, **kw):
@@ -87,15 +89,15 @@ def named_row_tuple(*column_names, **kw):
     mixin = object
   # compute candidate tuple attributes from the column names
   name_attributes = [
-      re.sub(r'\W+', '_', name).strip('_').lower()
-      for name in column_names
+      re.sub(r'\W+', '_', name).strip('_').lower() for name in column_names
   ]
   # final tuple attributes are the nonempty name_attributes_
-  attributes = [ attr for attr in name_attributes if attr ]
+  attributes = [attr for attr in name_attributes if attr]
   if len(attributes) == len(name_attributes):
     attributes = name_attributes
 
   _NamedRow = namedtuple(class_name, attributes)
+
   class NamedRow(_NamedRow, mixin):
     ''' A namedtuple to store row data.
 
@@ -118,8 +120,8 @@ def named_row_tuple(*column_names, **kw):
     computed_ = computed
     names_ = column_names
     name_attributes_ = name_attributes
-    attr_of_ = {}   # map name to attr, omits those with empty/missing attrs
-    name_of_ = {}   # map attr to name
+    attr_of_ = {}  # map name to attr, omits those with empty/missing attrs
+    name_of_ = {}  # map attr to name
     index_of_ = {}  # map name or attr to index
     i = 0
     for name, attr in zip(names_, name_attributes_):
@@ -129,7 +131,7 @@ def named_row_tuple(*column_names, **kw):
         index_of_[name] = i
         i += 1
     del i, name, attr
-    index_of_.update( (s, i) for i, s in enumerate(attributes_) )
+    index_of_.update((s, i) for i, s in enumerate(attributes_))
 
     def __getitem__(self, key):
       if isinstance(key, int):
@@ -158,8 +160,9 @@ def named_row_tuple(*column_names, **kw):
     ''' Factory function to create a NamedRow from a raw row.
     '''
     if attributes is not name_attributes:
-      row = [ item for item, attr in zip(row, name_attributes) if attr ]
+      row = [item for item, attr in zip(row, name_attributes) if attr]
     return NamedRow(*row)
+
   # pretty up the factory for external use
   factory.__name__ = 'factory(%s)' % (NamedRow.__name__,)
   factory.attributes_ = NamedRow.attributes_
@@ -187,8 +190,10 @@ _nct_Context = namedtuple('Context', 'cls index previous')
 
 def named_column_tuples(
     rows,
-    class_name=None, column_names=None,
-    computed=None, preprocess=None,
+    class_name=None,
+    column_names=None,
+    computed=None,
+    preprocess=None,
     mixin=None
 ):
   ''' Process an iterable of data rows, usually with the first row being
@@ -301,26 +306,29 @@ def named_column_tuples(
   '''
   gen = _named_column_tuples(
       rows,
-      class_name=class_name, column_names=column_names,
-      computed=computed, preprocess=preprocess,
-      mixin=mixin)
+      class_name=class_name,
+      column_names=column_names,
+      computed=computed,
+      preprocess=preprocess,
+      mixin=mixin
+  )
   cls = next(gen)
   return cls, gen
 
 def _named_column_tuples(
     rows,
-    class_name=None, column_names=None,
-    computed=None, preprocess=None,
+    class_name=None,
+    column_names=None,
+    computed=None,
+    preprocess=None,
     mixin=None
 ):
   if column_names is None:
     cls = None
   else:
     cls = named_row_tuple(
-        *column_names,
-        class_name=class_name,
-        computed=computed,
-        mixin=mixin)
+        *column_names, class_name=class_name, computed=computed, mixin=mixin
+    )
     yield cls
     tuple_attributes = cls.attributes_
     name_attributes = cls.name_attributes_
@@ -333,20 +341,18 @@ def _named_column_tuples(
     if cls is None:
       column_names = row
       cls = named_row_tuple(
-          *column_names,
-          class_name=class_name,
-          computed=computed,
-          mixin=mixin)
+          *column_names, class_name=class_name, computed=computed, mixin=mixin
+      )
       yield cls
       tuple_attributes = cls.attributes_
       name_attributes = cls.name_attributes_
       continue
     if callable(getattr(row, 'get', None)):
       # flatten a mapping into a list ordered by column_names
-      row = [ row.get(k) for k in column_names ]
+      row = [row.get(k) for k in column_names]
     if tuple_attributes is not name_attributes:
       # drop items from columns with empty names
-      row = [ item for item, attr in zip(row, name_attributes) if attr ]
+      row = [item for item, attr in zip(row, name_attributes) if attr]
     named_row = cls(*row)
     yield named_row
     previous = named_row
@@ -362,6 +368,7 @@ class SeqMapUC_Attrs(object):
       (ending in a literal 's' or 'es', a plural)
       returns the sequence (`FOO` must be a key of the mapping).
   '''
+
   def __init__(self, M, keepEmpty=False):
     self.__M = M
     self.keepEmpty = keepEmpty
@@ -375,7 +382,7 @@ class SeqMapUC_Attrs(object):
         else:
           value = value[0]
       kv.append((k, value))
-    return '{%s}' % (", ".join([ "%s: %r" % (k, value) for k, value in kv ]))
+    return '{%s}' % (", ".join(["%s: %r" % (k, value) for k, value in kv]))
 
   def __hasattr__(self, attr):
     k, _ = parseUC_sAttr(attr)
@@ -400,7 +407,10 @@ class SeqMapUC_Attrs(object):
       return
     if plural:
       if isinstance(type, StringTypes):
-        raise ValueError("invalid string %r assigned to plural attribute %r" % (value, attr))
+        raise ValueError(
+            "invalid string %r assigned to plural attribute %r" %
+            (value, attr)
+        )
       T = tuple(value)
       if len(T) == 0 and not self.keepEmpty:
         if k in self.__M:
@@ -421,6 +431,7 @@ class UC_Sequence(list):
   ''' A tuple-of-nodes on which `.ATTRs` indirection can be done,
       yielding another tuple-of-nodes or tuple-of-values.
   '''
+
   def __init__(self, Ns):
     ''' Initialise from an iterable sequence.
     '''
@@ -474,7 +485,7 @@ class AttributableList(list):
 
   def __getattr__(self, attr):
     if self.strict:
-      result = [ getattr(item, attr) for item in self ]
+      result = [getattr(item, attr) for item in self]
     else:
       result = []
       for item in self:
@@ -526,7 +537,7 @@ class MethodicalList(AttributableList):
 
   def __call_attr(self, attr):
     if self.strict:
-      submethods = [ getattr(item, attr) for item in self ]
+      submethods = [getattr(item, attr) for item in self]
     else:
       submethods = []
       for item in self:
@@ -536,7 +547,7 @@ class MethodicalList(AttributableList):
           pass
         else:
           submethods.append(submethod)
-    return MethodicalList( method() for method in submethods )
+    return MethodicalList(method() for method in submethods)
 
 class FallbackDict(defaultdict):
   ''' A dictlike object that inherits from another dictlike object;
@@ -576,8 +587,9 @@ class MappingChain(object):
         self.get_mappings = lambda: mappings
       else:
         raise ValueError(
-            "cannot supply both mappings (%r) and get_mappings (%r)"
-            % (mappings, get_mappings))
+            "cannot supply both mappings (%r) and get_mappings (%r)" %
+            (mappings, get_mappings)
+        )
     else:
       if get_mappings is not None:
         self.get_mappings = get_mappings
@@ -632,7 +644,8 @@ class SeenSet(object):
       with open(backing_path, "a"):
         pass
       self._backing_file = SharedAppendLines(
-          backing_path, importer=self._add_foreign_line)
+          backing_path, importer=self._add_foreign_line
+      )
       self._backing_file.ready()
 
   def _add_foreign_line(self, line):
@@ -711,10 +724,9 @@ class StackableValues(object):
 
   def __str__(self):
     return (
-        "%s(%s)"
-        % (
+        "%s(%s)" % (
             type(self).__name__,
-            ','.join( "%s=%s" % (k, v) for k, v in sorted(self.items()) )
+            ','.join("%s=%s" % (k, v) for k, v in sorted(self.items()))
         )
     )
 
@@ -765,8 +777,8 @@ class StackableValues(object):
       raise AttributeError(attr)
     try:
       v = self[attr]
-    except KeyError:
-      raise AttributeError(attr)
+    except KeyError as e:
+      raise AttributeError(attr) from e
     return v
 
   def __setattr__(self, attr, value):
@@ -780,24 +792,25 @@ class StackableValues(object):
       except KeyError:
         raise AttributeError(attr)
       else:
-        if not vs:
-          raise AttributeError(attr)
-        vs[-1] = value
+        if vs:
+          vs[-1] = value
+        else:
+          vs.append(value)
 
   def __getitem__(self, key):
     ''' Return the top value for `key` or raise `KeyError`.
     '''
     vs = self._values[key]
-    try:
+    if vs:
       v = vs[-1]
-    except IndexError:
+    else:
       try:
         fallback_func = self._fallback
       except AttributeError:
         # no fallback function
         raise KeyError(key)
       try:
-        return fallback_func(key)
+        v = fallback_func(key)
       except Exception as e:
         raise KeyError("fallback for %r fails: %s" % (key, e)) from e
     return v
@@ -846,16 +859,22 @@ class StackableValues(object):
       else:
         for k in mkeys():
           ovs.append((k, self.push(k, m[k])))
-    for k, v in kw.items():
+    for k in kw:
       ovs.append((k, self.push(k, kw[k])))
     return dict(reversed(ovs))
 
   @contextmanager
-  def stack(self, key, value):
-    ''' Context manager which pushes and pops a new `value` for `key`.
+  def stack(self, *a, **kw):
+    ''' Context manager which saves and restores the current state.
+        Any parameters are passed to `update()` after the save
+        but before the yield.
     '''
-    self.push(key, value)
+    old_values = self._values
+    self._values = defaultdict(
+        list, ((k, list(v)) for k, v in self._values.items())
+    )
+    self.update(*a, **kw)
     try:
       yield
     finally:
-      self.pop(key)
+      self._values = old_values
