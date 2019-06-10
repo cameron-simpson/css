@@ -99,7 +99,7 @@ do
               do
                 [ -d "$date" ] || continue
                 video=$date.mp4
-                [ -f "$video" ] || (
+                ls -ldL "$video" 2>/dev/null || (
                   set -ue
                   cd "$date"
                   # delete empty files
@@ -110,6 +110,7 @@ do
                       $trace ln "$img" "$nimg"
                       n=$((n+1))
                   done
+                  # get video size from first image
                   size=$(
                     set -- $date-*jpg
                     { gm identify "$1" || identify "$1"; } \
