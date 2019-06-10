@@ -209,11 +209,6 @@ class _Defaults(threading.local, StackableValues):
     '''
     return self._Ss.pop()
 
-  def push_runstate(self, new_runstate):
-    ''' Context manager to push a new RunState instance onto the per-Thread stack.
-    '''
-    return self.stack('runstate', new_runstate)
-
 defaults = _Defaults()
 
 class _TestAdditionsMixin:
