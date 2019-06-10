@@ -866,8 +866,12 @@ class StackableValues(object):
         Any parameters are passed to `update()` after the save
         but before the yield.
     '''
-    self.push(key, value)
+    old_values = self._values
+    self._values = defaultdict(
+        list, ((k, list(v)) for k, v in self._values.items())
+    )
+    self.update(*a, **kw)
     try:
       yield
     finally:
-      self.pop(key)
+      self._values = old_values
