@@ -580,62 +580,6 @@ class VTCmd:
         ls(path, D, recurse, sys.stdout)
     return 0
 
-  def parse_special(self, special, readonly):
-    ''' Parse the mount command's special device.
-    '''
-    fsname = special
-    specialD = None
-    special_store = None
-    archive = None
-    if special.startswith('D{') and special.endswith('}'):
-      # D{dir}
-      specialD, offset = parse(special)
-      if offset != len(special):
-        raise ValueError("unparsed text: %r" % (special[offset:],))
-      if not isinstance(specialD, Dir):
-        raise ValueError(
-            "does not seem to be a Dir transcription, looks like a %s" %
-            (type(specialD),)
-        )
-      special_basename = specialD.name
-      if not readonly:
-        warning("setting readonly")
-        readonly = True
-    elif special.startswith('['):
-      if special.endswith(']'):
-        # expect "[clause]"
-        clause_name, offset = get_clause_spec(special)
-        archive_name = ''
-        special_basename = clause_name
-      else:
-        # expect "[clause]archive"
-        clause_name, archive_name, offset = get_clause_archive(special)
-        special_basename = archive_name
-      if offset < len(special):
-        raise ValueError("unparsed text: %r" % (special[offset:],))
-      fsname = str(self.config) + special
-      try:
-        special_store = self.config[clause_name]
-      except KeyError:
-        raise ValueError("unknown config clause [%s]" % (clause_name,))
-      if archive_name is None or not archive_name:
-        special_basename = clause_name
-      else:
-        special_basename = archive_name
-      archive = special_store.get_Archive(archive_name)
-    else:
-      # pathname to archive file
-      archive = special
-      if not isfilepath(archive):
-        raise ValueError("not a file")
-      fsname = shortpath(realpath(archive))
-      spfx, sext = splitext(basename(special))
-      if spfx and sext == '.vt':
-        special_basename = spfx
-      else:
-        special_basename = special
-    return fsname, readonly, special_store, specialD, special_basename, archive
-
   def cmd_mount(self, args):
     ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
