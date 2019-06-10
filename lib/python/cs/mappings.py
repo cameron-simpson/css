@@ -807,7 +807,7 @@ class StackableValues(object):
         # no fallback function
         raise KeyError(key)
       try:
-        return fallback_func(key)
+        v = fallback_func(key)
       except Exception as e:
         raise KeyError("fallback for %r fails: %s" % (key, e)) from e
     return v
