@@ -403,8 +403,8 @@ class Config:
         hashclass=hashclass,
     )
 
+  @staticmethod
   def memory_Store(
-      self,
       store_name,
       clause_name,
       *,
@@ -547,8 +547,8 @@ class Config:
     S.readonly = readonly
     return S
 
+  @staticmethod
   def tcp_Store(
-      self,
       store_name,
       *,
       type_=None,
@@ -568,8 +568,8 @@ class Config:
       port, _ = get_integer(port, 0)
     return TCPClientStore(store_name, (host, port), hashclass=hashclass)
 
+  @staticmethod
   def socket_Store(
-      self,
       store_name,
       *,
       type_=None,
