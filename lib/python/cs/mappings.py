@@ -789,17 +789,18 @@ class StackableValues(object):
       except KeyError:
         raise AttributeError(attr)
       else:
-        if not vs:
-          raise AttributeError(attr)
-        vs[-1] = value
+        if vs:
+          vs[-1] = value
+        else:
+          vs.append(value)
 
   def __getitem__(self, key):
     ''' Return the top value for `key` or raise `KeyError`.
     '''
     vs = self._values[key]
-    try:
+    if vs:
       v = vs[-1]
-    except IndexError:
+    else:
       try:
         fallback_func = self._fallback
       except AttributeError:
