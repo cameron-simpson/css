@@ -774,8 +774,8 @@ class StackableValues(object):
       raise AttributeError(attr)
     try:
       v = self[attr]
-    except KeyError:
-      raise AttributeError(attr)
+    except KeyError as e:
+      raise AttributeError(attr) from e
     return v
 
   def __setattr__(self, attr, value):
