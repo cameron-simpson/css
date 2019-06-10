@@ -732,8 +732,11 @@ class StackableValues(object):
 
   def __repr__(self):
     return (
-        "%s(%s)" %
-        (type(self), ','.join("%r=%r" % (k, v) for k, v in self.items()))
+        "%s(%s)"
+        % (
+            type(self),
+            ','.join( "%r=%r" % (k, v) for k, v in self.items() )
+        )
     )
 
   def keys(self):

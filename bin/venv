@@ -80,8 +80,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 venvdir=$VENV_DIR/$pyver
+PATH=$venvdir/bin:$PATH
+export PATH
 
-set +u
-[ -t 2 ] && echo "+ . $venvdir/bin/activate" >&2
-. "$venvdir/bin/activate"
 exec $trace "$@"
