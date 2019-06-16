@@ -1,5 +1,6 @@
 #!/usr/bin/python
 #
+
 ''' I find the supplied python traceback facilities quite awkward.
     These functions provide convenient facilities.
 '''
@@ -9,7 +10,8 @@ import sys
 from traceback import extract_stack
 
 DISTINFO = {
-    'description': "Convenience functions for the python execution stack.",
+    'description':
+    "Convenience functions for the python execution stack.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -31,7 +33,7 @@ class Frame(_Frame):
 def frames():
   ''' Return the current stack as a list of `Frame` objects.
   '''
-  return [ Frame(*f) for f in extract_stack()[:-1] ]
+  return [Frame(*f) for f in extract_stack()[:-1]]
 
 def caller(frame_index=-3):
   ''' Return the `Frame` of the caller's caller.
