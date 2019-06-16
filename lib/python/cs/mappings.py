@@ -740,9 +740,10 @@ class StackableValues(object):
     )
 
   def keys(self):
-    ''' Mapping method returning an iterable of the names.
+    ''' Mapping method returning a list of the names.
     '''
-    return self._values.keys()
+    values = self._values
+    return list(k for k in values.keys() if values[k])
 
   def values(self):
     ''' Mapping method returning an iterable of the values.
@@ -842,6 +843,8 @@ class StackableValues(object):
       v = vs.pop()
     except IndexError:
       raise KeyError(key)
+    if not vs:
+      del self._values[key]
     return v
 
   def update(self, *ms, **kw):
