@@ -44,10 +44,12 @@ import tempfile
 import threading
 from cs.logutils import error, warning
 from cs.mappings import StackableValues
+from cs.pfx import Pfx
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -177,26 +179,29 @@ class _Defaults(threading.local, StackableValues):
     '''
     if key == 'S':
       warning("no per-Thread Store stack, using the global stack")
-      stack_dump()
+      ##stack_dump()
       Ss = self._Ss
       if Ss:
         return Ss[-1]
+      fallback = None
       error(
-          "%s: no per-Thread defaults.S and no global stack, returning None",
-          self
+          "%s: no per-Thread defaults.S and no global stack, returning %r",
+          self, fallback
       )
-      return None
+      return fallback
     raise ValueError("no fallback for %r" % (key,))
 
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
+    X("pushStore(S=%s)", newS)
     self.push('S', newS)
 
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
     oldS = self.pop('S')
+    X("popStore(): oldS=%s", oldS)
     return oldS
 
   def push_Ss(self, newS):
