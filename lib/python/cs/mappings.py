@@ -708,7 +708,7 @@ class StackableValues(object):
           3
           >>> print(S.x)
           1
-          >>> with S.stack('x', 4):
+          >>> with S.stack(x=4):
           ...   print(S.x)
           ...
           4
