@@ -177,7 +177,7 @@ class _Defaults(threading.local, StackableValues):
     '''
     if key == 'S':
       warning("no per-Thread Store stack, using the global stack")
-      stack_dump()
+      stack_dump(indent=2)
       Ss = self._Ss
       if Ss:
         return Ss[-1]
