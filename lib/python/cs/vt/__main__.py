@@ -144,7 +144,6 @@ class VTCmd(BaseCommand):
 
   def __init__(self):
     super().__init__()
-    self.in_context = False
 
   @classmethod
   def apply_defaults(cls, options):
