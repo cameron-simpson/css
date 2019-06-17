@@ -926,6 +926,7 @@ class VTCmd(BaseCommand):
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
+    runstate = options.runstate
     if address == '-':
       from .stream import StreamStore
       remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
@@ -936,9 +937,7 @@ class VTCmd(BaseCommand):
       X("serve via UNIX socket at %r", address)
       with defaults.S:
         srv = serve_socket(
-            socket_path=socket_path,
-            exports=exports,
-            runstate=options.runstate
+            socket_path=socket_path, exports=exports, runstate=runstate
         )
       srv.join()
     else:
@@ -952,10 +951,9 @@ class VTCmd(BaseCommand):
         port = int(port)
         with defaults.S:
           srv = serve_tcp(
-              bind_addr=(host, port),
-              exports=exports,
-              runstate=options.runstate
+              bind_addr=(host, port), exports=exports, runstate=runstate
           )
+          runstate.notify_cancel.add(lambda runstate: srv.shutdown())
         srv.join()
       else:
         raise GetoptError(
