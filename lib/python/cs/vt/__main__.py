@@ -145,7 +145,6 @@ class VTCmd(BaseCommand):
   def __init__(self):
     super().__init__()
     self.in_context = False
-    self.runstate = RunState("main")
 
   @classmethod
   def apply_defaults(cls, options):
@@ -170,7 +169,6 @@ class VTCmd(BaseCommand):
         'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
     )
     options.progress = None
-    options.runstate = None
     options.ticker = None
     options.status_label = cmd
 
@@ -228,7 +226,7 @@ class VTCmd(BaseCommand):
     else:
       cmd = options.cmd + ': ' + cmd
     setup_logging(cmd_name=options.cmd, upd_mode=sys.stderr.isatty())
-    runstate = RunState(name=cmd)
+    runstate = options.runstate
     progress = options.progress
     if progress is None:
       progress = Progress(total=0)
@@ -245,7 +243,7 @@ class VTCmd(BaseCommand):
       ticker = Thread(name='status-line', target=ticker)
       ticker.daemon = True
       ticker.start()
-    with options.stack(runstate=runstate, progress=progress, ticker=ticker):
+    with options.stack(progress=progress, ticker=ticker):
       with defaults.stack(runstate=runstate):
         if cmd not in ("config", "dump", "init", "profile", "scan", "test"):
           yield
@@ -259,7 +257,7 @@ class VTCmd(BaseCommand):
             options.store_spec = store_spec
           try:
             # set up the primary Store using the main programme RunState for control
-            S = Store(options.store_spec, options.config, runstate=runstate)
+            S = Store(options.store_spec, options.config)
           except ValueError as e:
             raise GetoptError(
                 "unusable Store specification: %s: %s" %
