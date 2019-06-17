@@ -14,7 +14,8 @@ from cs.pfx import Pfx
 from cs.resources import RunState
 
 DISTINFO = {
-    'description': "convenience functions for working with the Cmd module and other command line related stuff",
+    'description':
+    "convenience functions for working with the Cmd module and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
