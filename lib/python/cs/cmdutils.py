@@ -12,6 +12,7 @@ from getopt import getopt, GetoptError
 from logging import warning, exception
 from cs.mappings import StackableValues
 from cs.pfx import Pfx
+from cs.resources import RunState
 
 def docmd(dofunc):
   ''' Decorator for Cmd subclass methods
@@ -178,26 +179,30 @@ class BaseCommand:
       opts, argv = getopt(argv, self.getopt_spec)
       if self.getopt_spec:
         self.apply_opts(opts, options)
-      if argv:
-        # see if the first arg is a subcommand name
-        # by check for a cmd_{subcommand} method
-        subcmd_attr = 'cmd_' + argv[0]
-        subcmd_method = getattr(self, subcmd_attr, None)
-        if subcmd_method is not None:
-          subcmd = argv.pop(0)
-          with Pfx(subcmd):
-            with self.run_context(argv, options, cmd=subcmd):
-              return subcmd_method(argv, options, cmd=subcmd)
-      try:
-        main = self.main
-      except AttributeError as e:
-        raise GetoptError(
-            "%s: missing subcommand and no main method" %
-            (type(self).__name__,)
-        )
-      else:
-        with self.run_context(argv, options, cmd=None):
-          return self.main(argv, options, cmd=None)
+      runstate = options.runstate = RunState(cmd)
+      # expose the runstate for use by global caller who only has "self" :-(
+      self.runstate = runstate
+      with runstate:
+        if argv:
+          # see if the first arg is a subcommand name
+          # by check for a cmd_{subcommand} method
+          subcmd_attr = 'cmd_' + argv[0]
+          subcmd_method = getattr(self, subcmd_attr, None)
+          if subcmd_method is not None:
+            subcmd = argv.pop(0)
+            with Pfx(subcmd):
+              with self.run_context(argv, options, cmd=subcmd):
+                return subcmd_method(argv, options, cmd=subcmd)
+        try:
+          main = self.main
+        except AttributeError:
+          raise GetoptError(
+              "%s: missing subcommand and no main method" %
+              (type(self).__name__,)
+          )
+        else:
+          with self.run_context(argv, options, cmd=None):
+            return main(argv, options, cmd=None)
 
   @staticmethod
   @contextmanager

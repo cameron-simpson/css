@@ -177,7 +177,7 @@ class _Defaults(threading.local, StackableValues):
     '''
     if key == 'S':
       warning("no per-Thread Store stack, using the global stack")
-      stack_dump()
+      stack_dump(indent=2)
       Ss = self._Ss
       if Ss:
         return Ss[-1]
@@ -208,11 +208,6 @@ class _Defaults(threading.local, StackableValues):
     ''' Pop and return the topmost Store from the global stack.
     '''
     return self._Ss.pop()
-
-  def push_runstate(self, new_runstate):
-    ''' Context manager to push a new RunState instance onto the per-Thread stack.
-    '''
-    return self.stack('runstate', new_runstate)
 
 defaults = _Defaults()
 

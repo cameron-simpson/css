@@ -16,11 +16,12 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import re
-from cs.sharedfile import SharedAppendLines
 from cs.lex import isUC_, parseUC_sAttr
 from cs.logutils import warning
+from cs.pfx import Pfx
 from cs.py3 import StringTypes
 from cs.seq import the
+from cs.sharedfile import SharedAppendLines
 
 DISTINFO = {
     'description':
@@ -32,7 +33,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.sharedfile', 'cs.lex', 'cs.logutils', 'cs.py3', 'cs.seq'],
+    ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.sharedfile'],
 }
 
 def named_row_tuple(*column_names, **kw):
@@ -707,7 +708,7 @@ class StackableValues(object):
           3
           >>> print(S.x)
           1
-          >>> with S.stack('x', 4):
+          >>> with S.stack(x=4):
           ...   print(S.x)
           ...
           4
@@ -732,17 +733,15 @@ class StackableValues(object):
 
   def __repr__(self):
     return (
-        "%s(%s)"
-        % (
-            type(self),
-            ','.join( "%r=%r" % (k, v) for k, v in self.items() )
-        )
+        "%s(%s)" %
+        (type(self), ','.join("%r=%r" % (k, v) for k, v in self.items()))
     )
 
   def keys(self):
-    ''' Mapping method returning an iterable of the names.
+    ''' Mapping method returning a list of the names.
     '''
-    return self._values.keys()
+    values = self._values
+    return list(k for k in values.keys() if values[k])
 
   def values(self):
     ''' Mapping method returning an iterable of the values.
@@ -809,10 +808,11 @@ class StackableValues(object):
       except AttributeError:
         # no fallback function
         raise KeyError(key)
-      try:
-        v = fallback_func(key)
-      except Exception as e:
-        raise KeyError("fallback for %r fails: %s" % (key, e)) from e
+      with Pfx("%s._fallback(%r)", type(self).__name__, key):
+        try:
+          v = fallback_func(key)
+        except Exception as e:
+          raise KeyError("fallback for %r fails: %s" % (key, e)) from e
     return v
 
   def get(self, key, default=None):
@@ -842,6 +842,8 @@ class StackableValues(object):
       v = vs.pop()
     except IndexError:
       raise KeyError(key)
+    if not vs:
+      del self._values[key]
     return v
 
   def update(self, *ms, **kw):

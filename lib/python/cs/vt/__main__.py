@@ -144,8 +144,6 @@ class VTCmd(BaseCommand):
 
   def __init__(self):
     super().__init__()
-    self.in_context = False
-    self.runstate = RunState("main")
 
   @classmethod
   def apply_defaults(cls, options):
@@ -170,7 +168,6 @@ class VTCmd(BaseCommand):
         'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
     )
     options.progress = None
-    options.runstate = None
     options.ticker = None
     options.status_label = cmd
 
@@ -228,7 +225,7 @@ class VTCmd(BaseCommand):
     else:
       cmd = options.cmd + ': ' + cmd
     setup_logging(cmd_name=options.cmd, upd_mode=sys.stderr.isatty())
-    runstate = RunState(name=cmd)
+    runstate = options.runstate
     progress = options.progress
     if progress is None:
       progress = Progress(total=0)
@@ -245,9 +242,9 @@ class VTCmd(BaseCommand):
       ticker = Thread(name='status-line', target=ticker)
       ticker.daemon = True
       ticker.start()
-    with options.stack(runstate=runstate, progress=progress, ticker=ticker):
+    with options.stack(progress=progress, ticker=ticker):
       with defaults.stack(runstate=runstate):
-        if cmd not in ("config", "dump", "init", "profile", "scan", "test"):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
           yield
         else:
           # open the default Store
@@ -259,7 +256,7 @@ class VTCmd(BaseCommand):
             options.store_spec = store_spec
           try:
             # set up the primary Store using the main programme RunState for control
-            S = Store(options.store_spec, options.config, runstate=runstate)
+            S = Store(options.store_spec, options.config)
           except ValueError as e:
             raise GetoptError(
                 "unusable Store specification: %s: %s" %
@@ -805,14 +802,15 @@ class VTCmd(BaseCommand):
     '''
     xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
+      runstate = options.runstate
       Q, T = srcS.pushto(dstS, progress=options.progress)
       for pushable in pushables:
-        if options.runstate.cancelled:
+        if runstate.cancelled:
           xit = 1
           break
         with Pfx(str(pushable)):
           pushed_ok = pushable.pushto_queue(
-              Q, runstate=defaults.runstate, progress=options.progress
+              Q, runstate=runstate, progress=options.progress
           )
           assert isinstance(pushed_ok, bool)
           if not pushed_ok:
@@ -928,6 +926,7 @@ class VTCmd(BaseCommand):
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
+    runstate = options.runstate
     if address == '-':
       from .stream import StreamStore
       remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
@@ -935,12 +934,9 @@ class VTCmd(BaseCommand):
     elif '/' in address:
       # path/to/socket
       socket_path = expand_path(address)
-      X("serve via UNIX socket at %r", address)
       with defaults.S:
         srv = serve_socket(
-            socket_path=socket_path,
-            exports=exports,
-            runstate=options.runstate
+            socket_path=socket_path, exports=exports, runstate=runstate
         )
       srv.join()
     else:
@@ -954,10 +950,9 @@ class VTCmd(BaseCommand):
         port = int(port)
         with defaults.S:
           srv = serve_tcp(
-              bind_addr=(host, port),
-              exports=exports,
-              runstate=options.runstate
+              bind_addr=(host, port), exports=exports, runstate=runstate
           )
+          runstate.notify_cancel.add(lambda runstate: srv.shutdown())
         srv.join()
       else:
         raise GetoptError(
