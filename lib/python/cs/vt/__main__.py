@@ -245,7 +245,7 @@ class VTCmd(BaseCommand):
       ticker.start()
     with options.stack(progress=progress, ticker=ticker):
       with defaults.stack(runstate=runstate):
-        if cmd not in ("config", "dump", "init", "profile", "scan", "test"):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
           yield
         else:
           # open the default Store
