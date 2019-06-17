@@ -934,7 +934,6 @@ class VTCmd(BaseCommand):
     elif '/' in address:
       # path/to/socket
       socket_path = expand_path(address)
-      X("serve via UNIX socket at %r", address)
       with defaults.S:
         srv = serve_socket(
             socket_path=socket_path, exports=exports, runstate=runstate
