@@ -803,14 +803,15 @@ class VTCmd(BaseCommand):
     '''
     xit = 0
     with Pfx("%s => %s", srcS.name, dstS.name):
+      runstate = options.runstate
       Q, T = srcS.pushto(dstS, progress=options.progress)
       for pushable in pushables:
-        if options.runstate.cancelled:
+        if runstate.cancelled:
           xit = 1
           break
         with Pfx(str(pushable)):
           pushed_ok = pushable.pushto_queue(
-              Q, runstate=defaults.runstate, progress=options.progress
+              Q, runstate=runstate, progress=options.progress
           )
           assert isinstance(pushed_ok, bool)
           if not pushed_ok:
