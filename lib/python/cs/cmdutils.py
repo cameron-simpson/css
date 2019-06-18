@@ -115,7 +115,7 @@ class BaseCommand:
       it is intended that all the per command state
       is contained in the `options` object
       and therefore that in typical use
-      all of `apply_opts`, `cmd_`*subcmd*`, `main` and `run_context`
+      all of `apply_opts`, `cmd_`*subcmd*, `main` and `run_context`
       should be static methods making no reference to `self`.
 
       Editorial: why not arparse?
