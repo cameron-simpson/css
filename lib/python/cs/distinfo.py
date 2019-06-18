@@ -53,7 +53,7 @@ DISTINFO_CLASSIFICATION = {
     "Intended Audience": "Developers",
     "Operating System": "OS Independent",
     "Topic": "Software Development :: Libraries :: Python Modules",
-    "License": "OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License": "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 }
 
 

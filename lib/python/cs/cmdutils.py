@@ -1,10 +1,9 @@
 #!/usr/bin/python
 #
-
-''' Convenience functions for working with the Cmd module
-    and other command line related stuff.
-    - Cameron Simpson <cs@cskk.id.au> 03sep2015
-'''
+# Convenience functions for working with the Cmd module
+# and other command line related stuff.
+# - Cameron Simpson <cs@cskk.id.au> 03sep2015
+#
 
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
@@ -13,6 +12,18 @@ from logging import warning, exception
 from cs.mappings import StackableValues
 from cs.pfx import Pfx
 from cs.resources import RunState
+
+DISTINFO = {
+    'description':
+    "convenience functions for working with the Cmd module and other command line related stuff",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.mappings', 'cs.pfx', 'cs.resources'],
+}
 
 def docmd(dofunc):
   ''' Decorator for Cmd subclass methods
