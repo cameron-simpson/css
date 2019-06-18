@@ -29,9 +29,11 @@ def docmd(dofunc):
 
       The intended use is to decorate `cmd.Cmd` `do_`* methods:
 
-        @docmd
-        def do_something(...):
-          ... do something ...
+          from cmd import Cmd
+          class MyCmd(Cmd):
+            @docmd
+            def do_something(...):
+              ... do something ...
   '''
 
   def wrapped(self, *a, **kw):
@@ -90,11 +92,11 @@ class BaseCommand:
         `cmd_`*subcmd* method
         then method `main(argv,options)`
         will be called where `argv` contains the command line arguments.
-      * `run_context(argv,options,cmd=None)`:
+      * `run_context(argv,options,cmd)`:
         a context manager to provide setup or teardown actions
         to occur before and after the command implementation respectively.
         If the implementation is a `cmd_`*subcmd* method
-        then this is called with `cmd=`*subcmd`;
+        then this is called with `cmd=`*subcmd*;
         if the implementation is `main`
         then this is called with `cmd=None`.
 
@@ -124,7 +126,7 @@ class BaseCommand:
     self.getopt_spec = getopt_spec
 
   def apply_defaults(self, options):
-    ''' Stub apply_defaults method.
+    ''' Stub `apply_defaults` method.
 
         Subclasses can override this to set up the initial state of `options`.
     '''
