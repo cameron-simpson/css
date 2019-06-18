@@ -61,14 +61,14 @@ class BaseCommand:
       To implement a command line
       one instantiates a subclass of BaseCommand:
 
-        class MyCommand(BaseCommand):
-          GETOPT_SPEC = 'ab:c'
-        ...
-        the_cmd = MyCommand()
+          class MyCommand(BaseCommand):
+            GETOPT_SPEC = 'ab:c'
+          ...
+          the_cmd = MyCommand()
 
       Running a command is done by:
 
-        the_cmd.run(argv)
+          the_cmd.run(argv)
 
       The subclass is customised by overriding the following methods:
       * `apply_defaults(options)`:
