@@ -50,25 +50,39 @@ def oserror(errno_, msg, *a):
 #  OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
 # for the known names in the errno module.
 def mkOSfunc(M, Ename):
+  ''' Create a wrapper function for `oserror` from errno value name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to be a valid errno symbol from the `errno` module.
+  '''
   Evalue = getattr(errno, Ename)
   setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
 
-M = getmodule(oserror)
-for Ename in dir(errno):
-  if Ename.startswith('E'):
-    mkOSfunc(M, Ename)
-
 # Generate dummy functions for missing symbols which we use.
 def mkOSfuncEINVAL(M, Ename):
+  ''' Create a wrapper function for `oserror` from the name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to *not* be a valid errno symbol
+      from the `errno` module, and is to support calls of "foreign"
+      errno symbols;
+      they are translated to `EINVAL` with an indication in the warning message.
+  '''
   setattr(
       M, 'OS_' + Ename, lambda msg, *a:
       oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a)
   )
 
-for Ename in 'ENOATTR', :
-  if not hasattr(errno, Ename):
-    mkOSfuncEINVAL(M, Ename)
-del M
+def _prep_osfuncs():
+  ''' Generate the required wrappers for the various `E*` errno symbols.
+  '''
+  M = getmodule(oserror)
+  for Ename in dir(errno):
+    if Ename.startswith('E'):
+      mkOSfunc(M, Ename)
+  for Ename in 'ENOATTR', :
+    if not hasattr(errno, Ename):
+      mkOSfuncEINVAL(M, Ename)
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -90,7 +104,7 @@ class FileHandle:
 
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
-    return "<FileHandle:fhndx=%d:%s>" % (
+    return "<FileHandle:fhndx=%s:%s>" % (
         fhndx,
         self.E,
     )
