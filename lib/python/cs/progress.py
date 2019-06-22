@@ -15,7 +15,8 @@ from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
 DISTINFO = {
-    'description': "A progress tracker with methods for throughput, ETA and update notification",
+    'description':
+    "A progress tracker with methods for throughput, ETA and update notification",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -108,8 +109,10 @@ class BaseProgress(object):
       return None
     remaining = total - self.position
     if remaining < 0:
-      warning("%s.remaining_time: self.position(%s) > self.total(%s)",
-              self, self.position, self.total)
+      warning(
+          "%s.remaining_time: self.position(%s) > self.total(%s)", self,
+          self.position, self.total
+      )
       return None
     throughput = self.throughput
     if throughput is None or throughput == 0:
@@ -139,11 +142,9 @@ class BaseProgress(object):
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
     left = (
-        label
-        + ': '
-        + transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1)
-        + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
-        + ' '
+        label + ': ' +
+        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + ' / ' +
+        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1) + ' '
     )
     if remaining is None:
       right = 'ETA unknown'
@@ -213,7 +214,8 @@ class Progress(BaseProgress):
       position=None,
       name=None,
       start=None,
-      start_time=None, throughput_window=None,
+      start_time=None,
+      throughput_window=None,
       total=None,
   ):
     ''' Initialise the Progesss object.
@@ -239,7 +241,7 @@ class Progress(BaseProgress):
     self._total = total
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
-    positions = [ CheckPoint(start_time, start) ]
+    positions = [CheckPoint(start_time, start)]
     if position != start:
       positions.append(CheckPoint(time.time(), position))
     self._positions = positions
@@ -364,7 +366,9 @@ class Progress(BaseProgress):
     if oldest is None:
       window = self.throughput_window
       if window is None:
-        raise ValueError("oldest may not be None when throughput_window is None")
+        raise ValueError(
+            "oldest may not be None when throughput_window is None"
+        )
       oldest = time.time() - window
     positions = self._positions
     # scan for first item still in time window
@@ -379,24 +383,28 @@ class Progress(BaseProgress):
   def throughput(self):
     ''' Compute current overall throughput per second.
 
-        If self.throughput_window is not None,
-        calls self.self.throughput_recent(throughput_window).
+        If self.throughput_window is not `None`,
+        calls `self.self.throughput_recent(throughput_window)`.
     '''
     throughput_window = self.throughput_window
     if throughput_window is not None:
       return self.throughput_recent(throughput_window)
     consumed = self.position - self.start
     if consumed < 0:
-      warning("%s.throughput: self.position(%s) < self.start(%s)",
-              self, self.position, self.start)
+      warning(
+          "%s.throughput: self.position(%s) < self.start(%s)", self,
+          self.position, self.start
+      )
     if consumed == 0:
       return 0
     elapsed = self.elapsed_time
     if elapsed == 0:
       return 0
     if elapsed <= 0:
-      warning("%s.throughput: negative elapsed time since start_time=%s: %s",
-              self, self.start_time, elapsed)
+      warning(
+          "%s.throughput: negative elapsed time since start_time=%s: %s", self,
+          self.start_time, elapsed
+      )
       return 0
     return float(consumed) / elapsed
 
@@ -408,8 +416,9 @@ class Progress(BaseProgress):
     '''
     if time_window <= 0:
       raise ValueError(
-          "%s.throughput_recent: invalid time_window <= 0: %s"
-          % (self, time_window))
+          "%s.throughput_recent: invalid time_window <= 0: %s" %
+          (self, time_window)
+      )
     if not self._flushed:
       self._flush()
     now = time.time()
@@ -475,8 +484,8 @@ class OverProgress(BaseProgress):
   '''
 
   def __init__(self, subprogresses=None, name=None, start_time=None):
-    Progress.__init__(self, name=name)
-    self.subprogresses=set()
+    BaseProgress.__init__(self, name=name, start_time=start_time)
+    self.subprogresses = set()
     if subprogresses:
       for P in subprogresses:
         self.add(P)
@@ -500,20 +509,15 @@ class OverProgress(BaseProgress):
 
   @property
   def start(self):
-    ''' We always return a starting of 0.
+    ''' We always return a starting value of 0.
     '''
     return 0
 
-  @start.setter
-  def start(self, new_start):
-    if new_start != 0:
-      raise ValueError("new_start may only be 0, not %r" % (new_start,))
-
   def _oversum(self, fnP):
-    return sum(value for value in (fnP(P) for P in self.subprogresses) if value is not None)
-
-  def advance(self, delta, update_time=None):
-    raise RuntimeError("cannot advance an OverProgress")
+    return sum(
+        value for value in (fnP(P) for P in self.subprogresses)
+        if value is not None
+    )
 
   @property
   def position(self):
