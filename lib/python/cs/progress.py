@@ -25,21 +25,163 @@ DISTINFO = {
     'install_requires': ['cs.logutils', 'cs.seq', 'cs.units'],
 }
 
+@functools.total_ordering
+class BaseProgress(object):
+  ''' The base class for `Progress` and `OverProcess`
+      with various common methods.
+  '''
+
+  def __init__(self, name=None, start_time=None):
+    now = time.time()
+    if name is None:
+      name = '-'.join((type(self).__name__, str(seq())))
+    if start_time is None:
+      start_time = now
+    elif start_time > now:
+      raise ValueError("start_time(%s) > now(%s)" % (start_time, now))
+    self.name = name
+    self.start_time = start_time
+
+  def __str__(self):
+    return "%s[start=%s:pos=%s:total=%s]" \
+        % (self.name, self.start, self.position, self.total)
+
+  __repr__ = __str__
+
+  def __int__(self):
+    ''' int(Progress) returns the current position.
+    '''
+    return self.position
+
+  def __eq__(self, other):
+    ''' A Progress is equal to another object `other`
+        if its position equals `int(other)`.
+    '''
+    return int(self) == int(other)
+
+  def __lt__(self, other):
+    ''' A Progress is less then another object `other`
+        if its position is less than `int(other)`.
+    '''
+    return int(self) < int(other)
+
+  def __hash__(self):
+    return id(self)
+
+  @property
+  def elapsed_time(self):
+    ''' Time elapsed since start_time.
+    '''
+    return time.time() - self.start_time
+
+  @property
+  def ratio(self):
+    ''' The fraction progress completed: (position-start)/(total-start).
+        Returns None if total is None or total <= start.
+
+        Example:
+
+            >>> P = Progress()
+            >>> P.ratio
+            >>> P.total = 16
+            >>> P.ratio
+            0.0
+            >>> P.update(4)
+            >>> P.ratio
+            0.25
+    '''
+    total = self.total
+    if total is None:
+      return None
+    start = self.start
+    if total <= start:
+      return None
+    return float(self.position - start) / (total - start)
+
+  @property
+  def remaining_time(self):
+    ''' The projected time remaining to end
+        based on the current throughput and the total.
+    '''
+    total = self.total
+    if total is None:
+      return None
+    remaining = total - self.position
+    if remaining < 0:
+      warning("%s.remaining_time: self.position(%s) > self.total(%s)",
+              self, self.position, self.total)
+      return None
+    throughput = self.throughput
+    if throughput is None or throughput == 0:
+      return None
+    return remaining / throughput
+
+  @property
+  def eta(self):
+    ''' The projected time of completion.
+    '''
+    remaining = self.remaining_time
+    if remaining is None:
+      return None
+    return time.time() + remaining
+
+  def status(self, label, width):
+    ''' A progress string of the form:
+        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+    '''
+    ratio = self.ratio
+    remaining = self.remaining_time
+    if remaining:
+      remaining = int(remaining)
+    if ratio is None:
+      if remaining is None:
+        return label + ': ETA unknown'
+      return label + ': ETA ' + transcribe_time(remaining)
+    # "label: ==>  ETA xs"
+    left = (
+        label
+        + ': '
+        + transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1)
+        + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+        + ' '
+    )
+    if remaining is None:
+      right = 'ETA unknown'
+    else:
+      right = ' ETA ' + transcribe_time(remaining)
+    arrow_width = width - len(left) - len(right)
+    if arrow_width < 1:
+      # no roow for an arrow
+      return label + ':' + right
+    if ratio <= 0:
+      arrow = ''
+    elif ratio < 1.0:
+      arrow_len = arrow_width * ratio
+      if arrow_len < 1:
+        arrow = '>'
+      else:
+        arrow = '=' * int(arrow_len - 1) + '>'
+    else:
+      arrow = '=' * arrow_width
+    arrow_field = arrow + ' ' * (arrow_width - len(arrow))
+    return left + arrow_field + right
+
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
-@functools.total_ordering
-class Progress(object):
+class Progress(BaseProgress):
   ''' A progress counter to track task completion with various utility methods.
 
-      >>> P = Progress(name="example")
-      >>> P                         #doctest: +ELLIPSIS
-      Progress(name='example',start=0,position=0,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0)]
-      >>> P.advance(5)
-      >>> P                         #doctest: +ELLIPSIS
-      Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
-      >>> P.total = 100
-      >>> P                         #doctest: +ELLIPSIS
-      Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+      Example:
+
+          >>> P = Progress(name="example")
+          >>> P                         #doctest: +ELLIPSIS
+          Progress(name='example',start=0,position=0,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0)]
+          >>> P.advance(5)
+          >>> P                         #doctest: +ELLIPSIS
+          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+          >>> P.total = 100
+          >>> P                         #doctest: +ELLIPSIS
+          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
 
       A Progress instance has an attribute ``notify_update`` which
       is a set of callables. Whenever the position is updates, each
@@ -86,35 +228,23 @@ class Progress(object):
           default None.
         * `total`: expected completion value, default None.
     '''
-    if name is None:
-      name = '-'.join((type(self).__name__, str(seq())))
-    now = time.time()
+    BaseProgress.__init__(self, name=name, start_time=start_time)
     if position is None:
       position = 0
     if start is None:
       start = position
-    if start_time is None:
-      start_time = now
-    elif start_time > now:
-      raise ValueError("start_time(%s) > now(%s)" % (start_time, now))
     if throughput_window is not None and throughput_window <= 0:
       raise ValueError("throughput_window <= 0: %s" % (throughput_window,))
-    self.name = name
     self.start = start
     self._total = total
-    self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
     positions = [ CheckPoint(start_time, start) ]
     if position != start:
-      positions.append(CheckPoint(now, position))
+      positions.append(CheckPoint(time.time(), position))
     self._positions = positions
     self._flushed = True
     self.notify_update = set()
-
-  def __str__(self):
-    return "%s[start=%s:pos=%s:total=%s]" \
-        % (self.name, self.start, self.position, self.total)
 
   def __repr__(self):
     return "%s(name=%r,start=%s,position=%s,start_time=%s,thoughput_window=%s,total=%s):%r" \
@@ -123,23 +253,6 @@ class Progress(object):
             self.start, self.position, self.start_time,
             self.throughput_window, self.total,
             self._positions)
-
-  def __int__(self):
-    ''' int(Progress) returns the current position.
-    '''
-    return self.position
-
-  def __eq__(self, other):
-    ''' A Progress is equal to another object `other`
-        if its position equals `int(other)`.
-    '''
-    return int(self) == int(other)
-
-  def __lt__(self, other):
-    ''' A Progress is less then another object `other`
-        if its position is less than `int(other)`.
-    '''
-    return int(self) < int(other)
 
   def _updated(self):
     datum = self.latest
@@ -179,28 +292,6 @@ class Progress(object):
     '''
     self._total = new_total
     self._updated()
-
-  @property
-  def ratio(self):
-    ''' The fraction progress completed: (position-start)/(total-start).
-        Returns None if total is None or total <= start.
-
-        >>> P = Progress()
-        >>> P.ratio
-        >>> P.total = 16
-        >>> P.ratio
-        0.0
-        >>> P.update(4)
-        >>> P.ratio
-        0.25
-    '''
-    total = self.total
-    if total is None:
-      return None
-    start = self.start
-    if total <= start:
-      return None
-    return float(self.position - start) / (total - start)
 
   def update(self, new_position, update_time=None):
     ''' Record more progress.
@@ -285,12 +376,6 @@ class Progress(object):
     self._flushed = True
 
   @property
-  def elapsed_time(self):
-    ''' Time elapsed since start_time.
-    '''
-    return time.time() - self.start_time
-
-  @property
   def throughput(self):
     ''' Compute current overall throughput per second.
 
@@ -354,73 +439,94 @@ class Progress(object):
       warning('rate < 0 (%s)', rate)
     return rate
 
-  @property
-  def remaining_time(self):
-    ''' The projected time remaining to end
-        based on the current throughput and the total.
+class OverProgress(BaseProgress):
+  ''' A `Progress`-like class computed from a set of subsidiary `Process`es.
+
+      Example:
+
+          >>> P = OverProgress(name="over")
+          >>> P1 = Progress(name="progress1", position=12)
+          >>> P1.total = 100
+          >>> P1.advance(7)
+          >>> P2 = Progress(name="progress2", position=20)
+          >>> P2.total = 50
+          >>> P2.advance(9)
+          >>> P.add(P1)
+          >>> P.add(P2)
+          >>> P1.total
+          100
+          >>> P2.total
+          50
+          >>> P.total
+          150
+          >>> P1.start
+          12
+          >>> P2.start
+          20
+          >>> P.start
+          0
+          >>> P1.position
+          19
+          >>> P2.position
+          29
+          >>> P.position
+          16
+
+  '''
+
+  def __init__(self, subprogresses=None, name=None, start_time=None):
+    Progress.__init__(self, name=name)
+    self.subprogresses=set()
+    if subprogresses:
+      for P in subprogresses:
+        self.add(P)
+
+  def __repr__(self):
+    return "%s(name=%r,start=%s,position=%s,start_time=%s,total=%s)" \
+        % (
+            type(self).__name__, self.name,
+            self.start, self.position, self.start_time,
+            self.total)
+
+  def add(self, subprogress):
+    ''' Add a subsidairy `Progress` to the contributing set.
     '''
-    total = self.total
-    if total is None:
-      return None
-    remaining = total - self.position
-    if remaining < 0:
-      warning("%s.remaining_time: self.position(%s) > self.total(%s)",
-              self, self.position, self.total)
-      return None
-    throughput = self.throughput
-    if throughput is None or throughput == 0:
-      return None
-    return remaining / throughput
+    self.subprogresses.add(subprogress)
+
+  def remove(self, subprogress):
+    ''' Remove a subsidairy `Progress` from the contributing set.
+    '''
+    self.subprogresses.remove(subprogress)
 
   @property
-  def eta(self):
-    ''' The projected time of completion.
+  def start(self):
+    ''' We always return a starting of 0.
     '''
-    remaining = self.remaining_time
-    if remaining is None:
-      return None
-    return time.time() + remaining
+    return 0
 
-  def status(self, label, width):
-    ''' A progress string of the form
-        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+  @start.setter
+  def start(self, new_start):
+    if new_start != 0:
+      raise ValueError("new_start may only be 0, not %r" % (new_start,))
+
+  def _oversum(self, fnP):
+    return sum(value for value in (fnP(P) for P in self.subprogresses) if value is not None)
+
+  def advance(self, delta, update_time=None):
+    raise RuntimeError("cannot advance an OverProgress")
+
+  @property
+  def position(self):
+    ''' The position is the sum off the subsidiary position offsets
+        from their respective starts.
     '''
-    ratio = self.ratio
-    remaining = self.remaining_time
-    if remaining:
-      remaining = int(remaining)
-    if ratio is None:
-      if remaining is None:
-        return label + ': ETA unknown'
-      return label + ': ETA ' + transcribe_time(remaining)
-    # "label: ==>  ETA xs"
-    left = (
-        label
-        + ': '
-        + transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1)
-        + ' / ' + transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
-        + ' '
-    )
-    if remaining is None:
-      right = 'ETA unknown'
-    else:
-      right = ' ETA ' + transcribe_time(remaining)
-    arrow_width = width - len(left) - len(right)
-    if arrow_width < 1:
-      # no roow for an arrow
-      return label + ':' + right
-    if ratio <= 0:
-      arrow = ''
-    elif ratio < 1.0:
-      arrow_len = arrow_width * ratio
-      if arrow_len < 1:
-        arrow = '>'
-      else:
-        arrow = '=' * int(arrow_len - 1) + '>'
-    else:
-      arrow = '=' * arrow_width
-    arrow_field = arrow + ' ' * (arrow_width - len(arrow))
-    return left + arrow_field + right
+    return self._oversum(lambda P: P.position - P.start)
+
+  @property
+  def total(self):
+    ''' The `total` is the sum of the subsidiary totals.
+    '''
+    return self._oversum(lambda P: P.total)
 
 if __name__ == '__main__':
   from cs.debug import selftest
