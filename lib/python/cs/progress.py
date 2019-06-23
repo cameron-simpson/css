@@ -30,6 +30,10 @@ DISTINFO = {
 class BaseProgress(object):
   ''' The base class for `Progress` and `OverProcess`
       with various common methods.
+
+      Note that durations are in seconds
+      and that absolute time is in seconds since the UNIX epoch
+      (the basis of `time.time()`).
   '''
 
   def __init__(self, name=None, start_time=None):
@@ -71,14 +75,14 @@ class BaseProgress(object):
 
   @property
   def elapsed_time(self):
-    ''' Time elapsed since start_time.
+    ''' Time elapsed since `start_time`.
     '''
     return time.time() - self.start_time
 
   @property
   def ratio(self):
-    ''' The fraction progress completed: (position-start)/(total-start).
-        Returns None if total is None or total <= start.
+    ''' The fraction of progress completed: `(position-start)/(total-start)`.
+        Returns `None` if `total` is `None` or `total<=start`.
 
         Example:
 
@@ -99,10 +103,46 @@ class BaseProgress(object):
       return None
     return float(self.position - start) / (total - start)
 
+  def throughtput_overall(self):
+    ''' The overall throughput from `start` to `position`
+        during `elapsed_time`.
+    '''
+    consumed = self.position - self.start
+    if consumed < 0:
+      warning(
+          "%s.throughput: self.position(%s) < self.start(%s)", self,
+          self.position, self.start
+      )
+    if consumed == 0:
+      return 0
+    elapsed = self.elapsed_time
+    if elapsed == 0:
+      return 0
+    if elapsed <= 0:
+      warning(
+          "%s.throughput: negative elapsed time since start_time=%s: %s", self,
+          self.start_time, elapsed
+      )
+      return 0
+    return float(consumed) / elapsed
+
+  @property
+  def throughput(self):
+    ''' The overall throughput: `self.thoughput_overall()`.
+
+        By comparison,
+        the `Progress.throughput` property is `self.thoughput_recent`
+        if the `throughput_window` is not `None`,
+        otherwise it falls back to `throughput_overall`.
+    '''
+    return self.throughput_overall()
+
   @property
   def remaining_time(self):
     ''' The projected time remaining to end
-        based on the current throughput and the total.
+        based on the `throughput` and `total`.
+
+        If `total` is `None`, this is `None`.
     '''
     total = self.total
     if total is None:
@@ -121,7 +161,9 @@ class BaseProgress(object):
 
   @property
   def eta(self):
-    ''' The projected time of completion.
+    ''' The projected time of completion: now + `remaining_time`.
+
+        If `reamining_time` is `None`, this is also `None`.
     '''
     remaining = self.remaining_time
     if remaining is None:
@@ -185,21 +227,21 @@ class Progress(BaseProgress):
           Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
 
       A Progress instance has an attribute ``notify_update`` which
-      is a set of callables. Whenever the position is updates, each
-      of these will be called with the Progress instance and the
-      latest CheckPoint.
+      is a set of callables. Whenever the position is updated, each
+      of these will be called with the `Progress` instance and the
+      latest `CheckPoint`.
 
-      Progress objects also make a small pretense of being an integer.
+      `Progress` objects also make a small pretense of being an integer.
       The expression `int(progress)` returns the current position,
-      and += and -= adjust the position.
+      and `+=` and `-=` adjust the position.
 
       This is convenient for coding, but importantly it is also
-      important for discretionary use of a Progress with some other
+      useful for discretionary use of a Progress with some other
       object.
-      If you want to make a lightweight Progress capable class
-      you can set a position attribute to an int
-      and manipulate it carefully using += and -= entirely.
-      If you decide to incur the cost of maintaining a Progress object
+      If you want to make a lightweight `Progress` capable class
+      you can set a position attribute to an `int`
+      and manipulate it carefully using `+=` and `-=` entirely.
+      If you decide to incur the cost of maintaining a `Progress` object
       you can slot it in:
 
           # initial setup with just an int
@@ -221,7 +263,7 @@ class Progress(BaseProgress):
     ''' Initialise the Progesss object.
 
         Parameters:
-        * `position`: initial position, default 0.
+        * `position`: initial position, default `0`.
         * `name`: optional name for this instance.
         * `start`: starting position of progress range,
           default from `position`.
@@ -298,12 +340,12 @@ class Progress(BaseProgress):
   def update(self, new_position, update_time=None):
     ''' Record more progress.
 
-        >>> P = Progress()
-        >>> P.position
-        0
-        >>> P.update(12)
-        >>> P.position
-        12
+            >>> P = Progress()
+            >>> P.position
+            0
+            >>> P.update(12)
+            >>> P.position
+            12
     '''
     if update_time is None:
       update_time = time.time()
@@ -318,30 +360,30 @@ class Progress(BaseProgress):
   def advance(self, delta, update_time=None):
     ''' Record more progress, return the advanced position.
 
-        >>> P = Progress()
-        >>> P.position
-        0
-        >>> P.advance(4)
-        >>> P.position
-        4
-        >>> P.advance(4)
-        >>> P.position
-        8
+            >>> P = Progress()
+            >>> P.position
+            0
+            >>> P.advance(4)
+            >>> P.position
+            4
+            >>> P.advance(4)
+            >>> P.position
+            8
     '''
     self.update(self.position + delta, update_time=update_time)
 
   def __iadd__(self, delta):
     ''' Operator += form of advance().
 
-        >>> P = Progress()
-        >>> P.position
-        0
-        >>> P += 4
-        >>> P.position
-        4
-        >>> P += 4
-        >>> P.position
-        8
+            >>> P = Progress()
+            >>> P.position
+            0
+            >>> P += 4
+            >>> P.position
+            4
+            >>> P += 4
+            >>> P.position
+            8
     '''
     self.advance(delta)
     return self
@@ -349,15 +391,15 @@ class Progress(BaseProgress):
   def __isub__(self, delta):
     ''' Operator -= form of advance().
 
-        >>> P = Progress()
-        >>> P.position
-        0
-        >>> P += 4
-        >>> P.position
-        4
-        >>> P -= 4
-        >>> P.position
-        0
+            >>> P = Progress()
+            >>> P.position
+            0
+            >>> P += 4
+            >>> P.position
+            4
+            >>> P -= 4
+            >>> P.position
+            0
     '''
     self.advance(-delta)
     return self
@@ -381,32 +423,16 @@ class Progress(BaseProgress):
 
   @property
   def throughput(self):
-    ''' Compute current overall throughput per second.
+    ''' Current throughput per second.
 
-        If self.throughput_window is not `None`,
-        calls `self.self.throughput_recent(throughput_window)`.
+        If `self.throughput_window` is not `None`,
+        calls `self.throughput_recent(throughput_window)`.
+        Otherwise call `self.thoughput_overall()`.
     '''
     throughput_window = self.throughput_window
-    if throughput_window is not None:
-      return self.throughput_recent(throughput_window)
-    consumed = self.position - self.start
-    if consumed < 0:
-      warning(
-          "%s.throughput: self.position(%s) < self.start(%s)", self,
-          self.position, self.start
-      )
-    if consumed == 0:
-      return 0
-    elapsed = self.elapsed_time
-    if elapsed == 0:
-      return 0
-    if elapsed <= 0:
-      warning(
-          "%s.throughput: negative elapsed time since start_time=%s: %s", self,
-          self.start_time, elapsed
-      )
-      return 0
-    return float(consumed) / elapsed
+    if throughput_window is None:
+      return self.throughput_overall()
+    return self.throughput_recent(throughput_window)
 
   def throughput_recent(self, time_window):
     ''' Recent throughput per second within a time window in seconds.
@@ -521,7 +547,7 @@ class OverProgress(BaseProgress):
 
   @property
   def position(self):
-    ''' The position is the sum off the subsidiary position offsets
+    ''' The `position` is the sum off the subsidiary position offsets
         from their respective starts.
     '''
     return self._oversum(lambda P: P.position - P.start)
