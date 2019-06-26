@@ -103,7 +103,7 @@ class BaseProgress(object):
       return None
     return float(self.position - start) / (total - start)
 
-  def throughtput_overall(self):
+  def throughput_overall(self):
     ''' The overall throughput from `start` to `position`
         during `elapsed_time`.
     '''
@@ -466,7 +466,7 @@ class Progress(BaseProgress):
       # no samples within the window; caller might infer stall
       return 0
     if low_time >= now:
-      # in the future? warn and return None
+      # in the future? warn and return 0
       warning('low_time=%s >= now=%s', low_time, now)
       return 0
     rate = float(self.position - low_pos) / (now - low_time)
