@@ -25,7 +25,9 @@ def get_clause_spec(s, offset=0):
   offset += 1
   clause_name, offset = get_qstr_or_identifier(s, offset)
   if not clause_name:
-    raise ValueError("missing clause_name identifier at position %d" % (offset,))
+    raise ValueError(
+        "missing clause_name identifier at position %d" % (offset,)
+    )
   if not s.startswith(']', offset):
     raise ValueError("missing closing ']' at position %d" % (offset,))
   return clause_name, offset + 1
@@ -37,7 +39,9 @@ def get_clause_archive(s, offset=0):
   clause_name, offset = get_clause_spec(s, offset)
   archive_name, offset = get_identifier(s, offset)
   if not archive_name:
-    raise ValueError("missing archive name identifier at position %d" % (offset,))
+    raise ValueError(
+        "missing archive name identifier at position %d" % (offset,)
+    )
   return clause_name, archive_name, offset
 
 def parse_store_specs(s, offset=0):
@@ -48,7 +52,7 @@ def parse_store_specs(s, offset=0):
     while offset < len(s):
       with Pfx("offset %d", offset):
         store_text, store_type, params, offset = get_store_spec(s, offset)
-        store_specs.append( (store_text, store_type, params) )
+        store_specs.append((store_text, store_type, params))
       if offset < len(s):
         with Pfx("offset %d", offset):
           sep = s[offset]
@@ -56,8 +60,8 @@ def parse_store_specs(s, offset=0):
           if sep == ',':
             continue
           raise ValueError(
-              "expected comma ',', found unexpected separator: %r"
-              % (sep,))
+              "expected comma ',', found unexpected separator: %r" % (sep,)
+          )
     return store_specs
 
 def get_archive_path_entry(s, offset=0, stopchars=None):
@@ -97,8 +101,9 @@ def get_archive_path(s, offset=0, stopchars=None):
   entries = []
   while offset < len(s):
     clause_name, ptn, offset = get_archive_path_entry(
-        s, offset=offset, stopchars=stopchars + ',')
-    entries.append( (clause_name, ptn) )
+        s, offset=offset, stopchars=stopchars + ','
+    )
+    entries.append((clause_name, ptn))
     if not s.startswith(',', offset):
       break
     while s.startswith(',', offset):
@@ -162,9 +167,7 @@ def get_store_spec(s, offset=0):
       store_type = 'datadir'
       params = {'path': path}
     else:
-      raise ValueError(
-          "%r: not a directory or a socket"
-          % (path,))
+      raise ValueError("%r: not a directory or a socket" % (path,))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
@@ -174,8 +177,8 @@ def get_store_spec(s, offset=0):
     store_type, offset = get_identifier(s, offset)
     if not store_type:
       raise ValueError(
-          "expected identifier at offset %d, found: %r"
-          % (offset, s[offset:]))
+          "expected identifier at offset %d, found: %r" % (offset, s[offset:])
+      )
     with Pfx(store_type):
       if s.startswith('(', offset):
         params, offset = get_params(s, offset)
@@ -185,12 +188,15 @@ def get_store_spec(s, offset=0):
         if store_type == 'tcp':
           colon2 = s.find(':', offset)
           if colon2 < offset:
-            raise ValueError("missing second colon after offset %d" % (offset,))
+            raise ValueError(
+                "missing second colon after offset %d" % (offset,)
+            )
           hostpart = s[offset:colon2]
           offset = colon2 + 1
           if not isinstance(hostpart, str):
             raise ValueError(
-                "expected hostpart to be a string, got: %r" % (hostpart,))
+                "expected hostpart to be a string, got: %r" % (hostpart,)
+            )
           if not hostpart:
             hostpart = 'localhost'
           params['host'] = hostpart
@@ -213,8 +219,8 @@ def get_params(s, offset):
     param, offset = get_qstr_or_identifier(s, offset)
     if not param:
       raise ValueError(
-          "rejecting empty parameter name at position %d"
-          % (offset,))
+          "rejecting empty parameter name at position %d" % (offset,)
+      )
     if not s.startswith('=', offset):
       raise ValueError("missing '=' at poition %d" % (offset,))
     value, offset = get_token(s, offset)

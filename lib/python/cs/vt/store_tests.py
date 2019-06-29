@@ -145,8 +145,8 @@ def multitest(method):
   '''
 
   def testMethod(self):
-    for subtest, S in get_test_stores(
-        prefix=method.__module__ + '.' + method.__name__):
+    for subtest, S in get_test_stores(prefix=method.__module__ + '.' +
+                                      method.__name__):
       if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
         continue
       with self.subTest(test_store=S, **subtest):

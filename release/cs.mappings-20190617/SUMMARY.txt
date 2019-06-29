@@ -1,0 +1,7 @@
+StackableValues.push now returns the previous value.
+StackableValues.update has a signature like dict.update.
+StackableValues.pop removes entries when their stack becomes empty.
+StackableValues.stack: clean implementation of save/restore.
+StackableValues: avoid infinite recursion through ._fallback.
+StackableValues.keys now returns a list of the nonempty keys.
+Update doctests.

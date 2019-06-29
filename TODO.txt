@@ -1,3 +1,14 @@
+mutt-highlight: match markers at start or end of lines
+OverProgress: Progress whose properties are the sum of other Progresses, computed at need
+readline: fix spelling, detab, apply set -ue, use read -r line as fallback
+cs.excutils_tests: special logging setup to discard error messages - the successful test suite is very noisy
+distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose
+cs-release: latest release tag comment in top of generated distinfo
+@decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
+@decorator: maybe support @deco(callable,*a,**kw)?
+@mapattr class decorator to map .foo to .bah.this.that... with get/set support
+cs.deco: @decorator: does not seem to propagate __doc__ to wrapper functions from inner function - needs debugging
+man pages not included in PyPI packages, for example cs.app.mailfiler
 cs.app.megacli: after fixup, copy to megacli_legacy as py2, upgrade megacli to python 3, update module docstrings to explain and reference
 mcli: alarm control, locate control
 cs.result: attach a RunState and use it for the .state property - support attach in __init__ to use an existing runstate
@@ -33,7 +44,6 @@ cs.py.func: find out why eval causes syntax error with raise e from e2
 vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
 portfwd ARP_ADDR check for local networks
 colourise command highlighing multiple regexps and line ranges
-mailfiler: prepend received lines on pickup and filing
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
 e: sort entries

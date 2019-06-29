@@ -53,7 +53,7 @@ DISTINFO_CLASSIFICATION = {
     "Intended Audience": "Developers",
     "Operating System": "OS Independent",
     "Topic": "Software Development :: Libraries :: Python Modules",
-    "License": "OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License": "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 }
 
 
@@ -276,8 +276,16 @@ def get_md_doc(
           mro_names.append('`' + name + '`')
       if mro_names:
         odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
+      init_method = o.__dict__.get('__init__', None)
+      if init_method:
+        init_doc = getattr(init_method, '__doc__', None)
+        if init_doc:
+          init_doc = stripped_dedent(init_doc)
+          msig = signature(init_method)
+          odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
       full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
   return doc_head, full_doc
+
 
 class Package(O):
 

@@ -124,8 +124,8 @@ class Transcribe:
   '''
 
   def __init__(self):
-    self.prefix_map = {}        # prefix -> baseclass
-    self.class_map = {}         # baseclass -> prefix
+    self.prefix_map = {}  # prefix -> baseclass
+    self.class_map = {}  # baseclass -> prefix
     self.class_transcribers = {
         int: str,
         float: lambda f: "%f" % f,
@@ -152,12 +152,12 @@ class Transcribe:
     for prefix in prefixes:
       if prefix in self.prefix_map:
         raise ValueError("prefix %r already taken" % (prefix,))
-      if ( not isinstance(baseclass, Transcriber)
-           and ( not hasattr(baseclass, 'transcribe_inner')
-                 or not hasattr(baseclass, 'parse_inner')
-               )
-         ):
-        raise ValueError("baseclass %s not a subclass of Transcriber" % (baseclass,))
+      if (not isinstance(baseclass, Transcriber)
+          and (not hasattr(baseclass, 'transcribe_inner')
+               or not hasattr(baseclass, 'parse_inner'))):
+        raise ValueError(
+            "baseclass %s not a subclass of Transcriber" % (baseclass,)
+        )
       self.prefix_map[prefix] = baseclass
       if baseclass not in self.class_map:
         self.class_map[baseclass] = prefix
@@ -189,14 +189,18 @@ class Transcribe:
           # see if this class is in class_transcribers
           tr = self.class_transcribers.get(type(o))
           if tr is None:
-            raise ValueError("prefix is None and no o.transcribe_prefix and no class transcriber")
+            raise ValueError(
+                "prefix is None and no o.transcribe_prefix and no class transcriber"
+            )
           fp.write(tr(o))
           return
       # use prefix and rely on o.transcribe_inner
       baseclass = self.prefix_map.get(prefix)
       if baseclass is not None:
         if not isinstance(o, baseclass):
-          raise ValueError("type(o)=%s, not an instanceof(%r)" % (type(o), baseclass))
+          raise ValueError(
+              "type(o)=%s, not an instanceof(%r)" % (type(o), baseclass)
+          )
       fp.write(prefix)
       fp.write('{')
       o.transcribe_inner(self, fp)
@@ -248,7 +252,7 @@ class Transcribe:
     if value is not None:
       return value, offset2
     # decimal values
-    if s[offset:offset+1].isdigit():
+    if s[offset:offset + 1].isdigit():
       return get_decimal_or_float_value(s, offset)
     # {json}
     if s.startswith('{', offset):
@@ -293,9 +297,7 @@ class Transcribe:
     raise ValueError("offset %d: expected quoted string" % (offset,))
 
   def parse_mapping(
-      self,
-      s, offset=0, stopchar=None,
-      required=None, optional=None
+      self, s, offset=0, stopchar=None, required=None, optional=None
   ):
     ''' Parse a mapping from the string `s`.
         Return the mapping and the new offset.
@@ -316,7 +318,9 @@ class Transcribe:
         where missing optional values are presented as None.
     '''
     if optional is not None and required is None:
-      raise ValueError("required is None but optional is specified: %r" % (optional,))
+      raise ValueError(
+          "required is None but optional is specified: %r" % (optional,)
+      )
     d = OrderedDict()
     while offset < len(s) and (stopchar is None or s[offset] != stopchar):
       k, offset = get_identifier(s, offset)
@@ -333,7 +337,9 @@ class Transcribe:
       if c == stopchar:
         break
       if c != ',':
-        raise ValueError("offset %d: expected ',' but found: %r" % (offset, s[offset:]))
+        raise ValueError(
+            "offset %d: expected ',' but found: %r" % (offset, s[offset:])
+        )
       offset += 1
     if required is None and optional is None:
       return d, offset
@@ -427,8 +433,7 @@ def parse(s, offset=0, T=None):
   return T.parse(s, offset)
 
 def parse_mapping(
-    s, offset=0, stopchar=None, T=None,
-    required=None, optional=None
+    s, offset=0, stopchar=None, T=None, required=None, optional=None
 ):
   ''' Parse a mapping from the string `s`.
       Return the mapping and the new offset.
@@ -443,14 +448,18 @@ def parse_mapping(
   if T is None:
     T = _TRANSCRIBE
   return T.parse_mapping(
-      s, offset, stopchar,
-      required=required, optional=optional)
+      s, offset, stopchar, required=required, optional=optional
+  )
 
 @decorator
 def mapping_transcriber(
-    cls, *, prefix=None, T=None,
+    cls,
+    *,
+    prefix=None,
+    T=None,
     transcription_mapping=None,
-    required=None, optional=None,
+    required=None,
+    optional=None,
     factory=None,
 ):
   ''' A class decorator to provide mapping style `parse_inner` and
@@ -486,24 +495,37 @@ def mapping_transcriber(
     raise ValueError("missing prefix")
   if transcription_mapping is None:
     raise ValueError(
-        "missing transcription_mapping, expected a function of self")
+        "missing transcription_mapping, expected a function of self"
+    )
   if factory is None:
     factory = cls
+
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, parsed_prefix):
     ''' Parse the inner section as a mapping.
     '''
     if parsed_prefix != prefix:
       raise ValueError(
-          "expected prefix=%r, got: %r"
-          % (prefix, parsed_prefix,))
+          "expected prefix=%r, got: %r" % (
+              prefix,
+              parsed_prefix,
+          )
+      )
     m, offset = parse_mapping(
-        s, offset, stopchar=stopchar, T=T,
-        required=required, optional=optional)
+        s,
+        offset,
+        stopchar=stopchar,
+        T=T,
+        required=required,
+        optional=optional
+    )
     return factory(**m), offset
+
   cls.parse_inner = parse_inner
+
   def transcribe_inner(self, T, fp):
     return transcribe_mapping(transcription_mapping(self), fp, T=T)
+
   cls.transcribe_inner = transcribe_inner
   register(cls, prefix=prefix, T=T)
   return cls

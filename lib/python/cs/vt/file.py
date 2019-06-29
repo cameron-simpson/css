@@ -78,7 +78,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     if backing_block is None:
       backing_block = Block(data=b'')
     self.filename = None
-    self._syncer = None     # syncing Result, close waits for it
+    self._syncer = None  # syncing Result, close waits for it
     self._backing_block = None
     self._blockmap = None
     self._file = None
@@ -162,10 +162,12 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
       S = defaults.S
       S.open()
       syncer = self._syncer = dispatch(self._sync_file, S, scanner=scanner)
+
       def cleanup(R):
         with self._lock:
           if R is self._syncer:
             self._syncer = None
+
       syncer.notify(cleanup)
     return syncer
 
@@ -301,7 +303,7 @@ def filedata(f, start, end):
       These chunks don't need to be preferred-edge aligned;
       blockify() does that.
   '''
-  return datafrom(f, start, maxlength=end-start)
+  return datafrom(f, start, maxlength=end - start)
 
 def file_top_block(f, start, end, scanner=None):
   ''' Return a top Block for the data from an open file.

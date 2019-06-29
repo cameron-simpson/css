@@ -35,8 +35,8 @@ LOGGER_FILENAME = 'vtfuse.log'
 
 # OSX setxattr option values
 XATTR_NOFOLLOW = 0x0001
-XATTR_CREATE   = 0x0002
-XATTR_REPLACE  = 0x0004
+XATTR_CREATE = 0x0002
+XATTR_REPLACE = 0x0004
 
 PREV_DIRENT_NAME = '...'
 PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
@@ -45,10 +45,14 @@ PREV_DIRENT_NAMEb = PREV_DIRENT_NAME.encode('utf-8')
 FS_IO_BLOCKSIZE = 4096
 
 def mount(
-    mnt, E,
+    mnt,
+    E,
     *,
     S=None,
-    archive=None, subpath=None, readonly=None, append_only=False,
+    archive=None,
+    subpath=None,
+    readonly=None,
+    append_only=False,
     fsname=None
 ):
   ''' Run a FUSE filesystem, return the Thread running the filesystem.
@@ -69,7 +73,10 @@ def mount(
     readonly = S.readonly
   else:
     if not readonly and S.readonly:
-      warning("Store %s is readonly, using readonly option for mount (was %r)", S, readonly)
+      warning(
+          "Store %s is readonly, using readonly option for mount (was %r)", S,
+          readonly
+      )
       readonly = True
   # forget the archive if readonly
   if readonly:
@@ -87,8 +94,13 @@ def mount(
   ##dump_Dirent(E, recurse=True)
   FS = StoreFS(
       E,
-      S=S, archive=archive, subpath=subpath,
-      readonly=readonly, append_only=append_only, show_prev_dirent=True)
+      S=S,
+      archive=archive,
+      subpath=subpath,
+      readonly=readonly,
+      append_only=append_only,
+      show_prev_dirent=True
+  )
   return FS._vt_runfuse(mnt, fsname=fsname)
 
 def umount(mnt):
@@ -102,24 +114,25 @@ def handler(method):
       Prefixes exceptions with the method name, associates with the
       Store, prevents anything other than a FuseOSError being raised.
   '''
+
   def handle(self, *a, **kw):
     ''' Wrapper for FUSE handler methods.
     '''
     syscall = method.__name__
     if syscall == 'write':
       fh, offset, bs = a
-      arg_desc = [ str(a[0]), str(a[1]), "%d bytes:%r..." % (len(bs), bytes(bs[:16])) ]
+      arg_desc = [
+          str(a[0]),
+          str(a[1]),
+          "%d bytes:%r..." % (len(bs), bytes(bs[:16]))
+      ]
     else:
-      arg_desc = [ repr(arg) for arg in a ]
+      arg_desc = [repr(arg) for arg in a]
     arg_desc.extend(
-        "%s=%r" % (kw_name, kw_value)
-        for kw_name, kw_value in kw.items()
+        "%s=%r" % (kw_name, kw_value) for kw_name, kw_value in kw.items()
     )
     arg_desc = ','.join(arg_desc)
-    with Pfx(
-        "%s.%s(%s)",
-        type(self).__name__, syscall, arg_desc
-    ):
+    with Pfx("%s.%s(%s)", type(self).__name__, syscall, arg_desc):
       trace = syscall in (
           'getxattr',
           'setxattr',
@@ -135,7 +148,10 @@ def handler(method):
               result = method(self, *a, **kw)
             if trace:
               if isinstance(result, bytes):
-                X("CALL %s result => %d bytes, %r...", syscall, len(result), result[:16])
+                X(
+                    "CALL %s result => %d bytes, %r...", syscall, len(result),
+                    result[:16]
+                )
               else:
                 X("CALL %s result => %s", syscall, result)
             return result
@@ -143,16 +159,22 @@ def handler(method):
         warning("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
         raise
       except OSError as e:
-        warning("CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e)
+        warning(
+            "CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e
+        )
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
       except Exception as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", syscall, a, kw, e)
+        X(
+            "CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", syscall,
+            a, kw, e
+        )
         exception(
             "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
-            syscall, a, kw, type(e), e)
+            syscall, a, kw, type(e), e
+        )
         raise FuseOSError(errno.EINVAL) from e
       except BaseException as e:
         X("CALL %s(*%r,**%r) => EXCEPTION %s", syscall, a, kw, e)
@@ -160,6 +182,7 @@ def handler(method):
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
       except:
         X("CALL %s(*%r,**%r) => EXCEPTION %r", syscall, a, kw, sys.exc_info())
+
   return handle
 
 class DirHandle:
@@ -167,6 +190,7 @@ class DirHandle:
       and a reference to the Dir so that it can validate the names
       at readdir time.
   '''
+
   def __init__(self, fs, D):
     self.fs = fs
     self.D = D
@@ -181,8 +205,13 @@ class StoreFS_LLFUSE(llfuse.Operations):
       self,
       E,
       *,
-      S=None, archive=None, subpath=None,
-      options=None, readonly=None, append_only=False, show_prev_dirent=False
+      S=None,
+      archive=None,
+      subpath=None,
+      options=None,
+      readonly=None,
+      append_only=False,
+      show_prev_dirent=False
   ):
     ''' Initialise a new FUSE mountpoint.
 
@@ -201,16 +230,22 @@ class StoreFS_LLFUSE(llfuse.Operations):
       readonly = S.readonly
     fs = self._vtfs = FileSystem(
         E,
-        S=S, archive=archive, subpath=subpath,
-        readonly=readonly, append_only=append_only,
-        show_prev_dirent=show_prev_dirent)
+        S=S,
+        archive=archive,
+        subpath=subpath,
+        readonly=readonly,
+        append_only=append_only,
+        show_prev_dirent=show_prev_dirent
+    )
     # llfuse requires the mount point inode to be inode 1
     fs[1] = fs.mntE
     llf_opts = set(llfuse.default_options)
     if os.uname().sysname == 'Darwin' and 'nonempty' in llf_opts:
       # Not available on OSX.
-      warning("llf_opts=%r: drop 'nonempty' option, not available on Darwin",
-              sorted(llf_opts))
+      warning(
+          "llf_opts=%r: drop 'nonempty' option, not available on Darwin",
+          sorted(llf_opts)
+      )
       llf_opts.discard('nonempty')
     if options is not None:
       for opt in options:
@@ -223,12 +258,14 @@ class StoreFS_LLFUSE(llfuse.Operations):
   # debugging aid
   def __getattr__(self, attr):
     warning("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
+
     def attrfunc(*a, **kw):
       ''' Stub function to report on attributes which get called.
           Intended to report on unimplemented methods.
       '''
       warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
       raise RuntimeError("CALL UNKNOWN ATTR %s(*%r,**%r)" % (attr, a, kw))
+
     return attrfunc
 
 ##def __getattribute__(self, attr):
@@ -260,6 +297,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       # record the full path to the mount point
       # this is used to support '..' at the top of the tree
       fs.mnt_path = abspath(mnt)
+
       @logexc
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
@@ -270,6 +308,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
             llfuse.close()
         S.close()
         defaults.pop_Ss()
+
       T = PfxThread(target=mainloop)
       S.open()
       T.start()
@@ -321,7 +360,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
         warning("decode %r: %e, falling back to surrogateescape", bs, e)
         s = bs.decode('utf-8', errors='surrogateescape')
     else:
-      warning("_vt_str: expected bytes, got %s %r, passing unchanged", type(bs), bs)
+      warning(
+          "_vt_str: expected bytes, got %s %r, passing unchanged", type(bs), bs
+      )
       s = bs
     return s
 
@@ -330,7 +371,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     if isinstance(s, str):
       bs = s.encode('utf-8')
     else:
-      warning("_vt_bytes: expected str, got %s %r, passing unchanged", type(s), s)
+      warning(
+          "_vt_bytes: expected str, got %s %r, passing unchanged", type(s), s
+      )
       bs = s
     return bs
 
@@ -358,10 +401,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
     name = self._vt_str(name_b)
     P = self._vt_i2E(parent_inode)
     if name in P:
-      warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
-              parent_inode, P, name)
+      warning(
+          "create(parent_inode=%d:%s,name=%r): already exists - surprised!",
+          parent_inode, P, name
+      )
       del P[name]
-    fhndx = fs.open2(P, name, flags|O_CREAT)
+    fhndx = fs.open2(P, name, flags | O_CREAT)
     E = fs._fh(fhndx).E
     E.meta.chmod(mode)
     P[name] = E
@@ -497,8 +542,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
       if Pold.isindirect:
         if Pold.uuid != uu:
           warning(
-              "E.parent's UUID (%r) does not make E.uuid (%r)",
-              Pold.uuid, uu)
+              "E.parent's UUID (%r) does not make E.uuid (%r)", Pold.uuid, uu
+          )
       else:
         old_name = E.name
         Eold = Pold[old_name]
@@ -511,11 +556,15 @@ class StoreFS_LLFUSE(llfuse.Operations):
             # the expected scenario is that it has the same UUID
             # and a different history
             if Eold.uuid == uu:
-              warning("original link has the same UUID but is not the same object, reconciling")
+              warning(
+                  "original link has the same UUID but is not the same object, reconciling"
+              )
               E.reconcile(Eold)
               Eold = E
             else:
-              warning("old parent already has a different Dirent for %r", old_name)
+              warning(
+                  "old parent already has a different Dirent for %r", old_name
+              )
     # utilise the latest parent and name for purposes
     E.parent = EI
     E.name = new_name
@@ -633,10 +682,12 @@ class StoreFS_LLFUSE(llfuse.Operations):
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.open
     '''
     E = self._vt_i2E(inode)
-    if flags & (O_CREAT|O_EXCL):
-      warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
-              inode, E, flags, O_CREAT, O_EXCL)
-      flags &= ~(O_CREAT|O_EXCL)
+    if flags & (O_CREAT | O_EXCL):
+      warning(
+          "open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
+          inode, E, flags, O_CREAT, O_EXCL
+      )
+      flags &= ~(O_CREAT | O_EXCL)
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
     if (for_write or for_append) and self._vtfs.readonly:
@@ -685,6 +736,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
     '''
     # TODO: if rootdir, generate '..' for parent of mount
     FH = self._vtfs._fh(fhndx)
+
     def entries():
       ''' Generator to yield directory entries.
       '''
@@ -731,7 +783,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
               elif name == PREV_DIRENT_NAME and fs.show_prev_dirent:
                 warning(
                     "%s: readdir: suppressing entry %r because fs.show_prev_dirent is true",
-                    D, PREV_DIRENT_NAME)
+                    D, PREV_DIRENT_NAME
+                )
                 E = None
               else:
                 with S:
@@ -812,7 +865,9 @@ class StoreFS_LLFUSE(llfuse.Operations):
     return self._vtfs.removexattr(inode, xattr_name)
 
   @handler
-  def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
+  def rename(
+      self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx
+  ):
     ''' Rename an entry `name_old_b` from `parent_inode_old` to `name_new_b` in `parent_inode_new`.
 
         http://www.rath.org/llfuse-docs/operations.html#llfuse.Operations.rename
@@ -824,10 +879,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
     Psrc = self._vtfs.i2E(parent_inode_old)
     if name_old not in Psrc:
       raise FuseOSError(errno.ENOENT)
-    if not self._vtfs.access(Psrc, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    if not self._vtfs.access(Psrc, os.X_OK | os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     Pdst = self._vtfs.i2E(parent_inode_new)
-    if not self._vtfs.access(Pdst, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    if not self._vtfs.access(Pdst, os.X_OK | os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     E = Psrc[name_old]
     del Psrc[name_old]
@@ -844,7 +899,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       raise FuseOSError(errno.EROFS)
     name = self._vt_str(name_b)
     P = self._vtfs.i2E(parent_inode)
-    if not self._vtfs.access(P, os.X_OK|os.W_OK, ctx.uid, ctx.gid):
+    if not self._vtfs.access(P, os.X_OK | os.W_OK, ctx.uid, ctx.gid):
       raise FuseOSError(errno.EPERM)
     try:
       E = P[name]
@@ -876,7 +931,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       if fields.update_mtime:
         M.mtime = attr.st_mtime_ns / 1000000000.0
       if fields.update_mode:
-        M.chmod(attr.st_mode&0o7777)
+        M.chmod(attr.st_mode & 0o7777)
       if fields.update_uid:
         M.uid = attr.st_uid
       if fields.update_gid:
@@ -914,16 +969,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
     #       implies adding some kind of method to stores?
     st = os.statvfs(".")
     fst = llfuse.StatvfsData()
-    for attr in (
-        'f_bsize',
-        'f_frsize',
-        'f_blocks',
-        'f_bfree',
-        'f_bavail',
-        'f_files',
-        'f_ffree',
-        'f_favail'
-    ):
+    for attr in ('f_bsize', 'f_frsize', 'f_blocks', 'f_bfree', 'f_bavail',
+                 'f_files', 'f_ffree', 'f_favail'):
       setattr(fst, attr, getattr(st, attr))
     return fst
 
@@ -936,10 +983,8 @@ class StoreFS_LLFUSE(llfuse.Operations):
     fs = self._vtfs
     if fs.readonly:
       raise FuseOSError(errno.EROFS)
-    with Pfx(
-        "SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r",
-        parent_inode, name_b, target_b, ctx
-    ):
+    with Pfx("SYMLINK parent_iode=%r, name_b=%r, target_b=%r, ctx=%r",
+             parent_inode, name_b, target_b, ctx):
       name = self._vt_str(name_b)
       target = self._vt_str(target_b)
       # TODO: check search/write on P

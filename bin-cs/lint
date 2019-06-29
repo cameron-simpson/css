@@ -71,14 +71,11 @@ do
   if [ -z "$type" ]
   then
     case "$lintfile" in
-      *.json | *.go | *.php | *.py )
+      *.js | *.json | *.go | *.php | *.py | *.pl )
         type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
         ;;
-      *.pl | *.pm )
+      *.pm )
         type=pl
-        ;;
-      *.py)
-        type=py
         ;;
     esac
   fi
