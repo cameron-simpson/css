@@ -62,7 +62,7 @@ class WizPnP(object):
       except ValueError:
         print("bad index line:", line)
       else:
-        idx.append( (label, os.path.dirname(path)) )
+        idx.append((label, os.path.dirname(path)))
     return idx
 
   def tvwiz_header(self, path):

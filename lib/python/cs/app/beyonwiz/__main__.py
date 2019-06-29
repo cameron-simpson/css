@@ -2,7 +2,6 @@
 #
 
 from __future__ import print_function
-
 import sys
 import os.path
 import json
@@ -115,7 +114,7 @@ def main(argv=None):
             pass
           else:
             args.pop(0)
-            timespans.append( (start_s, end_s) )
+            timespans.append((start_s, end_s))
         # collect optional dstpath
         if args:
           dstpath = args.pop(0)
@@ -141,7 +140,8 @@ def main(argv=None):
         total = 0
         chunkSize = 0
         chunkOff = 0
-        for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc_records():
+        for wizOffset, fileNum, flags, offset, size in TVWiz(arg
+                                                             ).trunc_records():
           print("  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
                 % ( wizOffset, fileNum, flags, offset, size )
                )
