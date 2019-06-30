@@ -49,7 +49,7 @@ else
     else
       case "$src_dst" in
         ?*:?*) ;;
-        -*) rsopts=$src_dst rspart=1 ;;
+        -*) rsopts="$rsopts $src_dst" rspart=1 ;;
         *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
             badopts=1
             ;;
