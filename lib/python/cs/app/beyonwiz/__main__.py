@@ -19,13 +19,16 @@ from .wizpnp import WizPnP
 
 TRY_N = 32
 
-def main(argv=None):
+def main(argv=None, cmd=None):
   ''' Main command line.
   '''
   if argv is None:
     argv = sys.argv
-  setup_logging(os.path.basename(argv[0]))
-  return BWizCmd().run(argv)
+  argv0 = argv.pop(0)
+  if cmd is None:
+    cmd = argv0
+  setup_logging(os.path.basename(cmd))
+  return BWizCmd().run(argv, cmd=cmd)
 
 class BWizCmd(BaseCommand):
   ''' Command line handler.
@@ -189,4 +192,5 @@ class BWizCmd(BaseCommand):
     return 0
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv))
+  print(locals())
+  sys.exit(main(sys.argv, cmd=__package__))
