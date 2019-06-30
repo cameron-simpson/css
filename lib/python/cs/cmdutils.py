@@ -9,6 +9,7 @@ from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from logging import warning, exception
+import sys
 from cs.mappings import StackableValues
 from cs.pfx import Pfx
 from cs.resources import RunState
@@ -76,6 +77,11 @@ class BaseCommand:
 
           class MyCommand(BaseCommand):
             GETOPT_SPEC = 'ab:c'
+            USAGE_FORMAT = r"""Usage: {cmd} [-a] [-b bvalue] [-c] [--] arguments...
+              -a    Do it all.
+              -b    But using bvalue.
+              -c    The 'c' option!
+            """
           ...
           the_cmd = MyCommand()
 
@@ -124,18 +130,6 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
-  def __init__(self, getopt_spec=None):
-    ''' Initialise the BaseCommand.
-
-        Parameters:
-        * `getopt_spec`: optional `getopt.getopt` compatible
-          option specifier.
-          The default comes from the class' `.GETOPT_SPEC` attribute.
-    '''
-    if getopt_spec is None:
-      getopt_spec = self.GETOPT_SPEC
-    self.getopt_spec = getopt_spec
-
   def apply_defaults(self, options):
     ''' Stub `apply_defaults` method.
 
@@ -166,7 +160,8 @@ class BaseCommand:
         The command line arguments are parsed according to `getopt_spec`.
         If `getopt_spec` is not empty
         then `apply_opts(opts,options)` is called
-        to apply the supplied options to the state.
+        to apply the supplied options to the state
+        where `opts` is the return from `getopt.getopt(argv,getopt_spec)`.
 
         After the option parse,
         if the first command line argument *foo*
@@ -185,37 +180,79 @@ class BaseCommand:
     '''
     if cmd is None:
       cmd = argv.pop(0)
+    usage_format = getattr(self, 'USAGE_FORMAT')
+    if usage_format:
+      usage=usage_format.format(cmd=cmd)
+    else:
+      usage=None
     if options is None:
-      options = StackableValues(cmd=cmd)
+      options = StackableValues(cmd=cmd,usage=usage)
       self.apply_defaults(options)
     with Pfx(cmd):
-      opts, argv = getopt(argv, self.getopt_spec)
-      if self.getopt_spec:
-        self.apply_opts(opts, options)
-      runstate = options.runstate = RunState(cmd)
-      # expose the runstate for use by global caller who only has "self" :-(
-      self.runstate = runstate
-      with runstate:
-        if argv:
-          # see if the first arg is a subcommand name
-          # by check for a cmd_{subcommand} method
-          subcmd_attr = 'cmd_' + argv[0]
-          subcmd_method = getattr(self, subcmd_attr, None)
-          if subcmd_method is not None:
-            subcmd = argv.pop(0)
-            with Pfx(subcmd):
-              with self.run_context(argv, options, cmd=subcmd):
-                return subcmd_method(argv, options, cmd=subcmd)
-        try:
-          main = self.main
-        except AttributeError:
-          raise GetoptError(
-              "%s: missing subcommand and no main method" %
-              (type(self).__name__,)
-          )
-        else:
-          with self.run_context(argv, options, cmd=None):
-            return main(argv, options, cmd=None)
+      try:
+        opts, argv = getopt(argv, self.GETOPT_SPEC)
+        if self.GETOPT_SPEC:
+          self.apply_opts(opts, options)
+        runstate = options.runstate = RunState(cmd)
+        # expose the runstate for use by global caller who only has "self" :-(
+        self.runstate = runstate
+        with runstate:
+          if argv:
+            # see if the first arg is a subcommand name
+            # by check for a cmd_{subcommand} method
+            subcmd_attr = 'cmd_' + argv[0]
+            subcmd_method = getattr(self, subcmd_attr, None)
+            if subcmd_method is not None:
+              subcmd = argv.pop(0)
+              with Pfx(subcmd):
+                with self.run_context(argv, options, cmd=subcmd):
+                  return subcmd_method(argv, options, cmd=subcmd)
+          try:
+            main = self.main
+          except AttributeError:
+            raise GetoptError("missing subcommand")
+          else:
+            with self.run_context(argv, options, cmd=None):
+              return main(argv, options, cmd=None)
+      except GetoptError as e:
+        handler = getattr(self, 'getopt_error_handler')
+        if handler and handler(cmd,options,e,usage):
+          return 2
+        raise
+
+  def getopt_error_handler(self,cmd,options,e,usage):
+    ''' The `getopt_error_handler` method
+        is be used to control the handling of `GetoptError`s raised
+        during the command line parse
+        or during the `main` or `cmd_`*subcmd*` calls.
+
+        The handler is called with these parameters:
+        * `cmd`: the command name
+        * `options`: the `options` object
+        * `e`: the `GetoptError` exception
+        * `usage`: the command usage or `None` if this was not provided
+        It returns a true value if the exception is considered handled,
+        in which case the main `run` method returns 2.
+        It returns a false value if the exception is considered unhandled,
+        in which case the main `run` method reraises the `GetoptError`.
+
+        This default handler prints an error message to standard error,
+        prints the usage message (if specified) to standard error,
+        and returns `True` to indicate that the error has been handled.
+
+        To let the exceptions out unhandled
+        this can be overridden with a method which just returns `False`
+        or even by setting the `getopt_error_handler` attribute to `None`.
+
+        Otherwise,
+        the handler may perform any suitable action
+        and return `True` to contain the exception
+        or `False` to cause the exception to be reraised.
+    '''
+    print("%s: %s" % (cmd, e), file=sys.stderr)
+    if usage:
+      print(usage.rstrip(), file=sys.stderr)
+    return True
 
   @staticmethod
   @contextmanager
