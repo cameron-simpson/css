@@ -16,9 +16,11 @@ import os.path
 import re
 from threading import Lock
 from types import SimpleNamespace as NS
-from cs.app.ffmpeg import multiconvert as ffmconvert, \
-                          MetaData as FFmpegMetaData, \
-                          ConversionSource as FFSource
+from cs.app.ffmpeg import (
+    multiconvert as ffmconvert,
+    MetaData as FFmpegMetaData,
+    ConversionSource as FFSource,
+)
 from cs.deco import strable
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
