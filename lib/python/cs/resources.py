@@ -163,12 +163,10 @@ class MultiOpenMixin(object):
           caller_frame = caller()
         self._final_close_from = caller_frame
         retval = self.shutdown()
-    if opens == 0:
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+        if not self._finalise_later:
+          self.finalise()
+    if enforce_final_close and opens != 0:
+      raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
     return retval
 
   def finalise(self):
