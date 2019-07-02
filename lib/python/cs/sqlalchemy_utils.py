@@ -242,7 +242,7 @@ def get_json_field(column_value, field_name, *, default=None):
   except KeyError:
     return None
   else:
-    return final_field.get(final_field_name)
+    return final_field.get(final_field_name, default)
 
 def set_json_field(column_value, field_name, value, *, infill=False):
   ''' Set a new `value` for `field_name` of `column_value`.
