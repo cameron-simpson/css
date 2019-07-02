@@ -4,8 +4,8 @@
 '''
 
 from contextlib import contextmanager
-from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
+from icontract import require
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
@@ -291,7 +291,7 @@ def set_json_field(column_value, field_name, value, *, infill=False):
 
 @decorator
 def json_column(
-    cls, attr, json_field_name=None, *, json_column='info', default=None
+    cls, attr, json_field_name=None, *, json_column_name='info', default=None
 ):
   ''' Class decorator to declare a virtual column name on a table
       where the value resides inside a JSON column of the table.
@@ -302,7 +302,7 @@ def json_column(
       * `json_field_name`: the field within the JSON column
         used to store this value,
         default the same as `attr`
-      * `json_column`: the name of the associated JSON column,
+      * `json_column_name`: the name of the associated JSON column,
         default `'info'`
       * `default`: the default value returned by the getter
         if the field is not present,
@@ -324,17 +324,17 @@ def json_column(
     json_field_name = attr
 
   def get_col(row):
-    column_value = getattr(row, json_column)
+    column_value = getattr(row, json_column_name)
     return get_json_field(column_value, json_field_name, default=default)
 
   getter = property(get_col)
 
   def set_col(row, value):
-    column_value = getattr(row, json_column)
+    column_value = getattr(row, json_column_name)
     column_value = set_json_field(
         column_value, json_field_name, value, infill=True
     )
-    setattr(row, json_column, column_value)
+    setattr(row, json_column_name, column_value)
 
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))
