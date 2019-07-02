@@ -8,6 +8,7 @@ from icontract import require
 from sqlalchemy.ext.declarative import declarative_base
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
+from cs.resources import MultiOpenMixin
 
 DISTINFO = {
     'description':
@@ -24,6 +25,7 @@ DISTINFO = {
         'sqlalchemy',
         'cs.deco',
         'cs.py.func',
+        'cs.resources',
     ],
 }
 
@@ -75,21 +77,25 @@ def auto_session(func):
   wrapper.__doc__ = func.__doc__
   return wrapper
 
-class ORM:
+class ORM(MultiOpenMixin):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
       and provides various Session related convenience methods.
+      It is also a `MutliOpenMixin` subclass
+      supporting nested open/close sequences and use as a context manager.
 
-      Subclasses must define their own `.Session` factory in
-      their own `__init__`, for example:
-
-          self.Session = sessionmaker(bind=engine)
+      Subclasses must define the following:
+      * `.Session`: a factory in their own `__init__`, typically
+        `self.Session=sessionmaker(bind=engine)`
+      * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
+        even if these just `pass`
   '''
 
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
+    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self):
@@ -97,15 +103,16 @@ class ORM:
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
-    new_session = self.Session()
-    try:
-      yield new_session
-      new_session.commit()
-    except:
-      new_session.rollback()
-      raise
-    finally:
-      new_session.close()
+    with self:
+      new_session = self.Session()
+      try:
+        yield new_session
+        new_session.commit()
+      except:
+        new_session.rollback()
+        raise
+      finally:
+        new_session.close()
 
   @staticmethod
   def auto_session(method):
