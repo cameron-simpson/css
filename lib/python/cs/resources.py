@@ -50,7 +50,7 @@ def not_closed(func):
 _mom_lockclass = RLock
 
 ## debug: TrackedClassMixin
-class MultiOpenMixin(O):
+class MultiOpenMixin(object):
   ''' A mixin to count open and close calls, and to call .startup
       on the first .open and to call .shutdown on the last .close.
 
