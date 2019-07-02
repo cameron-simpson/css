@@ -10,7 +10,7 @@
 from __future__ import print_function
 from contextlib import contextmanager
 import sys
-from threading import Condition, RLock, Lock
+from threading import Condition, Lock, RLock
 import time
 from cs.logutils import error, warning
 from cs.obj import O, Proxy
@@ -254,10 +254,10 @@ class MultiOpen(MultiOpenMixin):
       using a MultiOpenMixin.
   '''
 
-  def __init__(self, openable, finalise_later=False, lock=None):
+  def __init__(self, openable, finalise_later=False):
     ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
     '''
-    MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
   def startup(self):
