@@ -69,7 +69,7 @@ class MultiOpenMixin(object):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False, lock=None, subopens=False):
+  def __init__(self, finalise_later=False):
     ''' Initialise the MultiOpenMixin state.
 
         Parameters:
@@ -79,25 +79,18 @@ class MultiOpenMixin(object):
           the final close prevents further .put calls, but users
           calling .join may need to wait for all the queued items
           to be processed.
-        * `lock`: if set and not None, an RLock to use; otherwise one will be allocated
 
         TODO:
         * `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
     '''
-    if subopens:
-      raise RuntimeError("subopens not implemented")
-    O.__init__(self)
     ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
-    if lock is None:
-      lock = _mom_lockclass()
     self.opened = False
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
-    self._lock = lock
     self.__mo_lock = _mom_lockclass()
     self._finalise_later = finalise_later
     self._finalise = None
