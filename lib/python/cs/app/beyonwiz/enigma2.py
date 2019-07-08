@@ -72,10 +72,12 @@ class Enigma2(_Recording):
   def metadata(self):
     ''' The metadata associated with this recording.
     '''
-    return Enigma2MetaData({
-        'meta': self.read_meta(),
-        'file': self.filename_metadata(),
-    })
+    return Enigma2MetaData(
+        {
+            'meta': self.read_meta(),
+            'file': self.filename_metadata(),
+        }
+    )
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.
@@ -91,16 +93,15 @@ class Enigma2(_Recording):
       fmeta['channel'] = channel
       fmeta['title'] = title
       time_fields = time_field.split()
-      if (
-          len(time_fields) != 2
-          or not all(_.isdigit() for _ in time_fields)
-          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
-      ):
+      if (len(time_fields) != 2 or not all(_.isdigit() for _ in time_fields)
+          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
-        fmeta['datetime'] = datetime.datetime.strptime(ymd + hhmm, '%Y%m%d%H%M')
-        fmeta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+        fmeta['datetime'] = datetime.datetime.strptime(
+            ymd + hhmm, '%Y%m%d%H%M'
+        )
+        fmeta['start_time'] = ':'.join((hhmm[:2], hhmm[2:4]))
     return fmeta
 
   def _parse_path(self):
@@ -129,8 +130,10 @@ class Enigma2(_Recording):
             if not data:
               break
             if len(data) < 16:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), apfp.tell() - len(data))
+              warning(
+                  "incomplete read (%d bytes) at offset %d", len(data),
+                  apfp.tell() - len(data)
+              )
               break
             pts, offset = struct.unpack('>QQ', data)
             apdata.append(Enigma2.APInfo(pts, offset))
@@ -152,8 +155,10 @@ class Enigma2(_Recording):
             if not data:
               break
             if len(data) < 12:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), cutfp.tell() - len(data))
+              warning(
+                  "incomplete read (%d bytes) at offset %d", len(data),
+                  cutfp.tell() - len(data)
+              )
               break
             pts, cut_type = struct.unpack('>QL', data)
             cuts.append(Enigma2.CutInfo(pts, cut_type))

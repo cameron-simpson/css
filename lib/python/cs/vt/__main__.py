@@ -67,7 +67,6 @@ def main(argv=None):
   if argv is None:
     argv = sys.argv
   vtcmd = VTCmd()
-  vtcmd.usage = VTCmd.USAGE % (argv[0],)
 
   # catch signals, flag termination
   def sig_handler(sig, frame):
@@ -83,12 +82,7 @@ def main(argv=None):
   signal(SIGHUP, sig_handler)
   signal(SIGINT, sig_handler)
   signal(SIGQUIT, sig_handler)
-  try:
-    return vtcmd.run(argv)
-  except GetoptError as e:
-    print(e, file=sys.stderr)
-    print(vtcmd.usage, file=sys.stderr)
-    return 2
+  return vtcmd.run(argv)
 
 def mount_vtfs(argv=None):
   ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
@@ -101,7 +95,7 @@ class VTCmd(BaseCommand):
 
   GETOPT_SPEC = 'C:S:f:h:qv'
 
-  USAGE = '''Usage: %s [option...] [profile] subcommand [arg...]
+  USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
@@ -122,12 +116,12 @@ class VTCmd(BaseCommand):
   Subcommands:
     cat filerefs...
     config
-    dump {datafile.vtd|index.gdbm|index.lmdb}
+    dump {{datafile.vtd|index.gdbm|index.lmdb}}
     fsck object...
-    import [-oW] path {-|archive.vt}
+    import [-oW] path {{-|archive.vt}}
     init
     ls [-R] dirrefs...
-    mount [-a] [-o {append_only,readonly}] [-r] {Dir|config-clause|archive.vt} [mountpoint [subpath]]
+    mount [-a] [-o {{append_only,readonly}}] [-r] {{Dir|config-clause|archive.vt}} [mountpoint [subpath]]
       -a  All dates. Implies readonly.
       -o options
           Mount options:
@@ -137,7 +131,7 @@ class VTCmd(BaseCommand):
     pack path
     pullfrom other-store objects...
     pushto other-store objects...
-    serve [{DEFAULT|-|/path/to/socket|host:port} [name:storespec]...]
+    serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
     test blockify file
     unpack archive.vt
 '''
@@ -151,7 +145,6 @@ class VTCmd(BaseCommand):
     if cmd.endswith('.py'):
       cmd = 'vt'
     options.cmd = cmd
-    options.usage = cls.USAGE % (cmd,)
     # verbose if stderr is a tty
     try:
       options.verbose = sys.stderr.isatty()
