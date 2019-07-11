@@ -1,3 +1,6 @@
+make most cs.obj methods functions, try to drop O class
+mutt-highlight: match markers at start or end of lines
+OverProgress: Progress whose properties are the sum of other Progresses, computed at need
 readline: fix spelling, detab, apply set -ue, use read -r line as fallback
 cs.excutils_tests: special logging setup to discard error messages - the successful test suite is very noisy
 distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose

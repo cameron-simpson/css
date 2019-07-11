@@ -58,7 +58,7 @@ py3files        = $(py2files :|/python/|/python3/|)
 rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
-        @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
+        @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'

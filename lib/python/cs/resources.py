@@ -10,7 +10,7 @@
 from __future__ import print_function
 from contextlib import contextmanager
 import sys
-from threading import Condition, RLock, Lock
+from threading import Condition, Lock, RLock
 import time
 from cs.logutils import error, warning
 from cs.obj import O, Proxy
@@ -50,7 +50,7 @@ def not_closed(func):
 _mom_lockclass = RLock
 
 ## debug: TrackedClassMixin
-class MultiOpenMixin(O):
+class MultiOpenMixin(object):
   ''' A mixin to count open and close calls, and to call .startup
       on the first .open and to call .shutdown on the last .close.
 
@@ -69,7 +69,7 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False, lock=None, subopens=False):
+  def __init__(self, finalise_later=False):
     ''' Initialise the MultiOpenMixin state.
 
         Parameters:
@@ -79,25 +79,18 @@ class MultiOpenMixin(O):
           the final close prevents further .put calls, but users
           calling .join may need to wait for all the queued items
           to be processed.
-        * `lock`: if set and not None, an RLock to use; otherwise one will be allocated
 
         TODO:
         * `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
     '''
-    if subopens:
-      raise RuntimeError("subopens not implemented")
-    O.__init__(self)
     ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
-    if lock is None:
-      lock = _mom_lockclass()
     self.opened = False
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
-    self._lock = lock
     self.__mo_lock = _mom_lockclass()
     self._finalise_later = finalise_later
     self._finalise = None
@@ -170,12 +163,10 @@ class MultiOpenMixin(O):
           caller_frame = caller()
         self._final_close_from = caller_frame
         retval = self.shutdown()
-    if opens == 0:
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+        if not self._finalise_later:
+          self.finalise()
+    if enforce_final_close and opens != 0:
+      raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
     return retval
 
   def finalise(self):
@@ -261,10 +252,10 @@ class MultiOpen(MultiOpenMixin):
       using a MultiOpenMixin.
   '''
 
-  def __init__(self, openable, finalise_later=False, lock=None):
+  def __init__(self, openable, finalise_later=False):
     ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
     '''
-    MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
   def startup(self):
