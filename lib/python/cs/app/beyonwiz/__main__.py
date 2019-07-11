@@ -111,7 +111,7 @@ class BWizCmd(BaseCommand):
       return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
 
   @staticmethod
-  def mconvert(args, options, cmd):
+  def cmd_mconvert(args, options, cmd):
     ''' Convert multiple recordings to MP4.
     '''
     if not args:
@@ -192,5 +192,4 @@ class BWizCmd(BaseCommand):
     return 0
 
 if __name__ == '__main__':
-  print(locals())
   sys.exit(main(sys.argv, cmd=__package__))
