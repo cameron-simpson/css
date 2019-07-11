@@ -4,7 +4,30 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' DataDir: the sharable directory storing DataFiles used by DataDirStores.
+''' Data directories: the sharable filesystem directories
+    storing the backing files for the `DataDir` and `PlatonicDir`
+    Store classes.
+
+    A `DataDir` uses `DataFile` formatted flat files to hold the block data,
+    consisting of block records holding a small header and the block data,
+    often compressed.
+    New block data are appended to active datafiles
+    up an an arbitrary size threshold,
+    when a new datafile is commenced.
+    Datafiles are named with UUIDs so that independent programmes
+    might share the directory of datafiles without conflict;
+    the append-only storage process means that they may monitor
+    updates from other programmes simply by watching file sizes
+    and scanning the new data.
+
+    A `PlatonicDir` uses an ordinary directory tree as the backing store,
+    obviating the requirement to copy original data into a `DataDir`.
+    Such a tree should generally just acquire new files;
+    existing files are not expected to have their content modified.
+    The typical examples include a media server's file tree
+    or a large repository of scientific data.
+    The `PlatonicDir` maintains a mapping of hashcodes
+    to their block data location within the backing files.
 '''
 
 from binascii import hexlify
@@ -74,14 +97,14 @@ def init_datadir(basedir):
       os.mkdir(datadirpath)
 
 class DataFileState(SimpleNamespace):
-  ''' General state information about a data file in use by a files based data dir.
+  ''' General state information about a data file
+      in use by a files based data dir.
 
       Attributes:
-      * `datadir`: the _FilesDir tracking this state.
+      * `datadir`: the `_FilesDir` tracking this state.
       * `filenum`: the numeric index of this file.
-      * `filename`: path relative to the _FilesDir's data directory.
-      * `indexed_to`: the maximum amount of data scanned and indexed
-        so far.
+      * `filename`: path relative to the `_FilesDir`'s data directory.
+      * `indexed_to`: the amount of data scanned and indexed so far.
   '''
 
   def __init__(
@@ -122,10 +145,10 @@ class DataFileState(SimpleNamespace):
     return S.st_size
 
   def scanfrom(self, offset=0, **kw):
-    ''' Scan this datafile from the supplied `offset` (default 0)
-        yielding (offset, flags, data, post_offset).
+    ''' Scan this datafile from the supplied `offset` (default `0`)
+        yielding `(offset,flags,data, post_offset)`.
 
-        We use the DataDir's .scanfrom method because it knows the
+        We use the `DataDir`'s `.scanfrom` method because it knows the
         format of the file.
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
@@ -134,15 +157,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
                 FlaggedMixin, Mapping):
   ''' Base class indexing locally stored data in files.
       This class is hashclass specific;
-      the utilising Store keeps one of these for each supported hashclass.
+      the utilising Store maintains one of these for each supported hashclass.
 
       There are two main subclasses of this at present:
-
-      DataDir, where the data are kept in a subdirectory of UUID-named
-      files, supporting easy merging and updating.
-
-      PlatonicDataDir, where the data are present in a normal file tree,
-      such as a preexisting media server directory or the like.
+      * `DataDir`: the data are kept in a subdirectory of UUID-named files,
+        supporting easy merging and updating.
+      * `PlatonicDataDir`: the data are present in a normal file tree,
+        such as a preexisting media server directory or the like.
   '''
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.sqlite'
@@ -157,7 +178,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       flags=None,
       flags_prefix=None,
   ):
-    ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
+    ''' Initialise the `DataDir` with `statedirpath` and `datadirpath`.
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
@@ -168,13 +189,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
-        * `flags`: optional Flags object for control; if specified then
-          `flags_prefix` is also required
-        * `flags_prefix`: prefix for control flag names
+        * `flags`: optional `Flags` object for control; if specified then
+          `flags_prefix` is also required.
+        * `flags_prefix`: prefix for control flag names.
 
-        Note that __init__ only saves the settings such as the `indexclass`
+        Note that `__init__` only saves the settings such as the `indexclass`
         and ensures that requisite directories exist.
-        The monitor thread and runtime state are setup by the `startup` method
+        The monitor thread and runtime state are set up by the `startup` method
         and closed down by the `shutdown` method.
     '''
     assert isinstance(statedirpath, str)
@@ -385,7 +406,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
         starting with optional `start_hashcode`.
 
         Parameters:
-        * `start_hashcode`: the first hashcode; if missing or None,
+        * `start_hashcode`: the first hashcode; if missing or `None`,
           iteration starts with the first key in the index
         * `reverse`: iterate backwards if true, otherwise forwards.
     '''
@@ -942,11 +963,11 @@ class PlatonicDir(_FilesDir):
   ''' Presentation of a block map based on a raw directory tree of
       files such as a preexisting media server.
 
-      A PlatonicDir may be used as the Mapping for a MappingStore.
+      A `PlatonicDir` may be used as the Mapping for a `MappingStore`.
 
       NB: _not_ thread safe; callers must arrange that.
 
-      A PlatonicDir is read-only. Data blocks are fetched directly
+      A `PlatonicDir` is read-only. Data blocks are fetched directly
       from the files in the backing directory tree.
   '''
 
@@ -969,7 +990,7 @@ class PlatonicDir(_FilesDir):
       meta_store=None,
       **kw
   ):
-    ''' Initialise the PlatonicDir with `statedirpath` and `datadirpath`.
+    ''' Initialise the `PlatonicDir` with `statedirpath` and `datadirpath`.
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
@@ -985,12 +1006,12 @@ class PlatonicDir(_FilesDir):
         * `follow_symlinks`: follow symbolic links, default False.
         * `meta_store`: an optional Store used to maintain a Dir
           representing the ideal directory; unhashed data blocks
-          encountered during scans which are promoted to HashCodeBlocks
+          encountered during scans which are promoted to `HashCodeBlock`s
           are also stored here
-        * `archive`: optional Archive ducktype instance with a
+        * `archive`: optional `Archive` ducktype instance with a
           .update(Dirent[,when]) method
 
-        Other keyword arguments are passed to _FilesDir.__init__.
+        Other keyword arguments are passed to `_FilesDir.__init__`.
 
         The directory and file paths tested are relative to the
         data directory path.
