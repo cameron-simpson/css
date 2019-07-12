@@ -61,7 +61,7 @@ def choose(basepath, preferred_indexclass=None):
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
-  def __init__(self, basepath, hashclass, decode, lock=None):
+  def __init__(self, basepath, hashclass, decode):
     ''' Initialise an _Index instance.
 
         Parameters:
@@ -69,9 +69,8 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
           is at `basepath`.SUFFIX
         * `decode`: function to decode a binary index record into the
           return type instance
-        * `lock`: optional mutex, passed to MultiOpenMixin.__init__.
     '''
-    MultiOpenMixin.__init__(self, lock=lock)
+    MultiOpenMixin.__init__(self)
     self.basepath = basepath
     self.hashclass = hashclass
     self.decode = decode
@@ -96,8 +95,8 @@ class LMDBIndex(_Index):
   SUFFIX = 'lmdb'
   MAP_SIZE = 1024 * 1024 * 1024
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass, decode):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode)
     self._lmdb = None
     self._resize_needed = False
     # Locking around transaction control logic.
@@ -348,8 +347,8 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass, decode):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode)
     self._kyoto = None
 
   @classmethod
@@ -454,3 +453,9 @@ def register(indexclass, indexname=None, priority=False):
 for klass in LMDBIndex, KyotoIndex, GDBMIndex:
   if klass.is_supported():
     register(klass)
+
+if not _CLASSES:
+  raise RuntimeError(
+      __name__ +
+      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex is available"
+  )
