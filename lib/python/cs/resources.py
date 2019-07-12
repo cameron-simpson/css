@@ -18,7 +18,8 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
 DISTINFO = {
-    'description': "resourcing related classes and functions",
+    'description':
+    "resourcing related classes and functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -37,15 +38,18 @@ def not_closed(func):
   ''' Decorator to wrap methods of objects with a .closed property
       which should raise when self.closed.
   '''
+
   def not_closed_wrapper(self, *a, **kw):
     ''' Wrapper function to check that this instance is not closed.
     '''
     if self.closed:
-      raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
+      raise ClosedError(
+          "%s: %s: already closed" % (not_closed_wrapper.__name__, self)
+      )
     return func(self, *a, **kw)
+
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
-
 
 _mom_lockclass = RLock
 
@@ -135,7 +139,7 @@ class MultiOpenMixin(object):
 
         Parameters:
         * `enforce_final_close`: if true, the caller expects this to
-          be the final close for the object and a RuntimeError is
+          be the final close for the object and a `RuntimeError` is
           raised if this is not actually the case.
         * `caller_frame`: used for debugging; the caller may specify
           this if necessary, otherwise it is computed from
@@ -157,7 +161,10 @@ class MultiOpenMixin(object):
         error("%s: UNDERFLOW CLOSE", self)
         error("  final close was from %s", self._final_close_from)
         for frame_key in sorted(self._opened_from.keys()):
-          error("  opened from %s %d times", frame_key, self._opened_from[frame_key])
+          error(
+              "  opened from %s %d times", frame_key,
+              self._opened_from[frame_key]
+          )
         ##from cs.debug import thread_dump
         ##from threading import current_thread
         ##thread_dump([current_thread()])
@@ -174,7 +181,9 @@ class MultiOpenMixin(object):
         if not self._finalise_later:
           self.finalise()
     if enforce_final_close and opens != 0:
-      raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      raise RuntimeError(
+          "%s: expected this to be the final close, but it was not" % (self,)
+      )
     return retval
 
   def finalise(self):
@@ -221,18 +230,21 @@ class MultiOpenMixin(object):
     ''' Decorator to wrap MultiOpenMixin proxy object methods which
         should raise if the object is not yet open.
     '''
+
     def is_opened_wrapper(self, *a, **kw):
       ''' Wrapper method which checks that the instance is open.
       '''
       if self.closed:
         raise RuntimeError(
-            "%s: %s: already closed from %s"
-            % (is_opened_wrapper.__name__, self, self._final_close_from))
+            "%s: %s: already closed from %s" %
+            (is_opened_wrapper.__name__, self, self._final_close_from)
+        )
       if not self.opened:
         raise RuntimeError(
-            "%s: %s: not yet opened"
-            % (is_opened_wrapper.__name__, self))
+            "%s: %s: not yet opened" % (is_opened_wrapper.__name__, self)
+        )
       return func(self, *a, **kw)
+
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
 
@@ -309,7 +321,9 @@ class Pool(O):
     self._lock = lock
 
   def __str__(self):
-    return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
+    return "Pool(max_size=%s, new_object=%s)" % (
+        self.max_size, self.new_object
+    )
 
   @contextmanager
   def instance(self):
@@ -393,14 +407,16 @@ class RunState(object):
     ''' Return true if the task is running.
     '''
     return self.running
+
   __nonzero__ = __bool__
 
   def __str__(self):
     return "%s:%s[%s:%gs]" % (
-        ( type(self).__name__
-          if self.name is None
-          else ':'.join( (type(self).__name__, repr(self.name)) ) ),
-        id(self), self.state, self.run_time
+        (
+            type(self).__name__ if self.name is None else ':'.join(
+                (type(self).__name__, repr(self.name))
+            )
+        ), id(self), self.state, self.run_time
     )
 
   def __enter__(self):
@@ -528,6 +544,7 @@ class RunStateMixin(object):
 
       Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
+
   def __init__(self, runstate=None):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
@@ -539,25 +556,30 @@ class RunStateMixin(object):
     elif isinstance(runstate, str):
       runstate = RunState(runstate)
     self.runstate = runstate
+
   def cancel(self):
     ''' Call .runstate.cancel().
     '''
     return self.runstate.cancel()
+
   @property
   def cancelled(self):
     ''' Test .runstate.cancelled.
     '''
     return self.runstate.cancelled
+
   @property
   def running(self):
     ''' Test .runstate.running.
     '''
     return self.runstate.running
+
   @property
   def stopping(self):
     ''' Test .runstate.stopping.
     '''
     return self.runstate.stopping
+
   @property
   def stopped(self):
     ''' Test .runstate.stopped.
