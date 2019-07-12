@@ -127,7 +127,9 @@ class MultiOpenMixin(object):
         self.startup()
     return self
 
-  def close(self, enforce_final_close=False, caller_frame=None):
+  def close(
+      self, enforce_final_close=False, caller_frame=None, unopened_ok=False
+  ):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown() and return its value.
 
@@ -139,8 +141,14 @@ class MultiOpenMixin(object):
           this if necessary, otherwise it is computed from
           cs.py.stack.caller when needed. Presently the caller of the
           final close is recorded to help debugging extra close calls.
+        * `unopened_ok`: if true, it is not an error if this is not open.
+          This is intended for closing callbacks which might get called
+          even if the original open never happened.
+          (I'm looking at you, `cs.resources.RunState`.)
     '''
     if not self.opened:
+      if unopened_ok:
+        return None
       raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
     with self.__mo_lock:
