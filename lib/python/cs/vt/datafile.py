@@ -100,7 +100,7 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
   '''
 
   def __init__(self, pathname, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
+    MultiOpenMixin.__init__(self)
     self.pathname = pathname
     self._rfd = None
     self._rlock = None
@@ -206,7 +206,7 @@ class DataFileWriter(MultiOpenMixin):
   '''
 
   def __init__(self, pathname, do_create=False, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
+    MultiOpenMixin.__init__(self)
     self.pathname = pathname
     if do_create:
       fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)

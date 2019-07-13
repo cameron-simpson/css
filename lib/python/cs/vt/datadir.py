@@ -43,6 +43,7 @@ from os.path import (
 import sqlite3
 import stat
 import sys
+from threading import Lock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -201,7 +202,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     assert isinstance(statedirpath, str)
     assert issubclass(hashclass, HashCode), "hashclass=%r" % (hashclass,)
     RunStateMixin.__init__(self)
-    MultiOpenMixin.__init__(self, lock=RLock())
+    MultiOpenMixin.__init__(self)
     if flags is None:
       if flags_prefix is None:
         flags = DummyFlags()
@@ -228,6 +229,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     self._indexQ = None
     self._index_Thread = None
     self._monitor_Thread = None
+    self._lock = Lock()
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
@@ -248,7 +250,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
         self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
         self.hashclass,
         self.index_entry_class.from_bytes,
-        lock=self._lock
     )
     self.index.open()
     self.runstate.start()

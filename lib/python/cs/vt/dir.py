@@ -12,6 +12,7 @@ import os.path
 import pwd
 import stat
 import sys
+from threading import Lock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
@@ -728,6 +729,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
   def __init__(self, name, block=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
     MultiOpenMixin.__init__(self)
+    self._lock = Lock()
     if block is None:
       block = Block(data=b'')
     self.open_file = None

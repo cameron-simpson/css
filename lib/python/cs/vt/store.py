@@ -195,7 +195,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
         capacity = 4
       if runstate is None:
         runstate = RunState(name)
-      MultiOpenMixin.__init__(self, lock=lock)
+      MultiOpenMixin.__init__(self)
       RunStateMixin.__init__(self, runstate=runstate)
       self._str_attrs = {}
       self.name = name

@@ -13,6 +13,7 @@ from __future__ import with_statement
 from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
+from threading import Lock
 import time
 from icontract import require
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
@@ -98,6 +99,7 @@ class StreamStore(BasicStoreSync):
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
     super().__init__('StreamStore:%s' % (name,), **kw)
+    self._lock = Lock()
     self.mode_addif = addif
     self._local_store = local_store
     self.exports = exports

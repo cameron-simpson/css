@@ -261,8 +261,8 @@ class GDBMIndex(_Index):
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass, decode):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode)
     self._gdbm = None
 
   @classmethod
