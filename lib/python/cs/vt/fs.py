@@ -68,8 +68,9 @@ def mkOSfuncEINVAL(M, Ename):
       errno symbols;
       they are translated to `EINVAL` with an indication in the warning message.
   '''
+  os_funcname = 'OS_' + Ename
   setattr(
-      M, 'OS_' + Ename, lambda msg, *a:
+      M, os_funcname, lambda msg, *a:
       oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a)
   )
 
@@ -83,6 +84,8 @@ def _prep_osfuncs():
   for Ename in 'ENOATTR', :
     if not hasattr(errno, Ename):
       mkOSfuncEINVAL(M, Ename)
+
+_prep_osfuncs()
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -456,7 +459,7 @@ class FileSystem(object):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with defaults.stack('fs', self):
+        with defaults.stack(fs=self):
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
