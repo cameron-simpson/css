@@ -729,7 +729,8 @@ class VTCmd(BaseCommand):
         return 1
       arpath = ospath + '.vt'
       A = Archive(arpath, missing_ok=True)
-      when, target = A.last
+      last_entry = A.last
+      when, target = last_entry.when, last_entry.dirent
       if target is None:
         target = Dir(basename(ospath))
       if isdirpath(ospath):
