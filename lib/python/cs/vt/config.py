@@ -26,7 +26,7 @@ from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.result import Result
 from . import Lock, DEFAULT_CONFIG
-from .archive import Archive
+from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
     parse_store_specs,
@@ -160,7 +160,14 @@ class Config:
 
   def parse_special(self, special, readonly):
     ''' Parse the mount command's special device from `special`.
-        Return `(fsname,readinly,Store,Dir,basename,archive)`.
+        Return `(fsname,readonly,Store,Dir,basename,archive)`.
+
+        Supported formats:
+        * `D{...}`: a raw `Dir` transcription.
+        * `[`*clause*`]`: a config clause name.
+        * `[`*clause*`]`*archive*: a config clause name
+        and a reference to a named archive associates with that clause.
+        * *archive_file*`.vt`: a path to a `.vt` archive file.
     '''
     fsname = special
     specialD = None
@@ -188,6 +195,8 @@ class Config:
         special_basename = clause_name
       else:
         # expect "[clause]archive"
+        # TODO: just pass to Archive(special,config=self)?
+        # what about special_basename then?
         clause_name, archive_name, offset = get_clause_archive(special)
         special_basename = archive_name
       if offset < len(special):
@@ -204,15 +213,16 @@ class Config:
       archive = special_store.get_Archive(archive_name)
     else:
       # pathname to archive file
-      archive = special
-      if not isfilepath(archive):
+      arpath = special
+      if not isfilepath(arpath):
         raise ValueError("not a file")
-      fsname = shortpath(realpath(archive))
-      spfx, sext = splitext(basename(special))
+      fsname = shortpath(realpath(arpath))
+      spfx, sext = splitext(basename(arpath))
       if spfx and sext == '.vt':
         special_basename = spfx
       else:
         special_basename = special
+      archive = FilePathArchive(arpath)
     return fsname, readonly, special_store, specialD, special_basename, archive
 
   def Store_from_spec(self, store_spec, runstate=None, hashclass=None):
