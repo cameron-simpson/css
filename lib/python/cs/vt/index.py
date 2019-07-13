@@ -337,6 +337,76 @@ class GDBMIndex(_Index):
       self._gdbm[hashcode] = entry
       self._written = True
 
+class NDBMIndex(_Index):
+  ''' NDBM index for a DataDir.
+  '''
+
+  NAME = 'ndbm'
+  SUFFIX = 'ndbm'
+
+  def __init__(self, lmdbpathbase, hashclass, decode):
+    _Index.__init__(self, lmdbpathbase, hashclass, decode)
+    self._ndbm = None
+
+  @classmethod
+  def is_supported(cls):
+    ''' Test whether this index class is supported by the Python environment.
+    '''
+    try:
+      import dbm.ndbm
+    except ImportError:
+      return False
+    return True
+
+  def startup(self):
+    ''' Start the index: open dbm, allocate lock.
+    '''
+    import dbm.ndbm
+    with Pfx(self.path):
+      self._ndbm = dbm.ndbm.open(self.path, 'c')
+    self._ndbm_lock = Lock()
+    self._written = False
+
+  def shutdown(self):
+    ''' Shutdown the index.
+    '''
+    self.flush()
+    with self._ndbm_lock:
+      self._ndbm.close()
+      self._ndbm = None
+      del self._ndbm_lock
+
+  def flush(self):
+    ''' Flush the index: sync the ndbm.
+    '''
+    # no fast mode, no sycn
+    pass
+
+  def __contains__(self, hashcode):
+    with self._ndbm_lock:
+      return hashcode in self._ndbm
+
+  def __getitem__(self, hashcode):
+    with self._ndbm_lock:
+      entry = self._ndbm[hashcode]
+    return self.decode(entry)
+
+  def get(self, hashcode, default=None):
+    ''' Get and decode the record for `hashcode`.
+        Return None for missing `hashcode`.
+    '''
+    with self._ndbm_lock:
+      entry = self._ndbm.get(hashcode, None)
+    if entry is None:
+      return default
+    return self.decode(entry)
+
+  def __setitem__(self, hashcode, value):
+    entry = value.encode()
+    with self._ndbm_lock:
+      self._ndbm[hashcode] = entry
+      self._written = True
+
 class KyotoIndex(_Index):
   ''' Kyoto Cabinet index.
       Notably this uses a B+ tree for the index and thus one can
@@ -450,12 +520,12 @@ def register(indexclass, indexname=None, priority=False):
   else:
     _CLASSES.append((indexclass.NAME, indexclass))
 
-for klass in LMDBIndex, KyotoIndex, GDBMIndex:
+for klass in LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex:
   if klass.is_supported():
     register(klass)
 
 if not _CLASSES:
   raise RuntimeError(
       __name__ +
-      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex is available"
+      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
   )
