@@ -142,7 +142,7 @@ def handler(method):
         X("CALL %s(%s)", syscall, arg_desc)
       fs = self._vtfs
       try:
-        with defaults.stack('fs', fs):
+        with defaults.stack(fs=fs):
           with fs.S:
             with LogTime("SLOW SYSCALL", threshold=5.0):
               result = method(self, *a, **kw)
@@ -302,7 +302,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with defaults.stack('fs', fs):
+        with defaults.stack(fs=fs):
           with S:
             llfuse.main(workers=32)
             llfuse.close()
@@ -792,7 +792,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with defaults.stack('fs', fs):
+              with defaults.stack(fs=fs):
                 with S:
                   try:
                     EA = self._vt_EntryAttributes(E)
