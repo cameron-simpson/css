@@ -1,3 +1,4 @@
+DataDirIndexEntry: use cs.binary?
 VTCmd.cmd_mount: pull out into its own BaseCommand
 maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
 http interface: hash based URLs to return a long or infinite expiry as their content is fixed
