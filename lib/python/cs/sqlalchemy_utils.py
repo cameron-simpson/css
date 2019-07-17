@@ -82,7 +82,7 @@ class ORM(MultiOpenMixin):
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
       and provides various Session related convenience methods.
-      It is also a `MutliOpenMixin` subclass
+      It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
 
       Subclasses must define the following:
@@ -125,7 +125,7 @@ class ORM(MultiOpenMixin):
       '''
       return with_session(method, self, *a, session=session, orm=self, **kw)
 
-    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method,),)
+    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
     return wrapper
 
