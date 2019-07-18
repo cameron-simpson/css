@@ -30,7 +30,6 @@ from os.path import basename, exists as pathexists
 import re
 from signal import signal, SIGHUP, SIGINT, SIGTERM
 import subprocess
-from subprocess import DEVNULL
 import sys
 from threading import RLock
 from time import sleep
@@ -41,6 +40,7 @@ from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
+from cs.py3 import DEVNULL
 from cs.sh import quotecmd as shq
 
 DISTINFO = {
@@ -58,6 +58,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.psutils',
         'cs.py.func',
+        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {

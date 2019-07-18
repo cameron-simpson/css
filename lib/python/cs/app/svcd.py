@@ -50,10 +50,6 @@ from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
 from subprocess import Popen, PIPE, call as callproc
-try:
-  from subprocess import DEVULL
-except ImportError:
-  DEVNULL = open(os.devnull, 'rb')
 import sys
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
@@ -61,6 +57,7 @@ from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
+from cs.py3 import DEVNULL
 from cs.sh import quotecmd
 
 DISTINFO = {
@@ -77,6 +74,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
+        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {
