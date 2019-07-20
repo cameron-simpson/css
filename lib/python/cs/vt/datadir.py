@@ -289,14 +289,14 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     # drop the location onto the _indexQ for persistent storage in
     # the index asynchronously.
     self._indexQ = IterableQueue(64)
-    T = self._index_Thread = Thread(
-        name="%s-index-thread" % (self,), target=self._index_updater
+    self._index_Thread = bg_thread(
+        self._index_updater,
+        name="%s-index-thread" % (self,),
     )
-    T.start()
-    T = self._monitor_Thread = Thread(
-        name="%s-datafile-monitor" % (self,), target=self._monitor_datafiles
+    self._monitor_Thread = bg_thread(
+        self._monitor_datafiles,
+        name="%s-datafile-monitor" % (self,),
     )
-    T.start()
 
   def shutdown(self):
     ''' Shut down the _FilesDir: cancel the runstate, close the
