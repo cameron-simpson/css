@@ -7,25 +7,47 @@ from fcntl import flock, LOCK_EX, LOCK_UN
 import os
 from os import (
     SEEK_END,
+    O_CREAT,
+    O_EXCL,
     O_RDONLY,
     O_WRONLY,
     O_APPEND,
     O_CLOEXEC,
 )
+from cs.buffer import CornuCopyBuffer
 from cs.pfx import Pfx
 from cs.logutils import warning
 
-def openfd_append(pathname):
-  ''' Low level OS open of `pathname` for append.
+def createpath(pathname):
+  ''' Create the file `pathname`.
+      The file must not already exist.
   '''
-  with Pfx("os.open(%r,O_WRONLY|O_APPEND|O_CLOEXEC)", pathname):
-    return os.open(pathname, O_WRONLY | O_APPEND | O_CLOEXEC)
+  with Pfx("createpath(%r)", pathname):
+    os.close(os.open(pathname, O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC))
+
+def openfd_append(pathname, create=False):
+  ''' Low level OS open of `pathname` for append.
+
+     `create`: default `False`; if true, add `O_CREAT|O_EXCL` to the open mode
+  '''
+  mode = O_WRONLY | O_APPEND | O_CLOEXEC
+  if create:
+    mode |= O_CREAT | O_EXCL
+  with Pfx("os.open(%r,0o%o)", pathname, mode):
+    return os.open(pathname, mode)
 
 def openfd_read(pathname):
   ''' Low level OS open of `pathname` for read.
   '''
   with Pfx("os.open(%r,O_RDONLY|O_CLOEXEC)", pathname):
     return os.open(pathname, O_RDONLY | O_CLOEXEC)
+
+def buffer_from_pathname(pathname, *, readsize=None, offset=None):
+  ''' Return a `CornuCopyBuffer` reading from the file `pathname`.
+  '''
+  return CornuCopyBuffer.from_fd(
+      openfd_read(pathname), readsize=readsize, offset=offset
+  )
 
 def append_data(wfd, bs):
   ''' Append the bytes `bs` to the writable file descriptor `wfd`.
