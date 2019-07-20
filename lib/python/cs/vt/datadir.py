@@ -501,7 +501,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
             # this can happen when the same key is indexed twice
             # entirely plausible if a new datafile is added to the datadir
             pass
-        DFstate = filemap[entry.n]
+        DFstate = filemap[entry.filenum]
         if DFstate is not old_DFstate:
           if old_DFstate is not None:
             filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
@@ -572,7 +572,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       raise KeyError(str(hashcode))
 
 class SqliteFilemap:
-  ''' The file mapping of `n` to `DataFileState`.
+  ''' The file mapping of `filenum` to `DataFileState`.
 
       The implementation is an in-memory dict with an SQLite database
       as backing store. SQLite databases are portable across
@@ -645,21 +645,21 @@ class SqliteFilemap:
       return list(self.n_to_DFstate.keys())
 
   def items(self):
-    ''' Return the active (n, DFstate) pairs.
+    ''' Return the active (filenum, DFstate) pairs.
     '''
     with self._lock:
       return list(self.n_to_DFstate.items())
 
-  def _map(self, path, n, indexed_to=0):
-    ''' Add a DataFileState for `path` and `n` to the mapping.
+  def _map(self, path, filenum, indexed_to=0):
+    ''' Add a DataFileState for `path` and `filenum` to the mapping.
     '''
     datadir = self.datadir
-    if n in self.n_to_DFstate:
-      warning("replacing n_to_DFstate[%s]", n)
+    if filenum in self.n_to_DFstate:
+      warning("replacing n_to_DFstate[%s]", filenum)
     if path in self.path_to_DFstate:
       warning("replacing path_toDFstate[%r]", path)
-    DFstate = DataFileState(datadir, n, path, indexed_to=indexed_to)
-    self.n_to_DFstate[n] = DFstate
+    DFstate = DataFileState(datadir, filenum, path, indexed_to=indexed_to)
+    self.n_to_DFstate[filenum] = DFstate
     self.path_to_DFstate[path] = DFstate
 
   def _load_map(self):
@@ -669,8 +669,8 @@ class SqliteFilemap:
           SELECT id, path, indexed_to FROM filemap
       '''
       )
-      for n, path, indexed_to in c.fetchall():
-        self._map(path, n, indexed_to)
+      for filenum, path, indexed_to in c.fetchall():
+        self._map(path, filenum, indexed_to)
       c.close()
 
   def add_path(self, new_path, indexed_to=0):
@@ -687,14 +687,14 @@ class SqliteFilemap:
             return_cursor=True
         )
         if c:
-          n = c.lastrowid
-          self._map(new_path, n, indexed_to=indexed_to)
+          filenum = c.lastrowid
+          self._map(new_path, filenum, indexed_to=indexed_to)
           c.close()
         else:
-          # TODO: look up the path=>(n,indexed_to) as fallback
+          # TODO: look up the path=>(filenum,indexed_to) as fallback
           error("FAILED")
           return None
-      return self.n_to_DFstate[n]
+      return self.n_to_DFstate[filenum]
 
   def del_path(self, old_path):
     ''' Forget the information for `old_path`.
@@ -732,39 +732,39 @@ class SqliteFilemap:
       return False
     return True
 
-  def set_indexed_to(self, n, new_indexed_to):
-    ''' Update the `indexed_to` value for path `n`.
+  def set_indexed_to(self, filenum, new_indexed_to):
+    ''' Update the `indexed_to` value for path `filenum`.
     '''
-    DFstate = self.n_to_DFstate[n]
+    DFstate = self.n_to_DFstate[filenum]
     with self._lock:
       self._modify(
           r'''
           UPDATE filemap SET indexed_to = ? WHERE id = ?
-      ''', (new_indexed_to, n)
+      ''', (new_indexed_to, filenum)
       )
     DFstate.indexed_to = new_indexed_to
 
-class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
+class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
   ''' A block record for a `DataDir`.
   '''
 
   @classmethod
   def from_bytes(cls, data: bytes):
-    ''' Parse a binary index entry, return (n, offset).
+    ''' Parse a binary index entry, return `(filenum,offset)`.
     '''
-    n, offset = get_bs(data)
+    filenum, offset = get_bs(data)
     file_offset, offset = get_bs(data, offset)
     if offset != len(data):
       raise ValueError(
-          "unparsed data from index entry; full entry = %s; n=%d, file_offset=%d, unparsed=%r"
-          % (hexlify(data), n, file_offset, data[offset:])
+          "unparsed data from index entry; full entry = %s; filenum=%d, file_offset=%d, unparsed=%r"
+          % (hexlify(data), filenum, file_offset, data[offset:])
       )
-    return cls(n, file_offset)
+    return cls(filenum, file_offset)
 
   def encode(self) -> bytes:
-    ''' Encode (n, offset) to binary form for use as an index entry.
+    ''' Encode (filenum, offset) to binary form for use as an index entry.
     '''
-    return put_bs(self.n) + put_bs(self.offset)
+    return put_bs(self.filenum) + put_bs(self.offset)
 
 class DataDir(_FilesDir):
   ''' Maintenance of a collection of DataFiles in a directory.
@@ -876,28 +876,29 @@ class DataDir(_FilesDir):
         self.flush()
       time.sleep(1)
 
-class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry',
-                                       'n offset length')):
-  ''' A block record for a PlatonicDir.
+class RawDataDirIndexEntry(namedtuple('RawDataDirIndexEntry',
+                                      'filenum offset length')):
+  ''' A block record for a raw data file.
   '''
 
   @classmethod
   def from_bytes(cls, data: bytes):
-    ''' Parse a binary index entry, return (n, offset).
+    ''' Parse a binary index entry, return (filenum, offset).
     '''
-    n, offset = get_bs(data)
+    filenum, offset = get_bs(data)
     file_offset, offset = get_bs(data, offset)
     length, offset = get_bs(data, offset)
     if offset != len(data):
       raise ValueError(
           "unparsed data from index entry; full entry = %s" % (hexlify(data),)
       )
-    return cls(n, file_offset, length)
+    return cls(filenum, file_offset, length)
 
   def encode(self) -> bytes:
-    ''' Encode (n, offset) to binary form for use as an index entry.
+    ''' Encode (filenum, offset) to binary form for use as an index entry.
     '''
-    return put_bs(self.n) + put_bs(self.offset) + put_bs(self.length)
+    return put_bs(self.filenum) + put_bs(self.offset) + put_bs(self.length)
+    '''
 
 class PlatonicFile(MultiOpenMixin, ReadMixin):
   ''' A PlatonicFile is a normal file whose content is used as the
@@ -1074,26 +1075,26 @@ class PlatonicDir(_FilesDir):
     base = basename(path)
     return not base or base.startswith('.')
 
-  def _open_datafile(self, n):
-    ''' Return the DataFile with index `n`.
+  def _open_datafile(self, filenum):
+    ''' Return the DataFile with index `filenum`.
     '''
     cache = self._cache
-    DF = cache.get(n)
+    DF = cache.get(filenum)
     if DF is None:
       with self._lock:
         # first, look again now that we have the _lock
-        DF = cache.get(n)
+        DF = cache.get(filenum)
         if DF is None:
           # still not in the cache, open the DataFile and put into the cache
-          DFstate = self._filemap[n]
-          DF = cache[n] = PlatonicFile(self.datapathto(DFstate.filename))
+          DFstate = self._filemap[filenum]
+          DF = cache[filenum] = PlatonicFile(self.datapathto(DFstate.filename))
           DF.open()
     return DF
 
   def fetch(self, entry):
-    ''' Return the data chunk stored in DataFile `n` at `offset`.
+    ''' Return the data chunk stored in DataFile `filenum` at `offset`.
     '''
-    DF = self._open_datafile(entry.n)
+    DF = self._open_datafile(entry.filenum)
     return DF.fetch(entry.offset, entry.length)
 
   @logexc
