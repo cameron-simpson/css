@@ -28,6 +28,13 @@
     or a large repository of scientific data.
     The `PlatonicDir` maintains a mapping of hashcodes
     to their block data location within the backing files.
+
+    A `RawDataDir` uses raw data files in the `data` subdirectory
+    which are `mmap`ped, and bufferviews of their content
+    supplied as Block data.
+    These are intended as the fastest backing store,
+    with the files large and kept open,
+    the data uncompressed.
 '''
 
 from binascii import hexlify
@@ -86,8 +93,14 @@ from .util import buffer_from_pathname, createpath, openfd_read, openfd_append
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
+RAWFILE_DOT_EXT = '.data'
+
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
+
+# 8GiB rollover for raw data files.
+# We mmap these and keep them open, so we minimise their number.
+DEFAULT_RAW_ROLLOVER = 8 * 1024 * 1024 * 1024
 
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
@@ -780,6 +793,9 @@ class DataDir(_FilesDir):
       file-level service such as Dropbox or plain old rsync.
   '''
 
+  DATA_DOT_EXT = DATAFILE_DOT_EXT
+  DATA_ROLLOVER = DEFAULT_ROLLOVER
+
   index_entry_class = DataDirIndexEntry
 
   @staticmethod
@@ -901,7 +917,91 @@ class RawDataDirIndexEntry(namedtuple('RawDataDirIndexEntry',
     ''' Encode (filenum, offset) to binary form for use as an index entry.
     '''
     return put_bs(self.filenum) + put_bs(self.offset) + put_bs(self.length)
+
+class RawDataDir(_FilesDir):
+  ''' Maintenance of a collection of raw data files in a directory.
+
+      A RawDataDir may be used as the Mapping for a MappingStore.
+
+      NB: _not_ thread safe; callers must arrange that.
+
+      The directory may be maintained by multiple instances of this
+      class as they will not try to add data to the same data file.
+      This is intended to address shared Stores such as a Store on
+      a NAS presented via NFS, or a Store replicated by an external
+      file-level service such as Dropbox or plain old rsync.
+  '''
+
+  DATA_DOT_EXT = RAWFILE_DOT_EXT
+  DATA_ROLLOVER = DEFAULT_RAW_ROLLOVER
+
+  index_entry_class = RawDataDirIndexEntry
+
+  def startup(self):
+    # mapping of rfd to (mmap,length)
+    self._mmaps = {}
+    super().startup()
+
+  def shutdown(self):
+    super().shutdown()
+    mmaps = self._mmaps
+    for rfd in mmaps:
+      mapped, _ = mmaps[rfd]
+      mapped.close()
+    del self._mmaps
+
+  def read_entry(self, rfd, entry):
+    ''' Return the data associated with `entry` from `rfd`.
+
+        This method underpins the `fetch` method.
+
+        This implementation returns
+        a slice of a memoryview of a mmap of `rfd`.
     '''
+    offset = entry.offset
+    length = entry.length
+    post_offset = offset + length
+    mmap_info = self._mmaps.get(rfd)
+    if mmap_info:
+      mapped, viewed = mmap_info
+      if post_offset > mapped.size():
+        fd_size = fstat(rfd).st_size
+        if post_offset > fd_size:
+          raise ValueError(
+              "rfd=%d, entry=%s: entry lies beyond the length of the file (%d)"
+              % (rfd, entry, fd_size)
+          )
+        # unmap the file - we will remap it below
+        with self._lock:
+          del self._mmaps[rfd]
+        mapped.close()
+        mmap_info = None
+    if mmap_info is None:
+      with self._lock:
+        try:
+          mapped, viewed = self._mmaps[rfd]
+        except KeyError:
+          mapped = mmap(rfd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
+          viewed = memoryview(mapped)
+          self._mmaps[rfd] = mapped, viewed
+    if post_offset > mapped.size():
+      raise ValueError(
+          "rfd=%d, entry=%s: entry lies beyond the length of the mmap (%d)" %
+          (rfd, entry, mapped.size())
+      )
+    return viewed[offset:post_offset]
+
+  @staticmethod
+  def data_record(data):
+    ''' Return the record for data to save in the save file.
+    '''
+    return data
+
+  @staticmethod
+  def index_entry(filenum, offset, length):
+    ''' Construct an index entry from the file number and offset.
+    '''
+    return RawDataDirIndexEntry(filenum, offset, length)
 
 class PlatonicFile(MultiOpenMixin, ReadMixin):
   ''' A PlatonicFile is a normal file whose content is used as the
@@ -984,7 +1084,7 @@ class PlatonicDir(_FilesDir):
   DELAY_INTERSCAN = 1.0  # regular pause between directory scans
   DELAY_INTRASCAN = 0.1  # stalls during scan: per directory and after big files
 
-  index_entry_class = PlatonicDirIndexEntry
+  index_entry_class = RawDataDirIndexEntry
 
   def __init__(
       self,
@@ -1237,7 +1337,7 @@ class PlatonicDir(_FilesDir):
                     indexQ.put(
                         (
                             hashcode,
-                            PlatonicDirIndexEntry(
+                            RawDataDirIndexEntry(
                                 DFstate.filenum, offset, len(data)
                             ), post_offset
                         )
