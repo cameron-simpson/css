@@ -29,7 +29,7 @@ from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults, Lock, RLock
 from .block import HashCodeBlock, _IndirectBlock, LiteralBlock
-from .datadir import DataDir, PlatonicDir, init_datadir
+from .datadir import DataDir, PlatonicDir
 from .hash import (
     HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
     MissingHashcodeError
@@ -1062,7 +1062,7 @@ class DataDirStore(MappingStore):
   def init(self):
     ''' Init the supporting data dir.
     '''
-    init_datadir(self.statedirpath)
+    self._datadir.initdir()
 
   def pathto(self, rpath):
     ''' Compute the full path from a relative path.
@@ -1137,7 +1137,7 @@ class _PlatonicStore(MappingStore):
     self.readonly = True
 
   def init(self):
-    init_datadir(self.statedirpath)
+    self._datadir.initdir()
 
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
