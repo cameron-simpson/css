@@ -1,3 +1,4 @@
+_FilesDir: close idle _rfd entries in DataDir and PlatonicDir to avoid unbounded fds - cannot do for RawDataDir as the mmaps must persist
 DataDirIndexEntry: use cs.binary?
 VTCmd.cmd_mount: pull out into its own BaseCommand
 maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
