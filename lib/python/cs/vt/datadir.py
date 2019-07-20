@@ -238,8 +238,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     self._indexQ = None
     self._index_Thread = None
     self._monitor_Thread = None
-    self._lock = Lock()
     self._WDFstate = None
+    self._lock = RLock()
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
@@ -268,6 +268,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     ''' Start up the _FilesDir: take locks, start worker threads etc.
     '''
     self.initdir()
+    self._rfds = {}
     self._unindexed = {}
     self._filemap = SqliteFilemap(self, self.statefilepath)
     hashname = self.hashname
@@ -330,6 +331,11 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       with Pfx("os.close(wfd:%d)", wfd):
         os.close(wfd)
       del self._wfd
+    # close the read file descriptors
+    for rfd in self._rfds.values():
+      with Pfx("os.close(rfd:%d)", rfd):
+        os.close(rfd)
+    del self._rfds
     self.runstate.stop()
 
   def pathto(self, rpath):
@@ -394,6 +400,19 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
           (self._WDFstate.pathname, len(bs), n)
       )
     return offset
+
+  def fetch(self, entry):
+    ''' Fetch the data associated with `entry`.
+    '''
+    filenum = entry.filenum
+    rfds = self._rfds
+    with self._lock:
+      try:
+        rfd = rfds[filenum]
+      except KeyError:
+        DFstate = self._filemap[filenum]
+        rfd = rfds[filenum] = openfd_read(DFstate.pathname)
+    return self.read_entry(rfd, entry)
 
   def add(self, data, hashclass):
     ''' Add the supplied data chunk to the current save DataFile,
@@ -763,14 +782,13 @@ class DataDir(_FilesDir):
 
   index_entry_class = DataDirIndexEntry
 
+  @staticmethod
+  def read_entry(rfd, entry):
+    ''' Return the data associated with `entry` from `rfd`.
 
-
-  def fetch(self, entry):
-    ''' Return the data chunk stored in DataFile `n` at `offset`.
+        This method underpins the `fetch` method.
     '''
-    DF = self._open_datafile(entry.n)
-    return DF.fetch(entry.offset)
-    '''
+    return DataRecord.from_fd(rfd, entry.offset).data
 
   @staticmethod
   def scanfrom(filepath, offset=0, **kw):
@@ -778,6 +796,12 @@ class DataDir(_FilesDir):
     ''' Return the record for data to save in the save file.
     '''
     return bytes(DataRecord(data))
+
+  @staticmethod
+  def index_entry(filenum, offset, length):
+    ''' Construct an index entry from the file number and offset.
+    '''
+    return DataDirIndexEntry(filenum, offset)
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
     with DataFileReader(filepath) as DF:
