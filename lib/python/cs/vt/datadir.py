@@ -85,7 +85,8 @@ INDEX_FLUSH_RATE = 16384
 
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file
-      in use by a files based data dir.
+      in use by a files based data dir
+      (any subclass of `_FiledDir`).
 
       Attributes:
       * `datadir`: the `_FilesDir` tracking this state.
@@ -162,6 +163,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       hashclass,
       *,
       indexclass=None,
+      rollover=None,
       flags=None,
       flags_prefix=None,
   ):
@@ -176,6 +178,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
           DataFiles. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
+        * `rollover`: data file roll over size; if a data file grows beyond
+          this a new datafile is commenced for new blocks.
+          Default: `self.DATA_ROLLOVER`.
         * `flags`: optional `Flags` object for control; if specified then
           `flags_prefix` is also required.
         * `flags_prefix`: prefix for control flag names.
@@ -197,6 +202,15 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       if flags_prefix is None:
         raise ValueError("flags provided but no flags_prefix")
     FlaggedMixin.__init__(self, flags=flags, prefix=flags_prefix)
+    if rollover is None:
+      rollover = self.DATA_ROLLOVER
+    elif rollover < 1024:
+      raise ValueError(
+          "rollover < 1024"
+          " (a more normal size would be in megabytes or gigabytes): %r" %
+          (rollover,)
+      )
+    self.rollover = rollover
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
     self.statedirpath = statedirpath
@@ -749,141 +763,21 @@ class DataDir(_FilesDir):
 
   index_entry_class = DataDirIndexEntry
 
-  def __init__(self, statedirpath, hashclass, *, rollover=None, **kw):
-    ''' Initialise the DataDir with `statedirpath`.
 
-        Parameters:
-        * `statedirpath`: a directory containing state information about the
-          DataFiles; this is the index-state.csv file and the associated
-          index dbm-ish files.
-        * `indexclass`: the IndexClass providing the index to chunks in the
-          DataFiles. If not specified, a supported index class with an
-          existing index file will be chosen, otherwise the most favoured
-          indexclass available will be chosen.
-        * `rollover`: data file roll over size; if a data file grows beyond
-          this a new datafile is commenced for new blocks.  Default:
-          `DEFAULT_ROLLOVER`.
-    '''
-    super().__init__(statedirpath, hashclass, **kw)
-    if rollover is None:
-      rollover = DEFAULT_ROLLOVER
-    elif rollover < 1024:
-      raise ValueError(
-          "rollover < 1024"
-          " (a more normal size would be in megabytes or gigabytes): %r" %
-          (rollover,)
-      )
-    self.rollover = rollover
-    self._write_n = None
-    self._write_DF = None
-    self._write_lockpath = None
-
-  def shutdown(self):
-    self._close_write_datafile()
-    super().shutdown()
-
-  def _open_datafile(self, n):
-    ''' Return the DataFileReader with index `n`.
-    '''
-    cache = self._cache
-    DF = cache.get(n)
-    if DF is None:
-      with self._lock:
-        # first, look again now that we have the _lock
-        DF = cache.get(n)
-        if DF is None:
-          # still not in the cache, open the DataFile and put into the cache
-          DFstate = self._filemap[n]
-          DF = cache[n] = DataFileReader(self.datapathto(DFstate.filename))
-          DF.open()
-    return DF
 
   def fetch(self, entry):
     ''' Return the data chunk stored in DataFile `n` at `offset`.
     '''
     DF = self._open_datafile(entry.n)
     return DF.fetch(entry.offset)
-
-  def _get_write_datafile(self):
-    ''' Obtain a fresh writable datafile, closing the current one if open.
-        Returns (n, WDF).
     '''
-    self._close_write_datafile()
-    rollover = self.rollover
-    WDF = None
-    for n, DFstate in self._filemap.items():
-      if DFstate.indexed_to < rollover:
-        try:
-          lockpath = makelockfile(DFstate.pathname, timeout=0)
-        except TimeoutError:
-          # lock taken, proceed to another file
-          continue
-        WDF = DataFileWriter(DFstate.pathname)
-        break
-    if WDF is None:
-      # no suitable existing file, make a new one
-      while True:
-        filename = str(uuid4()) + DATAFILE_DOT_EXT
-        pathname = self.datapathto(filename)
-        if os.path.exists(pathname):
-          error("new datafile path already exists, retrying: %r", pathname)
-          continue
-        break
-      lockpath = makelockfile(pathname, timeout=0)
-      WDF = DataFileWriter(pathname, do_create=True)
-      DFstate = self._filemap.add_path(filename)
-      n = DFstate.filenum
-    WDF.open()
-    self._write_n = n
-    self._write_DF = WDF
-    self._write_lockpath = lockpath
-    return n, WDF
-
-  def _close_write_datafile(self):
-    ''' Close the current writable datafile if open.
-    '''
-    WDF = self._write_DF
-    if WDF is not None:
-      WDF.close()
-      try:
-        os.remove(self._write_lockpath)
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          warning("remove(%r): %s", self._write_lockpath, e)
-        else:
-          error("remove(%r): %s", self._write_lockpath, e)
-      self._write_n = None
-      self._write_DF = None
-      self._write_lockpath = None
-
-  def add(self, data, hashclass):
-    ''' Add the supplied data chunk to the current save DataFile,
-        return the hashcode.
-        Roll the internal state over to a new file if the current
-        datafile has reached the rollover threshold.
-    '''
-    # obtain the write DataFile
-    with self._lock:
-      WDF = self._write_DF
-      if WDF is None:
-        n, WDF = self._get_write_datafile()
-      else:
-        n = self._write_n
-    # save the data chunk
-    with WDF:
-      offset, post_offset = WDF.add(data)
-    # queue the index update
-    hashcode = self.hashclass.from_chunk(data)
-    self._queue_index(hashcode, DataDirIndexEntry(n, offset), post_offset)
-    # see if the write DataFile is now full; if so, close it
-    rollover = self.rollover
-    with self._lock:
-      if rollover is not None and post_offset >= rollover:
-        self._close_write_datafile()
-    return hashcode
 
   @staticmethod
   def scanfrom(filepath, offset=0, **kw):
+  def data_record(data):
+    ''' Return the record for data to save in the save file.
+    '''
+    return bytes(DataRecord(data))
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
     with DataFileReader(filepath) as DF:
@@ -925,8 +819,8 @@ class DataDir(_FilesDir):
         if self.cancelled or self.flag_scan_disable:
           break
         # don't monitor the current datafile: our own actions will update it
-        n = self._write_n
-        if n is not None and filenum == n:
+        WDFstate = self._WDFstate
+        if WDFstate and filenum == WDFstate.filenum:
           continue
         try:
           DFstate = filemap[filenum]
