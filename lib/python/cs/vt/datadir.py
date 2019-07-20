@@ -34,16 +34,21 @@ from binascii import hexlify
 from collections import namedtuple
 from collections.abc import Mapping
 import errno
+from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
-from os import SEEK_SET, SEEK_CUR, SEEK_END
+from os import (
+    SEEK_SET,
+    SEEK_CUR,
+    SEEK_END,
+    fstat,
+)
 from os.path import (
-    basename, isdir as isdirpath, isfile as isfilepath, join as joinpath,
-    relpath
+    basename, exists as existspath, isdir as isdirpath, isfile as isfilepath,
+    join as joinpath, relpath
 )
 import sqlite3
 import stat
 import sys
-from threading import Lock
 import time
 from types import SimpleNamespace
 from uuid import uuid4
@@ -51,17 +56,20 @@ from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.excutils import logexc
 from cs.fileutils import (
-    DEFAULT_READSIZE, ReadMixin, datafrom_fd, makelockfile, read_from,
-    shortpath, TimeoutError
+    DEFAULT_READSIZE,
+    ReadMixin,
+    datafrom_fd,
+    read_from,
+    shortpath,
 )
 from cs.logutils import debug, info, warning, error, exception
-from cs.pfx import Pfx, PfxThread as Thread
+from cs.pfx import Pfx
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
-from cs.threads import locked
+from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
@@ -69,11 +77,12 @@ from .block import Block
 from .blockify import (
     DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
-from .datafile import DataFileReader, DataFileWriter, DATAFILE_DOT_EXT
+from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass
 from .parsers import scanner_from_filename
+from .util import buffer_from_pathname, createpath, openfd_read, openfd_append
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
