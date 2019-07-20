@@ -791,7 +791,6 @@ class DataDir(_FilesDir):
     return DataRecord.from_fd(rfd, entry.offset).data
 
   @staticmethod
-  def scanfrom(filepath, offset=0, **kw):
   def data_record(data):
     ''' Return the record for data to save in the save file.
     '''
@@ -802,10 +801,14 @@ class DataDir(_FilesDir):
     ''' Construct an index entry from the file number and offset.
     '''
     return DataDirIndexEntry(filenum, offset)
+
+  @staticmethod
+  def scanfrom(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding data chunks.
     '''
-    with DataFileReader(filepath) as DF:
-      yield from DF.scanfrom(offset, **kw)
+    bfr = buffer_from_pathname(filepath, offset=offset)
+    for record in DataRecord.parse_buffer(bfr):
+      yield record
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
