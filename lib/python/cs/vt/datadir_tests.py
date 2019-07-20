@@ -15,6 +15,7 @@ from .randutils import rand0, randblock
 from .datadir import DataDir, DataDirIndexEntry
 from .hash import HASHCLASS_BY_NAME
 from .index import class_names as indexclass_names, class_by_name as indexclass_by_name
+from cs.logutils import setup_logging
 
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
@@ -85,13 +86,13 @@ class TestDataDir(unittest.TestCase):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
       entry = DataDirIndexEntry(rand_n, rand_offset)
-      self.assertEqual(entry.n, rand_n)
+      self.assertEqual(entry.filenum, rand_n)
       self.assertEqual(entry.offset, rand_offset)
       encoded = entry.encode()
       self.assertIsInstance(encoded, bytes)
       entry2 = DataDirIndexEntry.from_bytes(encoded)
       self.assertEqual(entry, entry2)
-      self.assertEqual(entry2.n, rand_n)
+      self.assertEqual(entry2.filenum, rand_n)
       self.assertEqual(entry2.offset, rand_offset)
 
   def test002randomblocks(self):
@@ -178,4 +179,5 @@ def selftest(argv):
   ##thread_dump()
 
 if __name__ == '__main__':
+  setup_logging(sys.argv[0])
   selftest(sys.argv)
