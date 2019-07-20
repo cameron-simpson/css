@@ -543,15 +543,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
       raise KeyError(str(hashcode))
 
-  # TODO: memoised BlockMap on demand function?
-  def get_blockmap(self, B):
-    ''' Return a persistent BlockMap for the supplied Block.
-    '''
-    raise RuntimeError(
-        "%s.get_blockmap: return singleton persistent BlockMap here for Block %s"
-        % (self, B)
-    )
-
 class SqliteFilemap:
   ''' The file mapping of `n` to `DataFileState`.
 
