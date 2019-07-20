@@ -216,6 +216,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     self._index_Thread = None
     self._monitor_Thread = None
     self._lock = Lock()
+    self._WDFstate = None
 
   def __str__(self):
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
@@ -300,6 +301,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     self._filemap.close()
     self._filemap = None
     self.index.close()
+    # close the write file descriptor, if any
+    wfd = self.__dict__.get('_wfd')
+    if wfd is not None:
+      with Pfx("os.close(wfd:%d)", wfd):
+        os.close(wfd)
+      del self._wfd
     self.runstate.stop()
 
   def pathto(self, rpath):
@@ -311,6 +318,83 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     ''' Return the path to `rpath`, which is relative to the datadirpath.
     '''
     return self.pathto(joinpath('data', rpath))
+
+  def __getattr__(self, attr):
+    if attr == '_wfd':
+      # no ._wfd: create a new write data file and return the new wfd
+      with self._lock:
+        wfd = self.__dict__.get('_wfd')
+        if wfd is None:
+          DFstate = self.new_datafile()
+          wfd = self._wfd = openfd_append(DFstate.pathname)
+          self._WDFstate = DFstate
+      return wfd
+    return super().__getattr__(attr)
+
+  def new_datafile(self):
+    ''' Create a new datafile.
+        Return its `DataFileState`.
+    '''
+    while True:
+      filename = str(uuid4()) + self.DATA_DOT_EXT
+      pathname = self.datapathto(filename)
+      if existspath(pathname):
+        error("new datafile path already exists, retrying: %r", pathname)
+        continue
+      with Pfx(pathname):
+        try:
+          createpath(pathname)
+        except OSError as e:
+          if e.errno == errno.EEXIST:
+            error("new datafile path already exists")
+            continue
+          raise
+      break
+    return self._filemap.add_path(filename)
+
+  def write_data(self, bs):
+    ''' Write the bytes `bs` to the current output data file.
+        Return the starting offset of the data as saved to the file.
+    '''
+    with self._lock:
+      wfd = self._wfd
+      offset = os.lseek(wfd, 0, SEEK_END)
+      n = os.write(wfd, bs)
+      rollover = self.rollover
+      if rollover is not None and offset + n >= rollover:
+        # file now full, close it so as to start a new one on next write
+        os.close(wfd)
+        del self._wfd
+    if n != len(bs):
+      raise ValueError(
+          "os.write(%r,%d-bytes) wrote only %d bytes" %
+          (self._WDFstate.pathname, len(bs), n)
+      )
+    return offset
+
+  def add(self, data, hashclass):
+    ''' Add the supplied data chunk to the current save DataFile,
+        return the hashcode.
+        Roll the internal state over to a new file if the current
+        datafile has reached the rollover threshold.
+
+        Subclasses must define the `data_record(data)` method
+        and the `index_entry(filenum,offset)` method.
+    '''
+    bs = self.data_record(data)
+    with self._lock:
+      offset = self.write_data(bs)
+      DFstate = self._WDFstate
+    length = len(bs)
+    post_offset = offset + length
+    # queue the index update
+    hashcode = hashclass.from_chunk(data)
+    X("DFstate=%s", DFstate)
+    self._queue_index(
+        hashcode, self.index_entry(DFstate.filenum, offset, length),
+        post_offset
+    )
+    return hashcode
 
   def get_Archive(self, name=None, **kw):
     ''' Return the Archive named `name`.
