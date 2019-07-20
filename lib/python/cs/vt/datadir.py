@@ -339,12 +339,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     self.runstate.stop()
 
   def pathto(self, rpath):
-    ''' Return the path to `rpath`, which is relative to the statedirpath.
+    ''' Return the path to `rpath`, which is relative to the `statedirpath`.
     '''
     return joinpath(self.statedirpath, rpath)
 
   def datapathto(self, rpath):
-    ''' Return the path to `rpath`, which is relative to the datadirpath.
+    ''' Return the path to `rpath`, which is relative to the `datadirpath`.
     '''
     return self.pathto(joinpath('data', rpath))
 
@@ -446,7 +446,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
         plus the extension `'.vt'`.
         Otherwise it is the `statedirpath` plus a dash plus the `name`
         plus the extension `'.vt'`.
-        The `name` may not be empty or contain a dot.
+        The `name` may not be empty or contain a dot or a dash.
     '''
     with Pfx("%s.get_Archive", self):
       if name is None or not name:
@@ -472,7 +472,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
 
   @logexc
   def _index_updater(self):
-    ''' Thread body to collect hashcode index data from .indexQ and store it.
+    ''' Thread body to collect hashcode index data from `.indexQ` and store it.
     '''
     with Pfx("%s._index_updater", self):
       index = self.index
@@ -675,7 +675,7 @@ class SqliteFilemap:
 
   def add_path(self, new_path, indexed_to=0):
     ''' Insert a new path into the map.
-        Return its DataFileState.
+        Return its `DataFileState`.
     '''
     info("new path %r", shortpath(new_path))
     with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
@@ -700,7 +700,7 @@ class SqliteFilemap:
     ''' Forget the information for `old_path`.
 
         In order to prevent reuse of an id we just set the record's
-        `path` and `indexed_to` to NULL.
+        `path` and `indexed_to` to `NULL`.
     '''
     DFstate = self.path_to_DFstate[old_path]
     with self._lock:
@@ -745,7 +745,7 @@ class SqliteFilemap:
     DFstate.indexed_to = new_indexed_to
 
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
-  ''' A block record for a DataDir.
+  ''' A block record for a `DataDir`.
   '''
 
   @classmethod
@@ -811,7 +811,7 @@ class DataDir(_FilesDir):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
         This is what supports shared use of the data area. Other clients
-        may write to their onw datafiles and this thread sees new files
+        may write to their own datafiles and this thread sees new files
         and new data in existing files and scans them, adding the index
         information to the local state.
     '''
