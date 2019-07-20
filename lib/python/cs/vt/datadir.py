@@ -452,7 +452,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       if name is None or not name:
         archivepath = self.statedirpath + '.vt'
       else:
-        if '.' in name:
+        if '.' in name or '/' in name:
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.statedirpath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
