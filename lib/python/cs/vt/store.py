@@ -28,8 +28,7 @@ from cs.seq import Seq
 from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults, Lock, RLock
-from .block import HashCodeBlock, _IndirectBlock, LiteralBlock
-from .datadir import DataDir, PlatonicDir
+from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
     HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
     MissingHashcodeError
@@ -555,7 +554,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
                 This will be called after `addR` completes.
             '''
             with lock:
-              B = pending_blocks.pop(addR)
+              pending_blocks.pop(addR)
             sem.release()
 
           addR.notify(after_add_block)
@@ -1015,7 +1014,7 @@ class ProxyStore(BasicStoreSync):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A MappingStore using a DataDir as its backend.
+  ''' A MappingStore using a DataDir or RawDataDir as its backend.
   '''
 
   def __init__(
@@ -1027,8 +1026,21 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
+      raw=False,
       **kw
   ):
+    ''' Initialise the DataDirStore.
+
+        Parameters:
+        * `name`: Store name.
+        * `statedirpath`: data directory path.
+        * `hashclass`: hash class, default: `DEFAULT_HASHCLASS`.
+        * `indexclass`: passed to the data dir.
+        * `rollover`: passed to the data dir.
+        * `lock`: passed to the mapping.
+        * `raw`: option, default `False`.
+          If true use a `RawDataDir` otherwise a `DataDir`.
+    '''
     if lock is None:
       lock = RLock()
     self._lock = lock
@@ -1037,8 +1049,9 @@ class DataDirStore(MappingStore):
       hashclass = DEFAULT_HASHCLASS
     self.indexclass = indexclass
     self.rollover = rollover
+    datadirclass = RawDataDir if raw else DataDir
     self._datadir = _PerHashclassMapping(
-        lambda hcls: DataDir(
+        lambda hcls: datadirclass(
             self.statedirpath,
             hcls,
             indexclass=self.indexclass,
