@@ -20,6 +20,12 @@
     updates from other programmes simply by watching file sizes
     and scanning the new data.
 
+    A `RawDataDir` behaves like an ordinary `DataDir`
+    except that the data files contains the raw uncompressed data bytes.
+    This notional use case is as a local cache of efficiently accessed data.
+    The intent is that one might pull all the leaf data of a "file"
+    into the store contiguously in order to obtain more efficient data access.
+
     A `PlatonicDir` uses an ordinary directory tree as the backing store,
     obviating the requirement to copy original data into a `DataDir`.
     Such a tree should generally just acquire new files;
@@ -28,26 +34,17 @@
     or a large repository of scientific data.
     The `PlatonicDir` maintains a mapping of hashcodes
     to their block data location within the backing files.
-
-    A `RawDataDir` uses raw data files in the `data` subdirectory
-    which are `mmap`ped, and bufferviews of their content
-    supplied as Block data.
-    These are intended as the fastest backing store,
-    with the files large and kept open,
-    the data uncompressed.
 '''
 
 from binascii import hexlify
 from collections import namedtuple
 from collections.abc import Mapping
 import errno
-from mmap import mmap, MAP_PRIVATE, PROT_READ
 import os
 from os import (
     SEEK_SET,
     SEEK_CUR,
     SEEK_END,
-    fstat,
 )
 from os.path import (
     basename, exists as existspath, isdir as isdirpath, isfile as isfilepath,
@@ -78,6 +75,7 @@ from cs.seq import imerge
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek
+from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -97,10 +95,6 @@ RAWFILE_DOT_EXT = '.data'
 
 # 1GiB rollover
 DEFAULT_ROLLOVER = MAX_FILE_SIZE
-
-# 8GiB rollover for raw data files.
-# We mmap these and keep them open, so we minimise their number.
-DEFAULT_RAW_ROLLOVER = 8 * 1024 * 1024 * 1024
 
 # flush the index after this many updates in the index updater worker thread
 INDEX_FLUSH_RATE = 16384
@@ -280,6 +274,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
     '''
+    X("STARTUP %s ...", type(self).__name__)
     self.initdir()
     self._rfds = {}
     self._unindexed = {}
@@ -394,39 +389,6 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
       break
     return self._filemap.add_path(filename)
 
-  def write_data(self, bs):
-    ''' Write the bytes `bs` to the current output data file.
-        Return the starting offset of the data as saved to the file.
-    '''
-    with self._lock:
-      wfd = self._wfd
-      offset = os.lseek(wfd, 0, SEEK_END)
-      n = os.write(wfd, bs)
-      rollover = self.rollover
-      if rollover is not None and offset + n >= rollover:
-        # file now full, close it so as to start a new one on next write
-        os.close(wfd)
-        del self._wfd
-    if n != len(bs):
-      raise ValueError(
-          "os.write(%r,%d-bytes) wrote only %d bytes" %
-          (self._WDFstate.pathname, len(bs), n)
-      )
-    return offset
-
-  def fetch(self, entry):
-    ''' Fetch the data associated with `entry`.
-    '''
-    filenum = entry.filenum
-    rfds = self._rfds
-    with self._lock:
-      try:
-        rfd = rfds[filenum]
-      except KeyError:
-        DFstate = self._filemap[filenum]
-        rfd = rfds[filenum] = openfd_read(DFstate.pathname)
-    return self.read_entry(rfd, entry)
-
   def add(self, data, hashclass):
     ''' Add the supplied data chunk to the current save DataFile,
         return the hashcode.
@@ -438,17 +400,26 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     '''
     bs = self.data_record(data)
     with self._lock:
-      offset = self.write_data(bs)
-      DFstate = self._WDFstate
+      wfd = self._wfd
+      filenum = self._WDFstate.filenum
+      offset = os.lseek(wfd, 0, SEEK_END)
+      n = os.write(wfd, bs)
+      rollover = self.rollover
+      if rollover is not None and offset + n >= rollover:
+        # file now full, close it so as to start a new one on next write
+        os.close(wfd)
+        del self._wfd
+        del self._WDFstate
     length = len(bs)
+    if n != length:
+      raise ValueError(
+          "filenum %d: os.write(%d-bytes) wrote only %d bytes" %
+          (filenum, length, n)
+      )
+    entry = self.index_entry(filenum, offset, length)
     post_offset = offset + length
-    # queue the index update
     hashcode = hashclass.from_chunk(data)
-    X("DFstate=%s", DFstate)
-    self._queue_index(
-        hashcode, self.index_entry(DFstate.filenum, offset, length),
-        post_offset
-    )
+    self._queue_index(hashcode, entry, post_offset)
     return hashcode
 
   def get_Archive(self, name=None, **kw):
@@ -578,8 +549,16 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
           entry = index[hashcode]
       except KeyError:
         raise KeyError("%s[%s]: hash not in index" % (self, hashcode))
+    filenum = entry.filenum
     try:
-      return self.fetch(entry)
+      try:
+        rfd = self._rfds[filenum]
+      except KeyError:
+        # TODO: shove this sideways to self.open_datafile
+        # which releases an existing datafile if too many are open
+        DFstate = self._filemap[filenum]
+        rfd = self._rfds[filenum] = openfd_read(DFstate.pathname)
+      return entry.fetch_fd(rfd)
     except Exception as e:
       exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
       raise KeyError(str(hashcode))
@@ -779,6 +758,11 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
     '''
     return put_bs(self.filenum) + put_bs(self.offset)
 
+  def fetch_fd(self, rfd):
+    ''' Return the data associated with `entry` from `rfd`.
+    '''
+    return DataRecord.from_fd(rfd, self.offset).data
+
 class DataDir(_FilesDir):
   ''' Maintenance of a collection of DataFiles in a directory.
 
@@ -797,14 +781,6 @@ class DataDir(_FilesDir):
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
   index_entry_class = DataDirIndexEntry
-
-  @staticmethod
-  def read_entry(rfd, entry):
-    ''' Return the data associated with `entry` from `rfd`.
-
-        This method underpins the `fetch` method.
-    '''
-    return DataRecord.from_fd(rfd, entry.offset).data
 
   @staticmethod
   def data_record(data):
@@ -895,8 +871,7 @@ class DataDir(_FilesDir):
         self.flush()
       time.sleep(1)
 
-class RawDataDirIndexEntry(namedtuple('RawDataDirIndexEntry',
-                                      'filenum offset length')):
+class RawIndexEntry(namedtuple('RawIndexEntry', 'filenum offset length')):
   ''' A block record for a raw data file.
   '''
 
@@ -918,78 +893,43 @@ class RawDataDirIndexEntry(namedtuple('RawDataDirIndexEntry',
     '''
     return put_bs(self.filenum) + put_bs(self.offset) + put_bs(self.length)
 
+  def fetch_fd(self, rfd):
+    ''' Fetch the bytes associated with this entry from `rfd`.
+    '''
+    bs = os.pread(rfd, self.length, self.offset)
+    if len(bs) != self.length:
+      raise ValueError(
+          "incorrect pread(fd=%d,length=%d,offset=%d): got %d bytes" %
+          (rfd, self.length, self.offset, len(bs))
+      )
+    return bs
+
 class RawDataDir(_FilesDir):
   ''' Maintenance of a collection of raw data files in a directory.
+
+      This is intended as a fairly fast local data cache directory.
+      Records are read directly from the files, which are not
+      compressed or encapsulated.
+
+      Hypothetical use case is the pull the leaf data of a large
+      file into the store contiguously to effect efficient reads
+      of that data later.
 
       A RawDataDir may be used as the Mapping for a MappingStore.
 
       NB: _not_ thread safe; callers must arrange that.
-
-      The directory may be maintained by multiple instances of this
-      class as they will not try to add data to the same data file.
-      This is intended to address shared Stores such as a Store on
-      a NAS presented via NFS, or a Store replicated by an external
-      file-level service such as Dropbox or plain old rsync.
   '''
 
   DATA_DOT_EXT = RAWFILE_DOT_EXT
-  DATA_ROLLOVER = DEFAULT_RAW_ROLLOVER
+  DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-  index_entry_class = RawDataDirIndexEntry
+  index_entry_class = RawIndexEntry
 
-  def startup(self):
-    # mapping of rfd to (mmap,length)
-    self._mmaps = {}
-    super().startup()
-
-  def shutdown(self):
-    super().shutdown()
-    mmaps = self._mmaps
-    for rfd in mmaps:
-      mapped, _ = mmaps[rfd]
-      mapped.close()
-    del self._mmaps
-
-  def read_entry(self, rfd, entry):
-    ''' Return the data associated with `entry` from `rfd`.
-
-        This method underpins the `fetch` method.
-
-        This implementation returns
-        a slice of a memoryview of a mmap of `rfd`.
+  @staticmethod
+  def index_entry(filenum, offset, length):
+    ''' Construct an index entry from the file number and offset.
     '''
-    offset = entry.offset
-    length = entry.length
-    post_offset = offset + length
-    mmap_info = self._mmaps.get(rfd)
-    if mmap_info:
-      mapped, viewed = mmap_info
-      if post_offset > mapped.size():
-        fd_size = fstat(rfd).st_size
-        if post_offset > fd_size:
-          raise ValueError(
-              "rfd=%d, entry=%s: entry lies beyond the length of the file (%d)"
-              % (rfd, entry, fd_size)
-          )
-        # unmap the file - we will remap it below
-        with self._lock:
-          del self._mmaps[rfd]
-        mapped.close()
-        mmap_info = None
-    if mmap_info is None:
-      with self._lock:
-        try:
-          mapped, viewed = self._mmaps[rfd]
-        except KeyError:
-          mapped = mmap(rfd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
-          viewed = memoryview(mapped)
-          self._mmaps[rfd] = mapped, viewed
-    if post_offset > mapped.size():
-      raise ValueError(
-          "rfd=%d, entry=%s: entry lies beyond the length of the mmap (%d)" %
-          (rfd, entry, mapped.size())
-      )
-    return viewed[offset:post_offset]
+    return RawIndexEntry(filenum, offset, length)
 
   @staticmethod
   def data_record(data):
@@ -997,11 +937,8 @@ class RawDataDir(_FilesDir):
     '''
     return data
 
-  @staticmethod
-  def index_entry(filenum, offset, length):
-    ''' Construct an index entry from the file number and offset.
-    '''
-    return RawDataDirIndexEntry(filenum, offset, length)
+  def _monitor_datafiles(self):
+    pass
 
 class PlatonicFile(MultiOpenMixin, ReadMixin):
   ''' A PlatonicFile is a normal file whose content is used as the
@@ -1056,17 +993,6 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
       readsize = DEFAULT_READSIZE
     return datafrom_fd(self._fd, offset, readsize)
 
-  def fetch(self, offset, length):
-    ''' Fetch the data from this file at `offset`.
-    '''
-    data = self.read(length, offset=offset, longread=True)
-    if len(data) != length:
-      raise RuntimeError(
-          "%r: asked for %d bytes from offset %d, but got %d" %
-          (self.path, length, offset, len(data))
-      )
-    return data
-
 class PlatonicDir(_FilesDir):
   ''' Presentation of a block map based on a raw directory tree of
       files such as a preexisting media server.
@@ -1084,7 +1010,7 @@ class PlatonicDir(_FilesDir):
   DELAY_INTERSCAN = 1.0  # regular pause between directory scans
   DELAY_INTRASCAN = 0.1  # stalls during scan: per directory and after big files
 
-  index_entry_class = RawDataDirIndexEntry
+  index_entry_class = RawIndexEntry
 
   def __init__(
       self,
@@ -1193,12 +1119,6 @@ class PlatonicDir(_FilesDir):
           DF = cache[filenum] = PlatonicFile(self.datapathto(DFstate.filename))
           DF.open()
     return DF
-
-  def fetch(self, entry):
-    ''' Return the data chunk stored in DataFile `filenum` at `offset`.
-    '''
-    DF = self._open_datafile(entry.filenum)
-    return DF.fetch(entry.offset, entry.length)
 
   @logexc
   def _monitor_datafiles(self):
@@ -1337,9 +1257,8 @@ class PlatonicDir(_FilesDir):
                     indexQ.put(
                         (
                             hashcode,
-                            RawDataDirIndexEntry(
-                                DFstate.filenum, offset, len(data)
-                            ), post_offset
+                            RawIndexEntry(DFstate.filenum, offset,
+                                          len(data)), post_offset
                         )
                     )
                     if meta_store is not None:
