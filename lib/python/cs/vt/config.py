@@ -34,9 +34,13 @@ from .compose import (
     get_clause_archive,
     get_clause_spec,
 )
-from .convert import get_integer, \
-    convert_param_int, convert_param_scaled_int, \
-    convert_param_path
+from .convert import (
+    get_integer,
+    convert_param_bool,
+    convert_param_int,
+    convert_param_scaled_int,
+    convert_param_path,
+)
 from .dir import Dir
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
@@ -290,6 +294,7 @@ class Config:
       if store_type == 'config':
         S = self.config_Store(store_name, **params)
       elif store_type == 'datadir':
+        convert_param_bool(params, 'raw')
         S = self.datadir_Store(store_name, clause_name, **params)
       elif store_type == 'filecache':
         convert_param_int(params, 'max_files')
@@ -345,6 +350,7 @@ class Config:
       path=None,
       basedir=None,
       hashclass=None,
+      raw=False,
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
@@ -363,7 +369,7 @@ class Config:
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         path = joinpath(basedir, path)
-    return DataDirStore(store_name, path, hashclass=hashclass)
+    return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
 
   def filecache_Store(
       self,
