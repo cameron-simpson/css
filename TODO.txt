@@ -1,3 +1,4 @@
+Pfx: do not insert umark: if umark is empty, supports "" and None
 implement cs.lex cutprefix and cutsuffix, push to PyPI after testing in PM stuff
 make most cs.obj methods functions, try to drop O class
 mutt-highlight: match markers at start or end of lines
