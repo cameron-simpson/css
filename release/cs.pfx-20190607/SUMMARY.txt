@@ -1,0 +1,1 @@
+Pfx.__exit__ improved exception attribute handling.

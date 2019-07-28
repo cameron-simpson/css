@@ -1,0 +1,3 @@
+Support for virtual columns mapped to a JSON column interior value:
+New functions find_json_field, get_json_field, set_json_field.
+New decorator @json_column for declaritive_base tables.

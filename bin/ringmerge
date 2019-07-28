@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Read ring style records (multiline record intiated by a line
 # commencing with a nonblank character), emit unique records.

@@ -33,6 +33,18 @@ pmFromMan(manf) = lib/$(manf FP :|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
+##  pymanmods = cs.vt
+##  pymansrcs = $( "$((pymanmods :|\.|/|))/*.?.md" EG )
+##  pymanmoddirs = $(pymansrcs DU)
+##  pymandst(src) = $(MANDIR)/man$(src FPS)/$(src FP)
+##  pymandsts = $( '$$(pymandst("$((pymansrcs))"))' EE )
+##  pymansrc(dst) = $
+##  
+##  _t:
+##      echo $(pymansrcs)
+##      echo $(pymanmoddirs)
+##      echo $(pymandsts)
+
 subdirs = $('*/.' GD)
 allscripts = $('bin/*' GF !/\./ +"bin/rc.mobile" F)
 
@@ -46,7 +58,7 @@ py3files        = $(py2files :|/python/|/python3/|)
 rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
-        @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
+        @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'

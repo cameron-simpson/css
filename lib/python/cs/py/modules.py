@@ -1,8 +1,12 @@
 #!/usr/bin/python
 #
-# Convenience functions related to modules and importing.
-#   - Cameron Simpson <cs@cskk.id.au> 21dec2014
-#
+''' Convenience functions related to modules and importing.
+'''
+
+import importlib
+from inspect import getmodule
+import os.path
+import sys
 
 DISTINFO = {
     'description': "module/import related stuff",
@@ -11,21 +15,19 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [],
 }
 
-import importlib
-import os.path
-import sys
-
 def import_module_name(module_name, name, path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
-      `module_name`: the module name to import.
-      `name`: the name within the module whose value is returned;
-              if `name` is None, return the module itself.
-      `path`: an array of paths to use as sys.path during the import.
-      `lock`: a lock to hold during the import (recommended).
+
+      Parameters:
+      * `module_name`: the module name to import.
+      * `name`: the name within the module whose value is returned;
+        if `name` is None, return the module itself.
+      * `path`: an array of paths to use as sys.path during the import.
+      * `lock`: a lock to hold during the import (recommended).
   '''
   if lock:
     with lock:
@@ -54,7 +56,23 @@ def module_files(M):
   '''
   initpath = M.__file__
   moddir = os.path.dirname(initpath)
-  for dirpath, dirnames, filenames in os.walk(moddir):
+  for dirpath, _, filenames in os.walk(moddir):
     for filename in filenames:
       if filename.endswith('.py'):
         yield os.path.join(dirpath, filename)
+
+def module_attributes(M):
+  ''' Generator yielding the names and values of attributes from a module
+      which were defined in the module.
+  '''
+  for attr in dir(M):
+    value = getattr(M, attr, None)
+    if getmodule(value) is not M:
+      continue
+    yield attr, value
+
+def module_names(M):
+  ''' Return a list of the names of attributes from a module which were
+      defined in the module.
+  '''
+  return [ attr for attr, value in module_attributes(M) ]

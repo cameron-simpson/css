@@ -1,8 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Simple boolean states kept as files.
 #       - Cameron Simpson <cs@cskk.id.au> 25sep2006
 #
+
+set -ue
 
 trace=${DEBUG:+set-x}
 flagdir=${FLAGDIR:-$HOME/var/flags}
@@ -16,6 +18,8 @@ verbose=        # print flag state changes
 verbose_all=    # print flag state regardless
 [ -t 2 ] && verbose=1
 ##[ -t 2 ] && trace=set-x
+debug=${DEBUG:+1}
+[ -n "$debug" ] || { [ -s "$flagdir/FLAG_DEBUG" ] && debug=1; }
 
 cmd=$( basename "$0" )
 usage="Usage:
@@ -27,7 +31,7 @@ usage="Usage:
   $cmd [options...] [!] flagname
     Test flag for truth, or falsehood if \"!\" supplied.
   $cmd [options...] [!] flagname {true|false|0|1}
-    Set flag to true for \"true\" or "1", false otherwise.
+    Set flag to true for \"true\" or \"1\", false otherwise.
   $cmd [options...] [!] flagname -c shcmd
     Run shell command shcmd, set flag according to shell exit status.
   $cmd [options...] [!] flagname -e command [args...]
@@ -51,7 +55,7 @@ do
   case $1 in
     -d) flagdir=$2; shift ;;
     -F) flushflags=1 ;;
-    -q) quiet=1 verbose=1 qopt=$1 ;;
+    -q) quiet=1 verbose=1 verbose_all= qopt=$1 ;;
     -t) testmode=1 ;;
     -v) verbose=1 ;;
     -V) verbose=1 verbose_all=1 ;;
@@ -64,6 +68,18 @@ do
   esac
   shift
 done
+
+vecho(){
+  [ $verbose ] && echo "$*" || :
+}
+
+vvecho(){
+  [ $verbose_all ] && echo "$*" || :
+}
+
+debug(){
+  [ $debug ] && echo "$0: $*" >&2 || :
+}
 
 normflag(){
   [ $# = 1 ] || { echo "Usage: normflag flagname" >&2; return 2; }
@@ -91,7 +107,7 @@ then
       matchglob=$1
       shift
       eval "matchflag(){
-              case "\$1" in
+              case \"\$1\" in
                 $matchglob) return 0 ;;
                 *)          return 1 ;;
               esac
@@ -107,9 +123,6 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-debug=${DEBUG:+1}
-[ -n "$debug" ] || { [ -s "$flagdir/FLAG_DEBUG" ] && debug=1; }
 
 if [ $# = 0 ]
 then
@@ -204,7 +217,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 flagfile=$flagdir/$flagname
-[ $debug ] && echo "$0: flagfile=$flagfile" >&2
+debug "flagfile=$flagfile"
 
 if [ $setstate ]
 then
@@ -220,35 +233,22 @@ then
   fi
   if [ $newstate ]
   then
-    [ $debug ] && echo "$0: $flagfile -> 1" >&2 || :
-    if [ $verbose_all ]
-    then
-      echo "$flagname -> 1" >&2
-    else
-      if testflag "$flagname"
-      then  exit 0
-      fi
-      echo "$flagname -> 1" >&2 || :
+    # new state true
+    debug "$flagfile -> 1"
+    if testflag "$flagname"
+    then  vvecho "$flagname -> 1" >&2
+    else  vecho "$flagname -> 1" >&2
     fi
     [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 1
     echo 1 >"$flagfile" || exit 1
   else
-    [ $debug ] && echo "$0: $flagfile -> ''" >&2 || :
-    if [ $verbose_all ]
-    then
-      echo "$flagname -> 0" >&2 || :
-    else
-      if testflag "$flagname"
-      then
-        [ $verbose ] && echo "$flagname -> 0" >&2 || :
-      else
-        exit 0
-      fi
+    # new state false
+    debug "$flagfile -> ''"
+    if testflag "$flagname"
+    then  vecho "$flagname -> 0"
+    else  vvecho "$flagname -> 0"
     fi
-    if [ -z "$makemissing" -a ! -e "$flagfile" ]
-    then
-      exit 0
-    fi
+    [ "$makemissing" -o -e "$flagfile" ] || exit 0
     [ -d "$flagdir/." ] || $trace mkdir -p "$flagdir" || exit 1
     : >"$flagfile" || exit 1
   fi

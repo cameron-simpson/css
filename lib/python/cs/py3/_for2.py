@@ -18,6 +18,9 @@ DISTINFO = {
 def raise3(exc_type, exc_value, exc_traceback):
   exec("raise exc_type, exc_value, exc_traceback")
 
+def raise_from(e1, from_e2):
+  raise e1
+
 def exec_code(code, *a):
   if not a:
     exec(code)

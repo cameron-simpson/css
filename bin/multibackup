@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+# Run a series of histbackups.
+# - Cameron Simpson <cs@cskk.id.au> 17nov2018
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
+  -i            Itemise changes.
+  -x            Trace execution.
+  --copy-times  Passed to histbackup."
+
+rsopts=
+hbopts=
+trace=
+[ -t 2 ] && { trace=set-x hbopts="$hbopts -x" rsopts="$rsopts --progress"; }
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i) hbopts="$hbopts $1" ;;
+    -x) trace=set-x hbopts="$hbopts $1" ;;
+    --copy-times)
+        hbopts="$hbopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcpath:dstpath" >&2
+  badopts=1
+else
+  rspart=
+  for src_dst
+  do
+    if [ $rspart ]
+    then
+      rsopts="$rsopts $src_dst"
+    else
+      case "$src_dst" in
+        ?*:?*) ;;
+        -*) rsopts="$rsopts $src_dst" rspart=1 ;;
+        *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
+            badopts=1
+            ;;
+      esac
+    fi
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for src_dst
+do
+  case "$src_dst" in
+    -*) break ;;
+  esac
+  src=$( expr "x$src_dst" : 'x\(.*\):..*' )
+  dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
+  [ -d "$dst/." ] || {
+    echo "$cmd: $src_dst: skipping missing destination: $dst" >&2
+    xit=1
+    continue
+  }
+  $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
+done
+
+exit $xit

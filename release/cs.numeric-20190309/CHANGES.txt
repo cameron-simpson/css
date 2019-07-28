@@ -1,0 +1,4 @@
+lib/python/cs/numeric.py: cs.numeric: autopep8
+lib/python/cs/numeric.py: cs.numeric: add empty "install_requires" for completeness
+lib/python/cs/numeric.py: my email address has changed - update Python code
+lib/python/cs/numeric.py: cs.numeric: module docstring

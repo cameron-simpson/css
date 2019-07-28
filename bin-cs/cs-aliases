@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Tool to manipulate my email address table.
 #       - Cameron Simpson <cs@cskk.id.au> 26apr2008

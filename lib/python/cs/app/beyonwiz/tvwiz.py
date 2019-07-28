@@ -20,7 +20,7 @@ from . import _Recording, RecordingMetaData
 #  https://github.com/prl001/getWizPnP/blob/master/wizhdrs.h
 
 # various constants sucked directly from getWizPnP/Beyonwiz/Recording/Header.pm
-DAY = 24*60*60      # Seconds in a day
+DAY = 24 * 60 * 60  # Seconds in a day
 TVEXT = '.tvwiz'
 TVHDR = 'header' + TVEXT
 RADEXT = '.radwiz'
@@ -33,7 +33,7 @@ MAX_BOOKMARKS = 64
 HDR_MAIN_OFF = 0
 HDR_MAIN_SZ = 1564
 HDR_OFFSETS_OFF = 1564
-HDR_OFFSETS_SIZE = (MAX_TS_POINT-1) * 8
+HDR_OFFSETS_SIZE = (MAX_TS_POINT - 1) * 8
 HDR_BOOKMARKS_OFF = 79316
 HDR_BOOKMARKS_SZ = 20 + MAX_BOOKMARKS * 8
 HDR_EPISODE_OFF = 79856
@@ -62,7 +62,10 @@ TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
-TVWiz_Header = namedtuple('TVWiz_Header', 'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff')
+TVWiz_Header = namedtuple(
+    'TVWiz_Header',
+    'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff'
+)
 
 def bytes0_to_str(bs0, encoding='utf8'):
   ''' Decode a NUL terminated chunk of bytes into a string.
@@ -85,8 +88,9 @@ def unrle(data, fmt, offset=0):
   subdata = data[offset:offset2]
   if length != len(subdata):
     warning(
-        "unrle(%r...): rle=%d but len(subdata)=%d",
-        data[offset0:offset0+16], length, len(subdata))
+        "unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0 + 16],
+        length, len(subdata)
+    )
   offset += len(subdata)
   return subdata, offset
 
@@ -120,7 +124,8 @@ class TVWiz(_Recording):
     ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
     '''
     tvwiz_extra_opts = [
-        '-c:a', 'aac',       # convert all audio to AAC
+        '-c:a',
+        'aac',  # convert all audio to AAC
     ]
     if extra_opts:
       tvwiz_extra_opts.extend(extra_opts)
@@ -159,21 +164,33 @@ class TVWiz(_Recording):
     # advance to file offsets
     offset += TVWizTSPoint.size
     fileOffs = []
-    for _ in range(0, 8640):
-      fileOff, = struct.unpack('<Q', data[offset:offset+8])
+    for i in range(0, 8640):
+      fileOff, = struct.unpack('<Q', data[offset:offset + 8])
       fileOffs.append(fileOff)
       offset += 8
-    epi_b, offset = unrle(data[HDR_EPISODE_OFF:HDR_EPISODE_OFF+HDR_EPISODE_SZ], '<B')
+    epi_b, offset = unrle(
+        data[HDR_EPISODE_OFF:HDR_EPISODE_OFF + HDR_EPISODE_SZ], '<B'
+    )
     epi_b = epi_b.rstrip(b'\xff')
-    syn_b, offset = unrle(data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF+HDR_EXTINFO_SZ], '<H')
+    syn_b, offset = unrle(
+        data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF + HDR_EXTINFO_SZ], '<H'
+    )
     syn_b = syn_b.rstrip(b'\xff')
     episode = epi_b.decode('utf8', errors='replace')
     synopsis = syn_b.decode('utf8', errors='replace')
     return TVWiz_Header(
-        lock=lock, mediaType=mediaType, inRec=inRec,
-        svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
-        mjd=mjd, start=start,
-        playtime=last*10+sec, lastOff=lastOff)
+        lock=lock,
+        mediaType=mediaType,
+        inRec=inRec,
+        svcName=svcName,
+        evtName=evtName,
+        episode=episode,
+        synopsis=synopsis,
+        mjd=mjd,
+        start=start,
+        playtime=last * 10 + sec,
+        lastOff=lastOff
+    )
 
   def read_header(self):
     ''' Read and decode the header data.
@@ -214,10 +231,8 @@ class TVWiz(_Recording):
       fp = None
       lastFileNum = None
       for rec in self.trunc_records():
-        fileNum = rec.fileNum
-        offset = rec.offset
-        size = rec.size
-        if lastFileNum is None or lastFileNum != rec.fileNum:
+        wizOffset, fileNum, flags, offset, size = rec
+        if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
           fp = open(os.path.join(self.dirpath, "%04d" % (fileNum,)), "rb")

@@ -26,8 +26,10 @@ class Test_MP3(unittest.TestCase):
       total_size = 0
       for frame in frames_from_chunks(read_from(mp3fp)):
         total_size += len(frame)
-    self.assertEqual(total_size, mp3_size,
-                     "file size = %d, frames total = %d" % (mp3_size, total_size))
+    self.assertEqual(
+        total_size, mp3_size,
+        "file size = %d, frames total = %d" % (mp3_size, total_size)
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
