@@ -39,7 +39,7 @@ USAGE = '''Usage:
     %s scan recording...
         Scan the data structures of the supplied recordings.
     %s stat tvwizdirs...
-        Print some summary infomation for the named tvwiz directories.
+        Print some summary information for the named tvwiz directories.
     %s test
         Run unit tests.'''
 
