@@ -138,7 +138,7 @@ def main(argv):
               status = 'FLAWED'
             elif not pkg.check_uptodate(quiet=not verbose):
               status = 'RELEASE OUT OF DATE'
-            elif pkg.check_needs_release(quiet=not verbose):
+            elif not pkg.check_release_uptodate(quiet=not verbose):
               status = 'NEEDS NEW RELEASE'
             else:
               rel_tag = pkg.latest_release_tag()
@@ -490,10 +490,10 @@ class Package:
     return ok
 
   @cached
-  def check_needs_release(self, quiet=False):
-    ''' Check that this package is a candidate for release:
+  def check_release_uptodate(self, quiet=False):
+    ''' Check that this package is released.
         * basic correctness
-        * there are commits since the latest release
+        * there are no commits since the latest release
         * there are no uncommited changes awaiting commit
         * all the required modules are up to date
     '''
@@ -502,8 +502,8 @@ class Package:
     if not self.check_basic(quiet=quiet):
       ok = False
     unreleased_logs = list(self.log_since())
-    if not unreleased_logs:
-      quiet or warning("no unreleased commits")
+    if unreleased_logs:
+      quiet or warning("unreleased commits")
       ok = False
     changed_paths = [
         changed_path
