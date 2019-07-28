@@ -10,7 +10,8 @@ from cs.x import X
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
 from cs.x import X
-import cs.x; cs.x.X_via_tty = True
+import cs.x
+cs.x.X_via_tty = True
 
 class _TestMissingHashCodes(object):
 
@@ -72,19 +73,25 @@ class _TestMissingHashCodes(object):
     for window_size in 1, 7, 16, 23, 32, 1024:
       with self.subTest(window_size=window_size):
         # items in map1 not in map2
-        missing = set(self.miss_generator(self.map2, self.map1, window_size=window_size))
+        missing = set(
+            self.miss_generator(self.map2, self.map1, window_size=window_size)
+        )
         self.assertEqual(missing, ks1 - ks2)
         # items in map2 not in map1
-        missing = set(self.miss_generator(self.map1, self.map2, window_size=window_size))
+        missing = set(
+            self.miss_generator(self.map1, self.map2, window_size=window_size)
+        )
         self.assertEqual(missing, ks2 - ks1)
 
-class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes, unittest.TestCase):
+class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes,
+                                             unittest.TestCase):
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes
     unittest.TestCase.__init__(self, *a, **kw)
 
-class TestMissingHashCodes_Missing_hashcodes_checksum(_TestMissingHashCodes, unittest.TestCase):
+class TestMissingHashCodes_Missing_hashcodes_checksum(_TestMissingHashCodes,
+                                                      unittest.TestCase):
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes_by_checksum

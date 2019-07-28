@@ -10,7 +10,7 @@
 from __future__ import print_function
 from contextlib import contextmanager
 import sys
-from threading import Condition, RLock, Lock
+from threading import Condition, Lock, RLock
 import time
 from cs.logutils import error, warning
 from cs.obj import O, Proxy
@@ -50,7 +50,7 @@ def not_closed(func):
 _mom_lockclass = RLock
 
 ## debug: TrackedClassMixin
-class MultiOpenMixin(O):
+class MultiOpenMixin(object):
   ''' A mixin to count open and close calls, and to call .startup
       on the first .open and to call .shutdown on the last .close.
 
@@ -69,7 +69,7 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False, lock=None, subopens=False):
+  def __init__(self, finalise_later=False):
     ''' Initialise the MultiOpenMixin state.
 
         Parameters:
@@ -79,25 +79,18 @@ class MultiOpenMixin(O):
           the final close prevents further .put calls, but users
           calling .join may need to wait for all the queued items
           to be processed.
-        * `lock`: if set and not None, an RLock to use; otherwise one will be allocated
 
         TODO:
         * `subopens`: if true (default false) then .open will return
           a proxy object with its own .closed attribute set by the
           proxy's .close.
     '''
-    if subopens:
-      raise RuntimeError("subopens not implemented")
-    O.__init__(self)
     ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
-    if lock is None:
-      lock = _mom_lockclass()
     self.opened = False
     self._opens = 0
     self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._final_close_from = None
-    self._lock = lock
     self.__mo_lock = _mom_lockclass()
     self._finalise_later = finalise_later
     self._finalise = None
@@ -170,12 +163,10 @@ class MultiOpenMixin(O):
           caller_frame = caller()
         self._final_close_from = caller_frame
         retval = self.shutdown()
-    if opens == 0:
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+        if not self._finalise_later:
+          self.finalise()
+    if enforce_final_close and opens != 0:
+      raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
     return retval
 
   def finalise(self):
@@ -261,10 +252,10 @@ class MultiOpen(MultiOpenMixin):
       using a MultiOpenMixin.
   '''
 
-  def __init__(self, openable, finalise_later=False, lock=None):
+  def __init__(self, openable, finalise_later=False):
     ''' Initialise: save the `openable` and call the MultiOpenMixin initialiser.
     '''
-    MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
   def startup(self):
@@ -333,13 +324,16 @@ class RunState(object):
 
       Its purpose is twofold, to provide easily queriable state
       around tasks which can start and stop, and to provide control
-      methods to pronounce that a task has started, should stop
-      (cancel) and has stopped (stop).
+      methods to pronounce that a task has started (`.start`),
+      should stop (`.cancel`)
+      and has stopped (`.stop`).
 
-      A RunState can be used a a context manager, with the enter
-      and exit methods calling .start and .stop respectively.
+      A `RunState` can be used a a context manager, with the enter
+      and exit methods calling `.start` and `.stop` respectively.
+      Note that if the suite raises an exception
+      then the exit method also calls `.cancel` before the call to `.stop`.
 
-      Monitor or daemon processes can poll the RunState to see when
+      Monitor or daemon processes can poll the `RunState` to see when
       they should terminate, and may also manage the overall state
       easily using a context manager.
       Example:
@@ -349,27 +343,27 @@ class RunState(object):
                   while not self.runstate.cancelled:
                       ... main loop body here ...
 
-      A RunState has three main methods:
-      * `.start()`: set .running and clear .cancelled
-      * `.cancel()`: set .cancelled
-      * `.stop()`: clear .running
+      A `RunState` has three main methods:
+      * `.start()`: set `.running` and clear `.cancelled`
+      * `.cancel()`: set `.cancelled`
+      * `.stop()`: clear `.running`
 
-      A RunState has the following properties:
-      * `cancelled`: true if .cancel has been called.
-      * `running`: true if the task is running. Assigning a true value
-        to it also sets .start_time to now. Assigning a false value
-        to it also sets .stop_time to now.
-      * `start_time`: the time .running was last set to true.
-      * `stop_time`: the time .running was last set to false.
-      * `run_time`: max(0, .stop_time - .start_time)
+      A `RunState` has the following properties:
+      * `cancelled`: true if `.cancel` has been called.
+      * `running`: true if the task is running.
+        Further, assigning a true value to it also sets `.start_time` to now.
+        Assigning a false value to it also sets `.stop_time` to now.
+      * `start_time`: the time `.running` was last set to true.
+      * `stop_time`: the time `.running` was last set to false.
+      * `run_time`: `max(0,.stop_time-.start_time)`
       * `stopped`: true if the task is not running.
       * `stopping`: true if the task is running but has been cancelled.
-      * `notify_start`: a set of callables called with the RunState
-        instance to be called whenever .running becomes true.
-      * `notify_end`: a set of callables called with the RunState
-        instance to be called whenever .running becomes false.
-      * `notify_cancel`: a set of callables called with the RunState
-        instance to be called whenever .cancel is called.
+      * `notify_start`: a set of callables called with the `RunState` instance
+        to be called whenever `.running` becomes true.
+      * `notify_end`: a set of callables called with the `RunState` instance
+        to be called whenever `.running` becomes false.
+      * `notify_cancel`: a set of callables called with the `RunState` instance
+        to be called whenever `.cancel` is called.
   '''
 
   def __init__(self, name=None):
@@ -406,18 +400,20 @@ class RunState(object):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
+    if exc_type:
+      self.cancel()
     self.stop()
 
   @prop
   def state(self):
-    ''' The RunState's state as a string.
+    ''' The `RunState`'s state as a string.
 
         Meanings:
         * `"pending"`: not yet running/started.
         * `"stopping"`: running and cancelled.
         * `"running"`: running and not cancelled.
         * `"cancelled"`: cancelled and no longer running.
-        * `"stopping"`: no longer running and not cancelled.
+        * `"stopped"`: no longer running and not cancelled.
     '''
     start_time = self.start_time
     if start_time is None:
@@ -434,8 +430,8 @@ class RunState(object):
     return label
 
   def start(self):
-    ''' Start: adjust state, set start_time to now.
-        Sets .cancelled to False and sets .running to True.
+    ''' Start: adjust state, set `start_time` to now.
+        Sets `.cancelled` to `False` and sets `.running` to `True`.
     '''
     if self.running:
       warning("runstate.start() when already running")
@@ -448,8 +444,8 @@ class RunState(object):
     self.running = True
 
   def stop(self):
-    ''' Stop: adjust state, set stop_time to now.
-        Sets sets .running to False.
+    ''' Stop: adjust state, set `stop_time` to now.
+        Sets sets `.running` to `False`.
     '''
     assert self.running
     self.running = False
@@ -498,7 +494,7 @@ class RunState(object):
     return self.cancelled and not self.running
 
   def cancel(self):
-    ''' Set the cancelled flag; the process should notice and stop.
+    ''' Set the cancelled flag; the associated process should notice and stop.
     '''
     self.cancelled = True
     for notify in self.notify_cancel:
@@ -506,9 +502,9 @@ class RunState(object):
 
   @property
   def run_time(self):
-    ''' Property returning most recent run time (stop_time-start_time).
+    ''' Property returning most recent run time (`stop_time-start_time`).
         If still running, use now as the stop time.
-        If not started, return 0.0.
+        If not started, return `0.0`.
     '''
     start_time = self.start_time
     if start_time is None:
@@ -520,15 +516,15 @@ class RunState(object):
     return max(0, stop_time - start_time)
 
 class RunStateMixin(object):
-  ''' Mixin to provide convenient access to a RunState.
+  ''' Mixin to provide convenient access to a `RunState`.
 
-      Provides: .runstate, .cancelled, .running, .stopping, .stopped.
+      Provides: `.runstate`, `.cancelled`, `.running`, `.stopping`, `.stopped`.
   '''
   def __init__(self, runstate=None):
-    ''' Initialise the RunStateMixin; sets the .runstate attribute.
+    ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
-        `runstate`: RunState instance or name. If a `str`,
-        a new RunState with that name is allocated.
+        `runstate`: `RunState` instance or name.
+        If a `str`, a new `RunState` with that name is allocated.
     '''
     if runstate is None:
       runstate = RunState(type(self).__name__)

@@ -9,15 +9,17 @@ set -ue
 cfg=$HOME/.cameras
 trace=
 [ -t 2 ] && trace=set-x
+all_names=$( awk '$1 ~ /^[^#]/ { print $1 }' "$cfg" | keepfirst | tr '\012' ' ' )
 
 cmd=$0
 usage="Usage: $cmd [-f cfg] [--] op [args...]
   Operations:
     poll [names...]
       Fetch camera images.
-    process [names...]
+    process [{name|directory}...]
       Move all images prior to today into subdirectories by day.
-      Create per-day MP4 files for all such subdirectories."
+      Create per-day MP4 files for all such subdirectories.
+  Config names: $all_names"
 
 badopts=
 
@@ -27,7 +29,7 @@ do
     -f) cfg=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopt=1
+        badopts=1
         ;;
     *)  break ;;
   esac
@@ -58,7 +60,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$names" ] || names=$( awk '$1 ~ /^[^#]/ { print $1 }' "$cfg" | keepfirst )
+[ -n "$names" ] || names=$all_names
 
 xit=0
 
@@ -66,67 +68,93 @@ xit=0
 for name in $names
 do
   dir= url=
-  # name dir url
-  exec 3<"$cfg"
-  while read -r cfg_name cfg_dir cfg_url <&3
-  do
-    [ "x$cfg_name" = "x$name" ] || continue
-    dir=$cfg_dir url=$cfg_url
-    snapshots=$dir/snapshots
-    compiled=$dir/compiled
-    case "$op" in
-      poll)
-            [ -d "$snapshots/" ] || $trace mkdir $snapshots
-            $trace wget -q -O "$snapshots/`date +%Y-%m-%d-%H:%M:%S`.jpg" "$url" || xit=1
-            ;;
-      process)
-            [ -d "$compiled/" ] || $trace mkdir "$compiled"
-            (
-              set -ue
-              cd "$snapshots"
-              for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
-              do
-                ddir=$compiled/$date
-                [ -d "$ddir" ] || $trace mkdir "$ddir"
-                echo "mv $date-*.jpg $ddir/" >&2
-                mv "$date"-*.jpg "$ddir/"
-              done
-            )
-            (
-              set -ue
-              cd "$compiled"
-              for date in 20??-??-??
-              do
-                [ -d "$date" ] || continue
-                video=$date.mp4
-                [ -f "$video" ] || (
-                  set -ue
-                  cd "$date"
-                  # delete empty files
-                  find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
-                  n=0
-                  for img in "$date"-*.jpg
-                  do  nimg=$(printf '%04d.jpg' "$n")
-                      $trace ln "$img" "$nimg"
-                      n=$((n+1))
-                  done
-                  size=$(
-                    set -- $date-*jpg
-                    { gm identify "$1" || identify "$1"; } \
-                    | awk '{print$3}' | sed 's/+.*//'
-                  )
-                  $trace ffmpeg -r 4 -s "$size" -i '%04d.jpg' "$video"
-                  rm [0-9][0-9][0-9][0-9].jpg
-                  $trace touch -d "$date" "$video"
-                  $trace mv "$video" ..
-                ) || { echo "VIDEO FAILED FOR $video" >&2; break; }
-              done
-            )
-            ;;
-      *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
-    esac
-  done
-  exec 3<&-
+  case "$name" in
+    /*)
+      dir=$name
+      ;;
+    *)
+      # locate name in config
+      # name dir url
+      exec 3<"$cfg"
+      while read -r cfg_name cfg_dir cfg_url <&3
+      do
+        [ "x$cfg_name" = "x$name" ] || continue
+        dir=$cfg_dir url=$cfg_url
+        break
+      done
+      exec 3<&-
+      ;;
+  esac
+  [ -n "$dir" ] || {
+    echo "$cmd: no clause for name \"$name\"" >&2
+    xit=1
+    continue
+  }
+  [ -d "$dir/" ] || {
+    echo "$cmd: not a directory: $dir" >&2
+    xit=1
+    continue
+  }
+  snapshots=$dir/snapshots
+  compiled=$dir/compiled
+  case "$op" in
+    poll)
+          [ -n "$url" ] || {
+            echo "$cmd: $name: no URL" >&2
+            xit=1
+            continue
+          }
+          [ -d "$snapshots/" ] || $trace mkdir "$snapshots"
+          timestamp=$( date +%Y-%m-%d-%H:%M:%S )
+          $trace wget -q -O "$snapshots/$timestamp.jpg" "$url" || xit=1
+          ;;
+    process)
+          [ -d "$compiled/" ] || $trace mkdir "$compiled"
+          (
+            set -ue
+            cd "$snapshots"
+            for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
+            do
+              ddir=$compiled/$date
+              [ -d "$ddir" ] || $trace mkdir "$ddir"
+              echo "mv $date-*.jpg $ddir/" >&2
+              mv "$date"-*.jpg "$ddir/"
+            done
+          )
+          (
+            set -ue
+            cd "$compiled"
+            for date in 20??-??-??
+            do
+              [ -d "$date" ] || continue
+              video=$date.mp4
+              ls -ldL "$video" 2>/dev/null || (
+                set -ue
+                cd "$date"
+                # delete empty files
+                find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
+                n=0
+                for img in "$date"-*.jpg
+                do  nimg=$(printf '%04d.jpg' "$n")
+                    $trace ln "$img" "$nimg"
+                    n=$((n+1))
+                done
+                # get video size from first image
+                size=$(
+                  set -- "$date"-*jpg
+                  { gm identify "$1" || identify "$1"; } \
+                  | awk '{print$3}' | sed 's/+.*//'
+                )
+                $trace ffmpeg -r 4 -s "$size" -i '%04d.jpg' "$video"
+                rm [0-9][0-9][0-9][0-9].jpg
+                $trace touch -d "$date" "$video"
+                $trace mv "$video" ..
+              ) || { echo "VIDEO FAILED FOR $video" >&2; break; }
+            done
+          )
+          ;;
+    *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
+  esac
 done
 
 exit $xit

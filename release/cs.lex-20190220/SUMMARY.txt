@@ -1,0 +1,1 @@
+New function get_qstr_or_identifier.

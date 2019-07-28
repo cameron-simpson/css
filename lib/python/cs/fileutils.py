@@ -331,7 +331,7 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
   dkw['attr_name'] = attr_name
   dkw['poll_delay'] = poll_delay
   dkw['sig_func'] = sig_func
-  return cached(wrap0, **dkw)
+  return cached(**dkw)(wrap0)
 
 @decorator
 def file_property(func, **dkw):
@@ -912,8 +912,10 @@ class ReadMixin(object):
         # We need to retest on each iteration because other reads
         # may be interleaved, interfering with the buffer.
         if bfr is None or bfr.offset != offset:
-          if bfr is not None:
-            info("ReadMixin.read: new bfr from offset=%d (old bfr was %s)", offset, bfr)
+          ##if bfr is not None:
+          ##  info(
+          ##      "ReadMixin.read: new bfr from offset=%d (old bfr was %s)",
+          ##      offset, bfr)
           self._reading_bfr = bfr = self.bufferfrom(offset)
         bfr.extend(1, short_ok=True)
         if not bfr.buf:

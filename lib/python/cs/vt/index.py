@@ -44,7 +44,7 @@ def choose(basepath, preferred_indexclass=None):
         preferred_indexclass = None
   indexclasses = list(_CLASSES)
   if preferred_indexclass is not None and preferred_indexclass.is_supported():
-    indexclasses.insert( (preferred_indexclass.NAME, preferred_indexclass) )
+    indexclasses.insert((preferred_indexclass.NAME, preferred_indexclass))
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
@@ -56,8 +56,8 @@ def choose(basepath, preferred_indexclass=None):
       continue
     return indexclass
   raise ValueError(
-      "no supported index classes available: tried %r"
-      % (indexclasses,))
+      "no supported index classes available: tried %r" % (indexclasses,)
+  )
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
@@ -105,7 +105,7 @@ class LMDBIndex(_Index):
     # Lock preventing activity which cannot occur while a transaction is
     # current. This is primarily for database reopens, as when the
     # LMDB map_size is raised.
-    self._txn_idle = Lock()     # available if no transactions are in progress
+    self._txn_idle = Lock()  # available if no transactions are in progress
     self._txn_blocked = Lock()  # available if new transactions may commence
     self._txn_count = 0
 
@@ -122,7 +122,7 @@ class LMDBIndex(_Index):
   def startup(self):
     ''' Start up the index.
     '''
-    self.map_size = 10240   # self.MAP_SIZE
+    self.map_size = 10240  # self.MAP_SIZE
     self._open_lmdb()
 
   def shutdown(self):
@@ -137,9 +137,12 @@ class LMDBIndex(_Index):
     import lmdb
     self._lmdb = lmdb.Environment(
         self.path,
-        subdir=True, readonly=False,
-        metasync=False, sync=False,
-        writemap=True, map_async=True,
+        subdir=True,
+        readonly=False,
+        metasync=False,
+        sync=False,
+        writemap=True,
+        map_async=True,
         map_size=self.map_size,
     )
 
@@ -197,6 +200,15 @@ class LMDBIndex(_Index):
       cursor = txn.cursor()
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
+
+  def keys(self, hashclass=None):
+    if hashclass is not None:
+      if hashclass is not self.hashclass:
+        raise RuntimeError(
+            "%s.keys: hashclass:%s != self.hashclass:%s" %
+            (type(self), hashclass, self.hashclass)
+        )
+    return iter(self)
 
   def items(self):
     ''' Yield `(hashcode,record)` from index.
@@ -431,7 +443,8 @@ def register(indexclass, indexname=None, priority=False):
   if indexname in _BY_NAME:
     raise ValueError(
         'cannot register index class %s: indexname %r already registered to %s'
-        % (indexclass, indexname, _BY_NAME[indexname]))
+        % (indexclass, indexname, _BY_NAME[indexname])
+    )
   _BY_NAME[indexname] = indexclass
   if priority:
     _CLASSES.insert(0, (indexclass.NAME, indexclass))

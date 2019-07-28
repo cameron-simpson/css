@@ -32,7 +32,7 @@ class Control:
           action = getattr(self, 'cmd_' + op)
         except AttributeError as e:
           exception("unknown operation %r: %s", op, e)
-          raise ValueError("unknown operation %r: %s" % ( op, e))
+          raise ValueError("unknown operation %r: %s" % (op, e))
         try:
           return action(E, argv)
         except GetoptError as e:
@@ -51,8 +51,8 @@ class Control:
     name = argv.pop()
     if not name or PATHSEP in name:
       raise GetoptError(
-          "invalid name, may not be empty or contain the separator %r: %r"
-          % (PATHSEP, name)
+          "invalid name, may not be empty or contain the separator %r: %r" %
+          (PATHSEP, name)
       )
     if not argv:
       raise GetoptError("missing dirent_spec")

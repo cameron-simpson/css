@@ -1,8 +1,20 @@
+VTCmd.cmd_mount: pull out into its own BaseCommand
+maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
+http interface: hash based URLs to return a long or infinite expiry as their content is fixed
+http interface: ETag to be the appropriate hashcode with hashtype prefix in double quotes, honour If-None-Match: "hashtype:hashcode" and return 304 not modified on match
+report lmdb use of sys.argv at import time, figure out what it is doing
+cs.vtfuse: fsyncdir: sync this Dir downward, but "unsynced" version of ancestor Dirs?
+vt.1 doc -h option and $VT_HASHCLASS
+vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
+stats on stream packet stuffing/flushing
+streaming Store.pushto method based on hash_of_hashcodes and streaming .add
+Hash_SHA256 or Hash_SHA512 for the exercise and for test coverage, particularly code which may assume the wrong hashclass
+store_test for SocketClientStore
+doco for [clause]archive archive references and proxystore archive paths
+archives to support NDJSON state lines, thus UUIDs and other metadata
 autocreate basic .vtrc, and put one in the vtrc manual entry and vt.1
 .stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
 SHORTLIST:
-  config: socket: replace socket_path with address
-  config: tcp: replace host and port with address
   mount -a
   Store exports
     base Store: empty exports
@@ -32,14 +44,12 @@ ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates fro
 get rid of uses of totext/fromtext and dirent_fromtext etc
 sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
 Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
-socket Stores: just use path instead of socket_path?
 streamstore: Client handler: make current Store local to it for independence
 move CancellationError into cs.resources, associate with RunState
 socket store: export = name[:storespec],... with default being "default:{defaults.S}"
 socket store: dflt socket_path = {basedir}/{clausename}.sock
 cs.vt.socket_tests: UNIX domain socket tests
 ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
-vt setup/tutorial
 blockmap updates - use lower priority than regular I/O
 platonic updates - use lower priority than regular I/O
 readahead for CornuCopyBuffer?

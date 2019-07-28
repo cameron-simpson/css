@@ -852,7 +852,7 @@ class Later(object):
           default `self.outstanding`.
         * `until_idle`: if true,
           continue until `self.outstanding` is empty.
-          This requires the `outstanding` parameter to the `None`.
+          This requires the `outstanding` parameter to be `None`.
     '''
     if outstanding is not None:
       if until_idle:

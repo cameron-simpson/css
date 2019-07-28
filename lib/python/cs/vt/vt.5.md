@@ -77,6 +77,9 @@ as length prefixed data.
 `bsstring`: length prefixed `utf-8` text data:
   a `bsdata` whose data block is the `utf-8` encoding of a string value.
 
+`bssfloat`: textual floating point value:
+  a `bsstring` containing the textual representation of a floaing point value.
+
 ### Block Files (.vtd)
 
 Block files with the `.vtd` file extension
@@ -144,7 +147,7 @@ Every block reference is a `bsdata` length prefixed record:
       }
     }
 
-`flags` is a bit field holding the follow flags:
+`flags` is a bit field holding the following flags:
 
 `0x01` "INDIRECT":
   if set, the block data consist of a sequence of `blockref_record`s
@@ -214,7 +217,7 @@ with respect to the span covered by an index file
 plus the base offset of the span covered by the file.
 
 Bcause the hashcode of the top indirect block
-completely ditates its content,
+completely dictates its content,
 a blockmap index need only ever be constructed once per top block
 and may be kept persistently as a collection of blockmap files.
 
@@ -239,7 +242,7 @@ is a blockmap file for the first blockmap index
 of the top indirect block
 with SHA1 hashcode `06a86c1bb238cf58b34d8fe140b44818fd68728d`
 using index spans of `4294967296`
-(2^32, expressable with an unsigned 4 byte value in an index record).
+(2**32, expressable with an unsigned 4 byte value in an index record).
 
 If the top block spans more than 4294967296 bytes
 there will also be a `.../1.blockmap` file
@@ -434,7 +437,7 @@ with the following `rq_type` values and associated values:
 `0` "ADD":
   add the `payload` bytes as a data block.
   The response `payload` is a `hashcode_record`
-  containing the hashcode which indexed the data block.
+  containing the hashcode which indexes the data block.
 
 `1` "GET":
   fetch the data block whose hashcode is stored in the `payload`
@@ -467,9 +470,10 @@ with the following `rq_type` values and associated values:
   if the "reverse" flag is provided)
   and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
-  (or the highest hashocde if the "reverse" flag is provided).
+  (or the highest hashcode if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
   the response may be short of there are insufficient hashcodes in the Store.
+
   The response payload is the concatenation of the requested `hashcode_record` records.
 
 `5` "HASHCODES_HASH":
@@ -490,12 +494,45 @@ with the following `rq_type` values and associated values:
   if the "reverse" flag is provided)
   and `0x04` "has\_start\_hashcode" to indicate that a `start_hashcode`
   is provided, otherwise the hashcodes start from the lowest hashcode in the Store
-  (or the highest hashocde if the "reverse" flag is provided).
+  (or the highest hashcode if the "reverse" flag is provided).
   The `length` is the number of hashcodes to return;
   the response may be short of there are insufficient hashcodes in the Store.
+
   The response payload is a `hashcode_record`
   containing the hashcode
   of the concatenation of the requested `hashcode_record` records.
+
+`6` "ARCHIVE_LAST":
+  request the last archive entry of a named archive:
+
+    archive_last_request {
+      archive_name: bsstring
+    }
+
+  The response will have `flags==0` if there are no entries
+  or `flags==1` if there are entries.
+  In the latter case the payload will consist of the entry timestamp
+  as a `bssfloat` with the UNIX time of the entry
+  and the binary transcription of the directory.
+
+`7` "ARCHIVE_LIST":
+  request all the archive entries of a named archive:
+
+    archive_list_request {
+      archive_name: bsstring
+    }
+
+  The payload will be the concatenation of the archive entries
+  transcribed as for "ARCHIVE_LAST".
+
+`8` "ARCHIVE_UPDATE":
+  submit a new archive entry to append to a named archive:
+
+    archive_update_request {
+      archive_name: bsstring
+      when: bssfloat
+      dirent: binary_directory
+    }
 
 ## SEE ALSO
 

@@ -31,12 +31,11 @@ class _TestPacketFields(object):
     P, offset = cls.from_bytes(bs)
     self.assertEqual(
         offset, len(bs),
-        "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r"
-        % (offset, bs[:offset], bs[offset:]))
+        "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
+        (offset, bs[:offset], bs[offset:])
+    )
     bs2 = bytes(P)
-    self.assertEqual(
-        bs, bs2,
-        "bytes->%s->bytes fails" % (P,))
+    self.assertEqual(bs, bs2, "bytes->%s->bytes fails" % (P,))
 
   def roundtrip_constructor(self, cls, test_case):
     ''' Perform a cls(args) => bytes => instance round trip test.
@@ -54,17 +53,15 @@ class _TestPacketFields(object):
     if transcription is not None:
       self.assertEqual(
           bs2, transcription,
-          "bytes(%s) != %r (got %r)"
-          % (P, transcription, bs2))
+          "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
+      )
     P2, offset = cls.from_bytes(bs2)
     self.assertEqual(
         offset, len(bs2),
-        "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r"
-        % (offset, bs2[:offset], bs2[offset:]))
-    self.assertEqual(
-        P, P2,
-        "%s => bytes => %s not equal"
-        % (P, P2))
+        "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
+        (offset, bs2[:offset], bs2[offset:])
+    )
+    self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
 
   def test_PacketField_round_trip(self):
     ''' Perform round trip tests of the PacketFields for which we have test cases.

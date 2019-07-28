@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Roll messages older than "days" from maildir
 # into archivedir/date/`basename maildir`.

@@ -8,6 +8,7 @@
 '''
 
 import errno
+from inspect import getmodule
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
 import shlex
@@ -44,15 +45,30 @@ def oserror(errno_, msg, *a):
   warning("raise OSError(%s): %s", errno_, msg)
   raise OSError(errno_, msg)
 
-OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
-OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
-OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
-OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
-OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
-OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
-OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
-OS_ENOTSUP = lambda msg, *a: oserror(errno.ENOTSUP, msg, *a)
-OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
+# Generate OS_E* functions to raise custom OSErrors.
+# This generates a suite of functions like this:
+#  OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
+# for the known names in the errno module.
+def mkOSfunc(M, Ename):
+  Evalue = getattr(errno, Ename)
+  setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
+
+M = getmodule(oserror)
+for Ename in dir(errno):
+  if Ename.startswith('E'):
+    mkOSfunc(M, Ename)
+
+# Generate dummy functions for missing symbols which we use.
+def mkOSfuncEINVAL(M, Ename):
+  setattr(
+      M, 'OS_' + Ename, lambda msg, *a:
+      oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a)
+  )
+
+for Ename in 'ENOATTR', :
+  if not hasattr(errno, Ename):
+    mkOSfuncEINVAL(M, Ename)
+del M
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -74,7 +90,10 @@ class FileHandle:
 
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
-    return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
+    return "<FileHandle:fhndx=%d:%s>" % (
+        fhndx,
+        self.E,
+    )
 
   def bg(self, func, *a, **kw):
     ''' Function dispatcher.
@@ -89,12 +108,14 @@ class FileHandle:
     self.E.parent.changed = True
     S.open()
     # NB: additional S.open/close around self.E.close
-    R.notify(logexc(lambda _: (
-        defaults.pushStore(S),
-        self.E.close(),
-        defaults.popStore(),
-        S.close()
-    )))
+    R.notify(
+        logexc(
+            lambda _: (
+                defaults.pushStore(S), self.E.close(), defaults.popStore(),
+                S.close()
+            )
+        )
+    )
 
   def write(self, data, offset):
     ''' Write data to the file.
@@ -104,8 +125,9 @@ class FileHandle:
       with self._lock:
         if self.for_append and offset != len(f):
           OS_EFAULT(
-              "%s: file open for append but offset(%s) != length(%s)",
-              f, offset, len(f))
+              "%s: file open for append but offset(%s) != length(%s)", f,
+              offset, len(f)
+          )
         f.seek(offset)
         written = f.write(data)
     self.E.touch()
@@ -160,8 +182,6 @@ class Inode(Transcriber, NS):
       * `refcount`: the number of Dir references to this Dirent
   '''
 
-  transcribe_prefix = 'Ino'
-
   def __init__(self, inum, E, refcount=1):
     NS.__init__(self)
     self.inum = inum
@@ -170,27 +190,29 @@ class Inode(Transcriber, NS):
 
   def __repr__(self):
     return (
-        "%s(inum=%d,refcount=%d,E=%s(%r))"
-        % (
-            type(self).__name__,
-            self.inum,
-            self.refcount,
+        "%s(inum=%d,refcount=%d,E=%s(%r))" % (
+            type(self).__name__, self.inum, self.refcount,
             type(self.E).__name__, self.E.name
         )
     )
 
   def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping({
-        'refcount': self.refcount,
-        'E': self.E,
-    }, fp, T=T)
+    return T.transcribe_mapping(
+        {
+            'refcount': self.refcount,
+            'E': self.E,
+        }, fp, T=T
+    )
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     if prefix != cls.transcribe_prefix:
       raise ValueError(
-          "expected prefix=%r, got: %r"
-          % (cls.transcribe_prefix, prefix,))
+          "expected prefix=%r, got: %r" % (
+              cls.transcribe_prefix,
+              prefix,
+          )
+      )
     m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
     return cls(None, m['E'], m['refcount']), offset
 
@@ -212,8 +234,8 @@ class Inodes(object):
   '''
 
   def __init__(self, fs):
-    self.fs = fs                # main filesystem
-    self._allocated = Range()   # range of allocated inode numbers
+    self.fs = fs  # main filesystem
+    self._allocated = Range()  # range of allocated inode numbers
     self._by_inum = {}
     self._by_uuid = {}
     self._by_dirent = {}
@@ -275,7 +297,8 @@ class Inodes(object):
         if inum is not None and I.inum != inum:
           raise ValueError(
               "inum=%d: Dirent already has an Inode with a different inum: %s"
-              % (inum, I))
+              % (inum, I)
+          )
         if uu:
           # opportunisticly update UUID mapping
           # in case the Dirent has acquired a UUID
@@ -334,7 +357,8 @@ class FileSystem(object):
   '''
 
   def __init__(
-      self, E,
+      self,
+      E,
       *,
       S=None,
       archive=None,
@@ -391,6 +415,7 @@ class FileSystem(object):
     else:
       mntE = E
     self.mntE = mntE
+    self.is_darwin = os.uname().sysname == 'Darwin'
     self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
@@ -407,7 +432,9 @@ class FileSystem(object):
         if fs_inode_dirents:
           inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
           if offset < len(fs_inode_dirents):
-            warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
+            warning(
+                "unparsed text after Dirent: %r", fs_inode_dirents[offset:]
+            )
           X("IMPORT INODES:")
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
@@ -435,8 +462,7 @@ class FileSystem(object):
   def __str__(self):
     if self.subpath:
       return "<%s S=%s /=%s %r=%s>" % (
-          self.__class__.__name__,
-          self.S, self.E, self.subpath, self.mntE
+          self.__class__.__name__, self.S, self.E, self.subpath, self.mntE
       )
     return "%s(S=%s,/=%r)" % (type(self).__name__, self.S, self.E)
 
@@ -542,8 +568,10 @@ class FileSystem(object):
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
     for_trunc = (flags & O_TRUNC) == O_TRUNC
-    debug("for_read=%s, for_write=%s, for_append=%s",
-          for_read, for_write, for_append)
+    debug(
+        "for_read=%s, for_write=%s, for_append=%s", for_read, for_write,
+        for_append
+    )
     if for_trunc and not for_write:
       OS_EINVAL("O_TRUNC requires O_WRONLY or O_RDWR")
     if for_append and not for_write:
@@ -605,8 +633,7 @@ class FileSystem(object):
     with Pfx("access(E=%r,amode=%s,uid=%r,gid=%d)", E, amode, uid, gid):
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
-      return E.meta.access(
-          amode, uid, gid, default_uid=uid, default_gid=gid)
+      return E.meta.access(amode, uid, gid, default_uid=uid, default_gid=gid)
 
   def getxattr(self, inum, xattr_name):
     ''' Get the extended attribute `xattr_name` from `inum`.
@@ -619,13 +646,17 @@ class FileSystem(object):
       if suffix == 'block':
         return str(E.block).encode()
       OS_EINVAL(
-          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
-          inum, xattr_name, XATTR_VT_PREFIX)
+          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name", inum,
+          xattr_name, XATTR_VT_PREFIX
+      )
     xattr = E.meta.getxattr(xattr_name, None)
     if xattr is None:
       ##if xattr_name == 'com.apple.FinderInfo':
       ##  OS_ENOTSUP("inum %d: no xattr %r, pretend not supported", inum, xattr_name)
-      OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      if self.is_darwin:
+        OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      else:
+        OS_ENODATA("inum %d: no xattr %r", inum, xattr_name)
     return xattr
 
   def removexattr(self, inum, xattr_name):
@@ -637,8 +668,9 @@ class FileSystem(object):
     xattr_name = Meta.xattrify(xattr_name)
     if xattr_name.startswith(XATTR_VT_PREFIX):
       OS_EINVAL(
-          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
-          inum, xattr_name, XATTR_VT_PREFIX)
+          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name", inum,
+          xattr_name, XATTR_VT_PREFIX
+      )
     meta = E.meta
     try:
       meta.delxattr(xattr_name)
@@ -668,9 +700,7 @@ class FileSystem(object):
           block_s = Meta.xattrify(xattr_value)
           B, offset = parse(block_s)
           if offset < len(block_s):
-            OS_EINVAL(
-                "unparsed text after trancription: %r",
-                block_s[offset:])
+            OS_EINVAL("unparsed text after trancription: %r", block_s[offset:])
           if not isBlock(B):
             OS_EINVAL("not a Block transcription")
           info("%s: update .block directly to %r", E, str(B))

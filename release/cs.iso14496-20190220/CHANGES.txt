@@ -1,0 +1,3 @@
+  lib/python/cs/iso14496.py: cs.iso14496: parse_buffer: yield instead of return; tweak some docstrings
+  lib/python/cs/iso14496.py: cs.iso14496: remove a single speck of lint
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix unparsed handler, bugfix command line main test parser

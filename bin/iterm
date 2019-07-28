@@ -16,6 +16,7 @@ usage="Usage: $cmd [-x] op [op-args...]
         Specify the badge format string.
     colour scheme
         Switch colour schemes: green, white, black
+    fg  Bring terminal to the foreground, steal focus.
     img imgfiles...
         Display the imgfiles inline in the terminal.
     open command [args...]
@@ -73,7 +74,7 @@ else
         }
       fi
       ;;
-    colour)
+    colour | color)
       if [ $# = 0 ]
       then
         echo "$cmd: $op: missing scheme" >&2
@@ -90,17 +91,8 @@ else
                     ;;
         esac
       fi
-      [ $badopts ] || {
-        tee /dev/tty <<X | osascript -
-          tell application iTerm2
-            -- tell current session
-              -- set foreground color to {$fg, 0}
-              -- set background color to {$bg, 0}
-            -- end tell
-          end tell
-X
-      }
       ;;
+    fg);;
     img)
       if [ $# = 0 ]
       then
@@ -148,30 +140,47 @@ fi
 # gets passed through ssh.
 function print_osc() {
   case "$TERM" in
-    screen*)  printf "\033Ptmux;\033\033]" ;;
-    *)        printf "\033]" ;;
+    screen*)  printf "\e33Ptmux;\e\e]" ;;
+    *)        printf "\e33]" ;;
   esac
 }
 
 # More of the tmux workaround described above.
 function print_st() {
   case "$TERM" in
-    screen*)    printf "\a\033\\" ;;
+    screen*)    printf "\a\e\\" ;;
     *)          printf "\a" ;;
   esac
+}
+
+function l33t() {
+  printf "\e]1337;%s\a" "$*"
 }
 
 case "$op" in
   badge-format)
     format64=$( printf '%s' "$*" | $base64 )
-    printf '\e]1337;SetBadgeFormat=%s\a' "$format64"
+    l33t "SetBadgeFormat=$format64"
     ;;
   bgimg)
     case "$imgpath" in
       /*) ;; *) imgpath=$(pwd)/$imgpath ;;
     esac
     imgpath64=$( printf '%s' "$imgpath" | $base64 )
-    printf '\e]1337;SetBackgroundImageFile=%s\a' "$imgpath64"
+    l33t "SetBackgroundImageFile=$imgpath64"
+    ;;
+  colour | color )
+    tee /dev/tty <<X | osascript -
+      tell application iTerm2
+        -- tell current session
+          -- set foreground color to {$fg, 0}
+          -- set background color to {$bg, 0}
+        -- end tell
+      end tell
+X
+    ;;
+  fg)
+    l33t "StealFocus"
     ;;
   img)
     xit=0
@@ -217,7 +226,7 @@ case "$op" in
     varname=$1
     shift
     value64=$( printf '%s' "$*" | $base64 )
-    printf '\e]1337;SetUserVar=%s=%s\a' "$varname" "$value64"
+    l33t "SetUserVar=$varname=$value64"
     ;;
 
   switch-profile)

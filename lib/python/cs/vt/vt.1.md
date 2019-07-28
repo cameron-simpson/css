@@ -40,6 +40,27 @@ notably via the following subcommands:
 
 These and other subcommands are detailed below.
 
+The remaining object encountered is the "archive",
+which is simply a text file
+containing a record of file tree top directories.
+Conventionally these files have a `.vt` suffix.
+The `pack` subcommand creates or updates these,
+`unpack` command` extracts these,
+the `mount` subcommand mounts these
+and updates the archive which changes on unmount.
+
+Archives are referenced in two ways:
+
+* *path*`.vt`: as a plain pathname to a file ending in `.vt`
+* `[`*clause*`]`*name*: indicating an archive associated
+  with a Store.
+  The *name* is optional, as Stores have a default archive file,
+  but otherwise should be an identifier.
+
+The latter form accesses an archive file associated with a Store
+and provide convenient access to file trees from that Store.
+The *name* is optional as each Store has a default archive.
+
 ## GETTING STARTED
 
 Run the command `vt init`;
@@ -48,22 +69,22 @@ and empty default Stores.
 
 ## OPTIONS
 
-`-C` *store*
+`-C` *cache_store*
 
   Specify the Store to use as a cache.
-  Specify `NONE` for no cache.
+  Specify `NONE` for no *cache_store*.
   The default cache
   comes from the environment variable `$VT_CACHE_STORE`,
   otherwise the configuration clause `[cache]`
-  defines the Store.
+  defines the *cache_store*.
 
-`-S` *store*
+`-S` *main_store*
 
   Specify the main Store to use.
-  The default main Store
+  The default *main_store*
   comes from the environment variable `$VT_STORE`,
   otherwise the configuration clause `[default]`
-  defines the main Store
+  defines the *main_store*
   except for the `serve` subcommand
   which uses `[server]` and ignores the `$VT_STORE` environment variable.
 
@@ -84,6 +105,17 @@ and empty default Stores.
   Verbose; not quiet.
   This is the default if the standard error output is a tty.
 
+If a *cache_store* and a *main_store* are both specified
+then access is via a proxy Store set up as:
+
+    proxy(
+        read=cache_store,
+        read2=main_store,
+        copy2=cache_store,
+        save=cache_store:main_store)
+
+Proxy Stores are described in the STORE TYPES section below.
+
 ## SUBCOMMANDS
 
 `config`
@@ -98,6 +130,9 @@ and empty default Stores.
   from the configuration.
 
 `mount` [*option*...] *special* [*mountpoint* [*subpath*]]
+
+  *Note*: the mount facility requires the `llfuse` Python module
+  which is not an automatic requirement of the `cs.vt` package.
 
   Mount the storage specified by *special* on *mountpoint*
   presenting the directory tree from *subpath* downwards
@@ -128,8 +163,8 @@ and empty default Stores.
 
   The *special* specifies the directory contents.
   It may be *path*`.vt`:
-  a vt(5) archive file - the latest entry is mounted
-  and the default mount location is *path*;
+  a vt(5) archive file - the latest entry is mounted;
+  a `[`*clause*`]`*archive* archive reference;
   a content directory specification
   recognised by a leading `D{` and a trailing `}`
   (see CONTENT REFERENCES below).
@@ -138,6 +173,13 @@ and empty default Stores.
   on which to mount the content specified by *special*.
   If the directory does not exist it will be created
   and it will be removed after unmount.
+  If omitted the *mountpoint* will inferred from the *special*:
+  for a vt(5) archive file path, the basename of *path*;
+  for a `[`*clause*`]`*archive*
+  it will be *archive* unless that is empty
+  in which case it will be *clause*;
+  for a content directory specification
+  the name of the directory.
 
   If the *subpath* is specified,
   that subtree of *special* will be presented on the mount point.
@@ -148,20 +190,35 @@ and empty default Stores.
   record the reference to the copy in the file *path*`.vt`,
   remove *path*.
 
-`pullfrom` *other-store* *reference*...
+`pullfrom` *other_store* *objects*...
 
-  For each content *reference*
-  ensure that the main Store contains all the blocks
-  from *other-store*
-  required by *reference*.
+  Pull blocks from the Store *other_store*
+  into the default Store
+  to cover the supplied *objects*.
+  This ensures that the default Store
+  contains all the Blocks related to each *object*.
+  Each *object* may be a content reference
+  such as a content directory specification,
+  but may also be the pathname of a "datadir" Store
+  or a `.vtd` data file;
+  in this latter case the Blocks come directly
+  from the Store or data file respectively
+  instead of from *other_store*.
 
-`pushto` *other-store* *reference*...
+`pushto` *other_store* *objects*...
 
-  The converse of `pullfrom`.
-  For each content *reference*
-  ensure that *other-store* contains all the blocks
-  from the main Store
-  required by *reference*.
+  Push blocks from the default Store
+  to the Store *other_store*
+  to cover the supplied *objects*.
+  This ensures that *other_store*
+  contains all the Blocks related to each *object*.
+  Each *object* may be a content reference
+  such as a content directory specification,
+  but may also be the pathname of a "datadir" Store
+  or a `.vtd` data file;
+  in this latter case the Blocks come directly
+  from the Store or data file respectively
+  instead of from the default Store.
 
 `serve` [*address*]
 
@@ -189,7 +246,7 @@ and empty default Stores.
 
 `unpack` *path*`.vt`
 
-  Fetch the last refererence from the archive file *path*`.vt`
+  Fetch the last reference from the archive file *path*`.vt`
   and copy the contents out as the directory *path*.
 
 ## STORE SPECIFICATIONS
@@ -492,9 +549,8 @@ used as backing storage for vt file trees offering that data.
 Like a datadir Store
 it has a `data` subdirectory pointing at the regular files
 containing the data to be served.
-These pointers are normally symbolic links
-to whatever reference trees
-are to be offered.
+Typically this just contains symbolic links
+to whatever reference trees are to be offered.
 
 The Store scans new files as they appear in the reference trees
 and maintains an index of block hashcodes referring
@@ -533,7 +589,16 @@ Its parameters are as follows:
   A sequence of Stores to which to copy any data blocks
   obtained via the `read2` sequence.
 
-Example configuration file clauses:
+`archives`
+  A comma separated list of `[`*clause*`]`*ptn* items
+  associating Stores with filename glob patterns *ptn*.
+  Looking up a `[`*clause*`]`*name* archive reference
+  via a ProxyStore
+  matches *name* against the *ptn* glob
+  and passes the lookup to the first Store
+  whose *ptn* patches the *name*.
+
+Example configuration file clause:
 
     [laptop]
     type = proxy
@@ -542,6 +607,7 @@ Example configuration file clauses:
     read = [trove],[ideal],[spool]
     read2 = [home_server]
     copy2 = [trove]
+    archives = [ideal]ideal,[trove]*
 
 This clause is for a laptop with limited storage.
 Saves are stored to its `[trove]`,
@@ -563,6 +629,21 @@ it is sought from the `[home_server]` Store.
 Any blocks retrieved from the home server
 via the `read2` sequence are copied into the local `[trove]`
 so that they are available locally in the future.
+
+An archive loopup for the name `ideal` is obtained via the `[ideal]` Store
+and all other names are obtained via the `[trove]` Store.
+Note that this only controls where archive files are found;
+any block lookup follows the normal flow of the ProxyStore.
+
+## ENVIRONMENT
+
+`$VT_CONFIG`: the path to the configuration file. Default: `$HOME/.vtrc`
+
+`$VT_STORE`: the default Store specification.
+Default from the `[default]` clause of the configuration.
+
+`$VT_CACHE_STORE`: the default cache Store specification.
+Default from the `[cache]` clause of the configuration.
 
 ## SEE ALSO
 

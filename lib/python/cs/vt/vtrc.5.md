@@ -81,7 +81,7 @@ Parameters:
 `max_file_size`:
   the high water mark for cache files.
   When a file exceeds this size
-  and new file is commenced
+  a new file is commenced
   and older files discarded if there are more than *max_files* files.
   The size can have a scale factor,
   for example `8 MiB`.
@@ -124,16 +124,20 @@ Parameters:
 `save`:
   comma separated list of Stores
   to which to save new blocks.
+
 `read`:
   primary comma separated list of Stores from which to read blocks
+
 `save2`:
-  comma separate list of Stores to which to save blocks
+  comma separated list of Stores to which to save blocks
   which failed to be saved to a Store from `save`
+
 `read2`:
   secondary comma separated list of Stores from which to read blocks
-  for blocks now found in `read`
+  for blocks not found in `read`
+
 `copy2`:
-  comma separate list of Stores to which to save blocks
+  comma separated list of Stores to which to save blocks
   which are obtained via `read2`
 
 #### `type = socket`

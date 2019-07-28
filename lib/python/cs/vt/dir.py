@@ -19,19 +19,21 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
-from cs.lex import texthexify
 from cs.py.func import prop
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.threads import locked
-from . import totext, PATHSEP, defaults, RLock
+from . import PATHSEP, defaults, RLock
 from .block import Block, _Block, BlockRecord
 from .blockify import top_block_for, blockify
 from .file import RWBlockFile
+from .hash import io_fail
 from .meta import Meta, DEFAULT_DIR_ACL, DEFAULT_FILE_ACL
 from .paths import path_split, DirLike, FileLike
-from .transcribe import Transcriber, parse as parse_transcription, \
-                        register as register_transcriber
+from .transcribe import (
+    Transcriber, parse as parse_transcription, register as
+    register_transcriber, hexify
+)
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -50,12 +52,12 @@ class DirentType(IntEnum):
 class DirentFlags(IntFlag):
   ''' Flag values for the Dirent binary encoding.
   '''
-  HASMETA = 0x01        # has metadata
-  HASNAME = 0x02        # has a name
-  NOBLOCK = 0x04        # has no Block reference
-  HASUUID = 0x08        # has a UUID
+  HASMETA = 0x01  # has metadata
+  HASNAME = 0x02  # has a name
+  NOBLOCK = 0x04  # has no Block reference
+  HASUUID = 0x08  # has a UUID
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
-  EXTENDED = 0x20       # extended BSData field
+  EXTENDED = 0x20  # extended BSData field
 
 class DirentRecord(PacketField):
   ''' PacketField subclass to parsing and transcribing Dirents in binary form.
@@ -112,9 +114,12 @@ class DirentRecord(PacketField):
       extended_data = None
     if flags:
       warning(
-          "%s.value_from_buffer: unexpected extra flags: 0x%02x",
-          cls.__name__, flags)
-    E = _Dirent.from_components(type_, name, meta=metatext, uuid=uu, block=block)
+          "%s.value_from_buffer: unexpected extra flags: 0x%02x", cls.__name__,
+          flags
+      )
+    E = _Dirent.from_components(
+        type_, name, meta=metatext, uuid=uu, block=block
+    )
     E._prev_dirent_blockref = prev_dirent_blockref
     E.ingest_extended_data(extended_data)
     return E
@@ -167,7 +172,8 @@ class _Dirent(Transcriber):
 
   def __init__(
       self,
-      type_, name,
+      type_,
+      name,
       *,
       meta=None,
       uuid=None,
@@ -194,7 +200,9 @@ class _Dirent(Transcriber):
       if not isinstance(type_, int):
         raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
       if name is not None and not isinstance(name, str):
-        raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
+        raise TypeError(
+            "name is neither None nor str: <%s>%r" % (type(name), name)
+        )
       if kw:
         error("unsupported keyword arguments: %r", kw)
       if block is not None:
@@ -222,11 +230,7 @@ class _Dirent(Transcriber):
 
   def __repr__(self):
     return "%s:%s:%s(%r:%s,%r)" % (
-        self.__class__.__name__,
-        id(self),
-        self.type,
-        self.name,
-        self.uuid,
+        self.__class__.__name__, id(self), self.type, self.name, self.uuid,
         self.meta
     )
 
@@ -237,8 +241,9 @@ class _Dirent(Transcriber):
     E, offset2 = parse_transcription(s, offset)
     if not isinstance(E, cls):
       raise ValueError(
-          "expected instance of %s (got %s) at offset %d of %r"
-          % (cls, type(E), offset, s))
+          "expected instance of %s (got %s) at offset %d of %r" %
+          (cls, type(E), offset, s)
+      )
     return E, offset2
 
   @staticmethod
@@ -283,8 +288,9 @@ class _Dirent(Transcriber):
     '''
     if extended_data:
       raise ValueError(
-          "expected extended_data to be None or empty, got: %r"
-          % (extended_data,))
+          "expected extended_data to be None or empty, got: %r" %
+          (extended_data,)
+      )
 
   def get_extended_data(self):
     ''' The basic _Dirent subclasses do not use extended data.
@@ -373,8 +379,7 @@ class _Dirent(Transcriber):
     block = getattr(self, 'block', None)
     oblock = getattr(other, 'block', None)
     return (
-        self.name == other.name
-        and self.type == other.type
+        self.name == other.name and self.type == other.type
         and self.meta == other.meta
         and (block is None if oblock is None else block == oblock)
     )
@@ -396,8 +401,9 @@ class _Dirent(Transcriber):
     if not bfr.at_eof():
       warning(
           "prev_dirent: _prev_dirent_blockref=%s:"
-          " unparsed bytes after dirent at offset %d",
-          prev_blockref, bfr.offset)
+          " unparsed bytes after dirent at offset %d", prev_blockref,
+          bfr.offset
+      )
     return E
 
   @prev_dirent.setter
@@ -411,8 +417,9 @@ class _Dirent(Transcriber):
         self.changed = True
     elif E == self:
       warning(
-          "%r.prev_dirent=%s: ignore setting previous to our own state",
-          self, E)
+          "%r.prev_dirent=%s: ignore setting previous to our own state", self,
+          E
+      )
     else:
       Ebs = E.encode()
       self._prev_dirent_blockref = Block(data=Ebs)
@@ -468,11 +475,6 @@ class _Dirent(Transcriber):
     ''' Is this an indirect _Dirent?
     '''
     return self.type == DirentType.INDIRECT
-
-  def textencode(self):
-    ''' Serialise the dirent as text.
-    '''
-    return totext(self.encode())
 
   @property
   def size(self):
@@ -538,15 +540,20 @@ class _Dirent(Transcriber):
     st_atime = 0
     st_mtime = M.mtime
     st_ctime = 0
-    return os.stat_result( (
-        st_mode,
-        st_ino,
-        st_dev,
-        st_nlink,
-        st_uid, st_gid,
-        st_size,
-        st_atime, st_mtime, st_ctime,
-    ) )
+    return os.stat_result(
+        (
+            st_mode,
+            st_ino,
+            st_dev,
+            st_nlink,
+            st_uid,
+            st_gid,
+            st_size,
+            st_atime,
+            st_mtime,
+            st_ctime,
+        )
+    )
 
   @property
   def unix_typemode(self):
@@ -557,8 +564,8 @@ class _Dirent(Transcriber):
       E = E.ref
       if E.isindirect:
         raise ValueError(
-            "indirect %s refers to another indirect: %s"
-            % (self, E))
+            "indirect %s refers to another indirect: %s" % (self, E)
+        )
     if E.isdir:
       typemode = stat.S_IFDIR
     elif E.isfile:
@@ -567,18 +574,21 @@ class _Dirent(Transcriber):
       typemode = stat.S_IFLNK
     else:
       warning(
-          "%s.unix_typemode: unrecognised type %d, pretending S_IFREG"
-          % (type(self), self.type))
+          "%s.unix_typemode: unrecognised type %d, pretending S_IFREG" %
+          (type(self), self.type)
+      )
       typemode = stat.S_IFREG
     return typemode
 
-register_transcriber(_Dirent, (
-    'INVALIDDirent',
-    'SymLink',
-    'Indirect',
-    'D',
-    'F',
-))
+register_transcriber(
+    _Dirent, (
+        'INVALIDDirent',
+        'SymLink',
+        'Indirect',
+        'D',
+        'F',
+    )
+)
 
 class InvalidDirent(_Dirent):
   ''' Encapsulation for an invalid Dirent data chunk.
@@ -590,15 +600,11 @@ class InvalidDirent(_Dirent):
     ''' An invalid Dirent.
         Record the original data chunk for regurgitation later.
     '''
-    _Dirent.__init__(
-        self,
-        DirentType.INVALID,
-        name,
-        **kw)
+    _Dirent.__init__(self, DirentType.INVALID, name, **kw)
     self.chunk = chunk
 
   def __str__(self):
-    return '<InvalidDirent:%s>' % (texthexify(self.chunk),)
+    return '<InvalidDirent:%s>' % (hexify(self.chunk),)
 
   def encode(self):
     ''' Return the original data chunk.
@@ -650,7 +656,9 @@ class IndirectDirent(_Dirent):
 
   def __init__(self, name, uuid, meta=None, block=None):
     if block is not None:
-      raise ValueError("IndirectDirent block should be None, got: %r" % (block,))
+      raise ValueError(
+          "IndirectDirent block should be None, got: %r" % (block,)
+      )
     if meta is not None:
       raise ValueError("IndirectDirent meta should be None, got: %r" % (meta,))
     _Dirent.__init__(self, DirentType.INDIRECT, name, uuid=uuid)
@@ -735,7 +743,9 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     self._check()
     if self.open_file is not None:
-      raise RuntimeError("first open, but .open_file is not None: %r" % (self.open_file,))
+      raise RuntimeError(
+          "first open, but .open_file is not None: %r" % (self.open_file,)
+      )
     if self._block is None:
       raise RuntimeError("first open, but ._block is None")
     self.open_file = RWBlockFile(self._block)
@@ -750,8 +760,8 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     if self._block is not None:
       error(
           "final close, but ._block is not None;"
-          " replacing with self.open_file.close(), was: %s",
-          self._block)
+          " replacing with self.open_file.close(), was: %s", self._block
+      )
     f = self.open_file
     f.filename = self.name
     self._block = f.sync()
@@ -877,18 +887,26 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto(self, S2, Q=None, runstate=None):
-    ''' Push the Block with the file contents to the Store `S2`.
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push the Block with the file contents to a queue.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks
         * `Q`: optional preexisting Queue, which itself should have
           come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
+        * `progress`: optional Progress to update its total
 
-        Semantics are as for cs.vt.block.Block.pushto.
+        Semantics are as for `cs.vt.block.Block.pushto_queue`.
     '''
-    return self.block.pushto(S2, Q=Q, runstate=runstate)
+    return self.block.pushto_queue(Q, runstate=runstate, progress=progress)
+
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Inspect this FileDirent.
+    '''
+    self._check()
+    B = self.block
+    return B.fsck(recurse=recurse)
 
 class Dir(_Dirent, DirLike):
   ''' A directory.
@@ -987,17 +1005,16 @@ class Dir(_Dirent, DirLike):
 
   @property
   @locked
-  @logexc
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
 
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      warning(
-          "Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
-          id(self), self.name, self._block, self.changed)
-      stack_dump()
+      ##warning(
+      ##    "Dir(%d:%r): recompute block: current _block=%s, changed=%s ...",
+      ##    id(self), self.name, self._block, self.changed)
+      ##stack_dump()
       # recompute in case of change
       # restore the unparsed Dirents from initial load
       if self._unhandled_dirent_chunks is None:
@@ -1007,9 +1024,7 @@ class Dir(_Dirent, DirLike):
       # append the valid or new Dirents
       names = sorted(self.keys())
       data += b''.join(
-          self[name].encode()
-          for name in names
-          if name != '.' and name != '..'
+          self[name].encode() for name in names if name != '.' and name != '..'
       )
       # TODO: if len(data) >= 16384 blockify?
       B = self._block = Block(data=data)
@@ -1021,12 +1036,12 @@ class Dir(_Dirent, DirLike):
   def dirs(self):
     ''' Return a list of the names of subdirectories in this Dir.
     '''
-    return [ name for name in self.keys() if self[name].isdir ]
+    return [name for name in self.keys() if self[name].isdir]
 
   def files(self):
     ''' Return a list of the names of files in this Dir.
     '''
-    return [ name for name in self.keys() if self[name].isfile ]
+    return [name for name in self.keys() if self[name].isfile]
 
   @staticmethod
   def _validname(name):
@@ -1252,36 +1267,48 @@ class Dir(_Dirent, DirLike):
   def transcribe_inner(self, T, fp):
     return _Dirent.transcribe_inner(self, T, fp, {})
 
-  def pushto(self, S2, Q=None, runstate=None):
-    ''' Push the Dir Blocks to the Store `S2`.
+  def pushto_queue(self, Q, runstate=None, progress=None):
+    ''' Push the Dir Blocks to a queue.
 
         Parameters:
-        * `S2`: the secondary Store to receive Blocks
-        * `Q`: optional preexisting Queue, which itself should have
-          come from a .pushto targetting the Store `S2`.
         * `runstate`: optional RunState used to cancel operation
+        * `progress`: optional Progress to update its total
 
-        This pushes the Dir's Block encoding to `S2` and then
-        recursively pushes each Dirent's Block data to `S2`.
+        This pushes the Dir's Block encoding to the queue
+        and then recursively pushes each Dirent's Block data to the queue.
     '''
-    if Q is None:
-      # create a Queue and a worker Thread
-      Q, T = defaults.S.pushto(S2)
-    else:
-      # use an existing Queue, no Thread to wait for
-      T = None
     B = self.block
     # push the Dir block data
-    B.pushto(S2, Q=Q, runstate=runstate)
+    B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
     for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
       if runstate and runstate.cancelled:
-        warning("pushto(%s) cancelled", self)
+        warning("push cancelled")
+        return False
+      E.pushto_queue(Q, runstate=runstate, progress=progress)
+    return True
+
+  @io_fail
+  def fsck(self, recurse=False):
+    ''' Check this Dir.
+    '''
+    runstate = defaults.runstate
+    ok = True
+    B = self.block
+    if not B.fsck(recurse=recurse):
+      ok = False
+    for name, E in sorted(self.items()):
+      if runstate.cancelled:
+        error("cancelled")
+        ok = False
         break
-      E.pushto(S2, Q=Q, runstate=runstate)
-    if T:
-      Q.close()
-      T.join()
+      with Pfx(name):
+        if not self._validname(name):
+          error("invalid name")
+          ok = False
+        if not E.fsck(recurse=recurse):
+          ok = False
+    return ok
 
 if __name__ == '__main__':
   from .dir_tests import selftest

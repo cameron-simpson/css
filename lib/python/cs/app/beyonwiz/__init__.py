@@ -16,9 +16,11 @@ import os.path
 import re
 from threading import Lock
 from types import SimpleNamespace as NS
-from cs.app.ffmpeg import multiconvert as ffmconvert, \
-                          MetaData as FFmpegMetaData, \
-                          ConversionSource as FFSource
+from cs.app.ffmpeg import (
+    multiconvert as ffmconvert,
+    MetaData as FFmpegMetaData,
+    ConversionSource as FFSource,
+)
 from cs.deco import strable
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
@@ -59,6 +61,7 @@ def trailing_nul(bs):
   return start, bs[start:]
 
 class MetaJSONEncoder(json.JSONEncoder):
+
   def default(self, o):
     if isinstance(o, set):
       return sorted(o)
@@ -117,13 +120,8 @@ class _Recording(ABC):
   '''
 
   PATH_FIELDS = (
-      'series_name',
-      'episode_info_part',
-      'episode_name',
-      'tags_part',
-      'source_name',
-      'start_dt_iso',
-      'description'
+      'series_name', 'episode_info_part', 'episode_name', 'tags_part',
+      'source_name', 'start_dt_iso', 'description'
   )
 
   def __init__(self, path):
@@ -188,26 +186,28 @@ class _Recording(ABC):
     '''
     pfx, ext = os.path.splitext(path)
     for i in range(max_n):
-      path2 = "%s--%d%s" % (pfx, i+1, ext)
+      path2 = "%s--%d%s" % (pfx, i + 1, ext)
       if not os.path.exists(path2):
         return path2
-    raise ValueError("no available --0..--%d variations: %r" % (max_n-1, path))
+    raise ValueError(
+        "no available --0..--%d variations: %r" % (max_n - 1, path)
+    )
 
-  def convert(self,
-              dstpath, dstfmt='mp4', max_n=None,
-              timespans=(),
-              extra_opts=None):
+  def convert(
+      self, dstpath, dstfmt='mp4', max_n=None, timespans=(), extra_opts=None
+  ):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if not timespans:
-      timespans = ( (None, None), )
+      timespans = ((None, None),)
     srcfmt = 'mpegts'
     do_copyto = hasattr(self, 'data')
     if do_copyto:
       srcpath = None
       if len(timespans) > 1:
-        raise ValueError("%d timespans but do_copyto is true"
-                         % (len(timespans,)))
+        raise ValueError(
+            "%d timespans but do_copyto is true" % (len(timespans,))
+        )
     else:
       srcpath = self.path
       # stop path looking like a URL
@@ -238,7 +238,9 @@ class _Recording(ABC):
       if dstfmt is None:
         _, ext = os.path.splitext(dstpath)
         if not ext:
-          raise ValueError("can't infer output format from dstpath, no extension")
+          raise ValueError(
+              "can't infer output format from dstpath, no extension"
+          )
         dstfmt = ext[1:]
       ffmeta = self.ffmpeg_metadata(dstfmt)
       sources = []
@@ -272,14 +274,15 @@ class _Recording(ABC):
     if M.tags:
       comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
     episode_marker = str(M.episodeinfo)
-    return FFmpegMetaData(dstfmt,
-                          title=( '%s: %s' % (M.series_name, episode_marker)
-                                  if episode_marker
-                                  else M.series_name
-                                ),
-                          show=M.series_name,
-                          episode_id=episode_marker,
-                          synopsis=M.description,
-                          network=M.source_name,
-                          comment=comment,
-                         )
+    return FFmpegMetaData(
+        dstfmt,
+        title=(
+            '%s: %s' % (M.series_name, episode_marker)
+            if episode_marker else M.series_name
+        ),
+        show=M.series_name,
+        episode_id=episode_marker,
+        synopsis=M.description,
+        network=M.source_name,
+        comment=comment,
+    )

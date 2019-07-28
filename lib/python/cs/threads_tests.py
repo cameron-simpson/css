@@ -41,21 +41,25 @@ class TestWorkerThreadPool(unittest.TestCase):
     ''' Dispatch a single function.
     '''
     f = partial(self._testfunc, 1, 2, 3, a=4, b=5)
+
     def deliver(result):
       ''' Dummy function to receive the pool result.
       '''
       ##X("result = %r", result)
       pass
+
     self.pool.dispatch(f, deliver=deliver)
 
   def test01run16(self):
     ''' Dispatch many parallel functions.
     '''
+
     def deliver(result):
       ''' Dummy function to receive the pool result.
       '''
       ##X("result = %r", result)
       pass
+
     for n in range(16):
       f = partial(self._testfunc, 1, 2, 3, a=4, b=5, n=n)
       self.pool.dispatch(f, deliver=deliver)

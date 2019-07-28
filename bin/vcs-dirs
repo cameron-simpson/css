@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Search the named directories for VCS repositories; when found report terse summary for each.
 #   - Cameron Simpson <cs@cskk.id.au> 11may2016

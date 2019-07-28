@@ -1,0 +1,1 @@
+@file_based: adjust use of @cached from cached(wrap0, **dkw) to cached(**dkw)(wrap0).

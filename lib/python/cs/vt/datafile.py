@@ -13,9 +13,12 @@ from enum import IntFlag
 from fcntl import flock, LOCK_EX, LOCK_UN
 import os
 from os import SEEK_END, \
-               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND
+               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND, \
+               fstat
+from stat import S_ISREG
 import sys
 from zlib import compress, decompress
+from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.fileutils import ReadMixin, datafrom_fd
 from cs.logutils import warning
@@ -36,9 +39,7 @@ class DataRecord(PacketField):
   ''' A data chunk file record.
   '''
 
-  TEST_CASES = (
-      (b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),
-  )
+  TEST_CASES = ((b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),)
 
   def __init__(self, data, is_compressed=False):
     self._data = data
@@ -105,12 +106,21 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     self._rlock = None
 
   def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
+    return "%s(%s)" % (
+        type(self).__name__,
+        self.pathname,
+    )
 
   def startup(self):
     ''' Start up the DataFile: open the read and write file descriptors.
     '''
     rfd = os.open(self.pathname, O_RDONLY)
+    S = fstat(rfd)
+    if not S_ISREG(S.st_mode):
+      raise RuntimeError(
+          "fd %d: not a regular file: mode=0o%o: %r" %
+          (rfd, S.st_mode, self.pathname)
+      )
     self._rfd = rfd
     self._rlock = Lock()
 
@@ -120,6 +130,9 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     os.close(self._rfd)
     self._rfd = None
     self._rlock = None
+
+  def __len__(self):
+    return os.fstat(self._rfd).st_size
 
   def datafrom(self, offset, readsize=None):
     ''' Yield data from the file starting at `offset`.
@@ -164,6 +177,30 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     '''
     return self.scanbuffer(self.bufferfrom(offset))
 
+  @require(lambda self, offset: offset >= 0 and offset <= len(self))
+  def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
+    ''' Push the Blocks from this DataFile to the Store `S2`.
+
+        Note that if the target store is a DataDirStore
+        it is faster and simpler to move/copy the .vtd file
+        into its `data` subdirectory directly.
+        Of course, that may introduce redundant block copies.
+
+        Parameters:
+        * `Q`: queue on which to put blocks
+        * `offset`: starting offset, default `0`.
+        * `runstate`: optional RunState used to cancel operation.
+    '''
+    if progress:
+      progress.total += len(self) - offset
+    for DR, post_offset in self.scanfrom(offset=offset):
+      if runstate and runstate.cancelled:
+        return False
+      data = DR.data
+      Q.put((data, post_offset - offset))
+      offset = post_offset
+    return True
+
 class DataFileWriter(MultiOpenMixin):
   ''' Append access to a data file, storing data chunks in compressed form.
   '''
@@ -178,7 +215,10 @@ class DataFileWriter(MultiOpenMixin):
     self._wlock = None
 
   def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
+    return "%s(%s)" % (
+        type(self).__name__,
+        self.pathname,
+    )
 
   def startup(self):
     ''' Start up the DataFile: open the read and write file descriptors.
@@ -215,8 +255,9 @@ class DataFileWriter(MultiOpenMixin):
       # notice short writes, which should never happen with a regular file...
       while written < len(bs):
         warning(
-            "%s: tried to write %d bytes but only wrote %d, retrying",
-            self, len(bs), written)
+            "%s: tried to write %d bytes but only wrote %d, retrying", self,
+            len(bs), written
+        )
         bs = bs[written:]
         written = os.write(wfd, bs)
       if is_locked:
