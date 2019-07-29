@@ -78,11 +78,11 @@ def main(argv):
     force = True
 
   vcs = VCS_Hg()
-  lv = LastValues()
+  last_values = LastValues()
   state = NS(
       modules=Modules(),
       packages=Packages(),
-      last_values=lv,
+      last_values=last_values,
       vcs=vcs,
   )
   state.modules.state = state
@@ -184,9 +184,9 @@ def main(argv):
                 else filename for filename in files ]
             print(' ', ' '.join(files)+':', firstline)
         elif op == 'ls':
-          for k in sorted(lv.keys()):
+          for k in sorted(last_values.keys()):
             if k.startswith("pypi-css-cs."):
-              print(k[9:], lv[k])
+              print(k[9:], last_values[k])
           return 0
         elif op == 'export':
           path = pkg.export()
@@ -960,11 +960,11 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, modules, vcs, lv):
+  def __init__(self, prefix, modules, vcs, last_values):
     self.prefix = prefix
     self.modules = modules
     self.vcs = vcs
-    self.lv = lv
+    self.last_values = last_values
 
   def check(self, silent=False):
     ''' Perform various sanity checks on the named module, return true if all pass.
@@ -1083,7 +1083,7 @@ class ReleaseName(object):
 
   def last_upload(self, pypi_flavour):
     lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
-    last_pypi_release = self.lv.get(lastvalue_key, "")
+    last_pypi_release = self.last_values.get(lastvalue_key, "")
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
@@ -1111,7 +1111,7 @@ class ReleaseName(object):
         defaults = dict(DISTINFO_DEFAULTS)
         PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
         PKG.upload()
-        self.lv[lastvalue_key] = last_suffix
+        self.last_values[lastvalue_key] = last_suffix
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
