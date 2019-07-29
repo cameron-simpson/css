@@ -78,11 +78,11 @@ def main(argv):
     force = True
 
   vcs = VCS_Hg()
-  lv = LastValues()
+  last_values = LastValues()
   state = NS(
       modules=Modules(),
       packages=Packages(),
-      last_values=lv,
+      last_values=last_values,
       vcs=vcs,
   )
   state.modules.state = state
@@ -184,9 +184,9 @@ def main(argv):
                 else filename for filename in files ]
             print(' ', ' '.join(files)+':', firstline)
         elif op == 'ls':
-          for k in sorted(lv.keys()):
+          for k in sorted(last_values.keys()):
             if k.startswith("pypi-css-cs."):
-              print(k[9:], lv[k])
+              print(k[9:], last_values[k])
           return 0
         elif op == 'export':
           path = pkg.export()
@@ -259,6 +259,32 @@ def main(argv):
     xit = 2
   return xit
 
+def clean_release_entry(entry):
+  lines = entry.strip().split('\n')
+  return '\n'.join([
+      line for line in lines
+      if line and line != 'Summary:'
+      and not line.startswith('Release information for ') ])
+
+def pypipkg(pkgname, vcs, pypi_url=None):
+  if pypi_url is None:
+    pypi_url = URL_PYPI_PROD
+  release_log = list(vcs.release_log(pkgname))
+  tag, entry = release_log[0]
+  release_number = tag.split('-', 1)[1]
+  latest_suffix = release_number
+  release_entry = clean_release_entry(entry)
+  preamble_md = f'Release {release_number}:\n{release_entry}'
+  postamble_parts=[]
+  for tag, entry in release_log:
+    release_number = tag.split('-', 1)[1]
+    release_entry = clean_release_entry(entry)
+    postamble_parts.append(f'Release {release_number}:\n{release_entry}')
+  postamble_md = '\n\n#Release Log#\n\n' + '\n\n'.join(postamble_parts)
+  return PyPI_Package(
+      pypi_url, pkgname, latest_suffix, defaults=dict(DISTINFO_DEFAULTS),
+      preamble_md=preamble_md, postamble_md=postamble_md)
+
 class Packages(defaultdict):
   ''' An autopopulating dict of pkg_name->Package.
   '''
@@ -289,6 +315,12 @@ class Package:
     '''
     prefix = self.name + '-'
     return [ tag for tag in self.vcs.release_tags() if tag.startswith(prefix) ]
+
+  def release_log(self):
+    ''' Generator yeilding `(tag,log_entry)` for our release tags
+        in reverse tag order (most recent first).
+    '''
+    return self.vcs.release_log(self.name)
 
   def latest_release_tag(self):
     ''' Return the latest release tag or None.
@@ -358,8 +390,7 @@ class Package:
           "%s->%r",
           repr(last_pypi_suffix) if last_pypi_suffix else '',
           latest_suffix):
-        defaults = dict(DISTINFO_DEFAULTS)
-        PKG = PyPI_Package(pypi_url, self.name, latest_suffix, defaults=defaults)
+        PKG = pypipkg(self.name, self.vcs)
         PKG.upload()
         self.state.last_values[self.last_upload_key()] = latest_suffix
 
@@ -370,8 +401,7 @@ class Package:
     print('create %s ...' % (pkg_dir,))
     with Pfx("mkdir(%s)", pkg_dir):
       os.mkdir(pkg_dir)
-    defaults = dict(DISTINFO_DEFAULTS)
-    PKG = PyPI_Package(URL_PYPI_PROD, self.name, latest_suffix, defaults=defaults)
+    PKG = pypipkg(self.name, self.vcs)
     PKG.make_package(pkg_dir)
     return pkg_dir
 
@@ -924,6 +954,27 @@ class VCS_Hg(VCS):
       revision = 'tip'
     self.hg_cmd('tag',  '-r', revision, '--', tag_name)
 
+  def log_entry(self, rev):
+    ''' Return the log entry for the specified revision `rev`.
+    '''
+    with self._pipefrom(
+        'log',
+        '-r', rev,
+        '--template', '{desc}\n',
+        '--') as piped:
+      return ''.join(piped)
+
+  def release_log(self, package_name):
+    ''' Generator yeilding `(tag,log_entry)` for the release tags
+        of `package_name` in reverse tag order (most recent first).
+    '''
+    tag_prefix = package_name + '-'
+    for tag in sorted(
+        [ tag for tag in self.tags()
+          if tag.startswith(tag_prefix)
+        ], reverse=True):
+      yield tag, self.log_entry(tag)
+
   def log_since(self, tag, paths):
     with self._pipefrom(
         'log',
@@ -960,11 +1011,11 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, modules, vcs, lv):
+  def __init__(self, prefix, modules, vcs, last_values):
     self.prefix = prefix
     self.modules = modules
     self.vcs = vcs
-    self.lv = lv
+    self.last_values = last_values
 
   def check(self, silent=False):
     ''' Perform various sanity checks on the named module, return true if all pass.
@@ -1083,7 +1134,7 @@ class ReleaseName(object):
 
   def last_upload(self, pypi_flavour):
     lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
-    last_pypi_release = self.lv.get(lastvalue_key, "")
+    last_pypi_release = self.last_values.get(lastvalue_key, "")
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
@@ -1108,10 +1159,9 @@ class ReleaseName(object):
           "%s->%r",
           repr(last_pypi_release) if last_pypi_release else '',
           last_suffix):
-        defaults = dict(DISTINFO_DEFAULTS)
-        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
+        PKG = pypipkg(self.prefix, self.vcs, pypi_url=pypi_url)
         PKG.upload()
-        self.lv[lastvalue_key] = last_suffix
+        self.last_values[lastvalue_key] = last_suffix
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
