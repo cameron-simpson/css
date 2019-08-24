@@ -79,24 +79,13 @@ DISTINFO = {
     'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
 }
 
-if Enum:
-
-  class ResultState(Enum):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
-else:
-
-  class ResultState(object):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
+class ResultState(Enum or object):
+  ''' State tokens for `Result`s.
+  '''
+  pending = 'pending'
+  running = 'running'
+  ready = 'ready'
+  cancelled = 'cancelled'
 
 # compatability name
 AsynchState = ResultState
