@@ -108,10 +108,12 @@ class Result(object):
   '''
 
   def __init__(self, name=None, lock=None, result=None):
-    ''' Base initialiser for Result objects and subclasses.
-        `name`: optional parameter naming this object.
-        `lock`: optional locking object, defaults to a new Lock
-        `result`: if not None, prefill the .result property
+    ''' Base initialiser for `Result` objects and subclasses.
+
+        Parameter:
+        * `name`: optional parameter naming this object.
+        * `lock`: optional locking object, defaults to a new `threading.Lock`.
+        * `result`: if not `None`, prefill the `.result` property.
     '''
     if lock is None:
       lock = Lock()
@@ -376,6 +378,7 @@ class Result(object):
 
   def notify(self, notifier):
     ''' After the function completes, run notifier(self).
+
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
@@ -430,13 +433,14 @@ def report(LFs):
     yield Q.get()
 
 def after(Rs, R, func, *a, **kw):
-  ''' After the completion of `Rs` call `func(*a, **kw)` and return
-      its result via `R`; return the Result object.
+  ''' After the completion of `Rs` call `func(*a,**kw)` and return
+      its result via `R`; return the `Result` object.
 
-      `Rs`: an iterable of Results.
-      `R`: a Result to collect to result of calling `func`. If None,
-           one will be created.
-      `func`, `a`, `kw`: a callable and its arguments.
+      Parameters:
+      * `Rs`: an iterable of Results.
+      * `R`: a `Result` to collect to result of calling `func`.
+        If `None`, one will be created.
+      * `func`, `a`, `kw`: a callable and its arguments.
   '''
   if R is None:
     R = Result("after-%d" % (seq(),))
