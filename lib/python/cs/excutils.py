@@ -237,8 +237,6 @@ def LogExceptions(conceal=False):
 
   def handler(exc_type, exc_value, exc_tb):
     exception("EXCEPTION: <%s> %s", exc_type, exc_value)
-    for line in traceback.format_exception(exc_type, exc_value, exc_tb):
-      exception("EXCEPTION> " + line)
     return conceal
 
   return NoExceptions(handler)

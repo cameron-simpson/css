@@ -49,18 +49,16 @@ import os
 from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, PIPE, call as callproc
-try:
-  from subprocess import DEVULL
-except ImportError:
-  DEVNULL = open(os.devnull, 'rb')
+from subprocess import Popen, PIPE
 import sys
+from threading import Lock
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
 from cs.logutils import setup_logging, warning, info, debug, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
+from cs.py3 import DEVNULL
 from cs.sh import quotecmd
 
 DISTINFO = {
@@ -77,6 +75,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
+        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {
@@ -255,7 +254,7 @@ def main(argv=None):
         if trace:
           su_shcmd = 'set -x; ' + su_shcmd
         argv = ['su', test_username, '-c', su_shcmd]
-      P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
+      P = LockedPopen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()
       if returncode != 0:
@@ -313,6 +312,28 @@ def main(argv=None):
   else:
     S.start()
     S.wait()
+
+_Popen_lock = Lock()
+
+def LockedPopen(*a, **kw):
+  ''' Serialise the Popen calls.
+
+      My long term multithreaded SvcD programmes sometimes coredump.
+      My working theory is that Popen, maybe only on MacOS, is
+      slightly not multithead safe. This function exists to test
+      that theory.
+  '''
+  global _Popen_lock
+  with _Popen_lock:
+    P = Popen(*a, **kw)
+  return P
+
+def callproc(*a, **kw):
+  ''' Workalike for subprocess.call, using LockedPopen.
+  '''
+  P = LockedPopen(*a, **kw)
+  P.wait()
+  return P.returncode
 
 class SvcD(FlaggedMixin, object):
   ''' A process based service.
@@ -456,7 +477,7 @@ class SvcD(FlaggedMixin, object):
     ]
     if self.trace:
       info("alert: %s: %s" % (self.name, msg))
-    Popen(alert_argv, stdin=DEVNULL)
+    LockedPopen(alert_argv, stdin=DEVNULL)
 
   def spawn(self):
     ''' Spawn the subprocess.
@@ -466,7 +487,7 @@ class SvcD(FlaggedMixin, object):
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
-    self.subp = Popen(self.argv, stdin=DEVNULL)
+    self.subp = LockedPopen(self.argv, stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:

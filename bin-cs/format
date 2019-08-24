@@ -123,7 +123,7 @@ do
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
     py2)$trace py2 -m yapf -i "$srcfile" ;;
     py3)$trace py3 -m yapf -i "$srcfile" ;;
-    *)echo "$cmd: $srcfile: no formatter (type=$type)" >&2 ;;
+    *)  echo "$cmd: $srcfile: no formatter (type=$type)" >&2 ;;
   esac || xit=1
 done
 

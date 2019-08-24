@@ -42,7 +42,7 @@ DISTINFO = {
     ],
 }
 
-def bg(func, daemon=None, name=None, no_start=False):
+def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
 
@@ -53,6 +53,7 @@ def bg(func, daemon=None, name=None, no_start=False):
         default: the name of `func`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
+      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
   '''
   if name is None:
     name = funcname(func)
@@ -60,6 +61,8 @@ def bg(func, daemon=None, name=None, no_start=False):
     with Pfx(name):
       return func()
   T = Thread(name=name, target=thread_body)
+  if not no_logexc:
+    func = logexc(func)
   if daemon is not None:
     T.daemon = daemon
   no_start or T.start()
