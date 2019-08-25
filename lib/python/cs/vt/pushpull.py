@@ -14,8 +14,9 @@ def pull_hashcode(S1, S2, hashcode):
   h1 = S1.add(data)
   if h1 != hashcode:
     raise ValueError(
-        "%s.add(%s.fetch(%s)) gave different hashcode: %s"
-        % (S1, S2, hashcode, h1))
+        "%s.add(%s.fetch(%s)) gave different hashcode: %s" %
+        (S1, S2, hashcode, h1)
+    )
   return data
 
 def pull_hashcodes(S1, S2, hashcodes):
@@ -61,8 +62,13 @@ def missing_hashcodes(S1, S2, window_size=None, hashclass=None):
       if hashcodes1 is None or hashcode > last_hashcode1:
         # past the end of S1 hashcode window
         # fetch new window starting at current hashcode
-        hashcodes1 = list(S1.hashcodes(
-            start_hashcode=hashcode, hashclass=hashclass, length=window_size))
+        hashcodes1 = list(
+            S1.hashcodes(
+                start_hashcode=hashcode,
+                hashclass=hashclass,
+                length=window_size
+            )
+        )
         if not hashcodes1:
           # no more S1 hashcodes, cease scan
           # keep the unscanned hashcodes (including current)
@@ -78,9 +84,14 @@ def missing_hashcodes(S1, S2, window_size=None, hashclass=None):
     if not hashcodes1:
       break
     # fetch next batch of hashcodes from S2
-    hashcodes2 = list(S2.hashcodes(
-        start_hashcode=last_hashcode2, hashclass=hashclass,
-        length=window_size, after=True))
+    hashcodes2 = list(
+        S2.hashcodes(
+            start_hashcode=last_hashcode2,
+            hashclass=hashclass,
+            length=window_size,
+            after=True
+        )
+    )
   # no more hashcodes in S1 - gather everything else in S2
   while True:
     hashcode = None
@@ -90,8 +101,11 @@ def missing_hashcodes(S1, S2, window_size=None, hashclass=None):
       break
     # fetch next bunch of hashcodes
     hashcodes2 = S2.hashcodes(
-        start_hashcode=hashcode, hashclass=hashclass,
-        length=window_size, after=True)
+        start_hashcode=hashcode,
+        hashclass=hashclass,
+        length=window_size,
+        after=True
+    )
 
 def missing_hashcodes_by_checksum(S1, S2, window_size=None, hashclass=None):
   ''' Scan Stores `S1` and `S2` and yield hashcodes in `S2` but not in `S1`.
@@ -109,22 +123,28 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None, hashclass=None):
     # collect checksum of hashcodes after start_hashcode from S1 and S2
     hash1, h_final1 = S1.hash_of_hashcodes(
         length=window_size,
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        after=after)
+        start_hashcode=start_hashcode,
+        hashclass=hashclass,
+        after=after
+    )
     if h_final1 is None:
       # end of S1 hashcodes - return all following S2 hashcodes
       break
     hash2, h_final2 = S2.hash_of_hashcodes(
         length=window_size,
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        after=after)
+        start_hashcode=start_hashcode,
+        hashclass=hashclass,
+        after=after
+    )
     if h_final2 is None:
       # end of S2 hashcodes - done - return from function
       return
     if hash1 == hash2:
       if h_final1 != h_final2:
-        raise RuntimeError('hashes match but h_final1=%s != h_final2=%s'
-                           % (h_final1, h_final2))
+        raise RuntimeError(
+            'hashes match but h_final1=%s != h_final2=%s' %
+            (h_final1, h_final2)
+        )
       # this chunk matches, fetch the next
       start_hashcode = h_final1
       after = True
@@ -135,15 +155,25 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None, hashclass=None):
       window_size //= 2
       continue
     # fetch the actual hashcodes
-    hashcodes2 = list(S2.hashcodes(
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        length=window_size, after=after))
+    hashcodes2 = list(
+        S2.hashcodes(
+            start_hashcode=start_hashcode,
+            hashclass=hashclass,
+            length=window_size,
+            after=after
+        )
+    )
     if not hashcodes2:
       # maybe some entires removed? - anyway, no more S2 so return
       return
-    hashcodes1 = set(S1.hashcodes(
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        length=window_size, after=after))
+    hashcodes1 = set(
+        S1.hashcodes(
+            start_hashcode=start_hashcode,
+            hashclass=hashclass,
+            length=window_size,
+            after=after
+        )
+    )
     if not hashcodes1:
       # maybe some entries removed?
       # anyway, no more S1 so return all following S2 hashcodes
@@ -155,9 +185,13 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None, hashclass=None):
       # just keep running with that if so - do not check h_final1
       if hashcodes1 and h_final1 < hashcode:
         # hashcodes1 does not cover this point in hashcodes2, fetch more
-        hashcodes1 = set(S1.hashcodes(
-            start_hashcode=hashcode, hashclass=hashclass,
-            length=len(hashcodes2)-ndx))
+        hashcodes1 = set(
+            S1.hashcodes(
+                start_hashcode=hashcode,
+                hashclass=hashclass,
+                length=len(hashcodes2) - ndx
+            )
+        )
         if hashcodes1:
           h_final1 = max(hashcodes1)
         else:
@@ -169,9 +203,14 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None, hashclass=None):
     after = True
   # collect all following S2 hashcodes
   while True:
-    hashcodes2 = list(S2.hashcodes(
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        length=window_size, after=after))
+    hashcodes2 = list(
+        S2.hashcodes(
+            start_hashcode=start_hashcode,
+            hashclass=hashclass,
+            length=window_size,
+            after=after
+        )
+    )
     if not hashcodes2:
       break
     for hashcode in hashcodes2:

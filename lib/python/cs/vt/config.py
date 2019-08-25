@@ -10,7 +10,16 @@ Store definition configuration file.
 
 from configparser import ConfigParser
 import os
-from os.path import abspath, isabs as isabspath, join as joinpath, exists as pathexists
+from os.path import (
+    abspath,
+    basename,
+    realpath,
+    splitext,
+    isabs as isabspath,
+    isfile as isfilepath,
+    join as joinpath,
+    exists as pathexists,
+)
 import sys
 from cs.fileutils import shortpath, longpath
 from cs.logutils import debug, warning, error
@@ -19,12 +28,19 @@ from cs.result import Result
 from . import Lock, DEFAULT_CONFIG
 from .archive import Archive
 from .cache import FileCacheStore, MemoryCacheStore
-from .compose import parse_store_specs, get_archive_path
+from .compose import (
+    parse_store_specs,
+    get_archive_path,
+    get_clause_archive,
+    get_clause_spec,
+)
 from .convert import get_integer, \
     convert_param_int, convert_param_scaled_int, \
     convert_param_path
+from .dir import Dir
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
+from .transcribe import parse
 
 def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
@@ -104,10 +120,7 @@ class Config:
       except KeyError:
         raise ValueError("missing type field in clause")
       S = self.new_Store(
-          store_name,
-          store_type,
-          clause,
-          clause_name=clause_name
+          store_name, store_type, clause, clause_name=clause_name
       )
       R.result = S
     return S
@@ -140,14 +153,67 @@ class Config:
   def archive(self, archivename):
     ''' Return the Archive named `archivename`.
     '''
-    if (
-        not archivename
-        or '.' in archivename
-        or '/' in archivename
-    ):
+    if (not archivename or '.' in archivename or '/' in archivename):
       raise ValueError("invalid archive name: %r" % (archivename,))
     arpath = joinpath(self.basedir, archivename + '.vt')
     return Archive(arpath)
+
+  def parse_special(self, special, readonly):
+    ''' Parse the mount command's special device from `special`.
+        Return `(fsname,readinly,Store,Dir,basename,archive)`.
+    '''
+    fsname = special
+    specialD = None
+    special_store = None
+    archive = None
+    if special.startswith('D{') and special.endswith('}'):
+      # D{dir}
+      specialD, offset = parse(special)
+      if offset != len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      if not isinstance(specialD, Dir):
+        raise ValueError(
+            "does not seem to be a Dir transcription, looks like a %s" %
+            (type(specialD),)
+        )
+      special_basename = specialD.name
+      if not readonly:
+        warning("setting readonly")
+        readonly = True
+    elif special.startswith('['):
+      if special.endswith(']'):
+        # expect "[clause]"
+        clause_name, offset = get_clause_spec(special)
+        archive_name = ''
+        special_basename = clause_name
+      else:
+        # expect "[clause]archive"
+        clause_name, archive_name, offset = get_clause_archive(special)
+        special_basename = archive_name
+      if offset < len(special):
+        raise ValueError("unparsed text: %r" % (special[offset:],))
+      fsname = str(self) + special
+      try:
+        special_store = self[clause_name]
+      except KeyError:
+        raise ValueError("unknown config clause [%s]" % (clause_name,))
+      if archive_name is None or not archive_name:
+        special_basename = clause_name
+      else:
+        special_basename = archive_name
+      archive = special_store.get_Archive(archive_name)
+    else:
+      # pathname to archive file
+      archive = special
+      if not isfilepath(archive):
+        raise ValueError("not a file")
+      fsname = shortpath(realpath(archive))
+      spfx, sext = splitext(basename(special))
+      if spfx and sext == '.vt':
+        special_basename = spfx
+      else:
+        special_basename = special
+    return fsname, readonly, special_store, specialD, special_basename, archive
 
   def Store_from_spec(self, store_spec, runstate=None, hashclass=None):
     ''' Factory function to return an appropriate BasicStore* subclass
@@ -172,8 +238,12 @@ class Config:
         # multiple stores: save to the front store, read first from the
         # front store then from the rest
         S = ProxyStore(
-            store_spec, stores[0:1], stores[0:1],
-            read2=stores[1:], hashclass=hashclass)
+            store_spec,
+            stores[0:1],
+            stores[0:1],
+            read2=stores[1:],
+            hashclass=hashclass
+        )
       if runstate is not None:
         S.runstate = runstate
       return S
@@ -187,15 +257,17 @@ class Config:
       raise ValueError("empty Store specification: %r" % (store_specs,))
     stores = [
         self.new_Store(store_text, store_type, params, hashclass=hashclass)
-        for store_text, store_type, params
-        in store_specs
+        for store_text, store_type, params in store_specs
     ]
     return stores
 
-  def new_Store(self, store_name, store_type, params, clause_name=None, hashclass=None):
+  def new_Store(
+      self, store_name, store_type, params, clause_name=None, hashclass=None
+  ):
     ''' Construct a store given its specification.
     '''
-    with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type, params):
+    with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type,
+             params):
       if not isinstance(params, dict):
         params = dict(params)
       if hashclass is not None:
@@ -239,7 +311,7 @@ class Config:
 
   def config_Store(
       self,
-      _,    # store_name, unused
+      _,  # store_name, unused
       *,
       type_=None,
       clause_name=None,
@@ -256,7 +328,8 @@ class Config:
 
   def datadir_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -284,7 +357,8 @@ class Config:
 
   def filecache_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -321,15 +395,18 @@ class Config:
         path = joinpath(basedir, path)
         debug("path ==> %r", path)
     return FileCacheStore(
-        store_name, backend_store, path,
+        store_name,
+        backend_store,
+        path,
         max_cachefile_size=max_file_size,
         max_cachefiles=max_files,
         hashclass=hashclass,
     )
 
+  @staticmethod
   def memory_Store(
-      self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       max_data=None,
@@ -345,7 +422,8 @@ class Config:
 
   def platonic_Store(
       self,
-      store_name, clause_name,
+      store_name,
+      clause_name,
       *,
       type_=None,
       path=None,
@@ -386,10 +464,13 @@ class Config:
     if isinstance(archive, str):
       archive = longpath(archive)
     return PlatonicStore(
-        store_name, path,
-        hashclass=hashclass, indexclass=None,
+        store_name,
+        path,
+        hashclass=hashclass,
+        indexclass=None,
         follow_symlinks=follow_symlinks,
-        meta_store=meta_store, archive=archive,
+        meta_store=meta_store,
+        archive=archive,
         flags_prefix='VT_' + clause_name,
     )
 
@@ -452,11 +533,13 @@ class Config:
       for clause_name, ptn in archive_path:
         with Pfx("[%s]%s", clause_name, ptn):
           AS = self[clause_name]
-          archives.append( (AS, ptn) )
+          archives.append((AS, ptn))
     S = ProxyStore(
         store_name,
-        save_stores, read_stores,
-        save2=save2_stores, read2=read2_stores,
+        save_stores,
+        read_stores,
+        save2=save2_stores,
+        read2=read2_stores,
         copy2=copy2_stores,
         archives=archives,
         hashclass=hashclass,
@@ -464,8 +547,8 @@ class Config:
     S.readonly = readonly
     return S
 
+  @staticmethod
   def tcp_Store(
-      self,
       store_name,
       *,
       type_=None,
@@ -485,8 +568,8 @@ class Config:
       port, _ = get_integer(port, 0)
     return TCPClientStore(store_name, (host, port), hashclass=hashclass)
 
+  @staticmethod
   def socket_Store(
-      self,
       store_name,
       *,
       type_=None,

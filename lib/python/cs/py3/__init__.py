@@ -23,6 +23,10 @@ except ImportError:
     from Queue import PriorityQueue
   except ImportError:
     pass
+try:
+  from subprocess import DEVULL
+except ImportError:
+  DEVNULL = open(os.devnull, 'rb')
 import sys
 try:
   from types import StringTypes

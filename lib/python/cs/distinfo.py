@@ -53,7 +53,7 @@ DISTINFO_CLASSIFICATION = {
     "Intended Audience": "Developers",
     "Operating System": "OS Independent",
     "Topic": "Software Development :: Libraries :: Python Modules",
-    "License": "OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License": "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 }
 
 
@@ -232,8 +232,11 @@ def test_is_package(libdir, package_name):
 
 def get_md_doc(
     M,
+    *,
     sort_key=lambda key: key.lower(),
     filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
+    preamble_md='',
+    postamble_md='',
 ):
   ''' Fetch the docstrings from a module and assemble a MarkDown document.
   '''
@@ -249,6 +252,7 @@ def get_md_doc(
     doc_head, _ = full_doc.split('\n\n', 1)
   except ValueError:
     doc_head = full_doc
+  X("dir=%r,sort_key=%r",dir,sort_key)
   for Mname in sorted(dir(M), key=sort_key):
     if not filter_key(Mname):
       continue
@@ -276,8 +280,20 @@ def get_md_doc(
           mro_names.append('`' + name + '`')
       if mro_names:
         odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
+      init_method = o.__dict__.get('__init__', None)
+      if init_method:
+        init_doc = getattr(init_method, '__doc__', None)
+        if init_doc:
+          init_doc = stripped_dedent(init_doc)
+          msig = signature(init_method)
+          odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
       full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
+  if preamble_md:
+    full_doc = preamble_md.rstrip() + '\n\n' + full_doc
+  if postamble_md:
+    full_doc = full_doc.rstrip() + '\n\n' + postamble_md
   return doc_head, full_doc
+
 
 class Package(O):
 
@@ -296,6 +312,8 @@ class PyPI_Package(O):
     package_name, package_version,
     pypi_package_name=None, pypi_package_version=None,
     defaults=None,
+    preamble_md='',
+    postamble_md='',
   ):
     ''' Initialise: save package_name and its name in PyPI.
     '''
@@ -322,7 +340,7 @@ class PyPI_Package(O):
     self._pypi_package_version = pypi_package_version
     self.defaults = defaults
     self.libdir = LIBDIR
-    self._prep_distinfo()
+    self._prep_distinfo(preamble_md, postamble_md)
 
   @property
   def package_name(self):
@@ -346,8 +364,8 @@ class PyPI_Package(O):
   def hg_tag(self):
     return self.package.hg_tag
 
-  def _prep_distinfo(self):
-    ''' Property containing the distutils info for this package.
+  def _prep_distinfo(self, preamble_md, postamble_md):
+    ''' Compute the distutils info for this package.
     '''
     global DISTINFO_DEFAULTS
     global DISTINFO_CLASSIFICATION
@@ -355,7 +373,7 @@ class PyPI_Package(O):
     dinfo = dict(self.defaults)
     M = importlib.import_module(self.package_name)
     dinfo.update(M.DISTINFO)
-    doc_head, full_doc = get_md_doc(M)
+    doc_head, full_doc = get_md_doc(M, preamble_md=preamble_md, postamble_md=postamble_md)
 
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description', 'include_package_data':

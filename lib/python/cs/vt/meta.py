@@ -78,7 +78,7 @@ def permbits_to_allow_deny(bits):
   add = ''
   sub = ''
   for c, bit in ('r', 0x04), ('w', 0x02), ('x', 0x01):
-    if bits&bit:
+    if bits & bit:
       add += c
     else:
       sub += c
@@ -88,9 +88,8 @@ def rwx(mode):
   ''' Transcribe 3 bits of a UNIX mode in 'rwx' form.
   '''
   return (
-      ( 'r' if mode&4 else '-' )
-      + ( 'w' if mode&2 else '-' )
-      + ( 'x' if mode&1 else '-' )
+      ('r' if mode & 4 else '-') + ('w' if mode & 2 else '-') +
+      ('x' if mode & 1 else '-')
   )
 
 class AC(namedtuple('AccessControl', 'audience allow deny')):
@@ -103,16 +102,14 @@ class AC(namedtuple('AccessControl', 'audience allow deny')):
     audience, allow, deny = self
     if ':' in audience:
       raise ValueError(
-          "invalid audience, may not contain a colon: %r"
-          % (audience,))
+          "invalid audience, may not contain a colon: %r" % (audience,)
+      )
     if '-' in allow:
-      raise ValueError(
-          "invalid allow, may not contain a dash: %r"
-          % (allow,))
+      raise ValueError("invalid allow, may not contain a dash: %r" % (allow,))
     return audience + ':' + allow + '-' + deny
 
   def __repr__(self):
-    return ':'.join( (type(self).__name__, str(self)) )
+    return ':'.join((type(self).__name__, str(self)))
 
   @classmethod
   def from_str(cls, ac_text):
@@ -175,7 +172,7 @@ class ACL(list):
   def __str__(self):
     ''' Transcribe a list of AC instances as text.
     '''
-    return ','.join( [ str(ac) for ac in self ] )
+    return ','.join([str(ac) for ac in self])
 
   @classmethod
   def from_str(cls, acl_text):
@@ -236,7 +233,7 @@ class Meta(dict, Transcriber):
         self[k] = v
 
   def __repr__(self):
-    return ':'.join( (type(self).__name__, str(self)) )
+    return ':'.join((type(self).__name__, str(self)))
 
   def __eq__(self, other):
     d1 = self._as_dict()
@@ -252,10 +249,7 @@ class Meta(dict, Transcriber):
     if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in d.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join(
-          ':'.join((
-              k,
-              "%f" % v if isinstance(v, float) else str(v)
-          ))
+          ':'.join((k, "%f" % v if isinstance(v, float) else str(v)))
           for k, v in sorted(d.items())
       )
     else:
@@ -519,9 +513,9 @@ class Meta(dict, Transcriber):
     self.setuid = bool(mode & S_ISUID)
     self.setgid = bool(mode & S_ISGID)
     acl = ACL()
-    acl.append(AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ))
-    acl.append(AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ))
-    acl.append(AC_Other( *permbits_to_allow_deny( mode&7 ) ))
+    acl.append(AC_Owner(*permbits_to_allow_deny((mode >> 6) & 7)))
+    acl.append(AC_Group(*permbits_to_allow_deny((mode >> 3) & 7)))
+    acl.append(AC_Other(*permbits_to_allow_deny(mode & 7)))
     acl.extend(ac for ac in self.acl if ac.audience not in ('o', 'g', '*'))
     self.acl = acl
 
@@ -573,9 +567,12 @@ class Meta(dict, Transcriber):
     self['pathref'] = newref
 
   def access(
-      self, access_mode,
-      access_uid=None, access_gid=None,
-      default_uid=None, default_gid=None
+      self,
+      access_mode,
+      access_uid=None,
+      access_gid=None,
+      default_uid=None,
+      default_gid=None
   ):
     ''' POSIX like access call, accepting os.access `access_mode`.
 
@@ -602,29 +599,29 @@ class Meta(dict, Transcriber):
       g = default_gid
     perms = self.unix_perm_bits
     if access_mode & os.R_OK:
-      if u is None or ( access_uid is not None and access_uid == u):
-        if not (perms>>6) & 4:
+      if u is None or (access_uid is not None and access_uid == u):
+        if not (perms >> 6) & 4:
           return False
-      elif g is None or ( access_gid is not None and access_gid == g):
-        if not (perms>>3) & 4:
+      elif g is None or (access_gid is not None and access_gid == g):
+        if not (perms >> 3) & 4:
           return False
       elif not perms & 4:
         return False
     if access_mode & os.W_OK:
-      if u is None or ( access_uid is not None and access_uid == u):
-        if not (perms>>6) & 2:
+      if u is None or (access_uid is not None and access_uid == u):
+        if not (perms >> 6) & 2:
           return False
-      elif g is None or ( access_gid is not None and access_gid == g):
-        if not (perms>>3) & 2:
+      elif g is None or (access_gid is not None and access_gid == g):
+        if not (perms >> 3) & 2:
           return False
       elif not perms & 2:
         return False
     if access_mode & os.X_OK:
-      if u is None or ( access_uid is not None and access_uid == u):
-        if not (perms>>6) & 1:
+      if u is None or (access_uid is not None and access_uid == u):
+        if not (perms >> 6) & 1:
           return False
-      elif g is None or ( access_gid is not None and access_gid == g):
-        if not (perms>>3) & 1:
+      elif g is None or (access_gid is not None and access_gid == g):
+        if not (perms >> 3) & 1:
           return False
       elif not perms & 1:
         return False
@@ -674,7 +671,7 @@ class Meta(dict, Transcriber):
   def listxattrs(self):
     ''' Return the xattr keys, a list of bytes.
     '''
-    return [ xk.encode('iso8859-1') for xk in self._xattrs.keys() ]
+    return [xk.encode('iso8859-1') for xk in self._xattrs.keys()]
 
   @property
   def mime_type(self):

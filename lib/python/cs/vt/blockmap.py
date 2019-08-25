@@ -30,11 +30,12 @@ from .block import HashCodeBlock
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
-OFFSET_SCALE = 2 ** 32
+OFFSET_SCALE = 2**32
 
 OFF_STRUCT = Struct('<L')
 
 _MapEntry = namedtuple('MapEntry', 'index offset span hashcode')
+
 class MapEntry(_MapEntry):
   ''' A blockmap entry (index, offset, span, hashcode) and related properties.
   '''
@@ -158,12 +159,16 @@ class MappedFD:
     hash_offset = rec_offset + OFF_STRUCT.size
     next_rec_offset = rec_offset + rec_size
     offset, = OFF_STRUCT.unpack(mapped[rec_offset:hash_offset])
-    hashcode = self.hashclass.from_hashbytes(mapped[hash_offset:next_rec_offset])
+    hashcode = self.hashclass.from_hashbytes(
+        mapped[hash_offset:next_rec_offset]
+    )
     if i == self.record_count - 1:
       span = len(defaults.S[hashcode])
     else:
       next_hash_offset = next_rec_offset + OFF_STRUCT.size
-      next_offset, = OFF_STRUCT.unpack(mapped[next_rec_offset:next_hash_offset])
+      next_offset, = OFF_STRUCT.unpack(
+          mapped[next_rec_offset:next_hash_offset]
+      )
       span = next_offset - offset
     return MapEntry(i, offset, span, hashcode)
 
@@ -203,8 +208,9 @@ class BlockMap(RunStateMixin):
       mapsize = OFFSET_SCALE
     elif mapsize <= 0 or mapsize > OFFSET_SCALE:
       raise ValueError(
-          "mapsize(%d) out of range, must be >0 and <=%d"
-          % (mapsize, OFFSET_SCALE))
+          "mapsize(%d) out of range, must be >0 and <=%d" %
+          (mapsize, OFFSET_SCALE)
+      )
     # DEBUGGING
     if blockmapdir is None:
       blockmapdir = '/Users/cameron/hg/css-venti/test_blockmaps'
@@ -214,7 +220,10 @@ class BlockMap(RunStateMixin):
     RunStateMixin.__init__(self, "BlockMap")
     from .block import _IndirectBlock
     if not isinstance(block, _IndirectBlock):
-      raise TypeError("block needs to be a _IndirectBlock, got a %s instead" % (type(block),))
+      raise TypeError(
+          "block needs to be a _IndirectBlock, got a %s instead" %
+          (type(block),)
+      )
     hashcode = block.superblock.hashcode
     hashclass = type(hashcode)
     self.hashclass = hashclass
@@ -222,7 +231,9 @@ class BlockMap(RunStateMixin):
     if blockmapdir is None:
       self.mappath = mappath = None
     else:
-      self.mappath = mappath = joinpath(blockmapdir, "mapsize:%d" % (mapsize,), hashcode.filename)
+      self.mappath = mappath = joinpath(
+          blockmapdir, "mapsize:%d" % (mapsize,), hashcode.filename
+      )
       if not isdir(mappath):
         with Pfx("makedirs(%r)", mappath):
           X("MKDIR %r", mappath)
@@ -247,7 +258,10 @@ class BlockMap(RunStateMixin):
         mapped_to += mapsize
     self.mapped_to = mapped_to
     if mapped_to < len(block):
-      X("BlockMap.__init__: dispatch worker to scan from offset %d ...", mapped_to)
+      X(
+          "BlockMap.__init__: dispatch worker to scan from offset %d ...",
+          mapped_to
+      )
       self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
       self._worker.start()
@@ -274,7 +288,7 @@ class BlockMap(RunStateMixin):
     self.cancel()
     self.join()
     maps = self.maps
-    for i in range(len(maps)-1):
+    for i in range(len(maps) - 1):
       submap = maps[i]
       if submap is not None:
         submap.close()
@@ -323,12 +337,14 @@ class BlockMap(RunStateMixin):
             submap_index = leaf_submap_index
             if self.mappath:
               # if we're doing persistent submaps...
-              submap_path = joinpath(self.mappath, '%d.blockmap' % (submap_index,))
+              submap_path = joinpath(
+                  self.mappath, '%d.blockmap' % (submap_index,)
+              )
               if pathexists(submap_path):
                 # existing map, attach and install, advance and restart loop
                 X("LOAD MAPS: attach existing map %r", submap_path)
                 submaps[submap_index] = MappedFD(submap_path, hashclass)
-                offset = ( submap_index + 1 ) * mapsize
+                offset = (submap_index + 1) * mapsize
                 X("LOAD MAPS: skip to offset=0x%x", offset)
                 break
               # start a new persistent file to attach later
@@ -340,11 +356,9 @@ class BlockMap(RunStateMixin):
           # post condition: correct submap_index and correct submap_fp state
           assert (
               submap_index == leaf_submap_index
-              and submap_index < len(submaps)
-              and (
-                  submap_fp is None
-                  if self.mappath and pathexists(submap_path)
-                  else submap_fp is not None
+              and submap_index < len(submaps) and (
+                  submap_fp is None if self.mappath
+                  and pathexists(submap_path) else submap_fp is not None
               )
           )
           try:
@@ -353,7 +367,10 @@ class BlockMap(RunStateMixin):
             # make a conventional HashCodeBlock and index that
             data = leaf.data
             if len(data) >= 65536:
-              warning("promoting %d bytes from %s to a new HashCodeBlock", len(data), leaf)
+              warning(
+                  "promoting %d bytes from %s to a new HashCodeBlock",
+                  len(data), leaf
+              )
             leaf = HashCodeBlock(data=data)
             h = leaf.hashcode
           submap_fp.write(OFF_STRUCT.pack(leaf_submap_offset))
@@ -362,8 +379,9 @@ class BlockMap(RunStateMixin):
           nleaves += 1
           if nleaves % 4096 == 0:
             X(
-                "LOAD MAPS: processed %d leaves in %gs (%d leaves/s)",
-                nleaves, runstate.run_time, nleaves // runstate.run_time)
+                "LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves,
+                runstate.run_time, nleaves // runstate.run_time
+            )
       X("LOAD MAPS: leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
@@ -476,7 +494,9 @@ class BlockMap(RunStateMixin):
     start = 0 if index.start is None else index.start
     span = None if index.stop is None else index.stop - start
     if span < 0:
-      raise ValueError("invalid span: stop(%s) < start(%s)" % (index.stop, index.start))
+      raise ValueError(
+          "invalid span: stop(%s) < start(%s)" % (index.stop, index.start)
+      )
     if span == 0:
       return b''
     return b''.join(self.datafrom(start, span))

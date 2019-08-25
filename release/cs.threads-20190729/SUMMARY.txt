@@ -1,0 +1,1 @@
+bg: provide default `name`, run callable inside Pfx, add optional no_logexc=False param preventing @logec wrapper if true.

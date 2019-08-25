@@ -34,8 +34,8 @@ def path_resolve(path, do_mkdir=False):
       raise ValueError("extra path after no-Dir: %r" % (subpath,))
     if not path.startswith(PATHSEP, offset):
       raise ValueError(
-          "extra path does not commence with %r: %r"
-          % (PATHSEP, subpath))
+          "extra path does not commence with %r: %r" % (PATHSEP, subpath)
+      )
     E = resolve(E, subpath, do_mkdir=do_mkdir)
   return E
 
@@ -44,8 +44,7 @@ def path_split(path):
       The returned subparts are useful for path traversal.
   '''
   return [
-      subpath
-      for subpath in path.split(PATHSEP)
+      subpath for subpath in path.split(PATHSEP)
       if subpath != '' and subpath != '.'
   ]
 
@@ -200,7 +199,7 @@ class DirLike(ABC):
   def walk(self):
     ''' Walk this tree.
     '''
-    pending = [ (self, []) ]
+    pending = [(self, [])]
     while pending:
       node, rparts = pending.pop()
       rpath = PATHSEP.join(rparts)
@@ -219,13 +218,13 @@ class DirLike(ABC):
       for name in dirnames:
         if name not in odirnames:
           warning(
-              "walk(%s): %r: dirname %r not in original set",
-              self, rpath, name)
+              "walk(%s): %r: dirname %r not in original set", self, rpath, name
+          )
           continue
         node = node.get(name)
         if node is None:
           continue
-        pending.append( (node, rparts + [name]) )
+        pending.append((node, rparts + [name]))
 
 class FileLike(ABC):
   ''' Facilities offered by file like objects.
@@ -324,7 +323,9 @@ class OSDir(DirLike):
     ''' Create a subdirectory.
     '''
     if not name or PATHSEP in name:
-      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+      raise ValueError(
+          "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
+      )
     subpath = joinpath(self.path, name)
     with Pfx("mkdir(%r)", subpath):
       os.mkdir(subpath)
@@ -334,7 +335,9 @@ class OSDir(DirLike):
     ''' Create a new file from data from a CornuCopyBuffer.
     '''
     if not name or PATHSEP in name:
-      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+      raise ValueError(
+          "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
+      )
     subpath = joinpath(self.path, name)
     with open(subpath, 'wb') as f:
       for data in bfr:

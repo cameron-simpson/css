@@ -11,10 +11,14 @@
 
 set -ue
 
+default_editor=vim-flowed
+default_composedir=$HOME/var/mutt/compose
+
 : ${TMPDIR:=/tmp}
 : ${TMUX:=''}
 wprog=${MUTTEDIT_WINDOWPROG:-}
-editor=${MUTTEDIT_EDITOR:-${EDITOR:-vim-flowed}}
+editor=${MUTTEDIT_EDITOR:-${EDITOR:-$default_editor}}
+composedir=${MUTTEDIT_COMPOSEDIR:-"$default_composedir"}
 
 cmd=$0
 usage="Usage:
@@ -28,11 +32,14 @@ usage="Usage:
     Open sessions for all mutt editor files sitting about.
 
 Environment:
+  \$MUTTEDIT_COMPOSEDIR
+    Directory to hold message composition files.
+    Default: $default_composedir
+  \$MUTTEDIT_EDITOR or \$EDITOR
+    Editor for the sub mutt to invoke for composition.
+    Default: $default_editor
   \$MUTTEDIT_WINDOWPROG
-              If not empty, implies -w mode with its value.
-  \$MUTTEDIT_EDITOR
-              Editor for the sub mutt to invoke for composition.
-              Default: vim-flowed
+    If not empty, implies -w mode with its value.
 
 The default mode is window mode if \$MUTTEDIT_WINDOWPROG is set,
 otherwise pane mode (-T) if $TMUX is set, otherwise inline."
@@ -43,7 +50,7 @@ if [ $# -gt 0 ] && [ "x$1" = xreopen ]
 then
   shift
   xit=0
-  [ $# -gt 0 ] || set -- "$HOME"/var/mutt/mutt-*[0-9]
+  [ $# -gt 0 ] || set -- "$composedir/"mutt-*[0-9]
   for msgfile
   do  [ ! -s "$msgfile" ] || ( set -x; "$0" -d "$msgfile" ) || xit=1
   done
@@ -103,7 +110,8 @@ subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]
 session_name=mutt-$now-$subj
 
 # take a copy of the composition file
-tmpf=$TMPDIR/muttedit.$$
+[ -d "$composedir" ] || mkdir "$composedir" || exit 1
+tmpf=$composedir/muttedit.$$
 ( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
 filename=$tmpf
 

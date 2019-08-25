@@ -96,6 +96,9 @@ DISTINFO = {
             'mount.vtfs = cs.vt.__main__:mount_vtfs',
         ],
     },
+    'extras_requires': {
+        'FUSE': ['llfuse'],
+    },
 }
 
 DEFAULT_CONFIG_PATH = '~/.vtrc'
@@ -125,14 +128,17 @@ DEFAULT_CONFIG = {
 # intercept Lock and RLock
 if False:
   from .debug import DebuggingLock
+
   def RLock():
     ''' Obtain a recursive DebuggingLock.
     '''
     return DebuggingLock(recursive=True)
+
   def Lock():
     ''' Obtain a nonrecursive DebuggingLock.
     '''
     return DebuggingLock()
+
   # monkey patch MultiOpenMixin
   cs.resources._mom_lockclass = RLock
 else:
@@ -171,11 +177,14 @@ class _Defaults(threading.local, StackableValues):
     '''
     if key == 'S':
       warning("no per-Thread Store stack, using the global stack")
-      stack_dump()
+      stack_dump(indent=2)
       Ss = self._Ss
       if Ss:
         return Ss[-1]
-      error("%s: no per-Thread defaults.S and no global stack, returning None", self)
+      error(
+          "%s: no per-Thread defaults.S and no global stack, returning None",
+          self
+      )
       return None
     raise ValueError("no fallback for %r" % (key,))
 
@@ -200,11 +209,6 @@ class _Defaults(threading.local, StackableValues):
     '''
     return self._Ss.pop()
 
-  def push_runstate(self, new_runstate):
-    ''' Context manager to push a new RunState instance onto the per-Thread stack.
-    '''
-    return self.stack('runstate', new_runstate)
-
 defaults = _Defaults()
 
 class _TestAdditionsMixin:
@@ -218,9 +222,7 @@ class _TestAdditionsMixin:
     if prefix is None:
       prefix = cls.__qualname__
     return tempfile.TemporaryDirectory(
-        prefix="test-" + prefix + "-",
-        suffix=".tmpdir",
-        dir=os.getcwd()
+        prefix="test-" + prefix + "-", suffix=".tmpdir", dir=os.getcwd()
     )
 
   def assertLen(self, o, length, *a, **kw):
@@ -238,4 +240,5 @@ class _TestAdditionsMixin:
     '''
     self.assertTrue(
         isordered(s, reverse, strict),
-        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s))
+        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s)
+    )

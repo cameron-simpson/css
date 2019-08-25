@@ -48,8 +48,9 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if local_store is not None:
       if '' in exports:
         raise ValueError(
-            "both local_store=%s and exports['']=%s provided"
-            % (local_store, exports['']))
+            "both local_store=%s and exports['']=%s provided" %
+            (local_store, exports[''])
+        )
       exports[''] = local_store
     if '' not in exports:
       exports[''] = defaults.S
@@ -72,7 +73,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     self.socket_server_thread = Thread(
         name="%s(%s)[server-thread]" % (type(self), self.S),
         target=self.socket_server.serve_forever,
-        kwargs={'poll_interval': 0.5})
+        kwargs={'poll_interval': 0.5}
+    )
     self.socket_server_thread.daemon = False
     self.socket_server_thread.start()
 
@@ -133,16 +135,18 @@ class _ClientConnectionHandler(StreamRequestHandler):
 class _TCPServer(ThreadingMixIn, TCPServer):
 
   def __init__(self, store_server, bind_addr):
-    with Pfx(
-        "%s.__init__(store_server=%s, bind_addr=%r)",
-        type(self).__name__, store_server, bind_addr
-    ):
+    with Pfx("%s.__init__(store_server=%s, bind_addr=%r)", type(self).__name__,
+             store_server, bind_addr):
       TCPServer.__init__(self, bind_addr, _ClientConnectionHandler)
       self.bind_addr = bind_addr
       self.store_server = store_server
 
   def __str__(self):
-    return "%s(%s,%s)" % (type(self), self.bind_addr, self.store_server,)
+    return "%s(%s,%s)" % (
+        type(self),
+        self.bind_addr,
+        self.store_server,
+    )
 
 class TCPStoreServer(_SocketStoreServer):
   ''' A threading TCPServer that accepts connections from TCPClientStores.
@@ -163,9 +167,7 @@ class TCPClientStore(StreamStore):
     self.sock_bind_addr = bind_addr
     self.sock = None
     StreamStore.__init__(
-        self, name, None, None,
-        addif=addif, connect=self._tcp_connect,
-        **kw
+        self, name, None, None, addif=addif, connect=self._tcp_connect, **kw
     )
 
   def shutdown(self):
@@ -201,10 +203,8 @@ class TCPClientStore(StreamStore):
 class _UNIXSocketServer(ThreadingMixIn, UnixStreamServer):
 
   def __init__(self, store_server, socket_path, exports=None):
-    with Pfx(
-        "%s.__init__(store_server=%s, socket_path=%r)",
-        type(self), store_server, socket_path
-    ):
+    with Pfx("%s.__init__(store_server=%s, socket_path=%r)", type(self),
+             store_server, socket_path):
       UnixStreamServer.__init__(self, socket_path, _ClientConnectionHandler)
       self.store_server = store_server
       self.socket_path = socket_path
@@ -237,8 +237,12 @@ class UNIXSocketClientStore(StreamStore):
     self.socket_path = socket_path
     self.sock = None
     StreamStore.__init__(
-        self, name, None, None,
-        addif=addif, connect=self._unixsock_connect,
+        self,
+        name,
+        None,
+        None,
+        addif=addif,
+        connect=self._unixsock_connect,
         **kw
     )
 

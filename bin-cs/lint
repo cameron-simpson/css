@@ -71,14 +71,11 @@ do
   if [ -z "$type" ]
   then
     case "$lintfile" in
-      *.json | *.go | *.php | *.py )
+      *.js | *.json | *.go | *.php | *.py | *.pl )
         type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
         ;;
-      *.pl | *.pm )
+      *.pm )
         type=pl
-        ;;
-      *.py)
-        type=py
         ;;
     esac
   fi
@@ -109,7 +106,7 @@ do
       } || xit=1
       ;;
     py)
-      if $trace $python -m py_compile "$lintfile"
+      if $trace $python -We:invalid -m py_compile "$lintfile"
       then
         $trace $pyflakes "$lintfile" || xit=1
         $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1

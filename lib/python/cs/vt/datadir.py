@@ -14,11 +14,9 @@ import errno
 import os
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from os.path import (
-    basename,
-    isdir as isdirpath,
-    isfile as isfilepath,
-    join as joinpath,
-    relpath)
+    basename, isdir as isdirpath, isfile as isfilepath, join as joinpath,
+    relpath
+)
 import sqlite3
 import stat
 import sys
@@ -29,13 +27,9 @@ from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.excutils import logexc
 from cs.fileutils import (
-    DEFAULT_READSIZE,
-    ReadMixin,
-    datafrom_fd,
-    makelockfile,
-    read_from,
-    shortpath,
-    TimeoutError)
+    DEFAULT_READSIZE, ReadMixin, datafrom_fd, makelockfile, read_from,
+    shortpath, TimeoutError
+)
 from cs.logutils import debug, info, warning, error, exception
 from cs.pfx import Pfx, PfxThread as Thread
 from cs.py.func import prop as property
@@ -49,10 +43,7 @@ from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
 from .blockify import (
-    DEFAULT_SCAN_SIZE,
-    blocked_chunks_of,
-    spliced_blocks,
-    top_block_for
+    DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
 )
 from .datafile import DataFileReader, DataFileWriter, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
@@ -95,8 +86,11 @@ class DataFileState(SimpleNamespace):
 
   def __init__(
       self,
-      datadir, filenum, filename,
-      indexed_to=0, scanned_to=None,
+      datadir,
+      filenum,
+      filename,
+      indexed_to=0,
+      scanned_to=None,
   ) -> None:
     if scanned_to is None:
       scanned_to = indexed_to
@@ -136,7 +130,8 @@ class DataFileState(SimpleNamespace):
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
 
-class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin, Mapping):
+class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
+                FlaggedMixin, Mapping):
   ''' Base class indexing locally stored data in files.
       This class is hashclass specific;
       the utilising Store keeps one of these for each supported hashclass.
@@ -159,7 +154,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       hashclass,
       *,
       indexclass=None,
-      flags=None, flags_prefix=None,
+      flags=None,
+      flags_prefix=None,
   ):
     ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
 
@@ -198,10 +194,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.statedirpath = statedirpath
     self.statefilepath = joinpath(
         statedirpath,
-        self.STATE_FILENAME_FORMAT.format(hashname=self.hashname))
+        self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
+    )
     if indexclass is None:
       indexclass = choose_indexclass(
-          self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashname))
+          self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashname)
+      )
     self.indexclass = indexclass
     self._filemap = None
     self._unindexed = None
@@ -214,11 +212,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
 
   def __repr__(self):
-    return ( '%s(statedirpath=%r,indexclass=%s)'
-             % (self.__class__.__name__,
-                self.statedirpath,
-                self.indexclass)
-           )
+    return (
+        '%s(statedirpath=%r,indexclass=%s)' %
+        (self.__class__.__name__, self.statedirpath, self.indexclass)
+    )
 
   def startup(self):
     ''' Start up the _FilesDir: take locks, start worker threads etc.
@@ -230,13 +227,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
         self.hashclass,
         self.index_entry_class.from_bytes,
-        lock=self._lock)
+        lock=self._lock
+    )
     self.index.open()
     self.runstate.start()
     # cache of open DataFiles
     self._cache = LRU_Cache(
-        maxsize=4,
-        on_remove=lambda k, datafile: datafile.close()
+        maxsize=4, on_remove=lambda k, datafile: datafile.close()
     )
     # Set up indexing thread.
     # Map individual hashcodes to locations before being persistently stored.
@@ -245,12 +242,12 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     # the index asynchronously.
     self._indexQ = IterableQueue(64)
     T = self._index_Thread = Thread(
-        name="%s-index-thread" % (self,),
-        target=self._index_updater)
+        name="%s-index-thread" % (self,), target=self._index_updater
+    )
     T.start()
     T = self._monitor_Thread = Thread(
-        name="%s-datafile-monitor" % (self,),
-        target=self._monitor_datafiles)
+        name="%s-datafile-monitor" % (self,), target=self._monitor_datafiles
+    )
     T.start()
 
   def shutdown(self):
@@ -313,10 +310,13 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def _queue_index(self, hashcode, entry, post_offset):
     if not isinstance(entry, self.index_entry_class):
-      raise RuntimeError("expected %s but got %s %r" % (self.index_entry_class, type(entry), entry))
+      raise RuntimeError(
+          "expected %s but got %s %r" %
+          (self.index_entry_class, type(entry), entry)
+      )
     with self._lock:
       self._unindexed[hashcode] = entry
-    self._indexQ.put( (hashcode, entry, post_offset) )
+    self._indexQ.put((hashcode, entry, post_offset))
 
   def _queue_index_flush(self):
     self._indexQ.put(None)
@@ -341,7 +341,9 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           continue
         hashcode, entry, post_offset = item
         if not isinstance(entry, entry_class):
-          raise RuntimeError("expected %s but got %s %r" % (entry_class, type(entry), entry))
+          raise RuntimeError(
+              "expected %s but got %s %r" % (entry_class, type(entry), entry)
+          )
         with self._lock:
           index[hashcode] = entry
           try:
@@ -372,7 +374,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     if hashcode != h:
       raise ValueError(
           'supplied hashcode %s does not match data, data added under %s instead'
-          % (hashcode, h))
+          % (hashcode, h)
+      )
 
   def __len__(self):
     return len(self.index)
@@ -387,9 +390,10 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         * `reverse`: iterate backwards if true, otherwise forwards.
     '''
     unindexed = set(self._unindexed)
-    indexed = self.index.hashcodes_from(start_hashcode=start_hashcode,
-                                        reverse=reverse)
-    unseen_indexed = ( h for h in indexed if h not in unindexed )
+    indexed = self.index.hashcodes_from(
+        start_hashcode=start_hashcode, reverse=reverse
+    )
+    unseen_indexed = (h for h in indexed if h not in unindexed)
     return imerge(sorted(unindexed, reverse=reverse), unseen_indexed)
 
   def __iter__(self):
@@ -424,7 +428,8 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     raise RuntimeError(
         "%s.get_blockmap: return singleton persistent BlockMap here for Block %s"
-        % (self, B))
+        % (self, B)
+    )
 
 class SqliteFilemap:
   ''' The file mapping of `n` to `DataFileState`.
@@ -445,19 +450,23 @@ class SqliteFilemap:
     self.n_to_DFstate = {}
     self.path_to_DFstate = {}
     c = self.conn.cursor()
-    c.execute(r'''
+    c.execute(
+        r'''
         CREATE TABLE IF NOT EXISTS settings (
             `setting` TEXT,
             `value`   TEXT,
             CONSTRAINT `setting` UNIQUE (`setting`)
-        );''')
-    c.execute(r'''
+        );'''
+    )
+    c.execute(
+        r'''
         CREATE TABLE IF NOT EXISTS filemap (
             `id`   INTEGER PRIMARY KEY,
             `path` TEXT,
             `indexed_to` INTEGER,
             CONSTRAINT `path` UNIQUE (`path`)
-        );''')
+        );'''
+    )
     c.connection.commit()
     c.close()
     self._load_map()
@@ -509,16 +518,17 @@ class SqliteFilemap:
       warning("replacing n_to_DFstate[%s]", n)
     if path in self.path_to_DFstate:
       warning("replacing path_toDFstate[%r]", path)
-    DFstate = DataFileState(
-        datadir, n, path, indexed_to=indexed_to)
+    DFstate = DataFileState(datadir, n, path, indexed_to=indexed_to)
     self.n_to_DFstate[n] = DFstate
     self.path_to_DFstate[path] = DFstate
 
   def _load_map(self):
     with self._lock:
-      c = self._execute(r'''
+      c = self._execute(
+          r'''
           SELECT id, path, indexed_to FROM filemap
-      ''')
+      '''
+      )
       for n, path, indexed_to in c.fetchall():
         self._map(path, n, indexed_to)
       c.close()
@@ -530,9 +540,12 @@ class SqliteFilemap:
     info("new path %r", shortpath(new_path))
     with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
       with self._lock:
-        c = self._modify(r'''
+        c = self._modify(
+            r'''
             INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)
-        ''', (new_path, 0), return_cursor=True)
+        ''', (new_path, 0),
+            return_cursor=True
+        )
         if c:
           n = c.lastrowid
           self._map(new_path, n, indexed_to=indexed_to)
@@ -551,9 +564,11 @@ class SqliteFilemap:
     '''
     DFstate = self.path_to_DFstate[old_path]
     with self._lock:
-      self._modify(r'''
+      self._modify(
+          r'''
           UPDATE filemap SET path=NULL, indexed_to=NULL where id = ?
-      ''', (DFstate.filenum,))
+      ''', (DFstate.filenum,)
+      )
     del self.n_to_DFstate[DFstate.filenum]
     del self.path_to_DFstate[old_path]
 
@@ -582,9 +597,11 @@ class SqliteFilemap:
     '''
     DFstate = self.n_to_DFstate[n]
     with self._lock:
-      self._modify(r'''
+      self._modify(
+          r'''
           UPDATE filemap SET indexed_to = ? WHERE id = ?
-      ''', (new_indexed_to, n))
+      ''', (new_indexed_to, n)
+      )
     DFstate.indexed_to = new_indexed_to
 
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
@@ -600,7 +617,8 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'n offset')):
     if offset != len(data):
       raise ValueError(
           "unparsed data from index entry; full entry = %s; n=%d, file_offset=%d, unparsed=%r"
-          % (hexlify(data), n, file_offset, data[offset:]))
+          % (hexlify(data), n, file_offset, data[offset:])
+      )
     return cls(n, file_offset)
 
   def encode(self) -> bytes:
@@ -624,14 +642,7 @@ class DataDir(_FilesDir):
 
   index_entry_class = DataDirIndexEntry
 
-  def __init__(
-      self,
-      statedirpath,
-      hashclass,
-      *,
-      rollover=None,
-      **kw
-  ):
+  def __init__(self, statedirpath, hashclass, *, rollover=None, **kw):
     ''' Initialise the DataDir with `statedirpath`.
 
         Parameters:
@@ -652,8 +663,9 @@ class DataDir(_FilesDir):
     elif rollover < 1024:
       raise ValueError(
           "rollover < 1024"
-          " (a more normal size would be in megabytes or gigabytes): %r"
-          % (rollover,))
+          " (a more normal size would be in megabytes or gigabytes): %r" %
+          (rollover,)
+      )
     self.rollover = rollover
     self._write_n = None
     self._write_DF = None
@@ -796,11 +808,9 @@ class DataDir(_FilesDir):
             continue
           raise
         for filename in listing:
-          if (
-              not filename.startswith('.')
+          if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
-              and filename not in filemap
-          ):
+              and filename not in filemap):
             info("MONITOR: add new filename %r", filename)
             filemap.add_path(filename)
       # now scan known datafiles for new data
@@ -830,7 +840,9 @@ class DataDir(_FilesDir):
             offset = DFstate.scanned_to
             for record, post_offset in DFstate.scanfrom(offset=offset):
               hashcode = self.hashclass.from_chunk(record.data)
-              indexQ.put( (hashcode, DataDirIndexEntry(filenum, offset), post_offset) )
+              indexQ.put(
+                  (hashcode, DataDirIndexEntry(filenum, offset), post_offset)
+              )
               DFstate.scanned_to = post_offset
               if self.cancelled:
                 break
@@ -839,7 +851,8 @@ class DataDir(_FilesDir):
         self.flush()
       time.sleep(1)
 
-class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length')):
+class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry',
+                                       'n offset length')):
   ''' A block record for a PlatonicDir.
   '''
 
@@ -851,7 +864,9 @@ class PlatonicDirIndexEntry(namedtuple('PlatonicDirIndexEntry', 'n offset length
     file_offset, offset = get_bs(data, offset)
     length, offset = get_bs(data, offset)
     if offset != len(data):
-      raise ValueError("unparsed data from index entry; full entry = %s" % (hexlify(data),))
+      raise ValueError(
+          "unparsed data from index entry; full entry = %s" % (hexlify(data),)
+      )
     return cls(n, file_offset, length)
 
   def encode(self) -> bytes:
@@ -918,8 +933,9 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
     data = self.read(length, offset=offset, longread=True)
     if len(data) != length:
       raise RuntimeError(
-          "%r: asked for %d bytes from offset %d, but got %d"
-          % (self.path, length, offset, len(data)))
+          "%r: asked for %d bytes from offset %d, but got %d" %
+          (self.path, length, offset, len(data))
+      )
     return data
 
 class PlatonicDir(_FilesDir):
@@ -936,17 +952,21 @@ class PlatonicDir(_FilesDir):
 
   # delays during scanning to limit the CPU and I/O impact of the
   # monitoring and updating
-  DELAY_INTERSCAN = 1.0     # regular pause between directory scans
-  DELAY_INTRASCAN = 0.1     # stalls during scan: per directory and after big files
+  DELAY_INTERSCAN = 1.0  # regular pause between directory scans
+  DELAY_INTRASCAN = 0.1  # stalls during scan: per directory and after big files
 
   index_entry_class = PlatonicDirIndexEntry
 
   def __init__(
       self,
-      statedirpath, hashclass,
+      statedirpath,
+      hashclass,
       *,
-      exclude_dir=None, exclude_file=None,
-      follow_symlinks=False, archive=None, meta_store=None,
+      exclude_dir=None,
+      exclude_file=None,
+      follow_symlinks=False,
+      archive=None,
+      meta_store=None,
       **kw
   ):
     ''' Initialise the PlatonicDir with `statedirpath` and `datadirpath`.
@@ -1080,7 +1100,8 @@ class PlatonicDir(_FilesDir):
       with Pfx("%r", datadirpath):
         seen = set()
         info("scan tree...")
-        for dirpath, dirnames, filenames in os.walk(datadirpath, followlinks=True):
+        for dirpath, dirnames, filenames in os.walk(datadirpath,
+                                                    followlinks=True):
           time.sleep(self.DELAY_INTRASCAN)
           if self.cancelled or self.flag_scan_disable:
             break
@@ -1103,7 +1124,10 @@ class PlatonicDir(_FilesDir):
               if ino in seen:
                 # we have seen this subdir before, probably via a symlink
                 # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                debug("seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0], ino[1])
+                debug(
+                    "seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0],
+                    ino[1]
+                )
                 continue
               seen.add(ino)
               pruned_dirnames.append(dname)
@@ -1132,11 +1156,8 @@ class PlatonicDir(_FilesDir):
                   continue
                 # look up this file in our file state index
                 DFstate = filemap.get(rfilepath)
-                if (
-                    DFstate is not None
-                    and D is not None
-                    and filename not in D
-                ):
+                if (DFstate is not None and D is not None
+                    and filename not in D):
                   # in filemap, but not in dir: start again
                   warning("in filemap but not in Dir, rescanning")
                   filemap.del_path(rfilepath)
@@ -1174,22 +1195,27 @@ class PlatonicDir(_FilesDir):
                     blockQ = IterableQueue()
                     R = meta_store._defer(
                         lambda B, Q: top_block_for(spliced_blocks(B, Q)),
-                        E.block, blockQ)
+                        E.block, blockQ
+                    )
                   scan_from = DFstate.scanned_to
                   scan_start = time.time()
                   for offset, flags, data, post_offset in DFstate.scanfrom(
-                      offset=DFstate.scanned_to, do_decompress=True,
+                      offset=DFstate.scanned_to,
+                      do_decompress=True,
                   ):
                     assert flags == 0
                     hashcode = self.hashclass.from_chunk(data)
-                    indexQ.put( (
-                        hashcode,
-                        PlatonicDirIndexEntry(DFstate.filenum, offset, len(data)),
-                        post_offset
-                    ) )
+                    indexQ.put(
+                        (
+                            hashcode,
+                            PlatonicDirIndexEntry(
+                                DFstate.filenum, offset, len(data)
+                            ), post_offset
+                        )
+                    )
                     if meta_store is not None:
                       B = Block(data=data, hashcode=hashcode, added=True)
-                      blockQ.put( (offset, B) )
+                      blockQ.put((offset, B))
                     DFstate.scanned_to = post_offset
                     if self.cancelled or self.flag_scan_disable:
                       break
@@ -1212,15 +1238,15 @@ class PlatonicDir(_FilesDir):
                     scan_rate = None
                   if scan_rate is None:
                     info(
-                        "scanned to %d: %s",
-                        DFstate.scanned_to,
-                        transcribe_bytes_geek(scanned))
+                        "scanned to %d: %s", DFstate.scanned_to,
+                        transcribe_bytes_geek(scanned)
+                    )
                   else:
                     info(
-                        "scanned to %d: %s at %s/s",
-                        DFstate.scanned_to,
+                        "scanned to %d: %s at %s/s", DFstate.scanned_to,
                         transcribe_bytes_geek(scanned),
-                        transcribe_bytes_geek(scan_rate))
+                        transcribe_bytes_geek(scan_rate)
+                    )
                   # stall after a file scan, briefly, to limit impact
                   if elapsed > 0:
                     time.sleep(min(elapsed, self.DELAY_INTRASCAN))

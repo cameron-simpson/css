@@ -39,9 +39,7 @@ class DataRecord(PacketField):
   ''' A data chunk file record.
   '''
 
-  TEST_CASES = (
-      (b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),
-  )
+  TEST_CASES = ((b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),)
 
   def __init__(self, data, is_compressed=False):
     self._data = data
@@ -108,7 +106,10 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     self._rlock = None
 
   def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
+    return "%s(%s)" % (
+        type(self).__name__,
+        self.pathname,
+    )
 
   def startup(self):
     ''' Start up the DataFile: open the read and write file descriptors.
@@ -117,8 +118,9 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     S = fstat(rfd)
     if not S_ISREG(S.st_mode):
       raise RuntimeError(
-          "fd %d: not a regular file: mode=0o%o: %r"
-          % (rfd, S.st_mode, self.pathname))
+          "fd %d: not a regular file: mode=0o%o: %r" %
+          (rfd, S.st_mode, self.pathname)
+      )
     self._rfd = rfd
     self._rlock = Lock()
 
@@ -195,7 +197,7 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
       if runstate and runstate.cancelled:
         return False
       data = DR.data
-      Q.put( (data, post_offset - offset) )
+      Q.put((data, post_offset - offset))
       offset = post_offset
     return True
 
@@ -213,7 +215,10 @@ class DataFileWriter(MultiOpenMixin):
     self._wlock = None
 
   def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
+    return "%s(%s)" % (
+        type(self).__name__,
+        self.pathname,
+    )
 
   def startup(self):
     ''' Start up the DataFile: open the read and write file descriptors.
@@ -250,8 +255,9 @@ class DataFileWriter(MultiOpenMixin):
       # notice short writes, which should never happen with a regular file...
       while written < len(bs):
         warning(
-            "%s: tried to write %d bytes but only wrote %d, retrying",
-            self, len(bs), written)
+            "%s: tried to write %d bytes but only wrote %d, retrying", self,
+            len(bs), written
+        )
         bs = bs[written:]
         written = os.write(wfd, bs)
       if is_locked:

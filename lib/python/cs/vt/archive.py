@@ -38,10 +38,12 @@ class ArchiveEntry(PacketField):
 
   @require(lambda when: when is None or isinstance(when, float))
   @require(lambda dirent: dirent is None or isinstance(dirent, _Dirent))
-  @require(lambda when, dirent: (
-      (when is None and dirent is None)
-      or
-      (when is not None and dirent is not None)))
+  @require(
+      lambda when, dirent: (
+          (when is None and dirent is None) or
+          (when is not None and dirent is not None)
+      )
+  )
   def __init__(self, when, dirent):
     super().__init__(None)
     self.when = when
@@ -80,8 +82,8 @@ def Archive(path, missing_ok=False, weird_ok=False, config=None):
     clause_name, archive_name, offset = get_clause_archive(path)
     if offset < len(path):
       raise ValueError(
-          "unparsed text after archive name: %r"
-          % (path[offset:],))
+          "unparsed text after archive name: %r" % (path[offset:],)
+      )
     S = config[clause_name]
     return S.get_Archive(archive_name, missing_ok=missing_ok)
   # otherwise a file pathname
@@ -89,7 +91,9 @@ def Archive(path, missing_ok=False, weird_ok=False, config=None):
     if weird_ok:
       warning("unusual Archive path: %r", path)
     else:
-      raise ValueError("invalid Archive path (should end in '.vt'): %r" % (path,))
+      raise ValueError(
+          "invalid Archive path (should end in '.vt'): %r" % (path,)
+      )
   if not missing_ok and not isfile(path):
     raise ValueError("not a file: %r" % (path,))
   return FilePathArchive(path)
@@ -199,7 +203,8 @@ class BaseArchive(ABC):
           same transcription as `previous`, default False
         * `source`: optional source indicator for the update, default None
     '''
-    assert isinstance(E, _Dirent), "expected E<%s> to be a _Dirent" % (type(E),)
+    assert isinstance(E,
+                      _Dirent), "expected E<%s> to be a _Dirent" % (type(E),)
     etc = E.name
     if not force:
       # see if we should discard this update
@@ -220,8 +225,8 @@ class BaseArchive(ABC):
         notify(E, when=when, source=source)
       except Exception as e:
         exception(
-            "notify[%s](%s,when=%s,source=%s): %s",
-            notify, E, when, source, e)
+            "notify[%s](%s,when=%s,source=%s): %s", notify, E, when, source, e
+        )
     return s
 
 class FilePathArchive(BaseArchive):
@@ -297,8 +302,9 @@ def apply_posix_stat(src_st, ospath):
     if uid != -1 or gid != -1:
       with Pfx("chown(uid=%d,gid=%d)", uid, gid):
         debug(
-            "chown(%r,%d,%d) from %d:%d",
-            ospath, uid, gid, path_st.st_uid, path_st.st_gid)
+            "chown(%r,%d,%d) from %d:%d", ospath, uid, gid, path_st.st_uid,
+            path_st.st_gid
+        )
         try:
           os.chown(ospath, uid, gid)
         except OSError as e:
@@ -318,6 +324,7 @@ def apply_posix_stat(src_st, ospath):
       if mst_mtime != st_mtime:
         with Pfx("chmod(0o%04o)", mst_perms):
           debug(
-              "utime(%r,atime=%s,mtime=%s) from mtime=%s",
-              ospath, path_st.st_atime, mst_mtime, st_mtime)
+              "utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath,
+              path_st.st_atime, mst_mtime, st_mtime
+          )
           os.utime(ospath, (path_st.st_atime, mst_mtime))

@@ -34,7 +34,7 @@ and exception messages like:
 which lets one put just the relevant complaint in exception and log
 messages and get useful calling context on the output.
 This does make for wordier logs and exceptions
-but used with a little discretion produces far more debugable results.
+but used with a little discretion produces far more debuggable results.
 '''
 
 from __future__ import print_function
@@ -246,6 +246,21 @@ class Pfx(object):
           true, this message forms the base of the message prefixes;
           existing prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
+
+        *Note*:
+        the `mark` and `args` are only combined if the `Pfx` instance gets used,
+        for example for logging or to annotate an exception.
+        Otherwise, they are not combined.
+        Therefore the values interpolated are as they are when the `Pfx` is used,
+        not necessarily as they were when the `Pfx` was created.
+        If `args` is subject to change and you require the original values,
+        apply them to `mark` immediately, for example:
+
+            with Pfx('message %s ...' % (arg1, arg2, ...)):
+
+        This is a bit more expensive, and the common usage is:
+
+            with Pfx('message %s ...', arg1, arg2, ...):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
@@ -287,32 +302,54 @@ class Pfx(object):
               + ': ' \
               + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
 
-        did_prefix = False
-        for attr in 'args', 'message', 'msg', 'reason':
-          try:
-            value = getattr(exc_value, attr)
-          except AttributeError:
-            pass
-          else:
-            if isinstance(value, StringTypes):
-              value = prefixify(value)
+        def prefixify_exc(e):
+          ''' Modify the supplied exception `e` with the current prefix.
+              Return true if modified, false if unable to modify.
+          '''
+          did_prefix = False
+          for attr in 'args', 'message', 'msg', 'reason':
+            try:
+              value = getattr(e, attr)
+            except AttributeError:
+              pass
             else:
-              try:
-                vlen = len(value)
-              except TypeError:
-                print(
-                    "warning: %s: %s.%s: " % (current_prefix, exc_value, attr),
-                    prefixify("do not know how to prefixify: %r" % (value,)),
-                    file=sys.stderr
-                )
-                continue
+              if isinstance(value, StringTypes):
+                value = prefixify(value)
+              elif isinstance(value, Exception):
+                # set did_prefix if we modify this in place
+                did_prefix = prefixify_exc(value)
               else:
-                if vlen < 1:
-                  value = [prefixify(repr(value))]
+                try:
+                  vlen = len(value)
+                except TypeError:
+                  print(
+                      "warning: %s: %s.%s: " % (current_prefix, e, attr),
+                      prefixify(
+                          "do not know how to prefixify: %s:%r" %
+                          (type(value), value)
+                      ),
+                      file=sys.stderr
+                  )
+                  continue
                 else:
-                  value = [prefixify(value[0])] + list(value[1:])
-            setattr(exc_value, attr, value)
-            did_prefix = True
+                  if vlen < 1:
+                    value = [prefixify(repr(value))]
+                  else:
+                    value = [prefixify(value[0])] + list(value[1:])
+              if not did_prefix:
+                try:
+                  setattr(e, attr, value)
+                except AttributeError as e2:
+                  print(
+                      "warning: %s: %s.%s: cannot set to %r: %s" %
+                      (current_prefix, e, attr, value, e2),
+                      file=sys.stderr
+                  )
+                  continue
+              did_prefix = True
+          return did_prefix
+
+        did_prefix = prefixify_exc(exc_value)
         if not did_prefix:
           print(
               "warning: %s: %s:%s: message not prefixed" %
@@ -345,7 +382,11 @@ class Pfx(object):
         except TypeError as e:
           logging.warning(
               "FORMAT CONVERSION: %s: %r %% %r",
-              e, u, self.mark_args,exc_info=True)
+              e,
+              u,
+              self.mark_args,
+              exc_info=True
+          )
           u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u

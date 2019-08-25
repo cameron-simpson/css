@@ -31,7 +31,7 @@ DISTINFO = {
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module's __dict__.
+      formatted against the function's module's `__dict__`.
 
       This supports simple formatted docstrings:
 
@@ -54,43 +54,51 @@ def fmtdoc(func):
   return func
 
 def decorator(deco):
-  ''' Wrapper for decorator functions to support optional keyword arguments.
+  ''' Wrapper for decorator functions to support optional arguments.
+      The actual decorator function ends up being called as:
+
+          deco(func, *da, **dkw)
+
+      allowing `da` and `dkw` to affect the behaviour of the decorator `deco`.
 
       Examples:
 
           @decorator
-          def dec(func, **dkw):
-            ...
-          @dec
+          def deco(func, *da, kw=None):
+            ... decorate func subject to the values of da and kw
+          @deco
           def func1(...):
             ...
-          @dec(foo='bah')
+          @deco('foo', arg2='bah')
           def func2(...):
             ...
   '''
 
-  def overdeco(*da, **dkw):
-    if not da:
+  def metadeco(*da, **dkw):
+    # TODO: general handling of first-argument-callable
+    # to support func2 = deco(func1, args..., kwargs...).
+    # Currently this must be done as:
+    # func2=deco(args..., kwargs...)(func1)
+    #
+    # if there's exactly one callable position argument
+    # then it is the target function: call deco(func).
+    if len(da) == 1 and callable(da[0]) and not dkw:
+      func = da[0]
+      decorated = deco(func)
+      decorated.__doc__ = getattr(func, '__doc__', '')
+      return decorated
+    # otherwise we collect the arguments supplied
+    # and return a function which takes a callable
+    # and returns deco(func, *da, **kw).
+    def overdeco(func):
+      decorated = deco(func, *da, **dkw)
+      decorated.__doc__ = getattr(func, '__doc__', '')
+      return decorated
 
-      def wrapper(*a, **dkw2):
-        dkw.update(dkw2)
-        func, = a
-        dfunc = deco(func, **dkw)
-        dfunc.__doc__ = getattr(func, '__doc__', '')
-        return dfunc
+    return overdeco
 
-      return wrapper
-    if len(da) > 1:
-      raise ValueError(
-          "extra positional arguments after function: %r" % (da[1:],)
-      )
-    func = da[0]
-    dfunc = deco(func, **dkw)
-    dfunc.__doc__ = getattr(func, '__doc__', '')
-    return dfunc
-
-  overdeco.__doc__ = getattr(deco, '__doc__', '')
-  return overdeco
+  metadeco.__doc__ = getattr(deco, '__doc__', '')
+  return metadeco
 
 @decorator
 def cached(
@@ -223,9 +231,9 @@ def strable(func, open_func=None):
 
       Parameters:
       * `func`: the function to decorate
-      * `open_func`: the "open" factory to produce the core type form
-        the string if a string is provided; the default is the builtin
-        "open" function
+      * `open_func`: the "open" factory to produce the core type
+        if a string is provided;
+        the default is the builtin "open" function
 
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
@@ -242,8 +250,8 @@ def strable(func, open_func=None):
           class Recording:
             "Class representing a video recording."
             ...
-          @strable
-          def process_video(r, open_func=Recording):
+          @strable(open_func=Recording)
+          def process_video(r):
             ... do stuff with `r` as a Recording instance ...
   '''
   if open_func is None:

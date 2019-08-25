@@ -161,9 +161,9 @@ def main(argv=None):
         print "Adapter", An, A.product_name, "serial#", A.serial_no
         for Vn, V in A.virtual_drives.items():
           print "  Virtual Drive", Vn
-          print "    %d drives, size = %s%s, raid = %s" % (len(V.physical_disks), V.size, V.size_units, V.raid_level)
+          print "    %s: %d drives, size = %s%s, raid = %s" % (V.state, len(V.physical_disks), V.size, V.size_units, V.raid_level)
           for DRVn, DRV in V.physical_disks.items():
-            print "      physical drive", DRV.id, "[%s]" % (DRV.enc_slot,)
+            print "      physical drive %s[%s] %s" % (DRV.id, DRV.enc_slot, DRV.firmware_state)
         print "  %d drives:" % (len(A.physical_disks),)
         for DRV in A.physical_disks.values():
           print "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,

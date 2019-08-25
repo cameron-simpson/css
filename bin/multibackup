@@ -12,9 +12,10 @@ usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
   -x            Trace execution.
   --copy-times  Passed to histbackup."
 
+rsopts=
 hbopts=
 trace=
-[ -t 2 ] && { trace=set-x hbopts="$hbopts -x"; }
+[ -t 2 ] && { trace=set-x hbopts="$hbopts -x" rsopts="$rsopts --progress"; }
 
 badopts=
 
@@ -39,7 +40,6 @@ then
   echo "$cmd: missing srcpath:dstpath" >&2
   badopts=1
 else
-  rsopts=
   rspart=
   for src_dst
   do
@@ -49,7 +49,7 @@ else
     else
       case "$src_dst" in
         ?*:?*) ;;
-        -*) rsopts=$src_dst rspart=1 ;;
+        -*) rsopts="$rsopts $src_dst" rspart=1 ;;
         *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
             badopts=1
             ;;
