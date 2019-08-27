@@ -53,7 +53,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       the keyword parameter `session` to support nested calls.
   '''
   if session:
-    # run the function nside a savepoint in the supplied session
+    # run the function inside a savepoint in the supplied session
     with session.begin_nested():
       return func(*a, session=session, **kw)
   if not orm:
