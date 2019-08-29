@@ -274,12 +274,12 @@ def pypipkg(pkgname, vcs, pypi_url=None):
   release_number = tag.split('-', 1)[1]
   latest_suffix = release_number
   release_entry = clean_release_entry(entry)
-  preamble_md = f'Release {release_number}:\n{release_entry}'
+  preamble_md = f'*Release {release_number}*:\n{release_entry}'
   postamble_parts=[]
   for tag, entry in release_log:
     release_number = tag.split('-', 1)[1]
     release_entry = clean_release_entry(entry)
-    postamble_parts.append(f'Release {release_number}:\n{release_entry}')
+    postamble_parts.append(f'*Release {release_number}*:\n{release_entry}')
   postamble_md = '\n\n# Release Log\n\n' + '\n\n'.join(postamble_parts)
   return PyPI_Package(
       pypi_url, pkgname, latest_suffix, defaults=dict(DISTINFO_DEFAULTS),

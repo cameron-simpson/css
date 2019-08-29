@@ -1,0 +1,2 @@
+Bugfix @json_column setter: mark the column as modified for the ORM.
+New push_log_level context manager and @log_level decorator to temporarily change the SQLAlchemy logging handler level.

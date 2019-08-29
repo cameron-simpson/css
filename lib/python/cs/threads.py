@@ -51,10 +51,10 @@ def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
         If true, do not start the `Thread`.
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
   '''
-  if not no_logexc:
-    func = logexc(func)
   if name is None:
     name = funcname(func)
+  if not no_logexc:
+    func = logexc(func)
   T = Thread(name=name, target=func)
   if daemon is not None:
     T.daemon = daemon
