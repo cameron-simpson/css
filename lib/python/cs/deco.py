@@ -55,21 +55,24 @@ def fmtdoc(func):
 
 def decorator(deco):
   ''' Wrapper for decorator functions to support optional arguments.
+
       The actual decorator function ends up being called as:
 
-          deco(func, *da, **dkw)
+          mydeco(func, *da, **dkw)
 
-      allowing `da` and `dkw` to affect the behaviour of the decorator `deco`.
+      allowing `da` and `dkw` to affect the behaviour of the decorator `mydeco`.
 
       Examples:
 
           @decorator
-          def deco(func, *da, kw=None):
+          def mydeco(func, *da, kw=None):
             ... decorate func subject to the values of da and kw
-          @deco
+
+          @mydeco
           def func1(...):
             ...
-          @deco('foo', arg2='bah')
+
+          @mydeco('foo', arg2='bah')
           def func2(...):
             ...
   '''
