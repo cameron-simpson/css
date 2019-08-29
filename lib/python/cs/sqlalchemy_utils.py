@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+import logging
 from sqlalchemy.ext.declarative import declarative_base
 from icontract import require
 from cs.deco import decorator
@@ -75,6 +76,33 @@ def auto_session(func):
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
   wrapper.__doc__ = func.__doc__
+  return wrapper
+
+@contextmanager
+def push_log_level(level):
+  ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
+      Yields the logger.
+
+      *NOTE*: this is not MT safe - competing Threads can mix log levels up.
+  '''
+  logger = logging.getLogger('sqlalchemy.engine')
+  old_level =logger.level
+  logger.setLevel(level)
+  yield logger
+  logger.setLevel(old_level)
+
+@decorator
+def log_level(func, level=None):
+  ''' Decorator to run `func` at the specified logging `level`, default `logging.DEBUG`.
+  '''
+  if level is None:
+    level = logging.DEBUG
+  def wrapper(*a,**kw):
+    ''' Push the desired log level and run the function.
+    '''
+    with push_log_level(level):
+      return func(*a,**kw)
+  wrapper.__name__="@log_level(%s,%s)" %(func,level)
   return wrapper
 
 class ORM(MultiOpenMixin):
