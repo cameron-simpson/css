@@ -89,6 +89,7 @@ def decorator(deco):
       func = da[0]
       decorated = deco(func)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      decorated.__module__ = getattr(func, '__module__')
       return decorated
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
@@ -96,11 +97,13 @@ def decorator(deco):
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      decorated.__module__ = getattr(func, '__module__')
       return decorated
 
     return overdeco
 
   metadeco.__doc__ = getattr(deco, '__doc__', '')
+  metadeco.__module__ = getattr(deco, '__module__')
   return metadeco
 
 @decorator

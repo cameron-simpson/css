@@ -274,7 +274,7 @@ def pypipkg(pkgname, vcs, pypi_url=None):
   release_number = tag.split('-', 1)[1]
   latest_suffix = release_number
   release_entry = clean_release_entry(entry)
-  preamble_md = f'*Release {release_number}*:\n{release_entry}'
+  preamble_md = f'*Latest release {release_number}*:\n{release_entry}'
   postamble_parts=[]
   for tag, entry in release_log:
     release_number = tag.split('-', 1)[1]
