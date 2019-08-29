@@ -347,7 +347,9 @@ def json_column(
 
       This annotates the class with a `.virtual_name` property
       which can be accessed or set,
-      accessing or modifying the associated JSON column.
+      accessing or modifying the associated JSON column
+      (in this instance, the column `info`,
+      accessing `info['json']['field']['name']`).
   '''
   if json_field_name is None:
     json_field_name = attr
