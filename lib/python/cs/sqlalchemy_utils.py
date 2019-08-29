@@ -6,6 +6,7 @@
 from contextlib import contextmanager
 import logging
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.attributes import flag_modified
 from icontract import require
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
@@ -363,6 +364,7 @@ def json_column(
         column_value, json_field_name, value, infill=True
     )
     setattr(row, json_column_name, column_value)
+    flag_modified(row, json_column_name)
 
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))
