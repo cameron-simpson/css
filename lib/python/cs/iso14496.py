@@ -243,7 +243,7 @@ class BoxBody(Packet):
     '''
     B = cls()
     B.box = box
-    B.start_offset = bfr.offset
+    B.offset = bfr.offset
     B.parse_buffer(bfr, **kw)
     B.self_check()
     return B
@@ -304,6 +304,12 @@ class Box(Packet):
     if unparsed:
       s += ":unparsed=%d" % (len(unparsed,))
     return s
+
+  @property
+  def offset(self):
+    ''' The offset of a Box if the offset of its header.
+    '''
+    return self.header.offset
 
   def transcribe(self):
     ''' Transcribe the Box.
@@ -390,7 +396,6 @@ class Box(Packet):
         overridden by subclasses.
     '''
     B = cls()
-    B.offset = bfr.offset
     try:
       B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
     except EOFError as e:
