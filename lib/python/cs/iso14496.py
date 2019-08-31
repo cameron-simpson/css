@@ -399,6 +399,10 @@ class Box(Packet):
     '''
     return self.header.offset
 
+  @property
+  def boxes(self):
+    return self.body.boxes
+
   def transcribe(self):
     ''' Transcribe the Box.
 
