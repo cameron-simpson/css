@@ -461,13 +461,13 @@ class Box(Packet):
 
   def __getattr__(self, attr):
     # .TYPE - the sole item in self.boxes matching b'type'
-    if len(attr) == 4 and all(c.isupper() for c in attr):
+    if len(attr) == 4 and attr.isupper():
       box, = getattr(self, attr + 's')
       return box
     # .TYPEs - all items of self.boxes matching b'type'
     if len(attr) == 5 and attr.endswith('s'):
       attr4 = attr[:4]
-      if all(c.isupper() for c in attr4):
+      if attr4.isupper():
         box_type = attr4.lower().encode('ascii')
         boxes = [box for box in self.boxes if box.box_type == box_type]
         return boxes
