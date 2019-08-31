@@ -39,6 +39,7 @@ from cs.binary import (
     structtuple,
 )
 from cs.buffer import CornuCopyBuffer
+from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -85,6 +86,19 @@ def main(argv):
             parsee = spec
           over_box, = parse(parsee)
           over_box.dump()
+    elif op == 'deref':
+      spec = argv.pop(0)
+      with Pfx(spec):
+        if spec == '-':
+          parsee = sys.stdin.fileno()
+        else:
+          parsee = spec
+        over_box, = parse(parsee)
+        over_box.dump()
+        for path in argv:
+          with Pfx(path):
+            B = deref_box(over_box, path)
+            print(path, "offset=%d" % B.offset, B)
     elif op == 'extract':
       skip_header = False
       if argv and argv[0] == '-H':
@@ -148,6 +162,80 @@ B0_256 = bytes(256)
 
 # an arbitrary maximum read size for fetching the data section
 SIZE_16MB = 1024 * 1024 * 16
+
+def parse_deref_path(path, offset=0):
+  ''' Parse a `path` string from `offset`.
+      Return the path components and the offset where the parse stopped.
+
+      Path components:
+      * _identifier_: an identifier represents a Box field or if such a
+        field is not present, a the first subbox of this type
+      * `[`_index_`]`: the subbox with index _index_
+
+      Examples:
+
+          >>> parse_deref_path('.abcd[5]')
+          ['abcd', 5]
+  '''
+  parts = []
+  while offset < len(path):
+    try:
+      # .type
+      if path.startswith('.', offset):
+        name, offset2 = get_identifier(path, offset + 1)
+        if name:
+          parts.append(name)
+          offset = offset2
+          continue
+    except ValueError as e:
+      pass
+    try:
+      # [index]
+      if path.startswith('[', offset):
+        n, offset2 = get_decimal_value(path, offset + 1)
+        if path.startswith(']', offset2):
+          parts.append(n)
+          offset = offset2 + 1
+          continue
+    except ValueError as e:
+      pass
+    break
+  return parts, offset
+
+def deref_box(B, path):
+  ''' Dereference a path with respect to this Box.
+  '''
+  with Pfx("deref_path(%r)", path):
+    if isinstance(path, str):
+      parts, offset = parse_deref_path(path)
+      if offset < len(path):
+        raise ValueError(
+            "parse_path(%r): stopped early at %d:%r" %
+            (path, offset, path[offset:])
+        )
+      return deref_box(B, parts)
+    for i, part in enumerate(path):
+      with Pfx("%d:%r", i, part):
+        nextB = None
+        if isinstance(part, str):
+          # .field_name[n] or .field_name or .box_type
+          try:
+            nextB = getattr(B, part)
+          except AttributeError:
+            if len(part) == 4:
+              try:
+                nextB = getattr(B, part.upper())
+              except AttributeError:
+                pass
+        elif isinstance(part, int):
+          # [index]
+          nextB = B[part]
+        else:
+          raise ValueError("unhandled path component")
+        if nextB is None:
+          raise IndexError("no match")
+        B = nextB
+    return B
 
 class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
