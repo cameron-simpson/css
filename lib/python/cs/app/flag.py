@@ -308,7 +308,7 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       self.flags[flagname] = value
     else:
-      super().__setattr__(attr, value)
+      object.__setattr__(self, attr, value)
 
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)

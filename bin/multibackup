@@ -10,7 +10,8 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
   -i            Itemise changes.
   -x            Trace execution.
-  --copy-times  Passed to histbackup."
+  --copy-times, --no-symlink-if-unchanged
+                Passed to histbackup."
 
 rsopts=
 hbopts=
@@ -24,7 +25,7 @@ do
   case $1 in
     -i) hbopts="$hbopts $1" ;;
     -x) trace=set-x hbopts="$hbopts $1" ;;
-    --copy-times)
+    --copy-times | --no-symlink-if-unchanged )
         hbopts="$hbopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -49,7 +50,7 @@ else
     else
       case "$src_dst" in
         ?*:?*) ;;
-        -*) rsopts=$src_dst rspart=1 ;;
+        -*) rsopts="$rsopts $src_dst" rspart=1 ;;
         *)  echo "$cmd: invalid srcpath:dstpath: $src_dst" >&2
             badopts=1
             ;;

@@ -40,15 +40,21 @@ DISTINFO = {
     ],
 }
 
-def bg(func, daemon=None, name=None, no_start=False):
+def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
   ''' Dispatch the callable `func` in its own Thread; return the Thread.
 
       Parameters:
+      * `func`: callable to run in its own `Thread`.
       * `daemon`: optional argument specifying the .daemon attribute.
       * `name`: optional argument specifying the Thread name.
       * `no_start`: optional argument, default `False`.
-        If true, do not start the Thread.
+        If true, do not start the `Thread`.
+      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
   '''
+  if name is None:
+    name = funcname(func)
+  if not no_logexc:
+    func = logexc(func)
   T = Thread(name=name, target=func)
   if daemon is not None:
     T.daemon = daemon

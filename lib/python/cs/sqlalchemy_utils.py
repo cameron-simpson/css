@@ -4,10 +4,13 @@
 '''
 
 from contextlib import contextmanager
-from icontract import require
+import logging
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.attributes import flag_modified
+from icontract import require
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
+from cs.resources import MultiOpenMixin
 
 DISTINFO = {
     'description':
@@ -15,7 +18,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Database",
     ],
@@ -24,6 +26,7 @@ DISTINFO = {
         'sqlalchemy',
         'cs.deco',
         'cs.py.func',
+        'cs.resources',
     ],
 }
 
@@ -34,7 +37,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       nested if the session already exists.
 
       This is the inner mechanism of `@auto_session` and
-      `ORM.auto_session_method`.
+      `ORM.auto_session`.
 
       Parameters:
       * `func`: the function to call
@@ -42,6 +45,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       * `orm`: optional ORM class with a `.session()` context manager method
         such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
+      * `kw`: other keyword arguments, passed to `func`
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
@@ -51,7 +55,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       the keyword parameter `session` to support nested calls.
   '''
   if session:
-    # run the function nside a savepoint in the supplied session
+    # run the function inside a savepoint in the supplied session
     with session.begin_nested():
       return func(*a, session=session, **kw)
   if not orm:
@@ -63,6 +67,8 @@ def auto_session(func):
   ''' Decorator to run a function in a session if one is not presupplied.
       The function `func` runs within a transaction,
       nested if the session already exists.
+
+      See `with_session` for details.
   '''
 
   @require(lambda orm, session: orm is not None or session is not None)
@@ -73,23 +79,57 @@ def auto_session(func):
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
   wrapper.__doc__ = func.__doc__
+  wrapper.__module__ = getattr(func, '__module__', None)
   return wrapper
 
-class ORM:
+@contextmanager
+def push_log_level(level):
+  ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
+      Yields the logger.
+
+      *NOTE*: this is not MT safe - competing Threads can mix log levels up.
+  '''
+  logger = logging.getLogger('sqlalchemy.engine')
+  old_level = logger.level
+  logger.setLevel(level)
+  yield logger
+  logger.setLevel(old_level)
+
+@decorator
+def log_level(func, level=None):
+  ''' Decorator to run `func` at the specified logging `level`, default `logging.DEBUG`.
+  '''
+  if level is None:
+    level = logging.DEBUG
+
+  def wrapper(*a, **kw):
+    ''' Push the desired log level and run the function.
+    '''
+    with push_log_level(level):
+      return func(*a, **kw)
+
+  wrapper.__name__ = "@log_level(%s,%s)" % (func, level)
+  return wrapper
+
+class ORM(MultiOpenMixin):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
       and provides various Session related convenience methods.
+      It is also a `MultiOpenMixin` subclass
+      supporting nested open/close sequences and use as a context manager.
 
-      Subclasses must define their own `.Session` factory in
-      their own `__init__`, for example:
-
-          self.Session = sessionmaker(bind=engine)
+      Subclasses must define the following:
+      * `.Session`: a factory in their own `__init__`, typically
+        `self.Session=sessionmaker(bind=engine)`
+      * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
+        even if these just `pass`
   '''
 
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
+    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self):
@@ -97,20 +137,23 @@ class ORM:
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
-    new_session = self.Session()
-    try:
-      yield new_session
-      new_session.commit()
-    except:
-      new_session.rollback()
-      raise
-    finally:
-      new_session.close()
+    with self:
+      new_session = self.Session()
+      try:
+        yield new_session
+        new_session.commit()
+      except:
+        new_session.rollback()
+        raise
+      finally:
+        new_session.close()
 
   @staticmethod
   def auto_session(method):
     ''' Decorator to run a method in a session derived from this ORM
         if a session is not presupplied.
+
+        See `with_session` for details.
     '''
 
     def wrapper(self, *a, session=None, **kw):
@@ -118,14 +161,17 @@ class ORM:
       '''
       return with_session(method, self, *a, session=session, orm=self, **kw)
 
-    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method,),)
+    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
+    wrapper.__module__ = getattr(method, '__module__', None)
     return wrapper
 
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
       Intended to assist classes with a `.orm` attribute.
+
+      See `with_session` for details.
   '''
 
   def wrapper(self, *a, session=None, **kw):
@@ -135,6 +181,7 @@ def orm_auto_session(method):
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
+  wrapper.__module__ = getattr(method, '__module__', None)
   return wrapper
 
 @require(
@@ -242,7 +289,7 @@ def get_json_field(column_value, field_name, *, default=None):
   except KeyError:
     return None
   else:
-    return final_field.get(final_field_name)
+    return final_field.get(final_field_name, default)
 
 def set_json_field(column_value, field_name, value, *, infill=False):
   ''' Set a new `value` for `field_name` of `column_value`.
@@ -284,7 +331,7 @@ def set_json_field(column_value, field_name, value, *, infill=False):
 
 @decorator
 def json_column(
-    cls, attr, json_field_name=None, *, json_column='info', default=None
+    cls, attr, json_field_name=None, *, json_column_name='info', default=None
 ):
   ''' Class decorator to declare a virtual column name on a table
       where the value resides inside a JSON column of the table.
@@ -295,7 +342,7 @@ def json_column(
       * `json_field_name`: the field within the JSON column
         used to store this value,
         default the same as `attr`
-      * `json_column`: the name of the associated JSON column,
+      * `json_column_name`: the name of the associated JSON column,
         default `'info'`
       * `default`: the default value returned by the getter
         if the field is not present,
@@ -311,23 +358,26 @@ def json_column(
 
       This annotates the class with a `.virtual_name` property
       which can be accessed or set,
-      accessing or modifying the associated JSON column.
+      accessing or modifying the associated JSON column
+      (in this instance, the column `info`,
+      accessing `info['json']['field']['name']`).
   '''
   if json_field_name is None:
     json_field_name = attr
 
   def get_col(row):
-    column_value = getattr(row, json_column)
+    column_value = getattr(row, json_column_name)
     return get_json_field(column_value, json_field_name, default=default)
 
   getter = property(get_col)
 
   def set_col(row, value):
-    column_value = getattr(row, json_column)
+    column_value = getattr(row, json_column_name)
     column_value = set_json_field(
         column_value, json_field_name, value, infill=True
     )
-    setattr(row, json_column, column_value)
+    setattr(row, json_column_name, column_value)
+    flag_modified(row, json_column_name)
 
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))
