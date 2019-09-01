@@ -390,6 +390,49 @@ class SharedCSVFile(SharedAppendLines):
     with self.open() as wfp:
       yield csv.writer(wfp, dialect=self.dialect, **self.fmtparams)
 
+class SharedWriteable(object):
+  ''' Wrapper for a writable file with supported mutex based cooperation.
+
+      This is mostly a proxy for the wrapped file
+      exceptthat all `.write` calls are serialised
+      and when used as a context manager
+      other writers are blocked.
+
+      This is to support shared use of an output stream
+      where certain outputs should be contiguous,
+      such as a standard error stream used to maintain a status line
+      or multiline messages.
+  '''
+
+  def __init__(self, f):
+    self.f = f
+    self._lock = RLock()
+
+  def __enter__(self):
+    ''' Take the lock and return.
+    '''
+    self._lock.acquire()
+    return self
+
+  def __exit__(self, *_):
+    ''' Release the lock and proceed.
+    '''
+    self._lock.release()
+    return False
+
+  def __getattr__(self, attr):
+    ''' This object is mostly a proxy for the wrapped file.
+    '''
+    with Pfx("%s.%s from self.f<%s>.%s", type(self).__name__, attr,
+             type(self.f).__name__, attr):
+      return getattr(self.f, attr)
+
+  def write(self, s):
+    ''' Obtain the lock and then run the wrapped `.write` method.
+    '''
+    with self._lock:
+      return self.f.write(s)
+
 if __name__ == '__main__':
   import cs.sharedfile_tests
   cs.sharedfile_tests.selftest(sys.argv)
