@@ -25,7 +25,8 @@ from cs.range import Range
 from cs.timeutils import TimeoutError
 
 DISTINFO = {
-    'description': "facilities for shared access to files",
+    'description':
+    "facilities for shared access to files",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -69,15 +70,16 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
   lockpath = path + ext
   while True:
     try:
-      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+      lockfd = os.open(lockpath, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0)
     except OSError as e:
       if e.errno != errno.EEXIST:
         raise
       if timeout is not None and timeout <= 0:
         # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
+        raise TimeoutError(
+            "cs.fileutils.lockfile: pid %d timed out on lockfile %r" %
+            (os.getpid(), lockpath), timeout
+        )
       now = time.time()
       # post: timeout is None or timeout > 0
       if start is None:
@@ -87,8 +89,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
       else:
         if now - complaint_last >= complaint_interval:
-          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
-                  os.getpid(), now - start, lockpath)
+          warning(
+              "cs.fileutils.lockfile: pid %d waited %ds for %r", os.getpid(),
+              now - start, lockpath
+          )
           complaint_last = now
           complaint_interval *= 2
       # post: start is set
@@ -98,9 +102,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         sleep_for = min(poll_interval, start + timeout - now)
       # test for timeout
       if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
+        raise TimeoutError(
+            "cs.fileutils.lockfile: pid %d timed out on lockfile %r" %
+            (os.getpid(), lockpath), timeout
+        )
       time.sleep(sleep_for)
       continue
     else:
@@ -135,9 +140,17 @@ class SharedAppendFile(object):
       received data into their natural records.
   '''
 
-  def __init__(self, pathname,
-               read_only=False, write_only=False, binary=False, newline=None,
-               lock_ext=None, lock_timeout=None, poll_interval=None):
+  def __init__(
+      self,
+      pathname,
+      read_only=False,
+      write_only=False,
+      binary=False,
+      newline=None,
+      lock_ext=None,
+      lock_timeout=None,
+      poll_interval=None
+  ):
     ''' Initialise this SharedAppendFile.
 
         Parameters:
@@ -255,10 +268,12 @@ class SharedAppendFile(object):
             with self._lockfile():
                 ... write data ...
     '''
-    return lockfile(self.pathname,
-                    ext=self.lock_ext,
-                    poll_interval=self.poll_interval,
-                    timeout=self.lock_timeout)
+    return lockfile(
+        self.pathname,
+        ext=self.lock_ext,
+        poll_interval=self.poll_interval,
+        timeout=self.lock_timeout
+    )
 
   @contextmanager
   def open(self):
@@ -365,9 +380,8 @@ class SharedCSVFile(SharedAppendLines):
   def __iter__(self):
     ''' Yield csv rows.
     '''
-    for row in csv.reader( (line for line in super().__iter__()),
-                           dialect=self.dialect,
-                           **self.fmtparams):
+    for row in csv.reader((line for line in super().__iter__()),
+                          dialect=self.dialect, **self.fmtparams):
       yield row
 
   @contextmanager
