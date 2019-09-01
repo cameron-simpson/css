@@ -358,8 +358,7 @@ class SharedAppendLines(SharedAppendFile):
   def __init__(self, *a, **kw):
     if 'binary' in kw:
       raise ValueError('may not specify binary=')
-    else:
-      kw['binary'] = False
+    kw['binary'] = False
     super().__init__(*a, **kw)
 
   def __iter__(self):
