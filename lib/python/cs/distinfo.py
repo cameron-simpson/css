@@ -252,12 +252,12 @@ def get_md_doc(
     doc_head, _ = full_doc.split('\n\n', 1)
   except ValueError:
     doc_head = full_doc
-  X("dir=%r,sort_key=%r",dir,sort_key)
   for Mname in sorted(dir(M), key=sort_key):
     if not filter_key(Mname):
       continue
     o = getattr(M, Mname, None)
-    if getmodule(o) is not M:
+    oM = getmodule(o)
+    if oM and oM is not M:
       # name imported from another module
       continue
     if not isclass(o) and not isfunction(o):
@@ -288,6 +288,8 @@ def get_md_doc(
           msig = signature(init_method)
           odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
       full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
+    else:
+      X("UNHANDLED %r, neither function nor class",Mname)
   if preamble_md:
     full_doc = preamble_md.rstrip() + '\n\n' + full_doc
   if postamble_md:

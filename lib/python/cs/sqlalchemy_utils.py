@@ -4,7 +4,9 @@
 '''
 
 from contextlib import contextmanager
+import logging
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.attributes import flag_modified
 from icontract import require
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
@@ -16,7 +18,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Database",
     ],
@@ -36,7 +37,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       nested if the session already exists.
 
       This is the inner mechanism of `@auto_session` and
-      `ORM.auto_session_method`.
+      `ORM.auto_session`.
 
       Parameters:
       * `func`: the function to call
@@ -44,6 +45,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       * `orm`: optional ORM class with a `.session()` context manager method
         such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
+      * `kw`: other keyword arguments, passed to `func`
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
@@ -53,7 +55,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       the keyword parameter `session` to support nested calls.
   '''
   if session:
-    # run the function nside a savepoint in the supplied session
+    # run the function inside a savepoint in the supplied session
     with session.begin_nested():
       return func(*a, session=session, **kw)
   if not orm:
@@ -65,6 +67,8 @@ def auto_session(func):
   ''' Decorator to run a function in a session if one is not presupplied.
       The function `func` runs within a transaction,
       nested if the session already exists.
+
+      See `with_session` for details.
   '''
 
   @require(lambda orm, session: orm is not None or session is not None)
@@ -75,6 +79,36 @@ def auto_session(func):
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
   wrapper.__doc__ = func.__doc__
+  wrapper.__module__ = getattr(func, '__module__', None)
+  return wrapper
+
+@contextmanager
+def push_log_level(level):
+  ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
+      Yields the logger.
+
+      *NOTE*: this is not MT safe - competing Threads can mix log levels up.
+  '''
+  logger = logging.getLogger('sqlalchemy.engine')
+  old_level = logger.level
+  logger.setLevel(level)
+  yield logger
+  logger.setLevel(old_level)
+
+@decorator
+def log_level(func, level=None):
+  ''' Decorator to run `func` at the specified logging `level`, default `logging.DEBUG`.
+  '''
+  if level is None:
+    level = logging.DEBUG
+
+  def wrapper(*a, **kw):
+    ''' Push the desired log level and run the function.
+    '''
+    with push_log_level(level):
+      return func(*a, **kw)
+
+  wrapper.__name__ = "@log_level(%s,%s)" % (func, level)
   return wrapper
 
 class ORM(MultiOpenMixin):
@@ -118,6 +152,8 @@ class ORM(MultiOpenMixin):
   def auto_session(method):
     ''' Decorator to run a method in a session derived from this ORM
         if a session is not presupplied.
+
+        See `with_session` for details.
     '''
 
     def wrapper(self, *a, session=None, **kw):
@@ -127,12 +163,15 @@ class ORM(MultiOpenMixin):
 
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
+    wrapper.__module__ = getattr(method, '__module__', None)
     return wrapper
 
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
       Intended to assist classes with a `.orm` attribute.
+
+      See `with_session` for details.
   '''
 
   def wrapper(self, *a, session=None, **kw):
@@ -142,6 +181,7 @@ def orm_auto_session(method):
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
+  wrapper.__module__ = getattr(method, '__module__', None)
   return wrapper
 
 @require(
@@ -318,7 +358,9 @@ def json_column(
 
       This annotates the class with a `.virtual_name` property
       which can be accessed or set,
-      accessing or modifying the associated JSON column.
+      accessing or modifying the associated JSON column
+      (in this instance, the column `info`,
+      accessing `info['json']['field']['name']`).
   '''
   if json_field_name is None:
     json_field_name = attr
@@ -335,6 +377,7 @@ def json_column(
         column_value, json_field_name, value, infill=True
     )
     setattr(row, json_column_name, column_value)
+    flag_modified(row, json_column_name)
 
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))

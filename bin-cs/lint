@@ -9,6 +9,7 @@ set -ue
 trace=
 [ -t 2 ] && trace=set-x
 
+quick=
 pymode=3
 pyflakes2=pyflakes-2.7
 pyflakes3='py3 -m pyflakes'
@@ -22,7 +23,8 @@ shellcheck_exclusions=SC1007
 cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
   -2    Use Python 2 for Python linting.
-  -3    Use Python 3 for Python linting."
+  -3    Use Python 3 for Python linting.
+  -q    Quick. Skip the more expensive lints."
 
 badopts=
 
@@ -31,6 +33,7 @@ do
   case $1 in
     -2) pymode=2 ;;
     -3) pymode=3 ;;
+    -q) quick=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -95,7 +98,7 @@ do
 
   case "$type" in
     json)
-      $trace json-pprint <"$lintfile" 2>&1 >/dev/null || xit=1
+      $trace json-pprint <"$lintfile" >/dev/null 2>&1 || xit=1
       ;;
     go)
       $trace go tool vet -all -shadowstrict "$lintfile" || xit=1
@@ -109,8 +112,8 @@ do
       if $trace $python -We:invalid -m py_compile "$lintfile"
       then
         $trace $pyflakes "$lintfile" || xit=1
-        $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
-        $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        [ $quick ] || $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
       else
         xit=1
       fi
@@ -119,8 +122,8 @@ do
       if $trace python2 -m py_compile "$lintfile"
       then
         $trace $pyflakes2 "$lintfile" || xit=1
-        $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
-        $trace $pylint2 "--disable=$pylint_disable" "$lintfile" || xit=1
+        [ $quick ] || $trace $pep8 "--ignore=$pep8_ignore" "$lintfile" || xit=1
+        [ $quick ] || $trace $pylint2 "--disable=$pylint_disable" "$lintfile" || xit=1
       else
         xit=1
       fi
