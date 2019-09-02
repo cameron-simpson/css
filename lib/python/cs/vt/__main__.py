@@ -129,7 +129,7 @@ class VTCmd(BaseCommand):
             readonly    Read only; data may not be modified.
       -r  Readonly, the same as "-o readonly".
     pack path
-    pullfrom other-store objects...
+    pullfrom other-store [objects...]
     pushto other-store objects...
     serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
     test blockify file
@@ -783,9 +783,9 @@ class VTCmd(BaseCommand):
             raise
         else:
           if offset < len(s):
-            raise ValueError("uncomplete parse, unparsed: %r" % (s[offset:],))
+            raise ValueError("incomplete parse, unparsed: %r" % (s[offset:],))
     if not hasattr(obj, 'pushto_queue'):
-      raise ValueError("not pushable")
+      raise ValueError("type %s is not pushable" % (type(obj),))
     return obj
 
   @staticmethod
@@ -822,10 +822,10 @@ class VTCmd(BaseCommand):
     if not args:
       raise GetoptError("missing other_store")
     srcSspec = args.pop(0)
-    if not args:
-      raise GetoptError("missing objects")
     with Pfx("other_store %r", srcSspec):
       srcS = Store(srcSspec, options.config)
+    if not args:
+      args = (srcSpec,)
     dstS = defaults.S
     pushables = []
     for obj_spec in args:
@@ -848,7 +848,7 @@ class VTCmd(BaseCommand):
     srcS = defaults.S
     dstSspec = args.pop(0)
     if not args:
-      raise GetoptError("missing objects")
+      args = (dstSpec,)
     with Pfx("other_store %r", dstSspec):
       dstS = Store(dstSspec, options.config)
     pushables = []
