@@ -84,6 +84,8 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
+TRACK = logging.INFO + 5   # over INFO, under WARNING
+
 loginfo = O(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
@@ -564,6 +566,10 @@ def info(msg, *args, **kwargs):
   ''' Emit a log at `logging.INFO` `level` with the current Pfx prefix.
   '''
   log(logging.INFO, msg, *args, **kwargs)
+def track(msg, *args, **kwargs):
+  ''' Emit a log at `TRACK` `level` with the current Pfx prefix.
+  '''
+  log(TRACK, msg, *args, **kwargs)
 def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` `level` with the current Pfx prefix.
   '''
