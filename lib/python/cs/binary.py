@@ -123,14 +123,14 @@ DISTINFO = {
 
 if sys.version_info[0] < 3:
   print(
-      "WARNING: module %r requires Python 3 and recommends 3.6, but version_info=%r"
+      "WARNING: module %r requires Python 3 and recommends at least 3.6, but version_info=%r"
       % (__name__, sys.version_info),
       file=sys.stderr
   )
-elif sys.version_info[1] < 6:
+elif sys.version_info[0] == 3 and sys.version_info[1] < 6:
   print(
-      "WARNING: module %r recommends Python 3.6, but version_info=%r" %
-      (__name__, sys.version_info),
+      "WARNING: module %r recommends at least Python 3.6, but version_info=%r"
+      % (__name__, sys.version_info),
       file=sys.stderr
   )
 
