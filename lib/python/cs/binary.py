@@ -919,7 +919,7 @@ class ListField(PacketField):
     ''' ListFields do not know enough to parse a buffer.
     '''
     raise NotImplementedError(
-        "%s cannot be parsd directly from a buffer" % (cls,)
+        "%s cannot be parsed directly from a buffer" % (cls,)
     )
 
   def transcribe(self):
@@ -1164,7 +1164,10 @@ class Packet(PacketField):
     try:
       field = self.field_map[attr]
     except KeyError:
-      raise AttributeError(str(type(self)) + '.' + attr)
+      raise AttributeError(
+          "%s.%s (field_map has %r)" %
+          (type(self), attr, sorted(self.field_map.keys()))
+      )
     if field is None:
       return None
     return field.value
