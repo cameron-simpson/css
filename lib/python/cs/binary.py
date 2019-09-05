@@ -909,6 +909,11 @@ class ListField(PacketField):
         str(o) for o in value
     ) + suffix + ']'
 
+  def __iter__(self):
+    ''' Iterating over a `ListField` iterates over its `.value`.
+    '''
+    return iter(self.value)
+
   @classmethod
   def from_buffer(cls, bfr):
     ''' ListFields do not know enough to parse a buffer.
