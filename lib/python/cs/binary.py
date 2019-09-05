@@ -22,6 +22,10 @@
       factory method to parse it, a transcription method to transcribe
       it back out in binary form and usually a `.value` attribute
       holding the parsed value.
+    * `Packet`: a `PacketField` subclass for parsing multiple
+      `PacketField`s into a larger structure with ordered named
+      fields.
+      The fields themselves may be `Packet`s for complex structures.
     * several presupplied subclasses for common basic types such
       as `UInt32BE` (an unsigned 32 bit big endian integer).
     * `struct_field`: a factory for making PacketField classes for
@@ -29,12 +33,8 @@
     * `multi_struct_field` and `structtuple`: factories for making
       `PacketField`s from `struct` formats with multiple value
       fields;
-      `structtuple` makes `PacketFields` which are also `namedtuple`s,
+      `structtuple` makes `PacketField`s which are also `namedtuple`s,
       supporting trivial access to the parsed values.
-    * `Packet`: a `PacketField` subclass for parsing multiple
-      `PacketFields` into a larger structure with ordered named
-      fields.
-      The fields themselves may be `Packet`s for complex structures.
 
     You don't need to make fields only from binary data; because
     `PacketField.__init__` takes a post parse value, you can also
@@ -75,8 +75,8 @@
 
     A `Packet` is designed for deeper structures;
     all of its attributes are themselves `PacketField`s
-    (or `Packets`, which are `PacketField` subclasses).
-    The leaves of this hierarchy will be `PacketFields`,
+    (or `Packet`s, which are `PacketField` subclasses).
+    The leaves of this hierarchy will be `PacketField`s,
     whose attributes are ordinary types.
 
     By contrast, a `PacketField`'s attributes are "flat" values:
