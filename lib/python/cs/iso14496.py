@@ -313,7 +313,7 @@ class BoxHeader(Packet):
     self._length = new_length
 
 class BoxBody(Packet):
-  ''' Abstract basis for all Box bodies.
+  ''' Abstract basis for all `Box` bodies.
   '''
 
   PACKET_FIELDS = {}
@@ -362,11 +362,11 @@ class BoxBody(Packet):
 class Box(Packet):
   ''' Base class for all boxes - ISO14496 section 4.2.
 
-      This has the following PacketFields:
-      * `header`: a BoxHeader
-      * `body`: a BoxBody instance, usually a specific subclass
-      * `unparsed`: if there are unconsumed bytes from the Box they
-        are stored as here as a BytesesField; note that this field
+      This has the following `PacketField`s:
+      * `header`: a `BoxHeader`
+      * `body`: a `BoxBody` instance, usually a specific subclass
+      * `unparsed`: if there are unconsumed bytes from the `Box` they
+        are stored as here as a `BytesesField`; note that this field
         is not present if there were no unparsed bytes
   '''
 
@@ -695,9 +695,9 @@ class SubBoxesField(ListField):
         Parameters:
         * `bfr`: the buffer
         * `end_offset`: the ending offset of the input data, be an offset or
-          `Ellipsis` indicating "consume to end of buffer"; default: Ellipsis
+          `Ellipsis` indicating "consume to end of buffer"; default: `Ellipsis`
         * `max_boxes`: optional maximum number of Boxes to parse
-        * `default`: a default Box subclass for box_types without a
+        * `default`: a default `Box` subclass for `box_type`s without a
           registered subclass
         * `copy_boxes`: optional callable to receive parsed Boxes
         * `parent`: optional parent Box to record against parsed Boxes
@@ -748,7 +748,8 @@ class OverBox(Packet):
     ''' Parse all the Boxes from the input `bfr`.
 
         Parameters:
-        * `end_offset`: optional ending offset for the parse
+        * `end_offset`: optional ending offset for the parse.
+          Default: `Ellipsis`, indicating consumption of all data.
     '''
     if end_offset is None:
       end_offset = Ellipsis
@@ -1717,7 +1718,15 @@ class SMHDBoxBody(FullBoxBody):
 add_body_class(SMHDBoxBody)
 
 def parse(o, **kw):
-  ''' Return an OverBox source (str, int, file).
+  ''' Return the OverBoxes from source (str, int, file).
+
+      The leading `o` parameter may be one of:
+      * `str`: a filesystem file pathname
+      * `int`: a OS file descriptor
+      * `file`: if not `int` or `str` the presumption
+        is that this is a file-like object
+
+      Keyword arguments are as for `OverBox.from_buffer`.
   '''
   close = None
   if isinstance(o, str):
@@ -1734,9 +1743,11 @@ def parse(o, **kw):
 
 def parse_fd(fd, discard_data=False, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
-      `fd`: a file descriptor open for read
-      `discard_data`: whether to discard unparsed data, default False
-      `copy_offsets`: callable to receive BoxBody offsets
+
+      Parameters:
+      * `fd`: a file descriptor open for read
+      * `discard_data`: whether to discard unparsed data, default `False`
+      * `copy_offsets`: callable to receive `BoxBody` offsets
   '''
   if not discard_data and stat.S_ISREG(os.fstat(fd).st_mode):
     return parse_buffer(
@@ -1748,9 +1759,11 @@ def parse_fd(fd, discard_data=False, **kw):
 
 def parse_file(fp, **kw):
   ''' Parse an ISO14496 stream from the file `fp`, yield top level Boxes.
-      `fp`: a file open for read
-      `discard_data`: whether to discard unparsed data, default False
-      `copy_offsets`: callable to receive BoxBody offsets
+
+      Parameters:
+      * `fp`: a file open for read
+      * `discard_data`: whether to discard unparsed data, default `False`
+      * `copy_offsets`: callable to receive `BoxBody` offsets
   '''
   return parse_buffer(CornuCopyBuffer.from_file(fp), **kw)
 
@@ -1760,18 +1773,19 @@ def parse_chunks(chunks, **kw):
 
       Parameters:
       * `chunks`: an iterator yielding bytes objects
-      * `discard_data`: whether to discard unparsed data, default False
+      * `discard_data`: whether to discard unparsed data, default `False`
       * `copy_offsets`: callable to receive BoxBody offsets
   '''
   return parse_buffer(CornuCopyBuffer(chunks), **kw)
 
 def parse_buffer(bfr, copy_offsets=None, **kw):
   ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`,
-      yield top level Boxes.
+      yield top level OverBoxes.
 
       Parameters:
-      * `bfr`: a CornuCopyBuffer provided the stream data, preferably seekable
-      * `discard_data`: whether to discard unparsed data, default False
+      * `bfr`: a `CornuCopyBuffer` provided the stream data,
+        preferably seekable
+      * `discard_data`: whether to discard unparsed data, default `False`
       * `copy_offsets`: callable to receive Box offsets
   '''
   if copy_offsets is not None:
