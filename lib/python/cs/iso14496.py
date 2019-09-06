@@ -318,6 +318,49 @@ class BoxBody(Packet):
 
   PACKET_FIELDS = {}
 
+  def __getattr__(self, attr):
+    ''' The following virtual attributes are defined:
+        * *TYPE*`s`:
+          "boxes of type *TYPE*",
+          an uppercased box type name with a training `s`;
+          a list of all elements whose `.box_type`
+          equals *TYPE*`.lower().encode('ascii')`.
+          The elements are obtained by iterating over `self`
+          which normally means iterating over the `.boxes` attribute.
+        * *TYPE*:
+          "the box of type *TYPE*",
+          an uppercased box type name;
+          the sole element whose box type matches the type,
+          obtained from `.`*TYPE*`s[0]`
+          with a requirement that there is exactly one match.
+        * *TYPE*`0`:
+          "the optional box of type *TYPE*",
+          an uppercased box type name with a trailing `0`;
+          the sole element whose box type matches the type,
+          obtained from `.`*TYPE*`s[0]`
+          with a requirement that there is exactly zero or one match.
+          If there are zero matches, return `None`.
+          Otherwise return the matching box.
+    '''
+    # .TYPE - the sole item in self.boxes matching b'type'
+    if len(attr) == 4 and attr.isupper():
+      box, = getattr(self, attr + 's')
+      return box
+    # .TYPEs - all items of self.boxes matching b'type'
+    if len(attr) == 5 and (attr.endswith('s') or attr.endswith('0')):
+      attr4 = attr[:4]
+      if attr4.isupper():
+        box_type = attr4.lower().encode('ascii')
+        boxes = [box for box in self if box.box_type == box_type]
+        if attr.endswith('s'):
+          return boxes
+        if attr.endswith('0'):
+          if len(boxes) == 0:
+            return None
+          box, = boxes
+          return box
+    return super().__getattr__(attr)
+
   @classmethod
   def from_buffer(cls, bfr, box=None, **kw):
     ''' Create a BoxBody and fill it in via its `parse_buffer` method.
@@ -562,20 +605,6 @@ class Box(Packet):
         self.add_field('unparsed', EmptyField)
       if bfr_tail is not bfr:
         bfr_tail.flush()
-
-  def __getattr__(self, attr):
-    # .TYPE - the sole item in self.boxes matching b'type'
-    if len(attr) == 4 and attr.isupper():
-      box, = getattr(self, attr + 's')
-      return box
-    # .TYPEs - all items of self.boxes matching b'type'
-    if len(attr) == 5 and attr.endswith('s'):
-      attr4 = attr[:4]
-      if attr4.isupper():
-        box_type = attr4.lower().encode('ascii')
-        boxes = [box for box in self.boxes if box.box_type == box_type]
-        return boxes
-    return super().__getattr__(attr)
 
   @property
   def box_type(self):
