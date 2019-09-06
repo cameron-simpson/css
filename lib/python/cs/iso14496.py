@@ -436,15 +436,25 @@ class Box(Packet):
       s += ":unparsed=%d" % (len(unparsed,))
     return s
 
-  @property
-  def offset(self):
-    ''' The offset of a Box if the offset of its header.
+  def __getattr__(self, attr):
+    ''' If there is no direct attribute from `Packet.__getattr__`,
+        have a look in the `.header` and `.body`.
     '''
-    return self.header.offset
+    try:
+      value = super().__getattr__(attr)
+    except AttributeError:
+      try:
+        value = getattr(self.header, attr)
+      except AttributeError:
+        try:
+          value = getattr(self.body, attr)
+        except AttributeError:
+          raise AttributeError(
+              "%s.%s: not present via the Packet %r or the .header or .body fields"
+              % (type(self), attr, sorted(self.field_map.keys()))
+          )
+    return value
 
-  @property
-  def boxes(self):
-    return self.body.boxes
   def __iter__(self):
     ''' Iterating over a `Box` iterates over its body.
         Typically that would be the `.body.boxes`
