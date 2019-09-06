@@ -402,6 +402,13 @@ class Box(Packet):
   @property
   def boxes(self):
     return self.body.boxes
+  def __iter__(self):
+    ''' Iterating over a `Box` iterates over its body.
+        Typically that would be the `.body.boxes`
+        but might be the samples if the body is a sample box,
+        etc.
+    '''
+    return iter(self.body)
 
   def transcribe(self):
     ''' Transcribe the Box.
@@ -729,6 +736,9 @@ class OverBox(Packet):
       'boxes': SubBoxesField,
   }
 
+  def __iter__(self):
+    return iter(self.boxes)
+
   def __getattr__(self, attr):
     # .TYPE - the sole item in self.boxes matching b'type'
     if len(attr) == 4 and attr.isupper():
@@ -900,6 +910,9 @@ class ContainerBoxBody(BoxBody):
       BoxBody.PACKET_FIELDS,
       boxes=SubBoxesField,
   )
+
+  def __iter__(self):
+    return iter(self.boxes)
 
   def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
     ''' Gather the `boxes` field.
@@ -1224,6 +1237,9 @@ class _SampleTableContainerBoxBody(FullBoxBody):
       boxes=SubBoxesField,
   )
 
+  def __iter__(self):
+    return iter(self.boxes)
+
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     ''' Gather the `entry_count` and `boxes`.
     '''
@@ -1309,6 +1325,12 @@ def add_generic_sample_boxbody(
         entry_count=(False, UInt32BE),
         samples=ListField,
     )
+
+    def __iter__(self):
+      ''' Iterating over a `SpecificSampleBoxBody`
+          iterates over its `.samples`.
+      '''
+      return iter(self.samples)
 
     def parse_buffer(self, bfr, **kw):
       super().parse_buffer(bfr, **kw)
@@ -1659,6 +1681,9 @@ class METABoxBody(FullBoxBody):
       theHandler=Box,
       boxes=SubBoxesField,
   )
+
+  def __iter__(self):
+    return iter(self.boxes)
 
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
