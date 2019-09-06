@@ -1731,15 +1731,15 @@ def parse(o, **kw):
   close = None
   if isinstance(o, str):
     fd = os.open(o, os.O_RDONLY)
-    over_box = parse_fd(fd, **kw)
+    over_boxes = parse_fd(fd, **kw)
     close = partial(os.close, fd)
   elif isinstance(o, int):
-    over_box = parse_fd(o, **kw)
+    over_boxes = parse_fd(o, **kw)
   else:
-    over_box = parse_file(o, **kw)
+    over_boxes = parse_file(o, **kw)
   if close:
     close()
-  return over_box
+  return over_boxes
 
 def parse_fd(fd, discard_data=False, **kw):
   ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
@@ -1790,7 +1790,8 @@ def parse_buffer(bfr, copy_offsets=None, **kw):
   '''
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
-  yield OverBox.from_buffer(bfr, **kw)
+  while not bfr.at_eof():
+    yield OverBox.from_buffer(bfr, **kw)
 
 def dump_box(B, indent='', fp=None, crop_length=170):
   ''' Recursively dump a Box.
