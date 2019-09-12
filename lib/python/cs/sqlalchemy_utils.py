@@ -132,13 +132,13 @@ class ORM(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
 
   @contextmanager
-  def session(self):
+  def session(self, *a, **kw):
     ''' Context manager to issue a new session and close it down.
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
     with self:
-      new_session = self.Session()
+      new_session = self.Session(*a, **kw)
       try:
         yield new_session
         new_session.commit()
