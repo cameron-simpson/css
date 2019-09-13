@@ -1,3 +1,4 @@
+virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
 MMappedDataDir: do not mmap the write file, just pread it
 RawDataDir: do not mmap growing datafile as a remmap voids the memoryviews
 _FilesDir: close idle _rfd entries in DataDir and PlatonicDir to avoid unbounded fds - cannot do for RawDataDir as the mmaps must persist
