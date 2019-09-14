@@ -42,7 +42,6 @@ def oserror(errno_, msg, *a):
   assert isinstance(msg, str)
   if a:
     msg = msg % a
-  warning("raise OSError(%s): %s", errno_, msg)
   raise OSError(errno_, msg)
 
 # Generate OS_E* functions to raise custom OSErrors.
@@ -364,9 +363,9 @@ class FileSystem(object):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
-      See the cs.vtfuse module for the StoreFS_LLFUSE class (aliased
-      as StoreFS) and associated mount function which presents a
-      FileSystem as a FUSE mount.
+      See the `cs.vt.fuse` module for the `StoreFS_LLFUSE` class (aliased
+      as `StoreFS`) and associated mount function which presents a
+      `FileSystem` as a FUSE mount.
 
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
@@ -554,7 +553,6 @@ class FileSystem(object):
     ''' Return the Dirent associated with the supplied `inum`.
     '''
     I = self._inodes[inum]
-    X("inum %s => %r", inum, I)
     return I.E
 
   def open2(self, P, name, flags):
