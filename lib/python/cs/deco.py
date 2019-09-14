@@ -89,7 +89,11 @@ def decorator(deco):
       func = da[0]
       decorated = deco(func)
       decorated.__doc__ = getattr(func, '__doc__', '')
-      decorated.__module__ = getattr(func, '__module__', None)
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
@@ -97,7 +101,11 @@ def decorator(deco):
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
-      decorated.__module__ = getattr(func, '__module__', None)
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
 
     return overdeco

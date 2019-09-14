@@ -94,6 +94,19 @@ def pfx(func):
   wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
   return wrapped
 
+def pfx_method(method):
+  ''' Decorator to provide a Pfx context for an instance method prefixing
+      "classname.methodname".
+  '''
+
+  def wrapper(self, *a, **kw):
+    with Pfx("%s.%s", type(self).__name__, method.__name__):
+      return method(self, *a, **kw)
+
+  wrapper.__doc__ = method.__doc__
+  wrapper.__name__ = "@pfx_method(method.__name__)"
+  return wrapper
+
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
 
