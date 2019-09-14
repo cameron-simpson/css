@@ -191,7 +191,7 @@ class DirLike(ABC):
         node = self.parent
         if node is None:
           break
-      node = self.get(part)
+      node = node.get(part)
       if node is None:
         break
     return node
