@@ -176,7 +176,7 @@ def handler(method):
         error("UNCAUGHT EXCEPTION: %s", e)
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
       except:
-        X("CALL %s(*%r,**%r) => EXCEPTION %r", syscall, a, kw, sys.exc_info())
+        error("=> EXCEPTION %r", sys.exc_info())
 
   return handle
 
