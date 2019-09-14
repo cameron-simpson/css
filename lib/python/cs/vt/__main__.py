@@ -27,7 +27,6 @@ from os.path import (
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
-from threading import Thread
 from time import sleep
 from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
@@ -39,6 +38,7 @@ from cs.logutils import exception, error, warning, info, upd, debug, \
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import RunState
+from cs.threads import bg as bg_thread
 from cs.tty import ttysize
 import cs.x
 from cs.x import X
@@ -223,7 +223,7 @@ class VTCmd(BaseCommand):
     if progress is None:
       progress = Progress(total=0)
     ticker = options.ticker
-    if ticker is None and sys.stderr.isatty():
+    if False and ticker is None and sys.stderr.isatty():
       _, cols = ttysize(2)
       status_width = cols - 2
 
@@ -232,9 +232,7 @@ class VTCmd(BaseCommand):
           upd(progress.status(options.status_label, status_width))
           sleep(0.25)
 
-      ticker = Thread(name='status-line', target=ticker)
-      ticker.daemon = True
-      ticker.start()
+      ticker = bg_thread(ticker, name='status-line', daemon=True)
     with options.stack(progress=progress, ticker=ticker):
       with defaults.stack(runstate=runstate):
         if cmd in ("config", "dump", "init", "profile", "scan", "test"):
