@@ -753,10 +753,21 @@ class Pathname(str):
     '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-def datafrom_fd(fd, offset, readsize=None, aligned=True, maxlength=None):
+def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
-      This does not move the file offset.
+      This does not move the file descriptor position.
+
+      Parameters:
+      * `fd`: the file descriptor from which to read.
+      * `offset`: the offset from which to read.
+        If omitted, use the current file descriptor position.
+      * `readsize`: the read size, default: `DEFAULT_READSIZE`
+      * `aligned`: if true (the default), the first read is sized
+        to align the new offset with a multiple of `readsize`.
+      * `maxlength`: if specified yield no more than this many bytes of data.
   '''
+  if offset is None:
+    offset = os.lseek(fd, 0, SEEK_CUR)
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:

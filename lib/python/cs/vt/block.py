@@ -525,7 +525,7 @@ def get_HashCodeBlock(hashcode):
   ''' Caching constructor for HashCodeBlocks of known code.
   '''
   if hashcode is None:
-    raise ValueError("invlaid hashcode, may not be None")
+    raise ValueError("invalid hashcode, may not be None")
   return HashCodeBlock(hashcode=hashcode)
 
 class HashCodeBlock(_Block):

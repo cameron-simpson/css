@@ -184,6 +184,7 @@ def cached(
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       first = getattr(self, firstpoll_attr, True)
+      sig = getattr(self, sig_attr, None)
       setattr(self, firstpoll_attr, False)
       value0 = getattr(self, val_attr, unset_value)
       if not first and value0 is not unset_value:

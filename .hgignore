@@ -4,3 +4,4 @@ syntax: regexp
 \.tar\.gz$
 ^state/
 ^state3/
+^venv/

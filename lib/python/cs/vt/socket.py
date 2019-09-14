@@ -61,7 +61,7 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     self.socket_server = None
     self.socket_server_thread = None
     self.runstate.notify_start.add(lambda rs: self.open())
-    self.runstate.notify_end.add(lambda rs: self.close())
+    self.runstate.notify_end.add(lambda rs: self.close(unopened_ok=True))
     self.runstate.notify_cancel.add(lambda rs: self.shutdown_now())
 
   def __str__(self):

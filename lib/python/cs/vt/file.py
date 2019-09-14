@@ -83,7 +83,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self._blockmap = None
     self._file = None
     self._lock = RLock()
-    MultiOpenMixin.__init__(self, lock=self._lock)
+    MultiOpenMixin.__init__(self)
     self.open()
     self._reset(backing_block)
 

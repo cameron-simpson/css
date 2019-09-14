@@ -12,6 +12,7 @@ import os.path
 import pwd
 import stat
 import sys
+from threading import Lock
 import time
 from uuid import UUID, uuid4
 from cs.binary import PacketField, BSUInt, BSString, BSData
@@ -185,12 +186,12 @@ class _Dirent(Transcriber):
     ''' Initialise a _Dirent.
 
         Parameters:
-        * `type_`: the DirentType enum
-        * `name`: the Dirent's name
+        * `type_`: the `DirentType` enum
+        * `name`: the `Dirent`'s name
         * `meta`: optional metadata
         * `uuid`: optional identifying UUID;
-          *note*: for IndirectBlocks this is a reference to another Dirent's
-          UUID.
+          *note*: for `IndirectDirent`s this is a reference to another
+          `Dirent`'s UUID.
         * `parent`: optional parent Dirent
         * `prevblock`: optional Block whose contents are the binary
           transcription of this Dirent's previous state - another
@@ -229,9 +230,9 @@ class _Dirent(Transcriber):
       self.parent = parent
 
   def __repr__(self):
-    return "%s:%s:%s(%r:%s,%r)" % (
-        self.__class__.__name__, id(self), self.type, self.name, self.uuid,
-        self.meta
+    return "%s:%s:%s(%r%s,%r)" % (
+        self.__class__.__name__, id(self), self.type, self.name,
+        ':' + self.uuid if self.uuid else '', self.meta
     )
 
   @classmethod
@@ -642,14 +643,14 @@ class SymlinkDirent(_Dirent):
     return super().transcribe_inner(T, fp, {})
 
 class IndirectDirent(_Dirent):
-  ''' An indirect Dirent, referring to another Dirent by UUID.
+  ''' An indirect `Dirent`, referring to another `Dirent` by UUID.
 
       This is how a feature like a hard link is implented in a vt filesystem.
 
-      *Note*: unlike other Dirents, IndirectDirents are considered
+      *Note*: unlike other `Dirent`s, `IndirectDirent`s are considered
       emphemeral, specificly in that their uuid attribute is a
-      reference to another persistent Direct. Obtaining the target
-      dirent requires dereferencing through a FileSystem.
+      reference to another persistent `Direct`. Obtaining the target
+      `Dirent` requires dereferencing through a `FileSystem`.
   '''
 
   transcribe_prefix = 'Indirect'
@@ -728,6 +729,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
   def __init__(self, name, block=None, **kw):
     _Dirent.__init__(self, DirentType.FILE, name, **kw)
     MultiOpenMixin.__init__(self)
+    self._lock = Lock()
     if block is None:
       block = Block(data=b'')
     self.open_file = None
