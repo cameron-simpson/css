@@ -287,9 +287,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     return MultiOpenMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
-    if exc_value:
-      import traceback as TB
-      TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
