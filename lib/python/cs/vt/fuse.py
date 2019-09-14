@@ -127,7 +127,12 @@ def handler(method):
           "%d bytes:%r..." % (len(bs), bytes(bs[:16]))
       ]
     else:
-      arg_desc = [repr(arg) for arg in a]
+      arg_desc = [
+          (
+              ("<%s>" % (type(arg).__name__,))
+              if isinstance(arg, llfuse.RequestContext) else repr(arg)
+          ) for arg in a
+      ]
     arg_desc.extend(
         "%s=%r" % (kw_name, kw_value) for kw_name, kw_value in kw.items()
     )
@@ -156,28 +161,18 @@ def handler(method):
                 X("CALL %s result => %s", syscall, result)
             return result
       except FuseOSError as e:
-        warning("CALL %s(*%r,**%r) => FuseOSError %s", syscall, a, kw, e)
+        warning("=> FuseOSError %s", e, exc_info=False)
         raise
       except OSError as e:
-        warning(
-            "CALL %s(*%r,**%r) => OSError %s => FuseOSError", syscall, a, kw, e
-        )
+        warning("=> OSError %s => FuseOSError", e, exc_info=False)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)
         raise FuseOSError(errno.EIO) from e
       except Exception as e:
-        X(
-            "CALL %s(*%r,**%r) => EXCEPTION %s => FuseOSError.EINVAL", syscall,
-            a, kw, e
-        )
-        exception(
-            "unexpected exception, raising EINVAL from .%s(*%r,**%r): %s:%s",
-            syscall, a, kw, type(e), e
-        )
+        exception("unexpected exception, raising EINVAL %s:%s", type(e), e)
         raise FuseOSError(errno.EINVAL) from e
       except BaseException as e:
-        X("CALL %s(*%r,**%r) => EXCEPTION %s", syscall, a, kw, e)
         error("UNCAUGHT EXCEPTION: %s", e)
         raise RuntimeError("UNCAUGHT EXCEPTION") from e
       except:
