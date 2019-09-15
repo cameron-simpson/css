@@ -21,7 +21,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError
@@ -105,7 +105,7 @@ class StreamStore(BasicStoreSync):
     self.exports = exports
     # parameters controlling connection hysteresis
     self._conn_attempt_last = 0.0
-    self._conn_attempt_delay = 1.0
+    self._conn_attempt_delay = 10.0
     if connect is None:
       # set up protocol on existing stream
       # no reconnect facility
@@ -174,9 +174,10 @@ class StreamStore(BasicStoreSync):
         local_store.close()
       super().shutdown()
 
+  @pfx_method
   def connection(self):
     ''' Return the current connection, creating it if necessary.
-        Returns None if there was no current connection
+        Returns `None` if there was no current connection
         and it is too soon since the last connection attempt.
     '''
     with self._lock:
@@ -185,7 +186,7 @@ class StreamStore(BasicStoreSync):
         next_attempt = self._conn_attempt_last + self._conn_attempt_delay
         now = time.time()
         if now >= next_attempt:
-          self._conn_attemp_last = now
+          self._conn_attempt_last = now
           try:
             recv, send = self.connect()
           except Exception as e:
@@ -211,7 +212,7 @@ class StreamStore(BasicStoreSync):
     oconn = self._conn
     if oconn is conn:
       self._conn = None
-      self._conn_attemp_last = time.time()
+      self._conn_attempt_last = time.time()
     else:
       debug(
           "disconnect of %s, but that is not the current connection, ignoring",
