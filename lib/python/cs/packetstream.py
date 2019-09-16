@@ -24,7 +24,7 @@ from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.result import Result
 from cs.seq import seq, Seq
-from cs.threads import locked
+from cs.threads import locked, bg as bg_thread
 
 DISTINFO = {
     'description': "general purpose bidirectional packet stream connection",
@@ -208,16 +208,10 @@ class PacketConnection(object):
     self.closed = False
     self.packet_grace = DEFAULT_PACKET_GRACE
     # dispatch Thread to process received packets
-    self._recv_thread = Thread(
-        target=self._receive_loop,
-        name="%s[_receive_loop]" % (self.name,))
-    self._recv_thread.start()
+    self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
-    self._send_thread = Thread(
-        target=self._send_loop,
-        name="%s[_send]" % (self.name,))
-    self._send_thread.start()
+    self._send_thread = bg_thread(self._send_loop, name="%s[_send]" % (self.name,))
     # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()
     self.__send_queued = set()
@@ -410,7 +404,6 @@ class PacketConnection(object):
         self._respond(channel, tag, result_flags, result_payload)
       self._channel_request_tags[channel].remove(tag)
 
-  @logexc
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
@@ -500,7 +493,6 @@ class PacketConnection(object):
         self._recv = None
         self.shutdown()
 
-  @logexc
   def _send_loop(self):
     ''' Send packets upstream.
         Write every packet directly to self._send.
