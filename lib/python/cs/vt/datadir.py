@@ -172,6 +172,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.sqlite'
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
+  DATA_ROLLOVER = DEFAULT_ROLLOVER
 
   def __init__(
       self,
