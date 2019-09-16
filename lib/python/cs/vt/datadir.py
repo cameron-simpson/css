@@ -1025,7 +1025,7 @@ class PlatonicDir(_FilesDir):
       meta_store=None,
       **kw
   ):
-    ''' Initialise the `PlatonicDir` with `statedirpath` and `datadirpath`.
+    ''' Initialise the `PlatonicDir` at `statedirpath`.
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
@@ -1121,7 +1121,6 @@ class PlatonicDir(_FilesDir):
           DF.open()
     return DF
 
-  @logexc
   def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
