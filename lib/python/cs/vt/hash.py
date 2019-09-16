@@ -31,7 +31,7 @@ class MissingHashcodeError(KeyError):
     return "missing hashcode: %s" % (self.hashcode,)
 
 def io_fail(func):
-  ''' Decorator to transmute a MissingHashcodeError into a return of False.
+  ''' Decorator to transmute a `MissingHashcodeError` into a return of `False`.
   '''
   return exc_fold(func, exc_types=(MissingHashcodeError,))
 
