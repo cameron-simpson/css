@@ -1141,10 +1141,9 @@ class PlatonicDir(_FilesDir):
           info("scan %r DISABLED", shortpath(datadirpath))
           disabled = True
         continue
-      else:
-        if disabled:
-          info("scan %r ENABLED", shortpath(datadirpath))
-          disabled = False
+      if disabled:
+        info("scan %r ENABLED", shortpath(datadirpath))
+        disabled = False
       # scan for new datafiles
       with Pfx("%r", datadirpath):
         seen = set()
