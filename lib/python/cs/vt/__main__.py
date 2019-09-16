@@ -1006,7 +1006,7 @@ class VTCmd(BaseCommand):
       else:
         target = OSFile(arbase)
     with Pfx(arbase):
-      if not merge(target, source):
+      if not merge(target, source, runstate=options.runstate):
         return 1
     return 0
 
