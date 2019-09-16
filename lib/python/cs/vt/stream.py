@@ -35,7 +35,6 @@ from .hash import (
     HASHCLASS_BY_ENUM,
     HashCode,
     HashCodeField,
-    MissingHashcodeError,
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
@@ -269,7 +268,6 @@ class StreamStore(BasicStoreSync):
         )
       return rq
 
-  @logexc
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
         Return as for the `request_handler` parameter to `PacketConnection`.
@@ -280,6 +278,7 @@ class StreamStore(BasicStoreSync):
     rq = self.decode_request(rq_type, flags, payload)
     return rq.do(self)
 
+  @pfx_method
   def add(self, data, hashclass=None):
     h = self.hash(data, hashclass)
     if self.mode_addif:
@@ -299,11 +298,13 @@ class StreamStore(BasicStoreSync):
       )
     return h
 
+  @pfx_method
   def get(self, h):
     try:
       flags, payload = self.do(GetRequest(h))
     except StoreError as e:
-      raise MissingHashcodeError(str(e)) from e
+      error("h=%s: %s", h, e)
+      return None
     found = flags & 0x01
     if found:
       flags &= ~0x01
