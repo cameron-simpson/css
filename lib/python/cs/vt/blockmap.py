@@ -496,13 +496,16 @@ class BlockMap(RunStateMixin):
     if index.step is not None and index.step != 1:
       raise ValueError("invalid slice: step=%s" % (index.step,))
     start = 0 if index.start is None else index.start
-    span = None if index.stop is None else index.stop - start
-    if span < 0:
-      raise ValueError(
-          "invalid span: stop(%s) < start(%s)" % (index.stop, index.start)
-      )
-    if span == 0:
-      return b''
+    if index.stop is None:
+      span = None
+    else:
+      span = index.stop - start
+      if span < 0:
+        raise ValueError(
+            "invalid span: stop(%s) < start(%s)" % (index.stop, index.start)
+        )
+      if span == 0:
+        return b''
     return b''.join(self.datafrom(start, span))
 
 if __name__ == '__main__':
