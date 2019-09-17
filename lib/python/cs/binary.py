@@ -121,16 +121,22 @@ DISTINFO = {
     'install_requires': ['cs.buffer'],
 }
 
+# maybe monkey patch this with cs.logutils.warning if importable
+def warning(msg, *a, f=None):
+  if f is None:
+    f = sys.stderr
+  if a:
+    msg = msg % a
+  print('WARNING:', msg, file=f)
+
 if sys.version_info[0] < 3:
-  print(
-      "WARNING: module %r requires Python 3 and recommends 3.6, but version_info=%r"
-      % (__name__, sys.version_info),
-      file=sys.stderr)
+  warning(
+      "module %r requires Python 3 and recommends 3.6, but version_info=%r",
+      __name__, sys.version_info)
 elif sys.version_info[1] < 6:
-  print(
-      "WARNING: module %r recommends Python 3.6, but version_info=%r"
-      % (__name__, sys.version_info),
-      file=sys.stderr)
+  warning(
+      "module %r recommends Python 3.6, but version_info=%r",
+      __name__, sys.version_info)
 
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of `bytes` instances.
