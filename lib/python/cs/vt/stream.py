@@ -204,7 +204,12 @@ class StreamStore(BasicStoreSync):
     ''' Wrap a pair of binary streams in a PacketConnection.
     '''
     conn = PacketConnection(
-        recv, send, self._handle_request, name='PacketConnection:' + self.name
+        recv,
+        send,
+        self._handle_request,
+        name='PacketConnection:' + self.name,
+        packet_grace=0,
+        tick=True
     )
     return conn
 
