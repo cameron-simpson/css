@@ -1118,6 +1118,12 @@ class TKHDBoxBody(FullBoxBody):
     '''
     return (self.flags & 0x8) != 0
 
+  @prop
+  def timescale(self):
+    ''' The `timescale` comes from the movie header box (8.3.2.3).
+    '''
+    return self.ancestor('mvhd').timescale
+
 add_body_class(TKHDBoxBody)
 
 ##add_body_subclass(ContainerBoxBody, 'tref', '8.3.3', 'track Reference')
