@@ -33,8 +33,8 @@ def get_clause_spec(s, offset=0):
   return clause_name, offset + 1
 
 def get_clause_archive(s, offset=0):
-  ''' Match `[`*clause_name*`]`*archive_name* at `offset,
-      return *clause_name*`,`*archive_name*`,`*new_offset*.
+  ''' Match `[`*clause_name*`]`*archive_name* at `offset`,
+      return `(`*clause_name*`,`*archive_name*`,`*new_offset*`)`.
   '''
   clause_name, offset = get_clause_spec(s, offset)
   archive_name, offset = get_identifier(s, offset)

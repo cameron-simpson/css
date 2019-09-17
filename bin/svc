@@ -45,7 +45,7 @@ fi
 cmd="$cmd: $op"
 
 case "$op" in
-  disable|enable|ls|restart|start|stop)
+  disable|enable|exec|ls|restart|start|stop)
       [ $# -gt 0 ] || op=ls
       case "$op" in
         ls) ;;
@@ -148,6 +148,7 @@ do
       if [ "x$rc_op" = xservice ]
       then
         case "$op" in
+          exec)     shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd" ;;
           start)    shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd &" ;;
           stop|enable|disable|restart)
                     shcmd="svcd $op \"\$SVC_NAME\"" ;;

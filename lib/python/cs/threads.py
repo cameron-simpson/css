@@ -15,6 +15,7 @@ from cs.debug import Lock, Thread
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, debug, exception
 from cs.obj import O
+from cs.pfx import Pfx
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
@@ -33,6 +34,7 @@ DISTINFO = {
         'cs.excutils',
         'cs.logutils',
         'cs.obj',
+        'cs.pfx',
         'cs.py.func',
         'cs.py3',
         'cs.queues',
@@ -41,21 +43,26 @@ DISTINFO = {
 }
 
 def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
-  ''' Dispatch the callable `func` in its own Thread; return the Thread.
+  ''' Dispatch the callable `func` in its own `Thread`;
+      return the `Thread`.
 
       Parameters:
-      * `func`: callable to run in its own `Thread`.
-      * `daemon`: optional argument specifying the .daemon attribute.
-      * `name`: optional argument specifying the Thread name.
+      * `func`: a callable for the `Thread` target.
+      * `daemon`: optional argument specifying the `.daemon` attribute.
+      * `name`: optional argument specifying the `Thread` name,
+        default: the name of `func`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
   '''
   if name is None:
     name = funcname(func)
+  def thread_body():
+    with Pfx(name):
+      return func()
+  T = Thread(name=name, target=thread_body)
   if not no_logexc:
     func = logexc(func)
-  T = Thread(name=name, target=func)
   if daemon is not None:
     T.daemon = daemon
   no_start or T.start()
@@ -70,9 +77,9 @@ class WorkerThreadPool(MultiOpenMixin, O):
   def __init__(self, name=None, max_spare=4):
     ''' Initialise the WorkerThreadPool.
 
-        Paramaters:
-        `name`: optional name for the pool
-        `max_spare`: maximum size of each idle pool (daemon and non-daemon)
+        Parameters:
+        * `name`: optional name for the pool
+        * `max_spare`: maximum size of each idle pool (daemon and non-daemon)
     '''
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)

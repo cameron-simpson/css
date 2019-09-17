@@ -872,9 +872,9 @@ class FDIterator(_Iterator):
           iteration; the default is the current file position.
         * `readsize`: a preferred read size; if omitted then
           `DEFAULT_READSIZE` will be stored
-        * `align`: whther to align reads by default: if true then
+        * `align`: whether to align reads by default: if true then
           the iterator will do a short read to bring the `offset`
-          into alignment with `readsize`; the default is True
+          into alignment with `readsize`; the default is `True`
     '''
     if offset is None:
       offset = 0
@@ -895,7 +895,7 @@ class FDIterator(_Iterator):
 class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
   ''' An iterator over the data of a seekable file descriptor.
 
-      *Note*: the iterator works with an os.dup() of the file
+      *Note*: the iterator works with an `os.dup()` of the file
       descriptor so that it can close it with impunity; this requires
       the caller to close their descriptor.
   '''
@@ -917,8 +917,8 @@ class SeekableFDIterator(FDIterator, SeekableIteratorMixin):
 class FileIterator(_Iterator, SeekableIteratorMixin):
   ''' An iterator over the data of a file object.
 
-      *Note*: the iterator closes the file on __del__ or if its
-      .close method is called.
+      *Note*: the iterator closes the file on `__del__` or if its
+      `.close` method is called.
   '''
 
   def __init__(self, fp, offset=None, readsize=None, align=False):
@@ -932,7 +932,7 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
           `DEFAULT_READSIZE` will be stored
         * `align`: whether to align reads by default: if true then
           the iterator will do a short read to bring the `offset`
-          into alignment with `readsize`; the default is False
+          into alignment with `readsize`; the default is `False`
     '''
     if offset is None:
       offset = 0
@@ -973,7 +973,7 @@ class SeekableFileIterator(FileIterator, SeekableIteratorMixin):
           `DEFAULT_READSIZE` will be stored
         * `align`: whether to align reads by default: if true then
           the iterator will do a short read to bring the `offset`
-          into alignment with `readsize`; the default is False
+          into alignment with `readsize`; the default is `False`
     '''
     if offset is None:
       offset = fp.tell()
@@ -990,7 +990,7 @@ class SeekableFileIterator(FileIterator, SeekableIteratorMixin):
 class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
   ''' An iterator over the data of a mappable file descriptor.
 
-      *Note*: the iterator works with an mmap of an os.dup() of the
+      *Note*: the iterator works with an `mmap` of an `os.dup()` of the
       file descriptor so that it can close it with impunity; this
       requires the caller to close their descriptor.
   '''
@@ -1003,9 +1003,9 @@ class SeekableMMapIterator(_Iterator, SeekableIteratorMixin):
           iteration; the default is the current file position.
         * `readsize`: a preferred read size; if omitted then
           `DEFAULT_READSIZE` will be stored
-        * `align`: whther to align reads by default: if true then
+        * `align`: whether to align reads by default: if true then
           the iterator will do a short read to bring the `offset`
-          into alignment with `readsize`; the default is True
+          into alignment with `readsize`; the default is `True`
     '''
     if offset is None:
       offset = os.lseek(fd, 0, SEEK_CUR)
