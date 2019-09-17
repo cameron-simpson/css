@@ -1062,7 +1062,7 @@ class Packet(PacketField):
       raise ValueError("unknown field %r" % (field_name,))
 
   def self_check(self):
-    ''' Internal self check.
+    ''' Internal self check. Returns `True` if passed.
 
         If the Packet has a `PACKET_FIELDS` attribute, normally a
         class attribute, then check the fields against it. The
@@ -1108,10 +1108,22 @@ class Packet(PacketField):
         and that it is written as a tuple of `(True, types)` because
         it has more than one acceptable type.
     '''
+    def w(msg, *a):
+      type_name = type(self).__name__
+      try:
+        packet_str = str(self)
+      except Exception as e:
+        warning("%s.self_check: str(self) fails: %s", type_name, e)
+        packet_str = "%d:no-str()" % (id(self),)
+      return warning(
+          "%s.self_check: " + msg + " [%s]",
+          type(self).__name__, *a, packet_str)
+    ok = True
     try:
       fields_spec = self.PACKET_FIELDS
     except AttributeError:
-      print("self_check: warning: no PACKET_FIELDS for %s" % (self,), file=sys.stderr)
+      w("no PACKET_FIELDS")
+      ok = False
     else:
       for field_name, field_spec in fields_spec.items():
         if isinstance(field_spec, tuple):
@@ -1128,25 +1140,26 @@ class Packet(PacketField):
           field = getattr(self, field_name, None)
         if field is None:
           if required:
-            raise ValueError("%s: field %r missing" % (type(self).__name__, field_name,))
+            w("field %r missing", field_name)
+            ok = False
         else:
           if not isinstance(field, basetype):
-            raise ValueError(
-                "field %r should be an instance of %s:%s but is %s:%s: %s"
-                % (
-                    field_name,
-                    'tuple' if isinstance(basetype, tuple) else basetype.__name__,
-                    basetype,
-                    type(field).__name__,
-                    type(field),
-                    field))
+            w(
+                "field %r should be an instance of %s:%s but is %s:%s: %s",
+                field_name,
+                'tuple' if isinstance(basetype, tuple) else basetype.__name__,
+                basetype,
+                type(field).__name__,
+                type(field),
+                field)
+            ok = False
       for field_name in self.field_names:
         if field_name not in fields_spec:
-          print(
-              "%s.self_check:"
-              " field %r is present but is not defined"
-              " in self.PACKET_FIELDS: %r"
-              % (type(self).__name__, field_name, sorted(fields_spec.keys())))
+          w(
+              "field %r is present but is not defined in self.PACKET_FIELDS: %r",
+              field_name, sorted(fields_spec.keys()))
+          ok = False
+    return ok
 
   def __getattr__(self, attr):
     ''' Unknown attributes may be field names; return their value.
