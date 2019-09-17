@@ -75,6 +75,14 @@ class StreamStore(BasicStoreSync):
     ''' Initialise the Stream Store.
 
         Parameters:
+        * `addif`: optional mode causing .add to probe the peer for
+          the data chunk's hash and to only submit a ADD request
+          if the block is missing; this is a bandwith optimisation
+          at the expense of latency.
+        * `connect`: if not None, a function to return `recv` and `send`.
+          If specified, the `recv` and `send` parameters must be None.
+        * `exports`: a mapping of name=>Store providing requestable Stores
+        * `local_store`: optional local Store for serving requests from the peer.
         * `name`: the Store name.
         * `recv`: inbound binary stream.
           If this is an `int` it is taken to be an OS file descriptor,
@@ -87,14 +95,6 @@ class StreamStore(BasicStoreSync):
           For a file descriptor sending is done via an os.dup() of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
-        * `addif`: optional mode causing .add to probe the peer for
-          the data chunk's hash and to only submit a ADD request
-          if the block is missing; this is a bandwith optimisation
-          at the expense of latency.
-        * `connect`: if not None, a function to return `recv` and `send`.
-          If specified, the `recv` and `send` parameters must be None.
-        * `local_store`: optional local Store for serving requests from the peer.
-        * `exports`: a mapping of name=>Store providing requestable Stores
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
