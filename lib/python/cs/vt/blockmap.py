@@ -26,7 +26,7 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.x import X
 from . import defaults
-from .block import HashCodeBlock
+from .block import HashCodeBlock, IndirectBlock
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
@@ -218,10 +218,9 @@ class BlockMap(RunStateMixin):
     else:
       X("BlockMap: supplied blockmapdir=%r", blockmapdir)
     RunStateMixin.__init__(self, "BlockMap")
-    from .block import _IndirectBlock
-    if not isinstance(block, _IndirectBlock):
+    if not isinstance(block, IndirectBlock):
       raise TypeError(
-          "block needs to be a _IndirectBlock, got a %s instead" %
+          "block needs to be an IndirectBlock, got a %s instead" %
           (type(block),)
       )
     hashcode = block.superblock.hashcode

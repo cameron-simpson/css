@@ -154,7 +154,7 @@ class BlockRecord(PacketField):
     else:
       raise ValueError("unsupported Block type 0x%02x" % (block_type,))
     if is_indirect:
-      B = _IndirectBlock(B, span=ispan)
+      B = IndirectBlock(B, span=ispan)
     if not blockref_bfr.at_eof():
       warning(
           "unparsed data (%d bytes) follow Block %s",
@@ -690,44 +690,37 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
       B = LiteralBlock(data=data)
   return B
 
-def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
-  ''' Factory function for an indirect Block.
+class IndirectBlock(_Block):
 
-      Indirect blocks may be initialised in two ways:
+  transcribe_prefix = 'I'
 
-      The first way is specified by supplying the `subblocks`
-      parameter, an iterable of Blocks to be referenced by this
-      IndirectBlock. The referenced Blocks are encoded and assembled
-      into the data for this Block.
-
-      The second way is to supplying the `hashcode` and `span` for
-      an existing Stored block, whose content is used to initialise
-      an IndirectBlock is with a hashcode and a span indicating the
-      length of the data encompassed by the block speified by the
-      hashcode; the data of that Block can be decoded to obtain the
-      reference Blocks for this IndirectBlock.
-
-      As an optimisation, unless `force` is true: if `subblocks`
-      is empty a direct Block for b'' is returned; if `subblocks`
-      has just one element then that element is returned.
-
-      TODO: allow data= initialisation, to decode raw iblock data.
-
-  '''
-  ## TODO: A direct or single byte Block should be an RLEBlock;
-  ##   this breaks our implementation of .hashcode - need to see if we
-  ##   can not require it - check use cases.
-  if subblocks is None:
-    # hashcode specified
-    if hashcode is None:
-      raise ValueError("one of subblocks or hashcode must be supplied")
+  def __init__(self, superblock, span=None):
+    if superblock.indirect:
+      raise ValueError(
+          "superblock may not be indirect: superblock=%s" % (superblock,)
+      )
+    super().__init__(BlockType.BT_INDIRECT, 0)
+    self.indirect = True
+    self.superblock = superblock
+    self._subblocks = None
+    # now we can compute the span from the subblocks
     if span is None:
-      raise ValueError("no span supplied with hashcode %s" % (hashcode,))
-    B = get_HashCodeBlock(hashcode)
-  else:
-    # subblocks specified
-    if hashcode is not None:
-      raise ValueError("only one of hashocde and subblocks may be supplied")
+      span = sum(subB.span for subB in self.subblocks)
+    self.span = span
+    self.hashcode = superblock.hashcode
+
+  @classmethod
+  def from_hashcode(cls, hashcode, span):
+    return cls(get_HashCodeBlock(hashcode), span=span)
+
+  @classmethod
+  def from_subblocks(cls, subblocks, force=False):
+    ''' Construct an `IndirectBlock` from `subblocks`.
+
+        If `force`, always return an `IndirectBlock`.
+        Otherwise (the default), return an empty `LiteralBlock` if the span==0
+        or a `HashCodeBlock` if `len(subblocks)==1`.
+    '''
     if isinstance(subblocks, _Block):
       subblocks = (subblocks,)
     elif isinstance(subblocks, bytes):
@@ -735,38 +728,15 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None, force=False):
     else:
       subblocks = tuple(subblocks)
     spans = [subB.span for subB in subblocks]
-    subspan = sum(spans)
-    if span is None:
-      span = subspan
-    elif span != subspan:
-      raise ValueError(
-          "span(%d) does not match subblocks (totalling %d)" % (span, subspan)
-      )
+    span = sum(spans)
     if not force:
-      if not subblocks:
+      if span == 0:
         return Block(data=b'')
       if len(subblocks) == 1:
         return subblocks[0]
     superBdata = b''.join(subB.encode() for subB in subblocks)
-    B = HashCodeBlock(data=superBdata)
-  return _IndirectBlock(B, span=span)
-
-class _IndirectBlock(_Block):
-
-  transcribe_prefix = 'I'
-
-  def __init__(self, superB, span=None):
-    if superB.indirect:
-      raise ValueError("superB may not be indirect: superB=%s" % (superB,))
-    super().__init__(BlockType.BT_INDIRECT, 0)
-    self.indirect = True
-    self.superblock = superB
-    if span is None:
-      span = sum(subB.span for subB in self.subblocks)
-    self.span = span
-    self.hashcode = superB.hashcode
-    self._data = None
-    self._subblocks = None
+    superblock = HashCodeBlock(data=superBdata)
+    return cls(superblock, span=span)
 
   @prop
   @locked

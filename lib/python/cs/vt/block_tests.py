@@ -70,7 +70,7 @@ class TestAll(unittest.TestCase):
       ):
         if block_type == BlockType.BT_INDIRECT:
           subblocks = [self._make_random_Block() for _ in range(rand0(8))]
-          B = IndirectBlock(subblocks, force=True)
+          B = IndirectBlock.from_subblocks(subblocks, force=True)
         elif block_type == BlockType.BT_HASHCODE:
           rs = randblock(size)
           B = Block(data=rs)
@@ -137,7 +137,7 @@ class TestAll(unittest.TestCase):
             total_length += B.span
             chunks.append(B.get_spanned_data())
           fullblock = b''.join(chunks)
-          IB = IndirectBlock(subblocks=subblocks, force=True)
+          IB = IndirectBlock.from_subblocks(subblocks=subblocks, force=True)
           self._verify_block(IB, recurse=True)
           IBspan = IB.span
           self.assertEqual(
@@ -149,7 +149,7 @@ class TestAll(unittest.TestCase):
           self.assertEqual(len(IBdata), total_length)
           self.assertEqual(IBdata, fullblock)
           # refetch block by hashcode
-          IB2 = IndirectBlock(hashcode=IBH, span=len(IBdata))
+          IB2 = IndirectBlock.from_hashcode(hashcode=IBH, span=len(IBdata))
           self._verify_block(IB2, recurse=True)
           IB2data = IB2.get_spanned_data()
           self.assertEqual(
