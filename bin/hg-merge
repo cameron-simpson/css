@@ -63,7 +63,10 @@ fi
 checkout=$( pwd )
 branch=$( hg branch )
 obranch=$( incd "$ocheckout" hg branch )
-incd "$ocheckout" hg out "$checkout" | grep '^summary'
+incd "$ocheckout" hg out "$checkout" | grep '^summary' || {
+  echo "$cmd: no inbound changes from $ocheckout, aborting" >&2
+  exit 1
+}
 echo
 echo "from $ocheckout"
 echo "merging $obranch ==> $branch"
@@ -82,7 +85,11 @@ fi
 $trace hg fetch "$ocheckout"
 if [ "x$branch" != "x$obranch" ]
 then
-  $trace hg merge "$obranch"
+  $trace hg merge "$obranch" || {
+    echo "$cmd: merge from $obranch failed" >&2
+    hg resolve -l >&2
+    exit 1
+  }
   comsg="merge $obranch ==> $branch"
   [ -z "$msg" ] || comsg="$comsg: $msg"
   $trace hg commit -m "$comsg"
