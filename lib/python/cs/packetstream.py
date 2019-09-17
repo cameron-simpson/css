@@ -148,7 +148,7 @@ class PacketConnection(object):
   # special packet indicating end of stream
   EOF_Packet = Packet(True, 0, 0, 0, 0, b'')
 
-  def __init__(self, recv, send, request_handler=None, name=None):
+  def __init__(self, recv, send, request_handler=None, name=None, packet_grace=None):
     ''' Initialise the PacketConnection.
 
         Parameters:
@@ -163,6 +163,12 @@ class PacketConnection(object):
           For a file descriptor sending is done via an os.dup() of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
+        * `packet_grace`:
+          default pause in the packet sending worker
+          to allow another packet to be queued
+          before flushing the output stream.
+          Default: `DEFAULT_PACKET_GRACE`s.
+          A value of `0` will flush immediately if the queue is empty.
         * `request_handler`: an optional callable accepting
           (`rq_type`, `flags`, `payload`).
           The request_handler may return one of 5 values on success:
@@ -188,6 +194,9 @@ class PacketConnection(object):
       self._send = os.fdopen(os.dup(send), 'wb')
     else:
       self._send = send
+    if packet_grace is None:
+      packet_grace = DEFAULT_PACKET_GRACE
+    self.packet_grace = packet_grace
     self.request_handler = request_handler
     # tags of requests in play against the local system
     self._channel_request_tags = {0: set()}
@@ -206,7 +215,6 @@ class PacketConnection(object):
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
-    self.packet_grace = DEFAULT_PACKET_GRACE
     # dispatch Thread to process received packets
     self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
     # dispatch Thread to send data
@@ -503,6 +511,7 @@ class PacketConnection(object):
       with post_condition( ("_send is None", lambda: self._send is None) ):
         fp = self._send
         Q = self._sendQ
+        grace = self.packet_grace
         for P in Q:
           sig = (P.channel, P.tag, P.is_request)
           if sig in self.__sent:
@@ -513,7 +522,6 @@ class PacketConnection(object):
               fp.write(bs)
             if Q.empty():
               # no immediately ready further packets: flush the output buffer
-              grace = self.packet_grace
               if grace > 0:
                 # allow a little time for further Packets to queue
                 sleep(grace)
