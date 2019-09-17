@@ -43,6 +43,8 @@ from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.units import transcribe_bytes_geek as geek, transcribe_time
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -62,13 +64,15 @@ USAGE = '''Usage:
             -H  Skip the Box header.
   %s [parse [{-|filename}]...]
             Parse the named files (or stdin for "-").
+  %s info [{-|filename}]...]
+            Print informative report about each source.
   %s test   Run unit tests.'''
 
 def main(argv):
   ''' Module main programme.
   '''
   cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd)
   setup_logging(cmd)
   if not argv:
     argv = ['parse']
@@ -86,6 +90,18 @@ def main(argv):
             parsee = spec
           over_box, = parse(parsee)
           over_box.dump()
+    elif op == 'info':
+      if not argv:
+        argv = ['-']
+      for spec in argv:
+        with Pfx(spec):
+          if spec == '-':
+            parsee = sys.stdin.fileno()
+          else:
+            parsee = spec
+          over_box, = parse(parsee)
+          print(spec + ":")
+          report(over_box, indent='  ')
     elif op == 'deref':
       spec = argv.pop(0)
       with Pfx(spec):
@@ -1915,6 +1931,76 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
     fp.write('  boxes\n')
     for subbox in boxes:
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
+
+def report(box, indent='', fp=None, indent_incr=None):
+  if fp is None:
+    fp = sys.stdout
+  if indent_incr is None:
+    indent_incr = '  '
+
+  def p(*a):
+    a0 = a[0]
+    return print(indent + a0, *a[1:], file=fp)
+
+  def p1(*a):
+    a0 = a[0]
+    return print(indent + indent_incr + a0, *a[1:], file=fp)
+
+  def subreport(box):
+    return report(
+        box, indent=indent + indent_incr, indent_incr=indent_incr, fp=fp
+    )
+
+  if isinstance(box, OverBox):
+    ftyp = box.FTYP
+    p("File type: %r, brands=%r" % (ftyp.major_brand, ftyp.brands_bs))
+    for subbox in box:
+      btype = subbox.box_type_s
+      if btype in ('ftyp',):
+        continue
+      X("box %s", str(subbox)[:60])
+      subreport(subbox)
+  else:
+    # normal Boxes
+    btype = box.box_type_s
+    if btype == 'free':
+      p(geek(len(box)), "of free space")
+    elif btype == 'mdat':
+      p(geek(len(box.body)), "of media data")
+    elif btype == 'moov':
+      mvhd = box.MVHD
+      p(
+          "Movie:", f"timescale={mvhd.timescale}", f"duration={mvhd.duration}",
+          f"next_track_id={mvhd.next_track_id}"
+      )
+      for moov_box in box:
+        btype = moov_box.box_type_s
+        if btype == 'mvhd':
+          continue
+        subreport(moov_box)
+    elif btype == 'trak':
+      trak = box
+      edts = trak.EDTS0
+      mdia = trak.MDIA
+      mdhd = mdia.MDHD
+      tkhd = trak.TKHD
+      p(f"Track #{tkhd.track_id}:", f"duration={tkhd.duration}")
+      if edts is None:
+        p1("No EDTS.")
+      else:
+        p1("EDTS:", edts)
+      duration_s = transcribe_time(mdhd.duration / mdhd.timescale)
+      p1(f"MDIA: duration={duration_s} language={mdhd.language}")
+      for tbox in trak:
+        btype = tbox.box_type_s
+        if btype in ('edts', 'mdia', 'tkhd'):
+          continue
+        subreport(tbox)
+    else:
+      box_s = str(box)
+      if len(box_s) > 58:
+        box_s = box_s[:55] + '...'
+      p(box_s)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
