@@ -646,6 +646,12 @@ class SqliteFilemap:
   def _map(self, path, filenum, indexed_to=0):
     ''' Add a DataFileState for `path` and `filenum` to the mapping.
     '''
+    if path is None:
+      error(
+          "ignoring %s._map(path=%r,filenum=%r,indexed_to=%r)",
+          type(self).__name__, path, filenum, indexed_to
+      )
+      return
     datadir = self.datadir
     if filenum in self.n_to_DFstate:
       warning("replacing n_to_DFstate[%s]", filenum)
