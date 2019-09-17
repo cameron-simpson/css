@@ -1,3 +1,4 @@
+blockmap: continues running even after connection shutdown
 OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
 virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
 MMappedDataDir: do not mmap the write file, just pread it
