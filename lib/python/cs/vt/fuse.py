@@ -139,8 +139,8 @@ def handler(method):
     arg_desc = ','.join(arg_desc)
     with Pfx("%s.%s(%s)", type(self).__name__, syscall, arg_desc):
       trace = syscall in (
-          'getxattr',
-          'setxattr',
+          ##'getxattr',
+          ##'setxattr',
           ##'statfs',
       )
       if trace:
@@ -160,11 +160,11 @@ def handler(method):
               else:
                 X("CALL %s result => %s", syscall, result)
             return result
-      except FuseOSError as e:
-        warning("=> FuseOSError %s", e, exc_info=False)
-        raise
+      ##except FuseOSError as e:
+      ##  warning("=> FuseOSError %s", e, exc_info=False)
+      ##  raise
       except OSError as e:
-        warning("=> OSError %s => FuseOSError", e, exc_info=False)
+        ##warning("=> OSError %s => FuseOSError", e, exc_info=False)
         raise FuseOSError(e.errno) from e
       except MissingHashcodeError as e:
         error("raising IOError from missing hashcode: %s", e)

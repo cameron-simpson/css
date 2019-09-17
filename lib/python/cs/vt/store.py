@@ -260,7 +260,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
-        Raise KeyError if the hashcode is not present.
+        Raise `MissingHashcodeError` (a subclass of `KeyError`)
+        if the hashcode is not present.
     '''
     block = self.get(h)
     if block is None:

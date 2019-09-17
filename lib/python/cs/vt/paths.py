@@ -221,10 +221,11 @@ class DirLike(ABC):
               "walk(%s): %r: dirname %r not in original set", self, rpath, name
           )
           continue
-        node = node.get(name)
-        if node is None:
+        subnode = node.get(name)
+        if subnode is None:
+          warning("walk(%s): %r: dirname %r not in node", self, rapth, name)
           continue
-        pending.append((node, rparts + [name]))
+        pending.append((subnode, rparts + [name]))
 
 class FileLike(ABC):
   ''' Facilities offered by file like objects.

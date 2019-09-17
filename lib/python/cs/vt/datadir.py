@@ -172,6 +172,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
 
   STATE_FILENAME_FORMAT = 'index-{hashname}-state.sqlite'
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
+  DATA_ROLLOVER = DEFAULT_ROLLOVER
 
   def __init__(
       self,
@@ -645,6 +646,12 @@ class SqliteFilemap:
   def _map(self, path, filenum, indexed_to=0):
     ''' Add a DataFileState for `path` and `filenum` to the mapping.
     '''
+    if path is None:
+      error(
+          "ignoring %s._map(path=%r,filenum=%r,indexed_to=%r)",
+          type(self).__name__, path, filenum, indexed_to
+      )
+      return
     datadir = self.datadir
     if filenum in self.n_to_DFstate:
       warning("replacing n_to_DFstate[%s]", filenum)
@@ -1024,7 +1031,7 @@ class PlatonicDir(_FilesDir):
       meta_store=None,
       **kw
   ):
-    ''' Initialise the `PlatonicDir` with `statedirpath` and `datadirpath`.
+    ''' Initialise the `PlatonicDir` at `statedirpath`.
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
@@ -1120,7 +1127,6 @@ class PlatonicDir(_FilesDir):
           DF.open()
     return DF
 
-  @logexc
   def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
@@ -1141,10 +1147,9 @@ class PlatonicDir(_FilesDir):
           info("scan %r DISABLED", shortpath(datadirpath))
           disabled = True
         continue
-      else:
-        if disabled:
-          info("scan %r ENABLED", shortpath(datadirpath))
-          disabled = False
+      if disabled:
+        info("scan %r ENABLED", shortpath(datadirpath))
+        disabled = False
       # scan for new datafiles
       with Pfx("%r", datadirpath):
         seen = set()

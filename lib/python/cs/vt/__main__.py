@@ -996,7 +996,8 @@ class VTCmd(BaseCommand):
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):
-      _, source = Archive(arpath).last
+      entry = Archive(arpath).last
+      source = entry.dirent
       if source is None:
         error("no entries in archive")
         return 1
@@ -1005,7 +1006,7 @@ class VTCmd(BaseCommand):
       else:
         target = OSFile(arbase)
     with Pfx(arbase):
-      if not merge(target, source):
+      if not merge(target, source, runstate=options.runstate):
         return 1
     return 0
 

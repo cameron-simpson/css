@@ -31,9 +31,9 @@ class MissingHashcodeError(KeyError):
     return "missing hashcode: %s" % (self.hashcode,)
 
 def io_fail(func):
-  ''' Decorator to transmute a MissingHashcodeError into a return of False.
+  ''' Decorator to transmute a `MissingHashcodeError` into a return of `False`.
   '''
-  return exc_fold(func, exc_types=(MissingHashcodeError,))
+  return exc_fold(exc_types=(MissingHashcodeError,))(func)
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
