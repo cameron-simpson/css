@@ -1122,7 +1122,7 @@ class Packet(PacketField):
           field = getattr(self, field_name, None)
         if field is None:
           if required:
-            raise ValueError("field %r missing" % (field_name,))
+            raise ValueError("%s: field %r missing" % (type(self).__name__, field_name,))
         else:
           if not isinstance(field, basetype):
             raise ValueError(
