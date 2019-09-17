@@ -579,6 +579,32 @@ class HashCodeBlock(_Block):
         data = self._data = defaults.S[self.hashcode]
     return data
 
+  @classmethod
+  def need_direct_data(cls, blocks):
+    ''' Bulk request the direct data for `blocks`.
+    '''
+    S = defaults.S
+    Rs = []
+    for B in blocks:
+      try:
+        d = B._data
+      except AttributeError:
+        # not a HashCodeBlock-like Block
+        continue
+      if d is not None:
+        # data obtained already
+        continue
+      try:
+        h = B.hashcode
+      except AttributeError as e:
+        if isinstance(B, HashCodeBlock):
+          error("need_direct_data: B=%s: %s", B, e)
+      else:
+        # request the data
+        Rs.append(S._defer(B.get_direct_data))
+    for R in Rs:
+      R.join()
+
   @prop
   def span(self):
     ''' Return the data length, computing it from the data if required.
