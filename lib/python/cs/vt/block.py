@@ -392,6 +392,8 @@ class _Block(Transcriber, ABC):
           yield from blockmap.slices(start, end - start)
           return
       offset = 0
+      subblocks = self.subblocks
+      HashCodeBlock.need_direct_data(subblocks)
       for B in self.subblocks:
         sublen = len(B)
         if start <= offset + sublen:
