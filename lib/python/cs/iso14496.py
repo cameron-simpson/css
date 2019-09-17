@@ -667,6 +667,18 @@ class Box(Packet):
     '''
     return type(self).boxbody_type_from_klass()
 
+  def ancestor(self, box_type):
+    ''' Return the closest ancestor box of type `box_type`.
+    '''
+    if isinstance(box_type, str):
+      box_type = box_type.encode('ascii')
+    parent = self.parent
+    while parent:
+      if parent.box_type == box_type:
+        return parent
+      parent = parent.parent
+    return parent
+
   def dump(self, **kw):
     ''' Dump this Box.
     '''
