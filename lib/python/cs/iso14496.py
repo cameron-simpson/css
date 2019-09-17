@@ -1857,11 +1857,13 @@ def parse_buffer(bfr, copy_offsets=None, **kw):
   while not bfr.at_eof():
     yield OverBox.from_buffer(bfr, **kw)
 
-def dump_box(B, indent='', fp=None, crop_length=170):
+def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   ''' Recursively dump a Box.
   '''
   if fp is None:
     fp = sys.stdout
+  if indent_incr is None:
+    indent_incr = '  '
   fp.write(indent)
   summary = str(B)
   if len(summary) > crop_length - len(indent):
@@ -1883,7 +1885,9 @@ def dump_box(B, indent='', fp=None, crop_length=170):
         fp.write(field_name)
         fp.write(':\n')
         for subbox in field.value:
-          subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
+          subbox.dump(
+              indent=indent + indent_incr, fp=fp, crop_length=crop_length
+          )
   try:
     boxes = B.boxes
   except AttributeError:
@@ -1892,7 +1896,7 @@ def dump_box(B, indent='', fp=None, crop_length=170):
     fp.write(indent)
     fp.write('  boxes\n')
     for subbox in boxes:
-      subbox.dump(indent=indent + '    ', fp=fp, crop_length=crop_length)
+      subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
