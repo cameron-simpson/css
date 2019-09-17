@@ -69,6 +69,7 @@ class StreamStore(BasicStoreSync):
       connect=None,
       local_store=None,
       exports=None,
+      capacity=None,
       **kw
   ):
     ''' Initialise the Stream Store.
@@ -97,7 +98,9 @@ class StreamStore(BasicStoreSync):
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
-    super().__init__('StreamStore:%s' % (name,), **kw)
+    if capacity is None:
+      capacity = 1024
+    super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
     self._lock = Lock()
     self.mode_addif = addif
     self._local_store = local_store
