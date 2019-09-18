@@ -94,6 +94,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
     self.idle_fg = deque()      # nondaemon Threads
     self.idle_daemon = deque()  # daemon Threads
     self.all = set()
+    self._lock = Lock()
 
   def __str__(self):
     return "WorkerThreadPool:%s" % (self.name,)
