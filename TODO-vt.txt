@@ -1,3 +1,4 @@
+blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
 datadir SqliteFilemap: mappings with path=NULL, how?
 blockmap: continues running even after connection shutdown
 OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
