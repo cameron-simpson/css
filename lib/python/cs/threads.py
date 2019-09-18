@@ -8,7 +8,9 @@
 '''
 
 from __future__ import with_statement
-from collections import deque, namedtuple
+from collections import defaultdict, deque, namedtuple
+from contextlib import contextmanager
+from heapq import heappush, heappop
 import sys
 from threading import Semaphore, current_thread
 from cs.debug import Lock, Thread
@@ -376,6 +378,105 @@ def via(cmanager, func, *a, **kw):
     with cmanager:
       return func(*a, **kw)
   return f
+
+class PriorityLock(object):
+  ''' A priority based mutex.
+
+      A priority based mutex which is acquired by and released to waiters
+      in priority order.
+
+      The `acquire()` method accepts an optional `priority` value (default `0`)
+      which specifies the priority of the acquire request;
+      lower values have higher priorities.
+
+      Note that internally this allocates a `threading.Lock` per acquirer.
+
+      When `acquire is called, if the `PriorityLock` is taken
+      then the acquirer blocks on their personal `Lock`.
+
+      When `release()` is called the highest priority `Lock` is released.
+
+      Within a priority level `acquire`s are served in FIFO order.
+
+      Used as a context manager, tis mutex is obtained at the default priority.
+
+      The `priority()` method offers a context manager
+      with a specified priority.
+  '''
+
+  def __init__(self):
+    self._lock = Lock()
+    # heap of active priorities
+    self._priorities = []
+    # queues per priority
+    self._blocked = defaultdict(list)
+    self._nlocks = 0
+
+  @locked
+  def acquire(self, priority=0):
+    ''' Acquire the mutex with `priority` (default `0`).
+
+        This blocks behind any higher priority `acquire`s
+        or any earlier `acquire`s of the same priority.
+    '''
+    priorities = self._priorities
+    blocked_map = self._blocked
+    # prepare an acquired Lock at the right priority
+    my_lock = Lock()
+    my_lock.acquire()
+    with self._lock:
+      blocked = blocked_map[priority]
+      if not blocked:
+        # new priority
+        heappush(priorities, priority)
+      blocked.append(my_lock)
+      self._nlocks += 1
+      if self._nlocks == 1:
+        # we're the only contender: return now
+        return
+    # block until someone frees my_lock
+    my_lock.acquire()
+
+  def release(self):
+    ''' Release the mutex.
+
+        Internally, this releases the highest priority `Lock`,
+        allowing that `acquire`r to go forward.
+    '''
+    # release the top Lock
+    priorities = self._priorities
+    with self._lock:
+      top_priority = priorities[0]
+      top_blocked = self._blocked[top_priority]
+      top_lock = top_blocked.pop(0)
+      # release the lock ASAP
+      top_lock.release()
+      self._nlocks -= 1
+      if not top_blocked:
+        # no more locks of this priority, discard the queue and the priority
+        del self._blocked[top_priority]
+        heappop(priorities)
+
+  def __enter__(self):
+    ''' Enter the mutex as a context manager at the default priority.
+    '''
+    self.acquire()
+
+  def __exit__(self, *_):
+    ''' Exit the context manager.
+    '''
+    self.release()
+    return False
+
+  @contextmanager
+  def priority(self, priority=0):
+    ''' Return a context manager with the specified `priority` (default `0`).
+    '''
+    self.acquire(priority)
+    try:
+      yield
+    finally:
+      self.release()
 
 if __name__ == '__main__':
   import cs.threads_tests
