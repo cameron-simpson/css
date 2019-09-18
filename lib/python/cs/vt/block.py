@@ -357,8 +357,10 @@ class _Block(Transcriber, ABC):
   @locked
   def get_blockmap(self, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
-        `force`: if true, create a new blockmap anyway; default: False
-        `blockmapdir`: directory to hold persistent block maps
+
+        Parameters:
+        * `force`: if true, create a new blockmap anyway; default: `False`
+        * `blockmapdir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
