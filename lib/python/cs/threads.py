@@ -385,7 +385,9 @@ class PriorityLock(object):
       A priority based mutex which is acquired by and released to waiters
       in priority order.
 
-      The `acquire()` method accepts an optional `priority` value (default `0`)
+      The initialiser sets a default priority, itself defaulting to `0`.
+
+      The `acquire()` method accepts an optional `priority` value
       which specifies the priority of the acquire request;
       lower values have higher priorities.
 
@@ -398,27 +400,36 @@ class PriorityLock(object):
 
       Within a priority level `acquire`s are served in FIFO order.
 
-      Used as a context manager, tis mutex is obtained at the default priority.
+      Used as a context manager, the mutex is obtained at the default priority.
 
       The `priority()` method offers a context manager
       with a specified priority.
   '''
 
-  def __init__(self):
-    self._lock = Lock()
+  def __init__(self, default_priority=0):
+    ''' Initialise the `PriorityLock`.
+
+        Parameters:
+        * `default_priority`: the default `acquire` priority,
+          default `0`.
+    '''
+    self.default_priority = default_priority
     # heap of active priorities
     self._priorities = []
     # queues per priority
     self._blocked = defaultdict(list)
     self._nlocks = 0
+    self._lock = Lock()
 
   @locked
-  def acquire(self, priority=0):
-    ''' Acquire the mutex with `priority` (default `0`).
+  def acquire(self, priority=None):
+    ''' Acquire the mutex with `priority` (default from `default_priority`).
 
         This blocks behind any higher priority `acquire`s
         or any earlier `acquire`s of the same priority.
     '''
+    if priority is None:
+      priority = self.default_priority
     priorities = self._priorities
     blocked_map = self._blocked
     # prepare an acquired Lock at the right priority
@@ -469,10 +480,10 @@ class PriorityLock(object):
     return False
 
   @contextmanager
-  def priority(self, priority=0):
-    ''' Return a context manager with the specified `priority` (default `0`).
+  def priority(self, this_priority):
+    ''' Return a context manager with the specified `this_priority`.
     '''
-    self.acquire(priority)
+    self.acquire(this_priority)
     try:
       yield
     finally:
