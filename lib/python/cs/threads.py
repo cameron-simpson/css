@@ -410,7 +410,7 @@ class PriorityLock(object):
       with a specified priority.
   '''
 
-  _seq = Seq()
+  _cls_seq = Seq()
 
   def __init__(self, default_priority=0, name=None):
     ''' Initialise the `PriorityLock`.
@@ -421,7 +421,7 @@ class PriorityLock(object):
         * `name`: optional identifying name
     '''
     if name is None:
-      name = str(next(self._seq))
+      name = str(next(self._cls_seq))
     self.name = name
     self.default_priority = default_priority
     # heap of active priorities
@@ -429,12 +429,12 @@ class PriorityLock(object):
     # queues per priority
     self._blocked = defaultdict(list)
     self._nlocks = 0
+    self._seq = Seq()
     self._lock = Lock()
 
   def __str__(self):
     return "%s[%s]" % (type(self).__name__, self.name)
 
-  @locked
   def acquire(self, priority=None):
     ''' Acquire the mutex with `priority` (default from `default_priority`).
         Return the new `PriorityLockSubLock`.
@@ -448,7 +448,7 @@ class PriorityLock(object):
     blocked_map = self._blocked
     # prepare an acquired Lock at the right priority
     my_lock = PriorityLockSubLock(
-        str(self) + '-' + next(self._seq),
+        str(self) + '-' + str(next(self._seq)),
         priority,
         Lock(),
         self)
