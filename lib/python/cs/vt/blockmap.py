@@ -282,7 +282,6 @@ class BlockMap(RunStateMixin):
   def join(self):
     ''' Wait for the worker to complete.
     '''
-    self.runstate.cancel()
     worker = self._worker
     if worker is not None:
       self._worker.join()
