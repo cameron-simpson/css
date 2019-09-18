@@ -21,7 +21,7 @@ from cs.pfx import Pfx
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
-from cs.seq import seq
+from cs.seq import seq, Seq
 
 DISTINFO = {
     'description': "threading and communication/synchronisation conveniences",
@@ -379,6 +379,9 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
+PriorityLockSubLock = namedtuple(
+    'PriorityLockSubLock', 'name priority lock priority_lock')
+
 class PriorityLock(object):
   ''' A priority based mutex.
 
@@ -390,6 +393,7 @@ class PriorityLock(object):
       The `acquire()` method accepts an optional `priority` value
       which specifies the priority of the acquire request;
       lower values have higher priorities.
+      `acquire` returns a new `PriorityLockSubLock`.
 
       Note that internally this allocates a `threading.Lock` per acquirer.
 
@@ -406,13 +410,19 @@ class PriorityLock(object):
       with a specified priority.
   '''
 
-  def __init__(self, default_priority=0):
+  _seq = Seq()
+
+  def __init__(self, default_priority=0, name=None):
     ''' Initialise the `PriorityLock`.
 
         Parameters:
         * `default_priority`: the default `acquire` priority,
           default `0`.
+        * `name`: optional identifying name
     '''
+    if name is None:
+      name = str(next(self._seq))
+    self.name = name
     self.default_priority = default_priority
     # heap of active priorities
     self._priorities = []
@@ -421,9 +431,13 @@ class PriorityLock(object):
     self._nlocks = 0
     self._lock = Lock()
 
+  def __str__(self):
+    return "%s[%s]" % (type(self).__name__, self.name)
+
   @locked
   def acquire(self, priority=None):
     ''' Acquire the mutex with `priority` (default from `default_priority`).
+        Return the new `PriorityLockSubLock`.
 
         This blocks behind any higher priority `acquire`s
         or any earlier `acquire`s of the same priority.
@@ -433,8 +447,12 @@ class PriorityLock(object):
     priorities = self._priorities
     blocked_map = self._blocked
     # prepare an acquired Lock at the right priority
-    my_lock = Lock()
-    my_lock.acquire()
+    my_lock = PriorityLockSubLock(
+        str(self) + '-' + next(self._seq),
+        priority,
+        Lock(),
+        self)
+    my_lock.lock.acquire()
     with self._lock:
       blocked = blocked_map[priority]
       if not blocked:
@@ -444,9 +462,10 @@ class PriorityLock(object):
       self._nlocks += 1
       if self._nlocks == 1:
         # we're the only contender: return now
-        return
+        return my_lock
     # block until someone frees my_lock
-    my_lock.acquire()
+    my_lock.lock.acquire()
+    return my_lock
 
   def release(self):
     ''' Release the mutex.
@@ -461,7 +480,7 @@ class PriorityLock(object):
       top_blocked = self._blocked[top_priority]
       top_lock = top_blocked.pop(0)
       # release the lock ASAP
-      top_lock.release()
+      top_lock.lock.release()
       self._nlocks -= 1
       if not top_blocked:
         # no more locks of this priority, discard the queue and the priority
@@ -470,8 +489,9 @@ class PriorityLock(object):
 
   def __enter__(self):
     ''' Enter the mutex as a context manager at the default priority.
+        Returns the new `Lock`.
     '''
-    self.acquire()
+    return self.acquire()
 
   def __exit__(self, *_):
     ''' Exit the context manager.
@@ -481,11 +501,12 @@ class PriorityLock(object):
 
   @contextmanager
   def priority(self, this_priority):
-    ''' Return a context manager with the specified `this_priority`.
+    ''' A context manager with the specified `this_priority`.
+        Returns the new `Lock`.
     '''
-    self.acquire(this_priority)
+    my_lock = self.acquire(this_priority)
     try:
-      yield
+      yield my_lock
     finally:
       self.release()
 
