@@ -18,12 +18,12 @@ from os.path import isdir, exists as pathexists, join as joinpath
 from struct import Struct
 import sys
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import Thread
 from cs.excutils import logexc
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.resources import RunStateMixin
+from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults
 from .block import HashCodeBlock, IndirectBlock
@@ -266,11 +266,18 @@ class BlockMap(RunStateMixin):
           "BlockMap.__init__: dispatch worker to scan from offset %d ...",
           mapped_to
       )
-      self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
-      self._worker.start()
+      self._worker = bg_thread(
+          self._load_maps,
+          args=(defaults.S,),
+          daemon=True,
+          name="%s._load_maps" % (self,)
+      )
     else:
       self._worker = None
+
+  def __str__(self):
+    return "%s(%s,%r)" % (type(self).__name__, self.block, self.mappath)
 
   def join(self):
     ''' Wait for the worker to complete.
@@ -298,7 +305,6 @@ class BlockMap(RunStateMixin):
         submap.close()
         maps[i] = None
 
-  @logexc
   def _load_maps(self, S):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
