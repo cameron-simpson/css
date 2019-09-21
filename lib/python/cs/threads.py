@@ -385,8 +385,16 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
-PriorityLockSubLock = namedtuple(
-    'PriorityLockSubLock', 'name priority lock priority_lock')
+class PriorityLockSubLock(namedtuple(
+    'PriorityLockSubLock',
+    'name priority lock priority_lock')):
+  def __str__(self):
+    return "%s(name=%r,priority=%s,lock=%s:%s,priority_lock=%r)" \
+        % (type(self).__name__,
+           self.name,
+           self.priority,
+           type(self.lock).__name__, id(self.lock),
+           str(self.priority_lock))
 
 class PriorityLock(object):
   ''' A priority based mutex.
