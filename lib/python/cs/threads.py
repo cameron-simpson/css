@@ -443,6 +443,7 @@ class PriorityLock(object):
     # queues per priority
     self._blocked = defaultdict(list)
     self._nlocks = 0
+    self._current_sublock = None
     self._seq = Seq()
     self._lock = Lock()
 
@@ -468,17 +469,22 @@ class PriorityLock(object):
         self)
     my_lock.lock.acquire()
     with self._lock:
+      self._nlocks += 1
+      if self._nlocks == 1:
+        # we're the only contender: return now
+        assert self._current_sublock is None
+        self._current_sublock = my_lock
+        return my_lock
+      # store my_lock in the pending locks
       blocked = blocked_map[priority]
       if not blocked:
         # new priority
         heappush(priorities, priority)
       blocked.append(my_lock)
-      self._nlocks += 1
-      if self._nlocks == 1:
-        # we're the only contender: return now
-        return my_lock
     # block until someone frees my_lock
     my_lock.lock.acquire()
+    assert self._current_sublock is None
+    self._current_sublock = my_lock
     return my_lock
 
   def release(self):
@@ -490,16 +496,21 @@ class PriorityLock(object):
     # release the top Lock
     priorities = self._priorities
     with self._lock:
-      top_priority = priorities[0]
-      top_blocked = self._blocked[top_priority]
-      top_lock = top_blocked.pop(0)
-      # release the lock ASAP
-      top_lock.lock.release()
+      my_lock = self._current_sublock
+      self._current_sublock = None
+      my_lock.lock.release()
       self._nlocks -= 1
-      if not top_blocked:
-        # no more locks of this priority, discard the queue and the priority
-        del self._blocked[top_priority]
-        heappop(priorities)
+      if self._nlocks > 0:
+        # release to highest priority pending lock
+        top_priority = priorities[0]
+        top_blocked = self._blocked[top_priority]
+        top_lock = top_blocked.pop(0)
+        # release the lock ASAP
+        top_lock.lock.release()
+        if not top_blocked:
+          # no more locks of this priority, discard the queue and the priority
+          del self._blocked[top_priority]
+          heappop(priorities)
 
   def __enter__(self):
     ''' Enter the mutex as a context manager at the default priority.
