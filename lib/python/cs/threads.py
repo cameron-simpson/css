@@ -413,6 +413,8 @@ def via(cmanager, func, *a, **kw):
 
 class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
                                      'name priority lock priority_lock')):
+  ''' The record for the per-`acquire`r `Lock` held by `PriorityLock.acquire`.
+  '''
 
   def __str__(self):
     return "%s(name=%r,priority=%s,lock=%s:%s,priority_lock=%r)" \
@@ -423,9 +425,7 @@ class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
            str(self.priority_lock))
 
 class PriorityLock(object):
-  ''' A priority based mutex.
-
-      A priority based mutex which is acquired by and released to waiters
+  ''' A priority based mutex which is acquired by and released to waiters
       in priority order.
 
       The initialiser sets a default priority, itself defaulting to `0`.
@@ -437,7 +437,7 @@ class PriorityLock(object):
 
       Note that internally this allocates a `threading.Lock` per acquirer.
 
-      When `acquire is called, if the `PriorityLock` is taken
+      When `acquire` is called, if the `PriorityLock` is taken
       then the acquirer blocks on their personal `Lock`.
 
       When `release()` is called the highest priority `Lock` is released.
@@ -445,9 +445,10 @@ class PriorityLock(object):
       Within a priority level `acquire`s are served in FIFO order.
 
       Used as a context manager, the mutex is obtained at the default priority.
-
       The `priority()` method offers a context manager
       with a specified priority.
+      Both context managers return the `PriorityLockSubLock`
+      allocated by the `acuire`.
   '''
 
   _cls_seq = Seq()
