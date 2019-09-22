@@ -23,7 +23,8 @@ from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
 DISTINFO = {
-    'description': "threading and communication/synchronisation conveniences",
+    'description':
+    "threading and communication/synchronisation conveniences",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -42,7 +43,15 @@ DISTINFO = {
     ],
 }
 
-def bg(func, daemon=None, name=None, no_start=False, no_logexc=False, args=None, kwargs=None):
+def bg(
+    func,
+    daemon=None,
+    name=None,
+    no_start=False,
+    no_logexc=False,
+    args=None,
+    kwargs=None
+):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
 
@@ -62,9 +71,11 @@ def bg(func, daemon=None, name=None, no_start=False, no_logexc=False, args=None,
     args = ()
   if kwargs is None:
     kwargs = {}
+
   def thread_body():
     with Pfx(name):
       return func(*args, **kwargs)
+
   T = Thread(name=name, target=thread_body)
   if not no_logexc:
     func = logexc(func)
@@ -93,7 +104,7 @@ class WorkerThreadPool(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     self.name = name
     self.max_spare = max_spare
-    self.idle_fg = deque()      # nondaemon Threads
+    self.idle_fg = deque()  # nondaemon Threads
     self.idle_daemon = deque()  # daemon Threads
     self.all = set()
     self._lock = Lock()
@@ -164,7 +175,11 @@ class WorkerThreadPool(MultiOpenMixin):
         debug("dispatch: need new thread")
         # no available threads - make one
         Targs = []
-        T = Thread(target=self._handler, args=Targs, name=("%s:worker" % (self.name,)))
+        T = Thread(
+            target=self._handler,
+            args=Targs,
+            name=("%s:worker" % (self.name,))
+        )
         T.daemon = daemon
         Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         entry = WTPoolEntry(T, Q)
@@ -172,7 +187,7 @@ class WorkerThreadPool(MultiOpenMixin):
         Targs.append(entry)
         debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
         T.start()
-      entry.queue.put( (func, retq, deliver) )
+      entry.queue.put((func, retq, deliver))
 
   @logexc
   def _handler(self, entry):
@@ -205,10 +220,12 @@ class WorkerThreadPool(MultiOpenMixin):
         exc_info = sys.exc_info()
         log_func = (
             exception
-            if isinstance(exc_info[1], (TypeError, NameError, AttributeError))
-            else debug
+            if isinstance(exc_info[1],
+                          (TypeError, NameError, AttributeError)) else debug
         )
-        log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        log_func(
+            "%s: worker thread: ran task: exception! %r", self, sys.exc_info()
+        )
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
@@ -217,7 +234,7 @@ class WorkerThreadPool(MultiOpenMixin):
           raise3(*exc_info)
         debug("%s: worker thread: set result = (None, exc_info)", self)
       T.name = oname
-      func = None     # release func+args
+      func = None  # release func+args
       reuse = False and (len(idle) < self.max_spare)
       if reuse:
         # make available for another task
@@ -309,7 +326,8 @@ class AdjustableSemaphore(object):
           delta -= 1
       else:
         while delta < 0:
-          with LogTime("AdjustableSemaphore(%s): acquire excess capacity", self.__name):
+          with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
+                       self.__name):
             self.__sem.acquire(True)
           delta += 1
       self.__value = newvalue
@@ -318,18 +336,23 @@ def locked(func):
   ''' A decorator for monitor functions that must run within a lock.
       Relies upon a ._lock attribute for locking.
   '''
+
   def lockfunc(self, *a, **kw):
     with self._lock:
       return func(self, *a, **kw)
+
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
-def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
+def locked_property(
+    func, lock_name='_lock', prop_name=None, unset_object=None
+):
   ''' A thread safe property whose value is cached.
       The lock is taken if the value needs to computed.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
+
   @transmute(AttributeError)
   def getprop(self):
     ''' Attempt lockless fetch of property first.
@@ -355,6 +378,7 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
       ##debug("outside lock, already computed %s", prop_name)
       pass
     return p
+
   return prop(getprop)
 
 class LockableMixin(object):
@@ -362,10 +386,13 @@ class LockableMixin(object):
       Exposes the ._lock as the property .lock.
       Presents a context manager interface for obtaining an object's lock.
   '''
+
   def __enter__(self):
     self._lock.acquire()
+
   def __exit(self, exc_type, exc_value, traceback):
     self._lock.release()
+
   @property
   def lock(self):
     ''' Return the lock.
@@ -377,14 +404,16 @@ def via(cmanager, func, *a, **kw):
       with statement using the context manager `cmanager`.
       This intended use case is aimed at deferred function calls.
   '''
+
   def f():
     with cmanager:
       return func(*a, **kw)
+
   return f
 
-class PriorityLockSubLock(namedtuple(
-    'PriorityLockSubLock',
-    'name priority lock priority_lock')):
+class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
+                                     'name priority lock priority_lock')):
+
   def __str__(self):
     return "%s(name=%r,priority=%s,lock=%s:%s,priority_lock=%r)" \
         % (type(self).__name__,
@@ -460,10 +489,8 @@ class PriorityLock(object):
     blocked_map = self._blocked
     # prepare an acquired Lock at the right priority
     my_lock = PriorityLockSubLock(
-        str(self) + '-' + str(next(self._seq)),
-        priority,
-        Lock(),
-        self)
+        str(self) + '-' + str(next(self._seq)), priority, Lock(), self
+    )
     my_lock.lock.acquire()
     with self._lock:
       self._nlocks += 1
