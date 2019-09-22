@@ -448,7 +448,7 @@ class PriorityLock(object):
       The `priority()` method offers a context manager
       with a specified priority.
       Both context managers return the `PriorityLockSubLock`
-      allocated by the `acuire`.
+      allocated by the `acquire`.
   '''
 
   _cls_seq = Seq()
