@@ -16,7 +16,6 @@ from threading import Semaphore, current_thread
 from cs.debug import Lock, Thread
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, debug, exception
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
@@ -35,7 +34,6 @@ DISTINFO = {
         'cs.debug',
         'cs.excutils',
         'cs.logutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
@@ -77,7 +75,7 @@ def bg(func, daemon=None, name=None, no_start=False, no_logexc=False, args=None,
 
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
 
-class WorkerThreadPool(MultiOpenMixin, O):
+class WorkerThreadPool(MultiOpenMixin):
   ''' A pool of worker threads to run functions.
   '''
 
@@ -92,7 +90,6 @@ class WorkerThreadPool(MultiOpenMixin, O):
       name = "WorkerThreadPool-%d" % (seq(),)
     if max_spare < 1:
       raise ValueError("max_spare(%s) must be >= 1" % (max_spare,))
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.name = name
     self.max_spare = max_spare
