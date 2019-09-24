@@ -86,7 +86,7 @@ def title_to_part(title):
           >>> title_to_part('Episode Name')
           'episode-name'
   '''
-  return re.sub('[\s-]+', '-', title).strip().lower()
+  return re.sub(r'[\s-]+', '-', title).strip().lower()
 
 def part_to_title(part):
   ''' Convert a filename part into a title string.

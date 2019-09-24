@@ -31,7 +31,7 @@ DISTINFO = {
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module's `__dict__`.
+      formatted against the function's module `__dict__`.
 
       This supports simple formatted docstrings:
 
@@ -55,21 +55,24 @@ def fmtdoc(func):
 
 def decorator(deco):
   ''' Wrapper for decorator functions to support optional arguments.
+
       The actual decorator function ends up being called as:
 
-          deco(func, *da, **dkw)
+          mydeco(func, *da, **dkw)
 
-      allowing `da` and `dkw` to affect the behaviour of the decorator `deco`.
+      allowing `da` and `dkw` to affect the behaviour of the decorator `mydeco`.
 
       Examples:
 
           @decorator
-          def deco(func, *da, kw=None):
+          def mydeco(func, *da, kw=None):
             ... decorate func subject to the values of da and kw
-          @deco
+
+          @mydeco
           def func1(...):
             ...
-          @deco('foo', arg2='bah')
+
+          @mydeco('foo', arg2='bah')
           def func2(...):
             ...
   '''
@@ -86,6 +89,11 @@ def decorator(deco):
       func = da[0]
       decorated = deco(func)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
@@ -93,11 +101,17 @@ def decorator(deco):
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
 
     return overdeco
 
   metadeco.__doc__ = getattr(deco, '__doc__', '')
+  metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
 
 @decorator
@@ -170,6 +184,7 @@ def cached(
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       first = getattr(self, firstpoll_attr, True)
+      sig = getattr(self, sig_attr, None)
       setattr(self, firstpoll_attr, False)
       value0 = getattr(self, val_attr, unset_value)
       if not first and value0 is not unset_value:

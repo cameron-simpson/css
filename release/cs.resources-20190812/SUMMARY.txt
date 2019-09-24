@@ -1,0 +1,5 @@
+MultiOpenMixin: no longer subclass cs.obj.O.
+MultiOpenMixin: remove `lock` param support, the mixin has its own lock.
+MultiOpen: drop `lock` param support, no longer used by MultiOpenMixin.
+MultiOpenMixin: do finalise inside the lock for the same reason as shutdown (competition with open/startup).
+MultiOpenMixin.close: new `unopened_ok=False` parameter intended for callback closes which might fire even if the initial open does not occur.

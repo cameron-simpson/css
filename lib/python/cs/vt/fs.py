@@ -42,7 +42,6 @@ def oserror(errno_, msg, *a):
   assert isinstance(msg, str)
   if a:
     msg = msg % a
-  warning("raise OSError(%s): %s", errno_, msg)
   raise OSError(errno_, msg)
 
 # Generate OS_E* functions to raise custom OSErrors.
@@ -50,25 +49,42 @@ def oserror(errno_, msg, *a):
 #  OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
 # for the known names in the errno module.
 def mkOSfunc(M, Ename):
+  ''' Create a wrapper function for `oserror` from errno value name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to be a valid errno symbol from the `errno` module.
+  '''
   Evalue = getattr(errno, Ename)
   setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
 
-M = getmodule(oserror)
-for Ename in dir(errno):
-  if Ename.startswith('E'):
-    mkOSfunc(M, Ename)
-
 # Generate dummy functions for missing symbols which we use.
 def mkOSfuncEINVAL(M, Ename):
+  ''' Create a wrapper function for `oserror` from the name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to *not* be a valid errno symbol
+      from the `errno` module, and is to support calls of "foreign"
+      errno symbols;
+      they are translated to `EINVAL` with an indication in the warning message.
+  '''
+  os_funcname = 'OS_' + Ename
   setattr(
-      M, 'OS_' + Ename, lambda msg, *a:
+      M, os_funcname, lambda msg, *a:
       oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a)
   )
 
-for Ename in 'ENOATTR', :
-  if not hasattr(errno, Ename):
-    mkOSfuncEINVAL(M, Ename)
-del M
+def _prep_osfuncs():
+  ''' Generate the required wrappers for the various `E*` errno symbols.
+  '''
+  M = getmodule(oserror)
+  for Ename in dir(errno):
+    if Ename.startswith('E'):
+      mkOSfunc(M, Ename)
+  for Ename in 'ENOATTR', :
+    if not hasattr(errno, Ename):
+      mkOSfuncEINVAL(M, Ename)
+
+_prep_osfuncs()
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -90,7 +106,7 @@ class FileHandle:
 
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
-    return "<FileHandle:fhndx=%d:%s>" % (
+    return "<FileHandle:fhndx=%s:%s>" % (
         fhndx,
         self.E,
     )
@@ -347,9 +363,9 @@ class FileSystem(object):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
-      See the cs.vtfuse module for the StoreFS_LLFUSE class (aliased
-      as StoreFS) and associated mount function which presents a
-      FileSystem as a FUSE mount.
+      See the `cs.vt.fuse` module for the `StoreFS_LLFUSE` class (aliased
+      as `StoreFS`) and associated mount function which presents a
+      `FileSystem` as a FUSE mount.
 
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
@@ -442,7 +458,7 @@ class FileSystem(object):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with defaults.stack('fs', self):
+        with defaults.stack(fs=self):
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
@@ -537,7 +553,6 @@ class FileSystem(object):
     ''' Return the Dirent associated with the supplied `inum`.
     '''
     I = self._inodes[inum]
-    X("inum %s => %r", inum, I)
     return I.E
 
   def open2(self, P, name, flags):

@@ -83,7 +83,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
     self._blockmap = None
     self._file = None
     self._lock = RLock()
-    MultiOpenMixin.__init__(self, lock=self._lock)
+    MultiOpenMixin.__init__(self)
     self.open()
     self._reset(backing_block)
 
@@ -199,7 +199,7 @@ class RWBlockFile(MultiOpenMixin, LockableMixin, ReadMixin):
           if pad_length > 0:
             subblocks.append(RLEBlock(pad_length, b'\0'))
           subblocks.append(new_block)
-          new_backing_block = IndirectBlock(subblocks=subblocks)
+          new_backing_block = IndirectBlock.from_subblocks(subblocks)
         else:
           end = min(end, len(old_backing_block))
           new_backing_block = old_backing_block.splice(start, end, new_block)

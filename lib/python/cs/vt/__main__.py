@@ -27,7 +27,6 @@ from os.path import (
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
-from threading import Thread
 from time import sleep
 from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
@@ -39,6 +38,7 @@ from cs.logutils import exception, error, warning, info, upd, debug, \
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import RunState
+from cs.threads import bg as bg_thread
 from cs.tty import ttysize
 import cs.x
 from cs.x import X
@@ -129,7 +129,7 @@ class VTCmd(BaseCommand):
             readonly    Read only; data may not be modified.
       -r  Readonly, the same as "-o readonly".
     pack path
-    pullfrom other-store objects...
+    pullfrom other-store [objects...]
     pushto other-store objects...
     serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
     test blockify file
@@ -223,7 +223,7 @@ class VTCmd(BaseCommand):
     if progress is None:
       progress = Progress(total=0)
     ticker = options.ticker
-    if ticker is None and sys.stderr.isatty():
+    if False and ticker is None and sys.stderr.isatty():
       _, cols = ttysize(2)
       status_width = cols - 2
 
@@ -232,9 +232,7 @@ class VTCmd(BaseCommand):
           upd(progress.status(options.status_label, status_width))
           sleep(0.25)
 
-      ticker = Thread(name='status-line', target=ticker)
-      ticker.daemon = True
-      ticker.start()
+      ticker = bg_thread(ticker, name='status-line', daemon=True)
     with options.stack(progress=progress, ticker=ticker):
       with defaults.stack(runstate=runstate):
         if cmd in ("config", "dump", "init", "profile", "scan", "test"):
@@ -729,7 +727,8 @@ class VTCmd(BaseCommand):
         return 1
       arpath = ospath + '.vt'
       A = Archive(arpath, missing_ok=True)
-      when, target = A.last
+      last_entry = A.last
+      when, target = last_entry.when, last_entry.dirent
       if target is None:
         target = Dir(basename(ospath))
       if isdirpath(ospath):
@@ -782,9 +781,9 @@ class VTCmd(BaseCommand):
             raise
         else:
           if offset < len(s):
-            raise ValueError("uncomplete parse, unparsed: %r" % (s[offset:],))
+            raise ValueError("incomplete parse, unparsed: %r" % (s[offset:],))
     if not hasattr(obj, 'pushto_queue'):
-      raise ValueError("not pushable")
+      raise ValueError("type %s is not pushable" % (type(obj),))
     return obj
 
   @staticmethod
@@ -821,10 +820,10 @@ class VTCmd(BaseCommand):
     if not args:
       raise GetoptError("missing other_store")
     srcSspec = args.pop(0)
-    if not args:
-      raise GetoptError("missing objects")
     with Pfx("other_store %r", srcSspec):
       srcS = Store(srcSspec, options.config)
+    if not args:
+      args = (srcSpec,)
     dstS = defaults.S
     pushables = []
     for obj_spec in args:
@@ -847,7 +846,7 @@ class VTCmd(BaseCommand):
     srcS = defaults.S
     dstSspec = args.pop(0)
     if not args:
-      raise GetoptError("missing objects")
+      args = (dstSpec,)
     with Pfx("other_store %r", dstSspec):
       dstS = Store(dstSspec, options.config)
     pushables = []
@@ -997,7 +996,8 @@ class VTCmd(BaseCommand):
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):
-      _, source = Archive(arpath).last
+      entry = Archive(arpath).last
+      source = entry.dirent
       if source is None:
         error("no entries in archive")
         return 1
@@ -1006,7 +1006,7 @@ class VTCmd(BaseCommand):
       else:
         target = OSFile(arbase)
     with Pfx(arbase):
-      if not merge(target, source):
+      if not merge(target, source, runstate=options.runstate):
         return 1
     return 0
 
