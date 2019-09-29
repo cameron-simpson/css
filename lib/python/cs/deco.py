@@ -11,7 +11,6 @@ Assorted decorator functions.
 from collections import defaultdict
 import sys
 import time
-from cs.pfx import Pfx
 try:
   from cs.logutils import warning
 except ImportError:
@@ -23,9 +22,6 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-    ],
-    'install_requires': [
-        'cs.pfx',
     ],
 }
 
@@ -155,7 +151,7 @@ def cached(
       If the method raises an exception, this will be logged and
       the method will return the previously cached value,
       unless there is not yet a cached value
-      in which case the exception will raise.
+      in which case the exception will be reraised.
 
       If the signature function raises an exception
       then a log message is issued and the signature is considered unchanged.
@@ -166,7 +162,10 @@ def cached(
       might provide a signature function which called `os.stat()` on
       the file to check for changes before invoking a full read and
       parse of the file.
+
+      *Note*: use of this decorator requires the `cs.pfx` module.
   '''
+  from cs.pfx import Pfx
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
@@ -268,7 +267,10 @@ def strable(func, open_func=None):
           @strable(open_func=Recording)
           def process_video(r):
             ... do stuff with `r` as a Recording instance ...
+
+      *Note*: use of this decorator requires the `cs.pfx` module.
   '''
+  from cs.pfx import Pfx
   if open_func is None:
     open_func = open
 
