@@ -796,7 +796,7 @@ class DataDir(_FilesDir):
     return bytes(DataRecord(data))
 
   @staticmethod
-  def index_entry(filenum, offset, length):
+  def index_entry(filenum, offset, _):
     ''' Construct an index entry from the file number and offset.
     '''
     return DataDirIndexEntry(filenum, offset)
