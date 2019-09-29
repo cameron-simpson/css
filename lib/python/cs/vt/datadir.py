@@ -56,6 +56,7 @@ import sys
 import time
 from types import SimpleNamespace
 from uuid import uuid4
+from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.excutils import logexc
@@ -672,6 +673,8 @@ class SqliteFilemap:
         self._map(path, filenum, indexed_to)
       c.close()
 
+  @require(lambda new_path: new_path is not None)
+  @require(lambda new_path: isfilepath(new_path))
   def add_path(self, new_path, indexed_to=0):
     ''' Insert a new path into the map.
         Return its `DataFileState`.
