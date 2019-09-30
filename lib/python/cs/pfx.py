@@ -104,7 +104,7 @@ def pfx_method(method):
       return method(self, *a, **kw)
 
   wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(method.__name__)"
+  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
   return wrapper
 
 def pfxtag(tag, loggers=None):
