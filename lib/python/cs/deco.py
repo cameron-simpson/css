@@ -112,8 +112,8 @@ def decorator(deco):
   return metadeco
 
 @decorator
-def cached(
-    func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
+def cachedmethod(
+    method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
@@ -124,12 +124,12 @@ def cached(
       This decorator may be used in 2 modes.
       Directly:
 
-          @cached
+          @cachedmethod
           def method(self, ...)
 
       or indirectly:
 
-          @cached(poll_delay=0.25)
+          @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
       Optional keyword arguments:
@@ -174,7 +174,7 @@ def cached(
         "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
     )
 
-  attr = attr_name if attr_name else func.__name__
+  attr = attr_name if attr_name else method.__name__
   val_attr = '_' + attr
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
@@ -218,11 +218,11 @@ def cached(
         setattr(self, sig_attr, sig)
       # compute the current value
       try:
-        value = func(self, *a, **kw)
+        value = method(self, *a, **kw)
       except Exception as e:
         if value0 is unset_value:
           raise
-        warning("exception calling %s(self): %s", func, e, exc_info=True)
+        warning("exception calling %s(self): %s", method, e, exc_info=True)
         return value0
       setattr(self, val_attr, value)
       if sig_func is not None and not first:
@@ -391,7 +391,7 @@ if __name__ == '__main__':
     ''' Dummy class.
     '''
 
-    @cached(poll_delay=2)
+    @cachedmethod(poll_delay=2)
     def x(self, arg):
       ''' Dummy `x` method.
       '''
