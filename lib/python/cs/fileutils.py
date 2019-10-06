@@ -25,7 +25,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.deco import cached, decorator, strable
+from cs.deco import cachedmethod, decorator, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -285,7 +285,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
 def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
   ''' A decorator which caches a value obtained from a file.
 
-      In addition to all the keyword arguments for `@cs.deco.cached`,
+      In addition to all the keyword arguments for `@cs.deco.cachedmethod`,
       this decorator also accepts the following arguments:
       * `attr_name`: the name for the associated attribute, used as
         the basis for the internal cache value attribute
@@ -331,7 +331,7 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
   dkw['attr_name'] = attr_name
   dkw['poll_delay'] = poll_delay
   dkw['sig_func'] = sig_func
-  return cached(**dkw)(wrap0)
+  return cachedmethod(**dkw)(wrap0)
 
 @decorator
 def file_property(func, **dkw):
