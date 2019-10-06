@@ -63,8 +63,9 @@ import sys
 from threading import Lock
 from cs.logutils import exception, error, warning, debug
 from cs.pfx import Pfx, PfxThread as Thread
-from cs.seq import seq
 from cs.py3 import Queue, raise3, StringTypes
+from cs.seq import seq
+from cs.threads import bg as bg_thread
 
 DISTINFO = {
     'description':
@@ -271,19 +272,17 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate Thread,
-        returning the Thread.
+    ''' Submit a function to compute the result in a separate `Thread`;
+        returning the `Thread`.
 
-        The Result must be in "pending" state, and transitions to "running".
+        The `Result` must be in "pending" state, and transitions to "running".
     '''
-    T = Thread(
+    return bg_thread(
+        self.call,
         name="<%s>.bg(func=%s,...)" % (self, func),
-        target=self.call,
         args=[func] + list(a),
         kwargs=kw
     )
-    T.start()
-    return T
 
   @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
   def _complete(self, result, exc_info):
@@ -411,17 +410,18 @@ class Result(object):
     self.notify(notifier)
 
 def bg(func, *a, **kw):
-  ''' Dispatch a Thread to run `func`, return a Result to collect its value.
+  ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
   '''
   R = Result()
   R.bg(func, *a, **kw)
   return R
 
 def report(LFs):
-  ''' Generator which yields completed Results.
-      This is a generator that yields Results as they complete, useful
-      for waiting for a sequence of Results that may complete in an
-      arbitrary order.
+  ''' Generator which yields completed `Result`s.
+
+      This is a generator that yields `Result`s as they complete,
+      useful for waiting for a sequence of `Result`s
+      that may complete in an arbitrary order.
   '''
   Q = Queue()
   n = 0
