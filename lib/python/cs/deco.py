@@ -23,6 +23,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
 }
 
 def fmtdoc(func):
@@ -111,8 +112,8 @@ def decorator(deco):
   return metadeco
 
 @decorator
-def cached(
-    func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
+def cachedmethod(
+    method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
@@ -123,12 +124,12 @@ def cached(
       This decorator may be used in 2 modes.
       Directly:
 
-          @cached
+          @cachedmethod
           def method(self, ...)
 
       or indirectly:
 
-          @cached(poll_delay=0.25)
+          @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
       Optional keyword arguments:
@@ -173,7 +174,7 @@ def cached(
         "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
     )
 
-  attr = attr_name if attr_name else func.__name__
+  attr = attr_name if attr_name else method.__name__
   val_attr = '_' + attr
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
@@ -217,11 +218,11 @@ def cached(
         setattr(self, sig_attr, sig)
       # compute the current value
       try:
-        value = func(self, *a, **kw)
+        value = method(self, *a, **kw)
       except Exception as e:
         if value0 is unset_value:
           raise
-        warning("exception calling %s(self): %s", func, e, exc_info=True)
+        warning("exception calling %s(self): %s", method, e, exc_info=True)
         return value0
       setattr(self, val_attr, value)
       if sig_func is not None and not first:
@@ -237,6 +238,12 @@ def cached(
       return value
 
   return wrapper
+
+def cached(*a, **kw):
+  ''' Compatibility wrapper for `@cachedmethod`, issuing a warning.
+  '''
+  warning("obsolete use of @cached, please update to @cachedmethod")
+  return cachedmethod(*a, **kw)
 
 @decorator
 def strable(func, open_func=None):
@@ -290,7 +297,7 @@ def observable_class(property_names, only_unequal=False):
       * `property_names`:
         an interable of instance property names to set up as
         observable properties. As a special case a single `str` can
-        be supplied of only one attribute is to be observed.
+        be supplied if only one attribute is to be observed.
       * `only_unequal`:
         only call the observers if the new property value is not
         equal to the previous proerty value. This requires property
@@ -352,7 +359,7 @@ def observable_class(property_names, only_unequal=False):
     cls.report_observation = report_observation
 
     def make_property(cls, attr):
-      ''' make `cls.attr` into a property which reports setattr events.
+      ''' Make `cls.attr` into a property which reports setattr events.
       '''
       val_attr = '_' + attr
 
@@ -387,10 +394,14 @@ def observable_class(property_names, only_unequal=False):
 if __name__ == '__main__':
 
   class Foo:
+    ''' Dummy class.
+    '''
 
-    @cached(poll_delay=2)
-    def x(self, y):
-      return str(y)
+    @cachedmethod(poll_delay=2)
+    def x(self, arg):
+      ''' Dummy `x` method.
+      '''
+      return str(self) + str(arg)
 
   F = Foo()
   y = F.x(1)

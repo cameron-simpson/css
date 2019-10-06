@@ -104,11 +104,11 @@ def pfx_method(method, use_str=False):
   '''
 
   def wrapper(self, *a, **kw):
-    with Pfx("%s.%s", str(self) if use_str else type(self).__name__, method.__name__):
+    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
       return method(self, *a, **kw)
 
   wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(method.__name__)"
+  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
   return wrapper
 
 def pfxtag(tag, loggers=None):

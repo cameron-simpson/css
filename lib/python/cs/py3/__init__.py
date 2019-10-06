@@ -39,23 +39,28 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [],
 }
 
 if sys.hexversion >= 0x03000000:
 
   unicode = str
+
   def ustr(s, e='utf-8', errors='strict'):
     ''' Upgrade string to unicode: no-op for python 3.
     '''
     return s
+
   def iteritems(o):
     return o.items()
+
   def iterkeys(o):
     return o.keys()
+
   def itervalues(o):
     return o.values()
+
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
   from struct import pack, unpack
@@ -65,16 +70,22 @@ else:
 
   globals()['unicode'] = unicode
   bytesjoin = ''.join
+
   def iteritems(o):
     return o.iteritems()
+
   def iterkeys(o):
     return o.iterkeys()
+
   def itervalues(o):
     return o.itervalues()
+
   input = raw_input
   _sorted = sorted
+
   def sorted(iterable, key=None, reverse=False):
     return _sorted(iterable, None, key, reverse)
+
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
   from ._for2 import raise3, raise_from, exec_code, ustr, \
@@ -85,13 +96,16 @@ try:
   from struct import iter_unpack
 except ImportError:
   from struct import calcsize
+
   def iter_unpack(fmt, buffer):
     chunk_size = calcsize(fmt)
     if chunk_size < 1:
-      raise ValueError("struct.calcsize(%r) gave %d, expected >= 1" % (fmt, chunk_size))
+      raise ValueError(
+          "struct.calcsize(%r) gave %d, expected >= 1" % (fmt, chunk_size)
+      )
     offset = 0
     while offset < len(buffer):
-      yield unpack(fmt, buffer[offset:offset+chunk_size])
+      yield unpack(fmt, buffer[offset:offset + chunk_size])
       offset += chunk_size
 
 # fill in missing pread with weak workalike
@@ -101,6 +115,7 @@ except AttributeError:
   # implement our own pread
   # NB: not thread safe!
   from os import SEEK_CUR, SEEK_SET
+
   def pread(fd, size, offset):
     offset0 = os.lseek(fd, 0, SEEK_CUR)
     os.lseek(fd, offset, SEEK_SET)

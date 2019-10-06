@@ -1,3 +1,4 @@
+cs.app.flags: make a FlagOSDir mapping class to implement the fs based flags, accept any mapping for the Flags class, move the normalisation the the Flags class otherwise a raw mapping impl might fail if moved to the fs
 Pfx: do not insert umark: if umark is empty, supports "" and None
 implement cs.lex cutprefix and cutsuffix, push to PyPI after testing in PM stuff
 make most cs.obj methods functions, try to drop O class
