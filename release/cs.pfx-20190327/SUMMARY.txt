@@ -1,0 +1,2 @@
+@pfx: set __name__ on the wrapper function.
+Bugfix some references to the internal prefixify function.

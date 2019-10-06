@@ -1,0 +1,4 @@
+Update @contextmanager formalism to use try/finally for the cleanup phase.
+New decorator @gen to manage Pfx state across generator iterations; pretty clunky.
+Better fallback handling.
+Some docstring updates.

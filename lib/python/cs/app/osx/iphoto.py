@@ -26,6 +26,7 @@ from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
+from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
@@ -236,7 +237,7 @@ def cmd_rename(I, argv):
     elif obclass in ('people', 'faces'):
       table = I.person_table
     else:
-      raise GetoptError("known class")
+      raise GetoptError("unknown class %r" % (obclass,))
     items = list(table)
     all_names = set(item.name for item in items)
     X("%d items: %r", len(items), all_names)
@@ -322,10 +323,14 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  ''' Add or remove tags from selected images.
+      Usage: tag criteria... [--] {+tag|-tag}...
+  '''
   xit = 0
   badopts = False
   if not argv:
     raise GetoptError("missing selector")
+  # collect criteria
   selectors = []
   unknown = False
   while argv:
@@ -350,6 +355,7 @@ def cmd_tag(I, argv):
     return 1
   if not argv:
     raise GetoptError("missing tags")
+  # collect tag changes
   tagging = []
   for arg in argv:
     try:
@@ -423,56 +429,17 @@ def cmd_autotag(I, argv):
           continue
         with Pfx(part):
           # look for series/episode/scene/part markers
-          m = None
-          for ptn in (
-            RE_SCENE,
-            RE_SCENE_PART,
-            RE_EPISODE,
-            RE_EPISODE_PART,
-            RE_EPISODE_SCENE,
-            RE_SERIES_EPISODE,
-            RE_SERIES_EPISODE_SCENE,
-            RE_PART,
-          ):
-            m = re.match(ptn, part)
-            if not m:
-              continue
-            if m.group() != part:
-              m = None
-              continue
+          fields, offset = EpisodeInfo.parse_filename_part(part)
+          if offset == len(part):
             kwnames = []
-            if ptn == RE_SCENE:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-            elif ptn == RE_SCENE_PART:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-            elif ptn == RE_EPISODE_PART:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE_SCENE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('scene-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE_SCENE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-              kwnames.append('scene-%02d' % (int(m.group(3))))
-            elif ptn == RE_PART:
-              kwnames.append('part-%02d' % (int(m.group(1))))
-            else:
-              raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
+            for field, value in fields.items():
+              kwnames.append('%s-%02d' % (field, value))
             for kwname in kwnames:
               try:
                 kw = I.keyword(kwname)
               except KeyError:
                 kw = I.create_keyword(kwname)
               kws.add(kw)
-            break
-          if m:
             continue
           # look for person+person...
           if '+' in part:
@@ -768,12 +735,15 @@ class iPhoto(O):
     kw = self.keyword_table.get(lc_kwname)
     if kw:
       return kw,
-    kws = []
-    for kw in self.keywords:
-      words = kw.name.split()
-      if words and lc_kwname == words[0].lower():
-        kws.append(kw)
-    return kws
+    for sep in None, '/', '.':
+      kws = []
+      for kw in self.keywords:
+        words = kw.name.split(sep)
+        if words and lc_kwname == words[0].lower():
+          kws.append(kw)
+      if kws:
+        return kws
+    return ()
 
   def keyword(self, kwname):
     ''' Try to match a single keyword.

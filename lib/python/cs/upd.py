@@ -6,15 +6,17 @@
 r'''
 Single line status updates with minimal update sequences.
 
-* Upd: a class accepting update strings which emits minimal text to update a progress line.
-
--- out(s): update the line to show the string ``s``
-
--- nl(s): flush the output line, write ``s`` with a newline, restore the status line
-
--- without(func,...): flush the output line, call func, restore the status line
-
 This is available as an output mode in cs.logutils.
+
+Example:
+
+    upd = Upd(sys.stdout)
+    ...
+    upd.out('status line text: position = %d', position_value)
+    ...
+    upd.nl('an informational line')
+    ...
+    upd.out('new status text')
 '''
 
 from __future__ import with_statement
@@ -48,6 +50,8 @@ def upd_for(stream):
   return U
 
 def cleanupAtExit():
+  ''' Cleanup function called at programme exit to clear the status line.
+  '''
   global instances
   global instances_by_id
   for i in instances:
@@ -58,6 +62,8 @@ def cleanupAtExit():
 atexit.register(cleanupAtExit)
 
 class Upd(object):
+  ''' A class for maintaining a regularly updated status line.
+  '''
 
   def __init__(self, backend, columns=None):
     assert backend is not None
@@ -76,9 +82,18 @@ class Upd(object):
 
   @property
   def state(self):
+    ''' The current status line text value.
+    '''
     return self._state
 
   def out(self, txt, *a):
+    ''' Update the status line to `txt`.
+
+        Parameters:
+        * `txt`: the status line text.
+        * `a`: optional positional parameters;
+          if not empty, `txt` is percent formatted against this list.
+    '''
     if a:
       txt = txt % a
     # normalise text
@@ -126,6 +141,15 @@ class Upd(object):
     return old
 
   def nl(self, txt, *a):
+    ''' Write `txt` to the backend followed by a newline.
+
+        Clears the status line, writes the text line, restores the status line.
+
+        Parameters:
+        * `txt`: the message to write.
+        * `a`: optional positional parameters;
+          if not empty, `txt` is percent formatted against this list.
+    '''
     if a:
       txt = txt % a
     self.without(self._backend.write, txt + '\n')
@@ -134,17 +158,23 @@ class Upd(object):
     ''' Flush the output stream.
     '''
     if self._backend:
-      return self._backend.flush()
+      self._backend.flush()
 
   def close(self):
+    ''' Close this Upd.
+    '''
     if self._backend is not None:
       self.out('')
       self._backend = None
 
   def closed(self):
+    ''' Test whether this Upd is closed.
+    '''
     return self._backend is None
 
   def without(self, func, *args, **kw):
+    ''' Call `func` with the upd output suspended.
+    '''
     with self._withoutContext():
       ret = func(*args, **kw)
     return ret
@@ -153,5 +183,7 @@ class Upd(object):
   def _withoutContext(self):
     with self._lock:
       old = self.out('')
-      yield
-      self.out(old)
+      try:
+        yield
+      finally:
+        self.out(old)

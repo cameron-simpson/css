@@ -7,15 +7,9 @@
 r'''
 Stuff to do with counters, sequences and iterables.
 
-Presents:
-
-* Seq, a class for thread safe sequential integer generation.
-
-* seq(), a function to return such a number from a default global Seq instance.
-
-* the(), first(), last(), get0(): return the only, first, last or optional-first element of an iterable respectively.
-
-* TrackingCounter, a counting object with facilities for users to wait for it to reach arbitrary values.
+Note that any function accepting an iterable
+will consume some or all of the derived iterator
+in the course of its function.
 '''
 
 import heapq
@@ -30,7 +24,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': ['cs.logutils'],
 }
 
@@ -40,9 +34,11 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0):
+  def __init__(self, start=0, lock=None):
+    if lock is None:
+      lock = Lock()
     self.counter = itertools.count(start)
-    self._lock = Lock()
+    self._lock = lock
 
   def __iter__(self):
     return self
@@ -56,6 +52,8 @@ class Seq(object):
 __seq = Seq()
 
 def seq():
+  ''' Return a new sequential value.
+  '''
   global __seq
   return next(__seq)
 
@@ -63,21 +61,20 @@ def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
-  icontext="expected exactly one value"
+  icontext = "expected exactly one value"
   if context is not None:
-    icontext=icontext+" for "+context
-
-  first=True
+    icontext = icontext + " for " + context
+  is_first = True
   for elem in iterable:
-    if first:
-      it=elem
-      first=False
+    if is_first:
+      it = elem
+      is_first = False
     else:
-      raise IndexError("%s: got more than one element (%s, %s, ...)"
-                        % (icontext, it, elem)
-                      )
-
-  if first:
+      raise IndexError(
+          "%s: got more than one element (%s, %s, ...)"
+          % (icontext, it, elem)
+      )
+  if is_first:
     raise IndexError("%s: got no elements" % (icontext,))
 
   return it
@@ -110,9 +107,15 @@ def get0(iterable, default=None):
     return i
 
 def tee(iterable, *Qs):
-  ''' A generator yielding the items from an iterable which also copies those items to a series of queues.
-      `Qs`: the queues, objects accepting a .put method.
-      Note: the item is .put onto every queue before being yielded from this generator.
+  ''' A generator yielding the items from an iterable
+      which also copies those items to a series of queues.
+
+      Parameters:
+      * `iterable`: the iterable to copy
+      * `Qs`: the queues, objects accepting a `.put` method.
+
+      Note: the item is `.put` onto every queue
+      before being yielded from this generator.
   '''
   for item in iterable:
     for Q in Qs:
@@ -121,18 +124,22 @@ def tee(iterable, *Qs):
 
 def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
-      `reverse`: if true, yield items in reverse order
-                 this requires the iterables themselves to also be in
-                 reversed order
-      It relies on the source iterables being ordered and their elements
-      being comparable, through slightly misordered iterables (for example,
-      as extracted from web server logs) will produce only slightly
-      misordered results, as the merging is done on the basis of the front
-      elements of each iterable.
+
+      Parameters:
+      * `iters`: an iterable of iterators
+      * `reverse`: keyword parameter: if true, yield items in reverse order.
+        This requires the iterables themselves to also be in
+        reversed order.
+
+      This function relies on the source iterables being ordered
+      and their elements being comparable, through slightly misordered
+      iterables (for example, as extracted from web server logs)
+      will produce only slightly misordered results, as the merging
+      is done on the basis of the front elements of each iterable.
   '''
   reverse = kw.get('reverse', False)
   if kw:
-    raise ValueError("unexpected keyword arguments: %r", kw)
+    raise ValueError("unexpected keyword arguments: %r" % (kw,))
   if reverse:
     # tuples that compare in reverse order
     class _MergeHeapItem(tuple):
@@ -167,15 +174,19 @@ def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
       passing every element of the sequence to the function, expecting a
       single value back.
+
       Example:
-        class X(list):
-          @onetoone
-          def lower(self, item):
-            return item.lower()
-        strs = X(['Abc', 'Def'])
-        lower_strs = X.lower()
+
+            class X(list):
+                  @onetoone
+                  def lower(self, item):
+                        return item.lower()
+            strs = X(['Abc', 'Def'])
+            lower_strs = X.lower()
   '''
   def gather(self, *a, **kw):
+    ''' Yield the results of calling the function on each item.
+    '''
     for item in self:
       yield func(item, *a, **kw)
   return gather
@@ -184,16 +195,20 @@ def onetomany(func):
   ''' A decorator for a method of a sequence to merge the results of
       passing every element of the sequence to the function, expecting
       multiple values back.
+
       Example:
-        class X(list):
-          @onetomany
-          def chars(self, item):
-            return item
-        strs = X(['Abc', 'Def'])
-        all_chars = X.chars()
+
+            class X(list):
+                  @onetomany
+                  def chars(self, item):
+                        return item
+            strs = X(['Abc', 'Def'])
+            all_chars = X.chars()
   '''
   def gather(self, *a, **kw):
-    return itertools.chain(*[ func(item) for item in self ])
+    ''' Chain the function results together.
+    '''
+    return itertools.chain(*[ func(item, *a, **kw) for item in self ])
   return gather
 
 def isordered(s, reverse=False, strict=False):
@@ -201,10 +216,10 @@ def isordered(s, reverse=False, strict=False):
       Note that the iterable is iterated, so this is a destructive
       test for nonsequences.
   '''
-  first = True
+  is_first = True
   prev = None
-  for i, item in enumerate(s):
-    if not first:
+  for item in s:
+    if not is_first:
       if reverse:
         ordered = item < prev if strict else item <= prev
       else:
@@ -212,14 +227,16 @@ def isordered(s, reverse=False, strict=False):
       if not ordered:
         return False
     prev = item
-    first = False
+    is_first = False
   return True
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
+
       A facility is provided to wait for the counter to reach a specific value.
       The .inc and .dec methods also accept a `tag` argument to keep
       individual counts based on the tag to aid debugging.
+
       TODO: add `strict` option to error and abort if any counter tries
       to go below zero.
   '''
@@ -291,6 +308,8 @@ class TrackingCounter(object):
       self._notify()
 
   def check(self):
+    ''' Internal consistency check.
+    '''
     for tag in sorted(self._tag_up.keys()):
       ups = self._tag_up[tag]
       downs = self._tag_down.get(tag, 0)
@@ -309,6 +328,35 @@ class TrackingCounter(object):
         watcher = self._watched[value]
       watcher.acquire()
     watcher.wait()
+
+class StatefulIterator(object):
+  ''' A trivial iterator which wraps another iterator to expose some tracking state.
+
+      This has 2 attributes:
+      * `.it`: the internal iterator which should yield `(item,new_state)`
+      * `.state`: the last state value from the internal iterator
+
+      The originating use case is resuse of an iterator by independent
+      calls that are typically sequential, specificly the .read
+      method of file like objects. Naive sequential reads require
+      the underlying storage to locate the data on every call, even
+      though the previous call has just performed this task for the
+      previous read. Saving the iterator used from the preceeding
+      call allows the iterator to pick up directly if the file
+      offset hasn't been fiddled in the meantime.
+  '''
+
+  def __init__(self, it):
+    self.it = it
+    self.state = None
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    item, new_state = next(self.it)
+    self.state = new_state
+    return item
 
 if __name__ == '__main__':
   import sys

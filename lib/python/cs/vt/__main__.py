@@ -4,714 +4,1011 @@
 #       - Cameron Simpson <cs@cskk.id.au> 01may2007
 #
 
-from __future__ import with_statement
-import sys
-import os
-from os.path import basename, splitext, \
-    exists as existspath, join as joinpath, \
-    isabs as isabspath, isdir as isdirpath, isfile as isfilepath
+''' cs.vt command line utility.
+'''
+
+from __future__ import with_statement, print_function
+from collections import defaultdict
+from contextlib import contextmanager
+from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
-from datetime import datetime
 import logging
+import os
+from os.path import (
+    basename,
+    splitext,
+    expanduser,
+    exists as pathexists,
+    join as joinpath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+)
 import shutil
-from signal import signal, SIGINT, SIGHUP
-from threading import Thread
+from signal import signal, SIGINT, SIGHUP, SIGQUIT
+import sys
 from time import sleep
+from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.env import envsub
-from cs.lex import hexify
+from cs.fileutils import file_data, shortpath
+from cs.lex import hexify, get_identifier
 import cs.logutils
-from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, loginfo, logTo
+from cs.logutils import exception, error, warning, info, upd, debug, \
+                        setup_logging, logTo, loginfo
 from cs.pfx import Pfx
-from cs.tty import statusline
+from cs.progress import Progress
+from cs.resources import RunState
+from cs.threads import bg as bg_thread
+from cs.tty import ttysize
 import cs.x
 from cs.x import X
-from . import fromtext, defaults
-from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
-from .block import Block, IndirectBlock, dump_block, decodeBlock
-from .cache import FileCacheStore
-from .compose import Store, ConfigFile
-from .datadir import DataDir, DataDir_from_spec
-from .datafile import DataFile, F_COMPRESSED, decompress
-from .dir import Dir, DirFTP
-from .hash import DEFAULT_HASHCLASS
-from .fsck import fsck_Block, fsck_dir
-from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
-from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .smuggling import import_dir, import_file
-from .store import ProgressStore, DataDirStore
+from . import defaults, DEFAULT_CONFIG_PATH
+from .archive import Archive, FileOutputArchive, CopyModes
+from .blockify import blocked_chunks_of
+from .compose import get_store_spec
+from .config import Config, Store
+from .convert import expand_path
+from .datadir import DataDirIndexEntry
+from .datafile import DataFileReader
+from .debug import dump_chunk, dump_Block
+from .dir import Dir
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .index import LMDBIndex
+from .merge import merge
+from .parsers import scanner_from_filename
+from .paths import OSDir, OSFile, path_resolve
+from .server import serve_tcp, serve_socket
+from .store import ProxyStore, DataDirStore
+from .transcribe import parse
 
-def main(argv):
-  global loginfo
-  cmd = basename(argv[0])
-  if cmd.endswith('.py'):
-    cmd = 'vt'
-  usage = '''Usage: %s [options...] [profile] operation [args...]
-    Options:
-      -C        Do not put a cache in front of the store.
-      -S store  Specify the store to use:
-                  [clause]        Specification from .vtrc.
-                  /path/to/dir    GDBMStore
-                  tcp:[host]:port TCPStore
-                  |sh-command     StreamStore via sh-command
-      -q        Quiet; not verbose. Default if stderr is not a tty.
-      -v        Verbose; not quiet. Default if stderr is a tty.
-    Operations:
-      cat filerefs...
-      catblock [-i] hashcodes...
-      datadir [indextype:[hashname:]]/dirpath index
-      datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
-      datadir [indextype:[hashname:]]/dirpath push other-datadir
-      dump filerefs
-      fsck block blockref...
-      ftp archive.vt
-      import [-oW] path {-|archive.vt}
-      listen {-|host:port}
-      ls [-R] dirrefs...
-      mount [-a] [-o {append_only,readonly}] [-r] archive.vt [mountpoint [subpath]]
-        -a  All dates. Implies readonly.
-        -o options
-            Mount options:
-              append_only Files may not be truncated or overwritten.
-              readonly    Read only; data may not be modified.
-        -r  Readonly, the same as "-o readonly".
-      pack paths...
-      scan datafile
-      pull other-store objects...
-      report
-      unpack dirrefs...
-''' % (cmd,)
+def main(argv=None):
+  ''' Create a VTCmd instance and call its main method.
+  '''
+  if argv is None:
+    argv = sys.argv
+  vtcmd = VTCmd()
 
-  badopts = False
+  # catch signals, flag termination
+  def sig_handler(sig, frame):
+    ''' Signal handler
+    '''
+    warning("received signal %s from %s", sig, frame)
+    if sig == SIGQUIT:
+      thread_dump()
+    vtcmd.runstate.cancel()
+    if sig == SIGQUIT:
+      sys.exit(1)
 
-  # verbose if stderr is a tty
-  try:
-    verbose = sys.stderr.isatty()
-  except AttributeError:
-    verbose = False
+  signal(SIGHUP, sig_handler)
+  signal(SIGINT, sig_handler)
+  signal(SIGQUIT, sig_handler)
+  return vtcmd.run(argv)
 
-  setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=verbose)
-  cs.x.X_logger = logging.getLogger()
+def mount_vtfs(argv=None):
+  ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
+  '''
+  return main(argv, subcmd='mount')
 
-  dflt_configpath = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-  dflt_vt_store = os.environ.get('VT_STORE')
-  dflt_log = os.environ.get('VT_LOGFILE')
-  no_cache = False
+class VTCmd(BaseCommand):
+  ''' A main programme instance.
+  '''
 
-  args = argv[1:]
-  try:
-    opts, args = getopt(args, 'CS:qv')
-  except GetoptError as e:
-    error("unrecognised option: %s: %s"% (e.opt, e.msg))
-    badopts = True
-    opts, args = [], []
+  GETOPT_SPEC = 'C:S:f:h:qv'
 
-  for opt, val in opts:
-    if opt == '-C':
-      no_cache = True
-    elif opt == '-S':
-      # specify Store
-      dflt_vt_store = val
-    elif opt == '-q':
-      # quiet: not verbose
-      verbose = False
-    elif opt == '-v':
-      # verbose: not quiet
-      verbose = True
-    else:
-      raise RuntimeError("unhandled option: %s" % (opt,))
+  USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
+  Options:
+    -C store  Specify the store to use as a cache.
+              Specify "NONE" for no cache.
+              Default: from $VT_CACHE_STORE or "[cache]".
+    -S store  Specify the store to use:
+                [clause]        Specification from .vtrc.
+                /path/to/dir    DataDirStore
+                tcp:[host]:port TCPStore
+                |sh-command     StreamStore via sh-command
+              Default from $VT_STORE, or "[default]", except for
+              the "serve" subcommand which defaults to "[server]"
+              and ignores $VT_STORE.
+    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
+    + DEFAULT_CONFIG_PATH + '''
+    -h hashclass Hashclass for Stores.
+    -q        Quiet; not verbose. Default if stderr is not a tty.
+    -v        Verbose; not quiet. Default if stderr is a tty.
+  Subcommands:
+    cat filerefs...
+    config
+    dump {{datafile.vtd|index.gdbm|index.lmdb}}
+    fsck object...
+    import [-oW] path {{-|archive.vt}}
+    init
+    ls [-R] dirrefs...
+    mount [-a] [-o {{append_only,readonly}}] [-r] {{Dir|config-clause|archive.vt}} [mountpoint [subpath]]
+      -a  All dates. Implies readonly.
+      -o options
+          Mount options:
+            append_only Files may not be truncated or overwritten.
+            readonly    Read only; data may not be modified.
+      -r  Readonly, the same as "-o readonly".
+    pack path
+    pullfrom other-store [objects...]
+    pushto other-store objects...
+    serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
+    test blockify file
+    unpack archive.vt
+'''
 
-  if verbose:
-    loginfo.level = logging.INFO
-    loginfo.upd.nl_level = logging.INFO
+  def __init__(self):
+    super().__init__()
 
-  config = ConfigFile(dflt_configpath)
-
-  if dflt_log is not None:
-    logTo(dflt_log, delay=True)
-
-  xit = None
-  signal(SIGHUP, lambda sig, frame: thread_dump())
-  signal(SIGINT, lambda sig, frame: sys.exit(thread_dump()))
-
-  try:
-    xit = cmd_op(args, verbose, config, dflt_vt_store, no_cache)
-  except GetoptError as e:
-    error("%s", e)
-    badopts = True
-
-  if badopts:
-    sys.stderr.write(usage)
-    return 2
-
-  if not isinstance(xit, int):
-    raise RuntimeError("exit code not set by operation: %r" % (xit,))
-
-  if ifdebug():
-    dump_debug_threads()
-
-  return xit
-
-def cmd_op(args, verbose, config, dflt_vt_store, no_cache):
-  try:
-    op = args.pop(0)
-  except IndexError:
-    raise GetoptError("missing command")
-  with Pfx(op):
-    if op == "profile":
-      return cmd_profile(args, verbose, config,
-                         dflt_vt_store, no_cache)
+  @classmethod
+  def apply_defaults(cls, options):
+    cmd = basename(options.cmd)
+    if cmd.endswith('.py'):
+      cmd = 'vt'
+    options.cmd = cmd
+    # verbose if stderr is a tty
     try:
-      op_func = getattr(sys.modules[__name__], "cmd_" + op)
+      options.verbose = sys.stderr.isatty()
     except AttributeError:
-      raise GetoptError("unknown operation \"%s\"" % (op,))
-    # these commands run without a context Store
-    if op in ("scan", "datadir", "init"):
-      return op_func(args)
-    # open the default Store
-    if dflt_vt_store is None:
-      raise GetoptError("no $VT_STORE and no -S option")
-    try:
-      S = Store(dflt_vt_store, config)
-    except Exception as e:
-      exception("can't open store \"%s\": %s", dflt_vt_store, e)
-      raise GetoptError("unusable Store specification: %s" % (dflt_vt_store,))
-    if not no_cache:
-      S = FileCacheStore("main", S)
-    # start the status ticker
-    if False and sys.stdout.isatty():
-      X("wrap in a ProgressStore")
-      run_ticker = True
-      S = ProgressStore("ProgressStore(%s)" % (S,), S)
-      def ticker():
-        old_text = ''
-        while run_ticker:
-          text = S.status_text()
-          if text != old_text:
-            statusline(text)
-            old_text = text
-          sleep(0.25)
-      T = Thread(name='%s-status-line' % (S,), target=ticker)
-      T.daemon = True
-      T.start()
+      options.verbose = False
+    options.verbose = True
+    options.config_path = os.environ.get(
+        'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
+    )
+    options.store_spec = None
+    options.cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
+    options.dflt_log = os.environ.get('VT_LOGFILE')
+    options.hashname = os.environ.get(
+        'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
+    )
+    options.progress = None
+    options.ticker = None
+    options.status_label = cmd
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply the command line options mapping `opts` to `options`.
+    '''
+    for opt, val in opts:
+      if opt == '-C':
+        if val == 'NONE':
+          options.cache_store_spec = None
+        else:
+          options.cache_store_spec = val
+      elif opt == '-S':
+        # specify Store
+        options.store_spec = val
+      elif opt == '-f':
+        options.config_path = val
+      elif opt == '-h':
+        options.hashname = val
+      elif opt == '-q':
+        # quiet: not verbose
+        options.verbose = False
+      elif opt == '-v':
+        # verbose: not quiet
+        options.verbose = True
+      else:
+        raise RuntimeError("unhandled option: %s" % (opt,))
+    options.hashclass = None
+    if options.hashname is not None:
+      try:
+        options.hashclass = HASHCLASS_BY_NAME[options.hashname]
+      except KeyError:
+        raise GetoptError(
+            "unrecognised hashname %r: I know %r" %
+            (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
+        )
+    if options.verbose:
+      loginfo.level = logging.INFO
+    if options.dflt_log is not None:
+      logTo(options.dflt_log, delay=True)
+    options.config = Config(options.config_path)
+
+  @staticmethod
+  @contextmanager
+  def run_context(argv, options, cmd=None):
+    ''' Set up and tear down the surrounding context.
+
+        Parameters:
+        * `options`:
+        * `argv`: the command line arguments after the command name
+    '''
+    if cmd is None:
+      cmd = options.cmd
     else:
-      run_ticker = False
-    with S:
-      xit = op_func(args, verbose=verbose)
-    if run_ticker:
-      run_ticker = False
+      cmd = options.cmd + ': ' + cmd
+    setup_logging(cmd_name=options.cmd, upd_mode=sys.stderr.isatty())
+    runstate = options.runstate
+    progress = options.progress
+    if progress is None:
+      progress = Progress(total=0)
+    ticker = options.ticker
+    if False and ticker is None and sys.stderr.isatty():
+      _, cols = ttysize(2)
+      status_width = cols - 2
+
+      def ticker():
+        while not runstate.cancelled:
+          upd(progress.status(options.status_label, status_width))
+          sleep(0.25)
+
+      ticker = bg_thread(ticker, name='status-line', daemon=True)
+    with options.stack(progress=progress, ticker=ticker):
+      with defaults.stack(runstate=runstate):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+          yield
+        else:
+          # open the default Store
+          if options.store_spec is None:
+            if cmd == "serve":
+              store_spec = '[server]'
+            else:
+              store_spec = os.environ.get('VT_STORE', '[default]')
+            options.store_spec = store_spec
+          try:
+            # set up the primary Store using the main programme RunState for control
+            S = Store(options.store_spec, options.config)
+          except ValueError as e:
+            raise GetoptError(
+                "unusable Store specification: %s: %s" %
+                (options.store_spec, e)
+            )
+          except Exception as e:
+            exception(
+                "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                options.store_spec, e
+            )
+            raise GetoptError(
+                "unusable Store specification: %s" % (options.store_spec,)
+            )
+          defaults.push_Ss(S)
+          if options.cache_store_spec is None:
+            cacheS = None
+          else:
+            try:
+              cacheS = Store(options.cache_store_spec, options.config)
+            except Exception as e:
+              exception(
+                  "can't open cache store %r: %s", options.cache_store_spec, e
+              )
+              raise GetoptError(
+                  "unusable Store specification: %s" %
+                  (options.cache_store_spec,)
+              )
+            else:
+              S = ProxyStore(
+                  "%s:%s" % (cacheS.name, S.name),
+                  read=(cacheS,),
+                  read2=(S,),
+                  copy2=(cacheS,),
+                  save=(cacheS, S),
+                  archives=((S, '*'),),
+              )
+              S.config = options.config
+          defaults.push_Ss(S)
+          with S:
+            yield
+          if cacheS:
+            cacheS.backend = None
+    runstate.cancel()
+    if ticker:
+      ticker.join()
+    if ifdebug():
+      dump_debug_threads()
+
+  def cmd_profile(self, options, argv, cmd):
+    ''' Wrapper to profile other subcommands and report.
+    '''
+    try:
+      import cProfile as profile
+    except ImportError:
+      import profile
+    P = profile.Profile()
+    P.enable()
+    try:
+      xit = self.run(argv, options=options)
+    except Exception:
+      P.disable()
+      raise
+    P.disable()
+    P.create_stats()
+    P.print_stats(sort='cumulative')
     return xit
 
-def cmd_profile(*a, **kw):
-  try:
-    import cProfile as profile
-  except ImportError:
-    import profile
-  P = profile.Profile()
-  P.enable()
-  try:
-    xit = cmd_op(*a, **kw)
-  except Exception as e:
-    P.disable()
-    raise
-  P.disable()
-  P.create_stats()
-  P.print_stats(sort='cumulative')
-  return xit
-
-def cmd_cat(args, verbose=None):
-  ''' Concatentate the contents of the supplied filerefs to stdout.
-  '''
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    cat(path)
-  return 0
-
-def cmd_catblock(args, verbose=None):
-  '''  Emit the content of the blocks specified by the supplied hashcodes.
-  '''
-  indirect = False
-  if len(args) > 0 and args[0] == "-i":
-    indirect = True
-    args.pop(0)
-  if not args:
-    raise GetoptError("missing hashcodes")
-  for hctext in args:
-    h = defaults.S.hashclass(fromtext(hctext))
-    if indirect:
-      B = IndirectBlock(h)
-    else:
-      B = Block(h)
-    for subB in B.leaves:
-      sys.stdout.write(subB.data)
-  return 0
-
-def cmd_report(args, verbose=None):
-  ''' Report stuff after store setup.
-  '''
-  print("S =", defaults.S)
-  return 0
-
-def cmd_datadir(args, verbose=None):
-  ''' Perform various operations on DataDirs.
-  '''
-  xit = 1
-  if not args:
-    raise GetoptError("missing datadir spec")
-  datadir_spec = args.pop(0)
-  with Pfx(datadir_spec):
-    D = DataDir_from_spec(datadir_spec)
-    if not args:
-      raise GetoptError("missing subop")
-    subop = args.pop(0)
-    with Pfx(subop):
-      if subop == 'index':
-        if args:
-          raise GetoptError("extra arguments: %s" % (' '.join(args),))
-        D.reindex()
-      elif subop == 'pull':
-        if not args:
-          raise GetoptError("missing other-datadirs")
-        else:
-          for other_spec in args:
-            with Pfx(other_spec):
-              Dother = DataDir_from_spec(other_spec)
-              pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
-      elif subop == 'push':
-        if not args:
-          raise GetoptError("missing other-datadir")
-        else:
-          other_spec = args.pop(0)
-          if args:
-            raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
-          with Pfx(other_spec):
-            Dother = DataDir_from_spec(other_spec)
-            pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
-      else:
-        raise GetoptError('unrecognised subop')
-  return xit
-
-def cmd_dump(args, verbose=None):
-  ''' Do a Block dump of the filerefs.
-  '''
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    dump(path)
-  return 0
-
-def cmd_fsck(args, verbose=None):
-  import cs.logutils
-  cs.logutils.X_via_log = True
-  if not args:
-    raise GetoptError("missing fsck type")
-  fsck_type = args.pop(0)
-  with Pfx(fsck_type):
-    try:
-      fsck_op = {
-        "block":    cmd_fsck_block,
-        "dir":      cmd_fsck_dir,
-      }[fsck_type]
-    except KeyError:
-      raise GetoptError("unsupported fsck type")
-    return fsck_op(args, verbose=verbose)
-
-def cmd_fsck_block(args, verbose=None):
-  xit = 0
-  if not args:
-    raise GetoptError("missing blockrefs")
-  for blockref in args:
-    with Pfx(blockref):
-      blockref_bs = fromtext(blockref)
-      B, offset = decodeBlock(blockref_bs)
-      if offset < len(blockref_bs):
-        raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
-      if not fsck_Block(B):
-        error("fsck failed")
-        xit = 1
-  return xit
-
-def cmd_fsck_dir(args, verbose=None):
-  xit = 0
-  if not args:
-    raise GetoptError("missing dirents")
-  for dirent_txt in args:
-    with Pfx(dirent_txt):
-      D = decode_Dirent_text(dirent_txt)
-      if not fsck_dir(D):
-        error("fsck failed")
-        xit = 1
-  return xit
-
-def cmd_ftp(args, verbose=None):
-  if not args:
-    raise GetoptError("missing dirent or archive")
-  target = args.pop(0)
-  if args:
-    raise GetoptError("extra arguments: " + ' '.join(args))
-  with Pfx(target):
-    if isabspath(target):
-      archive = target
-      ArchiveFTP(archive).cmdloop()
-    else:
-      D = decode_Dirent_text(target)
-      DirFTP(D).cmdloop()
+  @staticmethod
+  def cmd_cat(argv, options, cmd):
+    ''' Concatentate the contents of the supplied filerefs to stdout.
+    '''
+    if not argv:
+      raise GetoptError("missing filerefs")
+    for path in argv:
+      cat(path)
     return 0
 
-def cmd_import(args, verbose=None):
-  ''' Import paths into the Store, print top Dirent for each.
-  '''
-  xit = 0
-  delete = False
-  overlay = False
-  whole_read = False
-  opts, args = getopt(args, 'oW')
-  for opt, val in opts:
-    with Pfx(opt):
-      if opt == '-D':
-        delete = True
-      elif opt == '-o':
-        overlay = True
-      elif opt == '-W':
-        whole_read = True
+  @staticmethod
+  def cmd_config(args, options, cmd):
+    ''' Recite the configuration.
+    '''
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    options.config.write(sys.stdout)
+    return 0
+
+  @staticmethod
+  def cmd_dump(args, options, cmd):
+    ''' Dump various file types.
+    '''
+    if not args:
+      raise GetoptError("missing filerefs")
+    hashclass = DEFAULT_HASHCLASS
+    one_line = True
+    _, columns = ttysize(1)
+    if columns is None:
+      columns = 80
+    max_width = columns - 1
+    for path in args:
+      if path.endswith('.vtd'):
+        print(path)
+        DF = DataFileReader(path)
+        with DF:
+          try:
+            for DR in DF.scanfrom(0):
+              data = DR.data
+              hashcode = hashclass(data)
+              leadin = '%9d %16.16s' % (DR.offset, hashcode)
+              dump_chunk(data, leadin, max_width, one_line)
+          except EOFError:
+            pass
+      elif path.endswith('.lmdb'):
+        print(path)
+        lmdb = LMDBIndex(
+            path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes
+        )
+        with lmdb:
+          for hashcode, entry in lmdb.items():
+            print(hashcode, entry)
       else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
-  if not args:
-    raise GetoptError("missing path")
-  srcpath = args.pop(0)
-  if not args:
-    raise GetoptError("missing archive.vt")
-  special = args.pop(0)
-  if special == '-':
-    special = None
-  if args:
-    raise GetoptError("extra arguments: %s" % (' '.join(args),))
-  if special is None:
-    D = None
-  else:
-    with Pfx(repr(special)):
-      try:
-        with open(special, 'a'):
-          pass
-      except OSError as e:
-        error("cannot open archive for append: %s", e)
-        return 1
-      when, D = Archive(special).last
-  if D is None:
-    D = Dir('import')
-  srcbase = basename(srcpath.rstrip(os.sep))
-  E = D.get(srcbase)
-  with Pfx(srcpath):
-    if isdirpath(srcpath):
-      if E is None:
-        E = D.mkdir(srcbase)
-      elif not overlay:
-        error("name %r already imported", srcbase)
-        return 1
-      elif not E.isdir:
-        error("name %r is not a directory", srcbase)
-      E, errors = import_dir(srcpath, E,
-                    delete=delete, overlay=overlay, whole_read=whole_read)
-      if errors:
-        warning("directory not fully imported")
-        for err in errors:
-          warning("  %s", err)
-        xit = 1
-    elif isfilepath(srcpath):
-      if E is not None:
-        error("name %r already imported", srcbase)
-        return 1
-      E = D[srcbase] = import_file(srcpath)
-    else:
-      error("not a file or directory")
-      xit = 1
-      return 1
-  if xit != 0:
-    fp = sys.stderr
-    print("updated dirent after import:", file=fp)
-  elif special is None:
-    Archive.write(sys.stdout, D)
-  else:
-    Archive(special).save(D)
-  return xit
+        warning("unsupported file type: %r", path)
+    return 0
 
-# TODO: create dir, dir/data
-def cmd_init(args, verbose=None):
-  ''' Initialise a directory for use as a store.
-      Usage: init dirpath [datadir]
-  '''
-  if not args:
-    raise GetoptError("missing dirpath")
-  statedirpath = args.pop(0)
-  if args:
-    datadirpath = args.pop(0)
-  else:
-    datadirpath = statedirpath
-  if args:
-    raise GetoptError("extra arguments after datadir: %s" % (' '.join(args),))
-  for dirpath in statedirpath, datadirpath:
-    with Pfx(dirpath):
-      if not isdirpath(dirpath):
-        raise GetoptError("not a directory")
-    with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS):
-      os.system("ls -la %s" % (statedirpath,))
-  return 0
-
-def cmd_listen(args, verbose=None):
-  ''' Start a daemon listening on a TCP port or on stdin/stdout.
-  '''
-  if len(args) != 1:
-    raise GetoptError("expected a port")
-  arg = args[0]
-  if arg == '-':
-    from .stream import StreamStore
-    RS = StreamStore("listen -", sys.stdin, sys.stdout,
-                     local_store=defaults.S)
-    RS.join()
-  else:
-    cpos = arg.rfind(':')
-    if cpos >= 0:
-      host = arg[:cpos]
-      port = arg[cpos+1:]
-      if len(host) == 0:
-        host = '127.0.0.1'
-      port = int(port)
-      from .tcp import TCPStoreServer
-      with TCPStoreServer((host, port), defaults.S) as srv:
-        signal(SIGHUP, lambda signum, frame: srv.cancel())
-        signal(SIGINT, lambda signum, frame: srv.cancel())
-        srv.join()
-    else:
-      raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
-  return 0
-
-def cmd_ls(args, verbose=None):
-  ''' Do a directory listing of the specified I<dirrefs>.
-  '''
-  recurse = False
-  if args and args[0] == "-R":
-    recurse = True
-    args.pop(0)
-  if not args:
-    raise GetoptError("missing dirrefs")
-  first = True
-  for path in args:
-    if first:
-      first = False
-    else:
-      print
-    D = dirent_dir(path)
-    ls(path, D, recurse, sys.stdout)
-  return 0
-
-def cmd_mount(args, verbose=None):
-  ''' Mount the specified special as on the specified mountpoint directory.
-      Requires FUSE support.
-  '''
-  badopts = False
-  all_dates = False
-  append_only = False
-  readonly = False
-  opts, args = getopt(args, 'ao:r')
-  for opt, val in opts:
-    with Pfx(opt):
-      if opt == '-a':
-        all_dates = True
-      elif opt == '-o':
-        for option in val.split(','):
-          with Pfx(option):
-            if option == '':
-              pass
-            elif option == 'append':
-              append_only = True
-            elif option == 'readonly':
-              readonly = True
-            else:
-              warning("unrecognised option")
-              badopts = True
-      elif opt == '-r':
-        readonly = True
-      else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
-  try:
-    special = args.pop(0)
-  except IndexError:
-    error("missing special")
-    badopts = True
-  else:
-    if not isfilepath(special):
-      error("not a file: %r", special)
-      badopts = True
-  if args:
-    mountpoint = args.pop(0)
-  else:
-    spfx, sext = splitext(special)
-    if sext != '.vt':
-      error('missing mountpoint, and cannot infer mountpoint from special (does not end in ".vt"): %r', special)
-      badopts = True
-    else:
-      mountpoint = spfx
-  if args:
-    subpath = args.pop(0)
-  else:
-    subpath = None
-  if args:
-    error("extra arguments: %s", ' '.join(args))
-    badopts = True
-  if badopts:
-    raise GetoptError("bad arguments")
-  if all_dates:
-    readonly = True
-  xit = 0
-  with Pfx(special):
-    A = Archive(special)
-    if all_dates:
-      E = Dir(basename(mountpoint))
-      for when, subD in A:
-        E[datetime.fromtimestamp(when).isoformat()] = subD
-    else:
-      try:
-        when, E = A.last
-      except OSError as e:
-        error("can't access special: %s", e)
-        return 1
-      except ValueError as e:
-        error("invalid contents: %s", e)
-        return 1
-      # no "last entry" (==> first use) - make an empty directory
-      if E is None:
-        E = Dir(basename(mountpoint))
-        X("cmd_mount: new E=%s", E)
-      else:
-        ##dump_Dirent(E, recurse=True)
-        if not E.isdir:
-          error("expected directory, not file: %s", E)
-          return 1
-    # forget the archive if readonly
-    if readonly:
-      A = None
-    # import vtfuse before doing anything with side effects
-    from .vtfuse import mount, umount
-    with Pfx(mountpoint):
-      need_rmdir = False
-      if not isdirpath(mountpoint):
-        # autocreate mountpoint
-        info('mkdir %r ...', mountpoint)
+  @staticmethod
+  def cmd_fsck(args, options, cmd):
+    ''' Data structure inspection/repair.
+    '''
+    if not args:
+      raise GetoptError("missing fsck objects")
+    xit = 0
+    for arg in args:
+      with Pfx(arg):
         try:
-          os.mkdir(mountpoint)
-          need_rmdir = True
-        except OSError as e:
-          if e.errno == errno.EEXIST:
-            error("mountpoint is not a directory", mountpoint)
-            return 1
-          else:
-            raise
-      try:
-        T = mount(mountpoint, E, defaults.S, archive=A, subpath=subpath, readonly=readonly, append_only=append_only)
-        cs.x.X_via_tty = True
-        T.join()
-      except KeyboardInterrupt as e:
-        error("keyboard interrupt, unmounting %r", mountpoint)
-        xit = umount(mountpoint)
-        T.join()
-    if need_rmdir:
-      info("rmdir %r ...", mountpoint)
-      try:
-        os.rmdir(mountpoint)
-      except OSError as e:
-        error("%r: rmdir fails: %s", mountpoint, e)
-        xit = 1
-  return xit
+          o, offset = parse(arg)
+        except ValueError as e:
+          error("does not seem to be a transcription: %s", e)
+          xit = 1
+          continue
+        if offset != len(arg):
+          error("unparsed text: %r", arg[offset:])
+          xit = 1
+          continue
+        try:
+          fsck_func = o.fsck
+        except AttributeError:
+          error("unsupported object type: %s", type(o))
+          xit = 1
+          continue
+        if fsck_func(recurse=True):
+          info("OK")
+        else:
+          info("BAD")
+          xit = 1
+    return xit
 
-def cmd_pack(args, verbose=None):
-  ''' Replace each I<path> with an archive file I<path>B<.vt> referring
-      to the stored content of I<path>.
-  '''
-  if not args:
-    raise GetoptError("missing paths")
-  xit = 0
-  modes = CopyModes(trust_size_mtime=True)
-  
-  for ospath in args:
+  @staticmethod
+  def cmd_import(args, options, cmd):
+    ''' Import paths into the Store, print top Dirent for each.
+
+        TODO: hook into vt.merge.
+    '''
+    xit = 0
+    delete = False
+    overlay = False
+    whole_read = False
+    opts, args = getopt(args, 'oW')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-D':
+          delete = True
+        elif opt == '-o':
+          overlay = True
+        elif opt == '-W':
+          whole_read = True
+        else:
+          raise RuntimeError("unhandled option: %r" % (opt,))
+    if not args:
+      raise GetoptError("missing path")
+    srcpath = args.pop(0)
+    if not args:
+      raise GetoptError("missing archive.vt")
+    special = args.pop(0)
+    if special == '-':
+      special = None
+    if args:
+      raise GetoptError("extra arguments: %s" % (' '.join(args),))
+    if special is None:
+      D = Dir('.')
+    else:
+      with Pfx(repr(special)):
+        try:
+          with open(special, 'a'):
+            pass
+        except OSError as e:
+          error("cannot open archive for append: %s", e)
+          return 1
+        _, D = Archive(special).last
+      if D is None:
+        dstbase, suffix = splitext(basename(special))
+        D = Dir(dstbase)
+    with Pfx(srcpath):
+      srcbase = basename(srcpath.rstrip(os.sep))
+      dst = D.get(srcbase)
+      if isdirpath(srcpath):
+        src = OSDir(srcpath)
+        if dst is None:
+          dst = D.mkdir(srcbase)
+        elif not dst.isdir:
+          error('target name %r is not a directory', srcbase)
+          xit = 1
+        elif not merge(dst, src):
+          error("merge failed")
+          xit = 1
+      elif isfilepath(srcpath):
+        src = OSFile(srcpath)
+        if dst is None or dst.isfile:
+          D.file_fromchunks(srcbase, src.datafrom())
+        else:
+          error("name %r already imported: %s", srcbase, dst)
+          xit = 1
+      else:
+        error("unsupported file type")
+        xit = 1
+    if special is None:
+      print(D)
+    else:
+      with Pfx(special):
+        if xit == 0:
+          Archive(special).update(D)
+        else:
+          warning("archive not updated")
+    return xit
+
+  @staticmethod
+  def cmd_init(args, options, cmd):
+    ''' Install a default config and initialise the configured datadir Stores.
+    '''
+    xit = 0
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    config = options.config
+    config_path = config.path
+    if not pathexists(config_path):
+      info("write %r", config_path)
+      with Pfx(config_path):
+        with open(config_path, 'w') as cfg:
+          options.config.write(cfg)
+    basedir = config.basedir
+    if not isdirpath(basedir):
+      with Pfx("basedir"):
+        info("mkdir %r", basedir)
+        with Pfx("mkdir(%r)", basedir):
+          try:
+            os.mkdir(basedir)
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    for clause_name, clause in sorted(config.map.items()):
+      with Pfx("%s[%s]", shortpath(config_path), clause_name):
+        if clause_name == 'GLOBAL':
+          continue
+        store_type = clause.get('type')
+        if store_type == 'datadir':
+          S = config[clause_name]
+          try:
+            S.init()
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    return xit
+
+  @staticmethod
+  def cmd_ls(args, options, cmd):
+    ''' Do a directory listing of the specified I<dirrefs>.
+    '''
+    recurse = False
+    if args and args[0] == "-R":
+      recurse = True
+      args.pop(0)
+    if not args:
+      raise GetoptError("missing dirrefs")
+    first = True
+    for path in args:
+      with Pfx(path):
+        if first:
+          first = False
+        else:
+          print()
+        D = parse(path)
+        ls(path, D, recurse, sys.stdout)
+    return 0
+
+  @staticmethod
+  def cmd_mount(args, options, cmd):
+    ''' Mount the specified special on the specified mountpoint directory.
+        Requires FUSE support.
+    '''
+    try:
+      from .fuse import mount, umount
+    except ImportError as e:
+      error("FUSE support not configured: %s", e)
+      return 1
+    badopts = False
+    all_dates = False
+    append_only = False
+    readonly = None
+    opts, args = getopt(args, 'ao:r')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-a':
+          all_dates = True
+        elif opt == '-o':
+          for option in val.split(','):
+            with Pfx(option):
+              if option == '':
+                pass
+              elif option == 'append':
+                append_only = True
+              elif option == 'readonly':
+                readonly = True
+              else:
+                warning("unrecognised option")
+                badopts = True
+        elif opt == '-r':
+          readonly = True
+        else:
+          raise RuntimeError("unhandled option: %r" % (opt,))
+    # special is either a D{dir} or [clause] or an archive pathname
+    mount_store = defaults.S
+    special_basename = None
+    # the special may derive directly from a config Store clause
+    try:
+      special = args.pop(0)
+    except IndexError:
+      special = None
+      error("missing special")
+      badopts = True
+    else:
+      with Pfx("special %r", special):
+        try:
+          fsname, readonly, special_store, specialD, special_basename, archive = \
+              options.config.parse_special(special, readonly)
+        except ValueError as e:
+          error("invalid: %s", e)
+          badopts = True
+        else:
+          if special_basename is not None:
+            # Make the name for an explicit mount safer:
+            # no path components, no dots (thus no leading dots).
+            special_basename = \
+                special_basename.replace(os.sep, '_').replace('.', '_')
+          if special_store is not None and special_store is not mount_store:
+            warning(
+                "replacing default Store with Store from special %s ==> %s",
+                mount_store, special_store
+            )
+            mount_store = special_store
+    if args:
+      mountpoint = args.pop(0)
+    else:
+      if special_basename is None:
+        if not badopts:
+          error(
+              'missing mountpoint, and cannot infer mountpoint from special: %r',
+              special
+          )
+          badopts = True
+      else:
+        mountpoint = special_basename
+    if args:
+      subpath = args.pop(0)
+    else:
+      subpath = None
+    if args:
+      error("extra arguments: %s", ' '.join(args))
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    if all_dates:
+      readonly = True
+    xit = 0
+    mount_base = basename(mountpoint)
+    with Pfx(special):
+      if specialD is not None:
+        # D{dir}
+        E = specialD
+      else:
+        # pathname or Archive obtained from Store
+        if archive is None:
+          warning("no Archive, writing to stdout")
+          archive = FileOutputArchive(sys.stdout)
+        if all_dates:
+          E = Dir(mount_base)
+          for when, subD in archive:
+            E[datetime.fromtimestamp(when).isoformat()] = subD
+        else:
+          try:
+            entry = archive.last
+          except OSError as e:
+            error("can't access special: %s", e)
+            return 1
+          except ValueError as e:
+            error("invalid contents: %s", e)
+            return 1
+          # no "last entry" (==> first use) - make an empty directory
+          when = entry.when
+          E = entry.dirent
+          if E is None:
+            E = Dir(mount_base)
+            X("cmd_mount: new E=%r", E)
+          else:
+            ##dump_Dirent(E, recurse=True)
+            if not E.isdir:
+              error("expected directory, not file: %s", E)
+              return 1
+      if E.name == '.':
+        info("rename %s from %r to %r", E, E.name, mount_base)
+        E.name = mount_base
+      with Pfx(mountpoint):
+        need_rmdir = False
+        if not isdirpath(mountpoint):
+          # autocreate mountpoint
+          info('mkdir %r ...', mountpoint)
+          try:
+            os.mkdir(mountpoint)
+            need_rmdir = True
+          except OSError as e:
+            if e.errno == errno.EEXIST:
+              error("mountpoint is not a directory")
+              return 1
+            raise
+        T = None
+        try:
+          T = mount(
+              mountpoint,
+              E,
+              S=mount_store,
+              archive=archive,
+              subpath=subpath,
+              readonly=readonly,
+              append_only=append_only,
+              fsname=fsname
+          )
+          cs.x.X_via_tty = True
+        except KeyboardInterrupt:
+          error("keyboard interrupt, unmounting %r", mountpoint)
+          xit = umount(mountpoint)
+        except Exception as e:
+          exception("unexpected exception: %s", e)
+          xit = 1
+        finally:
+          if T:
+            T.join()
+      if need_rmdir:
+        info("rmdir %r ...", mountpoint)
+        try:
+          os.rmdir(mountpoint)
+        except OSError as e:
+          error("%r: rmdir fails: %s", mountpoint, e)
+          xit = 1
+    return xit
+
+  @staticmethod
+  def cmd_pack(args, options, cmd):
+    ''' Replace the _path_ with an archive file _path_`.vt`
+        referring to the stored content of _path_.
+    '''
+    if not args:
+      raise GetoptError("missing path")
+    ospath = args.pop(0)
+    if args:
+      raise GetoptError("extra arguments after path: %r" % (args,))
+    modes = CopyModes(trust_size_mtime=True)
     with Pfx(ospath):
-      if not existspath(ospath):
+      if not pathexists(ospath):
         error("missing")
-        xit = 1
-        continue
+        return 1
       arpath = ospath + '.vt'
-      try:
-        update_archive(arpath, ospath, modes, create_archive=True)
-      except IOError as e:
-        error("%s" % (e,))
-        xit = 1
-        continue
+      A = Archive(arpath, missing_ok=True)
+      last_entry = A.last
+      when, target = last_entry.when, last_entry.dirent
+      if target is None:
+        target = Dir(basename(ospath))
+      if isdirpath(ospath):
+        source = OSDir(ospath)
+      else:
+        source = OSFile(ospath)
+      X("target = %s, source= %s", type(target), type(source))
+      if not merge(target, source):
+        error("merge into %r fails", arpath)
+        return 1
+      A.update(target)
       info("remove %r", ospath)
       if isdirpath(ospath):
         shutil.rmtree(ospath)
       else:
         os.remove(ospath)
-  return xit
+    return 0
 
-def cmd_pull(args, verbose=None):
-  ''' Pull missing content from other Stores.
-  '''
-  if not args:
-    raise GetoptError("missing stores")
-  raise NotImplementedError
-
-def cmd_scan(args, verbose=None):
-  ''' Read a datafile and report.
-  '''
-  if len(args) < 1:
-    raise GetoptError("missing datafile/datadir")
-  hashclass = DEFAULT_HASHCLASS
-  for arg in args:
-    if isdirpath(arg):
-      dirpath = arg
-      D = DataDir(dirpath)
-      with D:
-        for n, offset, data in D.scan():
-          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
+  def _parse_pushable(self, s):
+    ''' Parse an object specification and return the object.
+    '''
+    obj = None
+    if s.startswith('/'):
+      # a path, hopefully a datadir or a .vtd file
+      if isdirpath(s) and isdirpath(joinpath(s, 'data')):
+        # /path/to/datadir
+        obj = DataDirStore(s, s)
+      elif s.endswith('.vtd') and isfilepath(s):
+        # /path/to/datafile.vtd
+        obj = DataFileReader(s)
+        obj.open()
+      # TODO: /path/to/archive.vt
+      else:
+        raise ValueError("path is neither a DataDir nor a data file")
     else:
-      filepath = arg
-      F = DataFile(filepath)
-      with F:
-        for offset, flags, data in F.scan():
-          if flags & F_COMPRESSED:
-            data = decompress(data)
-          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
-  return 0
+      # try a Store specification
+      try:
+        obj = Store(s, self.config)
+      except ValueError:
+        # try an object transcription eg "D{...}"
+        try:
+          obj, offset = parse(s)
+        except ValueError:
+          # fall back: relative path to .vtd file
+          if s.endswith('.vtd') and isfilepath(s):
+            # /path/to/datafile.vtd
+            obj = DataFileReader(s)
+            obj.open()
+          else:
+            raise
+        else:
+          if offset < len(s):
+            raise ValueError("incomplete parse, unparsed: %r" % (s[offset:],))
+    if not hasattr(obj, 'pushto_queue'):
+      raise ValueError("type %s is not pushable" % (type(obj),))
+    return obj
 
-def cmd_unpack(args, verbose=None):
-  ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
-  '''
-  if len(args) < 1:
-    raise GetoptError("missing archive name")
-  arpath = args.pop(0)
-  arbase, arext = splitext(arpath)
-  X("arbase=%r, arext=%r", arbase, arext)
-  if arext != '.vt':
-    raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
-  if len(args) > 0:
-    raise GetoptError("extra arguments after archive name %r" % (arpath,))
-  if existspath(arbase):
-    error("archive base already exists: %r", arbase)
-    return 1
-  with Pfx(arpath):
-    when, rootE = Archive(arpath).last
-    if rootE is None:
-      error("no entries in archive")
+  @staticmethod
+  def _push(options, srcS, dstS, pushables):
+    ''' Push data from the source Store `srcS` to destination Store `dstS`
+        to ensure that `dstS` has all the Blocks needs to support
+        the `pushables`.
+    '''
+    xit = 0
+    with Pfx("%s => %s", srcS.name, dstS.name):
+      runstate = options.runstate
+      Q, T = srcS.pushto(dstS, progress=options.progress)
+      for pushable in pushables:
+        if runstate.cancelled:
+          xit = 1
+          break
+        with Pfx(str(pushable)):
+          pushed_ok = pushable.pushto_queue(
+              Q, runstate=runstate, progress=options.progress
+          )
+          assert isinstance(pushed_ok, bool)
+          if not pushed_ok:
+            error("push failed")
+            xit = 1
+      Q.close()
+      T.join()
+      return xit
+
+  def cmd_pullfrom(self, args, options, cmd):
+    ''' Pull missing content from other Stores.
+
+        Usage: pullfrom other_store objects...
+    '''
+    if not args:
+      raise GetoptError("missing other_store")
+    srcSspec = args.pop(0)
+    with Pfx("other_store %r", srcSspec):
+      srcS = Store(srcSspec, options.config)
+    if not args:
+      args = (srcSpec,)
+    dstS = defaults.S
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(options, srcS, dstS, pushables)
+
+  def cmd_pushto(self, args, options, cmd):
+    ''' Push something to a secondary Store,
+        such that the secondary store has all the required Blocks.
+
+        Usage: pushto other_store objects...
+    '''
+    if not args:
+      raise GetoptError("missing other_store")
+    srcS = defaults.S
+    dstSspec = args.pop(0)
+    if not args:
+      args = (dstSpec,)
+    with Pfx("other_store %r", dstSspec):
+      dstS = Store(dstSspec, options.config)
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
+
+  @staticmethod
+  def cmd_serve(args, options, cmd):
+    ''' Start a service daemon listening on a TCP port
+        or on a UNIX domain socket or on stdin/stdout.
+
+        Usage: serve [{DEFAULT|-|/path/to/socket|[host]:port} [name:storespec]...]
+
+        With no `name:storespec` arguments the default Store is served,
+        otherwise the named Stores are exported with the first being
+        served initially.
+    '''
+    if args:
+      address = args.pop(0)
+    else:
+      address = 'DEFAULT'
+    if address == 'DEFAULT':
+      # obtain the address from the [server] config clause
+      try:
+        clause = options.config.get_clause('server')
+      except KeyError:
+        raise GetoptError(
+            "no [server] clause to implement address %r" % (address,)
+        )
+      try:
+        address = clause['address']
+      except KeyError:
+        raise GetoptError("[server] clause: no address field")
+    if not args:
+      exports = {'': defaults.S}
+    else:
+      exports = {}
+      for named_store_spec in args:
+        with Pfx("name:storespec %r", named_store_spec):
+          name, offset = get_identifier(named_store_spec)
+          if not name:
+            raise GetoptError("missing name")
+          with Pfx(repr(name)):
+            if name in exports:
+              raise GetoptError("repeated name")
+            if not named_store_spec.startswith(':', offset):
+              raise GetoptError("missing colon after name")
+            offset += 1
+            try:
+              parsed, type_, params, offset = get_store_spec(
+                  named_store_spec, offset
+              )
+            except ValueError as e:
+              raise GetoptError(
+                  "invalid Store specification after \"name:\": %s" % (e,)
+              ) from e
+            if offset < len(named_store_spec):
+              raise GetoptError(
+                  "extra text after storespec: %r" %
+                  (named_store_spec[offset:],)
+              )
+            namedS = options.config.new_Store(parsed, type_, params)
+            exports[name] = namedS
+            if '' not in exports:
+              exports[''] = namedS
+    runstate = options.runstate
+    if address == '-':
+      from .stream import StreamStore
+      remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
+      remoteS.join()
+    elif '/' in address:
+      # path/to/socket
+      socket_path = expand_path(address)
+      with defaults.S:
+        srv = serve_socket(
+            socket_path=socket_path, exports=exports, runstate=runstate
+        )
+      srv.join()
+    else:
+      # [host]:port
+      cpos = address.rfind(':')
+      if cpos >= 0:
+        host = address[:cpos]
+        port = address[cpos + 1:]
+        if not host:
+          host = '127.0.0.1'
+        port = int(port)
+        with defaults.S:
+          srv = serve_tcp(
+              bind_addr=(host, port), exports=exports, runstate=runstate
+          )
+          runstate.notify_cancel.add(lambda runstate: srv.shutdown())
+        srv.join()
+      else:
+        raise GetoptError(
+            "invalid serve argument,"
+            " I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r"
+            % (address,)
+        )
+    return 0
+
+  @staticmethod
+  def cmd_test(args, options, cmd):
+    ''' Test various facilites.
+    '''
+    if not args:
+      raise GetoptError("missing test subcommand")
+    subcmd = args.pop(0)
+    with Pfx(subcmd):
+      if subcmd == 'blockify':
+        if not args:
+          raise GetoptError("missing filename")
+        filename = args.pop(0)
+        with Pfx(filename):
+          if args:
+            raise GetoptError("extra arguments after filename: %r" % (args,))
+          scanner = scanner_from_filename(filename)
+          size_counts = defaultdict(int)
+          with open(filename, 'rb') as fp:
+            for chunk in blocked_chunks_of(file_data(fp, None), scanner):
+              print(len(chunk), str(chunk[:16]))
+              size_counts[len(chunk)] += 1
+          for size, count in sorted(size_counts.items()):
+            print(size, count)
+        return 0
+      raise GetoptError("unrecognised subcommand")
+
+  @staticmethod
+  def cmd_unpack(args, options, cmd):
+    ''' Unpack the archive file _archive_`.vt` as _archive_.
+    '''
+    if not args:
+      raise GetoptError("missing archive name")
+    arpath = args.pop(0)
+    arbase, arext = splitext(arpath)
+    if arext != '.vt':
+      raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
+    if args:
+      raise GetoptError("extra arguments after archive name %r" % (arpath,))
+    if pathexists(arbase):
+      error("archive base already exists: %r", arbase)
       return 1
-  with Pfx(arbase):
-    if rootE.isdir:
-      os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
-    else:
-      copy_out_file(rootE, arbase)
-  return 0
+    with Pfx(arpath):
+      entry = Archive(arpath).last
+      source = entry.dirent
+      if source is None:
+        error("no entries in archive")
+        return 1
+      if source.isdir:
+        target = OSDir(arbase)
+      else:
+        target = OSFile(arbase)
+    with Pfx(arbase):
+      if not merge(target, source, runstate=options.runstate):
+        return 1
+    return 0
 
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
@@ -719,7 +1016,7 @@ def lsDirent(fp, E, name):
   B = E.block
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
-    st_atime, st_mtime, st_ctime = st
+      st_atime, st_mtime, st_ctime = st
   t = datetime.fromtimestamp(int(st_mtime))
   try:
     h = B.hashcode
@@ -727,9 +1024,10 @@ def lsDirent(fp, E, name):
     detail = repr(B)
   else:
     detail = hexify(h)
-  fp.write("%c %-41s %s %6d %s\n" \
-           % (('d' if E.isdir else 'f'),
-              detail, t, st_size, name))
+  fp.write(
+      "%c %-41s %s %6d %s\n" %
+      (('d' if E.isdir else 'f'), detail, t, st_size, name)
+  )
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.
@@ -741,7 +1039,7 @@ def ls(path, D, recurse, fp=None):
   fp.write(":\n")
   if not recurse:
     debug("ls(): getting dirs and files...")
-    names = D.dirs()+D.files()
+    names = D.dirs() + D.files()
     debug("ls(): got dirs and files = %s" % (names,))
     names.sort()
     for name in names:
@@ -766,20 +1064,20 @@ def cat(path, fp=None):
   '''
   if fp is None:
     with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
-      return cat(path, bfp)
+      cat(path, bfp)
   else:
-    F = dirent_file(path)
+    F = path_resolve(path)
     block = F.block
     for B in block.leaves:
       fp.write(B.data)
 
 def dump(path, fp=None):
+  ''' Dump the Block contents of `path`.
+  '''
   if fp is None:
     fp = sys.stdout
-  E, subname = dirent_resolve(path)
-  if subname:
-    E = E[subname]
-  dump_block(E.block, fp)
+  E = path_resolve(path)
+  dump_Block(E.block, fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

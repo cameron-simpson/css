@@ -9,43 +9,47 @@ Dynamic message prefixes providing execution context.
 
 The primary facility here is Pfx,
 a context manager which maintains a per thread stack of context prefixes.
-Usage is like this::
 
-  from cs.pfx import Pfx
-  ...
-  def parser(filename):
-    with Pfx("parse(%r)", filename):
-      with open(filename) as f:
-        for lineno, line in enumerate(f, 1):
-          with Pfx("%d", lineno) as P:
-            if line_is_invalid(line):
-              raise ValueError("problem!")
-            P.info("line = %r", line)
+Usage is like this:
 
-This produces log messages like::
+    from cs.pfx import Pfx
+    ...
+    def parser(filename):
+      with Pfx("parse(%r)", filename):
+        with open(filename) as f:
+          for lineno, line in enumerate(f, 1):
+            with Pfx("%d", lineno) as P:
+              if line_is_invalid(line):
+                raise ValueError("problem!")
+              P.info("line = %r", line)
 
-  datafile: 1: line = 'foo\n'
+This produces log messages like:
 
-and exception messages like::
+    datafile: 1: line = 'foo\n'
 
-  datafile: 17: problem!
+and exception messages like:
+
+    datafile: 17: problem!
 
 which lets one put just the relevant complaint in exception and log
 messages and get useful calling context on the output.
 This does make for wordier logs and exceptions
-but used with a little discretion produces far more debugable results.
+but used with a little discretion produces far more debuggable results.
 '''
 
 from __future__ import print_function
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
+from cs.deco import decorator
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
 DISTINFO = {
-    'description': "Easy context prefixes for messages.",
+    'description':
+    "Easy context prefixes for messages.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -53,6 +57,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.py3',
         'cs.x',
     ],
@@ -75,32 +80,60 @@ def pfx_iter(tag, iterable):
 
 def pfx(func):
   ''' Decorator for functions that should run inside:
-        with Pfx(func_name):
+
+          with Pfx(func_name):
+
       Use:
-        @pfx
-        def f(...):
+
+          @pfx
+          def f(...):
   '''
+
   def wrapped(*args, **kwargs):
     with Pfx(func.__name__):
       return func(*args, **kwargs)
+
+  wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
   return wrapped
+
+@decorator
+def pfx_method(method, use_str=False):
+  ''' Decorator to provide a `Pfx` context for an instance method prefixing
+      *classname.methodname*
+      (or *str(self).methodname* if `use_str` is true).
+  '''
+
+  def wrapper(self, *a, **kw):
+    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
+      return method(self, *a, **kw)
+
+  wrapper.__doc__ = method.__doc__
+  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
+  return wrapper
 
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
-        with Pfx(tag, loggers=loggers):
+
+          with Pfx(tag, loggers=loggers):
+
       Use:
-        @pfxtag(tag)
-        def f(...):
+
+          @pfxtag(tag)
+          def f(...):
   '''
+
   def wrap(func):
     if tag is None:
       wraptag = func.__name__
     else:
       wraptag = tag
+
     def wrapped(*args, **kwargs):
       with Pfx(wraptag, loggers=loggers):
         return func(*args, **kwargs)
+
     return wrapped
+
   return wrap
 
 class _PfxThreadState(threading.local):
@@ -108,10 +141,12 @@ class _PfxThreadState(threading.local):
   '''
 
   def __init__(self):
+    threading.local.__init__(self)
     self.raise_needs_prefix = False
     self._ur_prefix = None
     self.stack = []
     self.trace = None
+    self._doing_prefix = False
 
   @property
   def cur(self):
@@ -133,11 +168,20 @@ class _PfxThreadState(threading.local):
     ''' Return the prevailing message prefix.
     '''
     global cmd
+    # Because P.umark can call str() on the mark, which in turn may
+    # call arbitrary code which in turn may issue log messages, which
+    # in turn may call this, we prevent such recursion.
+    doing_prefix = self._doing_prefix
+    self._doing_prefix = True
     marks = []
     for P in reversed(list(self.stack)):
-      marks.append(P.umark)
+      if doing_prefix:
+        marks.append(str(type(P._umark)))
+      else:
+        marks.append(P.umark)
       if P.absolute:
         break
+    self._doing_prefix = doing_prefix
     if self._ur_prefix is not None:
       marks.append(self._ur_prefix)
     if cmd is not None:
@@ -155,6 +199,53 @@ class _PfxThreadState(threading.local):
     '''
     return self.stack.pop()
 
+def gen(func):
+  ''' Decorator for generators to manage the Pfx stack.
+
+      Before running the generator the current stack height is
+      noted.  After yield, the stack above that height is trimmed
+      and saved, and the value yielded.  On recommencement the saved
+      stack is reapplied to the current stack (which may have
+      changed) and the generator continued.
+  '''
+
+  def wrapper(*a, **kw):
+    if not isgeneratorfunction(func):
+      raise ValueError(
+          "@gen: generatior function required, received %s" % (func,)
+      )
+    # commence the generator
+    g = func(*a, **kw)
+    # note the current Thread's Pfx stack
+    stack = Pfx._state.stack
+    height = len(stack)
+    while True:
+      try:
+        value = next(g)
+      except StopIteration:
+        # clean up and reraise
+        stack[height:] = []
+        return
+      except:
+        # clean up and reraise
+        stack[height:] = []
+        raise
+      # shelve the in-generator Pfx stack and yield
+      saved = stack[height:]
+      stack[height:] = []
+      yield value
+      # note the current Thread's Pfx stack
+      stack = Pfx._state.stack
+      height = len(stack)
+      # reapply the in-generator Pfx stack
+      stack.extend(saved)
+      del saved
+
+  wrapper.__name__ = "@Pfx.gen(%s)" % (func.__name__,)
+  fdoc = func.__doc__
+  wrapper.__doc__ = wrapper.__name__ + ":\n" + fdoc if fdoc else ''
+  return wrapper
+
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
@@ -164,12 +255,29 @@ class Pfx(object):
 
   def __init__(self, mark, *args, **kwargs):
     ''' Initialise a new Pfx instance.
-        `mark`: message prefix string
-        `args`: if not empty, apply to the prefix string with `%`
-        `absolute`: optional keyword argument, default False. If
+
+        Parameters:
+        * `mark`: message prefix string
+        * `args`: if not empty, apply to the prefix string with `%`
+        * `absolute`: optional keyword argument, default False. If
           true, this message forms the base of the message prefixes;
           existing prefixes will be suppressed.
-        `loggers`: which loggers should receive log messages.
+        * `loggers`: which loggers should receive log messages.
+
+        *Note*:
+        the `mark` and `args` are only combined if the `Pfx` instance gets used,
+        for example for logging or to annotate an exception.
+        Otherwise, they are not combined.
+        Therefore the values interpolated are as they are when the `Pfx` is used,
+        not necessarily as they were when the `Pfx` was created.
+        If `args` is subject to change and you require the original values,
+        apply them to `mark` immediately, for example:
+
+            with Pfx('message %s ...' % (arg1, arg2, ...)):
+
+        This is a bit more expensive, and the common usage is:
+
+            with Pfx('message %s ...', arg1, arg2, ...):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
@@ -183,7 +291,7 @@ class Pfx(object):
     self._loggers = None
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
-        loggers = (loggers, )
+        loggers = (loggers,)
       self.logto(loggers)
 
   def __enter__(self):
@@ -200,38 +308,69 @@ class Pfx(object):
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
         # now hack the exception attributes
-        prefix = self._state.prefix
+        current_prefix = self._state.prefix
+
         def prefixify(text):
           if not isinstance(text, StringTypes):
             ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-            ##  prefix, text.__class__, text, sys.exc_info())
+            ##  current_prefix, text.__class__, text, sys.exc_info())
             return text
-          return prefix \
+          return current_prefix \
               + ': ' \
-              + ustr(text, errors='replace').replace('\n', '\n' + prefix)
-        for attr in 'args', 'message', 'msg', 'reason':
-          try:
-            value = getattr(exc_value, attr)
-          except AttributeError:
-            pass
-          else:
+              + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
+
+        def prefixify_exc(e):
+          ''' Modify the supplied exception `e` with the current prefix.
+              Return true if modified, false if unable to modify.
+          '''
+          did_prefix = False
+          for attr in 'args', 'message', 'msg', 'reason':
+            try:
+              value = getattr(e, attr)
+            except AttributeError:
+              continue
             if isinstance(value, StringTypes):
               value = prefixify(value)
+            elif isinstance(value, Exception):
+              # set did_prefix if we modify this in place
+              did_prefix = prefixify_exc(value)
             else:
               try:
                 vlen = len(value)
               except TypeError:
-                print("warning: %s: %s.%s: " % (prefix, exc_value, attr),
-                      prefixify("do not know how to prefixify: %r" % (value,)),
-                      file=sys.stderr)
+                print(
+                    "warning: %s: %s.%s: " % (current_prefix, e, attr),
+                    prefixify(
+                        "do not know how to prefixify: %s:%r" %
+                        (type(value), value)
+                    ),
+                    file=sys.stderr
+                )
                 continue
               else:
                 if vlen < 1:
-                  value = [ prefixify(repr(value)) ]
+                  value = [prefixify(repr(value))]
                 else:
-                  value = [ prefixify(value[0]) ] + list(value[1:])
-            setattr(exc_value, attr, value)
-            break
+                  value = [prefixify(value[0])] + list(value[1:])
+            try:
+              setattr(e, attr, value)
+            except AttributeError as e2:
+              print(
+                  "warning: %s: %s.%s: cannot set to %r: %s" %
+                  (current_prefix, e, attr, value, e2),
+                  file=sys.stderr
+              )
+              continue
+            did_prefix = True
+          return did_prefix
+
+        did_prefix = prefixify_exc(exc_value)
+        if not did_prefix:
+          print(
+              "warning: %s: %s:%s: message not prefixed" %
+              (current_prefix, type(exc_value).__name__, exc_value),
+              file=sys.stderr
+          )
     _state.pop()
     if _state.trace:
       _state.trace(_state.prefix)
@@ -240,7 +379,8 @@ class Pfx(object):
   @property
   def umark(self):
     ''' Return the unicode message mark for use with this Pfx.
-        Used by Pfx._state.prefix to compute to full prefix.
+
+        This is used by Pfx._state.prefix to compute the full prefix.
     '''
     u = self._umark
     if u is None:
@@ -252,7 +392,17 @@ class Pfx(object):
           mark = unicode(mark)
       u = mark
       if self.mark_args:
-        u = u % self.mark_args
+        try:
+          u = u % self.mark_args
+        except TypeError as e:
+          logging.warning(
+              "FORMAT CONVERSION: %s: %r %% %r",
+              e,
+              u,
+              self.mark_args,
+              exc_info=True
+          )
+          u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
 
@@ -264,13 +414,16 @@ class Pfx(object):
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
         within a surrounding Pfx context with the current mark string.
+
         This is intended for deferred call facilities like
         WorkerThreadPool, Later, and futures.
     '''
     pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
+
     def pfxfunc():
       with pfx2:
         return func(*a, **kw)
+
     return pfxfunc
 
   @property
@@ -292,24 +445,48 @@ class Pfx(object):
 
   # Logger methods
   def exception(self, msg, *args):
+    ''' Log an exception message to this Pfx's loggers.
+    '''
     for L in self.loggers:
       L.exception(msg, *args)
+
   def log(self, level, msg, *args, **kwargs):
+    ''' Log a message at an arbitrary log level to this Pfx's loggers.
+    '''
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
       try:
         L.log(level, msg, *args, **kwargs)
       except Exception as e:
-        print("%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s", self._state.prefix, L, msg, args, kwargs, e, file=sys.stderr)
+        print(
+            "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" %
+            (self._state.prefix, L, msg, args, kwargs, e),
+            file=sys.stderr
+        )
+
   def debug(self, msg, *args, **kwargs):
+    ''' Emit a debug log message.
+    '''
     self.log(logging.DEBUG, msg, *args, **kwargs)
+
   def info(self, msg, *args, **kwargs):
+    ''' Emit an info log message.
+    '''
     self.log(logging.INFO, msg, *args, **kwargs)
+
   def warning(self, msg, *args, **kwargs):
+    ''' Emit a warning log message.
+    '''
     self.log(logging.WARNING, msg, *args, **kwargs)
+
   def error(self, msg, *args, **kwargs):
+    ''' Emit an error log message.
+    '''
     self.log(logging.ERROR, msg, *args, **kwargs)
+
   def critical(self, msg, *args, **kwargs):
+    ''' Emit a critical log message.
+    '''
     self.log(logging.CRITICAL, msg, *args, **kwargs)
 
 def prefix():
@@ -326,8 +503,10 @@ def PrePfx(tag, *args):
   state = Pfx._state
   old_ur_prefix = state._ur_prefix
   state._ur_prefix = tag
-  yield None
-  state._ur_prefix = old_ur_prefix
+  try:
+    yield None
+  finally:
+    state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
@@ -335,24 +514,28 @@ class PfxCallInfo(Pfx):
 
   def __init__(self):
     import traceback
-    grandcaller, caller, myframe = traceback.extract_stack(None, 3)
-    Pfx.__init__(self,
-                 "at %s:%d %s(), called from %s:%d %s()",
-                 caller[0], caller[1], caller[2],
-                 grandcaller[0], grandcaller[1], grandcaller[2])
+    grandcaller, caller, _ = traceback.extract_stack(None, 3)
+    Pfx.__init__(
+        self, "at %s:%d %s(), called from %s:%d %s()", caller[0], caller[1],
+        caller[2], grandcaller[0], grandcaller[1], grandcaller[2]
+    )
 
 def PfxThread(target=None, **kw):
-  ''' Factory function returning a Thread which presents the current prefix as context.
+  ''' Factory function returning a Thread
+      which presents the current prefix as context.
   '''
   current_prefix = prefix()
+
   def run(*a, **kw):
     with Pfx(current_prefix):
       if target is not None:
         target(*a, **kw)
+
   return threading.Thread(target=run, **kw)
 
 def XP(msg, *args, **kwargs):
-  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  ''' Variation on `cs.x.X`
+      which prefixes the message with the current Pfx prefix.
   '''
   file = kwargs.pop('file', None)
   if file is None:
@@ -360,13 +543,18 @@ def XP(msg, *args, **kwargs):
   elif file is not None:
     if isinstance(file, StringTypes):
       with open(file, "a") as fp:
-        XP(msg, *args, file=fp)
-      return
+        return XP(msg, *args, file=fp)
   file.write(prefix())
   file.write(': ')
   file.flush()
   return X(msg, *args, file=file)
 
 def XX(prepfx, msg, *args, **kwargs):
+  ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
+
+      Example:
+
+          XX("NOTE!", "some message")
+  '''
   with PrePfx(prepfx):
     return XP(msg, *args, **kwargs)

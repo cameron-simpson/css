@@ -1,0 +1,2 @@
+Rename @ORM.orm_auto_session to @ORM.auto_session.
+New @orm_auto_session decorator for methods of objects with a .orm attribute.

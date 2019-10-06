@@ -34,8 +34,10 @@ import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug
 from cs.obj import O, Proxy
 from cs.pfx import Pfx
+from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
+from cs.result import Result
 from cs.seq import seq
 from cs.x import X
 
@@ -50,32 +52,18 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
+        'cs.result',
         'cs.seq',
         'cs.x',
     ],
 }
 
-from cmd import Cmd
-import inspect
-import logging
-import os
-from subprocess import Popen, PIPE
-import sys
-import threading
-import time
-import traceback
-import cs.logutils
-from cs.logutils import debug, error, warning, setup_logging, D, ifdebug
-from cs.obj import O, Proxy
-from cs.pfx import Pfx
-from cs.py.func import funccite
-from cs.py.stack import caller
-from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.seq import seq
-from cs.timeutils import sleep
-from cs.x import X
+# @DEBUG dispatches a thread to monitor function elapsed time.
+# This is how often it polls for function completion.
+DEBUG_POLL_RATE = 0.25
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -95,6 +83,32 @@ def RLock():
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
 
+class TimingOutLock(object):
+  ''' A Lock replacement which times out, used for locating deadlock points.
+  '''
+  def __init__(self, deadlock_timeout=20.0, recursive=False):
+    self._lock = threading.RLock() if recursive else threading.Lock()
+    self._deadlock_timeout = deadlock_timeout
+  def acquire(self, blocking=True, timeout=-1, name=None):
+    if timeout < 0:
+      timeout = self._deadlock_timeout
+    else:
+      timeout = min(timeout, self._deadlock_timeout)
+    ok = self._lock.acquire(timeout=timeout) if blocking else self._lock.acquire(blocking=blocking)
+    if not ok:
+      raise RuntimeError("TIMEOUT acquiring lock held by %s:%r" % (self.owner, self.owner_name))
+    self.owner = caller()
+    self.owner_name = name
+    return True
+  def release(self):
+    return self._lock.release()
+  def __enter__(self):
+    self.acquire()
+    self.owner = caller()
+    return True
+  def __exit__(self, *a):
+    return self._lock.__exit__(*a)
+
 class TraceSuite(object):
   ''' Context manager to trace start and end of a code suite.
   '''
@@ -104,7 +118,7 @@ class TraceSuite(object):
     self.msg = msg
   def __enter__(self):
     X("TraceSuite ENTER %s", self.msg)
-  def __exit__(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, exc_tb):
     X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
 def Thread(*a, **kw):
@@ -118,7 +132,6 @@ def thread_dump(Ts=None, fp=None):
       `Ts`: the Threads to dump; if unspecified use threading.enumerate().
       `fp`: the file to which to write; if unspecified use sys.stderr.
   '''
-  import traceback
   if Ts is None:
     Ts = threading.enumerate()
   if fp is None:
@@ -160,13 +173,12 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
     for line in text.splitlines():
       logger.log(log_level, line.rstrip())
 
-def DEBUG(f):
+def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
-  if not ifdebug():
-    return f
   def inner(*a, **kw):
-    from cs.result import Result
+    if not force and not ifdebug():
+      return f(*a, **kw)
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
@@ -176,14 +188,14 @@ def DEBUG(f):
     debug("%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a, kw)
     start = time.time()
     try:
-      result = f(*a, **kw)
+      retval = f(*a, **kw)
     except Exception as e:
       error("EXCEPTION from %s(*%s, **%s): %s", f, a, kw, e)
       raise
     end = time.time()
-    debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, result)
-    R.put(result)
-    return result
+    debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, retval)
+    R.put(retval)
+    return retval
   return inner
 
 def _debug_watcher(filename, lineno, n, funcname, R):
@@ -196,9 +208,16 @@ def _debug_watcher(filename, lineno, n, funcname, R):
       # reset report time and complain more slowly next time
       slowness = 0
       slow += 1
-    time.sleep(1)
-    sofar += 1
-    slowness += 1
+    time.sleep(DEBUG_POLL_RATE)
+    sofar += DEBUG_POLL_RATE
+    slowness += DEBUG_POLL_RATE
+
+def DF(func, *a, **kw):
+  ''' Wrapper for a function call to debug its use.
+      Requires rewriting the call from f(*a, *kw) to DF(f, *a, **kw).
+      Alternatively one could rewrite as DEBUG(f)(*a, **kw).
+  '''
+  return DEBUG(func, force=True)(*a, **kw)
 
 class DebugWrapper(O):
   ''' Base class for classes presenting debugging wrappers.
@@ -325,16 +344,25 @@ class DebuggingRLock(DebugWrapper):
     DebugWrapper.__init__(self, **dkw)
     self.debug('__init__')
     self.lock = threading.RLock()
+    self.stack = None
+
+  def __str__(self):
+    return "%s%r" % (
+        type(self).__name__,
+        [ "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
+          for f in self.stack
+        ] if self.stack else "NO_STACK")
 
   def __enter__(self):
-    filename, lineno = inspect.stack()[0][1:3]
+    filename, lineno = inspect.stack()[1][1:3]
     self.debug('from %s:%d: __enter__ ...', filename, lineno)
     self.lock.__enter__()
+    self.stack = inspect.stack()
     self.debug('from %s:%d: __enter__ ENTERED', filename, lineno)
     return self
 
   def __exit__(self, *a):
-    filename, lineno = inspect.stack()[0][1:3]
+    filename, lineno = inspect.stack()[1][1:3]
     self.debug('%s:%d: __exit__(*%s) ...', filename, lineno, a)
     return self.lock.__exit__(*a)
 
@@ -342,14 +370,18 @@ class DebuggingRLock(DebugWrapper):
     filename, lineno = inspect.stack()[0][1:3]
     self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
     if timeout < 0:
-      self.lock.acquire(blocking)
+      ret = self.lock.acquire(blocking)
     else:
-      self.lock.acquire(blocking, timeout)
+      ret = self.lock.acquire(blocking, timeout)
+    if ret:
+      self.stack = inspect.stack()
+    return ret
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
     self.debug('%s:%d: release()', filename, lineno)
     self.lock.release()
+    self.stack = None
 
 _debug_threads = set()
 
@@ -365,7 +397,7 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
     _debug_threads.add(self)
-    return threading.Thread.__init__(self, *a, **kw)
+    threading.Thread.__init__(self, *a, **kw)
 
   @DEBUG
   def join(self, timeout=None):

@@ -50,7 +50,7 @@ from cs.x import X
 from cs.pfx import Pfx
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars
-from cs.progress import Progress, ProgressWriter
+from cs.progress import Progress
 from cs.rfc2616 import read_headers, read_http_request_line, message_has_body, \
                         pass_chunked, pass_length, \
                         dec8, enc8, CRLF, CRLFb
@@ -713,6 +713,30 @@ class _NewCacheFile(object):
     self.node._setpath(finalpath)
     self.node._cache_async.result = finalpath
     self.node._cache_async = None
+
+class ProgressWriter(object):
+  ''' An object with a .write method which passes the write through to a file and then updates a Progress.
+  '''
+
+  def __init__(self, progress, fp):
+    ''' Initialise the ProgressWriter with a Progress `progress` and a file `fp`.
+    '''
+    self.progress = progress
+    self.fp = fp
+
+  def write(self, data):
+    ''' Write `data` to the file and update the Progress. Return as from `fp.write`.
+        The Progress is updated by the amount written; if fp.write
+        returns None then this presumed to be len(data), otherwise
+        the return value from fp.write is used.
+    '''
+    retval = self.fp.write(data)
+    if retval is None:
+      written = len(data)
+    else:
+      written = retval
+    self.progress.advance(written)
+    return retval
 
 class _NoCloseFile(object):
 

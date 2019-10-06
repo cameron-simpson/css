@@ -1,0 +1,1 @@
+stack_dump(): trim the last 2 frames from the listing by default (they are part of stack_dump's implementation).

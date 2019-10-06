@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: new class decoratr @observable class; bugfix import of "warning"; some autoformatting

@@ -1,0 +1,11 @@
+  lib/python/cs/threads.py: merge default ==> beyonwiz
+  lib/python/cs/threads.py: cs.threads: locked_property: use cs.py.func.prop instead of builtin property
+  lib/python/cs/threads.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/threads.py: cs.threads: new LockableMixin, presenting a context manager and a .lock property
+  lib/python/cs/threads.py: merge default ==> venti
+  lib/python/cs/threads.py: my email address has changed - update Python code
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool._handler: wrap in @logexc to report escaping exceptions
+  lib/python/cs/threads.py: cs.threads: @locked: probe the lock to see if it is taken, emit a warning if so - may prove too noisy in busy environments
+  lib/python/cs/threads.py: cs.threads: @locked: drop lock contention probe, now in a DebuggingLock class
+  lib/python/cs/threads.py: cs.threads: drop some unused classes, update docstrings, clean lint
+  lib/python/cs/threads.py: cs.threads: fix DISTINFO

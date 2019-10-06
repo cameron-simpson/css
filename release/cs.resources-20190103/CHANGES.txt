@@ -1,0 +1,39 @@
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: initial and incomplete subopen hook
+  lib/python/cs/resources.py: merge default ==> later
+  lib/python/cs/resources.py: cs.resources: docstring whitespace tweak
+  lib/python/cs/resources.py: cs.resources: import cs.obj.Proxy
+  lib/python/cs/resources.py: cs.resources: _SubOpen: bugfix revealed by lint
+  lib/python/cs/resources.py: cs.resources: RunState: docstring improvements
+  lib/python/cs/resources.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/resources.py: cs.resources: new mixin RunStateMixin
+  lib/python/cs/resources.py: merge venti ==> default: several bugfixes, scan control for PlatonicDirs using flags, start using RunStates to orchestrate shutdown
+  lib/python/cs/resources.py: cs.resources: RunStateMixin: provide a .cancel method
+  lib/python/cs/resources.py: cs.resources: RunState.run_time: use the current time as the end time if called while still running
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: include cs.obj.TrackedClassMixin as a mixin for debugging
+  lib/python/cs/resources.py: merge default ==> venti
+  lib/python/cs/resources.py: cs.resources: RunState.running docstring improvement
+  lib/python/cs/resources.py: cs.resources: RunState: add .state property, to be an enum in the future; run_time: return None if never started; TODO: consider returning 0 here
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: improve docstring; RunState: return 0.0 from .run_time if not started, improve __str__
+  lib/python/cs/resources.py: cs.resources: Pool: call O.__init__, support optional `lock` parameter
+  lib/python/cs/resources.py: cs.resources: _SubOpen: call Proxy.__init__, provide class docstring
+  lib/python/cs/resources.py: cs.resources: clean a little lint
+  lib/python/cs/resources.py: cs.resources: RunState.start: provide better debugging information with .start called when already running
+  lib/python/cs/resources.py: cs.resources: RunState: rename .end to .stop, .end_time to .stop_time
+  lib/python/cs/resources.py: cs.resources: clean some lint
+  lib/python/cs/resources.py: cs.resources: rephrase commented out debug check, no semantic change
+  lib/python/cs/resources.py: cs.resources: RunState.__str__: include instance id
+  lib/python/cs/resources.py: cs.resources: clarifying comments, clean some lint
+  lib/python/cs/resources.py: cs.resources: use modern print() function
+  lib/python/cs/resources.py: cs.resources: docstring improvements
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: bugfix lock - use a dedicated lock for the open/close stuff instead of sharing the main object logic, which may be held for other reasons; TODO: strip out the shared ._lock support, export back into users?
+  lib/python/cs/resources.py: cs.resources: RunState: provide a descriptive .name
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: open/close: run the startup/shutdown inside the lock to avoid slow startups racing with quick shutdowns
+  lib/python/cs/resources.py: cs.resources: RunState: bugfix __str__
+  lib/python/cs/resources.py: cs.resources: RunStateMixin: accept runstate=str, to use as the name of the allocated RunState
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: update docstring: recommend most dynamic setup to go in the startup method, mark the `subopens` param as a TODO
+  lib/python/cs/resources.py: cs.resources: bugfix MultiOpenMixin: fix spelling of opens counter, corrects finalisation logic
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: use an RLock for __mo_lock, possibly not necessary but prudent since subclass startup/shutdown gets called inside the lock; tidy up the _opens inc/dec (no semantic change)
+  lib/python/cs/resources.py: cs: clean some lint after recent bugfixes
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: private class attribute _mo_lockclass for monkeypatching with a DebuggingLock
+  lib/python/cs/resources.py: cs.resources: move MultiOpenMixin._mo_lockclass out to global _mom_lockclass, avoids differing py2 vs py3 behaviour
+  lib/python/cs/resources.py: cs.resources: docstring updates
