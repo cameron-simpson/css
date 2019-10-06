@@ -239,6 +239,12 @@ def cachedmethod(
 
   return wrapper
 
+def cached(*a, **kw):
+  ''' Compatibility wrapper for `@cachedmethod`, issuing a warning.
+  '''
+  warning("obsolete use of @cached, please update to @cachedmethod")
+  return cachedmethod(*a, **kw)
+
 @decorator
 def strable(func, open_func=None):
   ''' Decorator for functions which may accept a `str`
