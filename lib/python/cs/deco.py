@@ -23,6 +23,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
 }
 
 def fmtdoc(func):
@@ -290,7 +291,7 @@ def observable_class(property_names, only_unequal=False):
       * `property_names`:
         an interable of instance property names to set up as
         observable properties. As a special case a single `str` can
-        be supplied of only one attribute is to be observed.
+        be supplied if only one attribute is to be observed.
       * `only_unequal`:
         only call the observers if the new property value is not
         equal to the previous proerty value. This requires property
@@ -352,7 +353,7 @@ def observable_class(property_names, only_unequal=False):
     cls.report_observation = report_observation
 
     def make_property(cls, attr):
-      ''' make `cls.attr` into a property which reports setattr events.
+      ''' Make `cls.attr` into a property which reports setattr events.
       '''
       val_attr = '_' + attr
 
@@ -387,10 +388,14 @@ def observable_class(property_names, only_unequal=False):
 if __name__ == '__main__':
 
   class Foo:
+    ''' Dummy class.
+    '''
 
     @cached(poll_delay=2)
-    def x(self, y):
-      return str(y)
+    def x(self, arg):
+      ''' Dummy `x` method.
+      '''
+      return str(self) + str(arg)
 
   F = Foo()
   y = F.x(1)
