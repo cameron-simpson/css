@@ -95,9 +95,11 @@ class TestPriorityLock(unittest.TestCase):
 
   def test02mutex(self):
     lock = self.lock
+
     def sleeper(n):
       with lock as L:
         time.sleep(n)
+
     now = time.time()
     T1 = bg(sleeper, args=(0.1,), daemon=True)
     T2 = bg(sleeper, args=(0.1,), daemon=True)
@@ -109,10 +111,12 @@ class TestPriorityLock(unittest.TestCase):
   def test03priority(self):
     lock = self.lock
     pri_list = []
+
     def sleeper(n, pri):
       with lock.priority(pri) as L:
         pri_list.append(pri)
         time.sleep(n)
+
     now = time.time()
     Ts = []
     with lock as L:
