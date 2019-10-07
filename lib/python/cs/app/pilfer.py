@@ -52,10 +52,9 @@ import cs.obj
 from cs.obj import O
 from cs.pfx import Pfx, pfx_iter, XP
 from cs.pipeline import (
-    pipeline,
-                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
-                    FUNC_MANY_TO_MANY, FUNC_PIPELINE
-                    )
+    pipeline, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
+    FUNC_MANY_TO_MANY, FUNC_PIPELINE
+)
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
@@ -160,10 +159,10 @@ def main(argv, stdin=None):
     badopts = True
   else:
     op = argv.pop(0)
-    if op.startswith('http://') or op.startswith('https://') :
+    if op.startswith('http://') or op.startswith('https://'):
       # push the URL back and infer missing "url" op word
       argv.insert(0, op)
-      op ='url'
+      op = 'url'
     with Pfx(op):
       if op == 'url':
         if not argv:
@@ -216,7 +215,7 @@ def main(argv, stdin=None):
                 except KeyError as e:
                   error("add pipe: %s", e)
                   badopts = True
-                argv = argv[end_pos+1:]
+                argv = argv[end_pos + 1:]
 
           # now load the main pipeline
           if not argv:
@@ -240,24 +239,30 @@ def main(argv, stdin=None):
               # poll the status of the Later regularly
               def pinger(L):
                 while True:
-                  D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+                  D(
+                      "PINGER: L: quiescing=%s, state=%r: %s", L._quiescing,
+                      L._state, L
+                  )
                   sleep(2)
+
               ping = Thread(target=pinger, args=(LTR,))
               ping.daemon = True
               ping.start()
             with LTR as L:
               P.later = L
               # construct the pipeline
-              pipeline = pipeline(L, pipe_funcs,
-                                    name="MAIN",
-                                    outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                                   blocking=True).open(),
-                                   )
+              pipeline = pipeline(
+                  L,
+                  pipe_funcs,
+                  name="MAIN",
+                  outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
+                                 blocking=True).open(),
+              )
               X("MAIN: RUN PIPELINE...")
               with pipeline:
                 for U in urls(url, stdin=stdin, cmd=cmd):
                   X("MAIN: PUT %r", U)
-                  pipeline.put( P.copy_with_vars(_=U) )
+                  pipeline.put(P.copy_with_vars(_=U))
               X("MAIN: RUN PIPELINE: ALL ITEMS .put")
               # wait for main pipeline to drain
               LTR.state("drain main pipeline")
@@ -389,14 +394,19 @@ def argv_pipefuncs(argv, action_map, do_trace):
         tail_argv = list(argv)
         name = "per:[%s]" % (','.join(argv))
         pipespec = PipeSpec(name, argv)
+
         def per(P):
-          pipeline = pipeline(P.later,pipespec.actions,
-                                      inputs=(P,),
-                                      name="%s(%s)" % (name, P))
+          pipeline = pipeline(
+              P.later,
+              pipespec.actions,
+              inputs=(P,),
+              name="%s(%s)" % (name, P)
+          )
           with P.later.release():
             for P2 in pipeline.outQ:
               yield P2
-        pipe_funcs.append( (FUNC_ONE_TO_MANY, per) )
+
+        pipe_funcs.append((FUNC_ONE_TO_MANY, per))
       argv = []
       continue
     try:
@@ -427,7 +437,7 @@ class Pilfer(O):
   def __init__(self, *a, **kw):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
-    self.user_vars = { 'save_dir': '.' }
+    self.user_vars = {'save_dir': '.'}
     self._ = None
     self.flush_print = False
     self.do_trace = False
@@ -436,9 +446,9 @@ class Pilfer(O):
     self._print_lock = Lock()
     self.user_agent = None
     self._lock = RLock()
-    self.rcs = []               # chain of PilferRC libraries
+    self.rcs = []  # chain of PilferRC libraries
     self.seensets = {}
-    self.diversions_map = {}        # global mapping of names to divert: pipelines
+    self.diversions_map = {}  # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.opener.add_handler(HTTPCookieProcessor())
@@ -446,6 +456,7 @@ class Pilfer(O):
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
+
   __repr__ = __str__
 
   def copy(self, *a, **kw):
@@ -457,7 +468,7 @@ class Pilfer(O):
   def defaults(self):
     ''' Mapping for default values formed by cascading PilferRCs.
     '''
-    return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
+    return MappingChain(mappings=[rc.defaults for rc in self.rcs])
 
   @property
   def _(self):
@@ -500,13 +511,14 @@ class Pilfer(O):
     '''
     seen = self.seensets
     if name not in seen:
-      backing_path = MappingChain(mappings=[ rc.seen_backing_paths for rc in self.rcs ]).get(name)
+      backing_path = MappingChain(
+          mappings=[rc.seen_backing_paths for rc in self.rcs]
+      ).get(name)
       if backing_path is not None:
         backing_path = envsub(backing_path)
-        if ( not os.path.isabs(backing_path)
-         and not backing_path.startswith('./')
-         and not backing_path.startswith('../')
-           ):
+        if (not os.path.isabs(backing_path)
+            and not backing_path.startswith('./')
+            and not backing_path.startswith('../')):
           backing_basedir = self.defaults.get('seen_dir')
           if backing_basedir is not None:
             backing_basedir = envsub(backing_basedir)
@@ -583,17 +595,22 @@ class Pilfer(O):
     if pipe_name not in diversions:
       spec = self.pipes.get(pipe_name)
       if spec is None:
-        raise KeyError("no diversion named %r and no pipe specification found" % (pipe_name,))
+        raise KeyError(
+            "no diversion named %r and no pipe specification found" %
+            (pipe_name,)
+        )
       pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
       if errors:
         for err in errors:
           error(err)
-        raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
+        raise KeyError(
+            "invalid pipe specification for diversion named %r" % (pipe_name,)
+        )
       name = "DIVERSION:%s" % (pipe_name,)
-      outQ=NullQueue(name=name, blocking=True)
-      outQ.open()   # open outQ so it can be closed at the end of the pipeline
-      div = pipeline(self.later,pipe_funcs, name=name, outQ=outQ)
-      div.open()    # will be closed in main program shutdown
+      outQ = NullQueue(name=name, blocking=True)
+      outQ.open()  # open outQ so it can be closed at the end of the pipeline
+      div = pipeline(self.later, pipe_funcs, name=name, outQ=outQ)
+      div.open()  # will be closed in main program shutdown
       diversions[pipe_name] = div
     return diversions[pipe_name]
 
@@ -687,7 +704,10 @@ class Pilfer(O):
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
-    debug("save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas, dir, overwrite, kw)
+    debug(
+        "save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas,
+        dir, overwrite, kw
+    )
     with Pfx("save_url(%s)", U):
       U = URL(U, None)
       save_dir = self.save_dir
@@ -720,7 +740,11 @@ class Pilfer(O):
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
-      pylib = [ path for path in envsub(self.defaults.get('pythonpath', '')).split(':') if path ]
+      pylib = [
+          path
+          for path in envsub(self.defaults.get('pythonpath', '')).split(':')
+          if path
+      ]
       return import_module_name(module_name, func_name, pylib, self._lock)
 
   def format_string(self, s, U):
@@ -749,7 +773,7 @@ class FormatArgument(unicode):
   @property
   def as_int(self):
     return int(self)
-  
+
 class FormatMapping(object):
   ''' A mapping object to set or fetch user variables or URL attributes.
       Various URL attributes are known, and may not be assigned to.
@@ -784,9 +808,10 @@ class FormatMapping(object):
     return not callable(attr)
 
   def keys(self):
-    ks = ( set( [ k for k in dir(self.url) if self._ok_attrkey(k) ] )
-         + set(self.pilfer.user_vars.keys())
-         )
+    ks = (
+        set([k for k in dir(self.url) if self._ok_attrkey(k)]) +
+        set(self.pilfer.user_vars.keys())
+    )
     return ks
 
   def __getitem__(self, k):
@@ -799,7 +824,10 @@ class FormatMapping(object):
       if k in P.user_vars:
         return P.user_vars[k]
       if not self._ok_attrkey(k):
-        raise KeyError("unapproved attribute (missing or callable or not public): %r" % (k,))
+        raise KeyError(
+            "unapproved attribute (missing or callable or not public): %r" %
+            (k,)
+        )
       try:
         attr = getattr(url, k)
       except AttributeError as e:
@@ -849,9 +877,9 @@ def has_exts(U, suffixes, case_sensitive=False):
     base = os.path.basename(path)
     if not case_sensitive:
       base = base.lower()
-      suffixes = [ sfx.lower() for sfx in suffixes ]
+      suffixes = [sfx.lower() for sfx in suffixes]
     for sfx in suffixes:
-      if base.endswith('.'+sfx):
+      if base.endswith('.' + sfx):
         ok = True
         break
   return ok
@@ -865,9 +893,9 @@ def with_exts(urls, suffixes, case_sensitive=False):
       base = os.path.basename(path)
       if not case_sensitive:
         base = base.lower()
-        suffixes = [ sfx.lower() for sfx in suffixes ]
+        suffixes = [sfx.lower() for sfx in suffixes]
       for sfx in suffixes:
-        if base.endswith('.'+sfx):
+        if base.endswith('.' + sfx):
           ok = True
           break
     if ok:
@@ -883,8 +911,13 @@ def url_query(U, *a):
   U = URL(U, None)
   if not a:
     return U.query
-  qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
-  return ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
+  qsmap = dict(
+      [
+          (qsp.split('=', 1) if '=' in qsp else (qsp, ''))
+          for qsp in U.query.split('&')
+      ]
+  )
+  return ','.join([unquote(qsmap.get(qparam, '')) for qparam in a])
 
 def url_io(func, onerror, *a, **kw):
   ''' Call `func` and return its result.
@@ -937,39 +970,61 @@ many_to_many = {
 
 # actions that work on individual Pilfer instances, returning multiple strings
 one_to_many = {
-      'hrefs':        lambda P: url_hrefs(P._),
-      'srcs':         lambda P: url_srcs(P._),
-      'xml':          lambda P, match: url_xml_find(P._, match),
-      'xmltext':      lambda P, match: XML(P._).findall(match),
-    }
+    'hrefs': lambda P: url_hrefs(P._),
+    'srcs': lambda P: url_srcs(P._),
+    'xml': lambda P, match: url_xml_find(P._, match),
+    'xmltext': lambda P, match: XML(P._).findall(match),
+}
 
 # actions that work on individual Pilfer instances, returning single strings
 one_to_one = {
-      '..':           lambda P: URL(P._, None).parent,
-      'delay':        lambda P, delay: (P._, sleep(float(delay)))[0],
-      'domain':       lambda P: URL(P._, None).domain,
-      'hostname':     lambda P: URL(P._, None).hostname,
-      'print':        lambda P, **kw: (P._, P.print_url_string(P._, **kw))[0],
-      'query':        lambda P, *a: url_query(P._, *a),
-      'quote':        lambda P: quote(P._),
-      'unquote':      lambda P: unquote(P._),
-      'save':         lambda P, *a, **kw: (P._, P.save_url(P._, *a, **kw))[0],
-      'title':        lambda P: P._.page_title,
-      'type':         lambda P: url_io(P._.content_type, ""),
-      'xmlattr':      lambda P, attr: [ A for A in (ElementTree.XML(P._).get(attr),) if A is not None ],
-    }
+    '..':
+    lambda P: URL(P._, None).parent,
+    'delay':
+    lambda P, delay: (P._, sleep(float(delay)))[0],
+    'domain':
+    lambda P: URL(P._, None).domain,
+    'hostname':
+    lambda P: URL(P._, None).hostname,
+    'print':
+    lambda P, **kw: (P._, P.print_url_string(P._, **kw))[0],
+    'query':
+    lambda P, *a: url_query(P._, *a),
+    'quote':
+    lambda P: quote(P._),
+    'unquote':
+    lambda P: unquote(P._),
+    'save':
+    lambda P, *a, **kw: (P._, P.save_url(P._, *a, **kw))[0],
+    'title':
+    lambda P: P._.page_title,
+    'type':
+    lambda P: url_io(P._.content_type, ""),
+    'xmlattr':
+    lambda P, attr:
+    [A for A in (ElementTree.XML(P._).get(attr),) if A is not None],
+}
 
 one_test = {
-      'has_title':    lambda P: P._.page_title is not None,
-      'reject_re':    lambda P, regexp: not regexp.search(P._),
-      'same_domain':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.domain == P._.referer.domain,
-      'same_hostname':lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P._.referer.hostname,
-      'same_scheme':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.scheme == P._.referer.scheme,
-      'select_re':    lambda P, regexp: regexp.search(P._),
-    }
+    'has_title':
+    lambda P: P._.page_title is not None,
+    'reject_re':
+    lambda P, regexp: not regexp.search(P._),
+    'same_domain':
+    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
+                      ) and P._.domain == P._.referer.domain,
+    'same_hostname':
+    lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P
+    ._.referer.hostname,
+    'same_scheme':
+    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
+                      ) and P._.scheme == P._.referer.scheme,
+    'select_re':
+    lambda P, regexp: regexp.search(P._),
+}
 
 # regular expressions used when parsing actions
-re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
+re_GROK = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def Action(action_text, do_trace):
   ''' Wrapper for parse_action: parse an action text and promote (sig, function) into an _Action.
@@ -986,21 +1041,26 @@ def Action(action_text, do_trace):
 def pilferify11(func):
   ''' Decorator for 1-to-1 Pilfer=>nonPilfer functions to return a Pilfer.
   '''
+
   def pf(P, *a, **kw):
     return P.copy_with_vars(_=func(P, *a, **kw))
+
   return pf
 
 def pilferify1m(func):
   ''' Decorator for 1-to-many Pilfer=>nonPilfers functions to yield Pilfers.
   '''
+
   def pf(P, *a, **kw):
     for value in func(P, *a, **kw):
       yield P.copy_with_vars(_=value)
+
   return pf
 
 def pilferifymm(func):
   ''' Decorator for 1-to-many Pilfer=>nonPilfers functions to yield Pilfers.
   '''
+
   def pf(Ps, *a, **kw):
     if not isinstance(Ps, list):
       Ps = list(Ps)
@@ -1008,15 +1068,18 @@ def pilferifymm(func):
       P0 = Ps[0]
       for value in func(Ps, *a, **kw):
         yield P0.copy_with_vars(_=value)
+
   return pf
 
 def pilferifysel(func):
   ''' Decorator for selector Pilfer=>bool functions to yield Pilfers.
   '''
+
   def pf(Ps, *a, **kw):
     for P in Ps:
       if func(P, *a, **kw):
         yield P
+
   return pf
 
 def parse_action(action, do_trace):
@@ -1058,6 +1121,7 @@ def parse_action(action, do_trace):
           if varmap:
             P = P.copy_with_vars(**varmap)
           yield P
+
       return FUNC_ONE_TO_MANY, named_re_match
     else:
       return FUNC_SELECTOR, lambda P: regexp.search(P._)
@@ -1071,7 +1135,9 @@ def parse_action(action, do_trace):
       regexp = action[2:]
     regexp = re.compile(regexp)
     if regexp.groupindex:
-      raise ValueError("named groups may not be used in regexp rejection patterns")
+      raise ValueError(
+          "named groups may not be used in regexp rejection patterns"
+      )
     return FUNC_SELECTOR, lambda P: not regexp.search(P._)
 
   # parent
@@ -1086,7 +1152,7 @@ def parse_action(action, do_trace):
     else:
       exts, case = action[1:], True
     exts = exts.split(',')
-    return FUNC_SELECTOR, lambda P: has_exts( P._, exts, case_sensitive=case )
+    return FUNC_SELECTOR, lambda P: has_exts(P._, exts, case_sensitive=case)
 
   # select URLs not ending in particular extensions
   if action.startswith('-.'):
@@ -1095,7 +1161,9 @@ def parse_action(action, do_trace):
     else:
       exts, case = action[2:], True
     exts = exts.split(',')
-    return FUNC_SELECTOR, lambda P: not has_exts( P._, exts, case_sensitive=case )
+    return FUNC_SELECTOR, lambda P: not has_exts(
+        P._, exts, case_sensitive=case
+    )
 
   # catch "a.b.c" and convert to "grok:a.b.c"
   m = re_GROK.match(action)
@@ -1110,7 +1178,8 @@ def parse_action(action, do_trace):
   # comparison
   # name==
   if action.startswith('==', offset):
-    text = action[offset+2:]
+    text = action[offset + 2:]
+
     def compare(P):
       U = P._
       M = FormatMapping(P, U)
@@ -1121,12 +1190,14 @@ def parse_action(action, do_trace):
         raise
       cmp_value = M.format(text)
       return vvalue == cmp_value
+
     return FUNC_SELECTOR, compare
 
   # uncomparison
   # name!=
   if action.startswith('!=', offset):
-    text = action[offset+2:]
+    text = action[offset + 2:]
+
     def uncompare(P):
       U = P._
       M = FormatMapping(P, U)
@@ -1137,6 +1208,7 @@ def parse_action(action, do_trace):
         raise
       cmp_value = M.format(text)
       return vvalue != cmp_value
+
     return FUNC_SELECTOR, uncompare
 
   # contains
@@ -1144,8 +1216,12 @@ def parse_action(action, do_trace):
   if action.startswith('(', offset):
     args, kwargs, offset = parse_args(action, offset + 1, ')')
     if kwargs:
-      raise ValueError("you may not have kw= arguments in the 'contains' value list: %r" % (kwargs,))
+      raise ValueError(
+          "you may not have kw= arguments in the 'contains' value list: %r" %
+          (kwargs,)
+      )
     values = action[m.end():].split(',')
+
     def in_list(P):
       U = P._
       M = FormatMapping(P, U)
@@ -1159,25 +1235,31 @@ def parse_action(action, do_trace):
         if vvalue == cvalue:
           return True
       return False
+
     return FUNC_SELECTOR, in_list
 
   # assignment
   # varname=
   if action.startswith('=', offset):
-    exprtext = action[offset+1:]
+    exprtext = action[offset + 1:]
+
     def assign(P):
       U = P._
       param_value = P.format_string(exprtext, U)
       P2 = P.copy_with_vars(**{param: param_value})
       return P2
+
     return FUNC_ONE_TO_ONE, assign
 
   # test of variable value
   # varname~selector
   if action.startswith('~', offset):
-    selector = Action(action[offset+1:])
+    selector = Action(action[offset + 1:])
     if selector.sig != FUNC_SELECTOR:
-      raise ValueError("expected selector function but found: %s" % (selector,))
+      raise ValueError(
+          "expected selector function but found: %s" % (selector,)
+      )
+
     def do_test(P):
       U = P._
       M = FormatMapping(P, U)
@@ -1187,6 +1269,7 @@ def parse_action(action, do_trace):
         error("unknown variable %r", name)
         return False
       return selector(P, vvalue)
+
     return FUNC_SELECTOR, do_test
 
   if name == 's':
@@ -1195,16 +1278,16 @@ def parse_action(action, do_trace):
     if offset == len(action):
       raise ValueError("missing delimiter")
     delim = action[offset]
-    delim2pos = action.find(delim, offset+1)
+    delim2pos = action.find(delim, offset + 1)
     if delim2pos < offset + 1:
       raise ValueError("missing second delimiter (%r)" % (delim,))
-    regexp = action[offset+1:delim2pos]
+    regexp = action[offset + 1:delim2pos]
     if not regexp:
       raise ValueError("empty regexp")
-    delim3pos = action.find(delim, delim2pos+1)
-    if delim3pos < delim2pos+1:
+    delim3pos = action.find(delim, delim2pos + 1)
+    if delim3pos < delim2pos + 1:
       raise ValueError("missing third delimiter (%r)" % (delim,))
-    repl_format = action[delim2pos+1:delim3pos]
+    repl_format = action[delim2pos + 1:delim3pos]
     offset = delim3pos + 1
     repl_all = False
     repl_icase = False
@@ -1219,7 +1302,11 @@ def parse_action(action, do_trace):
         re_flags != re.IGNORECASE
       else:
         raise ValueError("unknown s///x modifier: %r" % (modchar,))
-    debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
+    debug(
+        "s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp,
+        repl_format, repl_all, repl_icase
+    )
+
     def substitute(P):
       ''' Perform a regexp substitution on the source string.
           `replacement` is a format string for the replacement text
@@ -1230,15 +1317,17 @@ def parse_action(action, do_trace):
           and any named groups.
       '''
       src = P._
-      debug("SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
-            src, regexp.pattern, replacement, replace_all)
+      debug(
+          "SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
+          src, regexp.pattern, replacement, replace_all
+      )
       strs = []
       offset = 0
       for m in regexp.finditer(src):
         # positional replacements come from the match groups
-        repl_args = [ m.group(0) ] + list(m.groups())
+        repl_args = [m.group(0)] + list(m.groups())
         # named replacements come from the named regexp groups
-        repl_kw = { '_': m.group(0) }
+        repl_kw = {'_': m.group(0)}
         repl_kw.update(m.groupdict())
         # save the unmatched section
         strs.append(src[offset:m.start()])
@@ -1254,6 +1343,7 @@ def parse_action(action, do_trace):
       if isURL(src):
         result = URL(result, src.referer)
       return result
+
     return FUNC_ONE_TO_ONE, substitute
 
   if name in ("copy", "divert", "pipe"):
@@ -1269,25 +1359,33 @@ def parse_action(action, do_trace):
       selector = None
     else:
       if action[offset] != marker:
-        raise ValueError("expected second marker to match first: expected %r, saw %r"
-                         % (marker, action[offset]))
-      selector = Action(action[offset+1:])
+        raise ValueError(
+            "expected second marker to match first: expected %r, saw %r" %
+            (marker, action[offset])
+        )
+      selector = Action(action[offset + 1:])
       if selector.sig != FUNC_SELECTOR:
-        raise ValueError("expected selector function but found: %s" % (selector,))
+        raise ValueError(
+            "expected selector function but found: %s" % (selector,)
+        )
     if name == 'copy':
+
       def copy(self, P):
         if selector is None or selector(P):
           pipe = P.diversion(pipe_name)
           pipe.put(P)
         return P
+
       return FUNC_ONE_TO_ONE, copy
     elif name == 'divert':
+
       def divert(self, P):
         if selector is None or selector(P):
           pipe = P.diversion(pipe_name)
           pipe.put(P)
         else:
           yield P
+
       return FUNC_ONE_TO_MANY, divert
     elif name == 'pipe':
       return ActionPipeTo(action0, pipe_name)
@@ -1309,13 +1407,16 @@ def parse_action(action, do_trace):
     if offset >= len(action):
       args, kwargs = (), {}
     elif action[offset] != marker:
-      raise ValueError("expected second marker to match first: expected %r, saw %r"
-                       % (marker, action[offset]))
+      raise ValueError(
+          "expected second marker to match first: expected %r, saw %r" %
+          (marker, action[offset])
+      )
     else:
       args, kwargs, offset = parse_action_args(action, offset)
     if offset < len(action):
       raise ValueError("unparsed content after args: %r", action[offset:])
     if name == "grok":
+
       @returns_Pilfer
       def grok(P):
         ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
@@ -1337,8 +1438,10 @@ def parse_action(action, do_trace):
             P = P.copy('user_vars')
             P.set_user_vars(**var_mapping)
         return P
+
       return FUNC_ONE_TO_ONE, grok
     elif name == "grokall":
+
       @yields_Pilfer
       def grokall(Ps):
         ''' Grokall performs a user-specified analysis on the items.
@@ -1361,10 +1464,11 @@ def parse_action(action, do_trace):
               exception("call")
             else:
               if var_mapping:
-                Ps = [ P.copy('user_vars') for P in Ps ]
+                Ps = [P.copy('user_vars') for P in Ps]
               for P in Ps:
                 P.set_user_vars(**var_mapping)
         return Ps
+
       return FUNC_ONE_TO_MANY, grokall
     else:
       raise RuntimeError("unhandled action %r", name)
@@ -1384,24 +1488,28 @@ def parse_action(action, do_trace):
     marker = action[offset]
     if marker == '=':
       # for:varname=value,...
-      values = action[offset+1:]
+      values = action[offset + 1:]
+
       def for_specific(P):
         U = P._
         # expand "values", split on whitespace, iterate with new Pilfer
         value_list = P.format_string(values, U).split()
         for value in value_list:
           yield P.copy_with_vars(**{varname: value})
+
       return FUNC_ONE_TO_MANY, for_specific
     if marker == ':':
       # for:varname:{start}..{stop}
-      start, stop = action[offset+1:].split('..', 1)
+      start, stop = action[offset + 1:].split('..', 1)
+
       def for_range(P):
         U = P._
         # expand "values", split on whitespace, iterate with new Pilfer
         istart = int(P.format_string(start, U))
         istop = int(P.format_string(stop, U))
-        for value in range(istart, istop+1):
+        for value in range(istart, istop + 1):
           yield P.copy_with_vars(**{varname: str(value)})
+
       return FUNC_ONE_TO_MANY, for_range
     raise ValueError("unrecognised marker after varname: %r", marker)
 
@@ -1419,63 +1527,79 @@ def parse_action(action, do_trace):
         seensets = ('_',)
       if offset < len(action):
         if action[offset] != marker:
-          raise ValueError("parse should have a second marker %r at %r" % (action[offset:]))
-        value = action[offset+1:]
+          raise ValueError(
+              "parse should have a second marker %r at %r" % (action[offset:])
+          )
+        value = action[offset + 1:]
         if not value:
           value = '{_}'
     if name == 'see':
       func_sig = FUNC_ONE_TO_ONE
+
       def see(P):
         U = P._
         see_value = P.format_string(value, U)
         for seenset in seensets:
           P.see(see_value, seenset)
         return P
+
       return FUNC_ONE_TO_ONE, see
     if name == 'seen':
+
       def seen(P):
         U = P._
         see_value = P.format_string(value, U)
-        return any( [ P.seen(see_value, seenset) for seenset in seensets ] )
+        return any([P.seen(see_value, seenset) for seenset in seensets])
+
       return FUNC_SELECTOR, seen
     if name == 'unseen':
+
       def unseen(P):
         U = P._
         see_value = P.format_string(value, U)
-        return not any( [ P.seen(see_value, seenset) for seenset in seensets ] )
+        return not any([P.seen(see_value, seenset) for seenset in seensets])
+
       return FUNC_SELECTOR, unseen
     raise RuntimeError("unsupported action %r", name)
 
   if name == 'unique':
     # unique
     seen = set()
+
     def unique(P):
       value = P._
       if value not in seen:
-         seen.add(value)
-         yield P
+        seen.add(value)
+        yield P
+
     return FUNC_ONE_TO_MANY, unique
 
   if action == 'first':
     is_first = [True]
+
     def first(P):
       if is_first[0]:
         is_first[0] = False
         return True
+
     return FUNC_SELECTOR, first
 
   if action == 'new_save_dir':
     # create a new directory based on {save_dir} and update save_dir to match
     def new_save_dir(P):
       return P.copy_with_vars(save_dir=new_dir(P.save_dir))
+
     return FUNC_ONE_TO_ONE, new_save_dir
 
   # some other function: gather arguments and then look up function by name in mappings
   if offset < len(action):
     marker = action[offset]
-    args, kwargs, offset = parse_action_args(action, offset+1)
+    args, kwargs, offset = parse_action_args(action, offset + 1)
     if offset < len(action):
-      raise ValueError("unparsed text after arguments: %r (found a=%r, kw=%r)" % (action[offset:],args,kwargs))
+      raise ValueError(
+          "unparsed text after arguments: %r (found a=%r, kw=%r)" %
+          (action[offset:], args, kwargs)
+      )
   else:
     args = ()
     kwargs = {}
@@ -1505,14 +1629,16 @@ def parse_action(action, do_trace):
     func = pilferify1m(func)
 
   if args or kwargs:
+
     def func_args(*a, **kw):
       a2 = args + a
       kw2 = dict(kwargs)
       kw2.update(kw)
       return func(*a2, **kw2)
+
     func = func_args
   return sig, func
-  
+
 def parse_action_args(action, offset, delim=None):
   ''' Parse [[kw=]arg[,[kw=]arg...] from `action` at `offset`, return (args, kwargs, offset).
      An arg is a quoted string or a sequence of nonwhitespace excluding `delim` and comma.
@@ -1545,12 +1671,14 @@ def parse_action_args(action, offset, delim=None):
 def retriable(func):
   ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
   '''
+
   def retry_func(P, *a, **kw):
     ''' Call func after testing flags.
     '''
     if not P.test_flags():
       raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
     return func(P, *a, **kw)
+
   retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
@@ -1622,7 +1750,10 @@ class ActionPipeTo(_Action):
       with self._lock:
         Q = self._Q
         if Q is None:
-          X("ActionPipeTo._OnDemandPipeline: create pipeline from %s", self.pipespec)
+          X(
+              "ActionPipeTo._OnDemandPipeline: create pipeline from %s",
+              self.pipespec
+          )
           Q = self._Q = P.pipe_from_spec(self.pipespec)
       self._pipeline.put(P)
 
@@ -1661,6 +1792,7 @@ class ShellProcFilter(MultiOpenMixin):
 
   def _startproc(self, shcmd):
     self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
+
     def copy_out(fp, outQ):
       ''' Copy lines from the shell output, put new Pilfers onto the outQ.
       '''
@@ -1669,9 +1801,12 @@ class ShellProcFilter(MultiOpenMixin):
           raise ValueError('premature EOF (missing newline): %r' % (line,))
         outQ.put(P.copy_with_vars(_=line[:-1]))
       outQ.close()
-    self.copier = Thread(name="%s.copy_out" % (self,),
-                         target=copy_out,
-                         args=(shproc.stdout, self.outQ)).start()
+
+    self.copier = Thread(
+        name="%s.copy_out" % (self,),
+        target=copy_out,
+        args=(shproc.stdout, self.outQ)
+    ).start()
 
   def put(self, P):
     with self._lock:
@@ -1721,6 +1856,7 @@ class ShellProcCommand(MultiOpenMixin):
   def _startproc(self, shcmd):
     self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
     self.shproc.stdin.close()
+
     def copy_out(fp, outQ):
       ''' Copy lines from the shell output, put new Pilfers onto the outQ.
       '''
@@ -1729,9 +1865,12 @@ class ShellProcCommand(MultiOpenMixin):
           raise ValueError('premature EOF (missing newline): %r' % (line,))
         outQ.put(P.copy_with_vars(_=line[:-1]))
       outQ.close()
-    self.copier = Thread(name="%s.copy_out" % (self,),
-                         target=copy_out,
-                         args=(shproc.stdout, self.outQ)).start()
+
+    self.copier = Thread(
+        name="%s.copy_out" % (self,),
+        target=copy_out,
+        args=(shproc.stdout, self.outQ)
+    ).start()
 
   def put(self, P):
     with self._lock:
@@ -1755,6 +1894,7 @@ def action_shcmd(shcmd):
   ''' Return (function, func_sig) for a shell command.
   '''
   shcmd = shcmd.strip()
+
   @yields_str
   def function(P):
     U = P._
@@ -1768,7 +1908,12 @@ def action_shcmd(shcmd):
         with open('/dev/null') as fp0:
           fd0 = fp0.fileno()
           try:
-            subp = Popen(['/bin/sh', '-c', 'sh -uex; '+v], stdin=fd0, stdout=PIPE, close_fds=True)
+            subp = Popen(
+                ['/bin/sh', '-c', 'sh -uex; ' + v],
+                stdin=fd0,
+                stdout=PIPE,
+                close_fds=True
+            )
           except Exception as e:
             exception("Popen: %r", e)
             return
@@ -1781,12 +1926,14 @@ def action_shcmd(shcmd):
         xit = subp.returncode
         if xit != 0:
           warning("exit code = %d", xit)
+
   return function, FUNC_ONE_TO_MANY
 
 def action_pipecmd(shcmd):
   ''' Return (function, func_sig) for pipeline through a shell command.
   '''
   shcmd = shcmd.strip()
+
   @yields_str
   def function(items):
     if not isinstance(items, list):
@@ -1803,7 +1950,12 @@ def action_pipecmd(shcmd):
       with Pfx(v):
         # spawn the shell command
         try:
-          subp = Popen(['/bin/sh', '-c', 'sh -uex; '+v], stdin=PIPE, stdout=PIPE, close_fds=True)
+          subp = Popen(
+              ['/bin/sh', '-c', 'sh -uex; ' + v],
+              stdin=PIPE,
+              stdout=PIPE,
+              close_fds=True
+          )
         except Exception as e:
           exception("Popen: %r", e)
           return
@@ -1812,6 +1964,7 @@ def action_pipecmd(shcmd):
           for P in items:
             print(P._, file=subp.stdin)
           subp.stdin.close()
+
         T = Thread(target=feedin, name='feedin to %r' % (v,))
         T.daemon = True
         T.start()
@@ -1825,6 +1978,7 @@ def action_pipecmd(shcmd):
         xit = subp.returncode
         if xit != 0:
           warning("exit code = %d", xit)
+
   return function, FUNC_MANY_TO_MANY
 
 class PipeSpec(O):
@@ -1862,9 +2016,10 @@ def load_pilferrcs(pathname):
       rcpath = os.path.join(pathname, "rc")
       if os.path.exists(rcpath):
         rcs.extend(load_pilferrcs(rcpath))
-      subrcs = sorted( name for name in os.listdir(pathname)
-                       if not name.startswith('.') and name.endswith('.rc')
-                     )
+      subrcs = sorted(
+          name for name in os.listdir(pathname)
+          if not name.startswith('.') and name.endswith('.rc')
+      )
       for subrc in subrcs:
         rcpath = os.path.join(pathname, subrc)
         rcs.extend(load_pilferrcs(rcpath))
@@ -1910,7 +2065,9 @@ class PilferRC(O):
       if cfg.has_section('actions'):
         for action_name in cfg.options('actions'):
           with Pfx('[actions].%s', action_name):
-            self.action_map[action_name] = shlex.split(cfg.get('actions', action_name))
+            self.action_map[action_name] = shlex.split(
+                cfg.get('actions', action_name)
+            )
       if cfg.has_section('pipes'):
         for pipe_name in cfg.options('pipes'):
           with Pfx('[pipes].%s', pipe_name):
