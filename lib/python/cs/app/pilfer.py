@@ -43,9 +43,7 @@ from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
-from cs.later import Later, RetryError, \
-                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, \
-                    FUNC_MANY_TO_MANY, FUNC_PIPELINE
+from cs.later import Later, RetryError
 from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, D
@@ -53,6 +51,11 @@ from cs.mappings import MappingChain, SeenSet
 import cs.obj
 from cs.obj import O
 from cs.pfx import Pfx, pfx_iter, XP
+from cs.pipeline import (
+    pipeline,
+                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
+                    FUNC_MANY_TO_MANY, FUNC_PIPELINE
+                    )
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
@@ -245,7 +248,7 @@ def main(argv, stdin=None):
             with LTR as L:
               P.later = L
               # construct the pipeline
-              pipeline = L.pipeline(pipe_funcs,
+              pipeline = pipeline(L, pipe_funcs,
                                     name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
                                                    blocking=True).open(),
@@ -387,7 +390,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
         name = "per:[%s]" % (','.join(argv))
         pipespec = PipeSpec(name, argv)
         def per(P):
-          pipeline = P.later.pipeline(pipespec.actions,
+          pipeline = pipeline(P.later,pipespec.actions,
                                       inputs=(P,),
                                       name="%s(%s)" % (name, P))
           with P.later.release():
@@ -589,14 +592,14 @@ class Pilfer(O):
       name = "DIVERSION:%s" % (pipe_name,)
       outQ=NullQueue(name=name, blocking=True)
       outQ.open()   # open outQ so it can be closed at the end of the pipeline
-      div = self.later.pipeline(pipe_funcs, name=name, outQ=outQ)
+      div = pipeline(self.later,pipe_funcs, name=name, outQ=outQ)
       div.open()    # will be closed in main program shutdown
       diversions[pipe_name] = div
     return diversions[pipe_name]
 
   @logexc
   def pipe_through(self, pipe_name, inputs):
-    ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
+    ''' Create a new pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
         `pipe_name` may be a PipeSpec.
     '''
@@ -605,7 +608,7 @@ class Pilfer(O):
       return self.pipe_from_spec(pipe_name, inputs, name=name)
 
   def pipe_from_spec(self, pipe_name, name=None):
-    ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
+    ''' Create a new pipeline from the specification named `pipe_name`.
     '''
     if isinstance(pipe_name, PipeSpec):
       spec = pipe_name
@@ -622,7 +625,7 @@ class Pilfer(O):
         for err in errors:
           error(err)
         raise ValueError("invalid pipe specification")
-    return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
+    return pipeline(self.later, pipe_funcs, name=name, inputs=inputs)
 
   def _rc_pipespecs(self):
     for rc in self.rcs:
