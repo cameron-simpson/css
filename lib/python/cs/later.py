@@ -39,13 +39,13 @@ from cs.debug import ifdebug
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import error, warning, info, debug, exception, D, OBSOLETE
-from cs.pfx import PrePfx
+from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.queues import IterableQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.result import Result, report, after
 from cs.seq import seq, TrackingCounter
-from cs.threads import bg
+from cs.threads import bg as bg_thread
 from cs.x import X
 
 DISTINFO = {
@@ -554,6 +554,7 @@ class Later(object):
     self.closed = False
     self._finished = Event()
 
+  @pfx_method
   def shutdown(self):
     ''' Shut down the Later instance:
         - close the request queue
@@ -562,17 +563,13 @@ class Later(object):
         - dispatch a Thread to wait for completion and fire the
           _finished Event
     '''
-    ##with Pfx("%s.shutdown()", self):
-    with PrePfx("%s SHUTDOWN [%s]", type(self).__name__, self):
-      if not self.closed:
-        self.close()
-      if self._timerQ:
-        self._timerQ.close()
-        self._timerQ.join()
-      # queue actions to detect activity completion
-      def finish_up():
-        self._finished.set()
-      bg(finish_up)
+    if not self.closed:
+      self.close()
+    if self._timerQ:
+      self._timerQ.close()
+      self._timerQ.join()
+    # queue actions to detect activity completion
+    bg_thread(self._finished.set)
 
   def close(self):
     ''' Close the Later, preventing further task submission.
