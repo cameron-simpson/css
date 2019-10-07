@@ -77,7 +77,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
+    'install_requires':
+    ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
 }
 
 class ResultState(Enum or object):
@@ -284,7 +285,10 @@ class Result(object):
         kwargs=kw
     )
 
-  @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
+  @require(
+      lambda self: self.state in
+      (ResultState.pending, ResultState.running, ResultState.cancelled)
+  )
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
