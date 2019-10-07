@@ -58,11 +58,11 @@ except ImportError:
   except ImportError:
     Enum = None
 from functools import partial
-from icontract import require
 import sys
 from threading import Lock
+from icontract import require
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx, PfxThread as Thread
+from cs.pfx import Pfx
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
@@ -153,8 +153,7 @@ class Result(object):
   def ready(self):
     ''' Whether the Result state is ready or cancelled.
     '''
-    state = self.state
-    return state == ResultState.ready or state == ResultState.cancelled
+    return self.state in (ResultState.ready, ResultState.cancelled)
 
   @property
   def cancelled(self):
@@ -186,7 +185,7 @@ class Result(object):
       if state == ResultState.ready:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state == ResultState.running or state == ResultState.pending:
+      if state in (ResultState.running, ResultState.pending):
         # in progress or not commenced - change state to cancelled and fall through to ._complete
         self.state = ResultState.cancelled
       else:
@@ -276,7 +275,9 @@ class Result(object):
     ''' Submit a function to compute the result in a separate `Thread`;
         returning the `Thread`.
 
-        The `Result` must be in "pending" state, and transitions to "running".
+        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        and as such the `Result` must be in "pending" state,
+        and transitions to "running".
     '''
     return bg_thread(
         self.call,
@@ -300,8 +301,8 @@ class Result(object):
           (result, exc_info)
       )
     state = self.state
-    if (state == ResultState.cancelled or state == ResultState.running
-        or state == ResultState.pending):
+    if state in (ResultState.cancelled, ResultState.running,
+                 ResultState.pending):
       self._result = result
       self._exc_info = exc_info
       if state != ResultState.cancelled:
