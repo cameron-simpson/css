@@ -4,16 +4,16 @@
 r'''
 Queue functions for execution later in priority and time order.
 
-I use Later objects for convenient queuing of functions whose
+I use `Later` objects for convenient queuing of functions whose
 execution occurs later in a priority order with capacity constraints.
 
 Why not futures?
 I already had this before futures came out,
 I prefer its naming scheme and interface,
-and futures did not seem to support prioritising execution.
+and futures did not then support prioritised execution.
 
-Use is simple enough: create a Later instance and typically queue
-functions with the .defer() method::
+Use is simple enough: create a `Later` instance and typically queue
+functions with the `.defer()` method::
 
     L = Later(4)      # a Later with a parallelism of 4
     ...
@@ -21,9 +21,10 @@ functions with the .defer() method::
     ...
     x = LF()          # collect result
 
-The .defer method and its siblings return a LateFunction,
-which is a subclass of cs.result.Result.
-As such it is a callable, so to collect the result you just call the LateFunction.
+The `.defer` method and its siblings return a `LateFunction`,
+which is a subclass of `cs.result.Result`.
+As such it is a callable,
+so to collect the result you just call the `LateFunction`.
 '''
 
 from __future__ import print_function
@@ -117,8 +118,10 @@ class RetryError(Exception):
 
 def retry(retry_interval, func, *a, **kw):
   ''' Call the callable `func` with the supplied arguments.
-      If it raises RetryError, sleep(`retry_interval`) and call
-      again until it does not raise RetryError.
+
+      If it raises `RetryError`,
+      run `time.sleep(retry_interval)`
+      and then call again until it does not raise `RetryError`.
   '''
   while True:
     try:
@@ -127,7 +130,7 @@ def retry(retry_interval, func, *a, **kw):
       time.sleep(retry_interval)
 
 class _Late_context_manager(object):
-  ''' The _Late_context_manager is a context manager to run a suite via an
+  ''' The `_Late_context_manager` is a context manager to run a suite via an
       existing Later object. Example usage:
 
           L = Later(4)    # a 4 thread Later
@@ -192,13 +195,16 @@ class _Late_context_manager(object):
     return True
 
 class LateFunction(Result):
-  ''' State information about a pending function.
-      A LateFunction is callable, so a synchronous call can be done like this:
+  ''' State information about a pending function,
+      a subclass of `cs.result.Result`.
+
+      A `LateFunction` is callable,
+      so a synchronous call can be done like this:
 
           def func():
             return 3
           L = Later(4)
-          LF = L.defer()
+          LF = L.defer(func)
           x = LF()
           print(x)        # prints 3
 
@@ -267,9 +273,13 @@ class LateFunction(Result):
     return self.join()
 
   def _complete(self, result, exc_info):
-    ''' Intercept RetryErrors in the completion.
-        If the function raised one of NameError, AttributeError, RuntimeError
-        (broadly: "programmer errors"), report the stack trace to aid debugging.
+    ''' Wrapper for `Result._complete` which handles `RetryError`s.
+
+        Further,
+        if the function raises one of `NameError`, `AttributeError`
+        or `RuntimeError`
+        (broadly: "programmer errors"),
+        report the stack trace to aid debugging.
     '''
     if exc_info:
       e = exc_info[1]
@@ -767,13 +777,28 @@ class Later(object):
     return not self.closed
 
   def bg(self, func, *a, **kw):
-    ''' Queue a function to run right now, ignoring the Later's capacity and priority system.
-        This is really just an easy way to utilise the Later's thread pool
-        and get back a handy LateFunction for result collection.
+    ''' Queue a function to run right now,
+        ignoring the `Later`'s capacity and priority system.
+
+        This is really just an easy way to utilise the `Later`'s thread pool
+        and get back a handy `LateFunction` for result collection.
+
         It can be useful for transient control functions that themselves
-        queue things through the Later queuing system but do not want to
+        queue things through the `Later` queuing system but do not want to
         consume capacity themselves, thus avoiding deadlock at the cost of
         transient overthreading.
+
+        The premise here is that the capacity limit
+        is more about managing compute contention than pure `Thread` count,
+        and that control functions should arrange other subfunctions
+        and then block or exit,
+        thus consuming neglible compute.
+        It is common to want to dispatch a higher order operation
+        via such a control function,
+        but that higher order would itself normally consume some
+        of the capacity
+        thus requiring an an hoc increase to the required capacity
+        to avoid deadlock.
     '''
     if not self.submittable:
       raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
