@@ -78,7 +78,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
+    ['cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.threads', 'icontract'],
 }
 
 class ResultState(Enum or object):
