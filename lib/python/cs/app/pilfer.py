@@ -1,76 +1,60 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Web page utility.
 #       - Cameron Simpson <cs@cskk.id.au> 07jul2010
 #
 
 from __future__ import with_statement, print_function
-import sys
+from collections import defaultdict
+from configutils import ConfigParser
 import os
 import os.path
 import errno
-import shlex
-from collections import defaultdict
-from copy import copy
-from functools import partial
-from itertools import chain
-import re
-if sys.hexversion < 0x02060000:
-  from sets import Set as set
 from getopt import getopt, GetoptError
+import re
+import shlex
 from string import Formatter, whitespace
 from subprocess import Popen, PIPE
-from time import sleep
+import sys
 from threading import Lock, RLock, Thread
-try:
-  from urllib.parse import quote, unquote
-except ImportError:
-  from urllib import quote, unquote
-try:
-  from urllib.error import HTTPError, URLError
-except ImportError:
-  from urllib2 import HTTPError, URLError
-try:
-  from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
-except ImportError:
-  from urllib2 import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+from time import sleep
+from urllib.parse import quote, unquote
+from urllib.error import HTTPError, URLError
+from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from icontract import require
 from cs.app.flag import PolledFlags
 from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
-from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
-from cs.fileutils import file_property, mkdirn
+from cs.excutils import logexc, LogExceptions
+from cs.fileutils import mkdirn
 from cs.later import Later, RetryError
-from cs.lex import get_identifier, is_identifier, get_other_chars
+from cs.lex import (
+    get_dotted_identifier, get_identifier, is_identifier, get_other_chars,
+    get_qstr
+)
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, D
+from cs.logutils import (
+    setup_logging, logTo, debug, error, warning, exception, trace, D
+)
 from cs.mappings import MappingChain, SeenSet
-import cs.obj
-from cs.obj import O
-from cs.pfx import Pfx, pfx_iter, XP
+from cs.obj import O, copy as obj_copy
+import cs.pfx
+from cs.pfx import Pfx
 from cs.pipeline import (
     pipeline, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR,
     FUNC_MANY_TO_MANY, FUNC_PIPELINE
 )
-from cs.py.func import funcname, funccite, yields_type, returns_type
+from cs.py.func import (funcname, yields_type, returns_type, yields_str)
 from cs.py.modules import import_module_name
-from cs.py3 import input, ConfigParser, sorted, ustr, unicode
-from cs.queues import NullQueue, NullQ, IterableQueue
+from cs.queues import NullQueue
 from cs.resources import MultiOpenMixin
 from cs.seq import seq
-from cs.threads import locked, locked_property
+from cs.threads import locked
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
-import cs.pfx
-import cs.obj
-from cs.obj import O
-from cs.py.func import funcname, funccite, \
-                       yields_type, returns_type, \
-                       yields_str, returns_bool
-from cs.py.modules import import_module_name
-from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 from cs.x import X
 
 # parallelism of jobs
@@ -267,7 +251,7 @@ def main(argv, stdin=None):
               # wait for main pipeline to drain
               LTR.state("drain main pipeline")
               for item in pipeline.outQ:
-                warn("main pipeline output: escaped: %r", item)
+                warning("main pipeline output: escaped: %r", item)
               # At this point everything has been dispatched from the input queue
               # and the only remaining activity is in actions in the diversions.
               # As long as there are such actions, the Later will be busy.
@@ -462,7 +446,7 @@ class Pilfer(O):
   def copy(self, *a, **kw):
     ''' Convenience function to shallow copy this Pilfer with modifications.
     '''
-    return cs.obj.copy(self, *a, **kw)
+    return obj_copy(self, *a, **kw)
 
   @property
   def defaults(self):
@@ -671,12 +655,10 @@ class Pilfer(O):
       if self.flush_print:
         file.flush()
 
+  @require(lambda kw: all(isinstance(v, str) for v in kw.values()))
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
-    ##for k, v in kw.items():
-    ##  if not isinstance(v, (str, unicode)):
-    ##    raise TypeError("%s.set_user_vars(%r): non-str value for %r: %r" % (self, kw, k, v))
     self.user_vars.update(kw)
 
   def copy_with_vars(self, **kw):
@@ -768,7 +750,7 @@ def returns_Pilfer(func):
   '''
   return returns_type(func, Pilfer)
 
-class FormatArgument(unicode):
+class FormatArgument(str):
 
   @property
   def as_int(self):
@@ -973,7 +955,7 @@ one_to_many = {
     'hrefs': lambda P: url_hrefs(P._),
     'srcs': lambda P: url_srcs(P._),
     'xml': lambda P, match: url_xml_find(P._, match),
-    'xmltext': lambda P, match: XML(P._).findall(match),
+    'xmltext': lambda P, match: ElementTree.XML(P._).findall(match),
 }
 
 # actions that work on individual Pilfer instances, returning single strings
@@ -1460,7 +1442,7 @@ def parse_action(action, do_trace):
           else:
             try:
               var_mapping = mfunc(Ps, *args, **kwargs)
-            except Exception as e:
+            except Exception:
               exception("call")
             else:
               if var_mapping:
@@ -1869,7 +1851,7 @@ class ShellProcCommand(MultiOpenMixin):
     self.copier = Thread(
         name="%s.copy_out" % (self,),
         target=copy_out,
-        args=(shproc.stdout, self.outQ)
+        args=(self.shproc.stdout, self.outQ)
     ).start()
 
   def put(self, P):
@@ -1883,7 +1865,7 @@ class ShellProcCommand(MultiOpenMixin):
 
   def shutdown(self):
     if self.shproc is None:
-      outQ.close()
+      self.outQ.close()
     else:
       self.shproc.wait()
       xit = self.shproc.returncode
@@ -2093,5 +2075,4 @@ class PilferRC(O):
     specs[pipename] = pipespec
 
 if __name__ == '__main__':
-  import sys
   sys.exit(main(sys.argv))
