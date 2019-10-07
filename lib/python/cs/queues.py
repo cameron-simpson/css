@@ -21,7 +21,8 @@ from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
 DISTINFO = {
-    'description': "some Queue subclasses and ducktypes",
+    'description':
+    "some Queue subclasses and ducktypes",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -105,7 +106,9 @@ class _QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self)
+      warning(
+          "%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self
+      )
       self._put(self.sentinel)
       self.finalise()
       raise StopIteration("Queue_Empty: %s" % (e,))
@@ -163,6 +166,7 @@ class Channel(object):
   ''' A zero-storage data passage.
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
+
   def __init__(self):
     self.__readable = Lock()
     self.__readable.acquire()
@@ -353,12 +357,13 @@ class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
   '''
+
   def __init__(self, name=None):
     if name is None:
       name = 'TimerQueue-%d' % (seq(),)
     self.name = name
-    self.Q = PriorityQueue()    # queue of waiting jobs
-    self.pending = None         # or (Timer, when, func)
+    self.Q = PriorityQueue()  # queue of waiting jobs
+    self.pending = None  # or (Timer, when, func)
     self.closed = False
     self._lock = Lock()
     self.mainRunning = False
@@ -377,7 +382,7 @@ class TimerQueue(object):
     self.closed = True
     if self.Q.empty():
       # dummy entry to wake up the main loop
-      self.Q.put( (None, None, None) )
+      self.Q.put((None, None, None))
     if cancel:
       self._cancel()
 
@@ -397,7 +402,7 @@ class TimerQueue(object):
         'func' is the job function, typically made with functools.partial.
     '''
     assert not self.closed, "add() on closed TimerQueue"
-    self.Q.put( (when, seq(), func) )
+    self.Q.put((when, seq(), func))
 
   def join(self):
     ''' Wait for the main loop thread to finish.
@@ -437,8 +442,8 @@ class TimerQueue(object):
             T, Twhen, Tfunc = self.pending
             self.pending[2] = None  # prevent the function from running if racy
             T.cancel()
-            self.pending = None     # nothing pending now
-            T = None                # let go of the cancelled timer
+            self.pending = None  # nothing pending now
+            T = None  # let go of the cancelled timer
             if when < Twhen:
               # push the pending function back onto the queue, but ahead of
               # later-queued funcs with the same timestamp
@@ -479,9 +484,10 @@ class TimerQueue(object):
                 exception("func %s threw exception", Tfunc)
               else:
                 debug("func %s returns %s", Tfunc, retval)
+
           with self._lock:
             T = Timer(delay, partial(doit, self))
-            self.pending = [ T, when, func ]
+            self.pending = [T, when, func]
             T.start()
       self.mainRunning = False
 
