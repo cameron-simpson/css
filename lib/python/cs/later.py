@@ -70,11 +70,11 @@ DISTINFO = {
 }
 
 # function signature designators, used with Later.pipeline()
-FUNC_ONE_TO_MANY = 0   # one to many: functor returns iterable
-FUNC_ONE_TO_ONE = 1    # one to one: functor returns value
-FUNC_SELECTOR = 2      # many to many, yielding item or nothing
+FUNC_ONE_TO_MANY = 0  # one to many: functor returns iterable
+FUNC_ONE_TO_ONE = 1  # one to one: functor returns value
+FUNC_SELECTOR = 2  # many to many, yielding item or nothing
 FUNC_MANY_TO_MANY = 3  # functor accepts all items at once
-FUNC_PIPELINE = 4      # functor is actually a pipeline, put items to it and collect asynchronously
+FUNC_PIPELINE = 4  # functor is actually a pipeline, put items to it and collect asynchronously
 
 DEFAULT_RETRY_DELAY = 0.1
 
@@ -138,7 +138,9 @@ class _Late_context_manager(object):
       This permits easy inline scheduled code.
   '''
 
-  def __init__(self, L, priority=None, delay=None, when=None, name=None, pfx=None):
+  def __init__(
+      self, L, priority=None, delay=None, when=None, name=None, pfx=None
+  ):
     self.later = L
     self.parameters = {
         'priority': priority,
@@ -235,7 +237,7 @@ class LateFunction(Result):
     Result.__init__(self)
     self.func = func
     if name is None:
-      name = "LF-%d[%s]" % ( seq(), funcname(func) )
+      name = "LF-%d[%s]" % (seq(), funcname(func))
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
@@ -248,7 +250,9 @@ class LateFunction(Result):
     ''' Resubmit this function for later execution.
     '''
     # TODO: put the retry logic in Later notify func, resubmit with delay from there
-    self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
+    self.later._submit(
+        self.func, delay=self.retry_delay, name=self.name, LF=self
+    )
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
@@ -322,6 +326,7 @@ class _PipelineStageOneToOne(_PipelineStage):
     # queue computable then send result to outQ
     self.outQ.open()
     LF = self.defer(self.functor, item)
+
     def notify(LF):
       # collect result: queue or report exception
       item2, exc_info = LF.join()
@@ -331,6 +336,7 @@ class _PipelineStageOneToOne(_PipelineStage):
       else:
         self.outQ.put(item2)
       self.outQ.close()
+
     LF.notify(notify)
 
 class _PipelineStageOneToMany(_PipelineStage):
@@ -339,6 +345,7 @@ class _PipelineStageOneToMany(_PipelineStage):
     self.outQ.open()
     # compute the iteratable
     LF = self.defer(self.functor, item)
+
     def notify(LF):
       I, exc_info = LF.join()
       if exc_info:
@@ -347,12 +354,15 @@ class _PipelineStageOneToMany(_PipelineStage):
         self.outQ.close()
       else:
         self.defer_iterable(I, self.outQ)
+
     LF.notify(notify)
 
 class _PipelineStageManyToMany(_PipelineStage):
 
   def __init__(self, name, pipeline, functor, outQ, retry_interval=None):
-    _PipelineStage.__init__(self, name, pipeline, functor, outQ, retry_interval=retry_interval)
+    _PipelineStage.__init__(
+        self, name, pipeline, functor, outQ, retry_interval=retry_interval
+    )
     self.gathered = []
 
   def put(self, item):
@@ -364,6 +374,7 @@ class _PipelineStageManyToMany(_PipelineStage):
     gathered = self.gathered
     self.gathered = None
     LF = self.defer(self.functor, gathered)
+
     def notify(LF):
       I, exc_info = LF.join()
       if exc_info:
@@ -373,6 +384,7 @@ class _PipelineStageManyToMany(_PipelineStage):
       else:
         self.defer_iterable(I, self.outQ)
       _PipelineStage.shutdown(self)
+
     LF.notify(notify)
 
 class _PipelineStagePipeline(_PipelineStage):
@@ -380,16 +392,22 @@ class _PipelineStagePipeline(_PipelineStage):
   '''
 
   def __init__(self, name, pipeline, subpipeline, outQ, retry_interval=None):
-    _PipelineStage.__init__(self, name, pipeline, None, outQ, retry_interval=retry_interval)
+    _PipelineStage.__init__(
+        self, name, pipeline, None, outQ, retry_interval=retry_interval
+    )
     self.subpipeline = subpipeline
     outQ.open()
+
     def copy_out(sub_outQ, outQ):
       for item in sub_outQ:
         outQ.put(item)
       outQ.close()
-    self.copier = Thread(name="%s.copy_out" % (self,),
-                         target=copy_out,
-                         args=(subpipeline.outQ, outQ))
+
+    self.copier = Thread(
+        name="%s.copy_out" % (self,),
+        target=copy_out,
+        args=(subpipeline.outQ, outQ)
+    )
     self.copier.start()
 
   def put(self, item):
@@ -427,20 +445,24 @@ class _Pipeline(MultiOpenMixin):
         X("_Pipeline: action=%r", action)
         func_sig = action.sig
         functor = action.functor(self.later)
-      pq_name = ":".join( (name,
-                           str(index),
-                           str(func_sig),
-                           funcname(functor),
-                          )
-                        )
+      pq_name = ":".join(
+          (
+              name,
+              str(index),
+              str(func_sig),
+              funcname(functor),
+          )
+      )
       if func_sig == FUNC_ONE_TO_MANY:
         PQ = _PipelineStageOneToMany(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_ONE_TO_ONE:
         PQ = _PipelineStageOneToOne(pq_name, self, functor, RHQ)
       elif func_sig == FUNC_SELECTOR:
+
         def selector(item):
           if functor(item):
             yield item
+
         PQ = _PipelineStageOneToMany(pq_name, self, selector, RHQ)
       elif func_sig == FUNC_MANY_TO_MANY:
         PQ = _PipelineStageManyToMany(pq_name, self, functor, RHQ)
@@ -448,7 +470,9 @@ class _Pipeline(MultiOpenMixin):
         X("_Pipeline: stage: FUNC_PIPELINE: functor=%r", functor)
         PQ = _PipelineStagePipeline(pq_name, self, functor, RHQ)
       else:
-        raise RuntimeError("unimplemented func_sig=%r, functor=%s" % (func_sig, functor))
+        raise RuntimeError(
+            "unimplemented func_sig=%r, functor=%s" % (func_sig, functor)
+        )
       PQ.open()
       self.queues.insert(0, PQ)
       RHQ = PQ
@@ -532,8 +556,9 @@ class Later(object):
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
     debug(
-        "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)",
-        capacity, inboundCapacity, name)
+        "Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity,
+        inboundCapacity, name
+    )
     if retry_delay is None:
       retry_delay = DEFAULT_RETRY_DELAY
     self.capacity = capacity
@@ -541,15 +566,15 @@ class Later(object):
     self.retry_delay = retry_delay
     self.name = name
     self._lock = Lock()
-    self.outstanding = set()    # dispatched but uncompleted LateFunctions
-    self.delayed = set()        # unqueued, delayed until specific time
-    self.pending = []           # undispatched LateFunctions, a heap
-    self.running = set()        # running LateFunctions
+    self.outstanding = set()  # dispatched but uncompleted LateFunctions
+    self.delayed = set()  # unqueued, delayed until specific time
+    self.pending = []  # undispatched LateFunctions, a heap
+    self.running = set()  # running LateFunctions
     # counter tracking jobs queued or active
     self._state = ""
-    self.logger = None          # reporting; see logTo() method
+    self.logger = None  # reporting; see logTo() method
     self._priority = (0,)
-    self._timerQ = None         # queue for delayed requests; instantiated at need
+    self._timerQ = None  # queue for delayed requests; instantiated at need
     # inbound requests queue
     self.closed = False
     self._finished = Event()
@@ -627,21 +652,18 @@ class Later(object):
     return (
         '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>'
         % (
-            self.__class__.__name__, self.name,
-            self.capacity,
-            len(self.running), ','.join( repr(LF.name) for LF in self.running ),
-            len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
-            len(self.delayed),
-            self.closed
+            self.__class__.__name__, self.name, self.capacity,
+            len(self.running), ','.join(repr(LF.name) for LF in self.running),
+            len(self.pending), ','.join(repr(LF.name) for LF in self.pending
+                                        ), len(self.delayed), self.closed
         )
     )
 
   def __str__(self):
     return (
-        "<%s[%s] pending=%d running=%d delayed=%d>"
-        % (
-            self.name, self.capacity,
-            len(self.pending), len(self.running), len(self.delayed)
+        "<%s[%s] pending=%d running=%d delayed=%d>" % (
+            self.name, self.capacity, len(self.pending), len(self.running),
+            len(self.delayed)
         )
     )
 
@@ -701,7 +723,9 @@ class Later(object):
     if log_level is None:
       log_level = logging.INFO
     logger, handler = cs.logutils.logTo(filename, logger=logger)
-    handler.setFormatter(logging.Formatter("%(asctime)-15s %(later_name)s %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)-15s %(later_name)s %(message)s")
+    )
     logger.setLevel(log_level)
     self.logger = logger
 
@@ -770,7 +794,9 @@ class Later(object):
     '''
     return _Late_context_manager(self, **kwargs)
 
-  def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+  def submit(
+      self, func, priority=None, delay=None, when=None, name=None, pfx=None
+  ):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
 
@@ -794,15 +820,25 @@ class Later(object):
     '''
     if not self.submittable:
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
-    return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
+    return self._submit(
+        func, priority=priority, delay=delay, when=when, name=name, pfx=pfx
+    )
 
   def _submit(
       self,
-      func, priority=None, delay=None, when=None,
-      name=None, pfx=None, LF=None, retry_delay=None
+      func,
+      priority=None,
+      delay=None,
+      when=None,
+      name=None,
+      pfx=None,
+      LF=None,
+      retry_delay=None
   ):
     if delay is not None and when is not None:
-      raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
+      raise ValueError(
+          "you can't specify both delay= and when= (%s, %s)" % (delay, when)
+      )
     if priority is None:
       priority = self._priority
     elif isinstance(priority, int):
@@ -812,7 +848,7 @@ class Later(object):
     if LF is None:
       LF = LateFunction(func, name=name, retry_delay=retry_delay)
     pri_entry = list(priority)
-    pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
+    pri_entry.append(seq())  # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
 
     now = time.time()
@@ -830,9 +866,12 @@ class Later(object):
         self.debug("queuing %s after delay", LF)
         heappush(self.pending, pri_entry)
         self._try_dispatch()
+
       with self._lock:
         if self._timerQ is None:
-          self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>" % (self.name,))
+          self._timerQ = TimerQueue(
+              name="<TimerQueue %s._timerQ>" % (self.name,)
+          )
       self.debug("delay %s until %s", LF, when)
       self._timerQ.add(when, queueFunc)
     # record the function as outstanding and attach a notification
@@ -910,9 +949,11 @@ class Later(object):
     ''' Defer `callable1`, then add its result to the arguments for
         `func` and defer that. Return the LateFunction for `func`.
     '''
+
     def then():
       LF1 = self.defer(callable1)
       return self.defer(func, *[a + [LF1.result]], **kw)
+
     return then()
 
   def after(self, LFs, R, func, *a, **kw):
@@ -960,11 +1001,16 @@ class Later(object):
     if R is None:
       R = Result("Later.after(%s)" % (",".join(str(_) for _ in LFs)))
     elif not isinstance(R, Result):
-      raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
+      raise TypeError(
+          "Later.after(LFs, R, func, ...): expected Result for R, got %r" %
+          (R,)
+      )
+
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
+
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
     return after(LFs, None, lambda: self._defer(put_func))
 
@@ -987,7 +1033,9 @@ class Later(object):
           the callable returns a true value
     '''
     if not self.submittable:
-      raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
+      raise RuntimeError(
+          "%s.defer_iterable(...) but not self.submittable" % (self,)
+      )
     return self._defer_iterable(I, outQ=outQ, test_ready=test_ready)
 
   def _defer_iterable(self, I, outQ, test_ready=None):
@@ -1010,7 +1058,9 @@ class Later(object):
         outQ.close()
         R.result = iterationss[0]
       except Exception as e:
-        exception("defer_iterable: iterate_once: exception during iteration: %s", e)
+        exception(
+            "defer_iterable: iterate_once: exception during iteration: %s", e
+        )
         outQ.close()
         R.exc_info = sys.exc_info()
       else:
@@ -1022,8 +1072,9 @@ class Later(object):
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
-    iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
-                                                   getattr(I, '__name__', repr(I)))
+    iterate_once.__name__ = "%s:next(iter(%s))" % (
+        funcname(iterate_once), getattr(I, '__name__', repr(I))
+    )
     self._defer(iterate_once)
     return R
 
@@ -1075,9 +1126,12 @@ class Later(object):
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
-      self._defer_iterable( inputs, inQ )
+      self._defer_iterable(inputs, inQ)
     else:
-      debug("%s._pipeline: no inputs, NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
+      debug(
+          "%s._pipeline: no inputs, NOT setting up _defer_iterable( inputs, inQ=%r)",
+          self, inQ
+      )
     return pipeline
 
   @contextmanager
@@ -1124,9 +1178,11 @@ class SubLater(object):
 
   def __str__(self):
     return "%s(%s%s,deferred=%d,completed=%d)" % (
-        type(self), self._later,
+        type(self),
+        self._later,
         "[CLOSED]" if self.closed else "",
-        self._deferred, self._queued,
+        self._deferred,
+        self._queued,
     )
 
   def __iter__(self):
@@ -1158,12 +1214,14 @@ class SubLater(object):
     with self._lock:
       LF = self._later.defer(func, *a, **kw)
       self._deferred += 1
+
       def on_complete(R):
         with self._lock:
           self._queue.put(R)
           self._queued += 1
           if self.closed and self._queued >= self._deferred:
             self._queue.close()
+
     LF.notify(on_complete)
     return LF
 
@@ -1174,6 +1232,7 @@ class SubLater(object):
         `handler`: optional callable to be passed each `LateFunction`
         as it completes.
     '''
+
     @logexc
     def reap(Q):
       for LF in Q:
@@ -1182,6 +1241,7 @@ class SubLater(object):
             handler(LF)
           except Exception as e:
             exception("%s: reap %s: %s", self, LF, e)
+
     T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
     T.start()
     return T
@@ -1205,7 +1265,15 @@ class LatePool(object):
             print(result)
   '''
 
-  def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
+  def __init__(
+      self,
+      L=None,
+      priority=None,
+      delay=None,
+      when=None,
+      pfx=None,
+      block=False
+  ):
     ''' Initialise the LatePool.
 
         Parameters:
