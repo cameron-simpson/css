@@ -256,7 +256,7 @@ class PushQueue(MultiOpenMixin):
     self.outQ = outQ
 
   def __str__(self):
-    return "PushQueue:%s" % (self.name,)
+    return "%s:%s" % (type(self).__name__, self.name)
 
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
