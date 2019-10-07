@@ -14,7 +14,6 @@ import time
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
-from cs.obj import O
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
@@ -31,7 +30,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -129,7 +127,7 @@ class _QueueIterator(MultiOpenMixin):
     try:
       return next(self)
     except StopIteration as e:
-      raise Queue_Empty("got StopIteration from %s" % (self,))
+      raise Queue_Empty("got %s from %s" % (e, self))
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -146,7 +144,7 @@ class _QueueIterator(MultiOpenMixin):
     '''
     self.q.join()
 
-def IterableQueue(capacity=0, name=None, *args, **kw):
+def IterableQueue(*args, capacity=0, name=None, **kw):
   ''' Factory to create an iterable Queue.
   '''
   if not isinstance(capacity, int):
@@ -154,7 +152,7 @@ def IterableQueue(capacity=0, name=None, *args, **kw):
   name = kw.pop('name', name)
   return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
 
-def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+def IterablePriorityQueue(*args, capacity=0, name=None, **kw):
   ''' Factory to create an iterable PriorityQueue.
   '''
   if not isinstance(capacity, int):
@@ -254,7 +252,6 @@ class PushQueue(MultiOpenMixin):
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
@@ -307,7 +304,6 @@ class NullQueue(MultiOpenMixin):
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.blocking = blocking
 
