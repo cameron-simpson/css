@@ -1383,7 +1383,7 @@ def parse_action(action, do_trace):
     marker = action[offset]
     offset += 1
     grokker, offset = get_dotted_identifier(action, offset)
-    if not grokker or '.' not in grokker:
+    if '.' not in grokker:
       raise ValueError("no dotted identifier found")
     grok_module, grok_funcname = grokker.rsplit('.', 1)
     if offset >= len(action):
