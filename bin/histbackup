@@ -173,7 +173,7 @@ then
     # failed to make target? fail outright
     [ -d "$2/." ] || return 1
     # if we made the target, update from source
-    $trace rsync -iaO "$1/." "$2/."
+    dorsync "$1/" "$2/"
   }
 else
   mklinktree(){ $trace linktree "$1" "$2"; }
