@@ -107,7 +107,9 @@ class TestLex(unittest.TestCase):
         get_envvar, environ=self.env, specials=self.env_specials
     )
     specials = {'$': special_func}
-    self.assertEqual(get_sloshed_text(r'\$', None, specials=specials), ('$', 2))
+    self.assertEqual(
+        get_sloshed_text(r'\$', None, specials=specials), ('$', 2)
+    )
     self.assertEqual(
         get_sloshed_text('$A', None, specials=specials), ('AA', 2)
     )
