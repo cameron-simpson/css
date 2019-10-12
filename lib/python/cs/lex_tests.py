@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Self tests for cs.lex.
+'''
+
 import sys
 from functools import partial
 import unittest
@@ -17,27 +20,38 @@ from cs.py3 import bytes
 ##from cs.logutils import X
 
 class TestLex(unittest.TestCase):
+  ''' Unit tests for cs.lex.
+  '''
 
   def setUp(self):
+    ''' Test seup.
+    '''
     self.env = {'A': 'AA', 'B1': 'BB1'}
     self.env_specials = {'!': '99'}
 
   def tearDown(self):
-    pass
+    ''' Undo test setup.
+    '''
 
   def test00untexthexify(self):
+    ''' Test untexthexify.
+    '''
     self.assertEqual(b'', untexthexify(''))
     self.assertEqual(b'A', untexthexify('41'))
     self.assertEqual(b'ABC', untexthexify('41[BC]'))
     self.assertRaises(ValueError, untexthexify, 'a')
 
   def test01texthexify(self):
+    ''' Test texthexify.
+    '''
     self.assertEqual('', texthexify(b''))
     self.assertEqual('00', texthexify(bytes((0x00,))))
 
   def test02get_envvar(self):
+    ''' Test get_envvar.
+    '''
     self.assertEqual(get_envvar('$!', specials=self.env_specials), ('99', 2))
-    for envvar in self.env.keys():
+    for envvar in self.env:
       envval, offset = get_envvar('$' + envvar, 0, self.env)
       self.assertEqual(
           envval, self.env[envvar], "get_envvar($%s) ==> %r, expected %r" %
@@ -48,6 +62,8 @@ class TestLex(unittest.TestCase):
     self.assertRaises(ValueError, get_envvar, '$x', environ={})
 
   def test03get_sloshed_text(self):
+    ''' Test get_sloshed_text.
+    '''
     self.assertRaises(ValueError, get_sloshed_text, '\\', None)
     self.assertRaises(ValueError, get_sloshed_text, '', '"')
     self.assertRaises(ValueError, get_sloshed_text, '\\', '"')
@@ -91,7 +107,9 @@ class TestLex(unittest.TestCase):
         get_envvar, environ=self.env, specials=self.env_specials
     )
     specials = {'$': special_func}
-    self.assertEqual(get_sloshed_text(r'\$', None, specials=specials), ('$', 2))
+    self.assertEqual(
+        get_sloshed_text(r'\$', None, specials=specials), ('$', 2)
+    )
     self.assertEqual(
         get_sloshed_text('$A', None, specials=specials), ('AA', 2)
     )
@@ -111,6 +129,8 @@ class TestLex(unittest.TestCase):
     )
 
   def test04get_qstr(self):
+    ''' Test get_qstr.
+    '''
     self.assertRaises(ValueError, get_qstr, '')
     self.assertRaises(ValueError, get_qstr, 'x')
     self.assertRaises(ValueError, get_qstr, '"x')
@@ -125,6 +145,8 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_qstr('"\\$B1"', environ=self.env), ('$B1', 6))
 
   def test05get_identifier(self):
+    ''' Test get_identifier.
+    '''
     self.assertEqual(get_identifier(''), ('', 0))
     self.assertEqual(get_identifier('a'), ('a', 1))
     self.assertEqual(get_identifier('a1'), ('a1', 2))
@@ -132,6 +154,8 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_identifier('1a', 1), ('a', 2))
 
   def test05get_dotted_identifier(self):
+    ''' test get_gotted_identifier.
+    '''
     self.assertEqual(get_dotted_identifier(''), ('', 0))
     self.assertEqual(get_dotted_identifier('a'), ('a', 1))
     self.assertEqual(get_dotted_identifier('a1'), ('a1', 2))
@@ -144,12 +168,8 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_dotted_identifier('a1.b.c+'), ('a1.b.c', 6))
 
 def selftest(argv):
-  unittest.main(__name__, None, argv)
-
-if __name__ == '__main__':
-  selftest(sys.argv)
-
-def selftest(argv):
+  ''' Run selftests.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':

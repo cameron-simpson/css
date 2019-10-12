@@ -12,8 +12,7 @@ from collections import defaultdict, deque, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 import sys
-from threading import Semaphore, current_thread
-from cs.debug import Lock, Thread
+from threading import Semaphore, Thread, current_thread, Lock
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, debug, exception
 from cs.pfx import Pfx
@@ -32,7 +31,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.debug',
         'cs.excutils',
         'cs.logutils',
         'cs.pfx',
