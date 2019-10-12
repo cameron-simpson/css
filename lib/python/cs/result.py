@@ -53,10 +53,7 @@ You can also collect multiple Results in completion order using the report() fun
 try:
   from enum import Enum
 except ImportError:
-  try:
-    from enum34 import Enum
-  except ImportError:
-    Enum = None
+  from enum34 import Enum # type: ignore
 from functools import partial
 import sys
 from threading import Lock
@@ -81,7 +78,7 @@ DISTINFO = {
     ['cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.threads', 'icontract'],
 }
 
-class ResultState(Enum or object):
+class ResultState(Enum):
   ''' State tokens for `Result`s.
   '''
   pending = 'pending'
