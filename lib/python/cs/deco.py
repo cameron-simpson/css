@@ -9,6 +9,7 @@ Assorted decorator functions.
 '''
 
 from collections import defaultdict
+from contextlib import contextmanager
 import sys
 import time
 try:
@@ -245,6 +246,24 @@ def cached(*a, **kw):
   warning("obsolete use of @cached, please update to @cachedmethod")
   return cachedmethod(*a, **kw)
 
+def contextual(func):
+  ''' Wrap a simple function as a context manager.
+
+      This was written to support `@strable`,
+      which requires its `open_func` to be a context manager.
+  '''
+
+  @contextmanager
+  def cmgr(*a, **kw):
+    ''' Wrapper for `func` as a context manager.
+    '''
+    yield func(*a, **kw)
+
+  func_name = getattr(func, '__name__', str(func))
+  cmgr.__name__ = '@contextual(%s)' % func_name
+  cmgr.__doc__ = func.__doc__
+  return cmgr
+
 @decorator
 def strable(func, open_func=None):
   ''' Decorator for functions which may accept a `str`
@@ -254,7 +273,10 @@ def strable(func, open_func=None):
       * `func`: the function to decorate
       * `open_func`: the "open" factory to produce the core type
         if a string is provided;
-        the default is the builtin "open" function
+        the default is the builtin "open" function.
+        The returned value should be a context manager.
+        Simpler functions can be decorated with `@contextual`
+        to turn them into context managers if need be.
 
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
