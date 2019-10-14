@@ -169,11 +169,12 @@ then
       /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
     esac
     # make link tree, might fail if hard link limit reached for files
-    $trace cp -ral "$1" "$2" && return 0
-    # failed to make target? fail outright
-    [ -d "$2/." ] || return 1
-    # if we made the target, update from source
-    dorsync "$1/" "$2/"
+    $trace cp -ral "$1" "$2" || {
+      # failed to make target? fail outright
+      [ -d "$2/." ] || return 1
+      # if we made the target, update from source
+      dorsync "$1/" "$2/"
+    }
   }
 else
   mklinktree(){ $trace linktree "$1" "$2"; }
