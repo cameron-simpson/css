@@ -419,7 +419,9 @@ wd=$( pwd )
 
 if [ -d "$dest/." ]
 then
-  absdest=$wd/$dest
+  case "$dest" in
+      /*) absdest=$dest ;; *) absdest=$wd/$dest ;;
+  esac
 else
   echo "$cmd: backup dir $dest: not a directory" >&2
   badopts=1
@@ -602,7 +604,8 @@ then
 else
   # do a proper hardlinked backup
   ( cd "$dest" || exit 1
-    dorsync "$src" "$thisbackup" --link-dest="$absdest/$lastbackup/" ${1+"$@"} $obackup_options
+    [ -z "$lastbackup" ] || set -- --link-dest="$absdest/$lastbackup/" ${1+"$@"}
+    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
   )
 fi \
 || {
