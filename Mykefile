@@ -7,6 +7,10 @@ title           = Cameron Simpson's Scripts
 
 target  = bin
 
+dev = env-dev -d $. -x
+venvdir = $./venv
+venv_requirements = $./venv-requirements.txt
+
 rewrite = rewriteif -0 -v
 
 JAVADIR	= $(ETCDIR)/www/java/classes
@@ -71,8 +75,15 @@ _help:
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
 
-_tags:  tags
+_setup:
+    :make _tags _venv
 
+_venv: $(venvdir)
+$(venvdir): $(venv_requirements)
+    :make $@/.
+    $(dev) pip install -U -r $(venv_requirements)
+
+_tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
         ctags-update -o '$@' $?
 

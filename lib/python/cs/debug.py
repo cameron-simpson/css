@@ -37,7 +37,6 @@ from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.result import Result
 from cs.seq import seq
 from cs.x import X
 
@@ -176,6 +175,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
 def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
+  from cs.result import Result
   def inner(*a, **kw):
     if not force and not ifdebug():
       return f(*a, **kw)

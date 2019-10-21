@@ -13,23 +13,23 @@ Presents various names in python 3 flavour for common use in python 2 and python
 try:
   from configparser import ConfigParser
 except ImportError:
-  from ConfigParser import SafeConfigParser as ConfigParser
+  from ConfigParser import SafeConfigParser as ConfigParser # type: ignore
 import os
 try:
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
 except ImportError:
-  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty
+  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty # type: ignore
   try:
-    from Queue import PriorityQueue
+    from Queue import PriorityQueue # type: ignore
   except ImportError:
     pass
 try:
-  from subprocess import DEVULL
+  from subprocess import DEVNULL
 except ImportError:
-  DEVNULL = open(os.devnull, 'rb')
+  DEVNULL = open(os.devnull, 'rb').fileno()
 import sys
 try:
-  from types import StringTypes
+  from types import StringTypes # type: ignore
 except ImportError:
   StringTypes = (str,)
 
@@ -43,9 +43,16 @@ DISTINFO = {
     'install_requires': [],
 }
 
-if sys.hexversion >= 0x03000000:
-
+try:
+  raw_input # type: ignore
+except NameError:
+  raw_input = input
+try:
+  unicode
+except NameError:
   unicode = str
+
+if sys.hexversion >= 0x03000000:
 
   def ustr(s, e='utf-8', errors='strict'):
     ''' Upgrade string to unicode: no-op for python 3.
@@ -87,10 +94,10 @@ else:
     return _sorted(iterable, None, key, reverse)
 
   input = raw_input
-  from itertools import ifilter as filter, ifilterfalse as filterfalse
+  from itertools import ifilter as filter, ifilterfalse as filterfalse # type: ignore
   from ._for2 import raise3, raise_from, exec_code, ustr, \
                         bytes, BytesFile, joinbytes, \
-                        pack, unpack
+                        pack, unpack # type: ignore
 
 try:
   from struct import iter_unpack
@@ -131,5 +138,5 @@ except AttributeError:
     return data
 
 if __name__ == '__main__':
-  import cs.py3_tests
-  cs.py3_tests.selftest(sys.argv)
+  import cs.py3.tests # type: ignore
+  cs.py3.tests.selftest(sys.argv)
