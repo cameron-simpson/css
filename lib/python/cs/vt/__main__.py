@@ -45,7 +45,7 @@ from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
-from .compose import get_store_spec
+from .compose import (get_clause_archive, get_clause_spec, get_store_spec)
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
@@ -53,6 +53,7 @@ from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .httpd import main as httpd_main
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
@@ -402,6 +403,9 @@ class VTCmd(BaseCommand):
           info("BAD")
           xit = 1
     return xit
+
+  def cmd_httpd(self, args):
+    httpd_main([self.cmd + ': ' + 'httpd'] + args)
 
   @staticmethod
   def cmd_import(args, options, cmd):

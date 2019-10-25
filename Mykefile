@@ -37,6 +37,10 @@ pmFromMan(manf) = lib/$(manf FP :|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
+venv_dir = $./venv
+venv_reqs = requirements.txt
+venv_pip = $(venv_dir)/bin/pip
+
 ##  pymanmods = cs.vt
 ##  pymansrcs = $( "$((pymanmods :|\.|/|))/*.?.md" EG )
 ##  pymanmoddirs = $(pymansrcs DU)
@@ -65,6 +69,7 @@ _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
+        @echo '_venv              - prepare local venv from $(venv_reqs)'
         @echo '_deploy            - deploy current release to /opt/css'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
         @echo '_publish_bitbucket - deploy tip to bitbucket'
@@ -86,6 +91,14 @@ $(venvdir): $(venv_requirements)
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
         ctags-update -o '$@' $?
+
+_venv:
+        :make $(venv_dir)
+
+$(venv_dir):    $(venv_reqs)
+        python3 -m venv $(venv_dir)
+        $(venv_pip) install -U pip
+        $(venv_pip) install -U -r $(venv_reqs)
 
 _updcss:
         ./bin-cs/updcss

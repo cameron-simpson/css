@@ -86,6 +86,12 @@ class HashCode(bytes, Transcriber):
   def __repr__(self):
     return ':'.join((self.HASHNAME, hexify(self)))
 
+  @property
+  def etag(self):
+    ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11).
+    '''
+    return '"' + ':'.join((self.HASHNAME, hexify(self))) + '"'
+
   def __eq__(self, other):
     return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
 
@@ -113,7 +119,7 @@ class HashCode(bytes, Transcriber):
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
-    ''' Factory function returning a Hash_SHA1 object from the hash bytes.
+    ''' Factory function returning a HashCode object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
       raise ValueError(
@@ -121,6 +127,13 @@ class HashCode(bytes, Transcriber):
           (cls.HASHLEN, len(hashbytes), hashbytes)
       )
     return cls(hashbytes)
+
+  @classmethod
+  def from_hashbytes_hex(cls, hashtext):
+    ''' Factory function returning a HashCode object from the hash bytes hex text.
+    '''
+    bs = unhexlify(hashtext)
+    return cls.from_hashbytes(bs)
 
   @classmethod
   def from_chunk(cls, chunk):
@@ -185,8 +198,7 @@ class HashCode(bytes, Transcriber):
           "expected %d hex digits, found only %d" % (hexlen, len(hashtext))
       )
     offset += hexlen
-    bs = unhexlify(hashtext)
-    H = hashclass.from_hashbytes(bs)
+    H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
 
 register_transcriber(HashCode)
