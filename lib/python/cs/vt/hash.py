@@ -110,13 +110,20 @@ class HashCode(bytes, Transcriber):
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
-    ''' Factory function returning a Hash_SHA1 object from the hash bytes.
+    ''' Factory function returning a HashCode object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
       raise ValueError(
           "expected %d bytes, received %d: %r"
           % (cls.HASHLEN, len(hashbytes), hashbytes))
     return cls(hashbytes)
+
+  @classmethod
+  def from_hashbytes_hex(cls, hashtext):
+    ''' Factory function returning a HashCode object from the hash bytes hex text.
+    '''
+    bs = unhexlify(hashtext)
+    return cls.from_hashbytes(bs)
 
   @classmethod
   def from_chunk(cls, chunk):
@@ -159,8 +166,7 @@ class HashCode(bytes, Transcriber):
     if len(hashtext) != hexlen:
       raise ValueError("expected %d hex digits, found only %d" % (hexlen, len(hashtext)))
     offset += hexlen
-    bs = unhexlify(hashtext)
-    H = hashclass.from_hashbytes(bs)
+    H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
 
 register_transcriber(HashCode)
