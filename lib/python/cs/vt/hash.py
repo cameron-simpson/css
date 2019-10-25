@@ -85,6 +85,12 @@ class HashCode(bytes, Transcriber):
   def __repr__(self):
     return ':'.join((self.HASHNAME, hexify(self)))
 
+  @property
+  def etag(self):
+    ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11).
+    '''
+    return '"' + ':'.join((self.HASHNAME, hexify(self))) + '"'
+
   def __eq__(self, other):
     return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
 
