@@ -21,9 +21,11 @@ class MissingHashcodeError(KeyError):
   ''' Subclass of KeyError
       raised when accessing a hashcode is not present in the Store.
   '''
+
   def __init__(self, hashcode):
     KeyError.__init__(self, str(hashcode))
     self.hashcode = hashcode
+
   def __str__(self):
     return "missing hashcode: %s" % (self.hashcode,)
 
@@ -81,7 +83,7 @@ class HashCode(bytes, Transcriber):
     return transcribe_s(self)
 
   def __repr__(self):
-    return ':'.join( (self.HASHNAME, hexify(self)) )
+    return ':'.join((self.HASHNAME, hexify(self)))
 
   def __eq__(self, other):
     return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
@@ -114,8 +116,9 @@ class HashCode(bytes, Transcriber):
     '''
     if len(hashbytes) != cls.HASHLEN:
       raise ValueError(
-          "expected %d bytes, received %d: %r"
-          % (cls.HASHLEN, len(hashbytes), hashbytes))
+          "expected %d bytes, received %d: %r" %
+          (cls.HASHLEN, len(hashbytes), hashbytes)
+      )
     return cls(hashbytes)
 
   @classmethod
@@ -164,7 +167,9 @@ class HashCode(bytes, Transcriber):
     hexlen = hashclass.HASHLEN * 2
     hashtext = s[offset:offset + hexlen]
     if len(hashtext) != hexlen:
-      raise ValueError("expected %d hex digits, found only %d" % (hexlen, len(hashtext)))
+      raise ValueError(
+          "expected %d hex digits, found only %d" % (hexlen, len(hashtext))
+      )
     offset += hexlen
     H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
@@ -202,13 +207,15 @@ def register_hashclass(klass):
   hashname = klass.HASHNAME
   if hashname in HASHCLASS_BY_NAME:
     raise ValueError(
-        'cannot register hash class %s: hashname %r already registered to %s'
-        % (klass, hashname, HASHCLASS_BY_NAME[hashname]))
+        'cannot register hash class %s: hashname %r already registered to %s' %
+        (klass, hashname, HASHCLASS_BY_NAME[hashname])
+    )
   hashenum = klass.HASHENUM
   if hashenum in HASHCLASS_BY_ENUM:
     raise ValueError(
-        'cannot register hash class %s: hashenum %r already registered to %s'
-        % (klass, hashenum, HASHCLASS_BY_NAME[hashenum]))
+        'cannot register hash class %s: hashenum %r already registered to %s' %
+        (klass, hashenum, HASHCLASS_BY_NAME[hashenum])
+    )
   HASHCLASS_BY_NAME[hashname] = klass
   HASHCLASS_BY_ENUM[hashenum] = klass
 
@@ -240,14 +247,18 @@ class HashCodeUtilsMixin(object):
       * `.hashcodes_missing`: likewise
   '''
 
-  @require(lambda start_hashcode, hashclass:
-           start_hashcode is None or hashclass is None
-           or isinstance(start_hashcode, hashclass))
+  @require(
+      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
+      None or isinstance(start_hashcode, hashclass)
+  )
   def hash_of_hashcodes(
       self,
       *,
-      start_hashcode=None, hashclass=None,
-      reverse=None, after=False, length=None
+      start_hashcode=None,
+      hashclass=None,
+      reverse=None,
+      after=False,
+      length=None
   ):
     ''' Return a hash of the hashcodes requested and the last
         hashcode (or None if no hashcodes matched); used for comparing
@@ -261,11 +272,18 @@ class HashCodeUtilsMixin(object):
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
-      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
+      raise ValueError(
+          "after=%s but start_hashcode=%s" % (after, start_hashcode)
+      )
     hs = list(
         self.hashcodes(
-            start_hashcode=start_hashcode, hashclass=hashclass,
-            reverse=reverse, after=after, length=length))
+            start_hashcode=start_hashcode,
+            hashclass=hashclass,
+            reverse=reverse,
+            after=after,
+            length=length
+        )
+    )
     if hs:
       h_final = hs[-1]
     else:
@@ -278,13 +296,16 @@ class HashCodeUtilsMixin(object):
         missing_hashcodes_by_checksum to reduce bandwidth.
     '''
     return missing_hashcodes(
-        self, other,
-        window_size=window_size, hashclass=hashclass)
+        self, other, window_size=window_size, hashclass=hashclass
+    )
 
-  @require(lambda start_hashcode, hashclass:
-           start_hashcode is None or hashclass is None
-           or isinstance(start_hashcode, hashclass))
-  def hashcodes_from(self, *, start_hashcode=None, reverse=False, hashclass=None):
+  @require(
+      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
+      None or isinstance(start_hashcode, hashclass)
+  )
+  def hashcodes_from(
+      self, *, start_hashcode=None, reverse=False, hashclass=None
+  ):
     ''' Default generator yielding hashcodes from this object until none remains.
 
         This implementation starts by fetching and sorting all the
@@ -305,7 +326,7 @@ class HashCodeUtilsMixin(object):
         hashclass = self.hashclass
       else:
         hashclass = type(start_hashcode)
-    ks = sorted( hashcode for hashcode in self.keys(hashclass) )
+    ks = sorted(hashcode for hashcode in self.keys(hashclass))
     if not ks:
       return
     if start_hashcode is None:
@@ -345,13 +366,18 @@ class HashCodeUtilsMixin(object):
       else:
         ndx += 1
 
-  @require(lambda start_hashcode, hashclass:
-           start_hashcode is None or hashclass is None
-           or isinstance(start_hashcode, hashclass))
+  @require(
+      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
+      None or isinstance(start_hashcode, hashclass)
+  )
   def hashcodes(
-      self, *,
-      start_hashcode=None, hashclass=None,
-      reverse=False, after=False, length=None
+      self,
+      *,
+      start_hashcode=None,
+      hashclass=None,
+      reverse=False,
+      after=False,
+      length=None
   ):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
@@ -374,7 +400,9 @@ class HashCodeUtilsMixin(object):
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
-      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
+      raise ValueError(
+          "after=%s but start_hashcode=%s" % (after, start_hashcode)
+      )
     # try to short circuit if there are no hashcodes
     try:
       nhashcodes = len(self)
@@ -384,9 +412,8 @@ class HashCodeUtilsMixin(object):
       if nhashcodes == 0:
         return
     first = True
-    for hashcode in self.hashcodes_from(
-        start_hashcode=start_hashcode, hashclass=hashclass, reverse=reverse
-    ):
+    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
+                                        hashclass=hashclass, reverse=reverse):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -398,20 +425,29 @@ class HashCodeUtilsMixin(object):
         if length < 1:
           break
 
-  @require(lambda start_hashcode, hashclass:
-           start_hashcode is None or hashclass is None
-           or isinstance(start_hashcode, hashclass))
+  @require(
+      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
+      None or isinstance(start_hashcode, hashclass)
+  )
   def hashcodes_bg(
-      self, *,
-      start_hashcode=None, hashclass=None,
-      reverse=None, after=False, length=None
+      self,
+      *,
+      start_hashcode=None,
+      hashclass=None,
+      reverse=None,
+      after=False,
+      length=None
   ):
     ''' Background a hashcodes call.
     '''
     return self._defer(
         self.hashcodes,
-        start_hashcode=start_hashcode, hashclass=hashclass,
-        reverse=reverse, after=after, length=length)
+        start_hashcode=start_hashcode,
+        hashclass=hashclass,
+        reverse=reverse,
+        after=after,
+        length=length
+    )
 
 class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
