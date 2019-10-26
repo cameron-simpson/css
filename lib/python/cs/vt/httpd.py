@@ -8,9 +8,10 @@ import sys
 from flask import (
     Flask, render_template, request, session as flask_session, jsonify, abort
 )
+from cs.logutils import warning
 from cs.resources import RunStateMixin
 from . import defaults
-from .hash import MissingHashcodeError, Hash_SHA1
+from .hash import HashCode, MissingHashcodeError
 
 def main(argv=None):
   if argv is None:
@@ -46,15 +47,20 @@ def StoreApp(name, S):
   '''
   app = _StoreApp(name, S)
 
-  @app.route('/h/<hashcode_s>.sha1')
-  def h_sha1(hashcode_s):
+  @app.route('/h/<hashname>/<hashcode_s>')
+  def h(hashname, hashcode_s):
     try:
-      h = _h(Hash_SHA1.from_hashbytes_hex(hashcode_s))
+      h = HashCode.from_named_hashbytes_hex(hashname, hashcode_s)
     except ValueError as e:
+      warning(
+          "HashCode.from_hashbytes_hex(%r,%r): %s", hashname, hashcode_s, e
+      )
       abort(404, 'invalid hashcode')
     return _h(h)
 
   def _h(hashcode):
+    ''' Return the block data for `hashcode`.
+    '''
     try:
       data = app.store[hashcode]
     except MissingHashcodeError:
