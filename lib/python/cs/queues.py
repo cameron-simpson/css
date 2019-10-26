@@ -144,21 +144,15 @@ class _QueueIterator(MultiOpenMixin):
     '''
     self.q.join()
 
-def IterableQueue(*args, capacity=0, name=None, **kw):
+def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable Queue.
   '''
-  if not isinstance(capacity, int):
-    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
-  name = kw.pop('name', name)
-  return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
+  return _QueueIterator(Queue(capacity), name=name).open()
 
-def IterablePriorityQueue(*args, capacity=0, name=None, **kw):
+def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable PriorityQueue.
   '''
-  if not isinstance(capacity, int):
-    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
-  name = kw.pop('name', name)
-  return _QueueIterator(PriorityQueue(capacity, *args, **kw), name=name).open()
+  return _QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
