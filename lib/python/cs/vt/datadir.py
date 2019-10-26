@@ -674,7 +674,7 @@ class SqliteFilemap:
       c.close()
 
   @require(lambda new_path: new_path is not None)
-  @require(lambda new_path: isfilepath(new_path))
+  ##@require(lambda new_path: isfilepath(new_path))
   def add_path(self, new_path, indexed_to=0):
     ''' Insert a new path into the map.
         Return its `DataFileState`.
