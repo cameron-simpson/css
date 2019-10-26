@@ -130,10 +130,22 @@ class HashCode(bytes, Transcriber):
 
   @classmethod
   def from_hashbytes_hex(cls, hashtext):
-    ''' Factory function returning a HashCode object from the hash bytes hex text.
+    ''' Factory function returning a `HashCode` object
+        from the hash bytes hex text.
     '''
     bs = unhexlify(hashtext)
     return cls.from_hashbytes(bs)
+
+  @staticmethod
+  def from_named_hashbytes_hex(hashname, hashtext):
+    ''' Factory function to return a `HashCode` object
+        from the hash type name and the hash bytes hex text.
+    '''
+    try:
+      hashclass = HASHCLASS_BY_NAME[hashname.lower()]
+    except KeyError:
+      raise ValueError("unknown hashclass name %r", hashname)
+    return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
   def from_chunk(cls, chunk):
