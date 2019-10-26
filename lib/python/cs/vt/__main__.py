@@ -404,8 +404,9 @@ class VTCmd(BaseCommand):
           xit = 1
     return xit
 
-  def cmd_httpd(self, args):
-    httpd_main([self.cmd + ': ' + 'httpd'] + args)
+  @staticmethod
+  def cmd_httpd(args, options, cmd):
+    httpd_main([cmd + ': ' + 'httpd'] + args)
 
   @staticmethod
   def cmd_import(args, options, cmd):
