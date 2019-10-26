@@ -83,11 +83,6 @@ _help:
 _setup:
     :make _tags _venv
 
-_venv: $(venvdir)
-$(venvdir): $(venv_requirements)
-    :make $@/.
-    $(dev) pip install -U -r $(venv_requirements)
-
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
         ctags-update -o '$@' $?
@@ -96,6 +91,7 @@ _venv:
         :make $(venv_dir)
 
 $(venv_dir):    $(venv_reqs)
+        :make $@/.
         python3 -m venv $(venv_dir)
         $(venv_pip) install -U pip
         $(venv_pip) install -U -r $(venv_reqs)
