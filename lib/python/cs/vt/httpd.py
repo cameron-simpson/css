@@ -56,20 +56,16 @@ def StoreApp(name, S):
           "HashCode.from_hashbytes_hex(%r,%r): %s", hashname, hashcode_s, e
       )
       abort(404, 'invalid hashcode')
-    return _h(h)
-
-  def _h(hashcode):
-    ''' Return the block data for `hashcode`.
-    '''
+      raise RuntimeError("NOTREACHED")
     try:
-      data = app.store[hashcode]
+      data = app.store[h]
     except MissingHashcodeError:
       abort(404)
-    else:
-      rsp = app.make_response(data)
-      rsp.headers.set('Content-Type', 'application/octet-stream')
-      rsp.headers.set('ETag', hashcode.etag)
-      return rsp
+      raise RuntimeError("NOTREACHED")
+    rsp = app.make_response(data)
+    rsp.headers.set('Content-Type', 'application/octet-stream')
+    rsp.headers.set('ETag', hashcode.etag)
+    return rsp
 
   return app
 
