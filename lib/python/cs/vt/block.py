@@ -216,6 +216,8 @@ class _Block(Transcriber, ABC):
     self._lock = RLock()
 
   def __eq__(self, oblock):
+    ''' Compare this Block with another Block for data equality.
+    '''
     if self is oblock:
       return True
     if self.span != oblock.span:
