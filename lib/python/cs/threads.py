@@ -334,14 +334,14 @@ class AdjustableSemaphore(object):
 
 @decorator
 def locked(func, initial_timeout=2.0, lockattr='_lock'):
-  ''' A decorator for functions that must run within a lock.
+  ''' A decorator for instance methods that must run within a lock.
 
       Decorator keyword arguments:
       * `initial_timeout`:
         the initial lock attempt timeout;
         if this is `>0` and exceeded a warning is issued
         and then an indefinite attempt is made.
-        Default: `2.0`
+        Default: `2.0`s
       * `lockattr`:
         the name of the attribute of `self`
         which references the lock object.
