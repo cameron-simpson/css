@@ -361,7 +361,9 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
       if initial_timeout > 0:
         warning(
             "timeout after %gs waiting for %s<%s>.%s, continuing to wait",
-            initial_timeout, type(self).__name__, self, lockattr)
+            initial_timeout,
+            type(self).__name__, self, lockattr
+        )
       with lock:
         return func(self, *a, **kw)
 
