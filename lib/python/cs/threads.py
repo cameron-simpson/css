@@ -354,7 +354,7 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
     lock = getattr(self, lockattr)
     if initial_timeout > 0 and lock.acquire(timeout=initial_timeout):
       try:
-        retval = func(self, *a, **kw)
+        return func(self, *a, **kw)
       finally:
         lock.release()
     else:
