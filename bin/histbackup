@@ -553,7 +553,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
@@ -590,6 +590,8 @@ then
   fi
 fi
 
+ok=1
+
 # New backup tree required.
 if [ $linkonly ]
 then
@@ -599,28 +601,33 @@ then
     exit 1
   }
   ( cd "$dest" || exit 1
-    dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
+    dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/" -H \
+    || dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
   )
 else
   # do a proper hardlinked backup
   ( cd "$dest" || exit 1
-    [ -z "$lastbackup" ] || set -- --link-dest="$absdest/$lastbackup/" ${1+"$@"}
-    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    if [ -n "$lastbackup" ]
+    then
+      dorsync "$src" "$thisbackup" --link-dest="$absdest/$lastbackup/" -H \
+        ${1+"$@"} $obackup_options \
+      || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    else
+      dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    fi
   )
 fi \
 || {
-  $trace rm -rf "$dest/$thisbackup"
-  exit 1
+  echo "$cmd: rsync failed, review errors and check the content of $absdest/$thisbackup" >&2
+  ok=
 }
-
-ok=1
 
 if [ $copytimes ]
 then
   $trace cpt "$src" "$dest/$thisbackup" || ok=
 fi
 
-if [ -n "$symlink" ]
+if [ $ok ] && [ -n "$symlink" ]
 then
   ( cd "$dest" || exit 1
     rm -f "$symlink"
