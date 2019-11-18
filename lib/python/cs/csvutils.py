@@ -23,14 +23,15 @@ from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
 DISTINFO = {
-    'description': "CSV file related facilities",
+    'description':
+    "CSV file related facilities",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx' ],
+    'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx'],
 }
 
 if sys.hexversion >= 0x03000000:
@@ -51,7 +52,8 @@ if sys.hexversion >= 0x03000000:
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
         default 'utf-8'.
     '''
-    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
+    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row,
+             encoding):
       return csvw.writerow(row)
 
 else:
@@ -91,7 +93,8 @@ def csv_import(
     computed=None,
     preprocess=None,
     mixin=None,
-    **kw):
+    **kw
+):
   ''' Read CSV data where the first row contains column headers.
       Returns a row namedtuple factory and an iterable of instances.
 
@@ -133,12 +136,10 @@ def csv_import(
       column_names=column_names,
       computed=computed,
       preprocess=preprocess,
-      mixin=mixin)
+      mixin=mixin
+  )
 
-def xl_import(
-    workbook, sheet_name=None,
-    skip_rows=0,
-    **kw):
+def xl_import(workbook, sheet_name=None, skip_rows=0, **kw):
   ''' Read the named `sheet_name` from the Excel XLSX file named
       `filename` as for `csv_import`.
       Returns a row namedtuple factory and an iterable of instances.
@@ -169,11 +170,12 @@ def xl_import(
     worksheet = workbook[sheet_name]
   return named_column_tuples(
       (
-          [ cell.value for cell in row ]
+          [cell.value
+           for cell in row]
           for ri, row in enumerate(worksheet)
           if ri >= skip_rows
-      ),
-      **kw )
+      ), **kw
+  )
 
 if __name__ == '__main__':
   args = sys.argv[1:]
