@@ -136,7 +136,7 @@ def csv_import(
       mixin=mixin)
 
 def xl_import(
-    workbook, sheet_name,
+    workbook, sheet_name=None,
     skip_rows=0,
     **kw):
   ''' Read the named `sheet_name` from the Excel XLSX file named
@@ -147,7 +147,9 @@ def xl_import(
       * `workbook`: Excel work book from which to load the sheet; if
         this is a str then the work book is obtained from
         openpyxl.load_workbook()
-      * `sheet_name`: the name of the work book sheet whose data should be imported
+      * `sheet_name`: optional name of the work book sheet
+        whose data should be imported;
+        the default (`None`) selects the active worksheet
 
       Other keyword parameters are as for cs.mappings.named_column_tuples.
 
@@ -159,14 +161,19 @@ def xl_import(
     with Pfx(wb_filename):
       workbook = load_workbook(filename=wb_filename, read_only=True)
       return xl_import(workbook, sheet_name, skip_rows=skip_rows, **kw)
+  if sheet_name is None:
+    worksheet = workbook.active
+    if worksheet is None:
+      worksheet = workbook[workbook.get_sheet_names()[0]]
   else:
-    return named_column_tuples(
-        (
-            [ cell.value for cell in row ]
-            for ri, row in enumerate(workbook[sheet_name])
-            if ri >= skip_rows
-        ),
-        **kw )
+    worksheet = workbook[sheet_name]
+  return named_column_tuples(
+      (
+          [ cell.value for cell in row ]
+          for ri, row in enumerate(worksheet)
+          if ri >= skip_rows
+      ),
+      **kw )
 
 if __name__ == '__main__':
   args = sys.argv[1:]
