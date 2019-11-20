@@ -90,7 +90,8 @@ def named_row_tuple(*column_names, **kw):
     mixin = object
   # compute candidate tuple attributes from the column names
   name_attributes = [
-      None if name is None else re.sub(r'\W+', '_', name).strip('_').lower() for name in column_names
+      None if name is None else re.sub(r'\W+', '_', name).strip('_').lower()
+      for name in column_names
   ]
   # final tuple attributes are the nonempty name_attributes_
   attributes = [attr for attr in name_attributes if attr]
