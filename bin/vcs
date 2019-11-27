@@ -132,6 +132,21 @@ case "$op" in
       # current diff
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
+      get-branches,git)
+                    remote=${1:-origin}
+                    git branch -r \
+                    | sed "s/^  //;/^$remote\\//!d; / /d" \
+                    | while read -r rbr
+                      do
+                        lbr=${rbr##$remote/}
+                        if git branch | grep "^. $lbr\$" >/dev/null
+                        then
+                          echo "$cmd: $op: $rbr: local branch already exists"
+                        else
+                          git branch --track "$lbr" "$rbr" || break
+                        fi
+                      done
+                    ;;
       # graph log
       glog,git)     git log \
                       --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" \
