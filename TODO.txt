@@ -1,3 +1,4 @@
+@strable: treat pathlike things like str?
 @locked: do a timedout acquire with backoff to aid deadlock debugging
 RunState flow diagram: pending->running->cancelled-stopped and triggers?
 cs.app.flags: make a FlagOSDir mapping class to implement the fs based flags, accept any mapping for the Flags class, move the normalisation the the Flags class otherwise a raw mapping impl might fail if moved to the fs
