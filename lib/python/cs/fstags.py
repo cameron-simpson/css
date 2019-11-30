@@ -42,7 +42,7 @@ import json
 from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
-    basename, isfile as isfilepath, join as joinpath, realpath
+    basename, expanduser, isfile as isfilepath, join as joinpath, realpath
 )
 from pathlib import Path
 import re
@@ -72,6 +72,8 @@ DISTINFO = {
 
 TAGSFILE = '.fstags'
 
+RCFILE = '~/.fstagsrc'
+
 def main(argv=None):
   ''' Command line mode.
   '''
@@ -85,6 +87,8 @@ class FSTagCommand(BaseCommand):
 
   GETOPT_SPEC = ''
   USAGE_FORMAT = '''Usage:
+    {cmd} autotag paths...
+        Tag paths based on rules from the rc file.
     {cmd} ls [paths...]
         List files from paths and their tags.
     {cmd} tag path {{tag[=value]|-tag}}...
@@ -102,6 +106,29 @@ class FSTagCommand(BaseCommand):
     options.fstags = FSTags()
 
   @staticmethod
+  def cmd_autotag(argv, options, *, cmd):
+    ''' Tag paths based on rules from the rc file.
+    '''
+    fstags = options.fstags
+    if not argv:
+      raise Getopt
+    rules=loadrc(expanduser(RCFILE))
+    for path in argv:
+      for filepath in rfilepaths(path):
+        with Pfx(filepath):
+          for tagfile, name in fstags.path_tagfiles(filepath):
+            tags=tagfile.tags_of(name)
+            updated=False
+            for rule in rules:
+              for autotag in rule.apply(name):
+                if autotag.name not in tags:
+                  print("autotag %r + %s" % (name, autotag))
+                  tags[autotag.name]=autotag.value
+                  updated=True
+            if updated:
+              tagfile.save()
+
+  @staticmethod
   def cmd_ls(argv, options, *, cmd):
     ''' List paths and their tags.
     '''
@@ -109,15 +136,8 @@ class FSTagCommand(BaseCommand):
     paths = argv or ['.']
     for path in paths:
       with Pfx(path):
-        if isfilepath(path):
-          print(PathTags(path, fstags=fstags))
-        else:
-          for dirpath, dirnames, filenames in os.walk(path):
-            dirnames[:] = sorted(dirnames)
-            for filename in sorted(filename for filename in filenames
-                                   if filename and not filename.startswith('.')
-                                   ):
-              print(PathTags(joinpath(dirpath, filename), fstags=fstags))
+        for filepath in rfilepaths(path):
+          print(PathTags(filepath, fstags=fstags))
 
   @staticmethod
   def cmd_tag(argv, options, *, cmd):
@@ -179,30 +199,6 @@ class FSTagCommand(BaseCommand):
       raise GetoptError("bad arguments")
     fstags.apply_tags([(remove_tag, tag)], argv)
 
-class RegexpTagRule:
-  ''' A regular expression based `Tag` rule.
-  '''
-
-  def __init__(self, regexp):
-    if isinstance(regexp, str):
-      regexp = re.compile(regexp)
-    self.regexp = regexp
-
-  def apply(self, s):
-    ''' Apply the rule to the string `s`, return `Tag`s.
-    '''
-    tags = []
-    m = self.regexp.search(s)
-    if m:
-      for tag_name, value in m.groupdict():
-        if value is not None:
-          try:
-            value = int(value)
-          except ValueError:
-            pass
-          tags.append(Tag(tag_name, value))
-    return tags
-
 class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
@@ -258,14 +254,13 @@ class Tag:
   ]
 
   @classmethod
-  @require(lambda value: isinstance(value, str))
   def from_json(cls, value):
     ''' Convert various formats to richer types.
     '''
     for type_, parse, transcribe in cls.EXTRA_TYPES:
       try:
         return parse(value)
-      except ValueError:
+      except (ValueError,TypeError):
         pass
     return value
 
@@ -437,7 +432,6 @@ class TagFile:
     '''
     return list(self.direct_tags.keys())
 
-  @property
   def tags_of(self, name):
     ''' Return the direct tags of `name`.
     '''
@@ -592,6 +586,63 @@ class PathTags:
         Raises `KeyError` if `tag_name` is not present in the direct tags.
     '''
     self.direct_tags.pop(tag_name)
+
+class RegexpTagRule:
+  ''' A regular expression based `Tag` rule.
+  '''
+
+  def __init__(self, regexp):
+    if isinstance(regexp, str):
+      regexp = re.compile(regexp)
+    self.regexp = regexp
+
+  def apply(self, s):
+    ''' Apply the rule to the string `s`, return `Tag`s.
+    '''
+    tags = []
+    m = self.regexp.search(s)
+    if m:
+      for tag_name, value in m.groupdict().items():
+        if value is not None:
+          try:
+            value = int(value)
+          except ValueError:
+            pass
+          tags.append(Tag(tag_name, value))
+    return tags
+
+def rfilepaths(path):
+  ''' Generator yielding pathnames of files found under `path`.
+  '''
+  if isfilepath(path):
+    yield path
+  else:
+    for dirpath, dirnames, filenames in os.walk(path):
+      dirnames[:] = sorted(dirnames)
+      for filename in sorted(filename for filename in filenames
+                             if filename and not filename.startswith('.')
+                             ):
+        yield joinpath(dirpath, filename)
+
+def loadrc(rcfilepath):
+  ''' Read rc file, return rules.
+  '''
+  with Pfx("loadrc(%r)", rcfilepath):
+    rules=[]
+    try:
+      with open(rcfilepath) as f:
+        for lineno, line in enumerate(f, 1):
+          with Pfx(lineno):
+            line=line.strip()
+            if not line or line.startswith('#'):
+              continue
+            if line.startswith('/') and line.endswith('/'):
+              regexp = re.compile(line[1:-1])
+              rules.append(RegexpTagRule(regexp))
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+    return rules
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
