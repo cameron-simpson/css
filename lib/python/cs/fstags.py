@@ -36,11 +36,9 @@ import json
 from json import JSONDecoder
 import os
 from os.path import (
-    basename, dirname, exists as existspath, isdir as isdirpath, isfile as
-    isfilepath, join as joinpath, normpath, realpath
+    basename, isfile as isfilepath, join as joinpath, realpath
 )
 from pathlib import Path
-from pprint import pprint, pformat
 import sys
 from threading import Lock
 from cs.cmdutils import BaseCommand
@@ -58,7 +56,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.cmdutils','cs.lex','cs.pfx','cs.threads','icontract'],
+    'install_requires':
+    ['cs.cmdutils', 'cs.lex', 'cs.pfx', 'cs.threads', 'icontract'],
 }
 
 TAGSFILE = '.fstags'
@@ -79,14 +78,16 @@ class FSTagCommand(BaseCommand):
         With the form "-tag", remove the tag from the immediate tags.
   '''
 
-  # {cmd} untag tag paths...
-
   def apply_defaults(self, options):
+    ''' Set up the default values in `options`.
+    '''
     setup_logging(options.cmd)
     options.fstags = FSTags()
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
+    ''' List paths and their tags.
+    '''
     fstags = options.fstags
     paths = argv or ['.']
     for path in paths:
@@ -103,6 +104,8 @@ class FSTagCommand(BaseCommand):
 
   @staticmethod
   def cmd_tag(argv, options, *, cmd):
+    ''' Tag a path with multiple tags.
+    '''
     badopts = False
     fstags = options.fstags
     if not argv:
@@ -113,48 +116,58 @@ class FSTagCommand(BaseCommand):
     tags = []
     for arg in argv:
       with Pfx(arg):
-        remove_tag=False
-        offset=0
+        remove_tag = False
+        offset = 0
         if arg.startswith('-'):
-          remove_tag=True
-          offset+=1
-        tag, offset = Tag.parse(arg,offset=offset)
+          remove_tag = True
+          offset += 1
+        tag, offset = Tag.parse(arg, offset=offset)
         if offset < len(arg):
           warning("unparsed: %r", arg[offset:])
           badopts = True
-        elif remove_tag and value is not None:
+        elif remove_tag and tag.value is not None:
           warning("a value may not be supplied in the \"-tag\" form")
-          badopts=True
+          badopts = True
         else:
-          tags.append((remove_tag,tag))
+          tags.append((remove_tag, tag))
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tags(tags,[path])
+    fstags.apply_tags(tags, [path])
 
   @staticmethod
   def cmd_tagpaths(argv, options, *, cmd):
+    ''' Tag multiple paths with a single tag.
+    '''
     badopts = False
     fstags = options.fstags
     if not argv:
       raise GetoptError("missing tag")
-    arg=argv.pop(0)
-    remove_tag=False
-    offset=0
+    arg = argv.pop(0)
+    remove_tag = False
+    offset = 0
     if arg.startswith('-'):
-      remove_tag=True
-      offset+=1
-    tag, offset=Tag.parse(arg,offset)
-    if offset<len(tag):
+      remove_tag = True
+      offset += 1
+    tag, offset = Tag.parse(arg, offset)
+    if offset < len(tag):
       warning("unparsed: %r", arg[offset:])
+      badopts = True
+    elif remove_tag and tag.value is not None:
+      warning("a value may not be supplied in the \"-tag\" form")
       badopts = True
     if not argv:
       warning("missing paths")
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tags([(remove_tag,tag)],argv)
+    fstags.apply_tags([(remove_tag, tag)], argv)
 
 class Tag:
+  ''' A Tag has a `.name` (`str`) and a `.value`.
+
+      The `name` must be a dotted identifier.
+  '''
+
   __slots__ = ('name', 'value')
 
   @require(lambda name: isinstance(name, str))
@@ -196,7 +209,6 @@ class Tag:
     '''
     json_decoder = JSONDecoder()
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
-      offset0 = offset
       name, offset = get_dotted_identifier(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -237,15 +249,24 @@ class TagFile:
 
   @staticmethod
   def encode_name(name):
-    if is_dotted_identifier(name,extras='_-:'):
+    ''' Encode `name`.
+
+        If the `name` is a dotted identifier
+        (including the additional characters `-` and `:`)
+        return it as-is,
+        otherwise JSON encode the name.
+    '''
+    if is_dotted_identifier(name, extras='_-:'):
       return name
     return json.dumps(name)
 
   @staticmethod
   def decode_name(s, offset=0):
+    ''' Decode the *name* from the string `s` at `offset` (default `0`).
+    '''
     json_decoder = JSONDecoder()
     if s[offset].isalpha():
-      name, offset = get_dotted_identifier(s, offset,extras='_-:')
+      name, offset = get_dotted_identifier(s, offset, extras='_-:')
     else:
       name, suboffset = json_decoder.raw_decode(s[offset:])
       offset += suboffset
@@ -300,7 +321,6 @@ class TagFile:
           if not tags:
             continue
           f.write(cls.encode_name(name))
-          tag_items = list(tagmap[name].items())
           for tag_name, value in sorted(tagmap[name].items()):
             f.write(' ')
             f.write(str(Tag(tag_name, value)))
@@ -308,10 +328,14 @@ class TagFile:
 
   @locked
   def save(self):
+    ''' Save the tag map to the tag file.
+    '''
     self.save_tagmap(self.filepath, self.direct_tags)
 
   @locked_property
   def direct_tags(self):
+    ''' The tag map from the tag file.
+    '''
     return self.load_tagmap(self.filepath)
 
   @property
@@ -322,6 +346,8 @@ class TagFile:
 
   @property
   def tags_of(self, name):
+    ''' Return the direct tags of `name`.
+    '''
     return self.direct_tags[name]
 
   @require(lambda name: isinstance(name, str))
@@ -404,12 +430,11 @@ class FSTags:
         * `paths`:
           an iterable of filesystem paths.
     '''
-    tags=[(False,tag) if isinstance(tag,Tag) else tag
-        for tag in tags]
+    tags = [(False, tag) if isinstance(tag, Tag) else tag for tag in tags]
     for path in paths:
       with Pfx(path):
         pathtags = PathTags(path, fstags=self)
-        for remove_tag,tag in tags:
+        for remove_tag, tag in tags:
           with Pfx(tag):
             if remove_tag:
               try:
