@@ -154,7 +154,7 @@ class FSTagCommand(BaseCommand):
       remove_tag = True
       offset += 1
     tag, offset = Tag.parse(arg, offset)
-    if offset < len(tag):
+    if offset < len(arg):
       warning("unparsed: %r", arg[offset:])
       badopts = True
     elif remove_tag and tag.value is not None:
