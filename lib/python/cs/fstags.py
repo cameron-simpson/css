@@ -35,15 +35,17 @@
 '''
 
 from collections import defaultdict
+from datetime import date, datetime
 import errno
 from getopt import GetoptError
 import json
-from json import JSONDecoder
+from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
     basename, isfile as isfilepath, join as joinpath, realpath
 )
 from pathlib import Path
+import re
 import sys
 from threading import Lock
 from cs.cmdutils import BaseCommand
@@ -167,6 +169,30 @@ class FSTagCommand(BaseCommand):
       raise GetoptError("bad arguments")
     fstags.apply_tags([(remove_tag, tag)], argv)
 
+class RegexpTagRule:
+  ''' A regular expression based `Tag` rule.
+  '''
+
+  def __init__(self, regexp):
+    if isinstance(regexp, str):
+      regexp = re.compile(regexp)
+    self.regexp = regexp
+
+  def apply(self, s):
+    ''' Apply the rule to the string `s`, return `Tag`s.
+    '''
+    tags = []
+    m = self.regexp.search(s)
+    if m:
+      for tag_name, value in m.groupdict():
+        if value is not None:
+          try:
+            value = int(value)
+          except ValueError:
+            pass
+          tags.append(Tag(tag_name, value))
+    return tags
+
 class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
@@ -200,9 +226,15 @@ class Tag:
     if value is None:
       return name
     if isinstance(value, str):
+      # bare dotted identifiers
       if is_dotted_identifier(value):
         return name + '=' + value
-    return name + '=' + json.dumps(value, separators=(',', ':'))
+    for type_, parse, transcribe in self.EXTRA_TYPES:
+      if isinstance(value, type_):
+        return name + '=' + transcribe(value)
+    value = self.for_json(value)
+    encoder = self.json_encoder()
+    return name + '=' + encoder.encode(value)
 
   @staticmethod
   def is_valid_name(name):
@@ -210,11 +242,43 @@ class Tag:
     '''
     return is_dotted_identifier(name)
 
+  EXTRA_TYPES = [
+      (date, date.fromisoformat, date.isoformat),
+      (datetime, datetime.fromisoformat, datetime.isoformat),
+  ]
+
+  @classmethod
+  @require(lambda value: isinstance(value, str))
+  def from_json(cls, value):
+    ''' Convert various formats to richer types.
+    '''
+    for type_, parse, transcribe in cls.EXTRA_TYPES:
+      try:
+        return parse(value)
+      except ValueError:
+        pass
+    return value
+
+  @classmethod
+  def for_json(cls, obj):
+    ''' Convert from types to strings for JSON.
+    '''
+    for type_, parse, transcribe in cls.EXTRA_TYPES:
+      if isinstance(obj, type_):
+        return transcribe(obj)
+    return obj
+
+  @staticmethod
+  def json_encoder():
+    ''' Prepare a JSON encoder for tag values.
+    '''
+    return JSONEncoder(separators=(',', ':'))
+
   @classmethod
   def parse(cls, s, offset=0):
     ''' Parse tag_name[=value], return `(tag,offset)`.
     '''
-    json_decoder = JSONDecoder()
+    decoder = JSONDecoder()
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
       name, offset = get_dotted_identifier(s, offset)
       with Pfx(name):
@@ -230,9 +294,21 @@ class Tag:
             elif s[offset].isalpha():
               value, offset = get_dotted_identifier(s, offset)
             else:
-              value_part = s[offset:]
-              value, suboffset = json_decoder.raw_decode(value_part)
-              offset += suboffset
+              nonwhite, nw_offset = get_nonwhite(s, offset)
+              nw_value = None
+              for type_, parse, transcribe in cls.EXTRA_TYPES:
+                try:
+                  nw_value = parse(nonwhite)
+                except ValueError:
+                  pass
+              if nw_value is not None:
+                value = nw_value
+                offset = nw_offset
+              else:
+                value_part = s[offset:]
+                value, suboffset = decoder.raw_decode(value_part)
+                offset += suboffset
+                value = cls.from_json(value)
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -247,8 +323,9 @@ class TagFile:
   '''
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath):
+  def __init__(self, filepath, fstags):
     self.filepath = filepath
+    self.fstags = fstags
     self._lock = Lock()
 
   def __repr__(self):
@@ -271,16 +348,15 @@ class TagFile:
   def decode_name(s, offset=0):
     ''' Decode the *name* from the string `s` at `offset` (default `0`).
     '''
-    json_decoder = JSONDecoder()
+    decoder = JSONDecoder()
     if s[offset].isalpha():
       name, offset = get_dotted_identifier(s, offset, extras='_-:')
     else:
-      name, suboffset = json_decoder.raw_decode(s[offset:])
+      name, suboffset = decoder.raw_decode(s[offset:])
       offset += suboffset
     return name, offset
 
-  @classmethod
-  def load_tagmap(cls, filepath):
+  def load_tagmap(self, filepath):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
@@ -293,7 +369,7 @@ class TagFile:
               line = line.strip()
               if not line or line.startswith('#'):
                 continue
-              name, offset = cls.decode_name(line)
+              name, offset = self.decode_name(line)
               if offset < len(line) and not line[offset].isspace():
                 _, offset2 = get_nonwhite(line, offset)
                 name = line[:offset2]
@@ -399,7 +475,7 @@ class FSTags:
     tagfilepath = dirpath / self.tagsfile
     tagfile = self._tagmaps.get(tagfilepath)
     if tagfile is None:
-      tagfile = self._tagmaps[tagfilepath] = TagFile(str(tagfilepath))
+      tagfile = self._tagmaps[tagfilepath] = TagFile(str(tagfilepath), self)
     return tagfile
 
   def path_tagfiles(self, filepath):
