@@ -63,11 +63,21 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'entry_points': {
+        'console_scripts': ['fstags = cs.fstags:main'],
+    },
     'install_requires':
     ['cs.cmdutils', 'cs.lex', 'cs.pfx', 'cs.threads', 'icontract'],
 }
 
 TAGSFILE = '.fstags'
+
+def main(argv=None):
+  ''' Command line mode.
+  '''
+  if argv is None:
+    argv = sys.argv
+  return FSTagCommand().run(argv)
 
 class FSTagCommand(BaseCommand):
   ''' fstag main command line class.
@@ -585,4 +595,4 @@ class PathTags:
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
-  sys.exit(FSTagCommand().run(sys.argv))
+  sys.exit(main(sys.argv))
