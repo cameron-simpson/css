@@ -17,16 +17,21 @@
 
         series.title="Series Full Name"
         season=2
+        sf
         episode=3
         episode.title="Full Episode Title"
 
     from the following `.fstags` files and entries:
     * `/path/to/.fstags`:
-      `series-name series.title="Series Full Name"`
+      `series-name sf series.title="Series Full Name"`
     * `/path/to/series-name/.fstags`:
       `season-02 season=2`
     * `/path/to/series-name/season-02.fstags`:
       `episode-name--s02e03--something.mp4 episode=3 episode.title="Full Episode Title"`
+
+    Tags may be "bare", or have a value.
+    If there is a value it is expressed with an equals (`'='`)
+    followed by the JSON encoding of the value.
 '''
 
 from collections import defaultdict
@@ -166,6 +171,8 @@ class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
       The `name` must be a dotted identifier.
+
+      A "bare" `Tag` has a `value` of `None`.
   '''
 
   __slots__ = ('name', 'value')
