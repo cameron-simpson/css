@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 #
 
-''' Simple filesystem based file tagging.
+''' Simple filesystem based file tagging
+    and the associated `fstags` command line script.
 
     Tags are stored in a file `.fstags` in directories
     with a line for each entry in the directory
