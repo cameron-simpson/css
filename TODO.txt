@@ -1,3 +1,4 @@
+BaseCommand: put cmd into options and drop from parameters of subcommands
 @strable: treat pathlike things like str?
 @locked: do a timedout acquire with backoff to aid deadlock debugging
 RunState flow diagram: pending->running->cancelled-stopped and triggers?
