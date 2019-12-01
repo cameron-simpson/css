@@ -94,6 +94,8 @@ class FSTagCommand(BaseCommand):
   USAGE_FORMAT = '''Usage:
     {cmd} autotag paths...
         Tag paths based on rules from the rc file.
+    {cmd} find path {{tag[=value]|-tag}}...
+        List files from path matching all the constraints.
     {cmd} ls [paths...]
         List files from paths and their tags.
     {cmd} tag path {{tag[=value]|-tag}}...
@@ -109,6 +111,31 @@ class FSTagCommand(BaseCommand):
     '''
     setup_logging(options.cmd)
     options.fstags = FSTags()
+
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse a list of tag specifications of the form:
+        * `-`*tag_name*: a negative requirement for *tag_name*
+        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
+          with optional *value*.
+        Return a list of `(arg,choice,Tag)` for each `arg` in `argv`.
+    '''
+    choices = []
+    for arg in argv:
+      with Pfx(arg):
+        offset = 0
+        if arg.startswith('-'):
+          choice = False
+          offset += 1
+        else:
+          choice = True
+        tag, offset = Tag.parse(arg, offset=offset)
+        if offset < len(arg):
+          raise ValueError("unparsed: %r", arg[offset:])
+        if not choice and tag.value is not None:
+          raise ValueError("a value may not be supplied in the \"-tag\" form")
+        choices.append((arg, choice, tag))
+    return choices
 
   @staticmethod
   def cmd_autotag(argv, options, *, cmd):
@@ -190,6 +217,31 @@ class FSTagCommand(BaseCommand):
       tagfile.save()
     return xit
 
+  @classmethod
+  def cmd_find(cls, argv, options, *, cmd):
+    ''' Find paths matching tag criteria.
+    '''
+    fstags = options.fstags
+    badopts = False
+    if not argv:
+      warning("missing path")
+      badopts = True
+    else:
+      path = argv.pop(0)
+      if not argv:
+        warning("missing tag criteria")
+        badopts = True
+      else:
+        try:
+          tag_choices = cls.parse_tag_choices(argv)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    for filepath in fstags.find(path, tag_choices):
+      print(filepath)
+
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
     ''' List paths and their tags.
@@ -201,8 +253,8 @@ class FSTagCommand(BaseCommand):
         for filepath in rfilepaths(path):
           print(PathTags(filepath, fstags=fstags))
 
-  @staticmethod
-  def cmd_tag(argv, options, *, cmd):
+  @classmethod
+  def cmd_tag(cls, argv, options, *, cmd):
     ''' Tag a path with multiple tags.
     '''
     badopts = False
@@ -212,54 +264,34 @@ class FSTagCommand(BaseCommand):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    tags = []
-    for arg in argv:
-      with Pfx(arg):
-        remove_tag = False
-        offset = 0
-        if arg.startswith('-'):
-          remove_tag = True
-          offset += 1
-        tag, offset = Tag.parse(arg, offset=offset)
-        if offset < len(arg):
-          warning("unparsed: %r", arg[offset:])
-          badopts = True
-        elif remove_tag and tag.value is not None:
-          warning("a value may not be supplied in the \"-tag\" form")
-          badopts = True
-        else:
-          tags.append((remove_tag, tag))
+    try:
+      tag_choices = cls.parse_tag_choices(argv)
+    except ValueError as e:
+      warning("bad tag specifications: %s", e)
+      badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tags(tags, [path])
+    fstags.apply_tag_choices(tag_choices, [path])
 
-  @staticmethod
-  def cmd_tagpaths(argv, options, *, cmd):
+  @classmethod
+  def cmd_tagpaths(cls, argv, options, *, cmd):
     ''' Tag multiple paths with a single tag.
     '''
     badopts = False
     fstags = options.fstags
     if not argv:
-      raise GetoptError("missing tag")
-    arg = argv.pop(0)
-    remove_tag = False
-    offset = 0
-    if arg.startswith('-'):
-      remove_tag = True
-      offset += 1
-    tag, offset = Tag.parse(arg, offset)
-    if offset < len(arg):
-      warning("unparsed: %r", arg[offset:])
-      badopts = True
-    elif remove_tag and tag.value is not None:
-      warning("a value may not be supplied in the \"-tag\" form")
+      raise GetoptError("missing tag choice")
+    try:
+      tag_choices = cls.parse_tag_choices([arg])
+    except ValueError as e:
+      warning("bad tag specifications: %s", e)
       badopts = True
     if not argv:
       warning("missing paths")
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tags([(remove_tag, tag)], argv)
+    fstags.apply_tag_choices(tag_choices, argv)
 
 class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
@@ -286,6 +318,11 @@ class Tag:
       return False
     return self.value < other.value
 
+  def __repr__(self):
+    return "%s(name=%r,value=%r)" % (
+        type(self).__name__, self.name, self.value
+    )
+
   def __str__(self):
     ''' Encode `tag_name` and `value`.
     '''
@@ -308,7 +345,10 @@ class Tag:
   def is_valid_name(name):
     ''' Test whether a tag name is valid: a dotted identifier.
     '''
-    return is_dotted_identifier(name)
+    return is_dotted_identifier(name, extras='_-')
+
+  def parse_name(s, offset=0):
+    return get_dotted_identifier(s, offset=offset, extras='_-')
 
   EXTRA_TYPES = [
       (date, date.fromisoformat, date.isoformat),
@@ -347,7 +387,7 @@ class Tag:
     '''
     decoder = JSONDecoder()
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
-      name, offset = get_dotted_identifier(s, offset)
+      name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
           sep = s[offset]
@@ -359,7 +399,7 @@ class Tag:
               warning("offset %d: missing value part", offset)
               value = None
             elif s[offset].isalpha():
-              value, offset = get_dotted_identifier(s, offset)
+              value, offset = cls.parse_name(s, offset)
             else:
               nonwhite, nw_offset = get_nonwhite(s, offset)
               nw_value = None
@@ -380,7 +420,7 @@ class Tag:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
             value = None
-            warning("bad separator %r, adjusting tag to %r" % (sep, name))
+            ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
         else:
           value = None
       return cls(name, value), offset
@@ -584,32 +624,57 @@ class FSTags:
         current = joinpath(current, next_part)
       return tagfiles
 
-  def apply_tags(self, tags, paths):
-    ''' Apply the `tags` to `paths`.
+  def apply_tag_choices(self, tag_choices, paths):
+    ''' Apply the `tag_choices` to `paths`.
 
         Parameters:
-        * `tags`:
-          an iterable of `Tag` or `(remove_tag,Tag)`;
-          the former is equivalent to `(False,Tag)`.
+        * `tag_choices`:
+          an iterable of `Tag` or `(spec,choice,Tag)`;
+          the former is equivalent to `(None,True,Tag)`.
           Each item applies or removes a `Tag`
           from each path's direct tags.
         * `paths`:
           an iterable of filesystem paths.
     '''
-    tags = [(False, tag) if isinstance(tag, Tag) else tag for tag in tags]
+    tag_choices = [
+        (None, True, tag) if isinstance(tag, Tag) else tag
+        for tag in tag_choices
+    ]
     for path in paths:
       with Pfx(path):
         pathtags = PathTags(path, fstags=self)
-        for remove_tag, tag in tags:
+        for spec, choice, tag in tag_choices:
           with Pfx(tag):
-            if remove_tag:
+            if choice:
+              pathtags.add(tag)
+            else:
               try:
                 pathtags.pop(tag.name)
               except KeyError:
                 warning("not a direct tag, not removed")
-            else:
-              pathtags.add(tag)
         pathtags.save()
+
+  def find(self, path, tag_choices):
+    ''' Walk the file tree from `path`
+        searching for files matching the supplied `tag_choices`.
+        Yield the matching file paths.
+    '''
+    for filepath in rfilepaths(path):
+      tags = PathTags(filepath, fstags=self).tags
+      tagmap = {tag.name: tag for tag in tags}
+      choose = True
+      for arg, choice, tag in tag_choices:
+        if choice:
+          if (tag.name not in tagmap or
+              (tag.value is not None and tagmap[tag.name].value != tag.value)):
+            choose = False
+            break
+        else:
+          if tag.name in tagmap:
+            choose = False
+            break
+      if choose:
+        yield filepath
 
 class PathTags:
   ''' Class to manipulate the tags for a specific path.
