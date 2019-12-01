@@ -13,6 +13,16 @@ from subprocess import Popen
 from tempfile import NamedTemporaryFile
 from cs.pfx import Pfx
 
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.pfx'],
+}
+
 # default editor
 EDITOR = 'vi'
 
