@@ -132,8 +132,6 @@ class FSTagCommand(BaseCommand):
         tag, offset = Tag.parse(arg, offset=offset)
         if offset < len(arg):
           raise ValueError("unparsed: %r", arg[offset:])
-        if not choice and tag.value is not None:
-          raise ValueError("a value may not be supplied in the \"-tag\" form")
         choices.append((arg, choice, tag))
     return choices
 
@@ -646,12 +644,14 @@ class FSTags:
         for spec, choice, tag in tag_choices:
           with Pfx(tag):
             if choice:
+              # add tag
               pathtags.add(tag)
             else:
-              try:
-                pathtags.pop(tag.name)
-              except KeyError:
-                warning("not a direct tag, not removed")
+              # delete tag
+              direct_tags = pathtags.direct_tags
+              if tag.name in direct_tags:
+                if tag.value is None or direct_tags[tag.name] == tag.value:
+                  direct_tags.pop(tag.name)
         pathtags.save()
 
   def find(self, path, tag_choices):
@@ -665,12 +665,14 @@ class FSTags:
       choose = True
       for arg, choice, tag in tag_choices:
         if choice:
+          # tag_choice not present or not with same nonNone value
           if (tag.name not in tagmap or
               (tag.value is not None and tagmap[tag.name].value != tag.value)):
             choose = False
             break
         else:
-          if tag.name in tagmap:
+          if (tag.name in tagmap
+              and (tag.value is None or tagmap[tag.name].value == tag.value)):
             choose = False
             break
       if choose:
