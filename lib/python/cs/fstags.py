@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#
 
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
@@ -35,7 +34,7 @@
     followed by the JSON encoding of the value.
 '''
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from datetime import date, datetime
 import errno
 from getopt import GetoptError
@@ -143,20 +142,22 @@ class FSTagCommand(BaseCommand):
     if not argv:
       argv = ['.']
     rules = loadrc(expanduser(RCFILE))
-    for path in argv:
-      for filepath in rfilepaths(path):
-        with Pfx(filepath):
-          for tagfile, name in fstags.path_tagfiles(filepath):
-            tags = tagfile.tags_of(name)
-            updated = False
-            for rule in rules:
-              for autotag in rule.apply(name):
-                if autotag.name not in tags:
-                  print("autotag %r + %s" % (name, autotag))
-                  tags[autotag.name] = autotag.value
-                  updated = True
-            if updated:
-              tagfile.save()
+    for top_path in argv:
+      for path in rpaths(top_path):
+        with Pfx(path):
+          tagged_file = TaggedPath(path, fstags)
+          name = tagged_file.basename
+          all_tags = tagged_file.all_tags
+          tags = tagged_file.direct_tags
+          updated = False
+          for rule in rules:
+            for autotag in rule.apply(name):
+              if autotag.name not in all_tags:
+                print("autotag %r + %s" % (name, autotag))
+                tags.add(autotag)
+                updated = True
+          if updated:
+            tagged_file.direct_tagfile.save()
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -176,14 +177,14 @@ class FSTagCommand(BaseCommand):
       path = realpath(path)
       fstags = options.fstags
       tagfile = fstags.dir_tagfile(path)
-      tagmap = tagfile.direct_tagmap
-      names = set(tagmap.keys())
+      tagsets = tagfile.tagsets
+      names = set(tagsets.keys())
       # infill with untagged names
       for name in os.listdir(path):
         if (name and name not in ('.', '..') and not name.startswith('.')):
           names.add(name)
       lines = [
-          tagfile.tags_line(name, tagfile.tags_of(name))
+          tagfile.tags_line(name, tagfile.direct_tags_of(name))
           for name in sorted(names)
       ]
       changed = edit_strings(lines)
@@ -192,11 +193,11 @@ class FSTagCommand(BaseCommand):
         new_name, new_tags = tagfile.parse_tags_line(new_line)
         with Pfx(old_name):
           if old_name != new_name:
-            if new_name in tagmap:
+            if new_name in tagsets:
               warning("new name %r already exists", new_name)
               xit = 1
               continue
-            del tagmap[old_name]
+            del tagsets[old_name]
             old_path = joinpath(path, old_name)
             if existspath(old_path):
               new_path = joinpath(path, new_name)
@@ -211,7 +212,7 @@ class FSTagCommand(BaseCommand):
                     info("renamed")
           # rewrite the tags under the new_name
           # (possibly the same as old_name)
-          tagmap[new_name] = {tag.name: tag.value for tag in new_tags}
+          tagsets[new_name] = {tag.name: tag.value for tag in new_tags}
       tagfile.save()
     return xit
 
@@ -249,7 +250,7 @@ class FSTagCommand(BaseCommand):
     for path in paths:
       with Pfx(path):
         for filepath in rfilepaths(path):
-          print(PathTags(filepath, fstags=fstags))
+          print(TaggedPath(filepath, fstags=fstags))
 
   @classmethod
   def cmd_tag(cls, argv, options, *, cmd):
@@ -339,13 +340,54 @@ class Tag:
     encoder = self.json_encoder()
     return name + '=' + encoder.encode(value)
 
+  @classmethod
+  def from_name_value(cls, name, value):
+    ''' Support method for functions accepting either a tag or a name and value.
+
+        If `name` is a str make a new Tag from `name` and `value`.
+        Otherwise check that `value is `None`
+        and that `name` has a `.name` and `.value`
+        and return it as a tag ducktype.
+
+        This supports functions of the form:
+
+            def f(x, y, tag_name, value=None):
+              tag = Tag.from_name_value(tag_name, value)
+
+        so that that may accept a `Tag` or a tag name or a tag name and value.
+
+        Exanples:
+
+            >>> Tag.from_name_value('a', 3)
+            Tag(name='a',value=3)
+            >>> T = Tag('b', None)
+            >>> Tag.from_name_value(T, None)
+            Tag(name='b',value=None)
+    '''
+    with Pfx("%s.from_name_value(name=%r,value=%r)", cls.__name__, name,
+             value):
+      if isinstance(name, str):
+        # (name,value) => Tag
+        return cls(name, value)
+      if value is not None:
+        raise ValueError("name is not a str, value must be None")
+      tag = name
+      if not hasattr(tag, 'name'):
+        raise ValueError("tag has no .name attribute")
+      if not hasattr(tag, 'value'):
+        raise ValueError("tag has no .value attribute")
+      # Tag ducktype
+      return tag
+
   @staticmethod
   def is_valid_name(name):
-    ''' Test whether a tag name is valid: a dotted identifier.
+    ''' Test whether a tag name is valid: a dotted identifier including dash.
     '''
     return is_dotted_identifier(name, extras='_-')
 
   def parse_name(s, offset=0):
+    ''' Parse a tag name from `s` at `offset`: a dotted identifier including dash.
+    '''
     return get_dotted_identifier(s, offset=offset, extras='_-')
 
   EXTRA_TYPES = [
@@ -378,6 +420,14 @@ class Tag:
     ''' Prepare a JSON encoder for tag values.
     '''
     return JSONEncoder(separators=(',', ':'))
+
+  def matches(self, tag_name, value):
+    ''' Test whether this `Tag` matches `(tag_name,value)`.
+    '''
+    other_tag = self.from_name_value(tag_name, value)
+    if self.name != tag_name:
+      return False
+    return value is None or self.value == value
 
   @classmethod
   def parse(cls, s, offset=0):
@@ -423,18 +473,71 @@ class Tag:
           value = None
       return cls(name, value), offset
 
+class TagSet(dict):
+  ''' A `dict` subclass mapping tag names to values.
+
+      A `TagFile` maintains one of these for each name.
+
+      We treat this mapping somewhat like a set,
+      providing `add` and `discard` methods to add and discard tags,
+      which are essentially `name`=>`value` pairs.
+  '''
+
+  def __contains__(self, tag):
+    if isinstance(tag, str):
+      return dict.__contains__(self, tag)
+    for tag_name, value in self.items():
+      if Tag(tag_name, value).matches(tag):
+        return True
+    return False
+
+  def __iter__(self):
+    for tag_name, value in self.items():
+      yield Tag(tag_name,value)
+  def add(self, tag_name, value=None):
+    ''' Add a tag to these tags.
+    '''
+    tag = Tag.from_name_value(tag_name, value)
+    self[tag.name] = tag.value
+
+  def discard(self, tag_name, value=None):
+    ''' Discard the tag matching `(tag_name,value)`.
+        Return a `Tag` with the old value,
+        or `None` if there was no matching tag.
+
+        Note that if the tag value is `None`
+        then the tag is unconditionally discarded.
+        Otherwise the tag is only discarded
+        if its value matches.
+    '''
+    tag = Tag.from_name_value(tag_name, value)
+    tag_name = tag.name
+    if tag_name in self:
+      value = tag.value
+      if value is None or self[tag_name] == value:
+        old_value = self.pop(tag_name)
+      return Tag(tag_name, old_value)
+    return None
+
 class TagFile:
   ''' A reference to a specific file containing tags.
+
+      This manages a mapping of `name` => `TagSet`,
+      itself a mapping of tag name => tag value.
   '''
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath, fstags):
+  def __init__(self, filepath):
     self.filepath = filepath
-    self.fstags = fstags
     self._lock = Lock()
 
   def __repr__(self):
     return "%s(%r)" % (type(self).__name__, self.filepath)
+
+  def __getitem__(self, name):
+    ''' Return the `TagSet` associated with `name`.
+    '''
+    return self.tagsets[name]
 
   @staticmethod
   def encode_name(name):
@@ -477,22 +580,22 @@ class TagFile:
       )
     with Pfx(name):
       assert isinstance(name, str)
-      tags = []
+      tags = TagSet()
       while offset < len(line):
         if not line[offset].isspace():
           warning("line offset %d: expected whitespace", offset)
         else:
           offset = skipwhite(line, offset)
         tag, offset = Tag.parse(line, offset)
-        tags.append(tag)
+        tags.add(tag)
     return name, tags
 
-  def load_tagmap(self, filepath):
+  def load_tagsets(self, filepath):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
     with Pfx("loadtags(%r)", filepath):
-      tagmap = defaultdict(dict)
+      tagsets = defaultdict(TagSet)
       try:
         with open(filepath) as f:
           for lineno, line in enumerate(f, 1):
@@ -501,14 +604,11 @@ class TagFile:
               if not line or line.startswith('#'):
                 continue
               name, tags = self.parse_tags_line(line)
-              for tag in tags:
-                tag_name, value = tag.name, tag.value
-                assert isinstance(tag_name, str)
-                tagmap[name][tag_name] = value
+              tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-      return tagmap
+      return tagsets
 
   @classmethod
   def tags_line(cls, name, tagmap):
@@ -520,62 +620,54 @@ class TagFile:
     return ' '.join(fields)
 
   @classmethod
-  def save_tagmap(cls, filepath, tagmap):
+  def save_tagsets(cls, filepath, tagsets):
     ''' Save a tagmap to `filepath`.
     '''
     with Pfx("savetags(%r)", filepath):
       with open(filepath, 'w') as f:
-        for name, tags in sorted(tagmap.items()):
+        for name, tags in sorted(tagsets.items()):
           if not tags:
             continue
-          f.write(cls.tags_line(name, tagmap[name]))
+          f.write(cls.tags_line(name, tagsets[name]))
           f.write('\n')
 
   @locked
   def save(self):
     ''' Save the tag map to the tag file.
     '''
-    self.save_tagmap(self.filepath, self.direct_tagmap)
+    self.save_tagsets(self.filepath, self.tagsets)
 
   @locked_property
-  def direct_tagmap(self):
+  def tagsets(self):
     ''' The tag map from the tag file.
     '''
-    return self.load_tagmap(self.filepath)
+    return self.load_tagsets(self.filepath)
 
   @property
   def names(self):
     ''' The names from this `TagFile`.
     '''
-    return list(self.direct_tagmap.keys())
+    return list(self.tagsets.keys())
 
-  def tags_of(self, name):
+  def direct_tags_of(self, name):
     ''' Return the direct tags of `name`.
     '''
-    return self.direct_tagmap[name]
+    return self.tagsets[name]
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
-    ''' Add the `tag`=`value` to the tags for `name`.
-
-        If `tag` is not a `str` and `value` is omitted or `None`
-        then `tag` should be an object with `.name` and `.value` attributes,
-        such as a `Tag`.
+    ''' Add a tag to the tags for `name`.
     '''
-    if not isinstance(tag, str) and value is None:
-      tag, value = tag.name, tag.value
-    assert isinstance(tag, str), "name=%r,tag=%r,value=%r" % (name, tag, value)
-    self.direct_tagmap[name][tag] = value
+    return self.direct_tags_of(name).add(tag, value)
 
-  def discard(self, name, tag_name):
-    ''' Discard the tag named `tag_name` from the tags for `name`.
-        Return a `Tag` with the old value, or `None`.
+  def discard(self, name, tag_name, value=None):
+    ''' Discard the tag matching `(tag_name,value)`.
+        Return a `Tag` with the old value,
+        or `None` if there was no matching tag.
     '''
-    name_tags = self.direct_tagmap[name]
-    if tag_name in name_tags:
-      old_value = name_tags.pop(tag_name)
-      return Tag(tag_name, old_value)
-    return None
+    return self.tagsets[name].discard(tag_name, value)
+
+TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
 class FSTags:
   ''' A class to examine filesystem tags.
@@ -596,11 +688,11 @@ class FSTags:
     tagfilepath = dirpath / self.tagsfile
     tagfile = self._tagmaps.get(tagfilepath)
     if tagfile is None:
-      tagfile = self._tagmaps[tagfilepath] = TagFile(str(tagfilepath), self)
+      tagfile = self._tagmaps[tagfilepath] = TagFile(str(tagfilepath))
     return tagfile
 
   def path_tagfiles(self, filepath):
-    ''' Return a list of `(TagFile,name)`
+    ''' Return a list of `TagFileEntry`s
         for the `TagFile`s affecting `filepath`
         in order from the root to `dirname(filepath)`
         where `name` is the key within `TagFile`.
@@ -618,7 +710,7 @@ class FSTags:
       current = root
       while subparts:
         next_part = subparts.pop(0)
-        tagfiles.append((self.dir_tagfile(current), next_part))
+        tagfiles.append(TagFileEntry(self.dir_tagfile(current), next_part))
         current = joinpath(current, next_part)
       return tagfiles
 
@@ -640,7 +732,7 @@ class FSTags:
     ]
     for path in paths:
       with Pfx(path):
-        pathtags = PathTags(path, fstags=self)
+        pathtags = TaggedPath(path, fstags=self)
         for spec, choice, tag in tag_choices:
           with Pfx(tag):
             if choice:
@@ -660,25 +752,23 @@ class FSTags:
         Yield the matching file paths.
     '''
     for filepath in rfilepaths(path):
-      tags = PathTags(filepath, fstags=self).tags
+      all_tags = TaggedPath(filepath, fstags=self).all_tags
       tagmap = {tag.name: tag for tag in tags}
       choose = True
       for arg, choice, tag in tag_choices:
         if choice:
           # tag_choice not present or not with same nonNone value
-          if (tag.name not in tagmap or
-              (tag.value is not None and tagmap[tag.name].value != tag.value)):
+          if tag not in all_tags:
             choose = False
             break
         else:
-          if (tag.name in tagmap
-              and (tag.value is None or tagmap[tag.name].value == tag.value)):
+          if tag in all_tags:
             choose = False
             break
       if choose:
         yield filepath
 
-class PathTags:
+class TaggedPath:
   ''' Class to manipulate the tags for a specific path.
   '''
 
@@ -686,20 +776,41 @@ class PathTags:
     if fstags is None:
       fstags = FSTags()
     self.filepath = Path(filepath)
-    self._tagfiles = fstags.path_tagfiles(filepath)
-    self.direct_tagfile = self._tagfiles[-1][0]
-    self.direct_tagfile_name = self._tagfiles[-1][1]
-    self.direct_tags = self.direct_tagfile.direct_tagmap[
-        self.direct_tagfile_name]
+    self._tagfile_entries = fstags.path_tagfiles(filepath)
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
     parts = [TagFile.encode_name(str(self.filepath))]
-    for tag in sorted(self.tags):
+    for tag in sorted(self.all_tags):
       parts.append(str(tag))
     return ' '.join(parts)
+
+  def __contains__(self, tag):
+    ''' Test for the presence of `tag` in the `all_tags`.
+    '''
+    for my_tag in self.all_tags:
+      if my_tag.matches(tag):
+        return True
+    return False
+
+  @property
+  def basename(self):
+    ''' The name of the final path component.
+    '''
+    return self._tagfile_entries[-1].name
+  @property
+  def direct_tagfile(self):
+    ''' The `TagFile` for the final path component.
+    '''
+    return self._tagfile_entries[-1].tagfile
+
+  @property
+  def direct_tags(self):
+    ''' The direct `TagSet` for the file.
+    '''
+    return self.direct_tagfile.tagsets[self.basename]
 
   def save(self):
     ''' Update the associated `TagFile`.
@@ -707,16 +818,15 @@ class PathTags:
     self.direct_tagfile.save()
 
   @property
-  def tags(self):
+  def all_tags(self):
     ''' Return the cumulative tags for this path
         by merging the tags from the root to the path.
     '''
-    tags = {}
-    for tagfile, name in self._tagfiles:
-      for tag_name, value in tagfile.direct_tagmap[name].items():
-        tags[tag_name] = value
-
-    return [Tag(tag_name, value) for tag_name, value in tags.items()]
+    tags = TagSet()
+    for tagfile, name in self._tagfile_entries:
+      for tag in tagfile[name]:
+        tags.add(tag)
+    return tags
 
   def add(self, tag, value=None):
     ''' Add the `tag`=`value` to the direct tags.
@@ -725,7 +835,7 @@ class PathTags:
         then `tag` should be an object with `.name` and `.value` attributes,
         such as a `Tag`.
     '''
-    self.direct_tagfile.add(self.direct_tagfile_name, tag, value)
+    self.direct_tagfile.add(self.basename, tag, value)
 
   def pop(self, tag_name):
     ''' Remove the tag named `tag_name` from the direct tags.
@@ -757,17 +867,24 @@ class RegexpTagRule:
           tags.append(Tag(tag_name, value))
     return tags
 
-def rfilepaths(path):
-  ''' Generator yielding pathnames of files found under `path`.
+def rpaths(path, yield_dirs=False, name_selector=None):
+  ''' Generator yielding pathnames found under `path`.
   '''
+  if name_selector is None:
+    name_selector = lambda name: name and not name.startswith('.')
   if isfilepath(path):
     yield path
   else:
     for dirpath, dirnames, filenames in os.walk(path):
-      dirnames[:] = sorted(dirnames)
-      for filename in sorted(filename for filename in filenames
-                             if filename and not filename.startswith('.')):
+      yield dirpath
+      dirnames[:] = sorted(filter(name_selector, dirnames))
+      for filename in sorted(filter(name_selector, filenames)):
         yield joinpath(dirpath, filename)
+
+def rfilepaths(path, name_selector=None):
+  ''' Generator yielding pathnames of files found under `path`.
+  '''
+  return rpaths(path, yield_dirs=False, name_selector=name_selector)
 
 def loadrc(rcfilepath):
   ''' Read rc file, return rules.
