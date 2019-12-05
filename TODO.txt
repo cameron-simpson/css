@@ -1,3 +1,4 @@
+fstags: autotag: use pathtags.add
 fstags: pathtags.add: do not add to direct tags if in all_tags
 logutils: use cs.tty stuff for the status() function
 BaseCommand: put cmd into options and drop from parameters of subcommands
