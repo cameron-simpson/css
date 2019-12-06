@@ -42,8 +42,8 @@ import json
 from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
-    basename, exists as existspath, expanduser, isdir as isdirpath, isfile as
-    isfilepath, join as joinpath, realpath
+    basename, dirname, exists as existspath, expanduser, isdir as isdirpath,
+    isfile as isfilepath, join as joinpath, realpath
 )
 from pathlib import Path
 import re
@@ -75,8 +75,9 @@ DISTINFO = {
 }
 
 TAGSFILE = '.fstags'
-
 RCFILE = '~/.fstagsrc'
+XATTR = 'x-fstags' if hasattr(os, 'getxattr'
+                              ) and hasattr(os, 'setxattr') else None
 
 def main(argv=None):
   ''' Command line mode.
@@ -542,6 +543,7 @@ class TagFile:
   @require(lambda filepath: isinstance(filepath, str))
   def __init__(self, filepath):
     self.filepath = filepath
+    self.dirpath = dirname(realpath(filepath))
     self._lock = Lock()
 
   def __repr__(self):
@@ -649,6 +651,23 @@ class TagFile:
     ''' Save the tag map to the tag file.
     '''
     self.save_tagsets(self.filepath, self.tagsets)
+    if XATTR is not None:
+      for name, tagset in self.tagsets.items():
+        name_path = joinpath(self.dirpath, name)
+        try:
+          old_xattr_value = os.getxattr(name_path, XATTR)
+        except OSError as e:
+          if e.errno != errno.ENOTSUP:
+            raise
+        else:
+          xattr_value = ' '.join(sorted(str(tag) for tag in tagset))
+          if xattr_value != old_xattr_value:
+            with Pfx("setxattr(%r,%r,xattr_value)", name_path, XATTR,
+                     xattr_value):
+              os.setxattr(
+                  name_path, 'x-fstags', xattr_value,
+                  (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
+              )
 
   @locked_property
   def tagsets(self):
