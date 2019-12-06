@@ -76,8 +76,9 @@ DISTINFO = {
 
 TAGSFILE = '.fstags'
 RCFILE = '~/.fstagsrc'
-XATTR = 'x-fstags' if hasattr(os, 'getxattr'
-                              ) and hasattr(os, 'setxattr') else None
+XATTR = (
+    'x-fstags' if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
+)
 
 def main(argv=None):
   ''' Command line mode.
@@ -423,7 +424,7 @@ class Tag:
     '''
     return JSONEncoder(separators=(',', ':'))
 
-  def matches(self, tag_name, value):
+  def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
     other_tag = self.from_name_value(tag_name, value)
