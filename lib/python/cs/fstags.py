@@ -320,8 +320,9 @@ class FSTagCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       raise GetoptError("missing tag choice")
+    tag_choice = argv.pop(0)
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tag_choices([tag_choice])
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
