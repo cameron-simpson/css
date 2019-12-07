@@ -697,7 +697,7 @@ class TagFile:
         try:
           old_xattr_value = os.getxattr(name_path, XATTR)
         except OSError as e:
-          if e.errno != errno.ENOTSUP:
+          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
             raise
         else:
           xattr_value = ' '.join(sorted(str(tag) for tag in tagset))
