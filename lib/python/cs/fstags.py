@@ -47,6 +47,7 @@ from os.path import (
 )
 from pathlib import Path
 import re
+import shutil
 import sys
 from threading import Lock
 from cs.cmdutils import BaseCommand
@@ -99,6 +100,8 @@ class FSTagCommand(BaseCommand):
         List files from path matching all the constraints.
     {cmd} ls [paths...]
         List files from paths and their tags.
+    {cmd} mv paths... targetdir
+        Move files and their tags into targetdir.
     {cmd} tag path {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
@@ -253,6 +256,41 @@ class FSTagCommand(BaseCommand):
       with Pfx(path):
         for filepath in rfilepaths(path):
           print(TaggedPath(filepath, fstags=fstags))
+
+  @staticmethod
+  def cmd_mv(argv, options, *, cmd):
+    ''' Move paths and their tags into a destination.
+    '''
+    fstags=options.fstags
+    if len(argv) < 2:
+      raise GetoptError("missing paths or targetdir")
+    target_dirpath=argv.pop()
+    if not isdirpath(target_dirpath):
+      raise GetoptError("targetdir %r: not a directory" % (target_dirpath,))
+    tagfile=fstags.dir_tagfile(target_dirpath)
+    xit=0
+    for path in argv:
+      with Pfx(path):
+        if not existspath(path):
+          error("path does not exist")
+          xit=1
+          continue
+        src_tags=TaggedPath(path).direct_tags
+        src_basename=basename(path)
+        target_path = joinpath(target_dirpath, src_basename)
+        with Pfx("=>%r",target_path):
+          if existspath(target_path):
+            error("target already exists")
+            xit=1
+            continue
+          print(path,'=>',target_path)
+          dst_taggedpath=TaggedPath(target_path)
+          with Pfx("shutil.move"):
+            shutil.move(path, target_path)
+          for tag in src_tags:
+            dst_taggedpath.add(tag)
+          dst_taggedpath.save()
+    return xit
 
   @classmethod
   def cmd_tag(cls, argv, options, *, cmd):
