@@ -183,11 +183,10 @@ class FSTagCommand(BaseCommand):
       fstags = options.fstags
       tagfile = fstags.dir_tagfile(path)
       tagsets = tagfile.tagsets
-      names = set(tagsets.keys())
-      # infill with untagged names
-      for name in os.listdir(path):
-        if (name and name not in ('.', '..') and not name.startswith('.')):
-          names.add(name)
+      names = set(
+          name for name in os.listdir(path)
+          if (name and name not in ('.', '..') and not name.startswith('.'))
+      )
       lines = [
           tagfile.tags_line(name, tagfile.direct_tags_of(name))
           for name in sorted(names)
