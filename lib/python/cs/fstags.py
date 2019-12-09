@@ -544,6 +544,11 @@ class TagSet:
     self.tagmap = {}
 
   def __str__(self):
+    ''' The `TagSet` suitable for writing to a tag file.
+    '''
+    return (' '.join(sorted(str(T) for T in self.as_tags())))
+
+  def __repr__(self):
     return "%s[%s]" % (
         type(self).__name__, ','.join(str(T) for T in self.as_tags())
     )
@@ -869,10 +874,7 @@ class TaggedPath:
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
-    parts = [TagFile.encode_name(str(self.filepath))]
-    for tag in sorted(self.all_tags):
-      parts.append(str(tag))
-    return ' '.join(parts)
+    return (TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags))
 
   def __contains__(self, tag):
     ''' Test for the presence of `tag` in the `all_tags`.
