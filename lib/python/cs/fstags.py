@@ -43,7 +43,7 @@ from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
     basename, dirname, exists as existspath, expanduser, isdir as isdirpath,
-    isfile as isfilepath, join as joinpath, realpath
+    isfile as isfilepath, join as joinpath, realpath, relpath
 )
 from pathlib import Path
 import re
@@ -96,7 +96,7 @@ class FSTagCommand(BaseCommand):
   USAGE_FORMAT = '''Usage:
     {cmd} autotag paths...
         Tag paths based on rules from the rc file.
-    {cmd} find path {{tag[=value]|-tag}}...
+    {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
     {cmd} ls [paths...]
         List files from paths and their tags.
@@ -227,6 +227,10 @@ class FSTagCommand(BaseCommand):
     '''
     fstags = options.fstags
     badopts = False
+    as_rsync_includes = False
+    if argv and argv[0] == '--for-rsync':
+      argv.pop(0)
+      as_rsync_includes = True
     if not argv:
       warning("missing path")
       badopts = True
@@ -243,8 +247,13 @@ class FSTagCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    for filepath in fstags.find(path, tag_choices):
-      print(filepath)
+    filepaths = list(fstags.find(path, tag_choices))
+    if as_rsync_includes:
+      for include in rsync_patterns(filepaths, path):
+        print(include)
+    else:
+      for filepath in filepaths:
+        print(filepath)
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
@@ -962,6 +971,28 @@ def rfilepaths(path, name_selector=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
   return rpaths(path, yield_dirs=False, name_selector=name_selector)
+
+def rsync_patterns(paths, top_path):
+  ''' Return a list of rsync include lines
+      suitable for use with the `--include-from` option.
+  '''
+  patterns = []
+  include_dirs = set()
+  for path in paths:
+    path = relpath(path, top_path)
+    ancestors = []
+    dirpath = dirname(path)
+    while dirpath:
+      if dirpath in include_dirs:
+        break
+      ancestors.append(dirpath)
+      dirpath = dirname(dirpath)
+    for dirpath in reversed(ancestors):
+      patterns.append('+ /' + dirpath)
+      include_dirs.add(dirpath)
+    patterns.append('+ /' + path)
+  patterns.append('- *')
+  return patterns
 
 def loadrc(rcfilepath):
   ''' Read rc file, return rules.
