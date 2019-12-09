@@ -98,7 +98,7 @@ class FSTagCommand(BaseCommand):
         Tag paths based on rules from the rc file.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
-    {cmd} ls [paths...]
+    {cmd} ls [--direct] [paths...]
         List files from paths and their tags.
     {cmd} mv paths... targetdir
         Move files and their tags into targetdir.
@@ -260,11 +260,22 @@ class FSTagCommand(BaseCommand):
     ''' List paths and their tags.
     '''
     fstags = options.fstags
+    show_direct_tags = False
+    if argv and argv[0] == '--direct':
+      show_direct_tags = True
+      argv.pop(0)
     paths = argv or ['.']
     for path in paths:
       with Pfx(path):
         for filepath in rfilepaths(path):
-          print(TaggedPath(filepath, fstags=fstags))
+          tagged_path = TaggedPath(filepath, fstags=fstags)
+          if show_direct_tags:
+            print(
+                TagFile.encode_name(str(tagged_path.filepath)),
+                tagged_path.direct_tags
+            )
+          else:
+            print(tagged_path)
 
   @staticmethod
   def cmd_mv(argv, options, *, cmd):
