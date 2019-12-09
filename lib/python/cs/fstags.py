@@ -127,16 +127,10 @@ class FSTagCommand(BaseCommand):
     choices = []
     for arg in argv:
       with Pfx(arg):
-        offset = 0
-        if arg.startswith('-'):
-          choice = False
-          offset += 1
-        else:
-          choice = True
-        tag, offset = Tag.parse(arg, offset=offset)
+        choice, offset = TagChoice.parse(arg)
         if offset < len(arg):
           raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append((arg, choice, tag))
+        choices.append(choice)
     return choices
 
   @staticmethod
@@ -179,7 +173,7 @@ class FSTagCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-      options.fstags.edit_dirpath(path)
+      fstags.edit_dirpath(path)
     return xit
 
   @classmethod
@@ -495,7 +489,21 @@ class Tag:
           value = None
       return cls(name, value), offset
 
-TagChoice = namedtuple('TagChoice', 'spec choice tag')
+class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
+
+  @classmethod
+  def parse(cls, s, offset=0):
+    ''' Parse a tag choice from `s` at `offset` (default `0`).
+        Return the `TagChoice` and new offset.
+    '''
+    offset0 = offset
+    if s.startswith('-', offset):
+      choice = False
+      offset += 1
+    else:
+      choice = True
+    tag, offset = Tag.parse(s, offset=offset)
+    return cls(s[offset0:offset], choice, tag), offset
 
 class TagSet:
   ''' A setlike class associating a set of tag names with values.
