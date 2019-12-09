@@ -545,7 +545,7 @@ lastbackup=$(
 
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
-  echo "DORSYNC $* ..." >&2
+  ##echo "DORSYNC $* ..." >&2
   _drs_src=$1
   _drs_dst=$2
   shift; shift
