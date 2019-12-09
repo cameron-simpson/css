@@ -56,7 +56,7 @@ from cs.lex import (
     get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
 )
 from cs.logutils import setup_logging, error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.threads import locked, locked_property
 from icontract import require
 
@@ -179,45 +179,7 @@ class FSTagCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-      path = realpath(path)
-      fstags = options.fstags
-      tagfile = fstags.dir_tagfile(path)
-      tagsets = tagfile.tagsets
-      names = set(
-          name for name in os.listdir(path)
-          if (name and name not in ('.', '..') and not name.startswith('.'))
-      )
-      lines = [
-          tagfile.tags_line(name, tagfile.direct_tags_of(name))
-          for name in sorted(names)
-      ]
-      changed = edit_strings(lines)
-      for old_line, new_line in changed:
-        old_name, old_tags = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-        with Pfx(old_name):
-          if old_name != new_name:
-            if new_name in tagsets:
-              warning("new name %r already exists", new_name)
-              xit = 1
-              continue
-            del tagsets[old_name]
-            old_path = joinpath(path, old_name)
-            if existspath(old_path):
-              new_path = joinpath(path, new_name)
-              if not existspath(new_path):
-                with Pfx("rename %r => %r", old_path, new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    xit = 1
-                  else:
-                    info("renamed")
-          # rewrite the tags under the new_name
-          # (possibly the same as old_name)
-          tagsets[new_name] = {tag.name: tag.value for tag in new_tags}
-      tagfile.save()
+      options.fstags.edit_dirpath(path)
     return xit
 
   @classmethod
@@ -775,6 +737,9 @@ class FSTags:
     self._tagmaps = {}  # cache of per directory `TagFile`s
     self._lock = Lock()
 
+  def __str__(self):
+    return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
+
   @locked
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
@@ -859,6 +824,50 @@ class FSTags:
             break
       if choose:
         yield filepath
+
+  @pfx_method(use_str=True)
+  def edit_dirpath(self, dirpath):
+    ''' Edit the filenames and tags in a directory.
+    '''
+    with Pfx("dirpath=%r", dirpath):
+      dirpath = realpath(dirpath)
+      tagfile = self.dir_tagfile(dirpath)
+      tagsets = tagfile.tagsets
+      names = set(
+          name for name in os.listdir(dirpath)
+          if (name and name not in ('.', '..') and not name.startswith('.'))
+      )
+      lines = [
+          tagfile.tags_line(name, tagfile.direct_tags_of(name))
+          for name in sorted(names)
+      ]
+      changed = edit_strings(lines)
+      for old_line, new_line in changed:
+        old_name, old_tags = tagfile.parse_tags_line(old_line)
+        new_name, new_tags = tagfile.parse_tags_line(new_line)
+        with Pfx(old_name):
+          if old_name != new_name:
+            if new_name in tagsets:
+              warning("new name %r already exists", new_name)
+              xit = 1
+              continue
+            del tagsets[old_name]
+            old_path = joinpath(dirpath, old_name)
+            if existspath(old_path):
+              new_path = joinpath(dirpath, new_name)
+              if not existspath(new_path):
+                with Pfx("rename %r => %r", old_path, new_path):
+                  try:
+                    os.rename(old_path, new_path)
+                  except OSError as e:
+                    warning("%s", e)
+                    xit = 1
+                  else:
+                    info("renamed")
+          # rewrite the tags under the new_name
+          # (possibly the same as old_name)
+          tagsets[new_name] = {tag.name: tag.value for tag in new_tags}
+      tagfile.save()
 
 class TaggedPath:
   ''' Class to manipulate the tags for a specific path.
