@@ -280,30 +280,29 @@ class FSTagCommand(BaseCommand):
   def cmd_mv(argv, options, *, cmd):
     ''' Move paths and their tags into a destination.
     '''
-    fstags=options.fstags
+    fstags = options.fstags
     if len(argv) < 2:
       raise GetoptError("missing paths or targetdir")
-    target_dirpath=argv.pop()
+    target_dirpath = argv.pop()
     if not isdirpath(target_dirpath):
       raise GetoptError("targetdir %r: not a directory" % (target_dirpath,))
-    tagfile=fstags.dir_tagfile(target_dirpath)
-    xit=0
+    xit = 0
     for path in argv:
       with Pfx(path):
         if not existspath(path):
           error("path does not exist")
-          xit=1
+          xit = 1
           continue
-        src_tags=TaggedPath(path).direct_tags
-        src_basename=basename(path)
+        src_tags = TaggedPath(path).direct_tags
+        src_basename = basename(path)
         target_path = joinpath(target_dirpath, src_basename)
-        with Pfx("=>%r",target_path):
+        with Pfx("=>%r", target_path):
           if existspath(target_path):
             error("target already exists")
-            xit=1
+            xit = 1
             continue
-          print(path,'=>',target_path)
-          dst_taggedpath=TaggedPath(target_path)
+          print(path, '=>', target_path)
+          dst_taggedpath = TaggedPath(target_path)
           with Pfx("shutil.move"):
             shutil.move(path, target_path)
           for tag in src_tags:
@@ -905,7 +904,7 @@ class TaggedPath:
 
   @property
   def all_tags(self):
-    ''' Return the cumulative tags for this path
+    ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
     tags = TagSet()
