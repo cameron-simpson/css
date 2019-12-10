@@ -37,7 +37,7 @@
 from collections import defaultdict, namedtuple
 from datetime import date, datetime
 import errno
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 import json
 from json import JSONEncoder, JSONDecoder
 import os
@@ -80,6 +80,7 @@ RCFILE = '~/.fstagsrc'
 XATTR = (
     'x-fstags' if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
+LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -98,8 +99,21 @@ class FSTagCommand(BaseCommand):
         Tag paths based on rules from the rc file.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
-    {cmd} ls [--direct] [paths...]
+        --for-rsync Instead of listing matching paths, emit a
+                    sequence of rsync(1) patterns suitable for use with
+                    --include-from in order to do a selective rsync of the
+                    matched paths.
+    {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
+        --direct    List direct tags instead of all tags.
+        -o output_format
+                    Use output_format as a Python format string to lay out
+                    the listing.
+                    Default: ''' + LS_OUTPUT_FORMAT_DEFAULT.replace(
+      '{', '{{'
+  ).replace(
+      '}', '}}'
+  ) + '''
     {cmd} mv paths... targetdir
         Move files and their tags into targetdir.
     {cmd} tag path {{tag[=value]|-tag}}...
@@ -216,21 +230,35 @@ class FSTagCommand(BaseCommand):
     '''
     fstags = options.fstags
     show_direct_tags = False
-    if argv and argv[0] == '--direct':
-      show_direct_tags = True
-      argv.pop(0)
+    output_format = LS_OUTPUT_FORMAT_DEFAULT
+    options, argv = getopt(argv, 'o:', longopts=['direct'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '--direct':
+          show_direct_tags = True
+        elif option == '-o':
+          output_format = value
+        else:
+          raise RuntimeError("unsupported option")
     paths = argv or ['.']
     for path in paths:
       with Pfx(path):
         for filepath in rfilepaths(path):
+          filepath_encoded = TagFile.encode_name(filepath)
           tagged_path = TaggedPath(filepath, fstags=fstags)
-          if show_direct_tags:
-            print(
-                TagFile.encode_name(str(tagged_path.filepath)),
-                tagged_path.direct_tags
-            )
-          else:
-            print(tagged_path)
+          tags = (
+              tagged_path.direct_tags
+              if show_direct_tags else tagged_path.all_tags
+          )
+          format_tags = defaultdict(lambda: "")
+          format_tags.update(tags.tagmap)
+          print(
+              output_format.format(
+                  filepath=filepath,
+                  filepath_encoded=filepath_encoded,
+                  tags=format_tags
+              ).strip()
+          )
 
   @staticmethod
   def cmd_mv(argv, options, *, cmd):
