@@ -532,6 +532,21 @@ class TagSet:
         return True
     return False
 
+  def __getitem__(self, tag_name):
+    ''' Fetch tag value by `tag_name`.
+        Raises `KeyError` for missing `tag_name`.
+    '''
+    return self.tagmap[tag_name]
+
+  def get(self, tag_name, default=None):
+    ''' Fetch tag value by `tag_name`, or `default`.
+    '''
+    try:
+      value = self[tag_name]
+    except KeyError:
+      value = default
+    return value
+
   def as_tags(self):
     ''' Yield the tag data as `Tag`s.
     '''
