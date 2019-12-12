@@ -929,6 +929,7 @@ class TaggedPath:
       fstags = FSTags()
     self.filepath = Path(filepath)
     self._tagfile_entries = fstags.path_tagfiles(filepath)
+    self._lock = Lock()
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.filepath)
@@ -964,7 +965,7 @@ class TaggedPath:
     '''
     self.direct_tagfile.save()
 
-  @property
+  @locked_property
   def all_tags(self):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
