@@ -250,8 +250,8 @@ class FSTagCommand(BaseCommand):
               tagged_path.direct_tags
               if show_direct_tags else tagged_path.all_tags
           )
-          format_tags = defaultdict(lambda: "")
-          format_tags.update(tags.tagmap)
+          format_tags = TagSet()
+          format_tags.update(tags)
           print(
               output_format.format(
                   filepath=filepath,
@@ -608,6 +608,13 @@ class TagSet:
         old_value = tagmap.pop(tag_name)
       return Tag(tag_name, old_value)
     return None
+
+  def update(self, other):
+    if isinstance(other, dict):
+      self.update(Tag.from_name_value(k, v) for k, v in other.items())
+    else:
+      for tag in other:
+        self.add(tag)
 
 class TagFile:
   ''' A reference to a specific file containing tags.
