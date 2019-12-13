@@ -679,7 +679,9 @@ class TagSet:
         if e.errno not in (errno.ENOTSUP, errno.ENOENT):
           raise
         old_xattr_value_b = None
-    if old_xattr_value_b is not None:
+    if old_xattr_value_b is None:
+      old_xattr_value = None
+    else:
       old_xattr_value = old_xattr_value_b.decode(errors='replace')
     return old_xattr_value
 
@@ -713,10 +715,14 @@ class TagSet:
       new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
       with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
                new_xattr_value_b):
-        os.setxattr(
-            filepath, xattr_name_b, new_xattr_value_b,
-            (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
-        )
+        try:
+          os.setxattr(
+              filepath, xattr_name_b, new_xattr_value_b,
+              (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
+          )
+        except OSError as e:
+          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
+            raise
     return old_xattr_value
 
   @fmtdoc
@@ -737,9 +743,10 @@ class TagSet:
     ''' Create a new `TagSet`
         from the extended attribute `xattr_name` of `filepath`.
     '''
-    tags = cls()
-    tags.update_from_xattr(filepath, xattr_name)
-    return tags
+    xattr_s = cls.xattr_value(filepath, xattr_name)
+    if xattr_s is None:
+      return cls()
+    return cls.from_line(xattr_s)
 
   @fmtdoc
   def update_from_xattr(self, filepath, xattr_name=None):
