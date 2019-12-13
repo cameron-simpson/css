@@ -51,6 +51,7 @@ import shutil
 import sys
 from threading import Lock
 from cs.cmdutils import BaseCommand
+from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.lex import (
     get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
@@ -70,15 +71,16 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.edit', 'cs.lex', 'cs.logutils', 'cs.pfx',
+        'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils', 'cs.pfx',
         'cs.threads', 'icontract'
     ],
 }
 
 TAGSFILE = '.fstags'
 RCFILE = '~/.fstagsrc'
-XATTR = (
-    'x-fstags' if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
+XATTR_B = (
+    b'x-fstags'
+    if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
 
@@ -176,6 +178,7 @@ class FSTagCommand(BaseCommand):
   def cmd_edit(argv, options, *, cmd):
     ''' Edit filenames and tags in a directory.
     '''
+    fstags = options.fstags
     xit = 0
     if not argv:
       path = '.'
@@ -187,7 +190,8 @@ class FSTagCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-      fstags.edit_dirpath(path)
+      if not fstags.edit_dirpath(path):
+        xit = 1
     return xit
 
   @classmethod
@@ -264,7 +268,6 @@ class FSTagCommand(BaseCommand):
   def cmd_mv(argv, options, *, cmd):
     ''' Move paths and their tags into a destination.
     '''
-    fstags = options.fstags
     if len(argv) < 2:
       raise GetoptError("missing paths or targetdir")
     target_dirpath = argv.pop()
@@ -518,6 +521,16 @@ class Tag:
       return cls(name, value), offset
 
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
+  ''' A "tag choice", an apply/reject flag and a `Tag`,
+      used to apply changes to a `TagSet`
+      or as a criterion for a tag search.
+
+      Attributes:
+      * `spec`: the source text from which this choice was parsed,
+        possible `None`
+      * `choice`: the apply/reject flag
+      * `tag`: the `Tag` representing the criterion
+  '''
 
   @classmethod
   def parse(cls, s, offset=0):
@@ -544,12 +557,32 @@ class TagSet:
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
     '''
-    return (' '.join(sorted(str(T) for T in self.as_tags())))
+    return ' '.join(sorted(str(T) for T in self.as_tags()))
 
   def __repr__(self):
     return "%s[%s]" % (
         type(self).__name__, ','.join(str(T) for T in self.as_tags())
     )
+
+  @classmethod
+  def from_line(cls, line, offset=0):
+    ''' Create a new `TagSet` from a line of text.
+    '''
+    tags = cls()
+    offset = skipwhite(line, offset)
+    while offset < len(line):
+      tag, offset = Tag.parse(line, offset)
+      tags.add(tag)
+      offset = skipwhite(line, offset)
+    return tags
+
+  @classmethod
+  def from_bytes(cls, bs):
+    ''' Create a new `TagSet` from the bytes `bs`,
+        a UTF-8 encoding of a `TagSet` line.
+    '''
+    line = bs.decode(errors='replace')
+    return cls.from_line(line)
 
   def __contains__(self, tag):
     tagmap = self.tagmap
@@ -610,11 +643,116 @@ class TagSet:
     return None
 
   def update(self, other):
+    ''' Update this `TagSet` from `other`,
+        a dict or an iterable of taggy things.
+    '''
     if isinstance(other, dict):
       self.update(Tag.from_name_value(k, v) for k, v in other.items())
     else:
       for tag in other:
         self.add(tag)
+
+  @staticmethod
+  @fmtdoc
+  def xattr_value(filepath, xattr_name=None):
+    ''' Read the extended attribute `xattr_name` of `filepath`.
+
+        Return the extended attribute value as a string,
+        or `None` if the attribute does not exist.
+
+        Parameters:
+        * `filepath`: the filesystem path to update
+        * `xattr_name`: the extended attribute to update;
+          if this is a `str`, the attribute is the UTF-8 encoding of that name.
+          The default is `XATTR_B` ({XATTR_B!r}).
+    '''
+    if xattr_name is None:
+      xattr_name_b = XATTR_B
+    elif isinstance(xattr_name, str):
+      xattr_name_b = xattr_name.encode()
+    else:
+      xattr_name_b = xattr_name
+    with Pfx("getxattr(%r,%r)", filepath, xattr_name_b):
+      try:
+        old_xattr_value_b = os.getxattr(filepath, xattr_name_b)
+      except OSError as e:
+        if e.errno not in (errno.ENOTSUP, errno.ENOENT):
+          raise
+        old_xattr_value_b = None
+    if old_xattr_value_b is not None:
+      old_xattr_value = old_xattr_value_b.decode(errors='replace')
+    return old_xattr_value
+
+  @classmethod
+  @fmtdoc
+  def set_xattr_value(cls, filepath, new_xattr_value, xattr_name=None):
+    ''' Update the extended attributes of `filepath`
+        with `new_xattr_value`,
+        the transcription of a `TagSet` as a string.
+
+        Return the extended attribute value as a string,
+        or `None` if the attribute does not exist.
+
+        Parameters:
+        * `filepath`: the filesystem path to update
+        * `new_xattr_value`: the new extended attribute value, a `str`
+          which should be the transcription of `TagSet`
+          i.e. `str(tagset)`
+        * `xattr_name`: the extended attribute to update;
+          if this is a `str`, the attribute is the UTF-8 encoding of that name.
+          The default is `XATTR_B` ({XATTR_B!r}).
+    '''
+    if xattr_name is None:
+      xattr_name_b = XATTR_B
+    elif isinstance(xattr_name, str):
+      xattr_name_b = xattr_name.encode()
+    else:
+      xattr_name_b = xattr_name
+    old_xattr_value = cls.xattr_value(filepath, xattr_name=xattr_name)
+    if old_xattr_value is None or old_xattr_value != new_xattr_value:
+      new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
+      with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
+               new_xattr_value_b):
+        os.setxattr(
+            filepath, xattr_name_b, new_xattr_value_b,
+            (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
+        )
+    return old_xattr_value
+
+  @fmtdoc
+  def update_xattr(self, filepath, xattr_name=None):
+    ''' Update the extended attributes of `filepath`
+        with the tags from this `TagSet`.
+
+        Parameters:
+        * `filepath`: the filesystem path to update
+        * `xattr_name`: the extended attribute to update;
+          if this is a `str`, the attribute is the UTF-8 encoding of that name.
+          The default is `XATTR_B` ({XATTR_B!r}).
+    '''
+    self.set_xattr_value(filepath, str(self), xattr_name=xattr_name)
+
+  @classmethod
+  def from_xattr(cls, filepath, xattr_name=None):
+    ''' Create a new `TagSet`
+        from the extended attribute `xattr_name` of `filepath`.
+    '''
+    tags = cls()
+    tags.update_from_xattr(filepath, xattr_name)
+    return tags
+
+  @fmtdoc
+  def update_from_xattr(self, filepath, xattr_name=None):
+    ''' Update the `TagSet` from the extended attributes of `filepath`.
+
+        Parameters:
+        * `filepath`: the filesystem path to update
+        * `xattr_name`: the extended attribute to update;
+          if this is a `str`, the attribute is the UTF-8 encoding of that name.
+          The default is `XATTR_B` ({XATTR_B!r}).
+    '''
+    xattr_tags = self.from_xattr(filepath, xattr_name=xattr_name)
+    self.update(xattr_tags)
 
 class TagFile:
   ''' A reference to a specific file containing tags.
@@ -672,20 +810,15 @@ class TagFile:
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
-      offset = offset2
       warning(
           "offset %d: expected whitespace, adjusted name to %r", offset, name
       )
+      offset = offset2
     with Pfx(name):
       assert isinstance(name, str)
-      tags = TagSet()
-      while offset < len(line):
-        if not line[offset].isspace():
-          warning("line offset %d: expected whitespace", offset)
-        else:
-          offset = skipwhite(line, offset)
-        tag, offset = Tag.parse(line, offset)
-        tags.add(tag)
+    if offset < len(line) and not line[offset].isspace():
+      warning("offset %d: expected whitespace", offset)
+    tags = TagSet.from_line(line, offset)
     return name, tags
 
   def load_tagsets(self, filepath):
@@ -702,6 +835,9 @@ class TagFile:
               if not line or line.startswith('#'):
                 continue
               name, tags = self.parse_tags_line(line)
+              if XATTR_B is not None:
+                name_path = joinpath(self.dirpath, name)
+                tags.update_from_xattr(name_path, xattr_name=XATTR_B)
               tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -734,23 +870,10 @@ class TagFile:
     ''' Save the tag map to the tag file.
     '''
     self.save_tagsets(self.filepath, self.tagsets)
-    if XATTR is not None:
+    if XATTR_B is not None:
       for name, tagset in self.tagsets.items():
         name_path = joinpath(self.dirpath, name)
-        try:
-          old_xattr_value = os.getxattr(name_path, XATTR)
-        except OSError as e:
-          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
-            raise
-        else:
-          xattr_value = ' '.join(sorted(str(tag) for tag in tagset))
-          if xattr_value != old_xattr_value:
-            with Pfx("setxattr(%r,%r,xattr_value)", name_path, XATTR,
-                     xattr_value):
-              os.setxattr(
-                  name_path, 'x-fstags', xattr_value,
-                  (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
-              )
+        tagset.update_xattr(name_path, xattr_name=XATTR_B)
 
   @locked_property
   def tagsets(self):
@@ -887,6 +1010,7 @@ class FSTags:
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
     '''
+    ok = True
     with Pfx("dirpath=%r", dirpath):
       dirpath = realpath(dirpath)
       tagfile = self.dir_tagfile(dirpath)
@@ -907,7 +1031,7 @@ class FSTags:
           if old_name != new_name:
             if new_name in tagsets:
               warning("new name %r already exists", new_name)
-              xit = 1
+              ok = False
               continue
             del tagsets[old_name]
             old_path = joinpath(dirpath, old_name)
@@ -919,13 +1043,14 @@ class FSTags:
                     os.rename(old_path, new_path)
                   except OSError as e:
                     warning("%s", e)
-                    xit = 1
+                    ok = False
                   else:
                     info("renamed")
           # rewrite the tags under the new_name
           # (possibly the same as old_name)
           tagsets[new_name] = {tag.name: tag.value for tag in new_tags}
       tagfile.save()
+    return ok
 
 class TaggedPath:
   ''' Class to manipulate the tags for a specific path.
@@ -942,7 +1067,7 @@ class TaggedPath:
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
-    return (TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags))
+    return TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags)
 
   def __contains__(self, tag):
     ''' Test for the presence of `tag` in the `all_tags`.
