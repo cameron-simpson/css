@@ -200,10 +200,17 @@ class FSTagCommand(BaseCommand):
     '''
     fstags = options.fstags
     badopts = False
+    use_direct_tags = False
     as_rsync_includes = False
-    if argv and argv[0] == '--for-rsync':
-      argv.pop(0)
-      as_rsync_includes = True
+    options, argv = getopt(argv, '', longopts=['direct', 'for-rsync'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '--direct':
+          use_direct_tags = True
+        elif option == '--for-rsync':
+          as_rsync_includes = True
+        else:
+          raise RuntimeError("unsupported option")
     if not argv:
       warning("missing path")
       badopts = True
@@ -220,7 +227,9 @@ class FSTagCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    filepaths = list(fstags.find(path, tag_choices))
+    filepaths = list(
+        fstags.find(path, tag_choices, use_direct_tags=use_direct_tags)
+    )
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
         print(include)
@@ -992,22 +1001,32 @@ class FSTags:
               tagged_path.discard(tag)
         tagged_path.save()
 
-  def find(self, path, tag_choices):
+  def find(self, path, tag_choices, use_direct_tags=False):
     ''' Walk the file tree from `path`
         searching for files matching the supplied `tag_choices`.
         Yield the matching file paths.
+
+        Parameters:
+        * `path`: the top of the file tree to walk
+        * `tag_choices`: an iterable of `TagChoice`s
+        * `use_direct_tags`: test the direct_tags if true,
+          otherwise the all_tags.
+          Default: `False`
     '''
-    for filepath in rfilepaths(path):
-      all_tags = TaggedPath(filepath, fstags=self).all_tags
+    for filepath in rpaths(path,yield_dirs=use_direct_tags):
+      tagged_path = TaggedPath(filepath, fstags=self)
+      tags = (
+          tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
+      )
       choose = True
       for _, choice, tag in tag_choices:
         if choice:
           # tag_choice not present or not with same nonNone value
-          if tag not in all_tags:
+          if tag not in tags:
             choose = False
             break
         else:
-          if tag in all_tags:
+          if tag in tags:
             choose = False
             break
       if choose:
