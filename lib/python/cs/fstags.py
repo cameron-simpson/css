@@ -745,7 +745,10 @@ class TagSet:
           if this is a `str`, the attribute is the UTF-8 encoding of that name.
           The default is `XATTR_B` ({XATTR_B!r}).
     '''
-    self.set_xattr_value(filepath, str(self), xattr_name=xattr_name)
+    old_xattr_value = self.xattr_value(filepath, xattr_name=xattr_name)
+    new_xattr_value = str(self)
+    if old_xattr_value is None or old_xattr_value != new_xattr_value:
+      self.set_xattr_value(filepath, new_xattr_value, xattr_name=xattr_name)
 
   @classmethod
   def from_xattr(cls, filepath, xattr_name=None):
