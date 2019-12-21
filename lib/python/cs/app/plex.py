@@ -92,6 +92,7 @@ def linkpath(srcpath, dstroot, tags):
   episode = tags.get('episode')
   episode_title = tags.episode_title
   extra = tags.get('extra')
+  part = tags.get('part')
   is_tv_episode = bool(season and (episode or extra))
   if is_tv_episode:
     # TV Series
@@ -100,15 +101,15 @@ def linkpath(srcpath, dstroot, tags):
       dstbase += ' - s%02de%02d' % (season, episode)
     else:
       dstbase += ' - s%02dx%02d' % (season, extra)
-    if episode_title:
-      dstbase += ' - %s' % (episode_title,)
   else:
     # Movie
     dstpath.append('Movies')
     if episode:
       dstbase += ' - %d' % (episode,)
-    if episode_title:
-      dstbase += ' - %s' % (episode_title,)
+  if episode_title:
+    dstbase += ' - %s' % (episode_title,)
+  if part:
+    dstbase += ' - pt%02d' % (part,)
   dstbase += srcext
   dstbase = dstbase.replace('/', '::')
   dstpath.append(dstbase)
