@@ -1153,13 +1153,16 @@ class TaggedPath:
     '''
     self.direct_tags.pop(tag_name)
 
-  def autotag(self, rules):
+  def autotag(self, rules=None, *, no_save=False):
     ''' Apply `rules`to this `TaggedPath`,
         update the `direct_tags` with new tags.
 
-        `rules` is an iterable of objects with a `.infer_tags(name)` method
-        which returns an iterable of `Tag`s.
-        Each rule will be passed the `TaggedPath.basename` as the `name`.
+        Parameters:
+        * `rules`: an iterable of objects with a `.infer_tags(name)` method
+          which returns an iterable of `Tag`s.
+          Each rule will be passed the `TaggedPath.basename` as the `name`.
+        * `no_save`: if true (default `False`)
+          suppress the save of updated tags back to the filesystem.
     '''
     name = self.basename
     tags = self.direct_tags
@@ -1172,7 +1175,8 @@ class TaggedPath:
         updated = True
     if updated:
       tags.update(new_tags)
-      self.save()
+      if not no_save:
+        self.save()
     return new_tags
 
 def infer_tags(name, rules=None):
