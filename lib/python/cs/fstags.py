@@ -1118,8 +1118,7 @@ class TaggedPath:
     '''
     self.direct_tagfile.save()
 
-  @locked_property
-  def all_tags(self):
+  def merged_tags(self):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
@@ -1128,6 +1127,16 @@ class TaggedPath:
       for tag in tagfile[name]:
         tags.add(tag)
     return tags
+
+  @locked_property
+  def all_tags(self):
+    ''' Cached cumulative tags for this path as a `TagSet`
+        by merging the tags from the root to the path.
+
+        Note that subsequent changes to some path component's `direct_tags`
+        will not affect this `TagSet`.
+    '''
+    return self.merged_tags()
 
   def add(self, tag, value=None):
     ''' Add the `tag`=`value` to the direct tags.
