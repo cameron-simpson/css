@@ -78,10 +78,12 @@ DISTINFO = {
 
 TAGSFILE = '.fstags'
 RCFILE = '~/.fstagsrc'
+
 XATTR_B = (
     b'x-fstags'
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
+
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
 
 def main(argv=None):
@@ -161,18 +163,8 @@ class FSTagCommand(BaseCommand):
       for path in rpaths(top_path):
         with Pfx(path):
           tagged_path = TaggedPath(path, fstags)
-          name = tagged_path.basename
-          all_tags = tagged_path.all_tags
-          tags = tagged_path.direct_tags
-          updated = False
-          for rule in rules:
-            for autotag in rule.apply(name):
-              if autotag.name not in all_tags:
-                print("autotag %r + %s" % (name, autotag))
-                tags.add(autotag)
-                updated = True
-          if updated:
-            tagged_path.save()
+          for autotag in tagged_path.autotag(rules):
+            print("autotag %r + %s" % (tagged_path.basename, autotag))
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -1016,7 +1008,7 @@ class FSTags:
           otherwise the all_tags.
           Default: `False`
     '''
-    for filepath in rpaths(path,yield_dirs=use_direct_tags):
+    for filepath in rpaths(path, yield_dirs=use_direct_tags):
       tagged_path = TaggedPath(filepath, fstags=self)
       tags = (
           tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
@@ -1161,6 +1153,40 @@ class TaggedPath:
     '''
     self.direct_tags.pop(tag_name)
 
+  def autotag(self, rules):
+    ''' Apply `rules`to this `TaggedPath`,
+        update the `direct_tags` with new tags.
+
+        `rules` is an iterable of objects with a `.infer_tags(name)` method
+        which returns an iterable of `Tag`s.
+        Each rule will be passed the `TaggedPath.basename` as the `name`.
+    '''
+    name = self.basename
+    tags = self.direct_tags
+    all_tags = self.all_tags
+    new_tags = TagSet()
+    updated = False
+    for autotag in infer_tags(name, rules):
+      if autotag not in all_tags:
+        new_tags.add(autotag)
+        updated = True
+    if updated:
+      tags.update(new_tags)
+      self.save()
+    return new_tags
+
+def infer_tags(name, rules):
+  ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
+
+      `rules` is an iterable of objects with a `.infer_tags(name)` method
+      which returns an iterable of `Tag`s.
+  '''
+  tags = TagSet()
+  for rule in rules:
+    for autotag in rule.infer_tags(name):
+      tags.add(autotag)
+  return tags
+
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
@@ -1170,7 +1196,7 @@ class RegexpTagRule:
       regexp = re.compile(regexp)
     self.regexp = regexp
 
-  def apply(self, s):
+  def infer_tags(self, s):
     ''' Apply the rule to the string `s`, return `Tag`s.
     '''
     tags = []
