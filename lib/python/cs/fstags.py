@@ -91,9 +91,9 @@ def main(argv=None):
   '''
   if argv is None:
     argv = sys.argv
-  return FSTagCommand().run(argv)
+  return FSTagsCommand().run(argv)
 
-class FSTagCommand(BaseCommand):
+class FSTagsCommand(BaseCommand):
   ''' fstag main command line class.
   '''
 
