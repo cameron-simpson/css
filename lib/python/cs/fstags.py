@@ -158,7 +158,7 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = loadrc(expanduser(RCFILE))
+    rules = loadrc()
     for top_path in argv:
       for path in rpaths(top_path):
         with Pfx(path):
@@ -1166,7 +1166,7 @@ class TaggedPath:
     all_tags = self.all_tags
     new_tags = TagSet()
     updated = False
-    for autotag in infer_tags(name, rules):
+    for autotag in infer_tags(name, rules=rules):
       if autotag not in all_tags:
         new_tags.add(autotag)
         updated = True
@@ -1175,12 +1175,14 @@ class TaggedPath:
       self.save()
     return new_tags
 
-def infer_tags(name, rules):
+def infer_tags(name, rules=None):
   ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
 
       `rules` is an iterable of objects with a `.infer_tags(name)` method
       which returns an iterable of `Tag`s.
   '''
+  if rules is None:
+    rules = loadrc()
   tags = TagSet()
   for rule in rules:
     for autotag in rule.infer_tags(name):
@@ -1253,9 +1255,14 @@ def rsync_patterns(paths, top_path):
   patterns.append('- *')
   return patterns
 
-def loadrc(rcfilepath):
+@fmtdoc
+def loadrc(rcfilepath=None):
   ''' Read rc file, return rules.
+
+      If `rcfilepath` is `None` default to `'{RCFILE}'` (from `RCFILE`).
   '''
+  if rcfilepath is None:
+    rcfilepath = expanduser(RCFILE)
   with Pfx("loadrc(%r)", rcfilepath):
     rules = []
     try:
