@@ -653,6 +653,35 @@ class TagSet:
       for tag in other:
         self.add(tag)
 
+  # Assorted computed properties.
+
+  def titleify(self, tag_name):
+    ''' Return the tag value for `tag_name`.
+        If this is empty or missing,
+        look at `tag_name+'_lc'`;
+        if not empty
+        replace the dashes with spaces and titlecase it.
+    '''
+    value = self.get(tag_name)
+    if value:
+      return value
+    value_lc = self.get(tag_name + '_lc')
+    if value_lc:
+      return value_lc.replace('-', ' ').title()
+    return None
+
+  @property
+  def episode_title(self):
+    ''' File title.
+    '''
+    return self.titleify('episode_title')
+
+  @property
+  def title(self):
+    ''' File title.
+    '''
+    return self.titleify('title')
+
   @staticmethod
   @fmtdoc
   def xattr_value(filepath, xattr_name=None):
