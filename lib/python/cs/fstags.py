@@ -78,10 +78,12 @@ DISTINFO = {
 
 TAGSFILE = '.fstags'
 RCFILE = '~/.fstagsrc'
+
 XATTR_B = (
     b'x-fstags'
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
+
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
 
 def main(argv=None):
@@ -89,9 +91,9 @@ def main(argv=None):
   '''
   if argv is None:
     argv = sys.argv
-  return FSTagCommand().run(argv)
+  return FSTagsCommand().run(argv)
 
-class FSTagCommand(BaseCommand):
+class FSTagsCommand(BaseCommand):
   ''' fstag main command line class.
   '''
 
@@ -156,23 +158,13 @@ class FSTagCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = loadrc(expanduser(RCFILE))
+    rules = loadrc()
     for top_path in argv:
       for path in rpaths(top_path):
         with Pfx(path):
           tagged_path = TaggedPath(path, fstags)
-          name = tagged_path.basename
-          all_tags = tagged_path.all_tags
-          tags = tagged_path.direct_tags
-          updated = False
-          for rule in rules:
-            for autotag in rule.apply(name):
-              if autotag.name not in all_tags:
-                print("autotag %r + %s" % (name, autotag))
-                tags.add(autotag)
-                updated = True
-          if updated:
-            tagged_path.save()
+          for autotag in tagged_path.autotag(rules):
+            print("autotag %r + %s" % (tagged_path.basename, autotag))
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -661,6 +653,35 @@ class TagSet:
       for tag in other:
         self.add(tag)
 
+  # Assorted computed properties.
+
+  def titleify(self, tag_name):
+    ''' Return the tag value for `tag_name`.
+        If this is empty or missing,
+        look at `tag_name+'_lc'`;
+        if not empty
+        replace the dashes with spaces and titlecase it.
+    '''
+    value = self.get(tag_name)
+    if value:
+      return value
+    value_lc = self.get(tag_name + '_lc')
+    if value_lc:
+      return value_lc.replace('-', ' ').title()
+    return None
+
+  @property
+  def episode_title(self):
+    ''' File title.
+    '''
+    return self.titleify('episode_title')
+
+  @property
+  def title(self):
+    ''' File title.
+    '''
+    return self.titleify('title')
+
   @staticmethod
   @fmtdoc
   def xattr_value(filepath, xattr_name=None):
@@ -1016,7 +1037,7 @@ class FSTags:
           otherwise the all_tags.
           Default: `False`
     '''
-    for filepath in rpaths(path,yield_dirs=use_direct_tags):
+    for filepath in rpaths(path, yield_dirs=use_direct_tags):
       tagged_path = TaggedPath(filepath, fstags=self)
       tags = (
           tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
@@ -1126,8 +1147,7 @@ class TaggedPath:
     '''
     self.direct_tagfile.save()
 
-  @locked_property
-  def all_tags(self):
+  def merged_tags(self):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
@@ -1136,6 +1156,16 @@ class TaggedPath:
       for tag in tagfile[name]:
         tags.add(tag)
     return tags
+
+  @locked_property
+  def all_tags(self):
+    ''' Cached cumulative tags for this path as a `TagSet`
+        by merging the tags from the root to the path.
+
+        Note that subsequent changes to some path component's `direct_tags`
+        will not affect this `TagSet`.
+    '''
+    return self.merged_tags()
 
   def add(self, tag, value=None):
     ''' Add the `tag`=`value` to the direct tags.
@@ -1161,6 +1191,46 @@ class TaggedPath:
     '''
     self.direct_tags.pop(tag_name)
 
+  def autotag(self, rules=None, *, no_save=False):
+    ''' Apply `rules`to this `TaggedPath`,
+        update the `direct_tags` with new tags.
+
+        Parameters:
+        * `rules`: an iterable of objects with a `.infer_tags(name)` method
+          which returns an iterable of `Tag`s.
+          Each rule will be passed the `TaggedPath.basename` as the `name`.
+        * `no_save`: if true (default `False`)
+          suppress the save of updated tags back to the filesystem.
+    '''
+    name = self.basename
+    tags = self.direct_tags
+    all_tags = self.all_tags
+    new_tags = TagSet()
+    updated = False
+    for autotag in infer_tags(name, rules=rules):
+      if autotag not in all_tags:
+        new_tags.add(autotag)
+        updated = True
+    if updated:
+      tags.update(new_tags)
+      if not no_save:
+        self.save()
+    return new_tags
+
+def infer_tags(name, rules=None):
+  ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
+
+      `rules` is an iterable of objects with a `.infer_tags(name)` method
+      which returns an iterable of `Tag`s.
+  '''
+  if rules is None:
+    rules = loadrc()
+  tags = TagSet()
+  for rule in rules:
+    for autotag in rule.infer_tags(name):
+      tags.add(autotag)
+  return tags
+
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
@@ -1170,7 +1240,7 @@ class RegexpTagRule:
       regexp = re.compile(regexp)
     self.regexp = regexp
 
-  def apply(self, s):
+  def infer_tags(self, s):
     ''' Apply the rule to the string `s`, return `Tag`s.
     '''
     tags = []
@@ -1227,9 +1297,14 @@ def rsync_patterns(paths, top_path):
   patterns.append('- *')
   return patterns
 
-def loadrc(rcfilepath):
+@fmtdoc
+def loadrc(rcfilepath=None):
   ''' Read rc file, return rules.
+
+      If `rcfilepath` is `None` default to `'{RCFILE}'` (from `RCFILE`).
   '''
+  if rcfilepath is None:
+    rcfilepath = expanduser(RCFILE)
   with Pfx("loadrc(%r)", rcfilepath):
     rules = []
     try:
