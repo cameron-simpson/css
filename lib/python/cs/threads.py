@@ -8,21 +8,23 @@
 '''
 
 from __future__ import with_statement
-from collections import deque, namedtuple
+from collections import defaultdict, deque, namedtuple
+from contextlib import contextmanager
+from heapq import heappush, heappop
 import sys
-from threading import Semaphore, current_thread
-from cs.debug import Lock, Thread
+from threading import Semaphore, Thread, current_thread, Lock
+from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, debug, exception
-from cs.obj import O
+from cs.logutils import LogTime, error, warning, debug, exception
 from cs.pfx import Pfx
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
-from cs.seq import seq
+from cs.seq import seq, Seq
 
 DISTINFO = {
-    'description': "threading and communication/synchronisation conveniences",
+    'description':
+    "threading and communication/synchronisation conveniences",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -30,10 +32,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.debug',
+        'cs.deco',
         'cs.excutils',
         'cs.logutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',
@@ -42,7 +43,15 @@ DISTINFO = {
     ],
 }
 
-def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
+def bg(
+    func,
+    daemon=None,
+    name=None,
+    no_start=False,
+    no_logexc=False,
+    args=None,
+    kwargs=None
+):
   ''' Dispatch the callable `func` in its own `Thread`;
       return the `Thread`.
 
@@ -54,12 +63,19 @@ def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
       * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
+      * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
     name = funcname(func)
+  if args is None:
+    args = ()
+  if kwargs is None:
+    kwargs = {}
+
   def thread_body():
     with Pfx(name):
-      return func()
+      return func(*args, **kwargs)
+
   T = Thread(name=name, target=thread_body)
   if not no_logexc:
     func = logexc(func)
@@ -70,7 +86,7 @@ def bg(func, daemon=None, name=None, no_start=False, no_logexc=False):
 
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
 
-class WorkerThreadPool(MultiOpenMixin, O):
+class WorkerThreadPool(MultiOpenMixin):
   ''' A pool of worker threads to run functions.
   '''
 
@@ -85,13 +101,13 @@ class WorkerThreadPool(MultiOpenMixin, O):
       name = "WorkerThreadPool-%d" % (seq(),)
     if max_spare < 1:
       raise ValueError("max_spare(%s) must be >= 1" % (max_spare,))
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.name = name
     self.max_spare = max_spare
-    self.idle_fg = deque()      # nondaemon Threads
+    self.idle_fg = deque()  # nondaemon Threads
     self.idle_daemon = deque()  # daemon Threads
     self.all = set()
+    self._lock = Lock()
 
   def __str__(self):
     return "WorkerThreadPool:%s" % (self.name,)
@@ -159,7 +175,11 @@ class WorkerThreadPool(MultiOpenMixin, O):
         debug("dispatch: need new thread")
         # no available threads - make one
         Targs = []
-        T = Thread(target=self._handler, args=Targs, name=("%s:worker" % (self.name,)))
+        T = Thread(
+            target=self._handler,
+            args=Targs,
+            name=("%s:worker" % (self.name,))
+        )
         T.daemon = daemon
         Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         entry = WTPoolEntry(T, Q)
@@ -167,7 +187,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
         Targs.append(entry)
         debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
         T.start()
-      entry.queue.put( (func, retq, deliver) )
+      entry.queue.put((func, retq, deliver))
 
   @logexc
   def _handler(self, entry):
@@ -200,10 +220,12 @@ class WorkerThreadPool(MultiOpenMixin, O):
         exc_info = sys.exc_info()
         log_func = (
             exception
-            if isinstance(exc_info[1], (TypeError, NameError, AttributeError))
-            else debug
+            if isinstance(exc_info[1],
+                          (TypeError, NameError, AttributeError)) else debug
         )
-        log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        log_func(
+            "%s: worker thread: ran task: exception! %r", self, sys.exc_info()
+        )
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
@@ -212,7 +234,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
           raise3(*exc_info)
         debug("%s: worker thread: set result = (None, exc_info)", self)
       T.name = oname
-      func = None     # release func+args
+      func = None  # release func+args
       reuse = False and (len(idle) < self.max_spare)
       if reuse:
         # make available for another task
@@ -304,27 +326,59 @@ class AdjustableSemaphore(object):
           delta -= 1
       else:
         while delta < 0:
-          with LogTime("AdjustableSemaphore(%s): acquire excess capacity", self.__name):
+          with LogTime("AdjustableSemaphore(%s): acquire excess capacity",
+                       self.__name):
             self.__sem.acquire(True)
           delta += 1
       self.__value = newvalue
 
-def locked(func):
-  ''' A decorator for monitor functions that must run within a lock.
-      Relies upon a ._lock attribute for locking.
+@decorator
+def locked(func, initial_timeout=2.0, lockattr='_lock'):
+  ''' A decorator for instance methods that must run within a lock.
+
+      Decorator keyword arguments:
+      * `initial_timeout`:
+        the initial lock attempt timeout;
+        if this is `>0` and exceeded a warning is issued
+        and then an indefinite attempt is made.
+        Default: `2.0`s
+      * `lockattr`:
+        the name of the attribute of `self`
+        which references the lock object.
+        Default `'_lock'`
   '''
+
   def lockfunc(self, *a, **kw):
-    with self._lock:
-      return func(self, *a, **kw)
+    ''' Obtain the lock and then call `func`.
+    '''
+    lock = getattr(self, lockattr)
+    if initial_timeout > 0 and lock.acquire(timeout=initial_timeout):
+      try:
+        return func(self, *a, **kw)
+      finally:
+        lock.release()
+    else:
+      if initial_timeout > 0:
+        warning(
+            "timeout after %gs waiting for %s<%s>.%s, continuing to wait",
+            initial_timeout,
+            type(self).__name__, self, lockattr
+        )
+      with lock:
+        return func(self, *a, **kw)
+
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
-def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
+def locked_property(
+    func, lock_name='_lock', prop_name=None, unset_object=None
+):
   ''' A thread safe property whose value is cached.
       The lock is taken if the value needs to computed.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
+
   @transmute(AttributeError)
   def getprop(self):
     ''' Attempt lockless fetch of property first.
@@ -350,6 +404,7 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
       ##debug("outside lock, already computed %s", prop_name)
       pass
     return p
+
   return prop(getprop)
 
 class LockableMixin(object):
@@ -357,10 +412,13 @@ class LockableMixin(object):
       Exposes the ._lock as the property .lock.
       Presents a context manager interface for obtaining an object's lock.
   '''
+
   def __enter__(self):
     self._lock.acquire()
+
   def __exit(self, exc_type, exc_value, traceback):
     self._lock.release()
+
   @property
   def lock(self):
     ''' Return the lock.
@@ -372,10 +430,161 @@ def via(cmanager, func, *a, **kw):
       with statement using the context manager `cmanager`.
       This intended use case is aimed at deferred function calls.
   '''
+
   def f():
     with cmanager:
       return func(*a, **kw)
+
   return f
+
+class PriorityLockSubLock(namedtuple('PriorityLockSubLock',
+                                     'name priority lock priority_lock')):
+  ''' The record for the per-`acquire`r `Lock` held by `PriorityLock.acquire`.
+  '''
+
+  def __str__(self):
+    return "%s(name=%r,priority=%s,lock=%s:%s,priority_lock=%r)" \
+        % (type(self).__name__,
+           self.name,
+           self.priority,
+           type(self.lock).__name__, id(self.lock),
+           str(self.priority_lock))
+
+class PriorityLock(object):
+  ''' A priority based mutex which is acquired by and released to waiters
+      in priority order.
+
+      The initialiser sets a default priority, itself defaulting to `0`.
+
+      The `acquire()` method accepts an optional `priority` value
+      which specifies the priority of the acquire request;
+      lower values have higher priorities.
+      `acquire` returns a new `PriorityLockSubLock`.
+
+      Note that internally this allocates a `threading.Lock` per acquirer.
+
+      When `acquire` is called, if the `PriorityLock` is taken
+      then the acquirer blocks on their personal `Lock`.
+
+      When `release()` is called the highest priority `Lock` is released.
+
+      Within a priority level `acquire`s are served in FIFO order.
+
+      Used as a context manager, the mutex is obtained at the default priority.
+      The `priority()` method offers a context manager
+      with a specified priority.
+      Both context managers return the `PriorityLockSubLock`
+      allocated by the `acquire`.
+  '''
+
+  _cls_seq = Seq()
+
+  def __init__(self, default_priority=0, name=None):
+    ''' Initialise the `PriorityLock`.
+
+        Parameters:
+        * `default_priority`: the default `acquire` priority,
+          default `0`.
+        * `name`: optional identifying name
+    '''
+    if name is None:
+      name = str(next(self._cls_seq))
+    self.name = name
+    self.default_priority = default_priority
+    # heap of active priorities
+    self._priorities = []
+    # queues per priority
+    self._blocked = defaultdict(list)
+    self._nlocks = 0
+    self._current_sublock = None
+    self._seq = Seq()
+    self._lock = Lock()
+
+  def __str__(self):
+    return "%s[%s]" % (type(self).__name__, self.name)
+
+  def acquire(self, priority=None):
+    ''' Acquire the mutex with `priority` (default from `default_priority`).
+        Return the new `PriorityLockSubLock`.
+
+        This blocks behind any higher priority `acquire`s
+        or any earlier `acquire`s of the same priority.
+    '''
+    if priority is None:
+      priority = self.default_priority
+    priorities = self._priorities
+    blocked_map = self._blocked
+    # prepare an acquired Lock at the right priority
+    my_lock = PriorityLockSubLock(
+        str(self) + '-' + str(next(self._seq)), priority, Lock(), self
+    )
+    my_lock.lock.acquire()
+    with self._lock:
+      self._nlocks += 1
+      if self._nlocks == 1:
+        # we're the only contender: return now
+        assert self._current_sublock is None
+        self._current_sublock = my_lock
+        return my_lock
+      # store my_lock in the pending locks
+      blocked = blocked_map[priority]
+      if not blocked:
+        # new priority
+        heappush(priorities, priority)
+      blocked.append(my_lock)
+    # block until someone frees my_lock
+    my_lock.lock.acquire()
+    assert self._current_sublock is None
+    self._current_sublock = my_lock
+    return my_lock
+
+  def release(self):
+    ''' Release the mutex.
+
+        Internally, this releases the highest priority `Lock`,
+        allowing that `acquire`r to go forward.
+    '''
+    # release the top Lock
+    priorities = self._priorities
+    with self._lock:
+      my_lock = self._current_sublock
+      self._current_sublock = None
+      my_lock.lock.release()
+      self._nlocks -= 1
+      if self._nlocks > 0:
+        # release to highest priority pending lock
+        top_priority = priorities[0]
+        top_blocked = self._blocked[top_priority]
+        top_lock = top_blocked.pop(0)
+        # release the lock ASAP
+        top_lock.lock.release()
+        if not top_blocked:
+          # no more locks of this priority, discard the queue and the priority
+          del self._blocked[top_priority]
+          heappop(priorities)
+
+  def __enter__(self):
+    ''' Enter the mutex as a context manager at the default priority.
+        Returns the new `Lock`.
+    '''
+    return self.acquire()
+
+  def __exit__(self, *_):
+    ''' Exit the context manager.
+    '''
+    self.release()
+    return False
+
+  @contextmanager
+  def priority(self, this_priority):
+    ''' A context manager with the specified `this_priority`.
+        Returns the new `Lock`.
+    '''
+    my_lock = self.acquire(this_priority)
+    try:
+      yield my_lock
+    finally:
+      self.release()
 
 if __name__ == '__main__':
   import cs.threads_tests

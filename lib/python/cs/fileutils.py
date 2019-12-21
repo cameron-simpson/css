@@ -25,11 +25,11 @@ from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.deco import cached, decorator, strable
+from cs.deco import cachedmethod, decorator, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
-from cs.logutils import error, warning, info, debug
+from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread
 from cs.range import Range
@@ -38,7 +38,8 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 
 DISTINFO = {
-    'description': "convenience functions and classes for files and filenames/pathnames",
+    'description':
+    "convenience functions and classes for files and filenames/pathnames",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -120,13 +121,16 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
-def rewrite(filepath, data,
-            mode='w',
-            backup_ext=None,
-            do_rename=False,
-            do_diff=None,
-            empty_ok=False,
-            overwrite_anyway=False):
+def rewrite(
+    filepath,
+    data,
+    mode='w',
+    backup_ext=None,
+    do_rename=False,
+    do_diff=None,
+    empty_ok=False,
+    overwrite_anyway=False
+):
   ''' Rewrite the file `filepath` with data from the file object `data`.
 
       Parameters:
@@ -282,10 +286,12 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
   return None, None
 
 @decorator
-def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw):
+def file_based(
+    func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw
+):
   ''' A decorator which caches a value obtained from a file.
 
-      In addition to all the keyword arguments for `@cs.deco.cached`,
+      In addition to all the keyword arguments for `@cs.deco.cachedmethod`,
       this decorator also accepts the following arguments:
       * `attr_name`: the name for the associated attribute, used as
         the basis for the internal cache value attribute
@@ -309,11 +315,13 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
     poll_delay = DEFAULT_POLL_INTERVAL
   sig_func = dkw.pop('sig_func', None)
   if sig_func is None:
+
     def sig_func(self):
       filename = filename0
       if filename is None:
         filename = getattr(self, filename_attr)
       return FileState(filename, missing_ok=True)
+
   def wrap0(self, *a, **kw):
     filename = kw.pop('filename', None)
     if filename is None:
@@ -328,10 +336,11 @@ def file_based(func, attr_name=None, filename=None, poll_delay=None, sig_func=No
       if e.errno == errno.ENOENT:
         return None
       raise
+
   dkw['attr_name'] = attr_name
   dkw['poll_delay'] = poll_delay
   dkw['sig_func'] = sig_func
-  return cached(**dkw)(wrap0)
+  return cachedmethod(**dkw)(wrap0)
 
 @decorator
 def file_property(func, **dkw):
@@ -377,7 +386,9 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
-def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL):
+def make_files_property(
+    attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL
+):
   ''' Construct a decorator that watches multiple associated files.
 
       Parameters:
@@ -414,6 +425,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
       where files that were stat()ed during the change check have
       changed state after the load.
   '''
+
   def made_files_property(func):
     if attr_name is None:
       attr_value = '_' + func.__name__
@@ -423,6 +435,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
     attr_filestates = attr_value + '_filestates'
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
+
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -454,7 +467,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
           if changed:
             try:
               new_paths, new_value = func(self, old_paths)
-              new_filestates = [ FileState(new_path) for new_path in new_paths ]
+              new_filestates = [FileState(new_path) for new_path in new_paths]
             except NameError:
               raise
             except AttributeError:
@@ -463,7 +476,10 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
               new_value = getattr(self, attr_value, unset_object)
               if new_value is unset_object:
                 raise
-              debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
+              debug(
+                  "exception reloading .%s, keeping cached value: %s",
+                  attr_value, e
+              )
             else:
               # examine new filestates in case they changed during load
               # _if_ we knew about them from the earlier load
@@ -478,10 +494,14 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
                 setattr(self, attr_paths, new_paths)
                 setattr(self, attr_filestates, new_filestates)
       return getattr(self, attr_value, unset_object)
+
     return property(getprop)
+
   return made_files_property
 
-def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
+def makelockfile(
+    path, ext=None, poll_interval=None, timeout=None, runstate=None
+):
   ''' Create a lockfile and return its path.
 
       The lockfile can be removed with os.remove.
@@ -514,13 +534,12 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
     while True:
       if runstate is not None and runstate.cancelled:
         warning(
-            "%s cancelled; pid %d waited %ds",
-            runstate,
-            os.getpid(),
-            0 if start is None else time.time() - start)
+            "%s cancelled; pid %d waited %ds", runstate, os.getpid(),
+            0 if start is None else time.time() - start
+        )
         raise CancellationError("lock acquisition cancelled")
       try:
-        lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+        lockfd = os.open(lockpath, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0)
       except OSError as e:
         if e.errno != errno.EEXIST:
           raise
@@ -536,8 +555,7 @@ def makelockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None
           complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
         else:
           if now - complaint_last >= complaint_interval:
-            warning("pid %d waited %ds",
-                    os.getpid(), now - start)
+            warning("pid %d waited %ds", os.getpid(), now - start)
             complaint_last = now
             complaint_interval *= 2
         # post: start is set
@@ -570,8 +588,11 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   '''
   lockpath = makelockfile(
       path,
-      ext=ext, poll_interval=poll_interval,
-      timeout=timeout, runstate=runstate)
+      ext=ext,
+      poll_interval=poll_interval,
+      timeout=timeout,
+      runstate=runstate
+  )
   try:
     yield lockpath
   finally:
@@ -620,14 +641,15 @@ def mkdirn(path, sep=''):
       if sep:
         raise ValueError(
             "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
-            % (path, sep, os.sep))
+            % (path, sep, os.sep)
+        )
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
       dirpath = dirname(path)
       if not dirpath:
         dirpath = '.'
-      pfx = basename(path)+sep
+      pfx = basename(path) + sep
 
     if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
@@ -670,7 +692,7 @@ def tmpdirn(tmp=None):
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
-DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
+DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
 def shortpath(path, environ=None, prefixes=None):
   ''' Return `path` with the first matching leading prefix replaced.
@@ -708,7 +730,7 @@ class Pathname(str):
       format strings related to file paths.
   '''
 
-  _default_prefixes = ( ('$HOME/', '~/'), )
+  _default_prefixes = (('$HOME/', '~/'),)
 
   def __format__(self, fmt_spec):
     ''' Calling format(<Pathname>, fmt_spec) treat `fmt_spec` as a new style
@@ -831,7 +853,8 @@ def datafrom(f, offset, readsize=None, maxlength=None):
   else:
     fd = get_fileno()
     if stat.S_ISREG(os.fstat(fd).st_mode):
-      for data in datafrom_fd(fd, offset, readsize=readsize, maxlength=maxlength):
+      for data in datafrom_fd(fd, offset, readsize=readsize,
+                              maxlength=maxlength):
         yield data
       return
   # presume a file-like object
@@ -883,7 +906,9 @@ class ReadMixin(object):
 
         Classes using this mixin must implement this method.
     '''
-    raise NotImplementedError("return an iterator which does not change the file offset")
+    raise NotImplementedError(
+        "return an iterator which does not change the file offset"
+    )
 
   def bufferfrom(self, offset):
     ''' Return a CornuCopyBuffer from the specified `offset`.
@@ -960,7 +985,9 @@ class ReadMixin(object):
     data = bytearray(n)
     nread = self.readinto(data)
     if nread != len(data):
-      raise RuntimeError("  WRONG NUMBER OF BYTES(%d): data=%s" % (nread, data))
+      raise RuntimeError(
+          "  WRONG NUMBER OF BYTES(%d): data=%s" % (nread, data)
+      )
     return memoryview(data)[:nread] if nread != n else data
 
   @locked
@@ -1097,9 +1124,12 @@ class BackedFile(ReadMixin):
     front_file.seek(start)
     written = front_file.write(b)
     if written is None:
-      warning("front_file.write() returned None, assuming %d bytes written, data=%r", len(b), b)
+      warning(
+          "front_file.write() returned None, assuming %d bytes written, data=%r",
+          len(b), b
+      )
       written = len(b)
-    self.front_range.add_span(start, start+written)
+    self.front_range.add_span(start, start + written)
     return written
 
 class BackedFile_TestMethods(object):
@@ -1128,11 +1158,11 @@ class BackedFile_TestMethods(object):
     bfp.seek(0)
     bfp_leading_text = bfp.read_n(512)
     self._eq(
-        backing_text[:512],
-        bfp_leading_text,
-        "leading 512 bytes of backing_text vs bfp_leading_text")
+        backing_text[:512], bfp_leading_text,
+        "leading 512 bytes of backing_text vs bfp_leading_text"
+    )
     # test writing some data and reading it back
-    random_chunk = bytes( randint(0, 255) for x in range(256) )
+    random_chunk = bytes(randint(0, 255) for x in range(256))
     bfp.seek(512)
     bfp.write(random_chunk)
     # check that the front file has a single span of the right dimensions
@@ -1155,10 +1185,9 @@ class BackedFile_TestMethods(object):
     bfp.seek(256)
     overlap_chunk = bfp.read_n(512)
     self.assertEqual(
-        len(overlap_chunk),
-        512,
-        "overlap_chunk not 512 bytes: %d:%s"
-        % (len(overlap_chunk), bytes(overlap_chunk)))
+        len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %d:%s" %
+        (len(overlap_chunk), bytes(overlap_chunk))
+    )
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 class Tee(object):
@@ -1200,12 +1229,15 @@ class Tee(object):
 def tee(fp, fp2):
   ''' Context manager duplicating .write and .flush from fp to fp2.
   '''
+
   def _write(*a, **kw):
     fp2.write(*a, **kw)
     return old_write(*a, **kw)
+
   def _flush(*a, **kw):
     fp2.flush(*a, **kw)
     return old_flush(*a, **kw)
+
   old_write = getattr(fp, 'write')
   old_flush = getattr(fp, 'flush')
   fp.write = _write
@@ -1263,8 +1295,9 @@ def file_data(fp, nbytes=None, rsize=None):
       if nbytes is not None:
         if copied > 0:
           # no warning of nothing copied - that is immediate end of file - valid
-          warning("early EOF: only %d bytes read, %d still to go",
-                  copied, nbytes)
+          warning(
+              "early EOF: only %d bytes read, %d still to go", copied, nbytes
+          )
       break
     yield data
     copied += len(data)
@@ -1314,7 +1347,9 @@ def read_from(fp, rsize=None, tail_mode=False, tail_delay=None):
   if tail_delay is None:
     tail_delay = DEFAULT_TAIL_PAUSE
   elif not tail_mode:
-    raise ValueError("tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay))
+    raise ValueError(
+        "tail_mode=%r but tail_delay=%r" % (tail_mode, tail_delay)
+    )
   while True:
     chunk = fp.read(rsize)
     if not chunk:

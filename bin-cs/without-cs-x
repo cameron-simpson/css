@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Strip "cs.x" import and "X()" use, run command, restore.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+cmd=$0
+usage="Usage: $cmd filename command [args...]"
+
+badopts=
+
+[ $# -gt 2 ] || {
+  echo "$cmd: missing filename or command" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec with-filter -e sed '/^ *from cs.x import /d;/ *X(/d' -- "$@"

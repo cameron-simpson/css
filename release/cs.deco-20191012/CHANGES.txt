@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: new @contextual decorator to turn a simple function into a context manager; @strable: mention context manager requirement and @contextual as workaround
+lib/python/cs/deco.py: cs.deco: @contextual: add a doctest

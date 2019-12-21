@@ -43,6 +43,7 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
+from cs.deco import decorator
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
@@ -56,6 +57,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.py3',
         'cs.x',
     ],
@@ -94,17 +96,19 @@ def pfx(func):
   wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
   return wrapped
 
-def pfx_method(method):
-  ''' Decorator to provide a Pfx context for an instance method prefixing
-      "classname.methodname".
+@decorator
+def pfx_method(method, use_str=False):
+  ''' Decorator to provide a `Pfx` context for an instance method prefixing
+      *classname.methodname*
+      (or *str(self).methodname* if `use_str` is true).
   '''
 
   def wrapper(self, *a, **kw):
-    with Pfx("%s.%s", type(self).__name__, method.__name__):
+    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
       return method(self, *a, **kw)
 
   wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(method.__name__)"
+  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
   return wrapper
 
 def pfxtag(tag, loggers=None):

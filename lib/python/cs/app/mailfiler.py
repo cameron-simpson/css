@@ -49,7 +49,7 @@ import time
 from time import sleep
 from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
-from cs.deco import cached, fmtdoc
+from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
 from cs.excutils import LogExceptions
@@ -2086,7 +2086,7 @@ class WatchedMaildir(O):
     return states
 
   @prop
-  @cached(sig_func=lambda md: md._rules_state())
+  @cachedmethod(sig_func=lambda md: md._rules_state())
   def rules(self):
     ''' The `Rules` object for this `WatchedMaildir`.
     '''
