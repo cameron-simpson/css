@@ -14,6 +14,7 @@ ISO make the standard available here:
 
 from __future__ import print_function
 from collections import namedtuple
+from datetime import datetime
 from functools import partial
 import os
 from os.path import basename
@@ -40,7 +41,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import get_identifier, get_decimal_value
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
@@ -89,7 +90,7 @@ def main(argv):
           else:
             parsee = spec
           over_box, = parse(parsee)
-          over_box.dump()
+          over_box.dump(crop_length=None)
     elif op == 'info':
       if not argv:
         argv = ['-']
@@ -334,6 +335,9 @@ class BoxBody(Packet):
 
   PACKET_FIELDS = {}
 
+  def __str__(self):
+    return Packet.__str__(self, skip_fields=['boxes'])
+
   def __getattr__(self, attr):
     ''' The following virtual attributes are defined:
         * *TYPE*`s`:
@@ -444,12 +448,15 @@ class Box(Packet):
     try:
       body = self.body
     except AttributeError:
-      s = "%s:NO_BODY" % (type_name,)
+      s = "%s[%d]:NO_BODY" % (
+          type_name,
+          self.length,
+      )
     else:
-      s = "%s:%s" % (type_name, body)
+      s = "%s[%d]:%s" % (type_name, self.length, body)
     unparsed = self.unparsed
-    if unparsed:
-      s += ":unparsed=%d" % (len(unparsed,))
+    if unparsed and unparsed != b'\0':
+      s += ":unparsed=%r" % (unparsed[:16],)
     return s
 
   def __getattr__(self, attr):
@@ -623,7 +630,7 @@ class Box(Packet):
         self.add_from_buffer(
             'unparsed', bfr_tail, BytesesField, end_offset=Ellipsis, **kw
         )
-        warning(
+        debug(
             "%s:%s: unparsed data: %d bytes",
             type(self).__name__, self.box_type_s, len(self['unparsed'])
         )
@@ -981,10 +988,12 @@ class ContainerBoxBody(BoxBody):
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
+  def parse_buffer(self, bfr, default_type=None, **kw):
     ''' Gather the `boxes` field.
     '''
-    super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
+    # parse the BoxBody
+    super().parse_buffer(bfr, **kw)
+    # gather following boxes as .boxes
     self.add_from_buffer(
         'boxes',
         bfr,
@@ -1553,21 +1562,7 @@ add_generic_sample_boxbody(
     b'elst', '8.6.6', 'Edit List', '>Ll', 'segment_duration media_time', '>Qq'
 )
 
-class DINFBoxBody(BoxBody):
-  ''' A 'dinf' Data Information BoxBody - section 8.7.1.
-  '''
-
-  PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS,
-                       ##boxes=SubBoxesField,
-                       )
-
-  def parse_buffer(self, bfr, **kw):
-    ''' A DINF BoxBody may contain further Boxes.
-    '''
-    super().parse_buffer(bfr, **kw)
-    ##self.add_from_buffer('boxes', bfr, SubBoxesField, **kw)
-
-add_body_class(DINFBoxBody)
+add_body_subclass(ContainerBoxBody, b'dinf', '8.7.1', 'Data Information')
 
 class URL_BoxBody(FullBoxBody):
   ''' An 'url ' Data Entry URL BoxBody - section 8.7.2.1.
@@ -1775,6 +1770,158 @@ class METABoxBody(FullBoxBody):
 
 add_body_class(METABoxBody)
 
+class ILSTBoxBody(ContainerBoxBody):
+  ''' iTunes Information List, container for iTunes metadata fields.
+
+      Much of the format knowledge here comes from AtomicParsley's
+      documentation here:
+
+          http://atomicparsley.sourceforge.net/mpeg-4files.html
+  '''
+
+  def ILSTRawSchema(attribute_name):
+    return namedtuple(
+        'ILSTRawSchema', 'attribute_name from_buffer transcribe_value'
+    )(attribute_name, lambda bfr: bfr.take(...), lambda bs: bs)
+
+  def ILSTTextSchema(attribute_name):
+    return namedtuple(
+        'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
+    )(
+        attribute_name, lambda bfr: bfr.take(...).decode(), lambda text: text.
+        encode()
+    )
+
+  def ILSTUInt32BESchema(attribute_name):
+    return namedtuple(
+        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
+    )(attribute_name, UInt32BE.value_from_buffer, UInt32BE.transcribe_value)
+
+  def ILSTUInt8Schema(attribute_name):
+    return namedtuple(
+        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
+    )(attribute_name, UInt8.value_from_buffer, UInt8.transcribe_value)
+
+  def ILSTAofBSchema(attribute_name):
+    return namedtuple(
+        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
+    )(
+        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')(
+            UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)
+        ), lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) +
+        UInt32BE.transcribe_value(member_n_of.total)
+    )
+
+  def ILSTISOFormatSchema(attribute_name):
+    return namedtuple(
+        'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
+    )(
+        attribute_name, lambda bfr: datetime.fromisoformat(
+            bfr.take(...).decode()
+        ), lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
+    )
+
+  SUBBOX_SCHEMA = {
+      b'\xa9alb': ILSTTextSchema('album_title'),
+      b'\xa9art': ILSTTextSchema('artist'),
+      b'\xa9ART': ILSTTextSchema('album_artist'),
+      b'\xa9cmt': ILSTTextSchema('comment'),
+      b'\xa9day': ILSTTextSchema('year'),
+      b'\xa9gen': ILSTTextSchema('custom_genre'),
+      b'\xa9grp': ILSTTextSchema('grouping'),
+      b'\xa9lyr': ILSTTextSchema('lyrics'),
+      b'\xa9nam': ILSTTextSchema('episode_title'),
+      b'\xa9too': ILSTTextSchema('encoder'),
+      b'\xa9wrt': ILSTTextSchema('composer'),
+      b'aART': ILSTTextSchema('album_artist'),
+      b'catg': ILSTTextSchema('category'),
+      b'covr': ILSTRawSchema('cover'),
+      b'cpil': ILSTUInt8Schema('compilation'),
+      b'cprt': ILSTTextSchema('copyright'),
+      b'desc': ILSTTextSchema('description'),
+      b'disk': ILSTUInt8Schema('disk_number'),
+      b'egid': ILSTRawSchema('episode_guid'),
+      b'genr': ILSTTextSchema('genre'),
+      b'keyw': ILSTTextSchema('keyword'),
+      b'ldes': ILSTTextSchema('long_description'),
+      b'pcst': ILSTUInt8Schema('podcast'),
+      b'pgap': ILSTUInt8Schema('gapless_playback'),
+      b'purd': ILSTISOFormatSchema('purchase_date'),
+      b'purl': ILSTUInt8Schema('podcast_url'),
+      b'rtng': ILSTUInt8Schema('rating'),
+      b'soal': ILSTTextSchema('song_album_title'),
+      b'soar': ILSTTextSchema('song_artist'),
+      b'sonm': ILSTTextSchema('song_name'),
+      b'tmpo': ILSTUInt8Schema('bpm'),
+      b'trkn': ILSTAofBSchema('track_number'),
+      b'tven': ILSTTextSchema('tv_episode_number'),
+      b'tves': ILSTUInt32BESchema('tv_episode'),
+      b'tvnn': ILSTTextSchema('tv_network_name'),
+      b'tvsh': ILSTTextSchema('tv_show_name'),
+      b'tvsn': ILSTUInt32BESchema('tv_season'),
+  }
+
+  def parse_buffer(self, bfr, **kw):
+    super().parse_buffer(bfr, **kw)
+    for subbox in self.boxes:
+      subbox_type = subbox.box_type
+      with Pfx("subbox %r", subbox_type):
+        field_name, unparsed = subbox.pop_field()
+        assert field_name == 'unparsed'
+        X("UNPARSED=%r", unparsed.value)
+        subbfr = CornuCopyBuffer(unparsed.value)
+        subbox.add_from_buffer('size', subbfr, UInt32BE)
+        data = subbfr.take(4)
+        # 1 byte version
+        subbox.add_from_buffer('version', subbfr, UInt8)
+        # 3 bytes flags
+        bs3 = subbfr.take(3)
+        subbox.add_from_value(
+            'flags', bs3[0] << 16 + bs3[1] << 8 + bs3[2], lambda flags:
+            bytes(((flags >> 16) & 0xff, (flags >> 8) & 0xff, flags & 0xff))
+        )
+        bs4 = subbfr.take(4)
+        if bs4 != b'\x00\x00\x00\x00':
+          warning("unparsed[12:16]: not all NULs: %r", bs4)
+        if subbox_type == b'----':
+          X("unparsed=%r", unparsed.value)
+        else:
+          if data != b'data':
+            warning("unparsed[4:8] is not b'data', got %r", data)
+          subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
+          if subbox_schema is None:
+            warning("no schema")
+          else:
+            with Pfx("%s", subbox_schema.from_buffer):
+              try:
+                value = subbox_schema.from_buffer(subbfr)
+              except (ValueError, TypeError) as e:
+                warning("decode fails: %s", e)
+                raise
+              else:
+                subbox.add_from_value(
+                    subbox_schema.attribute_name, value,
+                    subbox_schema.transcribe_value
+                )
+        subbox.add_from_buffer(
+            'unparsed', subbfr, BytesesField, end_offset=Ellipsis
+        )
+        if subbox.unparsed:
+          warning("unparsed=%s", subbox.unparsed)
+
+  def __getattr__(self, attr):
+    for schema_code, schema in self.SUBBOX_SCHEMA.items():
+      if schema.attribute_name == attr:
+        X(".%s: MATCHED %r", attr, schema_code)
+        subbox_attr = schema_code.decode('iso8859-1').upper()
+        X("  subbox_attr=%r", subbox_attr)
+        subbox = getattr(self, subbox_attr)
+        X("  subbox=%s", subbox)
+        return None
+    return super().__getattr__(attr)
+
+add_body_class(ILSTBoxBody)
+
 class VMHDBoxBody(FullBoxBody):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
@@ -1900,35 +2047,31 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
     indent_incr = '  '
   fp.write(indent)
   summary = str(B)
-  if len(summary) > crop_length - len(indent):
-    summary = summary[:crop_length - len(indent) - 4] + '...)'
+  if crop_length is not None:
+    if len(summary) > crop_length - len(indent):
+      summary = summary[:crop_length - len(indent) - 4] + '...)'
   fp.write(summary)
   fp.write('\n')
-  try:
-    body = B.body
-  except AttributeError:
-    fp.write(indent)
-    fp.write("NO BODY?")
-    fp.write('\n')
-  else:
+  boxes = getattr(B, 'boxes', None)
+  body = getattr(B, 'body', None)
+  if body:
     for field_name in body.field_names:
+      if field_name == 'boxes':
+        boxes = None
       field = body[field_name]
       if isinstance(field, SubBoxesField):
-        fp.write(indent)
-        fp.write('  ')
-        fp.write(field_name)
-        fp.write(':\n')
+        if field_name != 'boxes':
+          fp.write(indent + indent_incr)
+          fp.write(field_name)
+          if field.value:
+            fp.write(':\n')
+          else:
+            fp.write(': []\n')
         for subbox in field.value:
           subbox.dump(
               indent=indent + indent_incr, fp=fp, crop_length=crop_length
           )
-  try:
-    boxes = B.boxes
-  except AttributeError:
-    pass
-  else:
-    fp.write(indent)
-    fp.write('  boxes\n')
+  if boxes:
     for subbox in boxes:
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 

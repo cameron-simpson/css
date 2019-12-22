@@ -1223,22 +1223,28 @@ def infer_tags(name, rules=None):
       `rules` is an iterable of objects with a `.infer_tags(name)` method
       which returns an iterable of `Tag`s.
   '''
-  if rules is None:
-    rules = loadrc()
-  tags = TagSet()
-  for rule in rules:
-    for autotag in rule.infer_tags(name):
-      tags.add(autotag)
-  return tags
+  with Pfx("infer_tags(%r,..)", name):
+    if rules is None:
+      rules = loadrc()
+    tags = TagSet()
+    for rule in rules:
+      with Pfx(rule):
+        for autotag in rule.infer_tags(name):
+          with Pfx(autotag):
+            if autotag.name not in tags:
+              tags.add(autotag)
+    return tags
 
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
 
   def __init__(self, regexp):
-    if isinstance(regexp, str):
-      regexp = re.compile(regexp)
-    self.regexp = regexp
+    self.regexp_src = regexp
+    self.regexp = re.compile(regexp)
+
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.regexp_src)
 
   def infer_tags(self, s):
     ''' Apply the rule to the string `s`, return `Tag`s.
@@ -1315,8 +1321,7 @@ def loadrc(rcfilepath=None):
             if not line or line.startswith('#'):
               continue
             if line.startswith('/') and line.endswith('/'):
-              regexp = re.compile(line[1:-1])
-              rules.append(RegexpTagRule(regexp))
+              rules.append(RegexpTagRule(line[1:-1]))
     except OSError as e:
       if e.errno != errno.ENOENT:
         raise
