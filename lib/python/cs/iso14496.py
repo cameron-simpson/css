@@ -40,7 +40,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import get_identifier, get_decimal_value
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
@@ -623,7 +623,7 @@ class Box(Packet):
         self.add_from_buffer(
             'unparsed', bfr_tail, BytesesField, end_offset=Ellipsis, **kw
         )
-        warning(
+        debug(
             "%s:%s: unparsed data: %d bytes",
             type(self).__name__, self.box_type_s, len(self['unparsed'])
         )
@@ -1904,31 +1904,26 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
     summary = summary[:crop_length - len(indent) - 4] + '...)'
   fp.write(summary)
   fp.write('\n')
-  try:
-    body = B.body
-  except AttributeError:
-    fp.write(indent)
-    fp.write("NO BODY?")
-    fp.write('\n')
-  else:
+  boxes = getattr(B, 'boxes', None)
+  body = getattr(B, 'body', None)
+  if body:
     for field_name in body.field_names:
+      if field_name == 'boxes':
+        boxes = None
       field = body[field_name]
       if isinstance(field, SubBoxesField):
-        fp.write(indent)
-        fp.write('  ')
-        fp.write(field_name)
-        fp.write(':\n')
+        if field_name != 'boxes':
+          fp.write(indent + indent_incr)
+          fp.write(field_name)
+          if field.value:
+            fp.write(':\n')
+          else:
+            fp.write(': []\n')
         for subbox in field.value:
           subbox.dump(
               indent=indent + indent_incr, fp=fp, crop_length=crop_length
           )
-  try:
-    boxes = B.boxes
-  except AttributeError:
-    pass
-  else:
-    fp.write(indent)
-    fp.write('  boxes\n')
+  if boxes:
     for subbox in boxes:
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
