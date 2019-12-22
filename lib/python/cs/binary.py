@@ -472,7 +472,8 @@ class BytesesField(PacketField):
             pass
       else:
         # gather up all the data left in the buffer
-        bfr.hint(bfr_end_offset - bfr.offset)
+        if bfr_end_offset is not None:
+          bfr.hint(bfr_end_offset - bfr.offset)
         byteses.extend(bfr)
     else:
       # otherwise gather up a bounded range of bytes
