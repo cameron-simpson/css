@@ -89,7 +89,7 @@ def main(argv):
           else:
             parsee = spec
           over_box, = parse(parsee)
-          over_box.dump()
+          over_box.dump(crop_length=None)
     elif op == 'info':
       if not argv:
         argv = ['-']
@@ -1900,8 +1900,9 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
     indent_incr = '  '
   fp.write(indent)
   summary = str(B)
-  if len(summary) > crop_length - len(indent):
-    summary = summary[:crop_length - len(indent) - 4] + '...)'
+  if crop_length is not None:
+    if len(summary) > crop_length - len(indent):
+      summary = summary[:crop_length - len(indent) - 4] + '...)'
   fp.write(summary)
   fp.write('\n')
   boxes = getattr(B, 'boxes', None)
