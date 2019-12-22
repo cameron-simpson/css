@@ -1299,3 +1299,17 @@ class Packet(PacketField):
     self.fields.append(field)
     self.field_map[field_name] = field
     return None if field is None else field.value
+
+  def remove_field(self, field_name):
+    ''' Remove the field `field_name`. Return the field.
+    '''
+    field = self.field_map.pop(field_name)
+    self.field_names.remove(field_name)
+    return field
+
+  def pop_field(self):
+    ''' Remove the last field, return `(field_name,field)`.
+    '''
+    field_name = self.field_names[-1]
+    field = self.remove_field(field_name)
+    return field_name, field
