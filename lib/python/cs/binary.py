@@ -1271,8 +1271,27 @@ class Packet(PacketField):
     self.add_field(field_name, field)
     return field.value
 
+  def add_from_value(self, field_name, value, transcribe_value_fn):
+    ''' Add a new field named `field_name` with `.value=value`.
+        Return the new field.
+    '''
+
+    class ValueField(PacketField):
+      ''' A `PacketField` with a single `.value` and no parser.
+      '''
+
+      @staticmethod
+      def transcribe_value(value):
+        ''' Transcribe the value as bytes.
+        '''
+        return transcribe_value_fn(value)
+
+    field = ValueField(value)
+    self.add_field(field_name, field)
+    return field
+
   def add_field(self, field_name, field):
-    ''' Add a new PacketField `field` named `field_name`.
+    ''' Add a new `PacketField` `field` named `field_name`.
     '''
     if field_name in self.field_map:
       raise ValueError("field %r already in field_map" % (field_name,))
