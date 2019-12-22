@@ -454,8 +454,8 @@ class Box(Packet):
     else:
       s = "%s[%d]:%s" % (type_name, self.length, body)
     unparsed = self.unparsed
-    if unparsed:
-      s += ":unparsed=%d" % (len(unparsed,))
+    if unparsed and unparsed != b'\0':
+      s += ":unparsed=%r" % (unparsed[:16],)
     return s
 
   def __getattr__(self, attr):
