@@ -444,9 +444,12 @@ class Box(Packet):
     try:
       body = self.body
     except AttributeError:
-      s = "%s:NO_BODY" % (type_name,)
+      s = "%s[%d]:NO_BODY" % (
+          type_name,
+          self.length,
+      )
     else:
-      s = "%s:%s" % (type_name, body)
+      s = "%s[%d]:%s" % (type_name, self.length, body)
     unparsed = self.unparsed
     if unparsed:
       s += ":unparsed=%d" % (len(unparsed,))
