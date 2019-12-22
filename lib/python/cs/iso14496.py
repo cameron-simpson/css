@@ -334,6 +334,9 @@ class BoxBody(Packet):
 
   PACKET_FIELDS = {}
 
+  def __str__(self):
+    return Packet.__str__(self, skip_fields=['boxes'])
+
   def __getattr__(self, attr):
     ''' The following virtual attributes are defined:
         * *TYPE*`s`:
