@@ -987,10 +987,12 @@ class ContainerBoxBody(BoxBody):
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
+  def parse_buffer(self, bfr, default_type=None, **kw):
     ''' Gather the `boxes` field.
     '''
-    super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
+    # parse the BoxBody
+    super().parse_buffer(bfr, **kw)
+    # gather following boxes as .boxes
     self.add_from_buffer(
         'boxes',
         bfr,
