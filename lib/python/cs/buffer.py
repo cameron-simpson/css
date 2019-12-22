@@ -318,22 +318,29 @@ class CornuCopyBuffer(object):
   def extend(self, min_size, short_ok=False):
     ''' Extend the buffer to at least `min_size` bytes.
 
-        If there are insufficient data available then an EOFError
-        will be raised unless `short_ok` is true (default false)
+        If `min_size` is `Ellipsis`, extend the buffer to consume all the input.
+        This should really only be used with bounded buffers
+        in order to avoid unconstrained memory consumption.
+
+        If there are insufficient data available then an `EOFError`
+        will be raised unless `short_ok` is true (default `False`)
         in which case the updated buffer will be short.
     '''
-    if min_size < 1:
+    if min_size is Ellipsis:
+      pass
+    elif min_size < 1:
       raise ValueError("min_size(%r) must be >= 1" % (min_size,))
     length = len(self.buf)
-    if length < min_size:
-      self.hint(min_size - length)
+    if min_size is Ellipsis or length < min_size:
+      if min_size is not Ellipsis:
+        self.hint(min_size - length)
       bufs = [self.buf]
       chunks = self.input_data
-      while length < min_size:
+      while min_size is Ellipsis or length < min_size:
         try:
           next_chunk = next(chunks)
         except StopIteration:
-          if short_ok:
+          if min_size is Ellipsis or short_ok:
             break
           raise EOFError(
               "insufficient input data, wanted %d bytes but only found %d" %
@@ -380,7 +387,10 @@ class CornuCopyBuffer(object):
       return b''
     self.extend(size, short_ok=short_ok)
     buf = self.buf
-    taken = buf[:size]
+    if size is Ellipsis:
+      taken = buf
+    else:
+      taken = buf[:size]
     size = len(taken)  # adjust for possible short fetch
     self.buf = buf[size:]
     self.offset += size
