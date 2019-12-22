@@ -1052,11 +1052,12 @@ class Packet(PacketField):
     for field_name, field in fields.items():
       self.add_field(field_name, field)
 
-  def __str__(self):
+  def __str__(self, skip_fields=None):
     return "%s(%s)" % (
         type(self).__name__, ','.join(
             "%s=%s" % (field_name, self.field_map[field_name])
             for field_name in self.field_names
+            if skip_fields is None or field_name not in skip_fields
         )
     )
 
