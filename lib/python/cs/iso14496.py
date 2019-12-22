@@ -1561,21 +1561,7 @@ add_generic_sample_boxbody(
     b'elst', '8.6.6', 'Edit List', '>Ll', 'segment_duration media_time', '>Qq'
 )
 
-class DINFBoxBody(BoxBody):
-  ''' A 'dinf' Data Information BoxBody - section 8.7.1.
-  '''
-
-  PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS,
-                       ##boxes=SubBoxesField,
-                       )
-
-  def parse_buffer(self, bfr, **kw):
-    ''' A DINF BoxBody may contain further Boxes.
-    '''
-    super().parse_buffer(bfr, **kw)
-    ##self.add_from_buffer('boxes', bfr, SubBoxesField, **kw)
-
-add_body_class(DINFBoxBody)
+add_body_subclass(ContainerBoxBody, b'dinf', '8.7.1', 'Data Information')
 
 class URL_BoxBody(FullBoxBody):
   ''' An 'url ' Data Entry URL BoxBody - section 8.7.2.1.
