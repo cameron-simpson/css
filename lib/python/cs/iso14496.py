@@ -14,6 +14,7 @@ ISO make the standard available here:
 
 from __future__ import print_function
 from collections import namedtuple
+from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
 from getopt import GetoptError
@@ -668,6 +669,25 @@ class Box(Packet):
         self.add_field('unparsed', EmptyField)
       if bfr_tail is not bfr:
         bfr_tail.flush()
+
+  @contextmanager
+  def reparse_buffer(self):
+    ''' Context manager for continuing a parse from the `unparsed` field.
+
+        Pops the final `unparsed` field from the `Box`,
+        yields a `CornuCopyBuffer` make from it,
+        then pushes the `unparsed` field again
+        with the remaining contents of the buffer.
+    '''
+    field_name, unparsed = self.pop_field()
+    assert field_name == 'unparsed', "field_name(%r) is not 'unparsed'" % (
+        field_name,
+    )
+    bfr = CornuCopyBuffer(unparsed.value)
+    yield bfr
+    self.add_from_buffer('unparsed', bfr, BytesesField, end_offset=Ellipsis)
+    if self.unparsed:
+      warning("%r: unparsed=%s", self.box_type, self.unparsed)
 
   @property
   def box_type(self):
