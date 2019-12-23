@@ -477,6 +477,8 @@ class Box(Packet):
       s += ":unparsed=%r" % (unparsed[:16],)
     return s
 
+  __repr__ = __str__
+
   def __getattr__(self, attr):
     ''' If there is no direct attribute from `Packet.__getattr__`,
         have a look in the `.header` and `.body`.
@@ -630,7 +632,7 @@ class Box(Packet):
     body_class = pick_boxbody_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
       if bfr_tail.at_eof():
-        error("not Box body data parsing %s", body_class.__name__)
+        error("no Box body data parsing %s", body_class.__name__)
         self.add_field('body', EmptyField)
       else:
         try:
