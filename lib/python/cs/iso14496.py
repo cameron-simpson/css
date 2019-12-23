@@ -778,7 +778,7 @@ class SubBoxesField(ListField):
       parent=None,
       **kw
   ):
-    ''' Read Boxes from `bfr`, return a new SubBoxesField instance.
+    ''' Read Boxes from `bfr`, return a new `SubBoxesField` instance.
 
         Parameters:
         * `bfr`: the buffer
@@ -787,8 +787,8 @@ class SubBoxesField(ListField):
         * `max_boxes`: optional maximum number of Boxes to parse
         * `default`: a default `Box` subclass for `box_type`s without a
           registered subclass
-        * `copy_boxes`: optional callable to receive parsed Boxes
-        * `parent`: optional parent Box to record against parsed Boxes
+        * `copy_boxes`: optional callable to receive parsed `Box`es
+        * `parent`: optional parent `Box` to record against parsed `Box`es
     '''
     if end_offset is None:
       raise ValueError("SubBoxesField.from_buffer: missing end_offset")
@@ -810,7 +810,7 @@ class SubBoxesField(ListField):
     return boxes_field
 
 class OverBox(Packet):
-  ''' A fictitious Box encompassing all the Boxes in an input buffer.
+  ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
   '''
 
   PACKET_FIELDS = {
@@ -1875,7 +1875,6 @@ class ILSTBoxBody(ContainerBoxBody):
       with Pfx("subbox %r", subbox_type):
         field_name, unparsed = subbox.pop_field()
         assert field_name == 'unparsed'
-        X("UNPARSED=%r", unparsed.value)
         subbfr = CornuCopyBuffer(unparsed.value)
         subbox.add_from_buffer('size', subbfr, UInt32BE)
         data = subbfr.take(4)
