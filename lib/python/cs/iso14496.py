@@ -1728,6 +1728,12 @@ class DREFBoxBody(FullBoxBody):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      boxes=SubBoxesField,
+  )
+
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     ''' Gather the `entry_count` and `boxes` fields.
     '''
