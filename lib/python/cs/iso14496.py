@@ -16,6 +16,7 @@ from __future__ import print_function
 from collections import namedtuple
 from datetime import datetime
 from functools import partial
+from getopt import GetoptError
 import os
 from os.path import basename
 import stat
@@ -40,6 +41,7 @@ from cs.binary import (
     structtuple,
 )
 from cs.buffer import CornuCopyBuffer
+from cs.cmdutils import BaseCommand
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -56,123 +58,139 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Multimedia :: Video",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.lex', 'cs.logutils',
+        'cs.pfx', 'cspy.func', 'cs.units'
+    ],
 }
 
-USAGE = '''Usage:
-  %s extract [-H] filename boxref output
-            Extract the referenced Box from the specified filename into output.
-            -H  Skip the Box header.
-  %s [parse [{-|filename}]...]
-            Parse the named files (or stdin for "-").
-  %s info [{-|filename}]...]
-            Print informative report about each source.
-  %s test   Run unit tests.'''
-
-def main(argv):
-  ''' Module main programme.
+def main(argv=None):
+  ''' Command line mode.
   '''
-  cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd, cmd)
-  setup_logging(cmd)
-  if not argv:
-    argv = ['parse']
-  badopts = False
-  op = argv.pop(0)
-  with Pfx(op):
-    if op == 'parse':
-      if not argv:
-        argv = ['-']
-      for spec in argv:
-        with Pfx(spec):
-          if spec == '-':
-            parsee = sys.stdin.fileno()
-          else:
-            parsee = spec
-          over_box, = parse(parsee)
-          over_box.dump(crop_length=None)
-    elif op == 'info':
-      if not argv:
-        argv = ['-']
-      for spec in argv:
-        with Pfx(spec):
-          if spec == '-':
-            parsee = sys.stdin.fileno()
-          else:
-            parsee = spec
-          over_box, = parse(parsee)
-          print(spec + ":")
-          report(over_box, indent='  ')
-    elif op == 'deref':
-      spec = argv.pop(0)
+  if argv is None:
+    argv = sys.argv
+  return MP4Command().run(argv)
+
+class MP4Command(BaseCommand):
+  GETOPT_SPEC = ''
+
+  USAGE_FORMAT = '''Usage:
+    {cmd} extract [-H] filename boxref output
+        Extract the referenced Box from the specified filename into output.
+        -H  Skip the Box header.
+    {cmd} [parse [{{-|filename}}]...]
+        Parse the named files (or stdin for "-").
+    {cmd} info [{{-|filename}}]...]
+        Print informative report about each source.
+    {cmd} test
+        Run unit tests.'''
+
+  @staticmethod
+  def cmd_deref(argv, options, *, cmd):
+    ''' Dereference a Box specification against ISO14496 files.
+    '''
+    spec = argv.pop(0)
+    with Pfx(spec):
+      if spec == '-':
+        parsee = sys.stdin.fileno()
+      else:
+        parsee = spec
+      over_box, = parse(parsee)
+      over_box.dump()
+      for path in argv:
+        with Pfx(path):
+          B = deref_box(over_box, path)
+          print(path, "offset=%d" % B.offset, B)
+
+  @staticmethod
+  def cmd_extract(argv, options, *, cmd):
+    ''' Extract the content of the specified Box.
+    '''
+    skip_header = False
+    if argv and argv[0] == '-H':
+      argv.pop(0)
+      skip_header = True
+    if not argv:
+      warning("missing filename")
+      badopts = True
+    else:
+      filename = argv.pop(0)
+    if not argv:
+      warning("missing boxref")
+      badopts = True
+    else:
+      boxref = argv.pop(0)
+    if not argv:
+      warning("missing output")
+      badopts = True
+    else:
+      output = argv.pop(0)
+    if argv:
+      warning("extra argments after boxref: %s", ' '.join(argv))
+      badopts = True
+    if badopts:
+      raise GetoptError("invalid arguments")
+    over_box = parse(filename)
+    over_box.dump()
+    B = over_box
+    for box_type_s in boxref.split('.'):
+      B = getattr(B, box_type_s.upper())
+    with Pfx(filename):
+      fd = os.open(filename, os.O_RDONLY)
+      bfr = CornuCopyBuffer.from_fd(fd)
+      offset = B.offset
+      need = B.length
+      if skip_header:
+        offset += B.header_length
+        if need is not None:
+          need -= B.header_length
+      bfr.seek(offset)
+      with Pfx(output):
+        with open(output, 'wb') as ofp:
+          for chunk in bfr:
+            if need is not None and need < len(chunk):
+              chunk = chunk[need]
+            ofp.write(chunk)
+            need -= len(chunk)
+      os.close(fd)
+
+  @staticmethod
+  def cmd_info(argv, options, *, cmd):
+    ''' Produce a human friendly report.
+    '''
+    if not argv:
+      argv = ['-']
+    for spec in argv:
       with Pfx(spec):
         if spec == '-':
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
         over_box, = parse(parsee)
-        over_box.dump()
-        for path in argv:
-          with Pfx(path):
-            B = deref_box(over_box, path)
-            print(path, "offset=%d" % B.offset, B)
-    elif op == 'extract':
-      skip_header = False
-      if argv and argv[0] == '-H':
-        argv.pop(0)
-        skip_header = True
-      if not argv:
-        warning("missing filename")
-        badopts = True
-      else:
-        filename = argv.pop(0)
-      if not argv:
-        warning("missing boxref")
-        badopts = True
-      else:
-        boxref = argv.pop(0)
-      if not argv:
-        warning("missing output")
-        badopts = True
-      else:
-        output = argv.pop(0)
-      if argv:
-        warning("extra argments after boxref: %s", ' '.join(argv))
-        badopts = True
-      if not badopts:
-        over_box = parse(filename)
-        over_box.dump()
-        B = over_box
-        for box_type_s in boxref.split('.'):
-          B = getattr(B, box_type_s.upper())
-        with Pfx(filename):
-          fd = os.open(filename, os.O_RDONLY)
-          bfr = CornuCopyBuffer.from_fd(fd)
-          offset = B.offset
-          need = B.length
-          if skip_header:
-            offset += B.header_length
-            if need is not None:
-              need -= B.header_length
-          bfr.seek(offset)
-          with Pfx(output):
-            with open(output, 'wb') as ofp:
-              for chunk in bfr:
-                if need is not None and need < len(chunk):
-                  chunk = chunk[need]
-                ofp.write(chunk)
-                need -= len(chunk)
-          os.close(fd)
-    elif op == 'test':
-      import cs.iso14496_tests
-      cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
-    else:
-      warning("unknown op")
-      badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  return 0
+        print(spec + ":")
+        report(over_box, indent='  ')
+
+  @staticmethod
+  def cmd_parse(argv, options, *, cmd):
+    ''' Parse an ISO14496 based file.
+    '''
+    if not argv:
+      argv = ['-']
+    for spec in argv:
+      with Pfx(spec):
+        if spec == '-':
+          parsee = sys.stdin.fileno()
+        else:
+          parsee = spec
+        over_box, = parse(parsee)
+        over_box.dump(crop_length=None)
+
+  @staticmethod
+  def cmd_test(argv, options, *, cmd):
+    ''' Run self tests.
+    '''
+    import cs.iso14496_tests
+    cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
