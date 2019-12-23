@@ -13,6 +13,7 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
+from base64 import b64decode
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
@@ -1930,52 +1931,98 @@ class ILSTBoxBody(ContainerBoxBody):
       b'tvsn': ILSTUInt32BESchema('tv_season'),
   }
 
+  SUBSUBBOX_SCHEMA = {
+      'com.apple.iTunes': {
+          'Browsepath': None,
+          'Date': int,
+          'HasChapters': int,
+          'MaxAudioJump': float,
+          'MaxSourceFps': float,
+          'MaxVideoJump': float,
+          'MinSourceFps': float,
+          'PLVF': int,
+          'Path': None,
+          # this is actually XML
+          'Properties': lambda s: b64decode(s).decode(),
+          'ProviderName': None,
+          'RecordingTimestamp': datetime.fromisoformat,
+          'SourceFps': float,
+          'Sourceid': None,
+          'Status': int,
+          'Thumbnailurl': None,
+          'TotalAudioJumps': int,
+          'TotalVideoJumps': int,
+      }
+  }
+
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
     for subbox in self.boxes:
-      subbox_type = subbox.box_type
+      subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
-        field_name, unparsed = subbox.pop_field()
-        assert field_name == 'unparsed'
-        subbfr = CornuCopyBuffer(unparsed.value)
-        subbox.add_from_buffer('size', subbfr, UInt32BE)
-        data = subbfr.take(4)
-        # 1 byte version
-        subbox.add_from_buffer('version', subbfr, UInt8)
-        # 3 bytes flags
-        bs3 = subbfr.take(3)
-        subbox.add_from_value(
-            'flags', bs3[0] << 16 + bs3[1] << 8 + bs3[2], lambda flags:
-            bytes(((flags >> 16) & 0xff, (flags >> 8) & 0xff, flags & 0xff))
-        )
-        bs4 = subbfr.take(4)
-        if bs4 != b'\x00\x00\x00\x00':
-          warning("unparsed[12:16]: not all NULs: %r", bs4)
-        if subbox_type == b'----':
-          X("unparsed=%r", unparsed.value)
-        else:
-          if data != b'data':
-            warning("unparsed[4:8] is not b'data', got %r", data)
-          subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
-          if subbox_schema is None:
-            warning("no schema")
+        with subbox.reparse_buffer() as subbfr:
+          subbox.add_from_buffer(
+              'boxes', subbfr, SubBoxesField, end_offset=...
+          )
+          inner_boxes = subbox.boxes
+          if subbox_type == b'----':
+            # 3 boxes: mean, name, value
+            mean_box, name_box, data_box = inner_boxes
+            assert mean_box.box_type == b'mean'
+            assert name_box.box_type == b'name'
+            with mean_box.reparse_buffer() as meanbfr:
+              mean_box.add_from_buffer('n1', meanbfr, UInt32BE)
+              mean_box.add_from_value(
+                  'text',
+                  meanbfr.take(...).decode(), str.encode
+              )
+            with name_box.reparse_buffer() as namebfr:
+              name_box.add_from_buffer('n1', namebfr, UInt32BE)
+              name_box.add_from_value(
+                  'text',
+                  namebfr.take(...).decode(), str.encode
+              )
+            with data_box.reparse_buffer() as databfr:
+              data_box.add_from_buffer('n1', databfr, UInt32BE)
+              data_box.add_from_buffer('n2', databfr, UInt32BE)
+              data_box.add_from_value(
+                  'text',
+                  databfr.take(...).decode(), str.encode
+              )
+            value = data_box.text
+            decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
+                                                {}).get(name_box.text)
+            if decoder is not None:
+              value = decoder(value)
+            # annotate the subbox and the ilst
+            attribute_name = (
+                mean_box.text.replace('.', '_') + '_' + name_box.text
+            ).lower()
+            setattr(subbox, attribute_name, value)
+            setattr(self, attribute_name, value)
           else:
-            with Pfx("%s", subbox_schema.from_buffer):
-              try:
-                value = subbox_schema.from_buffer(subbfr)
-              except (ValueError, TypeError) as e:
-                warning("decode fails: %s", e)
-                raise
+            # single data box
+            data_box, = inner_boxes
+            with data_box.reparse_buffer() as databfr:
+              subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
+              if subbox_schema is None:
+                warning("%r: no schema", subbox_type)
               else:
-                subbox.add_from_value(
-                    subbox_schema.attribute_name, value,
-                    subbox_schema.transcribe_value
-                )
-        subbox.add_from_buffer(
-            'unparsed', subbfr, BytesesField, end_offset=Ellipsis
-        )
-        if subbox.unparsed:
-          warning("unparsed=%s", subbox.unparsed)
+                data_box.add_from_buffer('n1', databfr, UInt32BE)
+                data_box.add_from_buffer('n2', databfr, UInt32BE)
+                with Pfx("%s", subbox_schema.from_buffer):
+                  try:
+                    value = subbox_schema.from_buffer(databfr)
+                  except (ValueError, TypeError) as e:
+                    warning("decode fails: %s", e)
+                  else:
+                    data_box.add_from_value(
+                        subbox_schema.attribute_name, value,
+                        subbox_schema.transcribe_value
+                    )
+                    # annotate the subbox and the ilst
+                    setattr(subbox, subbox_schema.attribute_name, value)
+                    setattr(self, subbox_schema.attribute_name, value)
 
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
