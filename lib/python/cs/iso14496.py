@@ -1824,6 +1824,19 @@ class METABoxBody(FullBoxBody):
         copy_boxes=copy_boxes
     )
 
+  def __getattr__(self, attr):
+    ''' Present the ilst attributes if present.
+    '''
+    try:
+      return super().__getattr__(attr)
+    except AttributeError:
+      ilst = super().__getattr__('ISLT0')
+      if ilst is not None:
+        value = getattr(ilst, attr, None)
+        if value is not None:
+          return value
+      raise
+
 add_body_class(METABoxBody)
 
 class ILSTBoxBody(ContainerBoxBody):
