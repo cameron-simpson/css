@@ -440,6 +440,9 @@ class BytesesField(PacketField):
   def __len__(self):
     return self.length
 
+  def __iter__(self):
+    yield from self.value
+
   @classmethod
   def from_buffer(
       cls, bfr, end_offset=None, discard_data=False, short_ok=False
@@ -498,13 +501,7 @@ class BytesesField(PacketField):
     field.length = offset - offset0
     return field
 
-  def transcribe(self):
-    ''' Transcribe the bytes instances.
-
-        *Warning*: this will raise an exception if the data have been discarded.
-    '''
-    for bs in self.value:
-      yield bs
+  transcribe = __iter__
 
 class BytesRunField(PacketField):
   ''' A field containing a continuous run of a single bytes value.
