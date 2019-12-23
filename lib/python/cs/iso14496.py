@@ -484,6 +484,8 @@ class Box(Packet):
     try:
       value = super().__getattr__(attr)
     except AttributeError:
+      if attr in ('header', 'body'):
+        raise AttributeError("%s.%s: not present", type(self).__name__, attr)
       try:
         value = getattr(self.header, attr)
       except AttributeError:
@@ -492,7 +494,7 @@ class Box(Packet):
         except AttributeError:
           raise AttributeError(
               "%s.%s: not present via the Packet %r or the .header or .body fields"
-              % (type(self), attr, sorted(self.field_map.keys()))
+              % (type(self).__name__, attr, sorted(self.field_map.keys()))
           )
     return value
 
@@ -589,12 +591,14 @@ class Box(Packet):
         overridden by subclasses.
     '''
     B = cls()
+    B.offset = bfr.offset
     try:
       B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
     except EOFError as e:
       error("%s.parse_buffer: EOF parsing buffer: %s", type(B), e)
     B.end_offset = bfr.offset
     B.self_check()
+    bfr.report_offset(B.offset)
     if copy_boxes:
       copy_boxes(B)
     return B
@@ -615,7 +619,6 @@ class Box(Packet):
         class).
     '''
     header = self.add_from_buffer('header', bfr, BoxHeader)
-    bfr.report_offset(self.offset)
     length = header.length
     if length is Ellipsis:
       end_offset = Ellipsis
