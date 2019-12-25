@@ -25,6 +25,7 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     glog        Report a graphical change log.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
+    remote      Report remote paths.
     report      (Default.) Report brief summary.
     status      Report tree status.
     tags        Report tag names.
@@ -161,6 +162,9 @@ case "$op" in
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      # report remote repo paths
+      remote,git)   git remote ${1+"$@"} ${1-"-v"} ;;
+      remote,hg)    hg config paths ${1+"$@"} ;;
       # report and/or status
       report,git | status,git | st,git )
                     git status ${1+"$@"}

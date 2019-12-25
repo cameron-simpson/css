@@ -844,7 +844,7 @@ class TagFile:
 
   def parse_tags_line(self, line):
     ''' Parse a "name tags..." line as from a `.fstags` file,
-        return `(name,tags)`.
+        return `(name,TagSet)`.
     '''
     name, offset = self.decode_name(line)
     if offset < len(line) and not line[offset].isspace():
@@ -854,8 +854,6 @@ class TagFile:
           "offset %d: expected whitespace, adjusted name to %r", offset, name
       )
       offset = offset2
-    with Pfx(name):
-      assert isinstance(name, str)
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
     tags = TagSet.from_line(line, offset)
@@ -902,7 +900,7 @@ class TagFile:
         for name, tags in sorted(tagsets.items()):
           if not tags:
             continue
-          f.write(cls.tags_line(name, tagsets[name]))
+          f.write(cls.tags_line(name, tags))
           f.write('\n')
 
   @locked
@@ -917,7 +915,8 @@ class TagFile:
 
   @locked_property
   def tagsets(self):
-    ''' The tag map from the tag file.
+    ''' The tag map from the tag file,
+        a mapping of name=>TagSet.
     '''
     return self.load_tagsets(self.filepath)
 
@@ -1094,11 +1093,9 @@ class FSTags:
                   except OSError as e:
                     warning("%s", e)
                     ok = False
-                  else:
-                    info("renamed")
-          # rewrite the tags under the new_name
-          # (possibly the same as old_name)
-          tagsets[new_name] = {tag.name: tag.value for tag in new_tags}
+                    continue
+                  info("renamed")
+          tagsets[new_name] = new_tags
       tagfile.save()
     return ok
 
