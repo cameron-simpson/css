@@ -436,7 +436,7 @@ class CornuCopyBuffer(object):
     if not taken:
       return b''
     if len(taken) == 1:
-      return taken[0]
+      return bytes(taken[0])
     return b''.join(taken)
 
   def read(self, size, one_fetch=False):
