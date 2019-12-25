@@ -13,9 +13,12 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
+from base64 import b64decode
 from collections import namedtuple
+from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
+from getopt import GetoptError
 import os
 from os.path import basename
 import stat
@@ -40,6 +43,7 @@ from cs.binary import (
     structtuple,
 )
 from cs.buffer import CornuCopyBuffer
+from cs.cmdutils import BaseCommand
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -56,123 +60,139 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Multimedia :: Video",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.lex', 'cs.logutils',
+        'cs.pfx', 'cspy.func', 'cs.units'
+    ],
 }
 
-USAGE = '''Usage:
-  %s extract [-H] filename boxref output
-            Extract the referenced Box from the specified filename into output.
-            -H  Skip the Box header.
-  %s [parse [{-|filename}]...]
-            Parse the named files (or stdin for "-").
-  %s info [{-|filename}]...]
-            Print informative report about each source.
-  %s test   Run unit tests.'''
-
-def main(argv):
-  ''' Module main programme.
+def main(argv=None):
+  ''' Command line mode.
   '''
-  cmd = basename(argv.pop(0))
-  usage = USAGE % (cmd, cmd, cmd, cmd)
-  setup_logging(cmd)
-  if not argv:
-    argv = ['parse']
-  badopts = False
-  op = argv.pop(0)
-  with Pfx(op):
-    if op == 'parse':
-      if not argv:
-        argv = ['-']
-      for spec in argv:
-        with Pfx(spec):
-          if spec == '-':
-            parsee = sys.stdin.fileno()
-          else:
-            parsee = spec
-          over_box, = parse(parsee)
-          over_box.dump(crop_length=None)
-    elif op == 'info':
-      if not argv:
-        argv = ['-']
-      for spec in argv:
-        with Pfx(spec):
-          if spec == '-':
-            parsee = sys.stdin.fileno()
-          else:
-            parsee = spec
-          over_box, = parse(parsee)
-          print(spec + ":")
-          report(over_box, indent='  ')
-    elif op == 'deref':
-      spec = argv.pop(0)
+  if argv is None:
+    argv = sys.argv
+  return MP4Command().run(argv)
+
+class MP4Command(BaseCommand):
+  GETOPT_SPEC = ''
+
+  USAGE_FORMAT = '''Usage:
+    {cmd} extract [-H] filename boxref output
+        Extract the referenced Box from the specified filename into output.
+        -H  Skip the Box header.
+    {cmd} [parse [{{-|filename}}]...]
+        Parse the named files (or stdin for "-").
+    {cmd} info [{{-|filename}}]...]
+        Print informative report about each source.
+    {cmd} test
+        Run unit tests.'''
+
+  @staticmethod
+  def cmd_deref(argv, options, *, cmd):
+    ''' Dereference a Box specification against ISO14496 files.
+    '''
+    spec = argv.pop(0)
+    with Pfx(spec):
+      if spec == '-':
+        parsee = sys.stdin.fileno()
+      else:
+        parsee = spec
+      over_box, = parse(parsee)
+      over_box.dump()
+      for path in argv:
+        with Pfx(path):
+          B = deref_box(over_box, path)
+          print(path, "offset=%d" % B.offset, B)
+
+  @staticmethod
+  def cmd_extract(argv, options, *, cmd):
+    ''' Extract the content of the specified Box.
+    '''
+    skip_header = False
+    if argv and argv[0] == '-H':
+      argv.pop(0)
+      skip_header = True
+    if not argv:
+      warning("missing filename")
+      badopts = True
+    else:
+      filename = argv.pop(0)
+    if not argv:
+      warning("missing boxref")
+      badopts = True
+    else:
+      boxref = argv.pop(0)
+    if not argv:
+      warning("missing output")
+      badopts = True
+    else:
+      output = argv.pop(0)
+    if argv:
+      warning("extra argments after boxref: %s", ' '.join(argv))
+      badopts = True
+    if badopts:
+      raise GetoptError("invalid arguments")
+    over_box = parse(filename)
+    over_box.dump()
+    B = over_box
+    for box_type_s in boxref.split('.'):
+      B = getattr(B, box_type_s.upper())
+    with Pfx(filename):
+      fd = os.open(filename, os.O_RDONLY)
+      bfr = CornuCopyBuffer.from_fd(fd)
+      offset = B.offset
+      need = B.length
+      if skip_header:
+        offset += B.header_length
+        if need is not None:
+          need -= B.header_length
+      bfr.seek(offset)
+      with Pfx(output):
+        with open(output, 'wb') as ofp:
+          for chunk in bfr:
+            if need is not None and need < len(chunk):
+              chunk = chunk[need]
+            ofp.write(chunk)
+            need -= len(chunk)
+      os.close(fd)
+
+  @staticmethod
+  def cmd_info(argv, options, *, cmd):
+    ''' Produce a human friendly report.
+    '''
+    if not argv:
+      argv = ['-']
+    for spec in argv:
       with Pfx(spec):
         if spec == '-':
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
         over_box, = parse(parsee)
-        over_box.dump()
-        for path in argv:
-          with Pfx(path):
-            B = deref_box(over_box, path)
-            print(path, "offset=%d" % B.offset, B)
-    elif op == 'extract':
-      skip_header = False
-      if argv and argv[0] == '-H':
-        argv.pop(0)
-        skip_header = True
-      if not argv:
-        warning("missing filename")
-        badopts = True
-      else:
-        filename = argv.pop(0)
-      if not argv:
-        warning("missing boxref")
-        badopts = True
-      else:
-        boxref = argv.pop(0)
-      if not argv:
-        warning("missing output")
-        badopts = True
-      else:
-        output = argv.pop(0)
-      if argv:
-        warning("extra argments after boxref: %s", ' '.join(argv))
-        badopts = True
-      if not badopts:
-        over_box = parse(filename)
-        over_box.dump()
-        B = over_box
-        for box_type_s in boxref.split('.'):
-          B = getattr(B, box_type_s.upper())
-        with Pfx(filename):
-          fd = os.open(filename, os.O_RDONLY)
-          bfr = CornuCopyBuffer.from_fd(fd)
-          offset = B.offset
-          need = B.length
-          if skip_header:
-            offset += B.header_length
-            if need is not None:
-              need -= B.header_length
-          bfr.seek(offset)
-          with Pfx(output):
-            with open(output, 'wb') as ofp:
-              for chunk in bfr:
-                if need is not None and need < len(chunk):
-                  chunk = chunk[need]
-                ofp.write(chunk)
-                need -= len(chunk)
-          os.close(fd)
-    elif op == 'test':
-      import cs.iso14496_tests
-      cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
-    else:
-      warning("unknown op")
-      badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  return 0
+        print(spec + ":")
+        report(over_box, indent='  ')
+
+  @staticmethod
+  def cmd_parse(argv, options, *, cmd):
+    ''' Parse an ISO14496 based file.
+    '''
+    if not argv:
+      argv = ['-']
+    for spec in argv:
+      with Pfx(spec):
+        if spec == '-':
+          parsee = sys.stdin.fileno()
+        else:
+          parsee = spec
+        over_box, = parse(parsee)
+        over_box.dump(crop_length=None)
+
+  @staticmethod
+  def cmd_test(argv, options, *, cmd):
+    ''' Run self tests.
+    '''
+    import cs.iso14496_tests
+    cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -435,7 +455,7 @@ class Box(Packet):
 
   PACKET_FIELDS = {
       'header': BoxHeader,
-      'body': BoxBody,
+      'body': (True, (BoxBody, EmptyPacketField)),
       'unparsed': (True, (BytesesField, EmptyPacketField)),
   }
 
@@ -459,6 +479,8 @@ class Box(Packet):
       s += ":unparsed=%r" % (unparsed[:16],)
     return s
 
+  __repr__ = __str__
+
   def __getattr__(self, attr):
     ''' If there is no direct attribute from `Packet.__getattr__`,
         have a look in the `.header` and `.body`.
@@ -466,6 +488,8 @@ class Box(Packet):
     try:
       value = super().__getattr__(attr)
     except AttributeError:
+      if attr in ('header', 'body'):
+        raise AttributeError("%s.%s: not present", type(self).__name__, attr)
       try:
         value = getattr(self.header, attr)
       except AttributeError:
@@ -474,7 +498,7 @@ class Box(Packet):
         except AttributeError:
           raise AttributeError(
               "%s.%s: not present via the Packet %r or the .header or .body fields"
-              % (type(self), attr, sorted(self.field_map.keys()))
+              % (type(self).__name__, attr, sorted(self.field_map.keys()))
           )
     return value
 
@@ -571,12 +595,14 @@ class Box(Packet):
         overridden by subclasses.
     '''
     B = cls()
+    B.offset = bfr.offset
     try:
       B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
     except EOFError as e:
       error("%s.parse_buffer: EOF parsing buffer: %s", type(B), e)
     B.end_offset = bfr.offset
     B.self_check()
+    bfr.report_offset(B.offset)
     if copy_boxes:
       copy_boxes(B)
     return B
@@ -597,7 +623,6 @@ class Box(Packet):
         class).
     '''
     header = self.add_from_buffer('header', bfr, BoxHeader)
-    bfr.report_offset(self.offset)
     length = header.length
     if length is Ellipsis:
       end_offset = Ellipsis
@@ -608,20 +633,27 @@ class Box(Packet):
       bfr_tail = bfr.bounded(end_offset)
     body_class = pick_boxbody_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
-      try:
-        self.add_from_buffer(
-            'body',
-            bfr_tail,
-            body_class,
-            box=self,
-            copy_boxes=copy_boxes,
-            end_offset=Ellipsis,
-            **kw
-        )
-      except EOFError as e:
-        # TODO: recover the data already collected but lost
-        error("EOFError parsing %s: %s", body_class, e)
+      if bfr_tail.at_eof():
+        error("no Box body data parsing %s", body_class.__name__)
         self.add_field('body', EmptyField)
+      else:
+        try:
+          self.add_from_buffer(
+              'body',
+              bfr_tail,
+              body_class,
+              box=self,
+              copy_boxes=copy_boxes,
+              end_offset=Ellipsis,
+              **kw
+          )
+        except EOFError as e:
+          # TODO: recover the data already collected but lost
+          error(
+              "EOFError parsing %s: %s at bfr_tail.offset=%d",
+              body_class.__name__, e, bfr_tail.offset
+          )
+          self.add_field('body', EmptyField)
       # advance over the remaining data, optionally keeping it
       self.unparsed_offset = bfr_tail.offset
       if (not bfr_tail.at_eof()
@@ -638,6 +670,23 @@ class Box(Packet):
         self.add_field('unparsed', EmptyField)
       if bfr_tail is not bfr:
         bfr_tail.flush()
+
+  @contextmanager
+  def reparse_buffer(self):
+    ''' Context manager for continuing a parse from the `unparsed` field.
+
+        Pops the final `unparsed` field from the `Box`,
+        yields a `CornuCopyBuffer` make from it,
+        then pushes the `unparsed` field again
+        with the remaining contents of the buffer.
+    '''
+    field_name, unparsed = self.pop_field()
+    assert field_name == 'unparsed', "field_name(%r) is not 'unparsed'" % (
+        field_name,
+    )
+    bfr = CornuCopyBuffer(unparsed.value)
+    yield bfr
+    self.add_from_buffer('unparsed', bfr, BytesesField, end_offset=Ellipsis)
 
   @property
   def box_type(self):
@@ -771,7 +820,7 @@ class SubBoxesField(ListField):
       parent=None,
       **kw
   ):
-    ''' Read Boxes from `bfr`, return a new SubBoxesField instance.
+    ''' Read Boxes from `bfr`, return a new `SubBoxesField` instance.
 
         Parameters:
         * `bfr`: the buffer
@@ -780,8 +829,8 @@ class SubBoxesField(ListField):
         * `max_boxes`: optional maximum number of Boxes to parse
         * `default`: a default `Box` subclass for `box_type`s without a
           registered subclass
-        * `copy_boxes`: optional callable to receive parsed Boxes
-        * `parent`: optional parent Box to record against parsed Boxes
+        * `copy_boxes`: optional callable to receive parsed `Box`es
+        * `parent`: optional parent `Box` to record against parsed `Box`es
     '''
     if end_offset is None:
       raise ValueError("SubBoxesField.from_buffer: missing end_offset")
@@ -803,7 +852,7 @@ class SubBoxesField(ListField):
     return boxes_field
 
 class OverBox(Packet):
-  ''' A fictitious Box encompassing all the Boxes in an input buffer.
+  ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
   '''
 
   PACKET_FIELDS = {
@@ -1721,6 +1770,12 @@ class DREFBoxBody(FullBoxBody):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
 
+  PACKET_FIELDS = dict(
+      FullBoxBody.PACKET_FIELDS,
+      entry_count=UInt32BE,
+      boxes=SubBoxesField,
+  )
+
   def parse_buffer(self, bfr, copy_boxes=None, **kw):
     ''' Gather the `entry_count` and `boxes` fields.
     '''
@@ -1767,6 +1822,19 @@ class METABoxBody(FullBoxBody):
         parent=self.box,
         copy_boxes=copy_boxes
     )
+
+  def __getattr__(self, attr):
+    ''' Present the ilst attributes if present.
+    '''
+    try:
+      return super().__getattr__(attr)
+    except AttributeError:
+      ilst = super().__getattr__('ISLT0')
+      if ilst is not None:
+        value = getattr(ilst, attr, None)
+        if value is not None:
+          return value
+      raise
 
 add_body_class(METABoxBody)
 
@@ -1861,53 +1929,99 @@ class ILSTBoxBody(ContainerBoxBody):
       b'tvsn': ILSTUInt32BESchema('tv_season'),
   }
 
+  SUBSUBBOX_SCHEMA = {
+      'com.apple.iTunes': {
+          'Browsepath': None,
+          'Date': int,
+          'HasChapters': int,
+          'MaxAudioJump': float,
+          'MaxSourceFps': float,
+          'MaxVideoJump': float,
+          'MinSourceFps': float,
+          'PLVF': int,
+          'Path': None,
+          # this is actually XML
+          'Properties': lambda s: b64decode(s).decode(),
+          'ProviderName': None,
+          'RecordingTimestamp': datetime.fromisoformat,
+          'SourceFps': float,
+          'Sourceid': None,
+          'Status': int,
+          'Thumbnailurl': None,
+          'TotalAudioJumps': int,
+          'TotalVideoJumps': int,
+      }
+  }
+
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
     for subbox in self.boxes:
-      subbox_type = subbox.box_type
+      subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
-        field_name, unparsed = subbox.pop_field()
-        assert field_name == 'unparsed'
-        X("UNPARSED=%r", unparsed.value)
-        subbfr = CornuCopyBuffer(unparsed.value)
-        subbox.add_from_buffer('size', subbfr, UInt32BE)
-        data = subbfr.take(4)
-        # 1 byte version
-        subbox.add_from_buffer('version', subbfr, UInt8)
-        # 3 bytes flags
-        bs3 = subbfr.take(3)
-        subbox.add_from_value(
-            'flags', bs3[0] << 16 + bs3[1] << 8 + bs3[2], lambda flags:
-            bytes(((flags >> 16) & 0xff, (flags >> 8) & 0xff, flags & 0xff))
-        )
-        bs4 = subbfr.take(4)
-        if bs4 != b'\x00\x00\x00\x00':
-          warning("unparsed[12:16]: not all NULs: %r", bs4)
-        if subbox_type == b'----':
-          X("unparsed=%r", unparsed.value)
-        else:
-          if data != b'data':
-            warning("unparsed[4:8] is not b'data', got %r", data)
-          subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
-          if subbox_schema is None:
-            warning("no schema")
+        with subbox.reparse_buffer() as subbfr:
+          subbox.add_from_buffer(
+              'boxes', subbfr, SubBoxesField, end_offset=...
+          )
+          inner_boxes = subbox.boxes
+          if subbox_type == b'----':
+            # 3 boxes: mean, name, value
+            mean_box, name_box, data_box = inner_boxes
+            assert mean_box.box_type == b'mean'
+            assert name_box.box_type == b'name'
+            with mean_box.reparse_buffer() as meanbfr:
+              mean_box.add_from_buffer('n1', meanbfr, UInt32BE)
+              mean_box.add_from_value(
+                  'text',
+                  meanbfr.take(...).decode(), str.encode
+              )
+            with name_box.reparse_buffer() as namebfr:
+              name_box.add_from_buffer('n1', namebfr, UInt32BE)
+              name_box.add_from_value(
+                  'text',
+                  namebfr.take(...).decode(), str.encode
+              )
+            with data_box.reparse_buffer() as databfr:
+              data_box.add_from_buffer('n1', databfr, UInt32BE)
+              data_box.add_from_buffer('n2', databfr, UInt32BE)
+              data_box.add_from_value(
+                  'text',
+                  databfr.take(...).decode(), str.encode
+              )
+            value = data_box.text
+            decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
+                                                {}).get(name_box.text)
+            if decoder is not None:
+              value = decoder(value)
+            # annotate the subbox and the ilst
+            attribute_name = (
+                mean_box.text.replace('.', '_') + '_' + name_box.text
+            ).lower()
+            setattr(subbox, attribute_name, value)
+            setattr(self, attribute_name, value)
           else:
-            with Pfx("%s", subbox_schema.from_buffer):
-              try:
-                value = subbox_schema.from_buffer(subbfr)
-              except (ValueError, TypeError) as e:
-                warning("decode fails: %s", e)
-                raise
+            # single data box
+            data_box, = inner_boxes
+            with data_box.reparse_buffer() as databfr:
+              subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
+              if subbox_schema is None:
+                ##warning("%r: no schema", subbox_type)
+                pass
               else:
-                subbox.add_from_value(
-                    subbox_schema.attribute_name, value,
-                    subbox_schema.transcribe_value
-                )
-        subbox.add_from_buffer(
-            'unparsed', subbfr, BytesesField, end_offset=Ellipsis
-        )
-        if subbox.unparsed:
-          warning("unparsed=%s", subbox.unparsed)
+                data_box.add_from_buffer('n1', databfr, UInt32BE)
+                data_box.add_from_buffer('n2', databfr, UInt32BE)
+                with Pfx("%s", subbox_schema.from_buffer):
+                  try:
+                    value = subbox_schema.from_buffer(databfr)
+                  except (ValueError, TypeError) as e:
+                    warning("decode fails: %s", e)
+                  else:
+                    data_box.add_from_value(
+                        subbox_schema.attribute_name, value,
+                        subbox_schema.transcribe_value
+                    )
+                    # annotate the subbox and the ilst
+                    setattr(subbox, subbox_schema.attribute_name, value)
+                    setattr(self, subbox_schema.attribute_name, value)
 
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
