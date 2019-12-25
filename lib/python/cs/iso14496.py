@@ -687,8 +687,6 @@ class Box(Packet):
     bfr = CornuCopyBuffer(unparsed.value)
     yield bfr
     self.add_from_buffer('unparsed', bfr, BytesesField, end_offset=Ellipsis)
-    if self.unparsed:
-      warning("%r: unparsed=%s", self.box_type, self.unparsed)
 
   @property
   def box_type(self):
@@ -2006,7 +2004,8 @@ class ILSTBoxBody(ContainerBoxBody):
             with data_box.reparse_buffer() as databfr:
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                warning("%r: no schema", subbox_type)
+                ##warning("%r: no schema", subbox_type)
+                pass
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
                 data_box.add_from_buffer('n2', databfr, UInt32BE)
