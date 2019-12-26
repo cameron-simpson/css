@@ -462,6 +462,9 @@ class BoxBody(Packet):
           return box
     return super().__getattr__(attr)
 
+  def __iter__(self):
+    yield from ()
+
   @classmethod
   def from_buffer(cls, bfr, box=None, **kw):
     ''' Create a BoxBody and fill it in via its `parse_buffer` method.
@@ -817,6 +820,21 @@ class Box(Packet):
     '''
     return dump_box(self, **kw)
 
+  def walk(self):
+    ''' Walk this `Box` hierarchy.
+
+        Yields the starting box and its children as `(self,subboxes)`
+        and then yields `(subbox,subsubboxes)` for each child in turn.
+
+        As with `os.walk`, the returned `subboxes` list
+        may be modified to prune the subsequent walk.
+    '''
+    subboxes = list(self)
+    yield self, subboxes
+    for subbox in subboxes:
+      if isinstance(subbox, Box):
+        yield from subbox.walk()
+
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
@@ -958,6 +976,14 @@ class OverBox(Packet):
     ''' Dump this OverBox.
     '''
     return dump_box(self, **kw)
+
+  def walk(self):
+    ''' Walk the `Box`es in the `OverBox`.
+
+        This does not yield the `OverBox` itself, it isn't really a `Box`.
+    '''
+    for box in self:
+      yield from box.walk()
 
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic BoxBody, with a version and flags field.
