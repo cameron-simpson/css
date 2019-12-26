@@ -274,6 +274,35 @@ def deref_box(B, path):
         B = nextB
     return B
 
+class UTF8or16Field(Packet):
+  ''' An ISO14496 UTF8 or UTF16 encoded string.
+  '''
+
+  def parse_buffer(self, bfr, **kw):
+    ''' Gather the `language` and `notice` fields.
+    '''
+    bfr.extend(1)
+    if bfr[0] == '\0':
+      # empty UTF8 NUL terminated string
+      self.encoding = 'utf-8'
+      self.value = ''
+    else:
+      bom = bfr.take(2)
+      if bom == b'\xfe\xff':
+        self.encoding = 'utf_16_le'
+      else:
+        self.encoding = 'utf_16_be'
+      self.value = UTF16NULField.value_from_buffer(bfr, encoding=self.encoding)
+
+  def transcribe(self):
+    ''' Transcribe the field suitably encoded.
+    '''
+    if self.encoding == 'utf-8':
+      yield UTF8NULField.transcribe_value(self.value)
+    else:
+      yield b'\xfe\xff' if self.encoding == 'utf_16_le' else b'\xff\xfe'
+      yield UTF16NULField.transcribe_value(self.value, self.encoding)
+
 class TimeStampMixin:
   ''' Methods to assist with ISO14496 timestamps.
   '''
@@ -1825,6 +1854,38 @@ class DREFBoxBody(FullBoxBody):
 add_body_class(DREFBoxBody)
 
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
+
+class CPRTBoxBody(FullBoxBody):
+  ''' A 'cprt' Copyright box - section 8.10.2.
+  '''
+
+  def parse_buffer(self, bfr, **kw):
+    ''' Gather the `language` and `notice` fields.
+    '''
+    super().parse_buffer(bfr, **kw)
+    self.add_from_buffer('language_packed', UInt16BE)
+    self.add_from_buffer('notice', UTF8or16Field)
+
+  @property
+  def language(self):
+    ''' The `language_field` as the 3 character ISO 639-2/T language code.
+    '''
+    packed = self.language_packed.value
+    return bytes(
+        (packed & 0x1f) + 0x60, ((packed >> 5) & 0x1f) + 0x60,
+        ((packed >> 10) & 0x1f) + 0x60
+    ).decode('ascii')
+
+  @language.setter
+  def language(self, language_code):
+    ''' Pack a 3 character ISO 639-2/T language code.
+    '''
+    ch1, ch2, ch3 = language_code
+    packed = bytes(
+        (ord(ch1) - 0x60) & 0x1f, ((ord(ch1) - 0x60) & 0x1f) << 5,
+        ((ord(ch1) - 0x60) & 0x1f) << 10
+    )
+    self.language_packed.value = packed
 
 class METABoxBody(FullBoxBody):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
