@@ -380,20 +380,20 @@ class BytesField(PacketField):
 
   @classmethod
   def value_from_buffer(cls, bfr, length=None):
-    ''' Parse a BytesField of length `length` from `bfr`.
+    ''' Parse a `BytesField` of length `length` from `bfr`.
     '''
     if length < 0:
       raise ValueError("length(%d) < 0" % (length,))
     return bfr.take(length)
 
   def transcribe(self):
-    ''' A BytesField is its own transcription.
+    ''' A `BytesField` is its own transcription.
     '''
     assert isinstance(self.value, (bytes, memoryview))
     return self.value
 
 def fixed_bytes_field(length, class_name=None):
-  ''' Factory for BytesField subclasses built from fixed length byte strings.
+  ''' Factory for `BytesField` subclasses built from fixed length byte strings.
   '''
   if length < 1:
     raise ValueError("length(%d) < 1" % (length,))
