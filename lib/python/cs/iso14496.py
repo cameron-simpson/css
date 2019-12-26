@@ -274,6 +274,37 @@ def deref_box(B, path):
         B = nextB
     return B
 
+class TimeStampMixin:
+  ''' Methods to assist with ISO14496 timestamps.
+  '''
+
+  @property
+  def datetime(self):
+    ''' This timestamp as an UTC datetime.
+    '''
+    dt = datetime.utcfromtimestamp(self.value)
+    return dt.replace(year=dt.year - 66)
+
+  @property
+  def unixtime(self):
+    ''' This timestamp as a UNIX time (seconds since 1 January 1970).
+    '''
+    return self.datetime.timestamp()
+
+class TimeStamp32(UInt32BE, TimeStampMixin):
+  ''' The 32 bit form of an ISO14496 timestamp.
+  '''
+
+  def __str__(self):
+    return str(self.datetime)
+
+class TimeStamp64(UInt64BE, TimeStampMixin):
+  ''' The 64 bit form of an ISO14496 timestamp.
+  '''
+
+  def __str__(self):
+    return str(self.datetime)
+
 class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
   '''
@@ -1066,8 +1097,8 @@ class MVHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       rate_long=Int32BE,
@@ -1082,13 +1113,13 @@ class MVHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
     else:
@@ -1125,8 +1156,8 @@ class TKHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       track_id=UInt32BE,
       reserved1=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
@@ -1145,14 +1176,14 @@ class TKHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('track_id', bfr, UInt32BE)
       self.add_from_buffer('reserved1', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('track_id', bfr, UInt32BE)
       self.add_from_buffer('reserved1', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
@@ -1256,8 +1287,8 @@ class MDHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       language_short=UInt16BE,
@@ -1271,13 +1302,13 @@ class MDHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
     else:
