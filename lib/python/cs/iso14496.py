@@ -13,7 +13,7 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
-from base64 import b64decode
+from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
@@ -44,6 +44,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
+from cs.fstags import TagSet
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -61,8 +62,8 @@ DISTINFO = {
         "Topic :: Multimedia :: Video",
     ],
     'install_requires': [
-        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.lex', 'cs.logutils',
-        'cs.pfx', 'cspy.func', 'cs.units'
+        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.fstags', 'cs.lex',
+        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.units'
     ],
 }
 
@@ -2047,6 +2048,7 @@ class ILSTBoxBody(ContainerBoxBody):
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
+    self.tags = TagSet()
     for subbox in self.boxes:
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
@@ -2086,10 +2088,10 @@ class ILSTBoxBody(ContainerBoxBody):
               value = decoder(value)
             # annotate the subbox and the ilst
             attribute_name = (
-                mean_box.text.replace('.', '_') + '_' + name_box.text
+                mean_box.text.replace('.', '_') + '__' + name_box.text
             ).lower()
             setattr(subbox, attribute_name, value)
-            setattr(self, attribute_name, value)
+            self.tags.add(attribute_name, value)
           else:
             # single data box
             data_box, = inner_boxes
@@ -2113,7 +2115,13 @@ class ILSTBoxBody(ContainerBoxBody):
                     )
                     # annotate the subbox and the ilst
                     setattr(subbox, subbox_schema.attribute_name, value)
-                    setattr(self, subbox_schema.attribute_name, value)
+                    if isinstance(value, bytes):
+                      self.tags.add(
+                          subbox_schema.attribute_name,
+                          b64encode(value).decode('ascii')
+                      )
+                    else:
+                      self.tags.add(subbox_schema.attribute_name, value)
 
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
