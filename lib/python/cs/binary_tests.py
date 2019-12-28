@@ -48,20 +48,21 @@ class _TestPacketFields(object):
       transcription = args.pop()
     if args and isinstance(args[-1], dict):
       kwargs = args.pop()
-    P = cls(*args, **kwargs)
-    bs2 = bytes(P)
-    if transcription is not None:
+    with self.subTest(cls=cls, args=args, kwargs=kwargs):
+      P = cls(*args, **kwargs)
+      bs2 = bytes(P)
+      if transcription is not None:
+        self.assertEqual(
+            bs2, transcription,
+            "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
+        )
+      P2, offset = cls.from_bytes(bs2, **kwargs)
       self.assertEqual(
-          bs2, transcription,
-          "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
+          offset, len(bs2),
+          "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
+          (offset, bs2[:offset], bs2[offset:])
       )
-    P2, offset = cls.from_bytes(bs2)
-    self.assertEqual(
-        offset, len(bs2),
-        "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
-        (offset, bs2[:offset], bs2[offset:])
-    )
-    self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
+      self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
 
   def test_PacketField_round_trip(self):
     ''' Perform round trip tests of the PacketFields for which we have test cases.
