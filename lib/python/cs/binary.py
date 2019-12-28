@@ -193,7 +193,7 @@ class PacketField(ABC):
     return sum(len(bs) for bs in flatten(self.transcribe()))
 
   @classmethod
-  def from_bytes(cls, bs, offset=0, length=None):
+  def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Factory to return a `PacketField` instance parsed from the
         bytes `bs` starting at `offset`.
         Returns the new `PacketField` and the post parse offset.
@@ -204,12 +204,12 @@ class PacketField(ABC):
         This relies on the `cls.from_buffer` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    field = cls.from_buffer(bfr)
+    field = cls.from_buffer(bfr, **kw)
     post_offset = offset + bfr.offset
     return field, post_offset
 
   @classmethod
-  def value_from_bytes(cls, bs, offset=0, length=None):
+  def value_from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a value parsed from the bytes `bs` starting at `offset`.
         Returns the new value and the post parse offset.
 
@@ -218,7 +218,7 @@ class PacketField(ABC):
 
         This relies on the `cls.from_bytes` method for the parse.
     '''
-    field, offset = cls.from_bytes(bs, offset=offset, length=length)
+    field, offset = cls.from_bytes(bs, offset=offset, length=length, **kw)
     return field.value, offset
 
   @classmethod
@@ -229,7 +229,7 @@ class PacketField(ABC):
         the value returned by `cls.value_from_buffer(bfr, **kw)`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
-    return cls(value)
+    return cls(value, **kw)
     ##return cls(cls.value_from_buffer(bfr, **kw))
 
   @staticmethod
