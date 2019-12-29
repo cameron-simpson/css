@@ -1094,10 +1094,10 @@ class Packet(PacketField):
 
         If any keyword arguments are provided, they are used as a
         mapping of `field_name` to `Field` instance, supporting
-        direct construction of simple `Packet`s. From Python 3.6
-        onwards keyword arguments preserve the calling order; in
-        Python versions earlier than this the caller should adjust
-        the `Packet.field_names` list to the correct order after
+        direct construction of simple `Packet`s.
+        From Python 3.6 onwards keyword arguments preserve the calling order;
+        in Python versions earlier than this the caller should
+        adjust the `Packet.field_names` list to the correct order after
         initialisation.
     '''
     # Packets are their own value
