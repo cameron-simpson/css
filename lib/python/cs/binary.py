@@ -355,10 +355,11 @@ class UTF8NULField(PacketField):
     bfr.take(1)
     return utf8
 
-  def transcribe(self):
+  @staticmethod
+  def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
     '''
-    yield self.value.encode('utf-8')
+    yield s.encode('utf-8')
     yield b'\0'
 
 class UTF16NULField(PacketField):
