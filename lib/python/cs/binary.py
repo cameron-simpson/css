@@ -276,8 +276,8 @@ class PacketField(ABC):
     '''
     yield self.transcribe_value(self.value)
 
-  @staticmethod
-  def transcribe_value(value):
+  @classmethod
+  def transcribe_value(cls, value, **kw):
     ''' For simple `PacketField`s, return a bytes transcription of a
         value suitable for the `.value` attribute.
 
@@ -285,7 +285,7 @@ class PacketField(ABC):
         `.value` and exposes its serialisation method, suitable for
         any `int`, as `transcribe_value`.
     '''
-    raise NotImplementedError("no transcribe_value method")
+    return cls(value, **kw).transcribe()
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.
