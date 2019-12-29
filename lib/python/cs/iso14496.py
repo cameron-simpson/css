@@ -870,6 +870,31 @@ class Box(Packet):
       if isinstance(subbox, Box):
         yield from subbox.walk()
 
+  def metatags(self):
+    ''' Return a `TagSet` containing metadata for this box.
+    '''
+    with Pfx("metatags(%r)", self.box_type):
+      tags = TagSet()
+      meta_box = self.META0
+      if meta_box:
+        tags.update(meta_box.tagset())
+      udta_box = self.UDTA0
+      if udta_box:
+        udta_meta_box = udta_box.META0
+        if udta_meta_box:
+          ilst_box = udta_meta_box.ILST0
+          if ilst_box:
+            tags.update(ilst_box.tags)
+      return tags
+
+  def gather_metadata(self):
+    ''' Walk the `Box` hierarchy looking for metadata.
+        Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
+    '''
+    for box, subboxes in self.walk():
+      if box.box_type in (b'moov', b'trak'):
+        yield box, box.metatags()
+
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
@@ -1995,7 +2020,7 @@ add_body_class(METABoxBody)
 class ILSTBoxBody(ContainerBoxBody):
   ''' iTunes Information List, container for iTunes metadata fields.
 
-      Much of the format knowledge here comes from AtomicParsley's
+      The basis of the format knowledge here comes from AtomicParsley's
       documentation here:
 
           http://atomicparsley.sourceforge.net/mpeg-4files.html
