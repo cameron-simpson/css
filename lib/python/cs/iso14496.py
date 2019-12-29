@@ -13,7 +13,7 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
-from base64 import b64decode
+from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
@@ -30,6 +30,7 @@ from cs.binary import (
     ListField,
     UInt8,
     Int16BE,
+    UTF16NULField,
     Int32BE,
     UInt16BE,
     UInt32BE,
@@ -44,6 +45,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
+from cs.fstags import TagSet
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -61,8 +63,8 @@ DISTINFO = {
         "Topic :: Multimedia :: Video",
     ],
     'install_requires': [
-        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.lex', 'cs.logutils',
-        'cs.pfx', 'cspy.func', 'cs.units'
+        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.fstags', 'cs.lex',
+        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.units'
     ],
 }
 
@@ -274,6 +276,100 @@ def deref_box(B, path):
         B = nextB
     return B
 
+class UTF8or16Field(PacketField):
+  ''' An ISO14496 UTF8 or UTF16 encoded string.
+  '''
+
+  TEST_CASES = (
+      b'\0',
+      b'abc\0',
+      b'\xfe\xffa\x00b\x00c\x00\x00\x00',
+      b'\xff\xfe\x00a\x00b\x00c\x00\x00',
+  )
+
+  BOM_ENCODING = {
+      b'\xfe\xff': 'utf_16_le',
+      b'\xff\xfe': 'utf_16_be',
+  }
+
+  def __init__(self, value, *, bom):
+    super().__init__(value)
+    self.bom = bom
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Gather optional BOM and then UTF8 or UTF16 string.
+    '''
+    bfr.extend(1)
+    if bfr[0] == 0:
+      bom = None
+      text = UTF8NULField.value_from_buffer(bfr)
+    else:
+      bom = bfr.take(2)
+      encoding = cls.BOM_ENCODING.get(bom)
+      if encoding is None:
+        bfr.push(bom)
+        bom = None
+        text = UTF8NULField.value_from_buffer(bfr)
+      else:
+        text = UTF16NULField.value_from_buffer(bfr, encoding)
+    return cls(text, bom=bom)
+
+  def transcribe(self):
+    ''' Transcribe the field suitably encoded.
+    '''
+    if self.bom is None:
+      yield UTF8NULField.transcribe_value(self.value)
+    else:
+      yield self.bom
+      yield UTF16NULField.transcribe_value(
+          self.value, encoding=self.BOM_ENCODING[self.bom]
+      )
+
+class TimeStampMixin:
+  ''' Methods to assist with ISO14496 timestamps.
+  '''
+
+  @property
+  def datetime(self):
+    ''' This timestamp as an UTC datetime.
+    '''
+    if self.value in (0x7fffffffffffffff, 0x8000000000000000,
+                      0xfffffffffffffffe, 0xffffffffffffffff):
+      return None
+    try:
+      dt = datetime.utcfromtimestamp(self.value)
+    except (OverflowError, OSError) as e:
+      warning(
+          "%s.datetime: datetime.utcfromtimestamp(%s): %s, returning None",
+          type(self).__name__, self.value, e
+      )
+      return None
+    return dt.replace(year=dt.year - 66)
+
+  @property
+  def unixtime(self):
+    ''' This timestamp as a UNIX time (seconds since 1 January 1970).
+    '''
+    dt = self.datetime
+    if dt is None:
+      return None
+    return dt.timestamp()
+
+class TimeStamp32(UInt32BE, TimeStampMixin):
+  ''' The 32 bit form of an ISO14496 timestamp.
+  '''
+
+  def __str__(self):
+    return str(self.datetime) or str(self.value)
+
+class TimeStamp64(UInt64BE, TimeStampMixin):
+  ''' The 64 bit form of an ISO14496 timestamp.
+  '''
+
+  def __str__(self):
+    return str(self.datetime) or str(self.value)
+
 class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
   '''
@@ -400,6 +496,9 @@ class BoxBody(Packet):
           box, = boxes
           return box
     return super().__getattr__(attr)
+
+  def __iter__(self):
+    yield from ()
 
   @classmethod
   def from_buffer(cls, bfr, box=None, **kw):
@@ -756,6 +855,46 @@ class Box(Packet):
     '''
     return dump_box(self, **kw)
 
+  def walk(self):
+    ''' Walk this `Box` hierarchy.
+
+        Yields the starting box and its children as `(self,subboxes)`
+        and then yields `(subbox,subsubboxes)` for each child in turn.
+
+        As with `os.walk`, the returned `subboxes` list
+        may be modified to prune the subsequent walk.
+    '''
+    subboxes = list(self)
+    yield self, subboxes
+    for subbox in subboxes:
+      if isinstance(subbox, Box):
+        yield from subbox.walk()
+
+  def metatags(self):
+    ''' Return a `TagSet` containing metadata for this box.
+    '''
+    with Pfx("metatags(%r)", self.box_type):
+      tags = TagSet()
+      meta_box = self.META0
+      if meta_box:
+        tags.update(meta_box.tagset())
+      udta_box = self.UDTA0
+      if udta_box:
+        udta_meta_box = udta_box.META0
+        if udta_meta_box:
+          ilst_box = udta_meta_box.ILST0
+          if ilst_box:
+            tags.update(ilst_box.tags)
+      return tags
+
+  def gather_metadata(self):
+    ''' Walk the `Box` hierarchy looking for metadata.
+        Yield `(Box,TagSet)` for each `b'moov'` or `b'trak'` `Box`.
+    '''
+    for box, subboxes in self.walk():
+      if box.box_type in (b'moov', b'trak'):
+        yield box, box.metatags()
+
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
@@ -897,6 +1036,14 @@ class OverBox(Packet):
     ''' Dump this OverBox.
     '''
     return dump_box(self, **kw)
+
+  def walk(self):
+    ''' Walk the `Box`es in the `OverBox`.
+
+        This does not yield the `OverBox` itself, it isn't really a `Box`.
+    '''
+    for box in self:
+      yield from box.walk()
 
 class FullBoxBody(BoxBody):
   ''' A common extension of a basic BoxBody, with a version and flags field.
@@ -1066,8 +1213,8 @@ class MVHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       rate_long=Int32BE,
@@ -1082,13 +1229,13 @@ class MVHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
     else:
@@ -1125,8 +1272,8 @@ class TKHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       track_id=UInt32BE,
       reserved1=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
@@ -1145,14 +1292,14 @@ class TKHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('track_id', bfr, UInt32BE)
       self.add_from_buffer('reserved1', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('track_id', bfr, UInt32BE)
       self.add_from_buffer('reserved1', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
@@ -1256,8 +1403,8 @@ class MDHDBoxBody(FullBoxBody):
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
-      creation_time=(True, (UInt32BE, UInt64BE)),
-      modification_time=(True, (UInt32BE, UInt64BE)),
+      creation_time=(True, (TimeStamp32, TimeStamp64)),
+      modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       language_short=UInt16BE,
@@ -1271,13 +1418,13 @@ class MDHDBoxBody(FullBoxBody):
     super().parse_buffer(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, UInt32BE)
-      self.add_from_buffer('modification_time', bfr, UInt32BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp32)
+      self.add_from_buffer('modification_time', bfr, TimeStamp32)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, UInt64BE)
-      self.add_from_buffer('modification_time', bfr, UInt64BE)
+      self.add_from_buffer('creation_time', bfr, TimeStamp64)
+      self.add_from_buffer('modification_time', bfr, TimeStamp64)
       self.add_from_buffer('timescale', bfr, UInt32BE)
       self.add_from_buffer('duration', bfr, UInt64BE)
     else:
@@ -1795,6 +1942,38 @@ add_body_class(DREFBoxBody)
 
 add_body_subclass(ContainerBoxBody, b'udta', '8.10.1', 'User Data')
 
+class CPRTBoxBody(FullBoxBody):
+  ''' A 'cprt' Copyright box - section 8.10.2.
+  '''
+
+  def parse_buffer(self, bfr, **kw):
+    ''' Gather the `language` and `notice` fields.
+    '''
+    super().parse_buffer(bfr, **kw)
+    self.add_from_buffer('language_packed', UInt16BE)
+    self.add_from_buffer('notice', UTF8or16Field)
+
+  @property
+  def language(self):
+    ''' The `language_field` as the 3 character ISO 639-2/T language code.
+    '''
+    packed = self.language_packed.value
+    return bytes(
+        (packed & 0x1f) + 0x60, ((packed >> 5) & 0x1f) + 0x60,
+        ((packed >> 10) & 0x1f) + 0x60
+    ).decode('ascii')
+
+  @language.setter
+  def language(self, language_code):
+    ''' Pack a 3 character ISO 639-2/T language code.
+    '''
+    ch1, ch2, ch3 = language_code
+    packed = bytes(
+        (ord(ch1) - 0x60) & 0x1f, ((ord(ch1) - 0x60) & 0x1f) << 5,
+        ((ord(ch1) - 0x60) & 0x1f) << 10
+    )
+    self.language_packed.value = packed
+
 class METABoxBody(FullBoxBody):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
@@ -1841,7 +2020,7 @@ add_body_class(METABoxBody)
 class ILSTBoxBody(ContainerBoxBody):
   ''' iTunes Information List, container for iTunes metadata fields.
 
-      Much of the format knowledge here comes from AtomicParsley's
+      The basis of the format knowledge here comes from AtomicParsley's
       documentation here:
 
           http://atomicparsley.sourceforge.net/mpeg-4files.html
@@ -1955,6 +2134,7 @@ class ILSTBoxBody(ContainerBoxBody):
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
+    self.tags = TagSet()
     for subbox in self.boxes:
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
@@ -1994,10 +2174,10 @@ class ILSTBoxBody(ContainerBoxBody):
               value = decoder(value)
             # annotate the subbox and the ilst
             attribute_name = (
-                mean_box.text.replace('.', '_') + '_' + name_box.text
+                mean_box.text.replace('.', '_') + '__' + name_box.text
             ).lower()
             setattr(subbox, attribute_name, value)
-            setattr(self, attribute_name, value)
+            self.tags.add(attribute_name, value)
           else:
             # single data box
             data_box, = inner_boxes
@@ -2021,7 +2201,13 @@ class ILSTBoxBody(ContainerBoxBody):
                     )
                     # annotate the subbox and the ilst
                     setattr(subbox, subbox_schema.attribute_name, value)
-                    setattr(self, subbox_schema.attribute_name, value)
+                    if isinstance(value, bytes):
+                      self.tags.add(
+                          subbox_schema.attribute_name,
+                          b64encode(value).decode('ascii')
+                      )
+                    else:
+                      self.tags.add(subbox_schema.attribute_name, value)
 
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():

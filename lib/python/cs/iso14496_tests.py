@@ -9,9 +9,11 @@ import sys
 import os
 import os.path
 import unittest
+from .binary_tests import _TestPacketFields
 from .fileutils import read_from
 from .logutils import D
 from .iso14496 import parse_file
+from . import iso14496 as iso14496_module
 from .x import X
 
 TESTFILE = 'TEST.mp4'
@@ -37,6 +39,13 @@ class Test_iso14496(unittest.TestCase):
         total_size, mp4_size,
         "file size = %d, frames total = %d" % (mp4_size, total_size)
     )
+
+class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
+
+  def setUp(self):
+    ''' We're testing the cs.binary module.
+    '''
+    self.module = iso14496_module
 
 def selftest(argv, **kw):
   sys.argv = argv

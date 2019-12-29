@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Helper for youtube-dl. Downloads to $DL/v, optionally via at(1) to utilise an off peak period.
+# Helper for youtube-dl. Downloads to $DL/v, optionally via at(1)
+# to utilise an off peak period.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -15,7 +16,7 @@ trace=
 dldir=${DL:-$HOME/dl}/v
 when=
 proxy=${https_proxy:-''}
-ydlopts=
+ydlopts='--write-info-json --write-annotations'
 target_fmt=
 
 badopts=

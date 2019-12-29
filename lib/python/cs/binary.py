@@ -17,7 +17,9 @@
     The classes in this module support easy parsing of binary data
     structures.
 
-    The functions and classes in this module include:
+    The functions and classes in this module the following:
+
+    The two base classes for binary data:
     * `PacketField`: an abstract class for a binary field, with a
       factory method to parse it, a transcription method to transcribe
       it back out in binary form and usually a `.value` attribute
@@ -26,8 +28,12 @@
       `PacketField`s into a larger structure with ordered named
       fields.
       The fields themselves may be `Packet`s for complex structures.
-    * several presupplied subclasses for common basic types such
-      as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+
+    Several presupplied subclasses for common basic types such
+    as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+    Classes built from `struct` format strings:
     * `struct_field`: a factory for making PacketField classes for
       `struct` formats with a single value field.
     * `multi_struct_field` and `structtuple`: factories for making
@@ -136,7 +142,7 @@ if sys.version_info[0] < 3:
       "module %r requires Python 3 and recommends 3.6, but version_info=%r",
       __name__, sys.version_info
   )
-elif sys.version_info[1] < 6:
+elif sys.version_info[0] == 3 and sys.version_info[1] < 6:
   warning(
       "module %r recommends Python 3.6, but version_info=%r", __name__,
       sys.version_info
@@ -164,6 +170,39 @@ def flatten(chunks):
 
 class PacketField(ABC):
   ''' A record for an individual packet field.
+
+      This normally holds a single value, such as a int of a particular size
+      or a string.
+
+      There are 2 basic ways to implement a `PacketField` subclass.
+
+      For the simple case subclasses should implement two methods:
+      * `value_from_buffer`:
+        parse the value from a `CornuCopyBuffer` and returns the parsed value
+      * `transcribe_value`:
+        transcribe the value as bytes
+
+      Sometimes a `PacketField` may be slightly more complex
+      while still not warranting (or perhaps fitting)
+      to formality of a `Packet` with its multifield structure.
+
+      One example is the `cs.iso14496.UTF8or16Field` class.
+      This supports an ISO14496 utf* or UTF16 string field,
+      as as such has 2 attributes:
+      * `value`: the string itself
+      * `bom`: a UTF16 byte order marker or `None`;
+        `None` indicates that the string should be encoded as UTF-8
+        and otherwise the BOM indicates UTF16 big endian or little endian.
+
+      To make this subclass it defines these methods:
+      * `from_buffer`:
+        to read the optional BOM and then the following encoded string;
+        it then returns the new `UTF8or16Field`
+        initialised from these values via `cls(text, bom=bom)`.
+      * `transcribe`:
+        to transcribe the option BOM and suitably encoded string.
+      The instance method `transcribe` is required because the transcription
+      requires knowledge of the BOM, an attribute of an instance.
   '''
 
   def __init__(self, value=None):
@@ -193,7 +232,7 @@ class PacketField(ABC):
     return sum(len(bs) for bs in flatten(self.transcribe()))
 
   @classmethod
-  def from_bytes(cls, bs, offset=0, length=None):
+  def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Factory to return a `PacketField` instance parsed from the
         bytes `bs` starting at `offset`.
         Returns the new `PacketField` and the post parse offset.
@@ -204,12 +243,12 @@ class PacketField(ABC):
         This relies on the `cls.from_buffer` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    field = cls.from_buffer(bfr)
+    field = cls.from_buffer(bfr, **kw)
     post_offset = offset + bfr.offset
     return field, post_offset
 
   @classmethod
-  def value_from_bytes(cls, bs, offset=0, length=None):
+  def value_from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a value parsed from the bytes `bs` starting at `offset`.
         Returns the new value and the post parse offset.
 
@@ -218,7 +257,7 @@ class PacketField(ABC):
 
         This relies on the `cls.from_bytes` method for the parse.
     '''
-    field, offset = cls.from_bytes(bs, offset=offset, length=length)
+    field, offset = cls.from_bytes(bs, offset=offset, length=length, **kw)
     return field.value, offset
 
   @classmethod
@@ -229,7 +268,7 @@ class PacketField(ABC):
         the value returned by `cls.value_from_buffer(bfr, **kw)`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
-    return cls(value)
+    return cls(value, **kw)
     ##return cls(cls.value_from_buffer(bfr, **kw))
 
   @staticmethod
@@ -276,8 +315,8 @@ class PacketField(ABC):
     '''
     yield self.transcribe_value(self.value)
 
-  @staticmethod
-  def transcribe_value(value):
+  @classmethod
+  def transcribe_value(cls, value, **kw):
     ''' For simple `PacketField`s, return a bytes transcription of a
         value suitable for the `.value` attribute.
 
@@ -285,7 +324,7 @@ class PacketField(ABC):
         `.value` and exposes its serialisation method, suitable for
         any `int`, as `transcribe_value`.
     '''
-    raise NotImplementedError("no transcribe_value method")
+    return cls(value, **kw).transcribe()
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.
@@ -355,11 +394,71 @@ class UTF8NULField(PacketField):
     bfr.take(1)
     return utf8
 
-  def transcribe(self):
+  @staticmethod
+  def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
     '''
-    yield self.value.encode('utf-8')
+    yield s.encode('utf-8')
     yield b'\0'
+
+class UTF16NULField(PacketField):
+  ''' A NUL terminated UTF-16 string.
+  '''
+
+  TEST_CASES = (
+      ('abc', {
+          'encoding': 'utf_16_le'
+      }, b'a\x00b\x00c\x00\x00\x00'),
+      ('abc', {
+          'encoding': 'utf_16_be'
+      }, b'\x00a\x00b\x00c\x00\x00'),
+  )
+
+  VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
+
+  def __init__(self, value, *, encoding):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
+    if encoding not in self.VALID_ENCODINGS:
+      raise ValueError(
+          'unexpected encoding %r, expected one of %r' %
+          (encoding, self.VALID_ENCODINGS)
+      )
+    self.encoding = encoding
+    self.value = value
+
+  @classmethod
+  def value_from_buffer(cls, bfr, encoding):
+    ''' Read a NUL terminated UTF-16 string from `bfr`, return field.
+        The mandatory parameter `encoding` specifies the UTF16 encoding to use
+        (`'utf_16_be'` or `'utf_16_le'`).
+    '''
+    # probe for the terminating NUL
+    bs_length = 2
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 2
+      if bfr[nul_pos] == 0 and bfr[nul_pos + 1] == 0:
+        break
+      bs_length += 2
+    if nul_pos == 0:
+      utf16 = ''
+    else:
+      utf16_bs = bfr.take(nul_pos)
+      utf16 = utf16_bs.decode(encoding)
+    bfr.take(2)
+    return utf16
+
+  def transcribe(self):
+    yield from self.transcribe_value(self.value, encoding=self.encoding)
+
+  @staticmethod
+  def transcribe_value(value, encoding='utf-16'):
+    ''' Transcribe `value` in UTF-16 with a terminating NUL.
+    '''
+    yield value.encode(encoding)
+    yield b'\0\0'
 
 class BytesField(PacketField):
   ''' A field of bytes.
@@ -380,20 +479,20 @@ class BytesField(PacketField):
 
   @classmethod
   def value_from_buffer(cls, bfr, length=None):
-    ''' Parse a BytesField of length `length` from `bfr`.
+    ''' Parse a `BytesField` of length `length` from `bfr`.
     '''
     if length < 0:
       raise ValueError("length(%d) < 0" % (length,))
     return bfr.take(length)
 
   def transcribe(self):
-    ''' A BytesField is its own transcription.
+    ''' A `BytesField` is its own transcription.
     '''
     assert isinstance(self.value, (bytes, memoryview))
     return self.value
 
 def fixed_bytes_field(length, class_name=None):
-  ''' Factory for BytesField subclasses built from fixed length byte strings.
+  ''' Factory for `BytesField` subclasses built from fixed length byte strings.
   '''
   if length < 1:
     raise ValueError("length(%d) < 1" % (length,))
@@ -1034,10 +1133,10 @@ class Packet(PacketField):
 
         If any keyword arguments are provided, they are used as a
         mapping of `field_name` to `Field` instance, supporting
-        direct construction of simple `Packet`s. From Python 3.6
-        onwards keyword arguments preserve the calling order; in
-        Python versions earlier than this the caller should adjust
-        the `Packet.field_names` list to the correct order after
+        direct construction of simple `Packet`s.
+        From Python 3.6 onwards keyword arguments preserve the calling order;
+        in Python versions earlier than this the caller should
+        adjust the `Packet.field_names` list to the correct order after
         initialisation.
     '''
     # Packets are their own value
