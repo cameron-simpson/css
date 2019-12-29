@@ -30,6 +30,7 @@ from cs.binary import (
     ListField,
     UInt8,
     Int16BE,
+    UTF16NULField,
     Int32BE,
     UInt16BE,
     UInt32BE,
@@ -275,34 +276,55 @@ def deref_box(B, path):
         B = nextB
     return B
 
-class UTF8or16Field(Packet):
+class UTF8or16Field(PacketField):
   ''' An ISO14496 UTF8 or UTF16 encoded string.
   '''
 
-  def parse_buffer(self, bfr, **kw):
-    ''' Gather the `language` and `notice` fields.
+  TEST_CASES = (
+      b'\0',
+      b'abc\0',
+      b'\xfe\xffa\x00b\x00c\x00\x00\x00',
+      b'\xff\xfe\x00a\x00b\x00c\x00\x00',
+  )
+
+  BOM_ENCODING = {
+      b'\xfe\xff': 'utf_16_le',
+      b'\xff\xfe': 'utf_16_be',
+  }
+
+  def __init__(self, value, *, bom):
+    super().__init__(value)
+    self.bom = bom
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    ''' Gather optional BOM and then UTF8 or UTF16 string.
     '''
     bfr.extend(1)
-    if bfr[0] == '\0':
-      # empty UTF8 NUL terminated string
-      self.encoding = 'utf-8'
-      self.value = ''
+    if bfr[0] == 0:
+      bom = None
+      text = UTF8NULField.value_from_buffer(bfr)
     else:
       bom = bfr.take(2)
-      if bom == b'\xfe\xff':
-        self.encoding = 'utf_16_le'
+      encoding = cls.BOM_ENCODING.get(bom)
+      if encoding is None:
+        bfr.push(bom)
+        bom = None
+        text = UTF8NULField.value_from_buffer(bfr)
       else:
-        self.encoding = 'utf_16_be'
-      self.value = UTF16NULField.value_from_buffer(bfr, encoding=self.encoding)
+        text = UTF16NULField.value_from_buffer(bfr, encoding)
+    return cls(text, bom=bom)
 
   def transcribe(self):
     ''' Transcribe the field suitably encoded.
     '''
-    if self.encoding == 'utf-8':
+    if self.bom is None:
       yield UTF8NULField.transcribe_value(self.value)
     else:
-      yield b'\xfe\xff' if self.encoding == 'utf_16_le' else b'\xff\xfe'
-      yield UTF16NULField.transcribe_value(self.value, self.encoding)
+      yield self.bom
+      yield UTF16NULField.transcribe_value(
+          self.value, encoding=self.BOM_ENCODING[self.bom]
+      )
 
 class TimeStampMixin:
   ''' Methods to assist with ISO14496 timestamps.
