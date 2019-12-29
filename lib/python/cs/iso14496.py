@@ -334,28 +334,41 @@ class TimeStampMixin:
   def datetime(self):
     ''' This timestamp as an UTC datetime.
     '''
-    dt = datetime.utcfromtimestamp(self.value)
+    if self.value in (0x7fffffffffffffff, 0x8000000000000000,
+                      0xfffffffffffffffe, 0xffffffffffffffff):
+      return None
+    try:
+      dt = datetime.utcfromtimestamp(self.value)
+    except (OverflowError, OSError) as e:
+      warning(
+          "%s.datetime: datetime.utcfromtimestamp(%s): %s, returning None",
+          type(self).__name__, self.value, e
+      )
+      return None
     return dt.replace(year=dt.year - 66)
 
   @property
   def unixtime(self):
     ''' This timestamp as a UNIX time (seconds since 1 January 1970).
     '''
-    return self.datetime.timestamp()
+    dt = self.datetime
+    if dt is None:
+      return None
+    return dt.timestamp()
 
 class TimeStamp32(UInt32BE, TimeStampMixin):
   ''' The 32 bit form of an ISO14496 timestamp.
   '''
 
   def __str__(self):
-    return str(self.datetime)
+    return str(self.datetime) or str(self.value)
 
 class TimeStamp64(UInt64BE, TimeStampMixin):
   ''' The 64 bit form of an ISO14496 timestamp.
   '''
 
   def __str__(self):
-    return str(self.datetime)
+    return str(self.datetime) or str(self.value)
 
 class BoxHeader(Packet):
   ''' An ISO14496 Box header packet.
