@@ -17,7 +17,9 @@
     The classes in this module support easy parsing of binary data
     structures.
 
-    The functions and classes in this module include:
+    The functions and classes in this module the following:
+
+    The two base classes for binary data:
     * `PacketField`: an abstract class for a binary field, with a
       factory method to parse it, a transcription method to transcribe
       it back out in binary form and usually a `.value` attribute
@@ -26,8 +28,12 @@
       `PacketField`s into a larger structure with ordered named
       fields.
       The fields themselves may be `Packet`s for complex structures.
-    * several presupplied subclasses for common basic types such
-      as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+
+    Several presupplied subclasses for common basic types such
+    as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+    Classes built from `struct` format strings:
     * `struct_field`: a factory for making PacketField classes for
       `struct` formats with a single value field.
     * `multi_struct_field` and `structtuple`: factories for making
@@ -164,6 +170,39 @@ def flatten(chunks):
 
 class PacketField(ABC):
   ''' A record for an individual packet field.
+
+      This normally holds a single value, such as a int of a particular size
+      or a string.
+
+      There are 2 basic ways to implement a `PacketField` subclass.
+
+      For the simple case subclasses should implement two methods:
+      * `value_from_buffer`:
+        parse the value from a `CornuCopyBuffer` and returns the parsed value
+      * `transcribe_value`:
+        transcribe the value as bytes
+
+      Sometimes a `PacketField` may be slightly more complex
+      while still not warranting (or perhaps fitting)
+      to formality of a `Packet` with its multifield structure.
+
+      One example is the `cs.iso14496.UTF8or16Field` class.
+      This supports an ISO14496 utf* or UTF16 string field,
+      as as such has 2 attributes:
+      * `value`: the string itself
+      * `bom`: a UTF16 byte order marker or `None`;
+        `None` indicates that the string should be encoded as UTF-8
+        and otherwise the BOM indicates UTF16 big endian or little endian.
+
+      To make this subclass it defines these methods:
+      * `from_buffer`:
+        to read the optional BOM and then the following encoded string;
+        it then returns the new `UTF8or16Field`
+        initialised from these values via `cls(text, bom=bom)`.
+      * `transcribe`:
+        to transcribe the option BOM and suitably encoded string.
+      The instance method `transcribe` is required because the transcription
+      requires knowledge of the BOM, an attribute of an instance.
   '''
 
   def __init__(self, value=None):
