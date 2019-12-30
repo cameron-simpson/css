@@ -184,10 +184,10 @@ class PacketField(ABC):
 
       Sometimes a `PacketField` may be slightly more complex
       while still not warranting (or perhaps fitting)
-      to formality of a `Packet` with its multifield structure.
+      the formality of a `Packet` with its multifield structure.
 
       One example is the `cs.iso14496.UTF8or16Field` class.
-      This supports an ISO14496 utf* or UTF16 string field,
+      This supports an ISO14496 UTF8 or UTF16 string field,
       as as such has 2 attributes:
       * `value`: the string itself
       * `bom`: a UTF16 byte order marker or `None`;
