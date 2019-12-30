@@ -255,14 +255,16 @@ class FSTagsCommand(BaseCommand):
               tagged_path.direct_tags
               if show_direct_tags else tagged_path.all_tags
           )
-          format_tags = TagSet()
+          format_tags = TagSet(defaults=defaultdict(str))
           format_tags.update(tags)
           print(
+              repr(output_format),
               output_format.format(
+                  basename=basename(filepath),
                   filepath=filepath,
                   filepath_encoded=filepath_encoded,
-                  tags=format_tags
-              ).strip()
+                  tags=format_tags,
+              )
           )
 
   @staticmethod
@@ -552,8 +554,16 @@ class TagSet:
       A `TagFile` maintains one of these for each name.
   '''
 
-  def __init__(self):
+  def __init__(self, *, defaults=None):
+    ''' Initialise the `TagSet`.
+
+        Parameters:
+        * `defaults`: a mapping of name->TagSet to provide default values.
+    '''
+    if defaults is None:
+      defaults = {}
     self.tagmap = {}
+    self.defaults = defaults
 
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
@@ -598,7 +608,10 @@ class TagSet:
     ''' Fetch tag value by `tag_name`.
         Raises `KeyError` for missing `tag_name`.
     '''
-    return self.tagmap[tag_name]
+    try:
+      return self.tagmap[tag_name]
+    except KeyError:
+      return self.defaults[tag_name]
 
   def get(self, tag_name, default=None):
     ''' Fetch tag value by `tag_name`, or `default`.
