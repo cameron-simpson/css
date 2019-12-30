@@ -276,7 +276,7 @@ def get_md_doc(
           supermod = getmodule(superclass)
           if supermod is not M:
             name = supermod.__name__ + '.' + name
-          mro_names.append('`' + name + '`')
+          mro_names.append(name)
       if mro_names:
         classname_etc += '(' + ','.join(mro_names) + ')'
         ##odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
