@@ -37,7 +37,6 @@
       fields.
       The fields themselves may be `Packet`s for complex structures.
 
-
     Several presupplied subclasses for common basic types such
     as `UInt32BE` (an unsigned 32 bit big endian integer).
 
