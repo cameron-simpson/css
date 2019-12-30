@@ -84,6 +84,7 @@ XATTR_B = (
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 
+FIND_OUTPUT_FORMAT_DEFAULT = '{filepath}'
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
 
 def main(argv=None):
@@ -103,10 +104,19 @@ class FSTagsCommand(BaseCommand):
         Tag paths based on rules from the rc file.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
+        --direct    Use direct tags instead of all tags.
         --for-rsync Instead of listing matching paths, emit a
                     sequence of rsync(1) patterns suitable for use with
                     --include-from in order to do a selective rsync of the
                     matched paths.
+        -o output_format
+                    Use output_format as a Python format string to lay out
+                    the listing.
+                    Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
+      '{', '{{'
+  ).replace(
+      '}', '}}'
+  ) + '''
     {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         --direct    List direct tags instead of all tags.
@@ -194,13 +204,16 @@ class FSTagsCommand(BaseCommand):
     badopts = False
     use_direct_tags = False
     as_rsync_includes = False
-    options, argv = getopt(argv, '', longopts=['direct', 'for-rsync'])
+    output_format = FIND_OUTPUT_FORMAT_DEFAULT
+    options, argv = getopt(argv, 'o:', longopts=['direct', 'for-rsync'])
     for option, value in options:
       with Pfx(option):
         if option == '--direct':
           use_direct_tags = True
         elif option == '--for-rsync':
           as_rsync_includes = True
+        elif option == '-o':
+          output_format = value
         else:
           raise RuntimeError("unsupported option")
     if not argv:
@@ -219,28 +232,31 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    filepaths = list(
-        fstags.find(path, tag_choices, use_direct_tags=use_direct_tags)
-    )
+    filepaths = fstags.find(path, tag_choices, use_direct_tags=use_direct_tags)
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
         print(include)
     else:
       for filepath in filepaths:
-        print(filepath)
+        print(
+              output_format.format(
+                  **TaggedPath(filepath, fstags=fstags
+                               ).format_kwargs(direct=use_direct_tags)
+              )
+          )
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
     ''' List paths and their tags.
     '''
     fstags = options.fstags
-    show_direct_tags = False
+    use_direct_tags = False
     output_format = LS_OUTPUT_FORMAT_DEFAULT
     options, argv = getopt(argv, 'o:', longopts=['direct'])
     for option, value in options:
       with Pfx(option):
         if option == '--direct':
-          show_direct_tags = True
+          use_direct_tags = True
         elif option == '-o':
           output_format = value
         else:
@@ -249,21 +265,10 @@ class FSTagsCommand(BaseCommand):
     for path in paths:
       with Pfx(path):
         for filepath in rfilepaths(path):
-          filepath_encoded = TagFile.encode_name(filepath)
-          tagged_path = TaggedPath(filepath, fstags=fstags)
-          tags = (
-              tagged_path.direct_tags
-              if show_direct_tags else tagged_path.all_tags
-          )
-          format_tags = TagSet(defaults=defaultdict(str))
-          format_tags.update(tags)
           print(
-              repr(output_format),
               output_format.format(
-                  basename=basename(filepath),
-                  filepath=filepath,
-                  filepath_encoded=filepath_encoded,
-                  tags=format_tags,
+                  **TaggedPath(filepath, fstags=fstags
+                               ).format_kwargs(direct=use_direct_tags)
               )
           )
 
@@ -1133,6 +1138,19 @@ class TaggedPath:
     ''' Test for the presence of `tag` in the `all_tags`.
     '''
     return tag in self.all_tags
+
+  def format_kwargs(self, *, direct=False):
+    ''' Format arguments suitable for `str.format`.
+    '''
+    filepath = str(self.filepath)
+    format_tags = TagSet(defaults=defaultdict(str))
+    format_tags.update(self.direct_tags if direct else self.all_tags)
+    return dict(
+        basename=basename(filepath),
+        filepath=filepath,
+        filepath_encoded=TagFile.encode_name(filepath),
+        tags=format_tags,
+    )
 
   @property
   def basename(self):
