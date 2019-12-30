@@ -36,29 +36,40 @@ class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
 
+      Its purpose is to aid binary parsers
+      which do not themselves need to handle sources specially;
+      `CornuCopyBuffer`s are trivially made from `bytes`,
+      iterables of `bytes` and file-like objects.
+      See `cs.binary` for convenient parsing classes
+      which work against `CornuCopyBuffer`s.
+
       Attributes:
-      * `buf`: a buffer of unparsed data from the input, available
-        for direct inspection by parsers
+      * `buf`: the first of any buffered leading chunks
+        buffer of unparsed data from the input, available
+        for direct inspection by parsers;
+        normally however parsers will use `.extend` and `.take`.
       * `offset`: the logical offset of the buffer; this excludes
-        unconsumed input data and `.buf`
+        buffered data and unconsumed input data
 
       The primary methods supporting parsing of data streams are
-      extend() and take(). Calling `.extend(min_size)` arranges
-      that `.buf` contains at least `min_size` bytes.  Calling `.take(size)`
-      fetches exactly `size` bytes from `.buf` and the input source if
-      necessary and returns them, adjusting `.buf`.
+      `.extend()` and `take()`.
+      Calling `.extend(min_size)` arranges that `.buf` contains at least
+      `min_size` bytes.
+      Calling `.take(size)` fetches exactly `size` bytes from `.buf` and the
+      input source if necessary and returns them, adjusting `.buf`.
 
-      len(CornuCopyBuffer) returns the length of `.buf`.
+      len(`CornuCopyBuffer`) returns the length of any buffered data.
 
-      bool(CornuCopyBuffer) tests whether len() > 0.
+      bool(`CornuCopyBuffer`) tests whether len() > 0.
 
-      Indexing a CornuCopyBuffer accesses `.buf`.
+      Indexing a `CornuCopyBuffer` accesses the buffered data only,
+      returning an individual byte's value (an `int`).
 
-      A CornuCopyBuffer is also iterable, yielding data in whatever
+      A `CornuCopyBuffer` is also iterable, yielding data in whatever
       sizes come from its `input_data` source, preceeded by the
       current `.buf` if not empty.
 
-      A CornuCopyBuffer also supports the file methods `.read`,
+      A `CornuCopyBuffer` also supports the file methods `.read`,
       `.tell` and `.seek` supporting drop in use of the buffer in
       many file contexts. Backward seeks are not supported. `.seek`
       will take advantage of the `input_data`'s .seek method if it
@@ -77,19 +88,19 @@ class CornuCopyBuffer(object):
     ''' Prepare the buffer.
 
         Parameters:
-        * `input_data`: an iterable of data chunks (bytes instances);
+        * `input_data`: an iterable of data chunks (bytes-like instances);
           if your data source is a file see the .from_file factory;
           if your data source is a file descriptor see the .from_fd
           factory.
-        * `buf`: if not None, the initial state of the parse buffer
+        * `buf`: if not `None`, the initial state of the parse buffer
         * `offset`: logical offset of the start of the buffer, default 0
         * `seekable`: whether `input_data` has a working `.seek` method;
           the default is None meaning that it will be attempted on
           the first skip or seek
-        * `copy_offsets`: if not None, a callable for parsers to
+        * `copy_offsets`: if not `None`, a callable for parsers to
           report pertinent offsets via the buffer's .report_offset
           method
-        * `copy_chunks`: if not None, every fetched data chunk is
+        * `copy_chunks`: if not `None`, every fetched data chunk is
           copied to this callable
 
         The `input_data` is an iterable whose iterator may have
@@ -102,7 +113,7 @@ class CornuCopyBuffer(object):
           `input_data_displacement`, the difference between the
           buffer's logical offset and the input data's logical offset;
           if unavailable during initialisation this is presumed to
-          be 0.
+          be `0`.
         * `end_offset`: the end offset of the iterator if known.
     '''
     self.bufs = []
@@ -133,14 +144,14 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def from_fd(cls, fd, readsize=None, offset=None, **kw):
-    ''' Return a new CornuCopyBuffer attached to an open file descriptor.
+    ''' Return a new `CornuCopyBuffer` attached to an open file descriptor.
 
-        Internally this constructs a SeekableFDIterator for regular
+        Internally this constructs a `SeekableFDIterator` for regular
         files or an FDIterator for other files, which provides the
-        iteration that CornuCopyBuffer consumes, but also seek
+        iteration that `CornuCopyBuffer` consumes, but also seek
         support if the underlying file descriptor is seekable.
 
-        *Note*: a SeekableFDIterator makes an `os.dup` of the
+        *Note*: a `SeekableFDIterator` makes an `os.dup` of the
         supplied file descriptor, so the caller is responsible for
         closing the original.
 
@@ -160,14 +171,14 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def from_mmap(cls, fd, readsize=None, offset=None, **kw):
-    ''' Return a new CornuCopyBuffer attached to an mmap of an open
+    ''' Return a new `CornuCopyBuffer` attached to an mmap of an open
         file descriptor.
 
-        Internally this constructs a SeekableMMapIterator, which
-        provides the iteration that CornuCopyBuffer consumes, but
+        Internally this constructs a `SeekableMMapIterator`, which
+        provides the iteration that `CornuCopyBuffer` consumes, but
         also seek support.
 
-        *Note*: a SeekableMMapIterator makes an `os.dup` of the
+        *Note*: a `SeekableMMapIterator` makes an `os.dup` of the
         supplied file descriptor, so the caller is responsible for
         closing the original.
 
@@ -184,10 +195,10 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def from_file(cls, fp, readsize=None, offset=None, **kw):
-    ''' Return a new CornuCopyBuffer attached to an open file.
+    ''' Return a new `CornuCopyBuffer` attached to an open file.
 
-        Internally this constructs a SeekableFileIterator, which
-        provides the iteration that CornuCopyBuffer consumes, but
+        Internally this constructs a `SeekableFileIterator`, which
+        provides the iteration that `CornuCopyBuffer` consumes, but
         also seek support of the underlying file is seekable.
 
         Parameters:
@@ -208,7 +219,7 @@ class CornuCopyBuffer(object):
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
-    ''' Return a CornuCopyBuffer fed from the supplied bytes `bs`
+    ''' Return a `CornuCopyBuffer` fed from the supplied bytes `bs`
         starting at `offset` and ending after `length`.
 
         This is handy for callers parsing using buffers but handed bytes.
@@ -779,7 +790,7 @@ class CopyingIterator(object):
     return getattr(self.I, attr)
 
 def chunky(bfr_func):
-  ''' Decorator for a function accepting a leading CornuCopyBuffer
+  ''' Decorator for a function accepting a leading `CornuCopyBuffer`
       parameter.
       Returns a function accepting a leading data chunks parameter
       (bytes instances) and optional `offset` and 'copy_offsets`
@@ -806,7 +817,7 @@ class _Iterator(object):
   '''
 
   def __init__(self, offset=0, readsize=None, align=False):
-    ''' Initialise the SeekableIterator.
+    ''' Initialise the `SeekableIterator`.
 
         Parameters:
         * `offset`: the initial logical offset, kept up to date by
