@@ -23,6 +23,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     branches    Report all branch names.
     diff        Run the VCS diff command.
     glog        Report a graphical change log.
+    get-branches [remote]
+                Fetch all remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
     remote      Report remote paths.
