@@ -114,9 +114,7 @@ class FSTagsCommand(BaseCommand):
                     the listing.
                     Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
       '{', '{{'
-  ).replace(
-      '}', '}}'
-  ) + '''
+  ).replace('}', '}}') + '''
     {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         --direct    List direct tags instead of all tags.
@@ -239,11 +237,11 @@ class FSTagsCommand(BaseCommand):
     else:
       for filepath in filepaths:
         print(
-              output_format.format(
-                  **TaggedPath(filepath, fstags=fstags
-                               ).format_kwargs(direct=use_direct_tags)
-              )
-          )
+            output_format.format(
+                **TaggedPath(filepath, fstags=fstags
+                             ).format_kwargs(direct=use_direct_tags)
+            )
+        )
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
