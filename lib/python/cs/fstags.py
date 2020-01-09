@@ -80,7 +80,7 @@ TAGSFILE = '.fstags'
 RCFILE = '~/.fstagsrc'
 
 XATTR_B = (
-    b'x-fstags'
+    b'user.cs.fstags'
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 
