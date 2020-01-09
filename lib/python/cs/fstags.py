@@ -1143,12 +1143,19 @@ class TaggedPath:
     filepath = str(self.filepath)
     format_tags = TagSet(defaults=defaultdict(str))
     format_tags.update(self.direct_tags if direct else self.all_tags)
-    return dict(
+    kwargs = dict(
         basename=basename(filepath),
         filepath=filepath,
         filepath_encoded=TagFile.encode_name(filepath),
         tags=format_tags,
     )
+    try:
+      S = os.stat(filepath)
+    except OSError:
+      pass
+    else:
+      kwargs.update(filesize=S.st_size)
+    return kwargs
 
   @property
   def basename(self):
