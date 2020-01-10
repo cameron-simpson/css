@@ -3,7 +3,7 @@
 # Do simple things with revision controlled source.
 # - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
-# Huge revsision. - cameron 11may2017
+# Huge revision. - cameron 11may2017
 #
 
 set -ue
@@ -16,6 +16,7 @@ set -ue
 cmd=$(basename "$0")
 usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
   -d dir        Working directory, default: .
+  -t topdir     Top of the VCS tree.
   -V vcs_type   Specify the VCS type to use.
                 An empty string asks $cmd to figure this out.
   Commands:
@@ -46,6 +47,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) wd=$2; shift ;;
+    -t) vcs_top=$2; shift ;;
     -V) vcs_type=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -63,17 +65,19 @@ done
 # enter working directory
 cd "$wd"
 
-# locate VCS top
-case "$vcs_type" in
-  hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
-  git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
-  ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
-  *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
-esac
-vcs_top=$(
-    set -ue
-    findup -d . -c "$findup_test"
-) || {
+[ -n "$vcs_top" ] || {
+  # locate VCS top
+  case "$vcs_type" in
+    hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
+    git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
+    ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
+    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+  esac
+  vcs_top=$(
+      set -ue
+      findup -d . -c "$findup_test"
+  )
+} || {
   echo "$cmd: $wd: cannot locate VCS top" >&2
   exit 1
 }
@@ -95,8 +99,8 @@ then    op=report
 else    op=$1; shift
 fi
 
-hg(){   $trace hg ${1+"$@"}; }
-git(){  $trace git ${1+"$@"}; }
+hg(){   $trace hg -R "$vcs_top" ${1+"$@"}; }
+git(){  $trace git --git-dir "$vcs_top/.git" ${1+"$@"}; }
 
 # Compute working directory VCS type.
 # All other commands are split on type below.
