@@ -24,6 +24,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
   Options:
     --backup-area=/path     Path to backup area, default: $backup_area
     --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
+    --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
     --tag-name=tagname      Tag name, default: $tag_name
@@ -41,6 +42,8 @@ do
         backup_area=$( expr "x$1" : 'x--backup-area=\(.*\)' ) ;;
     --copies=?*)
         copies=$( expr "x$1" : 'x--copies=\(.*\)' ) ;;
+    --exclude=?*)
+        rsync_exclude_opts="$rsync_exclude_opts $1" ;;
     --no-mount)
         do_mount= ;;
     --tag-name=?*)
