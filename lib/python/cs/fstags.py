@@ -764,7 +764,7 @@ class TagSet:
         try:
           os.setxattr(
               filepath, xattr_name_b, new_xattr_value_b,
-              (os.XATTR_REPLACE if old_xattr_value else os.XATTR_CREATE)
+              (os.XATTR_CREATE if old_xattr_value is None else os.XATTR_REPLACE)
           )
         except OSError as e:
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
