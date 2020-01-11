@@ -79,11 +79,10 @@ do
   tags=
   while :
   do
-    tag_test=$( expr "x$src_dst" : 'x\([a-z][-._a-z0-9]*=[^:][^:]*\):.*' ) || break
+    tag_spec=$( expr "x$src_dst" : 'x\([a-z][-._a-z0-9]*=[^:][^:]*\):.*' ) || break
     src_dst=$( expr "x$src_dst" : 'x[a-z][-._a-z0-9]*=[^:][^:]*:\(.*\)' )
-    tags="$tags $tag_test"
+    tags="$tags $tag_spec"
   done
-  echo "tags = $tags, src_dst = $src_dst" >&2
   src=$( expr "x$src_dst" : 'x\(.*\):..*' )
   dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
   [ -d "$dst/." ] || {
