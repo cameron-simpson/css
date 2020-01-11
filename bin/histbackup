@@ -447,6 +447,28 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# have "cp -ral"? otherwise rely on my linktree script
+if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+then
+  mklinktree(){
+    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+    _mkl_src=$1
+    _mkl_dst=$2
+    case "$_mkl_dst" in
+      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+    esac
+    # make link tree, might fail if hard link limit reached for files
+    $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
+      # failed to make target? fail outright
+      [ -d "$_mkl_dst/." ] || return 1
+      # if we made the target, update from source
+      dorsync "$_mkl_src/" "$_mkl_dst/"
+    }
+  }
+else
+  mklinktree(){ $trace linktree "$1" "$2"; }
+fi
+
 if [ $linkonly ]
 then
   # protect against accidental misused of $src
@@ -601,7 +623,7 @@ then
     exit 1
   }
   ( cd "$dest" || exit 1
-    dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/" -H \
+    mklinktree "./$lastbackup" "$thisbackup" \
     || dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
   )
 else
@@ -609,8 +631,8 @@ else
   ( cd "$dest" || exit 1
     if [ -n "$lastbackup" ]
     then
-      dorsync "$src" "$thisbackup" --link-dest="$absdest/$lastbackup/" -H \
-        ${1+"$@"} $obackup_options \
+      mklinktree "./$lastbackup" "$thisbackup"
+      dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
       || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
     else
       dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
