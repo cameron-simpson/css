@@ -1,0 +1,146 @@
+#!/bin/sh
+#
+# Backup data according to tags.
+# - Cameron Simpson <cs@cskk.id.au> 11jan2020
+#
+
+set -ue
+
+tag_name=backup
+copies=a,b
+backup_area=/mnt
+do_mount=1
+rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
+rsync_delete_exclude_opts='--delete-excluded'
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [options...] src_path[:backup_subpath]...
+
+  Backup a series of directories to multiple backup area, usually
+  mountable external drives. The files to back up are identified
+  by tags to support backing up directory trees which exceed the
+  size of the backup drives.
+
+  Options:
+    --backup-area=/path     Path to backup area, default: $backup_area
+    --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
+    --no-mount              Do not mount the backup path, expect
+                            it to be already present.
+    --tag-name=tagname      Tag name, default: $tag_name
+    -x                      Trace execution."
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --backup-area=?*)
+        backup_area=$( expr "x$1" : 'x--backup-area=\(.*\)' ) ;;
+    --copies=?*)
+        copies=$( expr "x$1" : 'x--copies=\(.*\)' ) ;;
+    --no-mount)
+        do_mount= ;;
+    --tag-name=?*)
+        tag_name=$( expr "x$1" : 'x--tag-name=\(.*\)' ) ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -d "$backup_area/" ] || {
+  echo "$cmd: missing backup area: $backup_area" >&2
+  badopts=1
+}
+[ -n "$copies" ] || {
+  echo "$cmd: no copies?" >&2
+  badopts=1
+}
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing src_paths" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for src_dst
+do
+  case "$src_dst" in
+    *:?*)   subpath=$( expr "x$src_dst" : 'x.*:\(..*\)' )
+            src_path=$(     expr "x$src_dst" : 'x\(.*\):..*' )
+            ;;
+    *)      subpath=$( basename "$src_dst" )
+            src_path=$src_dst
+            ;;
+  esac
+  [ -d "$src_path/" ] || {
+    echo "$cmd: $src_dst: missing source directory: $src_path" >&2
+    xit=1
+    continue
+  }
+  backup_names=$(
+    $trace fstags ls -o "{tags[$tag_name]}" "$src_path" | grep . | sort -u
+  )
+  [ -n "$backup_names" ] || {
+    echo "$cmd: $src_dst: no $tag_name tags in $src_path, skipping ALL BACKUPS" >&2
+    xit=1
+    continue
+  }
+  not_archive_tags=
+  for backup_name in $backup_names
+  do
+    archive_tag=$tag_name=$backup_name
+    not_archive_tags="$not_archive_tags -$archive_tag"
+    for copy in $( printf '%s\n' "$copies" | tr , ' ' )
+    do
+      backup_tree=$backup_area/$backup_name$copy
+      backup_path=$backup_tree/$subpath
+      if [ $do_mount ]
+      then
+        $trace mount "$backup_tree" || {
+          echo "$cmd: $src_dst: mount fails for $backup_tree, skipping" >&2
+          continue
+        }
+      fi
+      if [ -d "$backup_path/" ]
+      then
+        $trace multibackup -i --copy-times "$archive_tag:$src_path:$backup_path" \
+          -O $rsync_exclude_opts $rsync_delete_exclude_opts \
+        || xit=1
+        du -sh "$backup_path/LATEST/"
+      else
+        echo "$cmd: $src_dst: missing backup path: $backup_path, skipping" >&2
+      fi
+      if [ $do_mount ]
+      then
+        $trace umount "$backup_tree" || xit=1
+      fi
+    done
+  done
+  skipped_bytes=$( fstags find -o '{filesize}' "$src_path" $not_archive_tags | colsum 1 )
+  [ "$skipped_bytes" = 0 ] || {
+    echo "$cmd: $src_dst: $skipped_bytes bytes NOT ARCHIVED" >&2
+    xit=1
+    ( cd "$src_path"
+      echo "unbacked up series/seasons:"
+      fstags find . -backup \
+      | egrep '/(series|season)' \
+      | sed 's|/[^/]*$||' \
+      | sort -u \
+      | xxargs du -sh \
+      | sort -h
+    )
+  }
+done
+
+exit $xit
