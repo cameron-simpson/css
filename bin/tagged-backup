@@ -6,6 +6,8 @@
 
 set -ue
 
+: ${TMPDIR:=/tmp}
+
 tag_name=backup
 copies=a,b
 backup_area=/mnt
@@ -76,6 +78,9 @@ done
 
 xit=0
 
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0 1 3 15
+
 for src_dst
 do
   case "$src_dst" in
@@ -117,9 +122,12 @@ do
       fi
       if [ -d "$backup_path/" ]
       then
-        $trace multibackup -i --copy-times "$archive_tag:$src_path:$backup_path" \
-          -O $rsync_exclude_opts $rsync_delete_exclude_opts \
-        || xit=1
+        { $trace fstags find --for-rsync "$src_path" "$archive_tag" >"$tmpf" \
+          && $trace histbackup -i --copy-times \
+               -- "$src_path" "$backup_path" \
+               "--include-from=$tmpf" \
+               -O $rsync_exclude_opts $rsync_delete_exclude_opts
+        } || xit=1
         du -sh "$backup_path/LATEST/"
       else
         echo "$cmd: $src_dst: missing backup path: $backup_path, skipping" >&2
