@@ -3,8 +3,8 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
-    Tags are stored in a file `.fstags` in directories
-    with a line for each entry in the directory
+    Tags are stored in the file `.fstags` in each directory;
+    there is a line for each entry in the directory with tags
     consisting of the directory entry name and the associated tags.
 
     The tags for a file are the union of its direct tags
@@ -21,12 +21,12 @@
         episode=3
         episode.title="Full Episode Title"
 
-    from the following `.fstags` files and entries:
-    * `/path/to/.fstags`:
+    from the following `.fstags` entries:
+    * tag file `/path/to/.fstags`:
       `series-name sf series.title="Series Full Name"`
-    * `/path/to/series-name/.fstags`:
+    * tag file `/path/to/series-name/.fstags`:
       `season-02 season=2`
-    * `/path/to/series-name/season-02.fstags`:
+    * tag file `/path/to/series-name/season-02/.fstags`:
       `episode-name--s02e03--something.mp4 episode=3 episode.title="Full Episode Title"`
 
     Tags may be "bare", or have a value.
@@ -95,7 +95,7 @@ def main(argv=None):
   return FSTagsCommand().run(argv)
 
 class FSTagsCommand(BaseCommand):
-  ''' fstag main command line class.
+  ''' `fstags` main command line class.
   '''
 
   GETOPT_SPEC = ''
@@ -533,7 +533,7 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
 
       Attributes:
       * `spec`: the source text from which this choice was parsed,
-        possible `None`
+        possibly `None`
       * `choice`: the apply/reject flag
       * `tag`: the `Tag` representing the criterion
   '''
@@ -763,8 +763,10 @@ class TagSet:
                new_xattr_value_b):
         try:
           os.setxattr(
-              filepath, xattr_name_b, new_xattr_value_b,
-              (os.XATTR_CREATE if old_xattr_value is None else os.XATTR_REPLACE)
+              filepath, xattr_name_b, new_xattr_value_b, (
+                  os.XATTR_CREATE
+                  if old_xattr_value is None else os.XATTR_REPLACE
+              )
           )
         except OSError as e:
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
@@ -1359,6 +1361,10 @@ def loadrc(rcfilepath=None):
       if e.errno != errno.ENOENT:
         raise
     return rules
+
+FSTagsCommand.__doc__ += '\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
+    cmd='fstags'
+).replace('\n', '\n    ')
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
