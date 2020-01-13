@@ -1362,7 +1362,7 @@ def loadrc(rcfilepath=None):
         raise
     return rules
 
-FSTagsCommand.__doc__ += '\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
+FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
     cmd='fstags'
 ).replace('\n', '\n    ')
 
