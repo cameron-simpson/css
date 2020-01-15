@@ -1,3 +1,4 @@
+fstags: [xattr] section with xattr=tag equivalences, move rules to [autotag] section
 fstags: mirror tags to xattrs:x-fstags?
 fstags: autotag: use pathtags.add
 fstags: pathtags.add: do not add to direct tags if in all_tags
