@@ -518,14 +518,19 @@ class HasFSTagsMixin:
   ''' Mixin providing a `.fstags` property.
   '''
 
-  default_fstags = FSTags()
+  _default_fstags = None
 
   @property
   def fstags(self):
     ''' Return the `.fstags` property,
         default a shared default `FSTags` instance.
     '''
-    return getattr(self, '_fstags', self.default_fstags)
+    _fstags = getattr(self, '_fstags')
+    if _fstags is None:
+      _fstags = self._default_fstags
+      if _fstags is None:
+        _fstags = self._default_fstags = FSTags()
+    return _fstags
 
   @fstags.setter
   def fstags(self, new_fstags):
