@@ -354,6 +354,165 @@ class FSTagsCommand(BaseCommand):
       raise GetoptError("bad arguments")
     fstags.apply_tag_choices(tag_choices, argv)
 
+class FSTags:
+  ''' A class to examine filesystem tags.
+  '''
+
+  def __init__(self, tagsfile=None):
+    if tagsfile is None:
+      tagsfile = TAGSFILE
+    self.config = FSTagsConfig()
+    self.config.tagsfile = tagsfile
+    self._tagmaps = {}  # cache of per directory `TagFile`s
+    self._lock = Lock()
+
+  @property
+  def tagsfile(self):
+    return self.config.tagsfile
+
+  def __str__(self):
+    return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
+
+  @locked
+  def dir_tagfile(self, dirpath):
+    ''' Return the `TagFile` associated with `dirpath`.
+    '''
+    dirpath = Path(dirpath)
+    tagfilepath = dirpath / self.tagsfile
+    tagfile = self._tagmaps.get(tagfilepath)
+    if tagfile is None:
+      tagfile = self._tagmaps[tagfilepath] = TagFile(
+          str(tagfilepath), fstags=self
+      )
+    return tagfile
+
+  def path_tagfiles(self, filepath):
+    ''' Return a list of `TagFileEntry`s
+        for the `TagFile`s affecting `filepath`
+        in order from the root to `dirname(filepath)`
+        where `name` is the key within `TagFile`.
+
+        Note that this is computed from `realpath(filepath)`.
+
+        TODO: optional `as_is` parameter to skip the realpath call?
+    '''
+    with Pfx("path_tagfiles(%r)", filepath):
+      real_filepath = Path(realpath(filepath))
+      root, *subparts = real_filepath.parts
+      if not subparts:
+        raise ValueError("root=%r and no subparts" % (root,))
+      tagfiles = []
+      current = root
+      while subparts:
+        next_part = subparts.pop(0)
+        tagfiles.append(TagFileEntry(self.dir_tagfile(current), next_part))
+        current = joinpath(current, next_part)
+      return tagfiles
+
+  def apply_tag_choices(self, tag_choices, paths):
+    ''' Apply the `tag_choices` to `paths`.
+
+        Parameters:
+        * `tag_choices`:
+          an iterable of `Tag` or `(spec,choice,Tag)`;
+          the former is equivalent to `(None,True,Tag)`.
+          Each item applies or removes a `Tag`
+          from each path's direct tags.
+        * `paths`:
+          an iterable of filesystem paths.
+    '''
+    tag_choices = [
+        TagChoice(str(tag_choice), True, tag_choice)
+        if isinstance(tag_choice, Tag) else tag_choice
+        for tag_choice in tag_choices
+    ]
+    for path in paths:
+      with Pfx(path):
+        tagged_path = TaggedPath(path, fstags=self)
+        for spec, choice, tag in tag_choices:
+          with Pfx(spec):
+            if choice:
+              # add tag
+              tagged_path.add(tag)
+            else:
+              # delete tag
+              tagged_path.discard(tag)
+        tagged_path.save()
+
+  def find(self, path, tag_choices, use_direct_tags=False):
+    ''' Walk the file tree from `path`
+        searching for files matching the supplied `tag_choices`.
+        Yield the matching file paths.
+
+        Parameters:
+        * `path`: the top of the file tree to walk
+        * `tag_choices`: an iterable of `TagChoice`s
+        * `use_direct_tags`: test the direct_tags if true,
+          otherwise the all_tags.
+          Default: `False`
+    '''
+    for filepath in rpaths(path, yield_dirs=use_direct_tags):
+      tagged_path = TaggedPath(filepath, fstags=self)
+      tags = (
+          tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
+      )
+      choose = True
+      for _, choice, tag in tag_choices:
+        if choice:
+          # tag_choice not present or not with same nonNone value
+          if tag not in tags:
+            choose = False
+            break
+        else:
+          if tag in tags:
+            choose = False
+            break
+      if choose:
+        yield filepath
+
+  @pfx_method(use_str=True)
+  def edit_dirpath(self, dirpath):
+    ''' Edit the filenames and tags in a directory.
+    '''
+    ok = True
+    with Pfx("dirpath=%r", dirpath):
+      dirpath = realpath(dirpath)
+      tagfile = self.dir_tagfile(dirpath)
+      tagsets = tagfile.tagsets
+      names = set(
+          name for name in os.listdir(dirpath)
+          if (name and name not in ('.', '..') and not name.startswith('.'))
+      )
+      lines = [
+          tagfile.tags_line(name, tagfile.direct_tags_of(name))
+          for name in sorted(names)
+      ]
+      changed = edit_strings(lines)
+      for old_line, new_line in changed:
+        old_name, old_tags = tagfile.parse_tags_line(old_line)
+        new_name, new_tags = tagfile.parse_tags_line(new_line)
+        with Pfx(old_name):
+          if old_name != new_name:
+            if new_name in tagsets:
+              warning("new name %r already exists", new_name)
+              ok = False
+              continue
+            del tagsets[old_name]
+            old_path = joinpath(dirpath, old_name)
+            if existspath(old_path):
+              new_path = joinpath(dirpath, new_name)
+              if not existspath(new_path):
+                with Pfx("rename %r => %r", old_path, new_path):
+                  try:
+                    os.rename(old_path, new_path)
+                  except OSError as e:
+                    warning("%s", e)
+                    ok = False
+                    continue
+                  info("renamed")
+          tagsets[new_name] = new_tags
+      tagfile.save()
+    return ok
 class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
@@ -973,164 +1132,6 @@ class TagFile:
     return self.tagsets[name].discard(tag_name, value)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
-
-class FSTags:
-  ''' A class to examine filesystem tags.
-  '''
-
-  def __init__(self, tagsfile=None):
-    if tagsfile is None:
-      tagsfile = TAGSFILE
-    self.config = FSTagsConfig(do_load=True)
-    self.config.tagsfile = tagsfile
-    self._tagmaps = {}  # cache of per directory `TagFile`s
-    self._lock = Lock()
-
-  @property
-  def tagsfile(self):
-    return self.config.tagsfile
-
-  def __str__(self):
-    return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
-
-  @locked
-  def dir_tagfile(self, dirpath):
-    ''' Return the `TagFile` associated with `dirpath`.
-    '''
-    dirpath = Path(dirpath)
-    tagfilepath = dirpath / self.tagsfile
-    tagfile = self._tagmaps.get(tagfilepath)
-    if tagfile is None:
-      tagfile = self._tagmaps[tagfilepath] = TagFile(str(tagfilepath))
-    return tagfile
-
-  def path_tagfiles(self, filepath):
-    ''' Return a list of `TagFileEntry`s
-        for the `TagFile`s affecting `filepath`
-        in order from the root to `dirname(filepath)`
-        where `name` is the key within `TagFile`.
-
-        Note that this is computed from `realpath(filepath)`.
-
-        TODO: optional `as_is` parameter to skip the realpath call?
-    '''
-    with Pfx("path_tagfiles(%r)", filepath):
-      real_filepath = Path(realpath(filepath))
-      root, *subparts = real_filepath.parts
-      if not subparts:
-        raise ValueError("root=%r and no subparts" % (root,))
-      tagfiles = []
-      current = root
-      while subparts:
-        next_part = subparts.pop(0)
-        tagfiles.append(TagFileEntry(self.dir_tagfile(current), next_part))
-        current = joinpath(current, next_part)
-      return tagfiles
-
-  def apply_tag_choices(self, tag_choices, paths):
-    ''' Apply the `tag_choices` to `paths`.
-
-        Parameters:
-        * `tag_choices`:
-          an iterable of `Tag` or `(spec,choice,Tag)`;
-          the former is equivalent to `(None,True,Tag)`.
-          Each item applies or removes a `Tag`
-          from each path's direct tags.
-        * `paths`:
-          an iterable of filesystem paths.
-    '''
-    tag_choices = [
-        TagChoice(str(tag_choice), True, tag_choice)
-        if isinstance(tag_choice, Tag) else tag_choice
-        for tag_choice in tag_choices
-    ]
-    for path in paths:
-      with Pfx(path):
-        tagged_path = TaggedPath(path, fstags=self)
-        for spec, choice, tag in tag_choices:
-          with Pfx(spec):
-            if choice:
-              # add tag
-              tagged_path.add(tag)
-            else:
-              # delete tag
-              tagged_path.discard(tag)
-        tagged_path.save()
-
-  def find(self, path, tag_choices, use_direct_tags=False):
-    ''' Walk the file tree from `path`
-        searching for files matching the supplied `tag_choices`.
-        Yield the matching file paths.
-
-        Parameters:
-        * `path`: the top of the file tree to walk
-        * `tag_choices`: an iterable of `TagChoice`s
-        * `use_direct_tags`: test the direct_tags if true,
-          otherwise the all_tags.
-          Default: `False`
-    '''
-    for filepath in rpaths(path, yield_dirs=use_direct_tags):
-      tagged_path = TaggedPath(filepath, fstags=self)
-      tags = (
-          tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
-      )
-      choose = True
-      for _, choice, tag in tag_choices:
-        if choice:
-          # tag_choice not present or not with same nonNone value
-          if tag not in tags:
-            choose = False
-            break
-        else:
-          if tag in tags:
-            choose = False
-            break
-      if choose:
-        yield filepath
-
-  @pfx_method(use_str=True)
-  def edit_dirpath(self, dirpath):
-    ''' Edit the filenames and tags in a directory.
-    '''
-    ok = True
-    with Pfx("dirpath=%r", dirpath):
-      dirpath = realpath(dirpath)
-      tagfile = self.dir_tagfile(dirpath)
-      tagsets = tagfile.tagsets
-      names = set(
-          name for name in os.listdir(dirpath)
-          if (name and name not in ('.', '..') and not name.startswith('.'))
-      )
-      lines = [
-          tagfile.tags_line(name, tagfile.direct_tags_of(name))
-          for name in sorted(names)
-      ]
-      changed = edit_strings(lines)
-      for old_line, new_line in changed:
-        old_name, old_tags = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-        with Pfx(old_name):
-          if old_name != new_name:
-            if new_name in tagsets:
-              warning("new name %r already exists", new_name)
-              ok = False
-              continue
-            del tagsets[old_name]
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if not existspath(new_path):
-                with Pfx("rename %r => %r", old_path, new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    continue
-                  info("renamed")
-          tagsets[new_name] = new_tags
-      tagfile.save()
-    return ok
 
 class TaggedPath:
   ''' Class to manipulate the tags for a specific path.
