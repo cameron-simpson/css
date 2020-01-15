@@ -1092,6 +1092,13 @@ class TagFile(HasFSTagsMixin):
               if XATTR_B is not None:
                 name_path = joinpath(self.dirpath, name)
                 tags.update_from_xattr(name_path, xattr_name=XATTR_B)
+                # import tags from other xattrs if not present
+                for xattr_name, tag_name in self.fstags.config['xattr'].items(
+                ):
+                  if tag_name not in tags:
+                    tag_value = tags.xattr_value(name_path, xattr_name)
+                    if tag_value is not None:
+                      tags.add(tag_name, tag_value)
               tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -1128,6 +1135,11 @@ class TagFile(HasFSTagsMixin):
       for name, tagset in self.tagsets.items():
         name_path = joinpath(self.dirpath, name)
         tagset.update_xattr(name_path, xattr_name=XATTR_B)
+        # export tagset to other xattrs
+        for xattr_name, tag_name in self.fstags.config['xattr'].items():
+          tag_value = tagset.get(tag_name)
+          if tag_value is not None:
+            tagset.set_xattr_value(name_path, tag_value, xattr_name=xattr_name)
 
   @locked_property
   def tagsets(self):
