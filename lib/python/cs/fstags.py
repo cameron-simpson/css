@@ -513,6 +513,26 @@ class FSTags:
           tagsets[new_name] = new_tags
       tagfile.save()
     return ok
+
+class HasFSTagsMixin:
+  ''' Mixin providing a `.fstags` property.
+  '''
+
+  default_fstags = FSTags()
+
+  @property
+  def fstags(self):
+    ''' Return the `.fstags` property,
+        default a shared default `FSTags` instance.
+    '''
+    return getattr(self, '_fstags', self.default_fstags)
+
+  @fstags.setter
+  def fstags(self, new_fstags):
+    ''' Set the `.fstags` property.
+    '''
+    self._fstags = new_fstags
+
 class Tag:
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
@@ -721,12 +741,12 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset)
     return cls(s[offset0:offset], choice, tag), offset
 
-class TagSet:
+class TagSet(HasFSTagsMixin):
   ''' A setlike class associating a set of tag names with values.
       A `TagFile` maintains one of these for each name.
   '''
 
-  def __init__(self, *, defaults=None):
+  def __init__(self, *, fstags=None, defaults=None):
     ''' Initialise the `TagSet`.
 
         Parameters:
@@ -734,6 +754,8 @@ class TagSet:
     '''
     if defaults is None:
       defaults = {}
+    if fstags is not None:
+      self.fstags = fstags
     self.tagmap = {}
     self.defaults = defaults
 
@@ -981,7 +1003,7 @@ class TagSet:
     xattr_tags = self.from_xattr(filepath, xattr_name=xattr_name)
     self.update(xattr_tags)
 
-class TagFile:
+class TagFile(HasFSTagsMixin):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -989,7 +1011,9 @@ class TagFile:
   '''
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath):
+  def __init__(self, filepath, *, fstags=None):
+    if fstags is not None:
+      self.fstags = fstags
     self.filepath = filepath
     self.dirpath = dirname(realpath(filepath))
     self._lock = Lock()
@@ -1133,13 +1157,13 @@ class TagFile:
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
-class TaggedPath:
+class TaggedPath(HasFSTagsMixin):
   ''' Class to manipulate the tags for a specific path.
   '''
 
   def __init__(self, filepath, fstags=None):
-    if fstags is None:
-      fstags = FSTags()
+    if fstags is not None:
+      self.fstags = fstags
     self.filepath = Path(filepath)
     self._tagfile_entries = fstags.path_tagfiles(filepath)
     self._lock = Lock()
