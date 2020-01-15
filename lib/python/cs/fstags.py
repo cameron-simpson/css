@@ -1392,9 +1392,13 @@ class FSTagsConfig:
       rcfilepath = expanduser(RCFILE)
     self.config = ConfigParser()
     self.config.add_section('general')
+    self.config.add_section('xattr')
+    self.config.add_section('autotag')
     self.filepath = rcfilepath
+    self._loaded = False
     if do_load:
       self.load()
+      self._loaded = True
 
   @pfx_method
   @fmtdoc
@@ -1425,12 +1429,18 @@ class FSTagsConfig:
   def tagsfile(self):
     ''' The tags filename, default `{TAGSFILE!r}`.
     '''
+    if not self._loaded:
+      self.load()
+      self._loaded = True
     return self.config.get('general', 'tagsfile') or TAGSFILE
 
   @tagsfile.setter
   def tagsfile(self, tagsfile):
     ''' Set the tags filename.
     '''
+    if not self._loaded:
+      self.load()
+      self._loaded = True
     self.config['general']['tagsfile'] = tagsfile
 
 FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
