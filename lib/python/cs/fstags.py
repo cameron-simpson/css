@@ -3,6 +3,15 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
+    Why `fstags`?
+    By storing the tags in a separate file we:
+    * can store tags without modifying a file
+    * do no need to know the file's format,
+      whether that supports metadata or not
+    * can process tags on any kind of file
+    * because tags are inherited from parent directories,
+      tags can be automatically acquired merely by arranging your file tree
+
     Tags are stored in the file `.fstags` in each directory;
     there is a line for each entry in the directory with tags
     consisting of the directory entry name and the associated tags.
@@ -35,6 +44,7 @@
 '''
 
 from collections import defaultdict, namedtuple
+from configparser import ConfigParser
 from datetime import date, datetime
 import errno
 from getopt import getopt, GetoptError
@@ -166,7 +176,7 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = loadrc()
+    rules = fstags.config.rules
     for top_path in argv:
       for path in rpaths(top_path):
         with Pfx(path):
@@ -971,9 +981,14 @@ class FSTags:
   def __init__(self, tagsfile=None):
     if tagsfile is None:
       tagsfile = TAGSFILE
-    self.tagsfile = tagsfile
+    self.config = FSTagsConfig(do_load=True)
+    self.config.tagsfile = tagsfile
     self._tagmaps = {}  # cache of per directory `TagFile`s
     self._lock = Lock()
+
+  @property
+  def tagsfile(self):
+    return self.config.tagsfile
 
   def __str__(self):
     return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
@@ -999,7 +1014,7 @@ class FSTags:
 
         TODO: optional `as_is` parameter to skip the realpath call?
     '''
-    with Pfx("path_tagfiles", filepath):
+    with Pfx("path_tagfiles(%r)", filepath):
       real_filepath = Path(realpath(filepath))
       root, *subparts = real_filepath.parts
       if not subparts:
@@ -1252,15 +1267,13 @@ class TaggedPath:
         self.save()
     return new_tags
 
-def infer_tags(name, rules=None):
+def infer_tags(name, rules):
   ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
 
       `rules` is an iterable of objects with a `.infer_tags(name)` method
       which returns an iterable of `Tag`s.
   '''
   with Pfx("infer_tags(%r,..)", name):
-    if rules is None:
-      rules = loadrc()
     tags = TagSet()
     for rule in rules:
       with Pfx(rule):
@@ -1338,29 +1351,62 @@ def rsync_patterns(paths, top_path):
   patterns.append('- *')
   return patterns
 
-@fmtdoc
-def loadrc(rcfilepath=None):
-  ''' Read rc file, return rules.
-
-      If `rcfilepath` is `None` default to `'{RCFILE}'` (from `RCFILE`).
+class FSTagsConfig:
+  ''' A configuration for fstags.
   '''
-  if rcfilepath is None:
-    rcfilepath = expanduser(RCFILE)
-  with Pfx("loadrc(%r)", rcfilepath):
-    rules = []
-    try:
-      with open(rcfilepath) as f:
-        for lineno, line in enumerate(f, 1):
-          with Pfx(lineno):
-            line = line.strip()
-            if not line or line.startswith('#'):
-              continue
-            if line.startswith('/') and line.endswith('/'):
-              rules.append(RegexpTagRule(line[1:-1]))
-    except OSError as e:
-      if e.errno != errno.ENOENT:
-        raise
-    return rules
+
+  @fmtdoc
+  def __init__(self, rcfilepath=None, *, do_load=False):
+    ''' Initialise the config.
+
+        Parameters:
+        * `rcfilepath`: the path to the confguration file
+          If `None`, default to `'{RCFILE}'` (from `RCFILE`).
+    '''
+    if rcfilepath is None:
+      rcfilepath = expanduser(RCFILE)
+    self.config = ConfigParser()
+    self.config.add_section('general')
+    self.filepath = rcfilepath
+    if do_load:
+      self.load()
+
+  @pfx_method
+  @fmtdoc
+  def load(self, rcfilepath=None):
+    ''' Read an rc file, merge into the current config.
+    '''
+    if rcfilepath is None:
+      rcfilepath = self.filepath
+    with Pfx(rcfilepath):
+      config = self.config
+      config['general']['tagsfile'] = TAGSFILE
+      try:
+        config.read(rcfilepath)
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
+      rules = []
+      for rule_name, pattern in config['autotag'].items():
+        with Pfx("%s = %s", rule_name, pattern):
+          if pattern.startswith('/') and pattern.endswith('/'):
+            rules.append(RegexpTagRule(pattern[1:-1]))
+          else:
+            warning("invalid autotag rule")
+      self.rules = rules
+
+  @property
+  @fmtdoc
+  def tagsfile(self):
+    ''' The tags filename, default `{TAGSFILE!r}`.
+    '''
+    return self.config.get('general', 'tagsfile') or TAGSFILE
+
+  @tagsfile.setter
+  def tagsfile(self, tagsfile):
+    ''' Set the tags filename.
+    '''
+    self.config['general']['tagsfile'] = tagsfile
 
 FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
     cmd='fstags'
