@@ -1183,7 +1183,7 @@ class TaggedPath(HasFSTagsMixin):
     ''' Format arguments suitable for `str.format`.
     '''
     filepath = str(self.filepath)
-    format_tags = TagSet(defaults=defaultdict(str))
+    format_tags = TagSet(defaults=defaultdict(str), fstags=self.fstags)
     format_tags.update(self.direct_tags if direct else self.all_tags)
     kwargs = dict(
         basename=basename(filepath),
@@ -1226,7 +1226,7 @@ class TaggedPath(HasFSTagsMixin):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
-    tags = TagSet()
+    tags = TagSet(fstags=self.fstags)
     for tagfile, name in self._tagfile_entries:
       for tag in tagfile[name]:
         tags.add(tag)
@@ -1280,7 +1280,7 @@ class TaggedPath(HasFSTagsMixin):
     name = self.basename
     tags = self.direct_tags
     all_tags = self.all_tags
-    new_tags = TagSet()
+    new_tags = TagSet(fstags=self.fstags)
     updated = False
     for autotag in infer_tags(name, rules=rules):
       if autotag not in all_tags:
