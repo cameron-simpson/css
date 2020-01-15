@@ -1417,6 +1417,9 @@ class FSTagsConfig:
       self.load()
       self._loaded = True
 
+  def __getitem__(self, section):
+    return self.config[section]
+
   @pfx_method
   @fmtdoc
   def load(self, rcfilepath=None):
