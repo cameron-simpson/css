@@ -113,7 +113,7 @@ do
     xit=1
     continue
   }
-  $vecho "$tag_name tags =" $backup_names
+  $vecho "$src_path: $tag_name tags =" $backup_names
   not_archive_tags=
   for backup_name in $backup_names
   do
@@ -123,7 +123,7 @@ do
     do
       backup_tree=$backup_area/$backup_name$copy
       backup_path=$backup_tree/$subpath
-      $vecho "backup $src_path to $backup_path for $tag_name=$backup_name"
+      $vecho "$src_path: backup to $backup_path for $tag_name=$backup_name"
       if [ $do_mount ]
       then
         $trace mount "$backup_tree" || {
@@ -139,7 +139,10 @@ do
                "--include-from=$tmpf" \
                -O $rsync_exclude_opts $rsync_delete_exclude_opts
         } || xit=1
-        [ $quiet ] || du -sh "$backup_path/LATEST/"
+        [ $quiet ] || {
+          du -sh "$backup_path/LATEST/" \
+          | awk -v "src_path=$src_path" '{ print(src_path ":", $2, $1) }'
+        }
       else
         echo "$cmd: $src_dst: missing backup path: $backup_path, skipping" >&2
       fi
