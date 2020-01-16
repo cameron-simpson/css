@@ -14,6 +14,8 @@ backup_area=/mnt
 do_mount=1
 rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
 rsync_delete_exclude_opts='--delete-excluded'
+quiet=
+hbopts=
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] src_path[:backup_subpath]...
@@ -30,6 +32,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
     --tag-name=tagname      Tag name, default: $tag_name
+    -q                      Quiet.
     -x                      Trace execution."
 
 trace=
@@ -50,6 +53,7 @@ do
         do_mount= ;;
     --tag-name=?*)
         tag_name=$( expr "x$1" : 'x--tag-name=\(.*\)' ) ;;
+    -q) quiet=1 ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -59,6 +63,11 @@ do
   esac
   shift
 done
+
+if [ $quiet ]
+then  vecho=:
+else  vecho=echo hbopts="$hbopts -i"
+fi
 
 [ -d "$backup_area/" ] || {
   echo "$cmd: missing backup area: $backup_area" >&2
@@ -104,6 +113,7 @@ do
     xit=1
     continue
   }
+  $vecho "$tag_name tags =" $backup_names
   not_archive_tags=
   for backup_name in $backup_names
   do
@@ -113,6 +123,7 @@ do
     do
       backup_tree=$backup_area/$backup_name$copy
       backup_path=$backup_tree/$subpath
+      $vecho "backup $src_path to $backup_path for $tag_name=$backup_name"
       if [ $do_mount ]
       then
         $trace mount "$backup_tree" || {
@@ -123,12 +134,12 @@ do
       if [ -d "$backup_path/" ]
       then
         { $trace fstags find --for-rsync "$src_path" "$archive_tag" >"$tmpf" \
-          && $trace histbackup -i --copy-times \
+          && $trace histbackup $hbopts --copy-times \
                -- "$src_path" "$backup_path" \
                "--include-from=$tmpf" \
                -O $rsync_exclude_opts $rsync_delete_exclude_opts
         } || xit=1
-        du -sh "$backup_path/LATEST/"
+        [ $quiet ] || du -sh "$backup_path/LATEST/"
       else
         echo "$cmd: $src_dst: missing backup path: $backup_path, skipping" >&2
       fi
@@ -142,15 +153,17 @@ do
   [ "$skipped_bytes" = 0 ] || {
     echo "$cmd: $src_dst: $skipped_bytes bytes NOT ARCHIVED" >&2
     xit=1
-    ( cd "$src_path"
-      echo "unbacked up series/seasons:"
-      fstags find . -backup \
-      | egrep '/(series|season)' \
-      | sed 's|/[^/]*$||' \
-      | sort -u \
-      | xxargs du -sh \
-      | sort -h
-    )
+    [ $quiet ] || {
+      ( cd "$src_path"
+        echo "unbacked up series/seasons:"
+        fstags find . -backup \
+        | egrep '/(series|season)' \
+        | sed 's|/[^/]*$||' \
+        | sort -u \
+        | xxargs du -sh \
+        | sort -h
+      )
+    }
   }
 done
 
