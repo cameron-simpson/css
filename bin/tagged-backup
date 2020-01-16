@@ -36,7 +36,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     -x                      Trace execution."
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 
 badopts=
 
