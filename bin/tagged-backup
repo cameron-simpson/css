@@ -162,6 +162,12 @@ do
         | sort -u \
         | xxargs du -sh \
         | sort -h
+        echo "unbacked up nonseries:"
+        fstags find . -backup \
+        | egrep -v '/(series|season)' \
+        | sort \
+        | xxargs du -sh \
+        | sort -h
       )
     }
   }
