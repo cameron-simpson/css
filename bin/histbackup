@@ -89,7 +89,7 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 vecho=:
 symlink=LATEST
 src=
