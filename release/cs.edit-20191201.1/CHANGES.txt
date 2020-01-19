@@ -1,0 +1,6 @@
+lib/python/cs/edit.py: erename, cs.edit: move edit-list-of-strings logic into new cs.edit module as edit_strings
+lib/python/cs/edit.py: cs.edit: edit_strings: accept optional `errors` error mode
+lib/python/cs/edit.py: my email address has changed - update Python code
+lib/python/cs/edit.py: cs.edit: fix errors() signature
+lib/python/cs/edit.py: cs.edit: pull out the raw edit strings code into bare edit() function for use by fstags, drop errors= parameter, add choose_editor function
+lib/python/cs/edit.py: cs.edit: add DISTINFO

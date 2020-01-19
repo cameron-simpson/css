@@ -26,7 +26,7 @@ DISTINFO = {
 }
 
 _FileState = namedtuple('FileState', 'stat mtime size dev ino')
-_FileState.__eq__ = lambda self, other: self[1:] == other[1:]
+_FileState.__eq__ = lambda self, other: other is not None and self[1:] == other[1:]
 
 def FileState(path, do_lstat=False, missing_ok=False):
   ''' Return a signature object for a file state derived from os.stat

@@ -7,285 +7,298 @@
 ''' cs.vt command line utility.
 '''
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 import logging
 import os
-from os.path import basename, splitext, expanduser, \
-    exists as existspath, join as joinpath, \
-    isabs as isabspath, isdir as isdirpath, isfile as isfilepath
+from os.path import (
+    basename,
+    splitext,
+    expanduser,
+    exists as pathexists,
+    join as joinpath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+)
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
-from threading import Thread
 from time import sleep
+from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
-from cs.env import envsub
-from cs.fileutils import file_data
+from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
-from cs.logutils import exception, error, warning, info, debug, \
-                        setup_logging, loginfo, logTo
+from cs.logutils import exception, error, warning, info, upd, debug, \
+                        setup_logging, logTo, loginfo
 from cs.pfx import Pfx
+from cs.progress import Progress
 from cs.resources import RunState
-from cs.tty import statusline, ttysize
+from cs.threads import bg as bg_thread
+from cs.tty import ttysize
 import cs.x
 from cs.x import X
-from . import fromtext, defaults
-from .archive import Archive, ArchiveFTP, CopyModes, copy_out_dir, copy_out_file
-from .block import Block, IndirectBlock, decodeBlock
+from . import defaults, DEFAULT_CONFIG_PATH
+from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
 from .config import Config, Store
-from .datadir import DataDir, DataDirIndexEntry
-from .datafile import DataFile, DataFlag, decompress
+from .convert import expand_path
+from .datadir import DataDirIndexEntry
+from .datafile import DataFileReader
 from .debug import dump_chunk, dump_Block
-from .dir import Dir, DirFTP
-from .fsck import fsck_Block, fsck_dir
-from .hash import DEFAULT_HASHCLASS
+from .dir import Dir
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
+from .merge import merge
 from .parsers import scanner_from_filename
-from .paths import decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve
+from .paths import OSDir, OSFile, path_resolve
 from .server import serve_tcp, serve_socket
-from .smuggling import import_dir, import_file
-from .store import ProgressStore, ProxyStore
+from .store import ProxyStore, DataDirStore
 from .transcribe import parse
 
-def main(argv):
-  return VTCmd().main(argv)
+def main(argv=None):
+  ''' Create a VTCmd instance and call its main method.
+  '''
+  if argv is None:
+    argv = sys.argv
+  vtcmd = VTCmd()
 
-class VTCmd:
+  # catch signals, flag termination
+  def sig_handler(sig, frame):
+    ''' Signal handler
+    '''
+    warning("received signal %s from %s", sig, frame)
+    if sig == SIGQUIT:
+      thread_dump()
+    vtcmd.runstate.cancel()
+    if sig == SIGQUIT:
+      sys.exit(1)
 
-  USAGE = '''Usage: %s [options...] [profile] operation [args...]
+  signal(SIGHUP, sig_handler)
+  signal(SIGINT, sig_handler)
+  signal(SIGQUIT, sig_handler)
+  return vtcmd.run(argv)
+
+def mount_vtfs(argv=None):
+  ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
+  '''
+  return main(argv, subcmd='mount')
+
+class VTCmd(BaseCommand):
+  ''' A main programme instance.
+  '''
+
+  GETOPT_SPEC = 'C:S:f:h:qv'
+
+  USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
               Default: from $VT_CACHE_STORE or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
-                /path/to/dir    GDBMStore
+                /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from $VT_STORE, or "[default]".
-    -f config Config file. Default from $VT_CONFIG, otherwise ~/.vtrc
+              Default from $VT_STORE, or "[default]", except for
+              the "serve" subcommand which defaults to "[server]"
+              and ignores $VT_STORE.
+    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
+    + DEFAULT_CONFIG_PATH + '''
+    -h hashclass Hashclass for Stores.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
-  Operations:
+  Subcommands:
     cat filerefs...
-    catblock [-i] hashcodes...
-    dump {datafile.vtd|index.gdbm|index.lmdb}
-    fsck block blockref...
-    ftp archive.vt
-    import [-oW] path {-|archive.vt}
+    config
+    dump {{datafile.vtd|index.gdbm|index.lmdb}}
+    fsck object...
+    import [-oW] path {{-|archive.vt}}
+    init
     ls [-R] dirrefs...
-    mount [-a] [-o {append_only,readonly}] [-r] {Dir|config-clause|archive.vt} [mountpoint [subpath]]
+    mount [-a] [-o {{append_only,readonly}}] [-r] {{Dir|config-clause|archive.vt}} [mountpoint [subpath]]
       -a  All dates. Implies readonly.
       -o options
           Mount options:
             append_only Files may not be truncated or overwritten.
             readonly    Read only; data may not be modified.
       -r  Readonly, the same as "-o readonly".
-    pack paths...
-    pullfrom other-store objects...
+    pack path
+    pullfrom other-store [objects...]
     pushto other-store objects...
-    report
-    scan datafile
-    serve {-|/path/to/socket|host:port} [name:storespec]...
+    serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
     test blockify file
-    unpack dirrefs...
+    unpack archive.vt
 '''
 
-  def main(self, argv=None, environ=None, verbose=None):
-    global loginfo
-    if argv is None:
-      argv = sys.argv
-    self.argv = argv
-    if environ is None:
-      environ = os.environ
+  def __init__(self):
+    super().__init__()
 
-    if verbose is None:
-      # verbose if stderr is a tty
-      try:
-        verbose = sys.stderr.isatty()
-      except AttributeError:
-        verbose = False
-    self.verbose = verbose
-
-    cmd = basename(argv[0])
-    args = argv[1:]
+  @classmethod
+  def apply_defaults(cls, options):
+    cmd = basename(options.cmd)
     if cmd.endswith('.py'):
       cmd = 'vt'
-    self.cmd = cmd
-
-    usage = self.USAGE % (cmd,)
-
-    badopts = False
-
-    setup_logging(cmd_name=cmd, upd_mode=sys.stderr.isatty(), verbose=self.verbose)
-    ####cs.x.X_logger = logging.getLogger()
-
-    config_path = os.environ.get('VT_CONFIG', envsub('$HOME/.vtrc'))
-    store_spec = os.environ.get('VT_STORE', '[default]')
-    cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
-    dflt_log = os.environ.get('VT_LOGFILE')
-
+    options.cmd = cmd
+    # verbose if stderr is a tty
     try:
-      opts, args = getopt(args, 'C:S:f:qv')
-    except GetoptError as e:
-      error("unrecognised option: %s: %s", e.opt, e.msg)
-      badopts = True
-      opts, args = [], []
+      options.verbose = sys.stderr.isatty()
+    except AttributeError:
+      options.verbose = False
+    options.verbose = True
+    options.config_path = os.environ.get(
+        'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
+    )
+    options.store_spec = None
+    options.cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
+    options.dflt_log = os.environ.get('VT_LOGFILE')
+    options.hashname = os.environ.get(
+        'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
+    )
+    options.progress = None
+    options.ticker = None
+    options.status_label = cmd
 
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply the command line options mapping `opts` to `options`.
+    '''
     for opt, val in opts:
       if opt == '-C':
         if val == 'NONE':
-          cache_store_spec = None
+          options.cache_store_spec = None
         else:
-          cache_store_spec = val
+          options.cache_store_spec = val
       elif opt == '-S':
         # specify Store
-        store_spec = val
+        options.store_spec = val
       elif opt == '-f':
-        config_path = val
+        options.config_path = val
+      elif opt == '-h':
+        options.hashname = val
       elif opt == '-q':
         # quiet: not verbose
-        self.verbose = False
+        options.verbose = False
       elif opt == '-v':
         # verbose: not quiet
-        self.verbose = True
+        options.verbose = True
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
-
-    self.config_path = config_path
-    self.store_spec = store_spec
-    self.cache_store_spec = cache_store_spec
-
-    if self.verbose:
+    options.hashclass = None
+    if options.hashname is not None:
+      try:
+        options.hashclass = HASHCLASS_BY_NAME[options.hashname]
+      except KeyError:
+        raise GetoptError(
+            "unrecognised hashname %r: I know %r" %
+            (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
+        )
+    if options.verbose:
       loginfo.level = logging.INFO
-      upd = loginfo.upd
-      if upd is not None:
-        upd.nl_level = logging.INFO
+    if options.dflt_log is not None:
+      logTo(options.dflt_log, delay=True)
+    options.config = Config(options.config_path)
 
-    if dflt_log is not None:
-      logTo(dflt_log, delay=True)
+  @staticmethod
+  @contextmanager
+  def run_context(argv, options, cmd=None):
+    ''' Set up and tear down the surrounding context.
 
-    xit = None
-    self.runstate = RunState()
-    with defaults.push_runstate(self.runstate):
-      with self.runstate:
-        self.config = Config(self.config_path)
-
-        # catch signals, flag termination
-        def sig_handler(sig, frame):
-          ''' Signal handler
-          '''
-          warning("received signal %s from %s", sig, frame)
-          if sig == SIGQUIT:
-            thread_dump()
-          X("%s.cancel()...", self.runstate)
-          self.runstate.cancel()
-          if sig == SIGQUIT:
-            sys.exit(1)
-        signal(SIGHUP, sig_handler)
-        signal(SIGINT, sig_handler)
-        signal(SIGQUIT, sig_handler)
-
-        try:
-          xit = self.cmd_op(args)
-        except GetoptError as e:
-          error("%s", e)
-          badopts = True
-
-      if badopts:
-        sys.stderr.write(usage)
-        return 2
-
-      if not isinstance(xit, int):
-        raise RuntimeError("exit code not set by operation: %r" % (xit,))
-
-      if ifdebug():
-        dump_debug_threads()
-
-    return xit
-
-  def cmd_op(self, args):
-    ''' Run an command operation.
+        Parameters:
+        * `options`:
+        * `argv`: the command line arguments after the command name
     '''
-    try:
-      op = args[0]
-    except IndexError:
-      raise GetoptError("missing command")
-    args = args[1:]
-    with Pfx(op):
-      if op == "profile":
-        return self.cmd_profile(args)
-      try:
-        op_func = getattr(self, "cmd_" + op)
-      except AttributeError:
-        raise GetoptError("unknown operation \"%s\"" % (op,))
-      # these commands run without a context Store
-      if op in ("dump", "scan", "test"):
-        return op_func(args)
-      # open the default Store
-      if self.store_spec is None:
-        raise GetoptError("no $VT_STORE and no -S option")
-      try:
-        S = Store(self.store_spec, self.config)
-      except ValueError as e:
-        raise GetoptError("unusable Store specification: %s: %s" % (self.store_spec, e))
-      except Exception as e:
-        exception("UNEXPECTED EXCEPTION: can't open store %r: %s", self.store_spec, e)
-        raise GetoptError("unusable Store specification: %s" % (self.store_spec,))
-      defaults.push_Ss(S)
-      if self.cache_store_spec is None:
-        cacheS = None
-      else:
-        try:
-          cacheS = Store(self.cache_store_spec, self.config)
-        except Exception as e:
-          exception("can't open cache store %r: %s", self.cache_store_spec, e)
-          raise GetoptError(
-              "unusable Store specification: %s"
-              % (self.cache_store_spec,))
-        else:
-          S = ProxyStore(
-              "%s:%s" % (cacheS.name, S.name),
-              read=(cacheS,),
-              read2=(S,),
-              save=(cacheS, S)
-          )
-          S.config = self.config
-      defaults.push_Ss(S)
-      # start the status ticker
-      if False and sys.stdout.isatty():
-        X("wrap in a ProgressStore")
-        run_ticker = True
-        S = ProgressStore("ProgressStore(%s)" % (S,), S)
-        def ticker():
-          old_text = ''
-          while run_ticker:
-            text = S.status_text()
-            if text != old_text:
-              statusline(text)
-              old_text = text
-            sleep(0.25)
-        T = Thread(name='%s-status-line' % (S,), target=ticker)
-        T.daemon = True
-        T.start()
-      else:
-        run_ticker = False
-      with S:
-        xit = op_func(args)
-      if cacheS:
-        cacheS.backend = None
-      if run_ticker:
-        run_ticker = False
-      return xit
+    if cmd is None:
+      cmd = options.cmd
+    else:
+      cmd = options.cmd + ': ' + cmd
+    setup_logging(cmd_name=options.cmd, upd_mode=sys.stderr.isatty())
+    runstate = options.runstate
+    progress = options.progress
+    if progress is None:
+      progress = Progress(total=0)
+    ticker = options.ticker
+    if False and ticker is None and sys.stderr.isatty():
+      _, cols = ttysize(2)
+      status_width = cols - 2
 
-  def cmd_profile(self, *a, **kw):
+      def ticker():
+        while not runstate.cancelled:
+          upd(progress.status(options.status_label, status_width))
+          sleep(0.25)
+
+      ticker = bg_thread(ticker, name='status-line', daemon=True)
+    with options.stack(progress=progress, ticker=ticker):
+      with defaults.stack(runstate=runstate):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+          yield
+        else:
+          # open the default Store
+          if options.store_spec is None:
+            if cmd == "serve":
+              store_spec = '[server]'
+            else:
+              store_spec = os.environ.get('VT_STORE', '[default]')
+            options.store_spec = store_spec
+          try:
+            # set up the primary Store using the main programme RunState for control
+            S = Store(options.store_spec, options.config)
+          except ValueError as e:
+            raise GetoptError(
+                "unusable Store specification: %s: %s" %
+                (options.store_spec, e)
+            )
+          except Exception as e:
+            exception(
+                "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                options.store_spec, e
+            )
+            raise GetoptError(
+                "unusable Store specification: %s" % (options.store_spec,)
+            )
+          defaults.push_Ss(S)
+          if options.cache_store_spec is None:
+            cacheS = None
+          else:
+            try:
+              cacheS = Store(options.cache_store_spec, options.config)
+            except Exception as e:
+              exception(
+                  "can't open cache store %r: %s", options.cache_store_spec, e
+              )
+              raise GetoptError(
+                  "unusable Store specification: %s" %
+                  (options.cache_store_spec,)
+              )
+            else:
+              S = ProxyStore(
+                  "%s:%s" % (cacheS.name, S.name),
+                  read=(cacheS,),
+                  read2=(S,),
+                  copy2=(cacheS,),
+                  save=(cacheS, S),
+                  archives=((S, '*'),),
+              )
+              S.config = options.config
+          defaults.push_Ss(S)
+          with S:
+            yield
+          if cacheS:
+            cacheS.backend = None
+    runstate.cancel()
+    if ticker:
+      ticker.join()
+    if ifdebug():
+      dump_debug_threads()
+
+  def cmd_profile(self, options, argv, cmd):
+    ''' Wrapper to profile other subcommands and report.
+    '''
     try:
       import cProfile as profile
     except ImportError:
@@ -293,7 +306,7 @@ class VTCmd:
     P = profile.Profile()
     P.enable()
     try:
-      xit = self.cmd_op(*a, **kw)
+      xit = self.run(argv, options=options)
     except Exception:
       P.disable()
       raise
@@ -302,41 +315,27 @@ class VTCmd:
     P.print_stats(sort='cumulative')
     return xit
 
-  def cmd_cat(self, args):
+  @staticmethod
+  def cmd_cat(argv, options, cmd):
     ''' Concatentate the contents of the supplied filerefs to stdout.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing filerefs")
-    for path in args:
+    for path in argv:
       cat(path)
     return 0
 
-  def cmd_catblock(self, args):
-    '''  Emit the content of the blocks specified by the supplied hashcodes.
+  @staticmethod
+  def cmd_config(args, options, cmd):
+    ''' Recite the configuration.
     '''
-    indirect = False
-    if args and args[0] == "-i":
-      indirect = True
-      args.pop(0)
-    if not args:
-      raise GetoptError("missing hashcodes")
-    for hctext in args:
-      h = defaults.S.hashclass(fromtext(hctext))
-      if indirect:
-        B = IndirectBlock(h)
-      else:
-        B = Block(h)
-      for subB in B.leaves:
-        sys.stdout.write(subB.data)
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    options.config.write(sys.stdout)
     return 0
 
-  def cmd_report(self, args):
-    ''' Report stuff after store setup.
-    '''
-    print("S =", defaults.S)
-    return 0
-
-  def cmd_dump(self, args):
+  @staticmethod
+  def cmd_dump(args, options, cmd):
     ''' Dump various file types.
     '''
     if not args:
@@ -350,18 +349,21 @@ class VTCmd:
     for path in args:
       if path.endswith('.vtd'):
         print(path)
-        DF = DataFile(path)
+        DF = DataFileReader(path)
         with DF:
           try:
-            for offset, flags, data, offset2 in DF.scanfrom(0, do_decompress=True):
+            for DR in DF.scanfrom(0):
+              data = DR.data
               hashcode = hashclass(data)
-              leadin = '%9d %16.16s' % (offset, hashcode)
+              leadin = '%9d %16.16s' % (DR.offset, hashcode)
               dump_chunk(data, leadin, max_width, one_line)
           except EOFError:
             pass
       elif path.endswith('.lmdb'):
         print(path)
-        lmdb = LMDBIndex(path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes)
+        lmdb = LMDBIndex(
+            path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes
+        )
         with lmdb:
           for hashcode, entry in lmdb.items():
             print(hashcode, entry)
@@ -369,66 +371,43 @@ class VTCmd:
         warning("unsupported file type: %r", path)
     return 0
 
-  def cmd_fsck(self, args):
-    if not args:
-      raise GetoptError("missing fsck type")
-    fsck_type = args.pop(0)
-    with Pfx(fsck_type):
-      try:
-        fsck_op = {
-            "block": self.cmd_fsck_block,
-            "dir": self.cmd_fsck_dir,
-        }[fsck_type]
-      except KeyError:
-        raise GetoptError("unsupported fsck type")
-      return fsck_op()
-
-  def cmd_fsck_block(self, args):
-    xit = 0
-    if not args:
-      raise GetoptError("missing blockrefs")
-    for blockref in args:
-      with Pfx(blockref):
-        blockref_bs = fromtext(blockref)
-        B, offset = decodeBlock(blockref_bs)
-        if offset < len(blockref_bs):
-          raise ValueError("invalid blockref, extra bytes: %r" % (blockref[offset:],))
-        if not fsck_Block(B):
-          error("fsck failed")
-          xit = 1
-    return xit
-
-  def cmd_fsck_dir(self, args):
-    xit = 0
-    if not args:
-      raise GetoptError("missing dirents")
-    for dirent_txt in args:
-      with Pfx(dirent_txt):
-        D = decode_Dirent_text(dirent_txt)
-        if not fsck_dir(D):
-          error("fsck failed")
-          xit = 1
-    return xit
-
-  def cmd_ftp(self, args):
-    ''' FTPlike interface to the Store.
+  @staticmethod
+  def cmd_fsck(args, options, cmd):
+    ''' Data structure inspection/repair.
     '''
     if not args:
-      raise GetoptError("missing dirent or archive")
-    target = args.pop(0)
-    if args:
-      raise GetoptError("extra arguments: " + ' '.join(args))
-    with Pfx(target):
-      if isabspath(target):
-        archive = target
-        ArchiveFTP(archive).cmdloop()
-      else:
-        D = decode_Dirent_text(target)
-        DirFTP(D).cmdloop()
-      return 0
+      raise GetoptError("missing fsck objects")
+    xit = 0
+    for arg in args:
+      with Pfx(arg):
+        try:
+          o, offset = parse(arg)
+        except ValueError as e:
+          error("does not seem to be a transcription: %s", e)
+          xit = 1
+          continue
+        if offset != len(arg):
+          error("unparsed text: %r", arg[offset:])
+          xit = 1
+          continue
+        try:
+          fsck_func = o.fsck
+        except AttributeError:
+          error("unsupported object type: %s", type(o))
+          xit = 1
+          continue
+        if fsck_func(recurse=True):
+          info("OK")
+        else:
+          info("BAD")
+          xit = 1
+    return xit
 
-  def cmd_import(self, args):
+  @staticmethod
+  def cmd_import(args, options, cmd):
     ''' Import paths into the Store, print top Dirent for each.
+
+        TODO: hook into vt.merge.
     '''
     xit = 0
     delete = False
@@ -456,7 +435,7 @@ class VTCmd:
     if args:
       raise GetoptError("extra arguments: %s" % (' '.join(args),))
     if special is None:
-      D = None
+      D = Dir('.')
     else:
       with Pfx(repr(special)):
         try:
@@ -466,46 +445,82 @@ class VTCmd:
           error("cannot open archive for append: %s", e)
           return 1
         _, D = Archive(special).last
-    if D is None:
-      D = Dir('import')
-    srcbase = basename(srcpath.rstrip(os.sep))
-    E = D.get(srcbase)
+      if D is None:
+        dstbase, suffix = splitext(basename(special))
+        D = Dir(dstbase)
     with Pfx(srcpath):
+      srcbase = basename(srcpath.rstrip(os.sep))
+      dst = D.get(srcbase)
       if isdirpath(srcpath):
-        if E is None:
-          E = D.mkdir(srcbase)
-        elif not overlay:
-          error("name %r already imported", srcbase)
-          return 1
-        elif not E.isdir:
-          error("name %r is not a directory", srcbase)
-        E, errors = import_dir(
-            srcpath, E,
-            delete=delete, overlay=overlay, whole_read=whole_read)
-        if errors:
-          warning("directory not fully imported")
-          for err in errors:
-            warning("  %s", err)
+        src = OSDir(srcpath)
+        if dst is None:
+          dst = D.mkdir(srcbase)
+        elif not dst.isdir:
+          error('target name %r is not a directory', srcbase)
+          xit = 1
+        elif not merge(dst, src):
+          error("merge failed")
           xit = 1
       elif isfilepath(srcpath):
-        if E is not None:
-          error("name %r already imported", srcbase)
-          return 1
-        E = D[srcbase] = import_file(srcpath)
+        src = OSFile(srcpath)
+        if dst is None or dst.isfile:
+          D.file_fromchunks(srcbase, src.datafrom())
+        else:
+          error("name %r already imported: %s", srcbase, dst)
+          xit = 1
       else:
-        error("not a file or directory")
+        error("unsupported file type")
         xit = 1
-        return 1
-    if xit != 0:
-      fp = sys.stderr
-      print("updated dirent after import:", file=fp)
-    elif special is None:
-      Archive.write(sys.stdout, D)
+    if special is None:
+      print(D)
     else:
-      Archive(special).update(D)
+      with Pfx(special):
+        if xit == 0:
+          Archive(special).update(D)
+        else:
+          warning("archive not updated")
     return xit
 
-  def cmd_ls(self, args):
+  @staticmethod
+  def cmd_init(args, options, cmd):
+    ''' Install a default config and initialise the configured datadir Stores.
+    '''
+    xit = 0
+    if args:
+      raise GetoptError("extra arguments: %r" % (args,))
+    config = options.config
+    config_path = config.path
+    if not pathexists(config_path):
+      info("write %r", config_path)
+      with Pfx(config_path):
+        with open(config_path, 'w') as cfg:
+          options.config.write(cfg)
+    basedir = config.basedir
+    if not isdirpath(basedir):
+      with Pfx("basedir"):
+        info("mkdir %r", basedir)
+        with Pfx("mkdir(%r)", basedir):
+          try:
+            os.mkdir(basedir)
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    for clause_name, clause in sorted(config.map.items()):
+      with Pfx("%s[%s]", shortpath(config_path), clause_name):
+        if clause_name == 'GLOBAL':
+          continue
+        store_type = clause.get('type')
+        if store_type == 'datadir':
+          S = config[clause_name]
+          try:
+            S.init()
+          except OSError as e:
+            error("%s", e)
+            xit = 1
+    return xit
+
+  @staticmethod
+  def cmd_ls(args, options, cmd):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
     recurse = False
@@ -516,18 +531,25 @@ class VTCmd:
       raise GetoptError("missing dirrefs")
     first = True
     for path in args:
-      if first:
-        first = False
-      else:
-        print
-      D = dirent_dir(path)
-      ls(path, D, recurse, sys.stdout)
+      with Pfx(path):
+        if first:
+          first = False
+        else:
+          print()
+        D = parse(path)
+        ls(path, D, recurse, sys.stdout)
     return 0
 
-  def cmd_mount(self, args):
+  @staticmethod
+  def cmd_mount(args, options, cmd):
     ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
     '''
+    try:
+      from .fuse import mount, umount
+    except ImportError as e:
+      error("FUSE support not configured: %s", e)
+      return 1
     badopts = False
     all_dates = False
     append_only = False
@@ -554,12 +576,9 @@ class VTCmd:
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     # special is either a D{dir} or [clause] or an archive pathname
-    specialD = None     # becomes not None for a D{dir}
     mount_store = defaults.S
-    # the special may derive directly from a config Store clause
-    special_store = None
     special_basename = None
-    archive = None
+    # the special may derive directly from a config Store clause
     try:
       special = args.pop(0)
     except IndexError:
@@ -568,72 +587,36 @@ class VTCmd:
       badopts = True
     else:
       with Pfx("special %r", special):
-        fsname = special
-        if special.startswith('D{') and special.endswith('}'):
-          # D{dir}
-          try:
-            D, offset = parse(special)
-          except ValueError as e:
-            error("does not seem to be a Dir transcription: %s", e)
-          else:
-            if offset != len(special):
-              error("unparsed text: %r", special[offset:])
-            elif not isinstance(D, Dir):
-              error("does not seem to be a Dir transcription, looks like a %s", type(D))
-            else:
-              specialD = D
-          if specialD is None:
-            badopts = True
-          else:
-            special_basename = D.name
-        elif special.startswith('[') and special.endswith(']'):
-          fsname = str(self.config) + special
-          special_basename = special[1:-1].strip()
-          special_store = self.config.Store_from_spec(special)
-          X("special_store=%s", special_store)
-          if special_store is not mount_store:
-            warning(
-                "mounting using Store from special %r instead of default: %s",
-                special, mount_store)
-            mount_store = special_store
-          try:
-            get_Archive = special_store.get_Archive
-          except AttributeError:
-            error("%s: no get_Archive method", special_store)
-            badopts = True
-          else:
-            X("MAIN: get_Archive=%s", get_Archive)
-            archive = get_Archive()
+        try:
+          fsname, readonly, special_store, specialD, special_basename, archive = \
+              options.config.parse_special(special, readonly)
+        except ValueError as e:
+          error("invalid: %s", e)
+          badopts = True
         else:
-          # pathname to archive file
-          archive = special
-          if not isfilepath(archive):
-            error("not a file: %r", archive)
-            badopts = True
-          else:
-            spfx, sext = splitext(basename(special))
-            if spfx and sext == '.vt':
-              special_basename = spfx
-            else:
-              special_basename = special
-    if special_basename is not None:
-      # Make the name for an explicit mount safer:
-      # no path components, no dots (thus no leading dots).
-      special_basename = special_basename.replace(os.sep, '_').replace('.', '_')
+          if special_basename is not None:
+            # Make the name for an explicit mount safer:
+            # no path components, no dots (thus no leading dots).
+            special_basename = \
+                special_basename.replace(os.sep, '_').replace('.', '_')
+          if special_store is not None and special_store is not mount_store:
+            warning(
+                "replacing default Store with Store from special %s ==> %s",
+                mount_store, special_store
+            )
+            mount_store = special_store
     if args:
       mountpoint = args.pop(0)
     else:
       if special_basename is None:
-        error('missing mountpoint, and cannot infer mountpoint from special: %r', special)
-        badopts = True
-      else:
-        mountdir = mount_store.mountdir
-        if mountdir is None:
-          error('missing mountpoint, no Sotre.mountdir, cannot infer mountpoint: store=%s', mount_store)
+        if not badopts:
+          error(
+              'missing mountpoint, and cannot infer mountpoint from special: %r',
+              special
+          )
           badopts = True
-        else:
-          mountdir = expanduser(mountdir)
-          mountpoint = joinpath(mountdir, special_basename)
+      else:
+        mountpoint = special_basename
     if args:
       subpath = args.pop(0)
     else:
@@ -653,15 +636,16 @@ class VTCmd:
         E = specialD
       else:
         # pathname or Archive obtained from Store
-        if isinstance(archive, str):
-          archive = Archive(archive)
+        if archive is None:
+          warning("no Archive, writing to stdout")
+          archive = FileOutputArchive(sys.stdout)
         if all_dates:
           E = Dir(mount_base)
           for when, subD in archive:
             E[datetime.fromtimestamp(when).isoformat()] = subD
         else:
           try:
-            when, E = archive.last
+            entry = archive.last
           except OSError as e:
             error("can't access special: %s", e)
             return 1
@@ -669,9 +653,11 @@ class VTCmd:
             error("invalid contents: %s", e)
             return 1
           # no "last entry" (==> first use) - make an empty directory
+          when = entry.when
+          E = entry.dirent
           if E is None:
             E = Dir(mount_base)
-            X("cmd_mount: new E=%s", E)
+            X("cmd_mount: new E=%r", E)
           else:
             ##dump_Dirent(E, recurse=True)
             if not E.isdir:
@@ -680,12 +666,6 @@ class VTCmd:
       if E.name == '.':
         info("rename %s from %r to %r", E, E.name, mount_base)
         E.name = mount_base
-      # import vtfuse before doing anything with side effects
-      try:
-        from cs.vtfuse import mount, umount
-      except ImportError as e:
-        error("required module cs.vtfuse not available: %s", e)
-        return 1
       with Pfx(mountpoint):
         need_rmdir = False
         if not isdirpath(mountpoint):
@@ -696,18 +676,31 @@ class VTCmd:
             need_rmdir = True
           except OSError as e:
             if e.errno == errno.EEXIST:
-              error("mountpoint is not a directory", mountpoint)
+              error("mountpoint is not a directory")
               return 1
-            else:
-              raise
+            raise
+        T = None
         try:
-          T = mount(mountpoint, E, mount_store, archive=archive, subpath=subpath, readonly=readonly, append_only=append_only, fsname=fsname)
+          T = mount(
+              mountpoint,
+              E,
+              S=mount_store,
+              archive=archive,
+              subpath=subpath,
+              readonly=readonly,
+              append_only=append_only,
+              fsname=fsname
+          )
           cs.x.X_via_tty = True
-          T.join()
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
           error("keyboard interrupt, unmounting %r", mountpoint)
           xit = umount(mountpoint)
-          T.join()
+        except Exception as e:
+          exception("unexpected exception: %s", e)
+          xit = 1
+        finally:
+          if T:
+            T.join()
       if need_rmdir:
         info("rmdir %r ...", mountpoint)
         try:
@@ -717,120 +710,182 @@ class VTCmd:
           xit = 1
     return xit
 
-  def cmd_pack(self, args):
-    ''' Replace each I<path> with an archive file I<path>B<.vt> referring
-        to the stored content of I<path>.
+  @staticmethod
+  def cmd_pack(args, options, cmd):
+    ''' Replace the _path_ with an archive file _path_`.vt`
+        referring to the stored content of _path_.
     '''
     if not args:
-      raise GetoptError("missing paths")
-    xit = 0
+      raise GetoptError("missing path")
+    ospath = args.pop(0)
+    if args:
+      raise GetoptError("extra arguments after path: %r" % (args,))
     modes = CopyModes(trust_size_mtime=True)
-    for ospath in args:
-      with Pfx(ospath):
-        if not existspath(ospath):
-          error("missing")
-          xit = 1
-          continue
-        arpath = ospath + '.vt'
-        try:
-          update_archive(arpath, ospath, modes, create_archive=True)
-        except IOError as e:
-          error("%s" % (e,))
-          xit = 1
-          continue
-        info("remove %r", ospath)
-        if isdirpath(ospath):
-          shutil.rmtree(ospath)
-        else:
-          os.remove(ospath)
-    return xit
+    with Pfx(ospath):
+      if not pathexists(ospath):
+        error("missing")
+        return 1
+      arpath = ospath + '.vt'
+      A = Archive(arpath, missing_ok=True)
+      last_entry = A.last
+      when, target = last_entry.when, last_entry.dirent
+      if target is None:
+        target = Dir(basename(ospath))
+      if isdirpath(ospath):
+        source = OSDir(ospath)
+      else:
+        source = OSFile(ospath)
+      X("target = %s, source= %s", type(target), type(source))
+      if not merge(target, source):
+        error("merge into %r fails", arpath)
+        return 1
+      A.update(target)
+      info("remove %r", ospath)
+      if isdirpath(ospath):
+        shutil.rmtree(ospath)
+      else:
+        os.remove(ospath)
+    return 0
 
-  def cmd_pullfrom(self, args):
+  def _parse_pushable(self, s):
+    ''' Parse an object specification and return the object.
+    '''
+    obj = None
+    if s.startswith('/'):
+      # a path, hopefully a datadir or a .vtd file
+      if isdirpath(s) and isdirpath(joinpath(s, 'data')):
+        # /path/to/datadir
+        obj = DataDirStore(s, s)
+      elif s.endswith('.vtd') and isfilepath(s):
+        # /path/to/datafile.vtd
+        obj = DataFileReader(s)
+        obj.open()
+      # TODO: /path/to/archive.vt
+      else:
+        raise ValueError("path is neither a DataDir nor a data file")
+    else:
+      # try a Store specification
+      try:
+        obj = Store(s, self.config)
+      except ValueError:
+        # try an object transcription eg "D{...}"
+        try:
+          obj, offset = parse(s)
+        except ValueError:
+          # fall back: relative path to .vtd file
+          if s.endswith('.vtd') and isfilepath(s):
+            # /path/to/datafile.vtd
+            obj = DataFileReader(s)
+            obj.open()
+          else:
+            raise
+        else:
+          if offset < len(s):
+            raise ValueError("incomplete parse, unparsed: %r" % (s[offset:],))
+    if not hasattr(obj, 'pushto_queue'):
+      raise ValueError("type %s is not pushable" % (type(obj),))
+    return obj
+
+  @staticmethod
+  def _push(options, srcS, dstS, pushables):
+    ''' Push data from the source Store `srcS` to destination Store `dstS`
+        to ensure that `dstS` has all the Blocks needs to support
+        the `pushables`.
+    '''
+    xit = 0
+    with Pfx("%s => %s", srcS.name, dstS.name):
+      runstate = options.runstate
+      Q, T = srcS.pushto(dstS, progress=options.progress)
+      for pushable in pushables:
+        if runstate.cancelled:
+          xit = 1
+          break
+        with Pfx(str(pushable)):
+          pushed_ok = pushable.pushto_queue(
+              Q, runstate=runstate, progress=options.progress
+          )
+          assert isinstance(pushed_ok, bool)
+          if not pushed_ok:
+            error("push failed")
+            xit = 1
+      Q.close()
+      T.join()
+      return xit
+
+  def cmd_pullfrom(self, args, options, cmd):
     ''' Pull missing content from other Stores.
+
         Usage: pullfrom other_store objects...
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S1spec = args.pop(0)
+    srcSspec = args.pop(0)
+    with Pfx("other_store %r", srcSspec):
+      srcS = Store(srcSspec, options.config)
     if not args:
-      raise GetoptError("missing objects")
-    with Pfx("other_store %r", S1spec):
-      S1 = Store(S1spec, self.config)
-    S2 = defaults.S
-    with Pfx("%s => %s", S1.name, S2.name):
-      with S1:
-        for obj_spec in args:
-          with Pfx(obj_spec):
-            try:
-              obj = parse(obj_spec)
-            except ValueError as e:
-              raise GetoptError("unparsed: %s" % (e,)) from e
-            try:
-              pushto = obj.pushto
-            except AttributeError:
-              raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-            pushto(S2, runstate=defaults.runstate)
-    return 0
+      args = (srcSpec,)
+    dstS = defaults.S
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(options, srcS, dstS, pushables)
 
-  def cmd_pushto(self, args):
-    ''' Push something to a secondary Store, such thet the secondary store has all the required Blocks.
+  def cmd_pushto(self, args, options, cmd):
+    ''' Push something to a secondary Store,
+        such that the secondary store has all the required Blocks.
+
         Usage: pushto other_store objects...
     '''
     if not args:
       raise GetoptError("missing other_store")
-    S2spec = args.pop(0)
+    srcS = defaults.S
+    dstSspec = args.pop(0)
     if not args:
-      raise GetoptError("missing objects")
-    with Pfx("other_store %r", S2spec):
-      S2 = Store(S2spec, self.config)
-    S1 = defaults.S
-    with Pfx("%s => %s", S1.name, S2spec):
-      for obj_spec in args:
-        with Pfx(obj_spec):
-          try:
-            obj = parse(obj_spec)
-          except ValueError as e:
-            raise GetoptError("unparsed: %s", e) from e
-          try:
-            pushto = obj.pushto
-          except AttributeError:
-            raise GetoptError("no pushto facility for %s objects" % (type(obj_spec),))
-          pushto(S2, runstate=defaults.runstate)
-    return 0
+      args = (dstSpec,)
+    with Pfx("other_store %r", dstSspec):
+      dstS = Store(dstSspec, options.config)
+    pushables = []
+    for obj_spec in args:
+      with Pfx(obj_spec):
+        try:
+          obj = self._parse_pushable(obj_spec)
+        except ValueError as e:
+          raise GetoptError("unparsed: %s" % (e,)) from e
+        pushables.append(obj)
+    return self._push(srcS, dstS, pushables)
 
-  def cmd_scan(self, args):
-    ''' Read a datafile and report.
-    '''
-    if len(args) < 1:
-      raise GetoptError("missing datafile/datadir")
-    hashclass = DEFAULT_HASHCLASS
-    for arg in args:
-      if isdirpath(arg):
-        dirpath = arg
-        D = DataDir(dirpath)
-        with D:
-          for n, offset, data in D.scan():
-            print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
-      else:
-        filepath = arg
-        DF = DataFile(filepath)
-        with DF:
-          for offset, flags, data in DF.scan():
-            if flags & DataFlag.COMPRESSED:
-              data = decompress(data)
-            print(filepath, offset, "%d:%s" % (len(data), hashclass.from_chunk(data)))
-    return 0
+  @staticmethod
+  def cmd_serve(args, options, cmd):
+    ''' Start a service daemon listening on a TCP port
+        or on a UNIX domain socket or on stdin/stdout.
 
-  def cmd_serve(self, args):
-    ''' Start a service daemon listening on a TCP port or on a UNIX domain socket or on stdin/stdout.
-        Usage: serve {-|/path/to/socket|[host]:port} [name:storespec]...
-        With no name:storespec arguments the default Store is served,
+        Usage: serve [{DEFAULT|-|/path/to/socket|[host]:port} [name:storespec]...]
+
+        With no `name:storespec` arguments the default Store is served,
         otherwise the named Stores are exported with the first being
         served initially.
     '''
-    if not args:
-      raise GetoptError("missing socket indicator")
-    address = args.pop(0)
+    if args:
+      address = args.pop(0)
+    else:
+      address = 'DEFAULT'
+    if address == 'DEFAULT':
+      # obtain the address from the [server] config clause
+      try:
+        clause = options.config.get_clause('server')
+      except KeyError:
+        raise GetoptError(
+            "no [server] clause to implement address %r" % (address,)
+        )
+      try:
+        address = clause['address']
+      except KeyError:
+        raise GetoptError("[server] clause: no address field")
     if not args:
       exports = {'': defaults.S}
     else:
@@ -847,48 +902,60 @@ class VTCmd:
               raise GetoptError("missing colon after name")
             offset += 1
             try:
-              parsed, type_, params, offset = get_store_spec(named_store_spec, offset)
+              parsed, type_, params, offset = get_store_spec(
+                  named_store_spec, offset
+              )
             except ValueError as e:
               raise GetoptError(
-                  "invalid Store specification after \"name:\": %s"
-                  % (e,)) from e
+                  "invalid Store specification after \"name:\": %s" % (e,)
+              ) from e
             if offset < len(named_store_spec):
               raise GetoptError(
-                  "extra text after storespec: %r"
-                  % (named_store_spec[offset:],))
-            namedS = self.config.new_Store(parsed, type_, params)
+                  "extra text after storespec: %r" %
+                  (named_store_spec[offset:],)
+              )
+            namedS = options.config.new_Store(parsed, type_, params)
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
+    runstate = options.runstate
     if address == '-':
       from .stream import StreamStore
-      remoteS = StreamStore(
-          "serve -", sys.stdin, sys.stdout,
-          exports=exports)
+      remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
       remoteS.join()
-    elif isabspath(address):
-      # /path/to/socket
-      X("serve via UNIX socket at %r", address)
+    elif '/' in address:
+      # path/to/socket
+      socket_path = expand_path(address)
       with defaults.S:
-        srv = serve_socket(socket_path=address, exports=exports, runstate=self.runstate)
+        srv = serve_socket(
+            socket_path=socket_path, exports=exports, runstate=runstate
+        )
       srv.join()
     else:
       # [host]:port
       cpos = address.rfind(':')
       if cpos >= 0:
         host = address[:cpos]
-        port = address[cpos+1:]
+        port = address[cpos + 1:]
         if not host:
           host = '127.0.0.1'
         port = int(port)
         with defaults.S:
-          srv = serve_tcp(bind_addr=(host, port), exports=exports, runstate=self.runstate)
+          srv = serve_tcp(
+              bind_addr=(host, port), exports=exports, runstate=runstate
+          )
+          runstate.notify_cancel.add(lambda runstate: srv.shutdown())
         srv.join()
       else:
-        raise GetoptError("invalid serve argument, I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r" % (address,))
+        raise GetoptError(
+            "invalid serve argument,"
+            " I expect \"-\" or \"/path/to/socket\" or \"[host]:port\", got: %r"
+            % (address,)
+        )
     return 0
 
-  def cmd_test(self, args):
+  @staticmethod
+  def cmd_test(args, options, cmd):
     ''' Test various facilites.
     '''
     if not args:
@@ -911,35 +978,36 @@ class VTCmd:
           for size, count in sorted(size_counts.items()):
             print(size, count)
         return 0
-      else:
-        raise GetoptError("unrecognised subcommand")
+      raise GetoptError("unrecognised subcommand")
 
-  def cmd_unpack(self, args):
-    ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
+  @staticmethod
+  def cmd_unpack(args, options, cmd):
+    ''' Unpack the archive file _archive_`.vt` as _archive_.
     '''
-    if len(args) < 1:
+    if not args:
       raise GetoptError("missing archive name")
     arpath = args.pop(0)
     arbase, arext = splitext(arpath)
-    X("arbase=%r, arext=%r", arbase, arext)
     if arext != '.vt':
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
     if args:
       raise GetoptError("extra arguments after archive name %r" % (arpath,))
-    if existspath(arbase):
+    if pathexists(arbase):
       error("archive base already exists: %r", arbase)
       return 1
     with Pfx(arpath):
-      when, rootE = Archive(arpath).last
-      if rootE is None:
+      entry = Archive(arpath).last
+      source = entry.dirent
+      if source is None:
         error("no entries in archive")
         return 1
-    with Pfx(arbase):
-      if rootE.isdir:
-        os.mkdir(arbase)
-        copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+      if source.isdir:
+        target = OSDir(arbase)
       else:
-        copy_out_file(rootE, arbase)
+        target = OSFile(arbase)
+    with Pfx(arbase):
+      if not merge(target, source, runstate=options.runstate):
+        return 1
     return 0
 
 def lsDirent(fp, E, name):
@@ -957,8 +1025,9 @@ def lsDirent(fp, E, name):
   else:
     detail = hexify(h)
   fp.write(
-      "%c %-41s %s %6d %s\n"
-      % (('d' if E.isdir else 'f'), detail, t, st_size, name))
+      "%c %-41s %s %6d %s\n" %
+      (('d' if E.isdir else 'f'), detail, t, st_size, name)
+  )
 
 def ls(path, D, recurse, fp=None):
   ''' Do an ls style directory listing with optional recursion.
@@ -970,7 +1039,7 @@ def ls(path, D, recurse, fp=None):
   fp.write(":\n")
   if not recurse:
     debug("ls(): getting dirs and files...")
-    names = D.dirs()+D.files()
+    names = D.dirs() + D.files()
     debug("ls(): got dirs and files = %s" % (names,))
     names.sort()
     for name in names:
@@ -997,7 +1066,7 @@ def cat(path, fp=None):
     with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
       cat(path, bfp)
   else:
-    F = dirent_file(path)
+    F = path_resolve(path)
     block = F.block
     for B in block.leaves:
       fp.write(B.data)
@@ -1007,9 +1076,7 @@ def dump(path, fp=None):
   '''
   if fp is None:
     fp = sys.stdout
-  E, subname = dirent_resolve(path)
-  if subname:
-    E = E[subname]
+  E = path_resolve(path)
   dump_Block(E.block, fp)
 
 if __name__ == '__main__':

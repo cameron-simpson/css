@@ -1,0 +1,1 @@
+New "edit" subcommand to rename files and edit tags.

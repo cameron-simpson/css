@@ -12,19 +12,20 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
-from cs.result import Result, report as report_LFs, ResultState
+from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
-import cs.logutils
 from cs.logutils import debug, info, warning, error, D
 from cs.obj import O
-import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import prop
-from cs.queues import MultiOpenMixin
-from cs.threads import Lock, RLock, Channel, locked, locked_property
+from cs.queues import Channel, MultiOpenMixin
+from cs.result import Result, report as report_LFs, ResultState
+from cs.threads import Lock, locked, locked_property
 from cs.x import X
+import cs.logutils
+import cs.pfx
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
@@ -80,11 +81,10 @@ class Maker(MultiOpenMixin):
 
   def startup(self):
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.open()
     self._makeQ.logTo("myke-later.log")
 
   def shutdown(self):
-    self._makeQ.close()
+    self._makeQ.shutdown()
     self._makeQ.wait()
 
   def report(self, fp=None):

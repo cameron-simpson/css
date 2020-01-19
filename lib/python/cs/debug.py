@@ -37,7 +37,6 @@ from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.result import Result
 from cs.seq import seq
 from cs.x import X
 
@@ -176,6 +175,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
 def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
+  from cs.result import Result
   def inner(*a, **kw):
     if not force and not ifdebug():
       return f(*a, **kw)
@@ -344,16 +344,25 @@ class DebuggingRLock(DebugWrapper):
     DebugWrapper.__init__(self, **dkw)
     self.debug('__init__')
     self.lock = threading.RLock()
+    self.stack = None
+
+  def __str__(self):
+    return "%s%r" % (
+        type(self).__name__,
+        [ "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
+          for f in self.stack
+        ] if self.stack else "NO_STACK")
 
   def __enter__(self):
-    filename, lineno = inspect.stack()[0][1:3]
+    filename, lineno = inspect.stack()[1][1:3]
     self.debug('from %s:%d: __enter__ ...', filename, lineno)
     self.lock.__enter__()
+    self.stack = inspect.stack()
     self.debug('from %s:%d: __enter__ ENTERED', filename, lineno)
     return self
 
   def __exit__(self, *a):
-    filename, lineno = inspect.stack()[0][1:3]
+    filename, lineno = inspect.stack()[1][1:3]
     self.debug('%s:%d: __exit__(*%s) ...', filename, lineno, a)
     return self.lock.__exit__(*a)
 
@@ -361,14 +370,18 @@ class DebuggingRLock(DebugWrapper):
     filename, lineno = inspect.stack()[0][1:3]
     self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
     if timeout < 0:
-      self.lock.acquire(blocking)
+      ret = self.lock.acquire(blocking)
     else:
-      self.lock.acquire(blocking, timeout)
+      ret = self.lock.acquire(blocking, timeout)
+    if ret:
+      self.stack = inspect.stack()
+    return ret
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
     self.debug('%s:%d: release()', filename, lineno)
     self.lock.release()
+    self.stack = None
 
 _debug_threads = set()
 

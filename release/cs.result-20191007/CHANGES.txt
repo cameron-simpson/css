@@ -1,0 +1,6 @@
+lib/python/cs/result.py: cs.result: simplify ResultState definition
+lib/python/cs/result.py: cs.result: docstring updates
+lib/python/cs/result.py: cs.result: Result.bg: use cs.threads.bg to dispatch the Thread; tweak some docstrings
+lib/python/cs/result.py: cs.result,cs.threads_tests: autoformat
+lib/python/cs/result.py: cs.result: clean lint, autoformat
+lib/python/cs/result.py: cs.result: update module dependencies

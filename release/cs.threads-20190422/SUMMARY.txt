@@ -1,0 +1,1 @@
+bg(): new optional `no_start=False` keyword argument, preventing Thread.start if true

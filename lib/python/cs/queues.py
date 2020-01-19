@@ -4,31 +4,38 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Queue-like items: iterable queues and channels.
+'''
+
+import sys
+from functools import partial
+from threading import Timer, Lock, RLock, Thread
+import time
+##from cs.debug import Lock, RLock, Thread
+import cs.logutils
+from cs.logutils import exception, warning, debug
+from cs.pfx import Pfx, PfxCallInfo
+from cs.py3 import Queue, PriorityQueue, Queue_Empty
+from cs.resources import MultiOpenMixin, not_closed, ClosedError
+from cs.seq import seq
+
 DISTINFO = {
-    'description': "some Queue subclasses and ducktypes",
+    'description':
+    "some Queue subclasses and ducktypes",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': ['cs.debug', 'cs.logutils', 'cs.resources', 'cs.seq', 'cs.py3', 'cs.obj'],
+    ],
+    'install_requires': [
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py3',
+        'cs.resources',
+        'cs.seq',
+    ],
 }
-
-import sys
-from functools import partial
-import logging
-from threading import Timer
-import time
-from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
-import cs.logutils
-from cs.logutils import exception, error, warning, debug, D
-from cs.obj import O
-from cs.pfx import Pfx, PfxCallInfo, XP
-from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
-from cs.resources import MultiOpenMixin, not_closed, ClosedError
-from cs.seq import seq
-from cs.x import X
 
 class _QueueIterator(MultiOpenMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
@@ -44,9 +51,9 @@ class _QueueIterator(MultiOpenMixin):
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    MultiOpenMixin.__init__(self, finalise_later=True)
     self.q = q
     self.name = name
+    MultiOpenMixin.__init__(self, finalise_later=True)
     # count of non-sentinel items
     self._item_count = 0
 
@@ -74,6 +81,8 @@ class _QueueIterator(MultiOpenMixin):
     return self.q.put(item, *args, **kw)
 
   def startup(self):
+    ''' Required MultiOpenMixin method.
+    '''
     pass
 
   def shutdown(self):
@@ -95,10 +104,12 @@ class _QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self)
+      warning(
+          "%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self
+      )
       self._put(self.sentinel)
       self.finalise()
-      raise StopIteration("Queue_Empty: %s", e)
+      raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
       self.q.task_done()
@@ -116,7 +127,7 @@ class _QueueIterator(MultiOpenMixin):
     try:
       return next(self)
     except StopIteration as e:
-      raise Queue_Empty("got StopIteration from %s" % (self,))
+      raise Queue_Empty("got %s from %s" % (e, self))
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -133,13 +144,17 @@ class _QueueIterator(MultiOpenMixin):
     '''
     self.q.join()
 
-def IterableQueue(capacity=0, name=None, *args, **kw):
+def IterableQueue(*args, capacity=0, name=None, **kw):
+  ''' Factory to create an iterable Queue.
+  '''
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
   return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
 
-def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+def IterablePriorityQueue(*args, capacity=0, name=None, **kw):
+  ''' Factory to create an iterable PriorityQueue.
+  '''
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
@@ -149,6 +164,7 @@ class Channel(object):
   ''' A zero-storage data passage.
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
+
   def __init__(self):
     self.__readable = Lock()
     self.__readable.acquire()
@@ -190,9 +206,8 @@ class Channel(object):
     self.__writable.release()
     # await a writer
     self.__readable.acquire()
-    self.close()
     value = self._value
-    delattr(self,'_value')
+    delattr(self, '_value')
     return value
 
   @not_closed
@@ -207,6 +222,8 @@ class Channel(object):
     self.__readable.release()
 
   def close(self):
+    ''' Close the Channel, preventing further puts.
+    '''
     if self.closed:
       warning("%s: .close() of closed Channel" % (self,))
     else:
@@ -214,31 +231,33 @@ class Channel(object):
 
 class PushQueue(MultiOpenMixin):
   ''' A puttable object which looks like an iterable Queue.
+
       Calling .put(item) calls `func_push` supplied at initialisation
-      to trigger a function on data arrival, whose processing is mediated 
+      to trigger a function on data arrival, whose processing is mediated
       queued via a Later for delivery to the output queue.
   '''
 
   def __init__(self, name, functor, outQ):
     ''' Initialise the PushQueue with the Later `L`, the callable `functor`
         and the output queue `outQ`.
-        `functor` is a one-to-many function which accepts a single
+
+        Parameters:
+        * `functor` is a one-to-many function which accepts a single
           item of input and returns an iterable of outputs; it may be a
           generator. These outputs are passed to outQ.put individually as
-          received.  
-        `outQ` is a MultiOpenMixin which accepts via its .put() method.
+          received.
+        * `outQ` is a MultiOpenMixin which accepts via its .put() method.
     '''
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
   def __str__(self):
-    return "PushQueue:%s" % (self.name,)
+    return "%s:%s" % (type(self).__name__, self.name)
 
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
@@ -251,11 +270,15 @@ class PushQueue(MultiOpenMixin):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
+    outQ = self.outQ
+    functor = self.functor
     with outQ:
       for computed in functor(item):
         outQ.put(computed)
 
   def startup(self):
+    ''' Start up.
+    '''
     pass
 
   def shutdown(self):
@@ -271,15 +294,16 @@ class NullQueue(MultiOpenMixin):
 
   def __init__(self, blocking=False, name=None):
     ''' Initialise the NullQueue.
-        `blocking`: if true, calls to .get() block until .shutdown().
-          Its default is False. 
-        `name`: a name for this NullQueue.
+
+        Parameters:
+        * `blocking`: if true, calls to .get() block until .shutdown().
+          Default: False.
+        * `name`: a name for this NullQueue.
     '''
     if name is None:
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.blocking = blocking
 
@@ -303,11 +327,12 @@ class NullQueue(MultiOpenMixin):
     raise Queue_Empty
 
   def startup(self):
+    ''' Start the queue.
+    '''
     pass
 
   def shutdown(self):
-    ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
-        as callers of .get() on a .blocking queue.
+    ''' Shut down the queue.
     '''
     pass
 
@@ -328,12 +353,13 @@ class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
   '''
+
   def __init__(self, name=None):
     if name is None:
       name = 'TimerQueue-%d' % (seq(),)
     self.name = name
-    self.Q = PriorityQueue()    # queue of waiting jobs
-    self.pending = None         # or (Timer, when, func)
+    self.Q = PriorityQueue()  # queue of waiting jobs
+    self.pending = None  # or (Timer, when, func)
     self.closed = False
     self._lock = Lock()
     self.mainRunning = False
@@ -346,13 +372,13 @@ class TimerQueue(object):
   def close(self, cancel=False):
     ''' Close the TimerQueue. This forbids further job submissions.
         If `cancel` is supplied and true, cancel all pending jobs.
-	Note: it is still necessary to call TimerQueue.join() to
-	wait for all pending jobs.
+        Note: it is still necessary to call TimerQueue.join() to
+        wait for all pending jobs.
     '''
     self.closed = True
     if self.Q.empty():
       # dummy entry to wake up the main loop
-      self.Q.put( (None, None, None) )
+      self.Q.put((None, None, None))
     if cancel:
       self._cancel()
 
@@ -372,7 +398,7 @@ class TimerQueue(object):
         'func' is the job function, typically made with functools.partial.
     '''
     assert not self.closed, "add() on closed TimerQueue"
-    self.Q.put( (when, seq(), func) )
+    self.Q.put((when, seq(), func))
 
   def join(self):
     ''' Wait for the main loop thread to finish.
@@ -412,8 +438,8 @@ class TimerQueue(object):
             T, Twhen, Tfunc = self.pending
             self.pending[2] = None  # prevent the function from running if racy
             T.cancel()
-            self.pending = None     # nothing pending now
-            T = None                # let go of the cancelled timer
+            self.pending = None  # nothing pending now
+            T = None  # let go of the cancelled timer
             if when < Twhen:
               # push the pending function back onto the queue, but ahead of
               # later-queued funcs with the same timestamp
@@ -454,9 +480,10 @@ class TimerQueue(object):
                 exception("func %s threw exception", Tfunc)
               else:
                 debug("func %s returns %s", Tfunc, retval)
+
           with self._lock:
             T = Timer(delay, partial(doit, self))
-            self.pending = [ T, when, func ]
+            self.pending = [T, when, func]
             T.start()
       self.mainRunning = False
 

@@ -8,11 +8,6 @@
 set -ue
 
 wd=$( command pwd )
-trace="dateify 1,2 pfx $wd set-x"
-
-logdir=${LOGDIR:-$HOME/var/log}
-[ -d "$logdir" ] || $trace mkdir "$logdir"
-logfile=$logdir/ctags
 
 tags=
 
@@ -34,59 +29,13 @@ do
   shift
 done
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing filenames" >&2
-  badopts=1
-else
-  first=1
-  for filename
-  do
-    rfilename=$( realpath "$filename" ) || {
-      echo "$cmd: unresolved filename: $filename" >&2
-      badopts=1
-      continue
-    }
-    if [ $first ]
-    then
-      set --
-      first=
-    fi
-    if [ -d "$rfilename" ]
-    then
-      dirpath=$rfilename
-      for rfile in $( find "$dirpath" -type f -size +0 -print )
-      do
-        set -- ${1+"$@"} "$rfile"
-      done
-    else
-      dirpath=$( dirname "$rfilename" )
-      [ -s "$rfilename" ] && set -- ${1+"$@"} "$rfilename"
-    fi
-    [ -n "$tags" ] || {
-      if tags=$( cd "$dirpath" && findup tags )
-      then
-        echo "$tags"
-        exec 1>&-
-      else
-        echo "$cmd: no tags found from $dirpath/" >&2
-      fi
-    }
-  done
-  [ $# -gt 0 ] || {
-    echo "$cmd: no filenames after scan" >&2
-    badopts=1
-  }
-fi
-
-[ -n "$tags" ] || {
-  echo "$cmd: no tags file found" >&2
-  badopts=1
+[ -n "$tags" ] || tags=$( findup tags ) || {
+  echo "$cmd: cannot find tags file and no -o option" >&2
+  exit 1
 }
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+echo "$tags"
+exec 1>&2
 
-exec 2>>"$logfile" 1>&2
-
-lock -P "$tags" $trace ctags -a -o "$tags" --tag-relative --links=no --extra=fq "$@" &
-exit 0
+set -x
+exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extra=fq ${1+"$@"}

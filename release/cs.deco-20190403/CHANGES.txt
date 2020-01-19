@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: @observable_class: move attribute value notification code out into .report_observation method for direct use
+lib/python/cs/deco.py: cs.deco: @cached: avoid using unset sig_func value on first pass

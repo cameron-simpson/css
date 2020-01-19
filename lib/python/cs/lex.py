@@ -31,6 +31,7 @@ DISTINFO = {
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
+
   def hexify(bs):
     ''' A Python 2 flavour of binascii.hexlify.
     '''
@@ -99,7 +100,8 @@ def strlist(ary, sep=", "):
 
 def lastlinelen(s):
   ''' The length of text after the last newline in a string.
-      Initially used by cs.hier to compute effective text width.
+
+      (Initially used by cs.hier to compute effective text width.)
   '''
   return len(s) - s.rfind('\n') - 1
 
@@ -108,7 +110,8 @@ def htmlify(s, nbsp=False):
 
       Parameters:
       * `s`: the string
-      * `nbsp`: replaces spaces with "&nbsp;" to prevent word folding, default `False`.
+      * `nbsp`: replaces spaces with `"&nbsp;"` to prevent word folding,
+        default `False`.
   '''
   s = s.replace("&", "&amp;")
   s = s.replace("<", "&lt;")
@@ -151,7 +154,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
 
       This can be reversed with the `untexthexify` function.
 
-      This is an ah doc format devised to be compact but also to
+      This is an ad doc format devised to be compact but also to
       expose "text" embedded within to the eye. The original use
       case was transcribing a binary directory entry format, where
       the filename parts would be somewhat visible in the transcription.
@@ -199,9 +202,8 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         if offset - offset0 > inout_len:
           # gather up whitelist span if long enough to bother
           chunk = (
-              shiftin
-              + ''.join(chr(bs[o]) for o in range(offset0, offset))
-              + shiftout
+              shiftin + ''.join(chr(bs[o])
+                                for o in range(offset0, offset)) + shiftout
           )
         else:
           # transcribe as hex anyway - too short
@@ -218,9 +220,8 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
       chunk = (
-          shiftin
-          + ''.join(chr(bs[o]) for o in range(offset0, offset))
-          + shiftout
+          shiftin + ''.join(chr(bs[o])
+                            for o in range(offset0, offset)) + shiftout
       )
     else:
       chunk = hexify(bs[offset0:offset])
@@ -364,7 +365,22 @@ def get_hexadecimal_value(s, offset=0):
     raise ValueError("expected hexadecimal value")
   return int('0x' + value_s), offset
 
-def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+def get_decimal_or_float_value(s, offset=0):
+  ''' Fetch a decimal or basic float (nnn.nnn) value
+      from the str `s` at `offset`.
+      Return (value, new_offset).
+  '''
+  int_part, offset = get_decimal(s, offset)
+  if not int_part:
+    raise ValueError("expected decimal or basic float value")
+  if offset == len(s) or s[offset] != '.':
+    return int(int_part), offset
+  sub_part, offset = get_decimal(s, offset + 1)
+  return float('.'.join((int_part, sub_part))), offset
+
+def get_identifier(
+    s, offset=0, alpha=ascii_letters, number=digits, extras='_'
+):
   ''' Scan the string `s` for an identifier (by default an ASCII
       letter or underscore followed by letters, digits or underscores)
       starting at `offset` (default 0).
@@ -402,9 +418,8 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       but require the letters to be uppercase.
   '''
   return get_identifier(
-      s,
-      offset=offset,
-      alpha=ascii_uppercase, number=number, extras=extras)
+      s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
+  )
 
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
@@ -460,7 +475,9 @@ def slosh_mapper(c, charmap=None):
     charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
-def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
+def get_sloshed_text(
+    s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None
+):
   ''' Collect slosh escaped text from the string `s` from position
       `offset` (default 0) and return the decoded unicode string and
       the offset of the completed parse.
@@ -502,7 +519,9 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     for special in specials.keys():
       if not special:
         raise ValueError(
-            'empty strings may not be used as keys for specials: %r' % (specials,))
+            'empty strings may not be used as keys for specials: %r' %
+            (specials,)
+        )
       special_starts.add(special[0])
       special_seqs.append(special)
     special_starts = u''.join(special_starts)
@@ -534,7 +553,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         # \xhh
         if slen - offset < 2:
           raise ValueError(
-              'short hexcode for %sxhh at offset %d' % (slosh, offset0))
+              'short hexcode for %sxhh at offset %d' % (slosh, offset0)
+          )
         hh = s[offset:offset + 2]
         offset += 2
         chunks.append(chr(int(hh, 16)))
@@ -543,7 +563,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         # \uhhhh
         if slen - offset < 4:
           raise ValueError(
-              'short hexcode for %suhhhh at offset %d' % (slosh, offset0))
+              'short hexcode for %suhhhh at offset %d' % (slosh, offset0)
+          )
         hh = s[offset:offset + 4]
         offset += 4
         chunks.append(chr(int(hh, 16)))
@@ -552,7 +573,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         # \Uhhhhhhhh
         if slen - offset < 8:
           raise ValueError(
-              'short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
+              'short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0)
+          )
         hh = s[offset:offset + 8]
         offset += 8
         chunks.append(chr(int(hh, 16)))
@@ -575,7 +597,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           chunks.append(chunk)
           continue
       raise ValueError(
-          'unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+          'unrecognised %s%s escape at offset %d' % (slosh, c, offset0)
+      )
     if specials is not None and c in special_starts:
       # test sequence prefixes from longest to shortest
       chunk = None
@@ -585,7 +608,9 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           chunk, offset = specials[seq](s, offset0)
           if offset < offset0 + 1:
             raise ValueError(
-                "special parser for %r at offset %d moved offset backwards" % (c, offset0))
+                "special parser for %r at offset %d moved offset backwards" %
+                (c, offset0)
+            )
           break
       if chunk is not None:
         chunks.append(chunk)
@@ -594,11 +619,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if (
-          c == slosh
-          or (delim is not None and c == delim)
-          or (specials is not None and c in special_starts)
-      ):
+      if (c == slosh or (delim is not None and c == delim)
+          or (specials is not None and c in special_starts)):
         break
       offset += 1
     chunks.append(s[offset0:offset])
@@ -608,7 +630,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
       $x where "x" is a special character.
 
-      Paramaters:
+      Parameters:
       * `s`: the string with the variable reference
       * `offset`: the starting point for the reference
       * `default`: default value for missing environment variables;
@@ -624,13 +646,15 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   offset += 1
   if offset >= len(s):
     raise ValueError(
-        "short string, nothing after '$' at offset %d" % (offset,))
+        "short string, nothing after '$' at offset %d" % (offset,)
+    )
   identifier, offset = get_identifier(s, offset)
   if identifier:
     value = environ.get(identifier, default)
     if value is None:
-      raise ValueError("unknown envvar name $%s, offset %d: %r"
-                       % (identifier, offset0, s))
+      raise ValueError(
+          "unknown envvar name $%s, offset %d: %r" % (identifier, offset0, s)
+      )
     return value, offset
   c = s[offset]
   offset += 1
@@ -638,7 +662,9 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
-def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
+def get_qstr(
+    s, offset=0, q='"', environ=None, default=None, env_specials=None
+):
   ''' Get quoted text with slosh escapes and optional environment substitution.
 
       Parameters:
@@ -651,7 +677,8 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   '''
   if environ is None and default is not None:
     raise ValueError(
-        "environ is None but default is not None (%r)" % (default,))
+        "environ is None but default is not None (%r)" % (default,)
+    )
   if q is None:
     delim = None
   else:
@@ -660,12 +687,23 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
     delim = s[offset]
     offset += 1
     if delim != q:
-      raise ValueError("expected opening quote %r, found %r" % (q, delim,))
+      raise ValueError("expected opening quote %r, found %r" % (
+          q,
+          delim,
+      ))
   if environ is None:
     return get_sloshed_text(s, delim, offset)
   getvar = partial(
-      get_envvar, environ=environ, default=default, specials=env_specials)
+      get_envvar, environ=environ, default=default, specials=env_specials
+  )
   return get_sloshed_text(s, delim, offset, specials={'$': getvar})
+
+def get_qstr_or_identifier(s, offset):
+  ''' Parse a double quoted string or an identifier.
+  '''
+  if s.startswith('"', offset):
+    return get_qstr(s, offset, q='"')
+  return get_identifier(s, offset)
 
 def get_delimited(s, offset, delim):
   ''' Collect text from the string `s` from position `offset` up
@@ -675,7 +713,8 @@ def get_delimited(s, offset, delim):
   pos = s.find(delim, offset)
   if pos < offset:
     raise ValueError(
-        "delimiter %r not found after offset %d" % (delim, offset))
+        "delimiter %r not found after offset %d" % (delim, offset)
+    )
   return s[offset:pos], pos + len(delim)
 
 def get_tokens(s, offset, getters):
@@ -704,6 +743,7 @@ def get_tokens(s, offset, getters):
     if callable(getter):
       func = getter
     elif isinstance(getter, StringTypes):
+
       def func(s, offset):
         ''' Wrapper for a literal string: require the string to be
             present at the current offset.
@@ -714,8 +754,10 @@ def get_tokens(s, offset, getters):
     elif isinstance(getter, (tuple, list)):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
+
       def func(s, offset):
-        ''' Wrapper for a getter with a .match method, such as a regular expression.
+        ''' Wrapper for a getter with a .match method, such as a regular
+            expression.
         '''
         m = getter.match(s, offset)
         if m:
@@ -739,11 +781,11 @@ def match_tokens(s, offset, getters):
     return tokens, offset2
 
 def isUC_(s):
-  ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
+  ''' Check that a string matches `^[A-Z][A-Z_0-9]*$`.
   '''
   if s.isalpha() and s.isupper():
     return True
-  if len(s) < 1:
+  if not s:
     return False
   if not s[0].isupper():
     return False
@@ -753,11 +795,11 @@ def isUC_(s):
   return True
 
 def parseUC_sAttr(attr):
-  ''' Take an attribute name and return (key, is_plural).
+  ''' Take an attribute name and return `(key, is_plural)`.
 
-      FOO returns (FOO, False).  
-      FOOs or FOOes returns (FOO, True).  
-      Otherwise return (None, False).
+      `'FOO'` returns `(`FOO`, False)`.
+      `'FOOs'` or `'FOOes'` returns `('FOO', True)`.
+      Otherwise return `(None, False)`.
   '''
   if len(attr) > 1:
     if attr[-1] == 's':

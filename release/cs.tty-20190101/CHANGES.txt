@@ -1,0 +1,9 @@
+  lib/python/cs/README-tty.rst: merge pypi ==> default
+  lib/python/cs/README-tty.rst: merge default ==> beyonwiz
+  lib/python/cs/README-tty.rst: merge default ==> iphoto
+  lib/python/cs/README-tty.rst: merge default ==> venti
+  lib/python/cs/README-tty.rst: merge default ==> later
+  lib/python/cs/README-tty.rst: merge later ==> pilfer
+  lib/python/cs/README-tty.rst: merge default ==> media
+  lib/python/cs/tty.py: cs.tty: docstring updates
+  lib/python/cs/tty.py: cs.tty: fix return from setupterm

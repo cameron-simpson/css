@@ -51,7 +51,7 @@ def framesof(bfr):
     else:
       # 4 byte header
       bfr.extend(4)
-      b0, b1, b2, b3 = bfr.buf[:4].tolist()
+      b0, b1, b2, b3 = bfr.buf[:4]
       if b0 != 255:
         raise ValueError("offset %d: expected 0xff, found 0x%02x" % (offset, b0,))
       if (b1 & 224) != 224:

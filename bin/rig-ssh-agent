@@ -3,10 +3,10 @@
 # Ensure we have an ssh agent, setting up a per-host ssh-agent in daemon mode if needed.
 # Emit $SSH_AUTH_SOCK to stdout.
 #
-# I keep a shell function around to access this:
+# I keep a shell function around to access the host agent:
 #
 #    gsa(){
-#      SSH_AUTH_SOCK=`rig-ssh-agent ${1+"$@"}`; export SSH_AUTH_SOCK
+#      SSH_AUTH_SOCK=`rig-ssh-agent -h ${1+"$@"}`; export SSH_AUTH_SOCK
 #    }
 #
 # - Cameron Simpson <cs@cskk.id.au> 30jul2001
@@ -16,28 +16,51 @@ set -ue
 
 : ${HOST:=`hostname -s`}
 
+statefile=$HOME/var/run/ssh-agent-$HOST
+
 cmd=$0
-usage="Usage: $cmd [-f]"
+usage="Usage: $cmd [-f] [-h]
+  -f    Force the creation of a new ssh-agent, updating the state file
+        $statefile
+  -h    Get the host specific agent, starting one if necessary.
+        The default (no -f or -h) will use an existing agent if already set up."
 
 force=
-[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+usehost=
 
-[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+badopts=
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) force=1 ;;
+    -h) usehost=1 ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
 
-statefile=$HOME/var/run/ssh-agent-$HOST
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 exec 3>&1 1>&2
 
+if [ $usehost ]
+then
+  unset SSH_AUTH_SOCK
+fi
+
 need_agent=
-if [ "$force" ]
+if [ $force ]
 then
   need_agent=1
 else
   # test for existing ssh-agent
-  { ssh-add -l >/dev/null || [ $? = 1 ]; } \
+  { [ -n "${SSH_AUTH_SOCK:-}" ] && { ssh-add -l >/dev/null || [ $? = 1 ]; }; } \
   || { [ -s "$statefile" ] \
        && . "$statefile" \
-       && { ssh-add -l >/dev/null || [ $? = 1 ]; }
+       && { ssh-add -l >/dev/null 2>&1 || [ $? = 1 ]; }
      } \
   || need_agent=1
 fi

@@ -1,5 +1,7 @@
 syntax: regexp
+^\.autoformat$
 ^html/manuals/
 \.tar\.gz$
 ^state/
 ^state3/
+^venv/
