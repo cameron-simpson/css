@@ -30,9 +30,12 @@ def funcname(func):
       Several objects do not have a __name__ attribute, such as partials.
   '''
   try:
-    return func.__name__
+    return func.__qualname__
   except AttributeError:
-    return str(func)
+    try:
+      return func.__name__
+    except AttributeError:
+      return str(func)
 
 def funccite(func):
   ''' Return a citation for a function (name and code location).
