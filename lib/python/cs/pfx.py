@@ -44,6 +44,7 @@ import logging
 import sys
 import threading
 from cs.deco import decorator
+from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
@@ -58,6 +59,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.py.func',
         'cs.py3',
         'cs.x',
     ],
@@ -88,13 +90,14 @@ def pfx(func):
           @pfx
           def f(...):
   '''
+  name = funcname(func)
 
-  def wrapped(*args, **kwargs):
-    with Pfx(func.__name__):
+  def pfx_wrapper(*args, **kwargs):
+    with Pfx(name):
       return func(*args, **kwargs)
 
-  wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
-  return wrapped
+  pfx_wrapper.__name__ = "@pfx(%s)" % (name,)
+  return pfx_wrapper
 
 @decorator
 def pfx_method(method, use_str=False):
