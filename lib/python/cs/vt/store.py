@@ -735,7 +735,7 @@ class ProxyStore(BasicStoreSync):
       This setup causes all saved data to be saved to `local` and
       `upstream`.
       If a save to `local` or `upstream` fails,
-      for example if the upstream if offline,
+      for example if the upstream is offline,
       the save is repeated to the `spool`,
       intended as a holding location for data needing a resave.
 
@@ -751,7 +751,7 @@ class ProxyStore(BasicStoreSync):
       from the first Store whose glob matches the name.
 
       TODO: replay and purge the spool? probably better as a separate
-      pushto operation ("vt -S spool_store pushto upstream_store").
+      pushto operation ("vt -S spool_store pushto --delete upstream_store").
   '''
 
   def __init__(
