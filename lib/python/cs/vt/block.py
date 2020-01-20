@@ -69,7 +69,7 @@ class BlockType(IntEnum):
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
 class BlockRecord(PacketField):
-  ''' PacketField support binary parsing and transcription of blockrefs.
+  ''' PacketField support for binary parsing and transcription of blockrefs.
   '''
 
   TEST_CASES = (
