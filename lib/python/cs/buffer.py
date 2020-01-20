@@ -336,8 +336,8 @@ class CornuCopyBuffer(object):
           if short_ok:
             break
           raise EOFError(
-              "insufficient input data, wanted %d bytes but only found %d" %
-              (min_size, length)
+              "offset %d: insufficient input data, wanted %d bytes but only found %d" %
+              (self.offset, min_size, length)
           )
         if next_chunk:
           # nonempty chunk, stash it
