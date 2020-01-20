@@ -108,6 +108,15 @@ class LMDBIndex(_Index):
     self._txn_blocked = Lock()  # available if new transactions may commence
     self._txn_count = 0
 
+  def __str__(self):
+    return "%s(%r,%s)" % (
+        type(self).__name__, self.basepath, self.hashclass.HASHNAME
+    )
+
+  def __len__(self):
+    db = self._lmdb
+    return None if db is None else db.stat()['entries']
+
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
