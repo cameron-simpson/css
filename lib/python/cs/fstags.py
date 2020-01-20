@@ -1398,7 +1398,7 @@ class FSTagsConfig:
   '''
 
   @fmtdoc
-  def __init__(self, rcfilepath=None, *, do_load=False):
+  def __init__(self, rcfilepath=None):
     ''' Initialise the config.
 
         Parameters:
@@ -1407,60 +1407,59 @@ class FSTagsConfig:
     '''
     if rcfilepath is None:
       rcfilepath = expanduser(RCFILE)
-    self.config = ConfigParser()
-    self.config.add_section('general')
-    self.config.add_section('xattr')
-    self.config.add_section('autotag')
     self.filepath = rcfilepath
-    self._loaded = False
-    if do_load:
-      self.load()
-      self._loaded = True
 
+  @pfx_method
+  def __getattr__(self, attr):
+    if attr == 'config':
+      self.config = self.load_config(self.filepath)
+      return self.config
+    if attr == 'rules':
+      self.rules = self.rules_from_config(self.config)
+      return self.rules
+    raise AttributeError(attr)
   def __getitem__(self, section):
     return self.config[section]
 
-  @pfx_method
-  @fmtdoc
-  def load(self, rcfilepath=None):
-    ''' Read an rc file, merge into the current config.
+  @staticmethod
+  def load_config(rcfilepath):
+    ''' Read an rc file, return a ConfigParser instance.
     '''
-    if rcfilepath is None:
-      rcfilepath = self.filepath
     with Pfx(rcfilepath):
-      config = self.config
+      config = ConfigParser()
+      config.add_section('general')
+      config.add_section('xattr')
+      config.add_section('autotag')
       config['general']['tagsfile'] = TAGSFILE
       try:
         config.read(rcfilepath)
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-      rules = []
-      for rule_name, pattern in config['autotag'].items():
-        with Pfx("%s = %s", rule_name, pattern):
-          if pattern.startswith('/') and pattern.endswith('/'):
-            rules.append(RegexpTagRule(pattern[1:-1]))
-          else:
-            warning("invalid autotag rule")
-      self.rules = rules
+      return config
+
+  @staticmethod
+  def rules_from_config(config):
+    rules = []
+    for rule_name, pattern in config['autotag'].items():
+      with Pfx("%s = %s", rule_name, pattern):
+        if pattern.startswith('/') and pattern.endswith('/'):
+          rules.append(RegexpTagRule(pattern[1:-1]))
+        else:
+          warning("invalid autotag rule")
+    return rules
 
   @property
   @fmtdoc
   def tagsfile(self):
     ''' The tags filename, default `{TAGSFILE!r}`.
     '''
-    if not self._loaded:
-      self.load()
-      self._loaded = True
     return self.config.get('general', 'tagsfile') or TAGSFILE
 
   @tagsfile.setter
   def tagsfile(self, tagsfile):
     ''' Set the tags filename.
     '''
-    if not self._loaded:
-      self.load()
-      self._loaded = True
     self.config['general']['tagsfile'] = tagsfile
 
 FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
