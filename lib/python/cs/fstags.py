@@ -366,7 +366,7 @@ class FSTags:
     self.use_xattrs = use_xattrs
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
-    self._tagmaps = {}  # cache of per directory `TagFile`s
+    self._tagfiles = {}  # cache of per directory `TagFile`s
     self._lock = Lock()
 
   @property
@@ -382,9 +382,9 @@ class FSTags:
     '''
     dirpath = Path(dirpath)
     tagfilepath = dirpath / self.tagsfile
-    tagfile = self._tagmaps.get(tagfilepath)
+    tagfile = self._tagfiles.get(tagfilepath)
     if tagfile is None:
-      tagfile = self._tagmaps[tagfilepath] = TagFile(
+      tagfile = self._tagfiles[tagfilepath] = TagFile(
           str(tagfilepath), fstags=self
       )
     return tagfile
