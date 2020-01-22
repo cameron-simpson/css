@@ -358,7 +358,7 @@ class FSTags:
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile=None):
+  def __init__(self, tagsfile=None, use_xattrs=None):
     if tagsfile is None:
       tagsfile = TAGSFILE
     self.config = FSTagsConfig()
@@ -1089,7 +1089,7 @@ class TagFile(HasFSTagsMixin):
               if not line or line.startswith('#'):
                 continue
               name, tags = self.parse_tags_line(line)
-              if XATTR_B is not None:
+              if self.fstags.use_xattrs:
                 name_path = joinpath(self.dirpath, name)
                 tags.update_from_xattr(name_path, xattr_name=XATTR_B)
                 # import tags from other xattrs if not present
@@ -1131,7 +1131,7 @@ class TagFile(HasFSTagsMixin):
     ''' Save the tag map to the tag file.
     '''
     self.save_tagsets(self.filepath, self.tagsets)
-    if XATTR_B is not None:
+    if self.fstags.use_xattrs:
       for name, tagset in self.tagsets.items():
         name_path = joinpath(self.dirpath, name)
         tagset.update_xattr(name_path, xattr_name=XATTR_B)
