@@ -763,6 +763,7 @@ class TagSet(HasFSTagsMixin):
       self.fstags = fstags
     self.tagmap = {}
     self.defaults = defaults
+    self.modified = False
 
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
@@ -834,6 +835,7 @@ class TagSet(HasFSTagsMixin):
     '''
     tag = Tag.from_name_value(tag_name, value)
     self.tagmap[tag.name] = tag.value
+    self.modified = True
 
   def discard(self, tag_name, value=None):
     ''' Discard the tag matching `(tag_name,value)`.
@@ -852,6 +854,7 @@ class TagSet(HasFSTagsMixin):
       value = tag.value
       if value is None or tagmap[tag_name] == value:
         old_value = tagmap.pop(tag_name)
+        self.modified = True
       return Tag(tag_name, old_value)
     return None
 
