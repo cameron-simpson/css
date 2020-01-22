@@ -52,7 +52,7 @@ import json
 from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
-    basename, dirname, exists as existspath, expanduser, isdir as isdirpath,
+    abspath, basename, dirname, exists as existspath, expanduser, isdir as isdirpath,
     isfile as isfilepath, join as joinpath, realpath, relpath
 )
 from pathlib import Path
@@ -407,14 +407,10 @@ class FSTags(MultiOpenMixin):
         for the `TagFile`s affecting `filepath`
         in order from the root to `dirname(filepath)`
         where `name` is the key within `TagFile`.
-
-        Note that this is computed from `realpath(filepath)`.
-
-        TODO: optional `as_is` parameter to skip the realpath call?
     '''
     with Pfx("path_tagfiles(%r)", filepath):
-      real_filepath = Path(realpath(filepath))
-      root, *subparts = real_filepath.parts
+      absfilepath = Path(abspath(filepath))
+      root, *subparts = absfilepath.parts
       if not subparts:
         raise ValueError("root=%r and no subparts" % (root,))
       tagfiles = []
@@ -492,7 +488,6 @@ class FSTags(MultiOpenMixin):
     '''
     ok = True
     with Pfx("dirpath=%r", dirpath):
-      dirpath = realpath(dirpath)
       tagfile = self.dir_tagfile(dirpath)
       tagsets = tagfile.tagsets
       names = set(
@@ -1039,7 +1034,7 @@ class TagFile(HasFSTagsMixin):
     if fstags is not None:
       self.fstags = fstags
     self.filepath = filepath
-    self.dirpath = dirname(realpath(filepath))
+    self.dirpath = dirname(filepath)
     self._lock = Lock()
 
   def __repr__(self):
