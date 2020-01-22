@@ -361,6 +361,9 @@ class FSTags:
   def __init__(self, tagsfile=None, use_xattrs=None):
     if tagsfile is None:
       tagsfile = TAGSFILE
+    if use_xattrs is None:
+      use_xattrs = XATTR_B is not None
+    self.use_xattrs = use_xattrs
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
     self._tagmaps = {}  # cache of per directory `TagFile`s
