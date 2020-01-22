@@ -68,6 +68,7 @@ from cs.lex import (
 )
 from cs.logutils import setup_logging, error, warning, info
 from cs.pfx import Pfx, pfx_method
+from cs.resources import MultiOpenMixin
 from cs.threads import locked, locked_property
 from icontract import require
 
@@ -177,12 +178,13 @@ class FSTagsCommand(BaseCommand):
     if not argv:
       argv = ['.']
     rules = fstags.config.rules
-    for top_path in argv:
-      for path in rpaths(top_path):
-        with Pfx(path):
-          tagged_path = TaggedPath(path, fstags)
-          for autotag in tagged_path.autotag(rules):
-            print("autotag %r + %s" % (tagged_path.basename, autotag))
+    with fstags:
+      for top_path in argv:
+        for path in rpaths(top_path):
+          with Pfx(path):
+            tagged_path = TaggedPath(path, fstags)
+            for autotag in tagged_path.autotag(rules):
+              print("autotag %r + %s" % (tagged_path.basename, autotag))
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -200,8 +202,9 @@ class FSTagsCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-      if not fstags.edit_dirpath(path):
-        xit = 1
+      with fstags:
+        if not fstags.edit_dirpath(path):
+          xit = 1
     return xit
 
   @classmethod
@@ -290,27 +293,29 @@ class FSTagsCommand(BaseCommand):
     if not isdirpath(target_dirpath):
       raise GetoptError("targetdir %r: not a directory" % (target_dirpath,))
     xit = 0
-    for path in argv:
-      with Pfx(path):
-        if not existspath(path):
-          error("path does not exist")
-          xit = 1
-          continue
-        src_tags = TaggedPath(path).direct_tags
-        src_basename = basename(path)
-        target_path = joinpath(target_dirpath, src_basename)
-        with Pfx("=>%r", target_path):
-          if existspath(target_path):
-            error("target already exists")
+    fstags = options.fstags
+    with fstags:
+      for path in argv:
+        with Pfx(path):
+          if not existspath(path):
+            error("path does not exist")
             xit = 1
             continue
-          print(path, '=>', target_path)
-          dst_taggedpath = TaggedPath(target_path)
-          with Pfx("shutil.move"):
-            shutil.move(path, target_path)
-          for tag in src_tags:
-            dst_taggedpath.add(tag)
-          dst_taggedpath.save()
+          src_tags = TaggedPath(path, fstags=fstags).direct_tags
+          src_basename = basename(path)
+          target_path = joinpath(target_dirpath, src_basename)
+          with Pfx("=>%r", target_path):
+            if existspath(target_path):
+              error("target already exists")
+              xit = 1
+              continue
+            print(path, '=>', target_path)
+            dst_taggedpath = TaggedPath(target_path, fstags=fstags)
+            with Pfx("shutil.move"):
+              shutil.move(path, target_path)
+            for tag in src_tags:
+              dst_taggedpath.add(tag)
+            dst_taggedpath.save()
     return xit
 
   @classmethod
@@ -354,11 +359,12 @@ class FSTagsCommand(BaseCommand):
       raise GetoptError("bad arguments")
     fstags.apply_tag_choices(tag_choices, argv)
 
-class FSTags:
+class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
   def __init__(self, tagsfile=None, use_xattrs=None):
+    MultiOpenMixin.__init__(self)
     if tagsfile is None:
       tagsfile = TAGSFILE
     if use_xattrs is None:
@@ -368,6 +374,13 @@ class FSTags:
     self.config.tagsfile = tagsfile
     self._tagfiles = {}  # cache of per directory `TagFile`s
     self._lock = Lock()
+
+  def startup(self):
+    pass
+
+  def shutdown(self):
+    for tagfile in self._tagfiles.values():
+      tagfile.save()
 
   @property
   def tagsfile(self):
@@ -429,18 +442,18 @@ class FSTags:
         if isinstance(tag_choice, Tag) else tag_choice
         for tag_choice in tag_choices
     ]
-    for path in paths:
-      with Pfx(path):
-        tagged_path = TaggedPath(path, fstags=self)
-        for spec, choice, tag in tag_choices:
-          with Pfx(spec):
-            if choice:
-              # add tag
-              tagged_path.add(tag)
-            else:
-              # delete tag
-              tagged_path.discard(tag)
-        tagged_path.save()
+    with self:
+      for path in paths:
+        with Pfx(path):
+          tagged_path = TaggedPath(path, fstags=self)
+          for spec, choice, tag in tag_choices:
+            with Pfx(spec):
+              if choice:
+                # add tag
+                tagged_path.add(tag)
+              else:
+                # delete tag
+                tagged_path.discard(tag)
 
   def find(self, path, tag_choices, use_direct_tags=False):
     ''' Walk the file tree from `path`
@@ -1430,6 +1443,7 @@ class FSTagsConfig:
       self.rules = self.rules_from_config(self.config)
       return self.rules
     raise AttributeError(attr)
+
   def __getitem__(self, section):
     return self.config[section]
 
