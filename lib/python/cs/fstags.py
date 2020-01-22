@@ -1133,6 +1133,12 @@ class TagFile(HasFSTagsMixin):
   def save(self):
     ''' Save the tag map to the tag file.
     '''
+    if getattr(self, '_tagsets', None) is None:
+      # TagSets never loaded
+      return
+    if not any(map(lambda tagset: tagset.modified, self._tagsets.values())):
+      # no modified TagSets
+      return
     self.save_tagsets(self.filepath, self.tagsets)
     if self.fstags.use_xattrs:
       for name, tagset in self.tagsets.items():
