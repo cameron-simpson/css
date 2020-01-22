@@ -83,7 +83,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.threads', 'icontract'
+        'cs.resources', 'cs.threads', 'icontract'
     ],
 }
 
