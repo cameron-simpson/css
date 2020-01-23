@@ -19,9 +19,10 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions
-SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
-                   '$':         lambda c, ns: '$',
-                 }
+SPECIAL_MACROS = {
+    '.': lambda c, ns: os.getcwd(),  # TODO: cache
+    '$': lambda c, ns: '$',
+}
 
 TARGET_MACROS = "@?/"
 
@@ -34,18 +35,25 @@ TARGET_MACROS = "@?/"
 #
 re_identifier = r'[A-Za-z]\w*'
 re_assignment = r'^\s*(' + re_identifier + r')\s*(\(\s*(' + re_identifier + r'(\s*,\s*' + re_identifier + r')*)\s*\)\s*)?='
-RE_ASSIGNMENT = re.compile( re_assignment )
+RE_ASSIGNMENT = re.compile(re_assignment)
 
-RE_COMMASEP = re.compile( r'\s*,\s*' )
+RE_COMMASEP = re.compile(r'\s*,\s*')
 
 _FileContext = namedtuple('FileContext', 'filename lineno text parent')
+
 class FileContext(_FileContext):
+
   def __init__(self, filename, lineno, text, parent):
-    assert type(filename) is str, "filename should be str, got %s" % (type(filename),)
-    assert type(lineno) is int, "lineno should be int, got %s" % (type(lineno),)
+    assert type(filename
+                ) is str, "filename should be str, got %s" % (type(filename),)
+    assert type(lineno
+                ) is int, "lineno should be int, got %s" % (type(lineno),)
     assert type(text) is str, "text should be str, got %s" % (type(text),)
     if parent is not None:
-      assert type(parent) is FileContext, "parent should be FileContext, got %s" % (type(parent),)
+      assert type(parent
+                  ) is FileContext, "parent should be FileContext, got %s" % (
+                      type(parent),
+                  )
 
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
@@ -93,6 +101,7 @@ def nsstr(namespaces):
 class Modifier(object):
   ''' Base class for modifiers.
   '''
+
   def __init__(self, context, modtext):
     self.context = context
     self.modtext = modtext
@@ -107,13 +116,15 @@ class Modifier(object):
     return ntext
 
   def words(self, text):
-    return [ word for word in text.split() if len(word) > 0 ]
+    return [word for word in text.split() if len(word) > 0]
 
   def foreach(self, text, f):
     ''' Apply the operator function `f` to each word in `text`.
         Return the results joined together with spaces.
     '''
-    return " ".join( [ word for word in map(f, self.words(text)) if len(word) > 0 ] )
+    return " ".join(
+        [word for word in map(f, self.words(text)) if len(word) > 0]
+    )
 
 class ModDirpart(Modifier):
   ''' A modifier to get the directory part of a filename.
@@ -143,38 +154,44 @@ class ModifierSplit1(Modifier):
     sep = self.separator
     keepright = self.keepright
     right = self.rightmost
-    return (word.rsplit(sep, 1) if right else word.split(sep, 1))[ 1 if keepright else 0 ]
+    return (word.rsplit(sep, 1)
+            if right else word.split(sep, 1))[1 if keepright else 0]
 
   def modify(self, text, namespaces):
-    return self.foreach( text, self.splitword )
+    return self.foreach(text, self.splitword)
 
 class ModPrefixLong(ModifierSplit1):
   ''' A modifier that splits on the last separator and returns the prefix.
   '''
+
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, True)
 
 class ModPrefixShort(ModifierSplit1):
   ''' A modifier that splits on the first separator and returns the prefix.
   '''
+
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, False)
 
 class ModSuffixLong(ModifierSplit1):
   ''' A modifier that splits on the first separator and returns the suffix.
   '''
+
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, False)
 
 class ModSuffixShort(ModifierSplit1):
   ''' A modifier that splits on the last separator and returns the suffix.
   '''
+
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, True)
 
 class ModUnique(Modifier):
   ''' A modifier which returns only the first occurence of each word in `text`.
   '''
+
   def modify(self, text, namespaces):
     seen = set()
     words = []
@@ -187,16 +204,19 @@ class ModUnique(Modifier):
 class ModNormpath(Modifier):
   ''' A modifier which returns os.path.normpath(word) for each word in `text`.
   '''
+
   def modify(self, text, namespaces):
     return self.foreach(os.path.normpath)
 
 class ModGlob(Modifier):
   ''' A modifier which returns each word of `text` replaced by its glob match.
   '''
+
   def __init__(self, context, modtext, muststat, lax):
     Modifier.__init__(self, context, modtext)
     self.muststat = muststat
     self.lax = lax
+
   def modify(self, text, namespaces):
     globbed = []
     for ptn in self.words(text):
@@ -216,25 +236,33 @@ class ModGlob(Modifier):
 class ModEval(Modifier):
   ''' A modifier which evaluates text as a macro expression.
   '''
+
   def modify(self, text, namespaces):
     ''' Evaluate `text` as a macro expression.
     '''
-    return parseMacroExpression(self.context, text)[0](self.context, namespaces)
+    return parseMacroExpression(self.context,
+                                text)[0](self.context, namespaces)
 
 class ModSubstitute(Modifier):
   ''' A modifier which returns `text` with 
   '''
+
   def __init__(self, context, modtext, regexp_mexpr, replacement):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
     self.replacement = replacement
+
   def modify(self, text, namespaces):
-    return re.sub(regexp_mexpr(self.context, namespaces), self.replacement, text)
+    return re.sub(
+        regexp_mexpr(self.context, namespaces), self.replacement, text
+    )
 
 class ModFromFiles(Modifier):
+
   def __init__(self, context, modtext, lax):
     Modifier.__init__(self, context, modtext)
     self.lax = lax
+
   def modify(self, text, namespaces):
     newwords = []
     for filename in self.words(text):
@@ -250,10 +278,12 @@ class ModFromFiles(Modifier):
     return " ".join(newwords)
 
 class ModSelectRegexp(Modifier):
+
   def __init__(self, context, modtext, regexp_mexpr, invert):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
     self.invert = bool(invert)
+
   def modify(self, text, namespaces):
     invert = self.invert
     regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
@@ -261,10 +291,12 @@ class ModSelectRegexp(Modifier):
     return self.foreach(text, f)
 
 class ModSelectRange(Modifier):
+
   def __init__(self, context, modtext, range, invert):
     Modifier.__init__(self, context, modtext)
     self.range = range
     self.invert = bool(invert)
+
   def modify(self, text, namespaces):
     invert = self.invert
     range = self.range
@@ -276,20 +308,25 @@ class ModSelectRange(Modifier):
     return " ".join(newwords)
 
 class ModSubstitute(Modifier):
+
   def __init__(self, context, modtext, ptn, repl):
     Modifier.__init__(self, context, modtext)
     self.ptn = ptn
     self.repl = repl
+
   def modify(self, text, namespaces):
     regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
-    return re.compile(regexp_mexpr(self.context, namespaces)).sub(self.repl, text)
+    return re.compile(regexp_mexpr(self.context,
+                                   namespaces)).sub(self.repl, text)
 
 class ModSetOp(Modifier):
+
   def __init__(self, context, modtext, op, macroname, literal):
     Modifier.__init__(self, context, modtext)
     self.op = op
     self.macroname = macroname
     self.literal = literal
+
   def modify(self, text, namespaces):
     words = set(self.words(text))
     if self.literal:
@@ -326,8 +363,11 @@ class Macro(object):
 
   def __str__(self):
     if self.params:
-      return "$(%s(%s))" % (self.name, ",".join(self.params), )
-    return ( "$(%s)" if len(self.name) > 1 else "$%s" ) % (self.name,)
+      return "$(%s(%s))" % (
+          self.name,
+          ",".join(self.params),
+      )
+    return ("$(%s)" if len(self.name) > 1 else "$%s") % (self.name,)
 
   __repr__ = __str__
 
@@ -342,13 +382,16 @@ class Macro(object):
     assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
     if len(param_values) != len(self.params):
       raise ValueError(
-              "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
-              % (self.params, len(self.params), len(param_values), param_values))
+          "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
+          % (self.params, len(self.params), len(param_values), param_values)
+      )
     if self.params:
-      namespaces = [ dict(zip(self.params, param_values)) ] + namespaces
+      namespaces = [dict(zip(self.params, param_values))] + namespaces
     return self.mexpr(context, namespaces)
 
-def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=False):
+def readMakefileLines(
+    M, fp, parent_context=None, start_lineno=1, missing_ok=False
+):
   ''' Read a Mykefile and yield text lines.
       This generator parses slosh extensions and
       :if/ifdef/ifndef/else/endif directives.
@@ -359,7 +402,8 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
     filename = fp
     try:
       with Pfx("open %r", filename).partial(open, filename)() as fp:
-        for O in readMakefileLines(M, fp, parent_context, missing_ok=missing_ok):
+        for O in readMakefileLines(M, fp, parent_context,
+                                   missing_ok=missing_ok):
           yield O
     except OSError as e:
       if e.errno == errno.ENOENT or e.errno == errno.EPERM:
@@ -371,13 +415,16 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
   except AttributeError:
     filename = str(fp)
 
-  ifStack = []        # active ifStates (state, in-first-branch)
-  context = None      # FileContext(filename, lineno, line)
+  ifStack = []  # active ifStates (state, in-first-branch)
+  context = None  # FileContext(filename, lineno, line)
 
   prevline = None
   for lineno, line in enumerate(fp, start_lineno):
     if not line.endswith('\n'):
-      raise ParseError(context, len(line), '%s:%d: unexpected EOF (missing final newline)', filename, lineno)
+      raise ParseError(
+          context, len(line), '%s:%d: unexpected EOF (missing final newline)',
+          filename, lineno
+      )
     if prevline is not None:
       # prepend previous continuation line if any
       # keep the same FileContext
@@ -411,9 +458,12 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
                 raise ParseError(context, offset, "missing macro name")
               _, offset = get_white(line, offset)
               if offset < len(line):
-                raise ParseError(context, offset, "extra arguments after macro name: %s", line[offset:])
-              newIfState = [ False, True ]
-              if all( [ item[0] for item in ifStack ] ):
+                raise ParseError(
+                    context, offset, "extra arguments after macro name: %s",
+                    line[offset:]
+                )
+              newIfState = [False, True]
+              if all([item[0] for item in ifStack]):
                 newIfState[0] = nsget(M.namespaces, mname) is not None
               ifStack.append(newIfState)
               continue
@@ -423,9 +473,12 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
                 raise ParseError(context, offset, "missing macro name")
               _, offset = get_white(line, offset)
               if offset < len(line):
-                raise ParseError(context, offset, "extra arguments after macro name: %s", line[offset:])
-              newIfState = [ True, True ]
-              if all( [ item[0] for item in ifStack ] ):
+                raise ParseError(
+                    context, offset, "extra arguments after macro name: %s",
+                    line[offset:]
+                )
+              newIfState = [True, True]
+              if all([item[0] for item in ifStack]):
                 newIfState[0] = nsget(M.namespaces, mname) is None
               ifStack.append(newIfState)
               continue
@@ -435,7 +488,9 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
             if word == "else":
               # extra text permitted
               if not ifStack:
-                raise ParseError(context, 0, ":else: no active :if directives in this file")
+                raise ParseError(
+                    context, 0, ":else: no active :if directives in this file"
+                )
               if not ifStack[-1][1]:
                 raise ParseError(context, 0, ":else inside :else")
               else:
@@ -444,23 +499,32 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1, missing_ok=Fal
             if word == "endif":
               # extra text permitted
               if not ifStack:
-                raise ParseError(context, 0, ":endif: no active :if directives in this file")
+                raise ParseError(
+                    context, 0, ":endif: no active :if directives in this file"
+                )
               ifStack.pop()
               continue
             if word == "include":
-              if all( ifState[0] for ifState in ifStack ):
+              if all(ifState[0] for ifState in ifStack):
                 if offset == len(line):
-                  raise ParseError(context, offset, ":include: no include files specified")
+                  raise ParseError(
+                      context, offset, ":include: no include files specified"
+                  )
                 include_mexpr, _ = parseMacroExpression(context, offset=offset)
-                for include_file in include_mexpr(context, M.namespaces).split():
+                for include_file in include_mexpr(context,
+                                                  M.namespaces).split():
                   if len(include_file) == 0:
                     continue
                   if isabs(include_file):
-                    include_file = os.path.join( dirname(filename), include_file )
-                  for context, line in readMakefileLines(M, include_file, parent_context=context, missing_ok=missing_ok):
+                    include_file = os.path.join(
+                        dirname(filename), include_file
+                    )
+                  for context, line in readMakefileLines(
+                      M, include_file, parent_context=context,
+                      missing_ok=missing_ok):
                     yield context, line
               continue
-        if not all( ifState[0] for ifState in ifStack ):
+        if not all(ifState[0] for ifState in ifStack):
           # in false branch of "if"; skip line
           continue
       except SyntaxError as e:
@@ -481,8 +545,9 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
   ''' Read a Mykefile and yield Macros and Targets.
   '''
   from .make import Target, Action
-  action_list = None       # not in a target
-  for context, line in readMakefileLines(M, fp, parent_context=parent_context, missing_ok=missing_ok):
+  action_list = None  # not in a target
+  for context, line in readMakefileLines(M, fp, parent_context=parent_context,
+                                         missing_ok=missing_ok):
     with Pfx(str(context)):
       if isinstance(line, OSError):
         e = line
@@ -510,7 +575,9 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
               for include_file in mexpr(context, M.namespaces).split():
                 if include_file:
                   if not os.path.isabs(include_file):
-                    include_file = os.path.join( realpath(dirname(filename)), include_file )
+                    include_file = os.path.join(
+                        realpath(dirname(filename)), include_file
+                    )
                   M.add_appendfile(include_file)
               continue
             if word == 'import':
@@ -526,16 +593,23 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
                     ok = False
                     missing_envvars.append(envvar)
                   else:
-                    yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
+                    yield Macro(
+                        context, envvar, (), envvalue.replace('$', '$$')
+                    )
               if not ok:
-                raise ValueError("missing environment variables: %s"
-                                 % (missing_envvars,))
+                raise ValueError(
+                    "missing environment variables: %s" % (missing_envvars,)
+                )
               continue
             if word == 'precious':
               if offset == len(line):
-                raise ParseError(context, offset, "nothing to mark as precious")
+                raise ParseError(
+                    context, offset, "nothing to mark as precious"
+                )
               mexpr, offset = parseMacroExpression(context, line, offset)
-              M.precious.update( word for word in mexpr(context, M.namespaces).split() if word )
+              M.precious.update(
+                  word for word in mexpr(context, M.namespaces).split() if word
+              )
               continue
             raise ParseError(context, doffset, "unrecognised directive")
 
@@ -560,10 +634,13 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
               action_list.append(A)
               continue
             # in-target directive like ":make"
-            _, offset = get_white(line, offset+1)
+            _, offset = get_white(line, offset + 1)
             directive, offset = get_identifier(line, offset)
             if not directive:
-              raise ParseError(context, offset, "missing in-target directive after leading colon")
+              raise ParseError(
+                  context, offset,
+                  "missing in-target directive after leading colon"
+              )
             A = Action(context, directive, line[offset:].lstrip())
             M.debug_parse("add action: %s", A)
             action_list.append(A)
@@ -579,15 +656,26 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
         target_mexpr, offset = parseMacroExpression(context, stopchars=':')
         if context.text[offset] != ':':
           raise ParseError(context, offset, "no colon in target definition")
-        prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
+        prereqs_mexpr, offset = parseMacroExpression(
+            context, offset=offset + 1, stopchars=':'
+        )
         if offset < len(context.text) and context.text[offset] == ':':
-          postprereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1)
+          postprereqs_mexpr, offset = parseMacroExpression(
+              context, offset=offset + 1
+          )
         else:
           postprereqs_mexpr = []
 
         action_list = []
         for target in target_mexpr(context, M.namespaces).split():
-          yield Target(M, target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
+          yield Target(
+              M,
+              target,
+              context,
+              prereqs=prereqs_mexpr,
+              postprereqs=postprereqs_mexpr,
+              actions=action_list
+          )
         continue
 
         raise ParseError(context, 0, 'unparsed line')
@@ -636,7 +724,9 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
         permutations.append(wh)
     else:
       # non-white, non-macro
-      plain, offset = get_other_chars(text, offset, stopchars+'$'+whitespace)
+      plain, offset = get_other_chars(
+          text, offset, stopchars + '$' + whitespace
+      )
       if plain:
         permutations.append(plain)
       else:
@@ -678,8 +768,8 @@ class MacroExpression(object):
     assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
     if self._result is not None:
       return self._result
-    strs = []           # strings to collate
-    wordlists = None    # accruing word permutations
+    strs = []  # strings to collate
+    wordlists = None  # accruing word permutations
     for item in self.permutations:
       if type(item) is str:
         if item.isspace():
@@ -687,21 +777,22 @@ class MacroExpression(object):
           # stash existing word if any
           if wordlists:
             # non-empty word accruing
-            words = [ ''.join(wordlists) for wordlists in product( *wordlists ) ]
+            words = [''.join(wordlists) for wordlists in product(*wordlists)]
             strs.append(" ".join(words))
             wordlists = None
           strs.append(item)
         else:
           # word
           if wordlists is None:
-            wordlists = [ [item] ]
+            wordlists = [[item]]
           else:
             if len(wordlists) > 0:
               wordlists.append([item])
       else:
         # should be a MacroTerm
         mterm = item
-        assert isinstance(mterm, MacroTerm), "expected MacroTerm, got %r" % (mterm,)
+        assert isinstance(mterm,
+                          MacroTerm), "expected MacroTerm, got %r" % (mterm,)
         if wordlists is not None and len(wordlists) == 0:
           # word already short circuited - skip evaluating the MacroTerm
           pass
@@ -714,18 +805,20 @@ class MacroExpression(object):
               wordlists = []
             else:
               if wordlists is None:
-                wordlists = [ textwords ]
+                wordlists = [textwords]
               else:
                 wordlists.append(textwords)
           else:
             if wordlists is None:
-              wordlists = [ [text] ]
+              wordlists = [[text]]
             else:
               wordlists.append([text])
 
     if wordlists:
       # non-empty word accruing - flatten it and store
-      strs.append(" ".join( [ ''.join(wordlist) for wordlist in product(*wordlists) ] ))
+      strs.append(
+          " ".join([''.join(wordlist) for wordlist in product(*wordlists)])
+      )
 
     result = ''.join(strs)
     debug("eval returns %r", result)
@@ -756,7 +849,8 @@ def parseMacro(context, text=None, offset=0):
     ch = text[offset]
 
     # $x
-    if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS or ch in TARGET_MACROS:
+    if ch == '_' or ch.isalpha(
+    ) or ch in SPECIAL_MACROS or ch in TARGET_MACROS:
       offset += 1
       M = MacroTerm(context, ch), offset
       return M
@@ -790,15 +884,21 @@ def parseMacro(context, text=None, offset=0):
         offset += 1
         _, offset = get_white(text, offset)
         while text[offset] != ')':
-          mexpr, offset = parseMacroExpression(context, text=text, offset=offset, stopchars=',)')
+          mexpr, offset = parseMacroExpression(
+              context, text=text, offset=offset, stopchars=',)'
+          )
           param_mexprs.append(mexpr)
           _, offset = get_white(text, offset)
           if text[offset] == ',':
             # gather comma and following whitespace
-            _, offset = get_white(text, offset+1)
+            _, offset = get_white(text, offset + 1)
             continue
           if text[offset] != ')':
-            raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: %s', text[offset:])
+            raise ParseError(
+                context, offset,
+                'macro paramaters: expected comma or closing parenthesis, found: %s',
+                text[offset:]
+            )
         offset += 1
     else:
       # must be "qtext" or a special macro name
@@ -833,7 +933,10 @@ def parseMacro(context, text=None, offset=0):
           offset += 1
           continue
         if ch == '?':
-          raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s', text[offset:])
+          raise ParseError(
+              context, offset, 'bare query "?" found in modifiers at: %s',
+              text[offset:]
+          )
 
         mod0 = ch
         modargs = ()
@@ -851,16 +954,28 @@ def parseMacro(context, text=None, offset=0):
             modclass = ModGlob
             if offset < len(text) and text[offset] == '?':
               offset += 1
-              modargs = (False, True,)
+              modargs = (
+                  False,
+                  True,
+              )
             else:
-              modargs = (False, False,)
+              modargs = (
+                  False,
+                  False,
+              )
           elif mod0 == 'g':
             modclass = ModGlob
             if offset < len(text) and text[offset] == '?':
               offset += 1
-              modargs = (True, True,)
+              modargs = (
+                  True,
+                  True,
+              )
             else:
-              modargs = (True, False,)
+              modargs = (
+                  True,
+                  False,
+              )
           elif mod0 in 'PpSs':
             if offset < len(text) and text[offset] == '[':
               offset += 1
@@ -883,7 +998,9 @@ def parseMacro(context, text=None, offset=0):
             elif mod0 == 's':
               modclass = ModSuffixLong
             else:
-              raise NotImplementedError("parse error: unhandled PpSs letter \"%s\"" % (mod0,))
+              raise NotImplementedError(
+                  "parse error: unhandled PpSs letter \"%s\"" % (mod0,)
+              )
           elif mod0 == '<':
             modclass = ModFromFiles
             if offset < len(text) and text[offset] == '?':
@@ -894,7 +1011,7 @@ def parseMacro(context, text=None, offset=0):
           elif mod0 in '-+*':
             modclass = ModSetOp
             _, offset = get_white(text, offset)
-            q = text[offset:offset+1]
+            q = text[offset:offset + 1]
             if q == '"' or q == "'":
               # 'qstr'
               offset += 1
@@ -907,23 +1024,37 @@ def parseMacro(context, text=None, offset=0):
             else:
               submname, offset = get_identifier(text, offset)
               if not submname:
-                raise ParseError(context, offset, 'missing macro name or string after "%s" modifier', mod0)
+                raise ParseError(
+                    context, offset,
+                    'missing macro name or string after "%s" modifier', mod0
+                )
               modargs = (mod0, submname, False)
           elif mod0 == ':':
             _, offset = get_white(text, offset)
             if offset >= len(text):
-              raise ParseError(context, offset, 'missing opening delimiter in :,ptn,rep,')
+              raise ParseError(
+                  context, offset, 'missing opening delimiter in :,ptn,rep,'
+              )
             delim = text[offset]
             if delim == mmark2:
-              raise ParseError(context, offset, 'found closing bracket instead of leading delimiter in :,ptn,rep,')
+              raise ParseError(
+                  context, offset,
+                  'found closing bracket instead of leading delimiter in :,ptn,rep,'
+              )
             if delim.isalnum():
-              raise ParseError(context, offset, 'invalid delimiter in :,ptn,rep, - must be nonalphanumeric')
+              raise ParseError(
+                  context, offset,
+                  'invalid delimiter in :,ptn,rep, - must be nonalphanumeric'
+              )
             modclass = ModSubstitute
             offset += 1
             try:
               ptn, repl, etc = text[offset:].split(delim, 2)
             except ValueError:
-              raise ParseError(context, offset, 'incomplete :%sptn%srep%s', delim, delim, delim)
+              raise ParseError(
+                  context, offset, 'incomplete :%sptn%srep%s', delim, delim,
+                  delim
+              )
             offset = len(text) - len(etc)
             modargs = (ptn, repl)
           else:
@@ -933,21 +1064,32 @@ def parseMacro(context, text=None, offset=0):
               # !/regexp/ or !{commalist}?
               _, offset2 = get_white(text, offset)
               if offset2 == len(text) or text[offset2] not in '/{':
-                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list} at %r', text[offset2:])
+                raise ParseError(
+                    context, offset2,
+                    '"!" not followed by /regexp/ or {comma-list} at %r',
+                    text[offset2:]
+                )
               offset = offset2
               ch = text[offset]
 
             if ch == '/':
               modclass = ModSelectRegexp
               offset += 1
-              mexpr, end = parseMacroExpression(context, text=text, offset=offset, stopchars='/')
+              mexpr, end = parseMacroExpression(
+                  context, text=text, offset=offset, stopchars='/'
+              )
               if end >= len(text):
-                raise ParseError(context, offset, 'incomplete /regexp/: %r', text[offset:])
+                raise ParseError(
+                    context, offset, 'incomplete /regexp/: %r', text[offset:]
+                )
               assert text[end] == '/'
-              offset = end+1
+              offset = end + 1
               modargs = (mexpr, invert)
             else:
-              raise ParseError(context, offset0, 'unknown macro modifier "%s": "%s"', mod0, text[offset0:])
+              raise ParseError(
+                  context, offset0, 'unknown macro modifier "%s": "%s"', mod0,
+                  text[offset0:]
+              )
 
           modifiers.append(modclass(context, text[offset0:offset], *modargs))
 
@@ -955,7 +1097,9 @@ def parseMacro(context, text=None, offset=0):
         error("%s", e)
         offset += 1
 
-    assert ch == mmark2, "should be at \"%s\", but am at: %s" % (mmark, text[offset:])
+    assert ch == mmark2, "should be at \"%s\", but am at: %s" % (
+        mmark, text[offset:]
+    )
     offset += 1
     if mpermute:
       if text[offset] != mmark2:
@@ -963,19 +1107,40 @@ def parseMacro(context, text=None, offset=0):
       else:
         offset += 1
 
-    M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute, literal=mliteral), offset
+    M = MacroTerm(
+        context,
+        mtext,
+        modifiers,
+        param_mexprs,
+        permute=mpermute,
+        literal=mliteral
+    ), offset
     return M
 
   except IndexError as e:
-    raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s', offset, text[offset:])
+    raise ParseError(
+        context, offset, 'parse incomplete, offset=%d, remainder: %s', offset,
+        text[offset:]
+    )
 
-  raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s', offset, text[offset:])
+  raise ParseError(
+      context, offset, 'unhandled parse failure at offset %d: %s', offset,
+      text[offset:]
+  )
 
 class MacroTerm(object):
   ''' A macro reference such as $x or $(foo(a,b,c) xyz).
   '''
 
-  def __init__(self, context, text, modifiers='', params=(), permute=False, literal=False):
+  def __init__(
+      self,
+      context,
+      text,
+      modifiers='',
+      params=(),
+      permute=False,
+      literal=False
+  ):
     ''' Initialise a MacroTerm.
         `context`: source context.
         `text`: macro name.
@@ -987,8 +1152,9 @@ class MacroTerm(object):
     if literal:
       if params:
         raise ValueError(
-              "no paramaters permitted with a literal MacroTerm: params=%r"
-                % (params,))
+            "no paramaters permitted with a literal MacroTerm: params=%r" %
+            (params,)
+        )
     self.context = context
     self.text = text
     self.modifiers = modifiers
@@ -1002,12 +1168,13 @@ class MacroTerm(object):
       return '$' + self.text
 
     # otherwise $(x) notation
-    return '$%s%s%s%s%s' % ( ( '((' if self.permute else '(' ),
-                             ('"%s"' % (self.text,) if self.literal else self.text),
-                             ( ' ' if self.modifiers else '' ),
-                             ''.join( str(mod) for mod in self.modifiers ),
-                             ( '))' if self.permute else ')' ),
-                           )
+    return '$%s%s%s%s%s' % (
+        ('((' if self.permute else '('),
+        ('"%s"' % (self.text,) if self.literal else self.text),
+        (' ' if self.modifiers else ''),
+        ''.join(str(mod) for mod in self.modifiers),
+        ('))' if self.permute else ')'),
+    )
 
   __repr__ = __str__
 
@@ -1021,7 +1188,7 @@ class MacroTerm(object):
         macro = nsget(namespaces, text)
         if macro is None:
           raise ValueError("unknown macro: $(%s)" % (text,))
-        param_values = [ mexpr(context, namespaces) for mexpr in param_mexprs ]
+        param_values = [mexpr(context, namespaces) for mexpr in param_mexprs]
         text = macro(context, namespaces, *param_values)
 
       for modifier in self.modifiers:
@@ -1047,18 +1214,20 @@ class TestAll(unittest.TestCase):
     self.assertEqual(str(M), '$.')
 
   def test10parseMacroExpr_PlainText(self):
-    self.assertEqual(parseMacroExpression(''),  ([], 0))
+    self.assertEqual(parseMacroExpression(''), ([], 0))
     self.assertEqual(parseMacroExpression('x'), (['x'], 1))
     self.assertEqual(parseMacroExpression(' '), ([], 1))
     self.assertEqual(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
-    self.assertEqual(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
+    self.assertEqual(
+        parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8)
+    )
 
   def test20parseMakeLines(self):
     from .make import Maker
     with Maker("myke") as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))
       self.assertEqual(len(parsed), 1)
-      self.assertEqual([ type(O) for O in parsed ], [ Macro ])
+      self.assertEqual([type(O) for O in parsed], [Macro])
 
 if __name__ == '__main__':
   unittest.main()

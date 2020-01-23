@@ -9,7 +9,7 @@ from .parse import parseMacroAssignment
 
 default_cmd = 'myke'
 
-usage="Usage: %s [options...] [macro=value...] [targets...]"
+usage = "Usage: %s [options...] [macro=value...] [targets...]"
 
 def main(argv=None):
   if argv is None:
