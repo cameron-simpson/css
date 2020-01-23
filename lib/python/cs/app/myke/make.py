@@ -1,8 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-from __future__ import print_function
 import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
 import os
 import os.path
 import errno

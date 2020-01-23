@@ -1,6 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-from __future__ import print_function
 from getopt import GetoptError
 import sys
 from cs.logutils import setup_logging, warning, error, info, D

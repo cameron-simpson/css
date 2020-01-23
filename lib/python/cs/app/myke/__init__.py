@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 DISTINFO = {
     'description': "my make program; parallel make tool with superior expression syntax",
