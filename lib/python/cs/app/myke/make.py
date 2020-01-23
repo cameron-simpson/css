@@ -266,11 +266,17 @@ class Maker(MultiOpenMixin):
         elif opt == '-f':
           self._makefiles.append(value)
         elif opt == '-j':
-          if value < 1:
-            error("invalid -j value: %d, must be >= 1", value)
+          try:
+            value = int(value)
+          except ValueError as e:
+            error("invlaid -j value: %s", e)
             badopts = True
           else:
-            self.parallel = int(value)
+            if value < 1:
+              error("invalid -j value: %d, must be >= 1", value)
+              badopts = True
+            else:
+              self.parallel = int(value)
         elif opt == '-k':
           self.fail_fast = False
         elif opt == '-n':
