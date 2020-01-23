@@ -2,12 +2,12 @@
 #
 # Read URLs and titles from stdin and update a state file.
 # Emit new URLs and titles on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 25sep2000
 #
 # Recode to use MUCH less memory and a temporary file
 # (on the premise that the input is much smaller than the state).
 # Probably cheaper CPUwise, too.
-#	- Cameron Simpson <cs@zip.com.au> 06nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 06nov2000
 #
 
 use strict qw(vars);

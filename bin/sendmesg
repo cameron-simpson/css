@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Acts like sendmail but intercepts messages to newsgroup@usenet and
 # dispatches then via NNTP, suitably rewritten. Addresses come on the
 # command line.
-#	- Cameron Simpson <cs@zip.com.au> 08jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 08jun2002
 #
 
 import os

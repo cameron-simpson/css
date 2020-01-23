@@ -2,7 +2,7 @@
 #
 # Read binary data from stdin. Write C data bytes of the form 0xXX to stdout,
 # suitable for inclusion in a C char array or Java byte array.
-#	- Cameron Simpson <cs@zip.com.au> 25apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 25apr2001
 #
 
 $i=0;

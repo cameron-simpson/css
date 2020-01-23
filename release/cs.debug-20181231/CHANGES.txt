@@ -1,0 +1,8 @@
+  lib/python/cs/debug.py: cs.debug: new TimingOutLock for locating deadlock points, grew from debugging cs.vt.index
+  lib/python/cs/debug.py: merge venti ==> default: Support pre-added Blocks. Various PlatonicDir fixes. Dir.changed logic fixes. Fix some test coverage.
+  lib/python/cs/debug.py: cs.debug: TimingOutLock: add recursive=False optional parameter, wraps an RLock if true, a Lock otherwise
+  lib/python/cs/debug.py: cs.debug: TimingOutLock.acquire: fix for blocking vs nonblocking calls
+  lib/python/cs/debug.py: cs.debug: modify @DEBUG to accept a `force` option (only usable in "DEBUG(f,force=True)" form), overriding ifdebug() check; add DF() for wrapping inline function calls with @DEBUG; add global DEBUG_POLL_RATE to tune the poll rate for the function watcher.
+  lib/python/cs/debug.py: cs.debug: clean a little lint
+  lib/python/cs/README-debug.rst: merge default ==> media
+  lib/python/cs/debug.py: cs.debug: DebuggingRLock: verbose __str__, bugfix index of caller stack frame, keep call stack on acquire

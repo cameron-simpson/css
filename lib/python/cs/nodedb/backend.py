@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Backend base classes.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from contextlib import contextmanager

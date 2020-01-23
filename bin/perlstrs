@@ -1,11 +1,11 @@
 #!/usr/bin/perl
 #
 # Tired of fighting with broken echo commands which interpret -n
-# or cs@zip.com.au etc, I resort to this cumbersome wrapper for the common
+# or cs@cskk.id.au etc, I resort to this cumbersome wrapper for the common
 #	blah=`echo "$blah" | sed 's/this/that/g'`
 # thing.
 # Based on sedstrs, which doesn't do newlines.
-#	- Cameron Simpson <cs@zip.com.au> 25aug97
+#	- Cameron Simpson <cs@cskk.id.au> 25aug97
 #
 
 ($cmd=$0) =~ s:.*/::;

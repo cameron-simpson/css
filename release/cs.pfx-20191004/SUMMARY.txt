@@ -1,0 +1,1 @@
+@pfx_method: new optional `use_str` parameter to use str(self) instead of type(self).__name__; now requires @cs.deco.decorator

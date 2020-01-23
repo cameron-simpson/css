@@ -3,7 +3,7 @@
 # Shell-only shqstr.
 # Relies on printf and a sed that copes with no trailing newline.
 # Requested by Zoong Do Dung PHAM.
-#       - Cameron Simpson <cs@zip.com.au> 09dec2010
+#       - Cameron Simpson <cs@cskk.id.au> 09dec2010
 #
 
 set -ue

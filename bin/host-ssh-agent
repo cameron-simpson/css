@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Connect to the per-host ssh-agent, starting it if necessary.
-#	- Cameron Simpson <cs@zip.com.au> 13jun2006
+#	- Cameron Simpson <cs@cskk.id.au> 13jun2006
 #
 
 set -ue

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to do things for image maps.
-#	- Cameron Simpson <cs@zip.com.au> 30dec96
+#	- Cameron Simpson <cs@cskk.id.au> 30dec96
 #
 
 use strict qw(vars);

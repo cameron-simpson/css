@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Emit a raise/resize/[animated]move as specified.
-#       - Cameron Simpson <cs@zip.com.au> 01jun2007
+#       - Cameron Simpson <cs@cskk.id.au> 01jun2007
 #
 
 from sys import argv, stderr

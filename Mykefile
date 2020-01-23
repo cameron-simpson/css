@@ -7,6 +7,10 @@ title           = Cameron Simpson's Scripts
 
 target  = bin
 
+dev = env-dev -d $. -x
+venvdir = $./venv
+venv_requirements = $./venv-requirements.txt
+
 rewrite = rewriteif -0 -v
 
 JAVADIR	= $(ETCDIR)/www/java/classes
@@ -33,6 +37,18 @@ pmFromMan(manf) = lib/$(manf FP :|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
+##  pymanmods = cs.vt
+##  pymansrcs = $( "$((pymanmods :|\.|/|))/*.?.md" EG )
+##  pymanmoddirs = $(pymansrcs DU)
+##  pymandst(src) = $(MANDIR)/man$(src FPS)/$(src FP)
+##  pymandsts = $( '$$(pymandst("$((pymansrcs))"))' EE )
+##  pymansrc(dst) = $
+##  
+##  _t:
+##      echo $(pymansrcs)
+##      echo $(pymanmoddirs)
+##      echo $(pymandsts)
+
 subdirs = $('*/.' GD)
 allscripts = $('bin/*' GF !/\./ +"bin/rc.mobile" F)
 
@@ -46,7 +62,7 @@ py3files        = $(py2files :|/python/|/python3/|)
 rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
-        @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
+        @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'
@@ -59,10 +75,17 @@ _help:
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
 
-_tags:  tags
+_setup:
+    :make _tags _venv
 
+_venv: $(venvdir)
+$(venvdir): $(venv_requirements)
+    :make $@/.
+    $(dev) pip install -U -r $(venv_requirements)
+
+_tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
-        ctags -R -o tags cs/
+        ctags-update -o '$@' $?
 
 _updcss:
         ./bin-cs/updcss
@@ -176,7 +199,7 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push --new-branch $(hg_bitbucket)
+        hg push --new-branch -r tip $(hg_bitbucket)
         @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release

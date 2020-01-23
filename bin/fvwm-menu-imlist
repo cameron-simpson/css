@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Generate actions for an image directory menu, with thumbnails.
-#       - Cameron Simpson <cs@zip.com.au> 19oct2002
+#       - Cameron Simpson <cs@cskk.id.au> 19oct2002
 #
 
 : ${TMPDIR:=/tmp}

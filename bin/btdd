@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Budtool compatible dd command.
-#	- Cameron Simpson <cs@zip.com.au> 12nov99
+#	- Cameron Simpson <cs@cskk.id.au> 12nov99
 #
 
 case $1 in

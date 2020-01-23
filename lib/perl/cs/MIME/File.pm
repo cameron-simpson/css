@@ -2,7 +2,7 @@
 #
 # Handle MIME messages as structured data,
 # and load and save from/to files and dirs.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 use strict qw(vars);

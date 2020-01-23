@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Take lock, run command, release lock. - Cameron Simpson <cs@zip.com.au>
+# Take lock, run command, release lock. - Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -75,7 +75,7 @@ cs::Lock(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt> 01oct1997;
+Cameron Simpson E<lt>cs@cskk.id.auE<gt> 01oct1997;
 converted to perl to beat shell fork/exec load during high contention 10feb1999.
 
 =cut

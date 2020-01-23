@@ -2,7 +2,7 @@
 #
 # Yet another audio CD ripper. Easiest way to learn the tools :-)
 # Like mkcd and mkiso, this is meant to be a no brainer command line.
-#       - Cameron Simpson <cs@zip.com.au> 12mar2001
+#       - Cameron Simpson <cs@cskk.id.au> 12mar2001
 #
 # Add MP3 mode, basicly for my brother.  -cameron 25aug2001
 # Support multiple encodings, add -k option, switch to WAV as
@@ -506,5 +506,5 @@ exit $xit
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au> 12mar2001
+# Cameron Simpson <cs@cskk.id.au> 12mar2001
 #

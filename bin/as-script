@@ -2,7 +2,7 @@
 #
 # Transcribe a command along with the current directory and environment
 # to a temporary self removing script. Emit the script name.
-#       - Cameron Simpson <cs@zip.com.au> 27apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 27apr2014
 #
 
 set -ue

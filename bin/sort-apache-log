@@ -1,8 +1,8 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Read Apache log lines from stdin, annotate with UNIX time, pipe into
 # sort and de-annotate.
-#       - Cameron Simpson <cs@zip.com.au> 30aug2007
+#       - Cameron Simpson <cs@cskk.id.au> 30aug2007
 #
 
 import os

@@ -1,0 +1,1 @@
+New at_eof() method. Python 2 tweak to support incidental import by python 2 even if unused.

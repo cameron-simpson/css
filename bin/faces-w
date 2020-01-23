@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Emit a faces(1) input list from the w(1) command.
-#	- Cameron Simpson <cs@zip.com.au> 26apr2002
+#	- Cameron Simpson <cs@cskk.id.au> 26apr2002
 #
 
 ($cmd=$0) =~ s:.*/::;

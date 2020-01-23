@@ -3,7 +3,7 @@
 # Copy/rsync Beyonwiz .tvwiz recordings into another directory
 # from the current one. Has facilities for skipping corrupt files.
 # Necessity is the mother and all that.
-#       - Cameron Simpson <cs@zip.com.au> 10apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 10apr2014
 #
 
 set -ue

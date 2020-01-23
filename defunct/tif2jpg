@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 usage="Usage: $0 [-f] [-r] [files...]

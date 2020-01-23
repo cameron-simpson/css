@@ -1,0 +1,1 @@
+  lib/python/cs/py/func.py: cs.py.func: improve DISTINFO, fix docstring typo

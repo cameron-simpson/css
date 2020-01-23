@@ -4,7 +4,7 @@
 # This means using the current directory as $prefix,
 # prefixing lots of $fooPATH vars with it appropriately,
 # sourcing the dev .env.sh if present, then running command.
-#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#       - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
 
 set -ue
@@ -48,13 +48,17 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$devdir" in /*) ;; *) devdir=$(cd "$devdir" && pwd) ;; esac
+venvdir=$devdir/venv
+
+# just causes lots of trouble
+##[ ! -f "$venvdir/bin/activate" ] || . "$venvdir/bin/activate"
 
 ENV_DEV_DIR=$devdir
 PYTHONPATH=$devdir/lib/python${PYTHONPATH:+:$PYTHONPATH}
 PERL5LIB=$devdir/lib/perl5${PERL5LIB:+:$PERL5LIB}
-MANPATH=$devdir/man:$MANPATH
+MANPATH=$devdir/man${MANPATH:+:$MANPATH}
 LD_LIBRARY_PATH=$devdir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-PATH=$devdir/bin:$PATH
+PATH=$devdir/bin:$venvdir/bin:$PATH
 export ENV_DEV_DIR PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
 
 [ ! -f "$devdir/.env.sh" ] || . "$devdir/.env.sh"

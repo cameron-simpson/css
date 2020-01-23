@@ -1,0 +1,2 @@
+  lib/python/cs/excutils.py: cs.excutils: new decorator @exc_fold to catch particular exceptions, log an error and return a defined value
+  lib/python/cs/excutils.py: cs.excutils: docstring for @exc_fold

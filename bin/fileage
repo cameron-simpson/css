@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Print file age in seconds: now-mtime(file).
-#	- Cameron Simpson <cs@zip.com.au> 18mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 18mar2005
 #
 
 ($cmd=$0) =~ s:.*/::;

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Pull from another checkout, merge its tip with ours even across a branch.
-#   - Cameron Simpson <cs@zip.com.au> 08sep2014
+#   - Cameron Simpson <cs@cskk.id.au> 08sep2014
 #
 
 set -ue
@@ -63,13 +63,22 @@ fi
 checkout=$( pwd )
 branch=$( hg branch )
 obranch=$( incd "$ocheckout" hg branch )
-incd "$ocheckout" hg out "$checkout" | grep '^summary'
+[ "x$branch" != "x$obranch" ] || {
+  echo "$cmd: local branch \"$branch\" matches remote branch from $ocheckout" >&2
+  exit 1
+}
+$trace hg pull "$ocheckout"
+merges=$( hg log --template '{desc|firstline}\n' -r "$obranch%$branch" )
+[ -n "$merges" ] || {
+  echo "$cmd: no inbound changes from $ocheckout, aborting" >&2
+  exit 1
+}
+printf '%s\n' "$merges"
 echo
 echo "from $ocheckout"
 echo "merging $obranch ==> $branch"
 
-if [ -z "$hadmsg" ]
-then
+[ $hadmsg ] || {
   if [ -t 0 -a -t 1 ]
   then
     msg=$( readline "merge description> " ) || exit 1
@@ -77,13 +86,14 @@ then
     echo "$cmd: merge description is mandatory (may be an empty -m option)" >&2
     exit 2
   fi
-fi
+}
 
-$trace hg fetch "$ocheckout"
-if [ "x$branch" != "x$obranch" ]
-then
-  $trace hg merge "$obranch"
-  comsg="merge $obranch ==> $branch"
-  [ -z "$msg" ] || comsg="$comsg: $msg"
-  $trace hg commit -m "$comsg"
-fi
+$trace hg merge "$obranch" || {
+  echo "$cmd: merge from $obranch failed" >&2
+  hg resolve -l >&2
+  exit 1
+}
+
+comsg="merge $obranch ==> $branch"
+[ -z "$msg" ] || comsg="$comsg: $msg"
+$trace hg commit -m "$comsg"

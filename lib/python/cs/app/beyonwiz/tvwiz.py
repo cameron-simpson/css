@@ -1,5 +1,13 @@
 #!/usr/bin/python
 
+from collections import namedtuple
+import datetime
+import os
+import os.path
+import struct
+from cs.logutils import warning, error
+from cs.pfx import Pfx
+from cs.threads import locked_property
 from . import _Recording, RecordingMetaData
 
 # constants related to headers
@@ -8,7 +16,7 @@ from . import _Recording, RecordingMetaData
 #  https://github.com/prl001/getWizPnP/blob/master/wizhdrs.h
 
 # various constants sucked directly from getWizPnP/Beyonwiz/Recording/Header.pm
-DAY = 24*60*60      # Seconds in a day
+DAY = 24 * 60 * 60  # Seconds in a day
 TVEXT = '.tvwiz'
 TVHDR = 'header' + TVEXT
 RADEXT = '.radwiz'
@@ -21,7 +29,7 @@ MAX_BOOKMARKS = 64
 HDR_MAIN_OFF = 0
 HDR_MAIN_SZ = 1564
 HDR_OFFSETS_OFF = 1564
-HDR_OFFSETS_SIZE = (MAX_TS_POINT-1) * 8
+HDR_OFFSETS_SIZE = (MAX_TS_POINT - 1) * 8
 HDR_BOOKMARKS_OFF = 79316
 HDR_BOOKMARKS_SZ = 20 + MAX_BOOKMARKS * 8
 HDR_EPISODE_OFF = 79856
@@ -50,6 +58,11 @@ TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
+TVWiz_Header = namedtuple(
+    'TVWiz_Header',
+    'lock mediaType inRec svcName evtName episode synopsis mjd start playtime lastOff'
+)
+
 def bytes0_to_str(bs0, encoding='utf8'):
   ''' Decode a NUL terminated chunk of bytes into a string.
   '''
@@ -68,16 +81,26 @@ def unrle(data, fmt, offset=0):
   offset2 += length
   subdata = data[offset:offset2]
   if length != len(subdata):
-    warning("unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0+16], length, len(subdata))
+    warning(
+        "unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0 + 16],
+        length, len(subdata)
+    )
   offset += len(subdata)
   return subdata, offset
 
 class TVWizMetaData(RecordingMetaData):
 
-  @property
-  def start_unixtime(self):
-    H = self.sources['header']
-    return (H['mjd'] - 40587) * DAY + H['start']
+  def __init__(self, raw):
+    RecordingMetaData.__init__(self, raw)
+    self.series_name = raw['evtName']
+    self.description = raw['synopsis']
+    self.start_unixtime = (raw['mjd'] - 40587) * DAY + raw['start']
+    channel = raw['svcName']
+    if channel:
+      self.source_name = channel
+    episode = raw['episode']
+    if episode:
+      self.episodeinfo.episode = int(episode)
 
 class TVWiz(_Recording):
 
@@ -86,6 +109,17 @@ class TVWiz(_Recording):
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
     self.headerpath = os.path.join(self.dirpath, TVHDR)
+
+  def convert(self, dstpath, extra_opts=None, **kw):
+    ''' Wrapper for _Recording.convert which requests audio conversion to AAC.
+    '''
+    tvwiz_extra_opts = [
+        '-c:a',
+        'aac',  # convert all audio to AAC
+    ]
+    if extra_opts:
+      tvwiz_extra_opts.extend(extra_opts)
+    super().convert(dstpath, extra_opts=tvwiz_extra_opts)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -123,19 +157,32 @@ class TVWiz(_Recording):
     offset += TVWizTSPoint.size
     fileOffs = []
     for i in range(0, 8640):
-      fileOff, = struct.unpack('<Q', data[offset:offset+8])
+      fileOff, = struct.unpack('<Q', data[offset:offset + 8])
       fileOffs.append(fileOff)
       offset += 8
-    epi_b, offset = unrle(data[HDR_EPISODE_OFF:HDR_EPISODE_OFF+HDR_EPISODE_SZ], '<B')
+    epi_b, offset = unrle(
+        data[HDR_EPISODE_OFF:HDR_EPISODE_OFF + HDR_EPISODE_SZ], '<B'
+    )
     epi_b = epi_b.rstrip(b'\xff')
-    syn_b, offset = unrle(data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF+HDR_EXTINFO_SZ], '<H')
+    syn_b, offset = unrle(
+        data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF + HDR_EXTINFO_SZ], '<H'
+    )
     syn_b = syn_b.rstrip(b'\xff')
     episode = epi_b.decode('utf8', errors='replace')
     synopsis = syn_b.decode('utf8', errors='replace')
-    return TVWiz_Header(lock=lock, mediaType=mediaType, inRec=inRec,
-              svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
-              mjd=mjd, start=start,
-              playtime=last*10+sec, lastOff=lastOff)
+    return TVWiz_Header(
+        lock=lock,
+        mediaType=mediaType,
+        inRec=inRec,
+        svcName=svcName,
+        evtName=evtName,
+        episode=episode,
+        synopsis=synopsis,
+        mjd=mjd,
+        start=start,
+        playtime=last * 10 + sec,
+        lastOff=lastOff
+    )
 
   def read_header(self):
     with open(self.headerpath, "rb") as hfp:
@@ -144,21 +191,7 @@ class TVWiz(_Recording):
 
   @locked_property
   def metadata(self):
-    H = self.read_header()
-    hd = H._asdict()
-    hdata['pathname'] = self.headerpath
-    data = {
-        'channel': H.channel,
-        'title': H.evtName,
-        'episode': H.episode,
-        'synopsys': H.synopsis,
-        'start_unixtime':  H.start,
-        'tags': set(),
-        'sources': {
-          'header': hdata,
-        }
-      }
-    return TVWizMetaData(**data)
+    return TVWizMetaData(self.read_header().as_dict())
 
   @staticmethod
   def tvwiz_parse_trunc(fp):
@@ -176,16 +209,17 @@ class TVWiz(_Recording):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
     with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
-      for trec in self.parse_trunc(tfp):
+      for trec in self.tvwiz_parse_trunc(tfp):
         yield trec
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
     with Pfx("data(%s)", self.dirpath):
+      fp = None
       lastFileNum = None
       for rec in self.trunc_records():
-        wizOffset, fileNum, flags, offset, size  = rec
+        wizOffset, fileNum, flags, offset, size = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()

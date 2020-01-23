@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # ISO8601 related facilities.
-#   - Cameron Simpson <cs@zip.com.au> 09jun2017
+#   - Cameron Simpson <cs@cskk.id.au> 09jun2017
 #
 
 from datetime import datetime, timezone

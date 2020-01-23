@@ -1,0 +1,3 @@
+lib/python/cs/excutils_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/excutils.py lib/python/cs/excutils_tests.py: cs.excutils: improve docstrings, autoformat, move try_* functions sideways to cs.excutils_tests
+lib/python/cs/excutils.py: cs.excutils: LogExceptions: drop stack trace noise

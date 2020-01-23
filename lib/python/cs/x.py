@@ -1,43 +1,80 @@
 #!/usr/bin/python
 #
 # Just my X debugging function.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
+
+'''
+X(), for low level debugging
+
+X() is my function for low level ad hoc debug messages.
+It takes a message and optional format arguments for use with `%`.
+It is presented here in its own module for reuse.
+
+It normally writes directly to `sys.stderr` but accepts an optional
+keyword argument `file` to specify a different filelike object.
+If `file` is not specified, its behaviour is further tweaked with
+the globals `X_discard`, `X_logger` and `X_via_tty`:
+if X_logger then log a warning to that logger;
+otherwise if X_via_tty then open /dev/tty and write the message to it;
+otherwise if X_discard then discard the message;
+otherwise write the message to sys.stderr.
+`X_discard`'s default value is `not sys.stderr.isatty()`.
+'''
 
 from __future__ import print_function
 import sys
+from cs.ansi_colour import colourise
 
 DISTINFO = {
-    'description': "X(), for low level debugging",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'install_requires': [],
+    ],
+    'install_requires': ['cs.ansi_colour'],
 }
 
-# set to true to log as a warning
+# discard output? the default if sys.stderr is not a tty
+try:
+  isatty = sys.stderr.isatty
+except AttributeError:
+  X_discard = True
+else:
+  X_discard = not isatty()
+# set to a logger to log as a warning
 X_logger = None
 # set to true to write direct to /dev/tty
 X_via_tty = False
 
 def X(msg, *args, **kw):
-  ''' Unconditionally write the message `msg` to sys.stderr.
-      If `args` is not empty, format `msg` using %-expansion with `args`.
-      `file`: optional keyword argument specifying the output file.
-      If `file` is not None, write to it unconditionally.
-      Otherwise, if X_logger then log a warning to that logger.
-      Otherwise, if X_via_tty then open /dev/tty and write the message to it.
-      Otherwise, write the message to sys.stderr.
+  ''' Unconditionally write the message `msg`.
+
+      If there are positional arguments after `msg`,
+      format `msg` using %-expansion with those arguments.
+
+      Keyword arguments:
+      * `file`: optional keyword argument specifying the output file.
+      * `colour`: optional text colour.
+        If specified, surround the message with ANSI escape sequences
+        to render the text in that colour.
+
+      If `file` is not None, write to it unconditionally;
+      otherwise if X_logger then log a warning to that logger;
+      otherwise if X_via_tty then open /dev/tty and write the message to it;
+      otherwise if X_discard then discard the message;
+      otherwise write the message to sys.stderr.
   '''
   fp = kw.pop('file', None)
+  colour = kw.pop('colour', None)
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
   if args:
     msg = msg % args
+  if colour:
+    msg = colourise(msg, colour=colour)
   if fp is None:
     if X_logger:
       # NB: ignores any kwargs
@@ -49,9 +86,11 @@ def X(msg, *args, **kw):
         with open('/dev/tty', 'w') as fp:
           fp.write(msg)
           fp.write('\n')
-      except OSError as e:
+      except (IOError, OSError) as e:
         X("X: cannot write to /dev/tty: %s", e, file=sys.stderr)
-      else:
-        return
+        X(msg, file=sys.stderr)
+      return
+    if X_discard:
+      return
     fp = sys.stderr
   print(msg, file=fp)

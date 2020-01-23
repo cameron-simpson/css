@@ -3,7 +3,7 @@
 # Recompress a gzipped file with the specified options.
 # Written originally to recompress files with -n, so that
 # identical content creates identical compressed files.
-#       - Cameron Simpson <cs@zip.com.au> 05nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 05nov2006
 #
 
 cmd=`basename "$0"` || exit 1

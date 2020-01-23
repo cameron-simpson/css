@@ -1,0 +1,9 @@
+  lib/python/cs/packetstream.py: cs.packetstream: renamed from cs.stream
+  lib/python/cs/packetstream.py: cs.packetstream: docstring improvements
+  lib/python/cs/packetstream.py: cs.packetstream.py: str is the new unicode
+  lib/python/cs/packetstream.py: cs.packetstream: a little more sanity checking
+  lib/python/cs/packetstream.py: cs.packetstream: tweak docstring
+  lib/python/cs/packetstream.py: cs.app.myke.make,cs.packetstream: adjust for simpler Later semantics, no longer a MultiOpenMixin subclass
+  lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._send_loop: optionally sleep briefly if the queue empties before deciding to flush the output buffer, trading a little latency for for an improved chance of sending larger data chunks
+  lib/python/cs/packetstream.py: cs.packetstream: do not force send and receive workers to be daemon Threads
+  lib/python/cs/packetstream.py: cs.packetstream: clean lint, prep for PyPI

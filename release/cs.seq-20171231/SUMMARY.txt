@@ -1,0 +1,4 @@
+Python 2 backport for imerge().
+New tee function to duplicate an iterable to queues.
+Function isordered() is now a test instead of an assertion.
+Drop NamedTuple, NamedTupleClassFactory (unused).

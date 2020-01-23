@@ -1,0 +1,3 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: rename @ORM.orm_auto_session to @ORM.auto_session
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: new @orm_auto_session decorator for methods of objects with a .orm attribute; add some icontract.require checks to functions
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: strip debug for release

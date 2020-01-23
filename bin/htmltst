@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Convert HTML to troff-mm macros for printing.
-#	- Cameron Simpson <cs@zip.com.au>, 08jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 08jul94
 #
 
 require HTML;

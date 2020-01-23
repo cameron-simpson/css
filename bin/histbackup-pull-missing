@@ -3,7 +3,7 @@
 # Pull missing histbackup trees from a remote host.
 # This tries to hard link associated backups but does only one
 # snapshot at a time to avoid blowing the memory.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Copy file modes from one file to another.
-#	- Cameron Simpson <cs@zip.com.au> 05jan99
+#	- Cameron Simpson <cs@cskk.id.au> 05jan99
 #
 
 use strict qw(vars);

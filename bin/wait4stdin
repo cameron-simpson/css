@@ -5,7 +5,7 @@
 # command (eg resource hungry or holds a lock for an excessive time)
 # until its input is ready. (In fact, that's the only use I can think
 # of for this script, but then that was what I needed.)
-#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 25sep2000
 #
 
 cmd=`basename "$0"`

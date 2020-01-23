@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Bluray backup facility. Convenient wrapper for MakeMKV's "mkv" command line mode.
+# - Cameron Simpson <cs@cskk.id.au> 07may2019
+#
+
+set -ue
+
+outdir_base=${BRIP_OUTDIR_BASE:-.}
+default_src=disc:0
+mode=mkv
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [--backup] [--mkv] [src] [outdir]
+  --backup  Backup mode.
+  --mkv     MKV mode.
+            Default mode: $mode
+  src       Disc source. Default: $default_src
+  outdir    Output directory; must not already exist.
+            Default from \$BRIP_OUTDIR_BASE: $outdir_base/{disc_label}"
+
+src=
+outdir=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --backup)   mode=backup ;;
+    --mkv)      mode=mkde ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    disc:*) [ -z "$src" ] || echo "$cmd: warning: multiple src specifications, discarding \"$src\", using \"$1\"" >&2
+            src=$1
+            ;;
+    *)      if [ -n "$outdir" ]
+            then
+              echo "$cmd: error: outdir already specified: \"$outdir\", rejecting \"$1\"" >&2
+              badopts=1
+            else
+              outdir=$1
+            fi
+            ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -n "$outdir" ] && [ -e "$outdir" ]
+then
+  echo "$cmd: outdir $outdir: already exists" >&2
+  exit 1
+fi
+
+: ${src:=$default_src}
+
+time set-x makemkvcon info --noscan --decrypt --noscan -r "$src" \
+| tee /dev/fd/2 \
+| awk -F, '
+  $1 == "CINFO:2" { print "disc_label", $3 }
+  ' \
+| sed 's/"\(.*\)"$/\1/' \
+| tee /dev/fd/2 \
+| {
+    set -ue
+    while read -r field value
+    do
+      eval "blu_$field=\"\$value\""
+    done
+    case "$mode" in
+      backup)
+        : ${outdir:=$outdir_base/$blu_disc_label-BAK}
+        set-x mkdir "$outdir"
+        time set-x makemkvcon backup  --noscan --decrypt --cache=1024 -r "$src" "$outdir"
+        ;;
+      mkv)
+        : ${outdir:=$outdir_base/$blu_disc_label}
+        set-x mkdir "$outdir"
+        time set-x makemkvcon mkv  --noscan --decrypt --cache=1024 -r "$src" all "$outdir"
+        # report
+        cd "$outdir"
+        for mkv in *.mkv
+        do
+          pfx "$blu_disc_label/$mkv" ffmpeg -i "$mkv" 2>&1 | egrep '(Duration|Stream.*Video)'
+        done
+        ;;
+      *)echo "$cmd: unsupported mode: $mode" >&2
+        exit 1
+        ;;
+    esac
+  }

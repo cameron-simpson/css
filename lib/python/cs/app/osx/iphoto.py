@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access iPhoto data.
-#       - Cameron Simpson <cs@zip.com.au> 04apr2013
+#       - Cameron Simpson <cs@cskk.id.au> 04apr2013
 #
 
 from __future__ import print_function
@@ -20,18 +20,18 @@ from threading import RLock
 from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import PListDict, ingest_plist
-from cs.dbutils import TableSpace, Table, Row, IdRelation
+from .plist import ingest_plist
+from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
+from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
 from cs.threads import locked, locked_property
-from cs.xml import pprint as xml_pprint
 from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -48,10 +48,9 @@ RE_PART = r'p0(\d+)[a-z]?'
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
     -                   Read ops from standard input and execute.
     info masters        List info about masters.
-    ls                  List apdb names.
-    ls [0-5]            List master pathnames with specific rating.
+    ls {0,1,2,3,4,5}    List master pathnames with specific rating.
     ls albums           List album names.
-    ls events           List events names.
+    ls [event]          List events names (default mode).
     ls folders          List folder names (includes events).
     ls {keywords|tags}  List keywords/tags.
     ls masters          List master pathnames.
@@ -87,7 +86,6 @@ def main(argv=None):
   usage = USAGE % (cmd,)
   setup_logging(cmd)
   with Pfx(cmd):
-    badopts = False
     if argv and argv[0].startswith('/'):
       library_path = argv.pop(0)
     else:
@@ -102,7 +100,6 @@ def main(argv=None):
 
 def main_iphoto(I, argv):
   xit = 0
-  badopts = False
   if not argv:
     raise GetoptError("missing op")
   op = argv.pop(0)
@@ -160,7 +157,7 @@ def cmd_info(I, argv):
   obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass == 'masters':
-      for master in sorted(I.masters(), key=lambda m: m.pathname):
+      for master in sorted(I.masters, key=lambda m: m.pathname):
         with Pfx(master.pathname):
           iminfo = master.image_info
           if iminfo is None:
@@ -175,30 +172,26 @@ def cmd_info(I, argv):
 
 def cmd_ls(I, argv):
   xit = 0
-  obclass = argv.pop(0)
+  if not argv:
+    obclass = 'events'
+  else:
+    obclass = argv.pop(0)
   with Pfx(obclass):
     if obclass.isdigit():
       rating = int(obclass)
       rows = I.versions_table.rows_by_value('rating', rating)
     elif obclass == 'events':
-      rows = I.events()
+      rows = I.events
     elif obclass == 'folders':
-      rows = I.folders()
+      rows = I.folders
     elif obclass in ('keywords', 'tags'):
-      rows = I.keywords()
+      rows = I.keywords
     elif obclass == 'masters':
-      rows = I.masters()
+      rows = I.masters
     elif obclass in ('faces', 'people'):
-      rows = I.persons()
+      rows = I.persons
     else:
       raise GetoptError("unknown class")
-      I.load_versions()
-      names = []
-      for version in I.versions():
-        if version.mainRating == rating:
-          pathname = version.master.pathname
-          if pathname is not None:
-            names.append(pathname)
     for row in sorted(rows):
       name = row.name
       with Pfx(name):
@@ -225,7 +218,7 @@ def cmd_ls(I, argv):
             print("filter:")
             apalbum.dump()
         if obclass in ('folders', 'events'):
-          for master in row.masters():
+          for master in row.masters:
             print('   ', master.pathname)
   return xit
 
@@ -244,7 +237,7 @@ def cmd_rename(I, argv):
     elif obclass in ('people', 'faces'):
       table = I.person_table
     else:
-      raise GetoptError("known class")
+      raise GetoptError("unknown class %r" % (obclass,))
     items = list(table)
     all_names = set(item.name for item in items)
     X("%d items: %r", len(items), all_names)
@@ -330,10 +323,14 @@ def cmd_select(I, argv):
   return xit
 
 def cmd_tag(I, argv):
+  ''' Add or remove tags from selected images.
+      Usage: tag criteria... [--] {+tag|-tag}...
+  '''
   xit = 0
   badopts = False
   if not argv:
     raise GetoptError("missing selector")
+  # collect criteria
   selectors = []
   unknown = False
   while argv:
@@ -358,6 +355,7 @@ def cmd_tag(I, argv):
     return 1
   if not argv:
     raise GetoptError("missing tags")
+  # collect tag changes
   tagging = []
   for arg in argv:
     try:
@@ -390,7 +388,8 @@ def cmd_tag(I, argv):
     masters = selector.select(masters)
   for master in masters:
     with Pfx(master.basename):
-      V = master.latest_version()
+      XP("examine %s", master.basename)
+      V = master.latest_version
       for add, tag in tagging:
         with Pfx("%s%s", "+" if add else "-", tag.name):
           kws = V.keywords
@@ -415,69 +414,32 @@ def cmd_autotag(I, argv):
     ptn = None
   if argv:
     raise GetoptError('extra arguments: %s' % (' '.join(argv),))
-  events = I.events()
+  events = I.events
   if ptn:
     X("winnow %d events", len(events))
     events = [ E for E in events if ptn_re.search(E.name) ]
   warned_faces = set()
   warned_kws = set()
   for event in sorted(events):
-    with Pfx(event.name):
+    with Pfx("event %r", event.name):
       kws = set()
       for part in event.name.split('--'):
         part = part.strip('-')
+        if not part:
+          continue
         with Pfx(part):
           # look for series/episode/scene/part markers
-          m = None
-          for ptn in (
-            RE_SCENE,
-            RE_SCENE_PART,
-            RE_EPISODE,
-            RE_EPISODE_PART,
-            RE_EPISODE_SCENE,
-            RE_SERIES_EPISODE,
-            RE_SERIES_EPISODE_SCENE,
-            RE_PART,
-          ):
-            m = re.match(ptn, part)
-            if not m:
-              continue
-            if m.group() != part:
-              m = None
-              continue
+          fields, offset = EpisodeInfo.parse_filename_part(part)
+          if offset == len(part):
             kwnames = []
-            if ptn == RE_SCENE:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-            elif ptn == RE_SCENE_PART:
-              kwnames.append('scene-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-            elif ptn == RE_EPISODE_PART:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('part-%02d' % (int(m.group(2))))
-            elif ptn == RE_EPISODE_SCENE:
-              kwnames.append('episode-%02d' % (int(m.group(1))))
-              kwnames.append('scene-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-            elif ptn == RE_SERIES_EPISODE_SCENE:
-              kwnames.append('series-%02d' % (int(m.group(1))))
-              kwnames.append('episode-%02d' % (int(m.group(2))))
-              kwnames.append('scene-%02d' % (int(m.group(3))))
-            elif ptn == RE_PART:
-              kwnames.append('part-%02d' % (int(m.group(1))))
-            else:
-              raise RuntimeError("unhandled series/episode/scene regexp: %r" % (ptn,))
+            for field, value in fields.items():
+              kwnames.append('%s-%02d' % (field, value))
             for kwname in kwnames:
               try:
                 kw = I.keyword(kwname)
               except KeyError:
                 kw = I.create_keyword(kwname)
               kws.add(kw)
-            break
-          if m:
             continue
           # look for person+person...
           if '+' in part:
@@ -498,6 +460,8 @@ def cmd_autotag(I, argv):
               if face is None:
                 if False and '-' in part:
                   for subpart in part.split('-'):
+                    if subpart in warned_kws:
+                      continue
                     with Pfx(subpart):
                       kw = I.get_keyword(subpart)
                       if kw:
@@ -517,7 +481,7 @@ def cmd_autotag(I, argv):
             else:
               kws.add(kw)
       if kws:
-        for V in event.versions():
+        for V in event.versions:
           vkws = V.keywords
           for kw in sorted(kws):
             if kw not in vkws:
@@ -587,6 +551,33 @@ class iPhoto(O):
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
     self.dbs.load_all()
+    # set up intertable links now that the Tables are defined
+    # direct relations
+    for nickname, table in sorted(self.table_by_nickname.items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_to', {}).items()):
+        with Pfx("%s.link_to[%r]:%r", nickname, rel_name, rel_defn):
+          info("LINK TO: %s.to_%ss => %r", nickname, rel_name, rel_defn)
+          local_column, other_table, other_column = rel_defn
+          if isinstance(other_table, str):
+            other_table = self.table_by_nickname[other_table]
+          table.link_to(other_table,
+                        local_column=local_column, other_column=other_column,
+                        rel_name=rel_name)
+    # relations via mapping tables
+    for nickname, table in sorted(self.table_by_nickname.items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_via', {}).items()):
+        with Pfx("%s.link_via[%r]:%r", nickname, rel_name, rel_defn):
+          info("LINK VIA: %s.to_%ss => %r", nickname, rel_name, rel_defn)
+          local_column, \
+            via_table, via_left_column, via_right_column, \
+            other_table, other_column = rel_defn
+          if isinstance(other_table, str):
+            other_table = self.table_by_nickname[other_table]
+          if isinstance(via_table, str):
+            via_table = self.table_by_nickname[via_table]
+          table.link_via(via_table, via_left_column, via_right_column,
+                         other_table, right_column=other_column,
+                         rel_name=rel_name)
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -600,40 +591,42 @@ class iPhoto(O):
     return self.dbs.pathto(db_name)
 
   def __getattr__(self, attr):
-    try:
-      if not attr.startswith('_'):
-        if attr.endswith('s'):
-          if '_' not in attr:
-            # *s ==> iterable of * (obtained from *_by_id)
-            nickname = attr[:-1]
+    with Pfx('.' + attr):
+      try:
+        if not attr.startswith('_'):
+          if attr.endswith('s'):
+            # {nickname}s => iter(table-nickname)
+            if '_' not in attr:
+              # *s ==> iterable of * (obtained from *_by_id)
+              nickname = attr[:-1]
+              try:
+                T = self.table_by_nickname[nickname]
+              except KeyError:
+                raise RuntimeError("no table with nickname %r" % (nickname,))
+              return iter(T)
+            # *_rows ==> iterator of rows from table "*"
+            if attr.endswith('_rows'):
+              nickname = attr[:-5]
+              return iter(self.table_by_nickname[nickname])
+          if attr.startswith('select_by_'):
+            criterion_words = attr[10:].split('_')
+            class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
+            return partial(globals()[class_name], self)
+          if attr.endswith('_table'):
+            # *_table ==> table "*"
+            nickname = attr[:-6]
             if nickname in self.table_by_nickname:
-              return lambda: iter(self.table_by_nickname[nickname])
-          # *_rows ==> iterator of rows from table "*"
-          if attr.endswith('_rows'):
-            nickname = attr[:-5]
-            return iter(self.table_by_nickname[nickname])
-        if attr.startswith('select_by_'):
-          criterion_words = attr[10:].split('_')
-          class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
-          return partial(globals()[class_name], self)
-        if attr.endswith('_table'):
-          # *_table ==> table "*"
-          nickname = attr[:-6]
-          if nickname in self.table_by_nickname:
-            return self.table_by_nickname[nickname]
-          else:
-            X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
-    except AttributeError as e:
-      msg = "__getattr__ got internal AttributeError: %s" % (e,)
-      raise RuntimeError(msg)
-    msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
-    raise AttributeError(msg)
+              return self.table_by_nickname[nickname]
+            else:
+              X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
+      except AttributeError as e:
+        msg = "__getattr__ got internal AttributeError: %s" % (e,)
+        raise RuntimeError(msg)
+      msg = "iPhoto.__getattr__: nothing named %r" % (attr,)
+      raise AttributeError(msg)
 
   def album(self, album_id):
     return self.albums_table[album_id]
-
-  def album_names(self):
-    return self.albums_by_name.keys()
 
   @property
   def albumdata_path(self):
@@ -650,21 +643,12 @@ class iPhoto(O):
     '''
     return self.load_albumdata()
 
-  def face(self, face_id):
-    return self.person_table[face_id]
-
-  @locked_property
-  def vfaces_by_master_id(self):
-    return I._vfaces_by_master_id.get(self.modelId, ())
-
   def folder(self, folder_id):
     return self.folders_table[folder_id]
 
-  def folder_names(self):
-    return self.folders_by_name.keys()
-
+  @prop
   def folders_simple(self):
-    return [ folder for folder in self.folders() if folder.is_simple_folder ]
+    return [ folder for folder in self.folders if folder.is_simple_folder ]
 
   def event(self, event_id):
     folder = self.folder(event_id)
@@ -672,47 +656,54 @@ class iPhoto(O):
       return None
     return folder
 
+  @prop
   def events(self):
-    return [ folder for folder in self.folders() if folder.is_event ]
-
-  def event_names(self):
-    return [ event.name for event in self.events() ]
-
-  def events_by_name(self, name):
-    return [ event for event in self.events() if event.name == name ]
-
-  def person(self, faceKey):
-    return self.person_by_faceKey.get(faceKey)
-
-  def person_names(self):
-    return self.person_by_name.keys()
+    return [ folder for folder in self.folders if folder.is_event ]
 
   def match_people(self, person_name):
-    ''' User convenience: match string against all person names, return matches.
+    ''' User convenience: match string against all person names, return Person rows.
     '''
     lc_person_name = person_name.lower()
-    all_names = list(self.person_names())
+    people = self.persons
     matches = set()
     # try exact match, ignoring case
-    for name in all_names:
-      if lc_person_name == name.lower():
-        matches.add(name)
+    for P in people:
+      if lc_person_name == P.name.lower():
+        matches.add(P)
     if not matches:
-      # try by word
+      # try "who aka who-else" and "formerly" and "was"
+      for split_word in 'aka', 'formerly', 'was':
+        split_word = ' ' + split_word + ' '
+        for P in people:
+          aliases = P.name.lower().split(split_word)
+          if lc_person_name in aliases:
+            matches.add(P)
+    if not matches:
+      # try "who (where)"
+      for P in people:
+        if P.name.endswith(')'):
+          try:
+            left, etc = P.name.split(' (', 1)
+          except ValueError:
+            continue
+          if left.lower().strip() == lc_person_name:
+            matches.add(P)
+    if not matches:
+      # try by word: all words but in any order
       lc_person_words = lc_person_name.split()
-      for name in all_names:
-        lc_words = name.lower().split()
+      for P in people:
+        lc_words = P.name.lower().split()
         match_count = 0
         for lc_person_word in lc_person_words:
           if lc_person_word in lc_words:
             match_count += 1
         if match_count == len(lc_person_words):
-          matches.add(name)
+          matches.add(P)
     if not matches:
       # try substrings
-      for name in all_names:
-        if lc_person_name in name.lower():
-          matches.add(name)
+      for P in people:
+        if lc_person_name in P.name.lower():
+          matches.add(P)
     return matches
 
   def match_one_person(self, person_name):
@@ -729,18 +720,6 @@ class iPhoto(O):
   def master_pathnames(self):
     return [ master.pathname for master in self.masters_table ]
 
-  def version(self, version_id):
-    return self.versions_table[version_id]
-
-  def _load_table_keywords(self):
-    ''' Load Library.RKKeyword into memory and set up mappings.
-    '''
-    by_id = self.keyword_by_id = {}
-    by_name = self.keyword_by_name = {}
-    for kw in self.keyword_rows:
-      by_id[kw.modelId] = kw
-      by_name[kw.name] = kw
-
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords())
 
@@ -756,12 +735,15 @@ class iPhoto(O):
     kw = self.keyword_table.get(lc_kwname)
     if kw:
       return kw,
-    kws = []
-    for kw in self.keywords():
-      words = kw.name.split()
-      if words and lc_kwname == words[0].lower():
-        kws.append(kw)
-    return kws
+    for sep in None, '/', '.':
+      kws = []
+      for kw in self.keywords:
+        words = kw.name.split(sep)
+        if words and lc_kwname == words[0].lower():
+          kws.append(kw)
+      if kws:
+        return kws
+    return ()
 
   def keyword(self, kwname):
     ''' Try to match a single keyword.
@@ -783,7 +765,8 @@ class iPhoto(O):
       if len(pfxkws) == 1:
         return pfxkws[0]
       # multiple inexact matches
-      raise ValueError("matches multiple keywords, rejected: %r" % (kws,))
+      raise ValueError("matches multiple keywords, rejected: %r"
+                       % ([kw.name for kw in kws],))
 
   def get_keyword(self, kwname, default=None):
     try:
@@ -795,18 +778,10 @@ class iPhoto(O):
       return None
 
   def versions_by_keyword(self, kwname):
-    return self.keyword(kwname).versions()
+    return self.keyword(kwname).versions
 
   def masters_by_keyword(self, kwname):
-    return self.keyword(kwname).masters()
-
-  def keywords_by_version(self, version_id):
-    ''' Return version
-    '''
-    return IdRelation('modelId', self.keywordForVersion_table,
-                      'versionId', self.version_table,
-                      'keywordId', self.keyword_table \
-                     ).left_to_right(version_id)
+    return self.keyword(kwname).masters
 
   def replace_keywords(self, old_keyword_id, new_keyword_id):
     ''' Update image tags to replace one keyword with another.
@@ -889,19 +864,17 @@ class iPhoto(O):
             person_name = selection
             if not person_name:
               selector = SelectByFunction(self,
-                                          lambda master: len(master.vfaces) > 0,
+                                          lambda master: len(master.faces) > 0,
                                           invert)
             else:
               operson_name = person_name
               try:
-                person_name = self.match_one_person(person_name)
+                P = self.match_one_person(person_name)
               except ValueError as e:
-                warning("rejected face name: %s", e)
-                badopts = True
-              else:
-                if person_name != operson_name:
-                  info("%r ==> %r", operson_name, person_name)
-                selector = SelectByPerson_Name(self, person_name, invert)
+                raise KeyError("rejected face name: %r: %s" % (person_name, e))
+              if P.name != operson_name:
+                info("%r ==> %r", operson_name, P.name)
+              selector = SelectByPerson_Name(self, P.name, invert)
           else:
             raise ValueError("unknown selector type %r" % (sel_type,))
         elif selection[0] in '<=>':
@@ -1013,6 +986,12 @@ class iPhotoRow(Row):
   def edit_string(self):
     return "%d:%s" % (self.modelId, self.name)
 
+  def __eq__(self, other):
+    return self.modelId == other.modelId
+
+  def __hash__(self):
+    return self.modelId
+
 class Album_Mixin(iPhotoRow):
 
   @prop
@@ -1097,53 +1076,40 @@ class Master_Mixin(iPhotoRow):
 
   @locked_property
   def versions(self):
-    I = self.iphoto
-    return I.version_table.rows_by_value('masterId', self.modelId)
+    return self.to_versions
 
+  @locked_property
   def latest_version(self):
     vs = self.versions
     if not vs:
       raise RuntimeError("no versions for master %d: %r", self.modelId, self.pathname)
-      ##return None
-    return max(vs, key=lambda v: v.versionNumber)
+    if len(vs) == 1:
+      return vs[0]
+    return max(*vs, key=lambda v: v.versionNumber)
 
   @prop
   def width(self):
-    return self.latest_version().processedWidth
+    return self.latest_version.processedWidth
 
   @prop
   def height(self):
-    return self.latest_version().processedHeight
+    return self.latest_version.processedHeight
 
-  @locked_property
+  @prop
+  def detected_faces(self):
+    return self.latest_version.detected_faces
+
+  @prop
   def faces(self):
-    I = self.iphoto
-    return I.faces_by_master_id.get(self.modelId, ())
-
-  @locked_property
-  def vfaces(self):
-    I = self.iphoto
-    return I.vfaces_by_master_id.get(self.modelId, ())
-
-  @locked_property
-  def people(self):
-    them = set()
-    for vface in self.vfaces:
-      who = vface.person()
-      if who is not None:
-        ##X("master %d + %s", self.modelId, who.name)
-        them.add(who)
-    return them
+    return self.latest_version.faces
 
   @prop
   def keywords(self):
-    ''' Return the keywords for the latest version of this master.
-    '''
-    return self.latest_version().keywords
+    return self.latest_version.keywords
 
   @prop
   def keyword_names(self):
-    return [ kw.name for kw in self.keywords ]
+    return self.latest_version.keyword_names
 
   def Image(self):
     ''' Obtain an open Image of this master.
@@ -1179,7 +1145,7 @@ class Master_Mixin(iPhotoRow):
 
 class Version_Mixin(iPhotoRow):
 
-  @prop
+  @locked_property
   def master(self):
     master = self.iphoto.master_table[self.masterId]
     if master is None:
@@ -1187,38 +1153,47 @@ class Version_Mixin(iPhotoRow):
                        % (self.modelId, self.masterId))
     return master
 
-  @locked_property
+  @prop
   def keywords(self):
-    ''' Return the keywords for this version.
-    '''
-    return frozenset(self.iphoto.keywords_by_version(self.modelId))
+    return self.to_keywords
 
   @prop
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
   def add_keyword(self, kw):
-    # remove keyword from versions
-    self \
-      .iphoto.table_by_nickname['keywordForVersion'] \
-      .insert( ('keywordId', 'versionId'),
-               ( (kw.modelId, self.modelId), ) )
+    # add keyword to version
+    if isinstance(kw, str):
+      kw = self.iphoto.keyword(kw)
+    self.keywords += kw.modelId
 
   def del_keyword(self, kw):
-    # remove keyword from versions
-    self \
-      .iphoto.table_by_nickname['keywordForVersion'] \
-      .delete('keywordId=? and versionId=?', kw.modelId, self.modelId)
+    # remove keyword from version
+    if isinstance(kw, str):
+      kw = self.iphoto.keyword(kw)
+    self.keywords -= kw.modelId
+
+  @prop
+  def detected_faces(self):
+    ''' Return face detections for this image version.
+    '''
+    return self.to_detected_faces
+
+  @prop
+  def faces(self):
+    return self.to_faces
 
 class Folder_Mixin(Album_Mixin):
 
-  def versions(self):
-    return [ M.latest_version() for M in self.masters() ]
-
+  @prop
   def masters(self):
     ''' Return the masters from this album.
     '''
-    return self.iphoto.master_table.rows_by_value('projectUuid', self['uuid'])
+    return self.to_masters
+
+  @prop
+  def versions(self):
+    return [ M.latest_version for M in self.masters ]
 
   @property
   def is_event(self):
@@ -1230,27 +1205,26 @@ class Folder_Mixin(Album_Mixin):
 
 class Keyword_Mixin(iPhotoRow):
 
+  @prop
   def versions(self):
     ''' Return the versions with this keyword.
     '''
-    I = self.iphoto
-    return IdRelation('modelId', I.keywordForVersion_table,
-                      'keywordId', I.keyword_table,
-                      'versionId', I.version_table) \
-                     .left_to_right(self.modelId)
+    return self.to_versions
 
+  @prop
   def masters(self):
     ''' Return the masters with this keyword.
     '''
     ms = set()
-    for version in self.versions():
+    for version in self.versions:
       ms.add(version.master)
     return ms
 
+  @prop
   def latest_versions(self):
     ''' Return the latest version of all masters with this keyword.
     '''
-    return set(master.latest_version for master in self.masters())
+    return set(master.latest_version for master in self.masters)
 
 class Person_Mixin(iPhotoRow):
 
@@ -1307,7 +1281,7 @@ class _SelectMasters(object):
       return self.select_masters(masters)
 
   def select_from_all(self):
-    return self.select_masters(self.iphoto.masters())
+    return self.select_masters(self.iphoto.masters)
 
 class SelectByFunction(_SelectMasters):
   ''' Select by arbitrary function on a master.
@@ -1384,18 +1358,19 @@ class SelectByPerson_Name(_SelectMasters):
   def __init__(self, iphoto, person_name, invert=False):
     self.iphoto = iphoto
     self.person_name = person_name
-    self.person = iphoto.person_by_name[person_name]
+    self.person = iphoto.match_one_person(person_name)
     self.invert = invert
 
   def select_masters(self, masters):
     person = self.person
     if self.invert:
       for master in masters:
-        if person not in master.people:
+        if person not in master.faces:
           yield master
     else:
       for master in masters:
-        if person in master.people:
+        fs = master.faces
+        if person in fs:
           yield master
 
 class SelectByFilenameRE(_SelectMasters):
@@ -1412,11 +1387,11 @@ class SelectByFilenameRE(_SelectMasters):
     re = self.re
     if self.invert:
       for master in masters:
-        if not re.search(master.latest_version().fileName):
+        if not re.search(master.latest_version.fileName):
           yield master
     else:
       for master in masters:
-        if re.search(master.latest_version().fileName):
+        if re.search(master.latest_version.fileName):
           yield master
 
 class SelectByKeyword_Name(_SelectMasters):
@@ -1432,14 +1407,14 @@ class SelectByKeyword_Name(_SelectMasters):
     if self.kwname is None:
       if self.invert:
         if masters is None:
-          masters = self.iphoto.masters()
+          masters = self.iphoto.masters
         return masters
       return ()
     return super().select(masters)
 
   def select_from_all(self):
     if self.invert:
-      return self.select_masters(self.iphoto.masters())
+      return self.select_masters(self.iphoto.masters)
     else:
       return self.iphoto.masters_by_keyword(self.kwname)
 
@@ -1455,7 +1430,8 @@ class SelectByKeyword_Name(_SelectMasters):
           yield master
 
 SCHEMAE = {'Faces':
-            { 'person':
+            { # person definition: their name, etc
+              'person':
                 { 'table_name': 'RKFaceName',
                   'mixin': Person_Mixin,
                   'columns':
@@ -1465,6 +1441,7 @@ SCHEMAE = {'Faces':
                       'attrs',
                     ),
                 },
+              # detected faces in master images
               'face':
                 { 'table_name': 'RKDetectedFace',
                   'columns':
@@ -1482,9 +1459,14 @@ SCHEMAE = {'Faces':
                 },
             },
            'Library':
-            { 'master':
+            {
+              # master images
+              'master':
                 { 'table_name': 'RKMaster',
                   'mixin': Master_Mixin,
+                  'link_to': {
+                    'version': ('modelId', 'version', 'masterId'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
                       'fileVolumeUuid', 'alternateMasterUuid', 'originalVersionUuid',
@@ -1499,6 +1481,7 @@ SCHEMAE = {'Faces':
                       'streamAssetId', 'streamSourceUuid', 'burstUuid',
                     ),
                 },
+              # faces in image versions
               'vface':
                 { 'table_name': 'RKVersionFaceContent',
                   'mixin': VFace_Mixin,
@@ -1506,9 +1489,13 @@ SCHEMAE = {'Faces':
                     ( 'modelId', 'versionId', 'masterId', 'isNamed', 'faceKey', 'faceIndex', 'faceRectLeft', 'faceRectTop', 'faceRectWidth', 'faceRectHeight',
                     ),
                 },
+              # events
               'folder':
                 { 'table_name': 'RKFolder',
                   'mixin': Folder_Mixin,
+                  'link_to': {
+                    'master': ('uuid', 'master', 'projectUuid'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
                       'implicitAlbumUuid', 'posterVersionUuid',
@@ -1519,14 +1506,23 @@ SCHEMAE = {'Faces':
                       'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
                     ),
                 },
+              # keyword definitions
+              # TODO: keywords form a tree? always presented as flat in GUI
               'keyword':
                 { 'table_name': 'RKKeyword',
                   'mixin': Keyword_Mixin,
+                  'link_via': {
+                    'version': (
+                        'modelId',
+                        'keywordForVersion', 'keywordId', 'versionId',
+                        'version', 'modelId'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
                       'hasChildren', 'shortcut',
                     ),
                 },
+              # albums
               'album':
                 { 'table_name': 'RKAlbum',
                   'mixin': Album_Mixin,
@@ -1541,9 +1537,24 @@ SCHEMAE = {'Faces':
                       'queryData', 'viewData', 'selectedVersionIds',
                     ),
                 },
+              # image versions
               'version':
                 { 'table_name': 'RKVersion',
                   'mixin': Version_Mixin,
+                  'link_via': {
+                    'face': (
+                        'modelId',
+                        'vface', 'versionId', 'faceKey',
+                        'person', 'faceKey'),
+                    'keyword': (
+                        'modelId',
+                        'keywordForVersion', 'versionId', 'keywordId',
+                        'keyword', 'modelId'),
+                    'detected_face': (
+                        'modelId',
+                        'vface', 'versionId', 'faceKey',
+                        'face', 'faceKey'),
+                  },
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'fileName',
                       'versionNumber', 'stackUuid', 'masterUuid',
@@ -1565,11 +1576,13 @@ SCHEMAE = {'Faces':
                       'hasKeywords',
                     ),
                 },
+              # presence of image versions in albums
               'albumForVersion':
                 { 'table_name': 'RKAlbumVersion',
                   'columns':
                     ( 'modelId', 'versionId', 'albumId'),
                 },
+              # association of keywords with image versions
               'keywordForVersion':
                 { 'table_name': 'RKKeywordForVersion',
                   'columns':
