@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 
+''' Make make processes.
+'''
+
 import sys
 import os
 import os.path
-import errno
 import getopt
-from functools import partial
 import logging
 from subprocess import Popen
-from threading import Thread
 import time
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
-from cs.logutils import debug, info, warning, error, D
+from cs.logutils import debug, info, error, D
 from cs.obj import O
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.queues import Channel, MultiOpenMixin
-from cs.result import Result, report as report_LFs, ResultState
+from cs.queues import MultiOpenMixin
+from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
-from cs.x import X
 import cs.logutils
 import cs.pfx
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
@@ -77,17 +76,28 @@ class Maker(MultiOpenMixin):
     self._namespaces = [{'MAKE': makecmd.replace('$', '$$')}]
 
   def __str__(self):
-    return "<MAKER>"
+    return (
+        '%s:%s(parallel=%s,fail_fast=%s,no_action=%s,default_target=%s)' % (
+            type(self).__name__, self.name, self.parallel, self.fail_fast,
+            self.no_action, self.default_target
+        )
+    )
 
   def startup(self):
+    ''' Set up the `Later` work qeueu and log to `'myke.log'`.
+    '''
     self._makeQ = Later(self.parallel, self.name)
     self._makeQ.logTo("myke-later.log")
 
   def shutdown(self):
+    ''' Shut down the make queue and wait for it.
+    '''
     self._makeQ.shutdown()
     self._makeQ.wait()
 
   def report(self, fp=None):
+    ''' Report the make queue status.
+    '''
     D("REPORT...")
     if fp is None:
       fp = sys.stderr
@@ -107,6 +117,11 @@ class Maker(MultiOpenMixin):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
     return self._namespaces + [SPECIAL_MACROS]
+
+  def insert_namespace(self, ns):
+    ''' Insert a macro namespace in front of the existing namespaces.
+    '''
+    self._namespaces.insert(0, ns)
 
   @prop
   def makefiles(self):
@@ -178,7 +193,8 @@ class Maker(MultiOpenMixin):
     return MLF
 
   def after(self, LFs, func, *a, **kw):
-    ''' Submit a function to be run after the supplied LateFunctions `LFs`, return a Result instance for collection.
+    ''' Submit a function to be run after the supplied LateFunctions `LFs`,
+        return a Result instance for collection.
     '''
     if not isinstance(LFs, list):
       LFs = list(LFs)
@@ -289,6 +305,7 @@ class Maker(MultiOpenMixin):
 
   def loadMakefiles(self, makefiles, parent_context=None):
     ''' Load the specified Makefiles; return success.
+
         Each top level Makefile named gets its own namespace prepended
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
@@ -301,15 +318,15 @@ class Maker(MultiOpenMixin):
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
       ns = {}
-      self._namespaces.insert(0, ns)
-      for O in parseMakefile(self, makefile, parent_context):
-        with Pfx(O.context):
-          if isinstance(O, Exception):
-            error("exception: %s", O)
+      self.insert_namespace(ns)
+      for parsed_object in parseMakefile(self, makefile, parent_context):
+        with Pfx(parsed_object.context):
+          if isinstance(parsed_object, Exception):
+            error("exception: %s", parsed_object)
             ok = False
-          elif isinstance(O, Target):
+          elif isinstance(parsed_object, Target):
             # record this Target in the Maker
-            T = O
+            T = parsed_object
             self.debug_parse("add target %s", T)
             if '%' in T.name:
               # record this Target as a rule
@@ -318,13 +335,13 @@ class Maker(MultiOpenMixin):
               self.targets[T.name] = T
               if first_target is None:
                 first_target = T
-          elif isinstance(O, Macro):
-            self.debug_parse("add macro %s", O)
-            ns[O.name] = O
+          elif isinstance(parsed_object, Macro):
+            self.debug_parse("add macro %s", parsed_object)
+            ns[parsed_object.name] = parsed_object
           else:
             raise ValueError(
                 "parseMakefile({}): unsupported parse item received: {}{!r}"
-                .format(makefile, type(O), O)
+                .format(makefile, type(parsed_object), parsed_object)
             )
       if first_target is not None:
         self.default_target = first_target
@@ -390,6 +407,8 @@ class TargetMap(O):
       self.targets[name] = target
 
 class Target(Result):
+  ''' A make target.
+  '''
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
@@ -432,6 +451,8 @@ class Target(Result):
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
+    ''' Emit a debug message.
+    '''
     return self.maker.debug_make(msg, *a)
 
   @locked
@@ -509,6 +530,8 @@ class Target(Result):
 
   @locked_property
   def mtime(self):
+    ''' Modification time of this Target, `None` if missing or inaccessable.
+    '''
     try:
       s = os.stat(self.name)
     except OSError:
@@ -516,6 +539,8 @@ class Target(Result):
     return s.st_mtime
 
   def older_than(self, other):
+    ''' Test whether we are older than another Target.
+    '''
     if self.was_missing:
       return True
     if isinstance(other, str):
@@ -659,6 +684,8 @@ class Target(Result):
         self.succeed()
 
 class Action(O):
+  ''' A make ation.
+  '''
 
   def __init__(self, context, variant, line, silent=False):
     self.context = context
@@ -677,6 +704,8 @@ class Action(O):
 
   @prop
   def prline(self):
+    ''' Printable form of this Action.
+    '''
     return self.line.rstrip().replace('\n', '\\n')
 
   def act_later(self, target):
@@ -685,7 +714,7 @@ class Action(O):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    ALF = target.maker.defer(
+    target.maker.defer(
         "%s:act[%s]" % (
             self,
             target,
