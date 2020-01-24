@@ -433,15 +433,16 @@ class Macro(object):
     return self._mexpr
 
   def __call__(self, context, namespaces, *param_values):
-    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
-    if len(param_values) != len(self.params):
-      raise ValueError(
-          "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
-          % (self.params, len(self.params), len(param_values), param_values)
-      )
-    if self.params:
-      namespaces = [dict(zip(self.params, param_values))] + namespaces
-    return self.mexpr(context, namespaces)
+    with Pfx("%s.__call__(...,param_values=%r)...", self, param_values):
+      assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
+      if len(param_values) != len(self.params):
+        raise ValueError(
+            "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
+            % (self.params, len(self.params), len(param_values), param_values)
+        )
+      if self.params:
+        namespaces = [dict(zip(self.params, param_values))] + namespaces
+      return self.mexpr(context, namespaces)
 
 def readMakefileLines(
     M, fp, parent_context=None, start_lineno=1, missing_ok=False
