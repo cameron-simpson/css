@@ -573,10 +573,12 @@ def readMakefileLines(
                     include_file = os.path.join(
                         dirname(filename), include_file
                     )
-                  for context, line in readMakefileLines(
-                      M, include_file, parent_context=context,
-                      missing_ok=missing_ok):
-                    yield context, line
+                  yield from readMakefileLines(
+                      M,
+                      include_file,
+                      parent_context=context,
+                      missing_ok=missing_ok
+                  )
               continue
         if not all(ifState[0] for ifState in ifStack):
           # in false branch of "if"; skip line
@@ -1164,8 +1166,8 @@ def parseMacro(context, text=None, offset=0):
         param_mexprs,
         permute=mpermute,
         literal=mliteral
-    ), offset
-    return M
+    )
+    return M, offset
 
   except IndexError:
     raise ParseError(
