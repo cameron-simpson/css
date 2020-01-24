@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 #
 
-import sys
+''' Makefile parsing functions.
+'''
+
 import errno
 import glob
 from collections import namedtuple
 from io import StringIO
-from itertools import chain, product
+from itertools import product
 import os
 import os.path
 from os.path import dirname, realpath, isabs
 import re
-from string import whitespace, digits
+from string import whitespace
 import unittest
+from cs.deco import strable
 from cs.lex import get_other_chars, get_white, get_identifier
-from cs.logutils import error, warning, info, debug, exception, D
+from cs.logutils import error, warning, debug, exception
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 
@@ -42,6 +45,8 @@ RE_COMMASEP = re.compile(r'\s*,\s*')
 _FileContext = namedtuple('FileContext', 'filename lineno text parent')
 
 class FileContext(_FileContext):
+  ''' Context information for parse objects and exceptions.
+  '''
 
   def __init__(self, filename, lineno, text, parent):
     assert type(filename
@@ -58,7 +63,7 @@ class FileContext(_FileContext):
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
     if self.parent:
-      tag = str(parent) + "::" + tag
+      tag = str(self.parent) + "::" + tag
     return tag
 
 class ParseError(SyntaxError):
@@ -82,6 +87,8 @@ class ParseError(SyntaxError):
     self.context = context
 
 def nsget(namespaces, mname):
+  ''' Look up `macro name `mname` in `namespaces`.
+  '''
   for ns in namespaces:
     M = ns.get(mname)
     if M:
@@ -91,6 +98,8 @@ def nsget(namespaces, mname):
   return None
 
 def nsstr(namespaces):
+  ''' Transcribe a list of namespaces.
+  '''
   return \
     "\n  ".join( "{ %s\n  }" % ( ",\n    ".join( "%s: %s" % (k, ns[k])
                                                  for k in sorted(ns.keys())
@@ -197,6 +206,8 @@ class ModUnique(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Return the unique words.
+    '''
     seen = set()
     words = []
     for word in self.words(text):
@@ -211,6 +222,8 @@ class ModNormpath(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Normalise the path `text`.
+    '''
     return self.foreach(os.path.normpath)
 
 class ModGlob(Modifier):
@@ -224,6 +237,8 @@ class ModGlob(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Expand the glob.
+    '''
     globbed = []
     for ptn in self.words(text):
       with Pfx("glob(\"%s\")", ptn):
@@ -251,7 +266,7 @@ class ModEval(Modifier):
                                 text)[0](self.context, namespaces)
 
 class ModSubstitute(Modifier):
-  ''' A modifier which returns `text` with 
+  ''' A modifier which returns `text` with substitutions.
   '''
 
   def __init__(self, context, modtext, regexp_mexpr, replacement):
@@ -261,11 +276,15 @@ class ModSubstitute(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Apply the substitution.
+    '''
     return re.sub(
         regexp_mexpr(self.context, namespaces), self.replacement, text
     )
 
 class ModFromFiles(Modifier):
+  ''' Read file contents.
+  '''
 
   def __init__(self, context, modtext, lax):
     Modifier.__init__(self, context, modtext)
@@ -273,6 +292,8 @@ class ModFromFiles(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Read file contents.
+    '''
     newwords = []
     for filename in self.words(text):
       with Pfx(filename):
@@ -287,6 +308,8 @@ class ModFromFiles(Modifier):
     return " ".join(newwords)
 
 class ModSelectRegexp(Modifier):
+  ''' A regular expression selector.
+  '''
 
   def __init__(self, context, modtext, regexp_mexpr, invert):
     Modifier.__init__(self, context, modtext)
@@ -295,30 +318,38 @@ class ModSelectRegexp(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Select by regular expression.
+    '''
     invert = self.invert
     regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
     f = lambda word: word if invert ^ bool(regexp.search(word)) else ''
     return self.foreach(text, f)
 
 class ModSelectRange(Modifier):
+  ''' A range selection `Modifier`.
+  '''
 
-  def __init__(self, context, modtext, range, invert):
+  def __init__(self, context, modtext, select_range, invert):
     Modifier.__init__(self, context, modtext)
-    self.range = range
+    self.range = select_range
     self.invert = bool(invert)
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Select the range.
+    '''
     invert = self.invert
-    range = self.range
+    select_range = self.range
     newwords = []
     i = 0
     for word in self.words(text):
-      if (i in range) ^ invert:
+      if (i in select_range) ^ invert:
         newwords.append(word)
     return " ".join(newwords)
 
 class ModSubstitute(Modifier):
+  ''' A substituion `Modifier`.
+  '''
 
   def __init__(self, context, modtext, ptn, repl):
     Modifier.__init__(self, context, modtext)
@@ -327,11 +358,15 @@ class ModSubstitute(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Apply the substitution.
+    '''
     regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
     return re.compile(regexp_mexpr(self.context,
                                    namespaces)).sub(self.repl, text)
 
 class ModSetOp(Modifier):
+  ''' A set operation `Modifier`.
+  '''
 
   def __init__(self, context, modtext, op, macroname, literal):
     Modifier.__init__(self, context, modtext)
@@ -341,6 +376,8 @@ class ModSetOp(Modifier):
 
   @pfx_method
   def modify(self, text, namespaces):
+    ''' Apply the set operation.
+    '''
     words = set(self.words(text))
     if self.literal:
       mtext = self.macroname
@@ -363,10 +400,12 @@ class Macro(object):
 
   def __init__(self, context, name, params, text):
     ''' Initialise macro definition.
-        `context`: source context.
-        `name`: macro name.
-        `params`: list of paramater names.
-        `text`: replacement text, unparsed.
+
+        Parameters:
+        * `context`: source context.
+        * `name`: macro name.
+        * `params`: list of paramater names.
+        * `text`: replacement text, unparsed.
     '''
     self.context = context
     self.name = name
@@ -386,6 +425,8 @@ class Macro(object):
 
   @prop
   def mexpr(self):
+    ''' The parsed MacroExpression.
+    '''
     if self._mexpr is None:
       self._mexpr, offset = parseMacroExpression(self.context, self.text)
       assert offset == len(self.text)
@@ -506,8 +547,7 @@ def readMakefileLines(
                 )
               if not ifStack[-1][1]:
                 raise ParseError(context, 0, ":else inside :else")
-              else:
-                ifStack[-1][1] = False
+              ifStack[-1][1] = False
               continue
             if word == "endif":
               # extra text permitted
@@ -799,7 +839,7 @@ class MacroExpression(object):
           if wordlists is None:
             wordlists = [[item]]
           else:
-            if len(wordlists) > 0:
+            if wordlists:
               wordlists.append([item])
       else:
         # should be a MacroTerm
@@ -813,7 +853,7 @@ class MacroExpression(object):
           text = mterm(context, namespaces, mterm.params)
           if mterm.permute:
             textwords = text.split()
-            if len(textwords) == 0:
+            if not textwords:
               # short circuit
               wordlists = []
             else:
@@ -845,19 +885,15 @@ def parseMacro(context, text=None, offset=0):
 
   if text is None:
     text = context.text
-
   mmark = None
   mtext = None
   param_mexprs = []
   modifiers = []
   mpermute = False
   mliteral = False
-
   try:
-
     if text[offset] != '$':
       raise ParseError(context, offset, 'expected "$" at start of macro')
-
     offset += 1
     ch = text[offset]
 
@@ -1130,7 +1166,7 @@ def parseMacro(context, text=None, offset=0):
     ), offset
     return M
 
-  except IndexError as e:
+  except IndexError:
     raise ParseError(
         context, offset, 'parse incomplete, offset=%d, remainder: %s', offset,
         text[offset:]
@@ -1155,17 +1191,19 @@ class MacroTerm(object):
       literal=False
   ):
     ''' Initialise a MacroTerm.
-        `context`: source context.
-        `text`: macro name.
-        `modifiers`: list of modifier terms eg: ['P', 'G?',]
-        `params`: list of parameter MacroExpressions.
-        `permute`: whether inside $((...)).
-        `literal`: if true, text is just text, not a macro name.
+
+        Parameters:
+        * `context`: source context.
+        * `text`: macro name.
+        * `modifiers`: list of modifier terms eg: `['P','G?']`
+        * `params`: list of parameter `MacroExpression`s.
+        * `permute`: whether inside `$((`*...*`))`.
+        * `literal`: if true, text is just text, not a macro name.
     '''
     if literal:
       if params:
         raise ValueError(
-            "no paramaters permitted with a literal MacroTerm: params=%r" %
+            "no parameters permitted with a literal MacroTerm: params=%r" %
             (params,)
         )
     self.context = context
@@ -1211,14 +1249,12 @@ class MacroTerm(object):
       return text
 
 class TestAll(unittest.TestCase):
-
-  def setUp(self):
-    pass
-
-  def tearDown(self):
-    pass
+  ''' Parsing unit tests.
+  '''
 
   def test00parseMacro(self):
+    ''' Basic $foo macro tests.
+    '''
     M, offset = parseMacro('$x')
     self.assertEqual(offset, 2)
     self.assertEqual(str(M), '$x')
@@ -1227,6 +1263,8 @@ class TestAll(unittest.TestCase):
     self.assertEqual(str(M), '$.')
 
   def test10parseMacroExpr_PlainText(self):
+    ''' Plain text parse.
+    '''
     self.assertEqual(parseMacroExpression(''), ([], 0))
     self.assertEqual(parseMacroExpression('x'), (['x'], 1))
     self.assertEqual(parseMacroExpression(' '), ([], 1))
@@ -1236,6 +1274,8 @@ class TestAll(unittest.TestCase):
     )
 
   def test20parseMakeLines(self):
+    ''' Test parse of Mykefile.
+    '''
     from .make import Maker
     with Maker("myke") as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))
