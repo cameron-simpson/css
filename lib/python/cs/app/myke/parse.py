@@ -882,10 +882,11 @@ class MacroExpression(object):
 
 SIMPLE_MODIFIERS = 'DEG?Fv?<?'
 
+@strable(open_func=lambda context: FileContext('<string>', 1, context, None))
 def parseMacro(context, text=None, offset=0):
-  if type(context) is str:
-    context = FileContext('<string>', 1, context, None)
-
+  ''' Parse macro from `text` from `FileContext` `context` at `offset`.
+      Return `(MacroTerm,offset)`.
+  '''
   if text is None:
     text = context.text
   mmark = None
