@@ -116,7 +116,7 @@ class Modifier(object):
     self.modtext = modtext
 
   def __str__(self):
-    return "<Mod %s %s>" % (self.context, self.modtext)
+    return "<Mod %s>" % (self.modtext,)
 
   def __call__(self, text, namespaces):
     with Pfx("%r %s", text, self):
