@@ -15,7 +15,7 @@ from string import whitespace, digits
 import unittest
 from cs.lex import get_other_chars, get_white, get_identifier
 from cs.logutils import error, warning, info, debug, exception, D
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions
@@ -130,6 +130,7 @@ class ModDirpart(Modifier):
   ''' A modifier to get the directory part of a filename.
   '''
 
+  @pfx_method
   def modify(self, text, namespaces):
     return self.foreach(text, os.path.dirname)
 
@@ -137,6 +138,7 @@ class ModFilepart(Modifier):
   ''' A modifier to get the file part of a filename.
   '''
 
+  @pfx_method
   def modify(self, text, namespaces):
     return self.foreach(text, os.path.basename)
 
@@ -157,6 +159,7 @@ class ModifierSplit1(Modifier):
     return (word.rsplit(sep, 1)
             if right else word.split(sep, 1))[1 if keepright else 0]
 
+  @pfx_method
   def modify(self, text, namespaces):
     return self.foreach(text, self.splitword)
 
@@ -192,6 +195,7 @@ class ModUnique(Modifier):
   ''' A modifier which returns only the first occurence of each word in `text`.
   '''
 
+  @pfx_method
   def modify(self, text, namespaces):
     seen = set()
     words = []
@@ -205,6 +209,7 @@ class ModNormpath(Modifier):
   ''' A modifier which returns os.path.normpath(word) for each word in `text`.
   '''
 
+  @pfx_method
   def modify(self, text, namespaces):
     return self.foreach(os.path.normpath)
 
@@ -217,6 +222,7 @@ class ModGlob(Modifier):
     self.muststat = muststat
     self.lax = lax
 
+  @pfx_method
   def modify(self, text, namespaces):
     globbed = []
     for ptn in self.words(text):
@@ -237,6 +243,7 @@ class ModEval(Modifier):
   ''' A modifier which evaluates text as a macro expression.
   '''
 
+  @pfx_method
   def modify(self, text, namespaces):
     ''' Evaluate `text` as a macro expression.
     '''
@@ -252,6 +259,7 @@ class ModSubstitute(Modifier):
     self.regexp_mexpr = regexp_mexpr
     self.replacement = replacement
 
+  @pfx_method
   def modify(self, text, namespaces):
     return re.sub(
         regexp_mexpr(self.context, namespaces), self.replacement, text
@@ -263,6 +271,7 @@ class ModFromFiles(Modifier):
     Modifier.__init__(self, context, modtext)
     self.lax = lax
 
+  @pfx_method
   def modify(self, text, namespaces):
     newwords = []
     for filename in self.words(text):
@@ -284,6 +293,7 @@ class ModSelectRegexp(Modifier):
     self.regexp_mexpr = regexp_mexpr
     self.invert = bool(invert)
 
+  @pfx_method
   def modify(self, text, namespaces):
     invert = self.invert
     regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
@@ -297,6 +307,7 @@ class ModSelectRange(Modifier):
     self.range = range
     self.invert = bool(invert)
 
+  @pfx_method
   def modify(self, text, namespaces):
     invert = self.invert
     range = self.range
@@ -314,6 +325,7 @@ class ModSubstitute(Modifier):
     self.ptn = ptn
     self.repl = repl
 
+  @pfx_method
   def modify(self, text, namespaces):
     regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
     return re.compile(regexp_mexpr(self.context,
@@ -327,6 +339,7 @@ class ModSetOp(Modifier):
     self.macroname = macroname
     self.literal = literal
 
+  @pfx_method
   def modify(self, text, namespaces):
     words = set(self.words(text))
     if self.literal:
