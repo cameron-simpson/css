@@ -286,7 +286,7 @@ class Maker(MultiOpenMixin):
           try:
             value = int(value)
           except ValueError as e:
-            error("invlaid -j value: %s", e)
+            error("invalid -j value: %s", e)
             badopts = True
           else:
             if value < 1:
