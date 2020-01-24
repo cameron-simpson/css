@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+''' Myke main programme.
+'''
+
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info, D
-from cs.x import X
+from cs.logutils import setup_logging, warning, error
 from .make import Maker
 from .parse import parseMacroAssignment
 
@@ -12,6 +14,8 @@ default_cmd = 'myke'
 usage = "Usage: %s [options...] [macro=value...] [targets...]"
 
 def main(argv=None):
+  ''' The main command line.
+  '''
   if argv is None:
     argv = sys.argv
 
@@ -41,7 +45,7 @@ def main(argv=None):
   ok = M.loadMakefiles(M.makefiles)
   ok = ok and M.loadMakefiles(M.appendfiles)
   if cmd_ns:
-    M._namespaces.insert(0, cmd_ns)
+    M.insert_namespace(cmd_ns)
   if not ok:
     error("errors loading Mykefiles")
     xit = 1
