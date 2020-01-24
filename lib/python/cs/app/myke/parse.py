@@ -849,7 +849,7 @@ class MacroExpression(object):
         mterm = item
         assert isinstance(mterm,
                           MacroTerm), "expected MacroTerm, got %r" % (mterm,)
-        if wordlists is not None and len(wordlists) == 0:
+        if wordlists is not None and not wordlists:
           # word already short circuited - skip evaluating the MacroTerm
           pass
         else:
