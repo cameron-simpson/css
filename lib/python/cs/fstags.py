@@ -139,12 +139,16 @@ class FSTagsCommand(BaseCommand):
   ) + '''
     {cmd} mv paths... targetdir
         Move files and their tags into targetdir.
-    {cmd} tag path {{tag[=value]|-tag}}...
+    {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
-    {cmd} tagpaths {{tag[=value]|-tag}} paths...
+        A path named "-" indicates that paths should be read from the
+        standard input.
+    {cmd} tagpaths {{tag[=value]|-tag}} {{-|paths...}}
         Associate a tag with multiple paths.
         With the form "-tag", remove the tag from the immediate tags.
+        A single path named "-" indicates that paths should be read
+        from the standard input.
   '''
 
   def apply_defaults(self, options):
@@ -336,7 +340,11 @@ class FSTagsCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tag_choices(tag_choices, [path])
+    if path == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = [path]
+    fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_tagpaths(cls, argv, options, *, cmd):
@@ -357,7 +365,11 @@ class FSTagsCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    fstags.apply_tag_choices(tag_choices, argv)
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    fstags.apply_tag_choices(tag_choices, paths)
 
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
