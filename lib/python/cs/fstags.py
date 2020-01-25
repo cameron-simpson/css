@@ -1395,6 +1395,7 @@ def rpaths(path, yield_dirs=False, name_selector=None):
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
+  path = abspath(path)
   if isfilepath(path):
     yield path
   else:
