@@ -52,8 +52,8 @@ import json
 from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
-    abspath, basename, dirname, exists as existspath, expanduser, isdir as isdirpath,
-    isfile as isfilepath, join as joinpath, realpath, relpath
+    abspath, basename, dirname, exists as existspath, expanduser, isdir as
+    isdirpath, isfile as isfilepath, join as joinpath, relpath
 )
 from pathlib import Path
 import re
@@ -376,14 +376,20 @@ class FSTags(MultiOpenMixin):
     self._lock = Lock()
 
   def startup(self):
+    ''' Stub for startup.
+    '''
     pass
 
   def shutdown(self):
+    ''' Save any modified tag files on shutdown.
+    '''
     for tagfile in self._tagfiles.values():
       tagfile.save()
 
   @property
   def tagsfile(self):
+    ''' The tag file basename.
+    '''
     return self.config.tagsfile
 
   def __str__(self):
@@ -559,6 +565,18 @@ class Tag:
 
   __slots__ = ('name', 'value')
 
+  # A JSON encoder used for tag values which lack a special encoding.
+  # The default here is "compact": no whitespace in delimiters.
+  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+
+  # A JSON decoder.
+  JSON_DECODER = JSONDecoder()
+
+  EXTRA_TYPES = [
+      (date, date.fromisoformat, date.isoformat),
+      (datetime, datetime.fromisoformat, datetime.isoformat),
+  ]
+
   @require(lambda name: isinstance(name, str))
   def __init__(self, name, value):
     self.name = name
@@ -586,16 +604,25 @@ class Tag:
     value = self.value
     if value is None:
       return name
-    if isinstance(value, str):
-      # bare dotted identifiers
-      if is_dotted_identifier(value):
-        return name + '=' + value
-    for type_, parse, transcribe in self.EXTRA_TYPES:
+    return name + '=' + self.transcribe_value(value)
+
+  @classmethod
+  def transcribe_value(cls, value):
+    ''' Transcribe `value` for use in `Tag` transcription.
+    '''
+    for type_, from_str, to_str in cls.EXTRA_TYPES:
       if isinstance(value, type_):
-        return name + '=' + transcribe(value)
-    value = self.for_json(value)
-    encoder = self.json_encoder()
-    return name + '=' + encoder.encode(value)
+        value_s = to_str(value)
+        # should be nonwhitespace
+        assert skipwhite(value_s) == len(value_s)
+        # should round trip
+        assert from_str(value_s) == value
+        return value_s
+    # "bare" dotted identifiers
+    if isinstance(value, str) and is_dotted_identifier(value):
+      return value
+    # fall back to JSON encoded form of value
+    return cls.JSON_ENCODER.encode(value)
 
   @classmethod
   def from_name_value(cls, name, value):
@@ -648,37 +675,6 @@ class Tag:
     '''
     return get_dotted_identifier(s, offset=offset, extras='_-')
 
-  EXTRA_TYPES = [
-      (date, date.fromisoformat, date.isoformat),
-      (datetime, datetime.fromisoformat, datetime.isoformat),
-  ]
-
-  @classmethod
-  def from_json(cls, value):
-    ''' Convert various formats to richer types.
-    '''
-    for type_, parse, transcribe in cls.EXTRA_TYPES:
-      try:
-        return parse(value)
-      except (ValueError, TypeError):
-        pass
-    return value
-
-  @classmethod
-  def for_json(cls, obj):
-    ''' Convert from types to strings for JSON.
-    '''
-    for type_, parse, transcribe in cls.EXTRA_TYPES:
-      if isinstance(obj, type_):
-        return transcribe(obj)
-    return obj
-
-  @staticmethod
-  def json_encoder():
-    ''' Prepare a JSON encoder for tag values.
-    '''
-    return JSONEncoder(separators=(',', ':'))
-
   def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
@@ -691,7 +687,6 @@ class Tag:
   def parse(cls, s, offset=0):
     ''' Parse tag_name[=value], return `(tag,offset)`.
     '''
-    decoder = JSONDecoder()
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
@@ -701,27 +696,7 @@ class Tag:
             value = None
           elif sep == '=':
             offset += 1
-            if offset >= len(s) or s[offset].isspace():
-              warning("offset %d: missing value part", offset)
-              value = None
-            elif s[offset].isalpha():
-              value, offset = cls.parse_name(s, offset)
-            else:
-              nonwhite, nw_offset = get_nonwhite(s, offset)
-              nw_value = None
-              for type_, parse, transcribe in cls.EXTRA_TYPES:
-                try:
-                  nw_value = parse(nonwhite)
-                except ValueError:
-                  pass
-              if nw_value is not None:
-                value = nw_value
-                offset = nw_offset
-              else:
-                value_part = s[offset:]
-                value, suboffset = decoder.raw_decode(value_part)
-                offset += suboffset
-                value = cls.from_json(value)
+            value, offset = cls.parse_value(s, offset)
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -730,6 +705,36 @@ class Tag:
         else:
           value = None
       return cls(name, value), offset
+
+  @classmethod
+  def parse_value(cls, s, offset=0):
+    ''' Parse a value from `s` at `offset` (default `0`).
+        Return the value, or `None` on no data.
+    '''
+    if offset >= len(s) or s[offset].isspace():
+      warning("offset %d: missing value part", offset)
+      value = None
+    elif s[offset].isalpha():
+      value, offset = cls.parse_name(s, offset)
+    else:
+      # check for special "nonwhitespace" transcription
+      nonwhite, nw_offset = get_nonwhite(s, offset)
+      nw_value = None
+      for type_, from_str, to_str in cls.EXTRA_TYPES:
+        try:
+          nw_value = from_str(nonwhite)
+        except ValueError:
+          pass
+      if nw_value is not None:
+        # special format found
+        value = nw_value
+        offset = nw_offset
+      else:
+        # decode as plain JSON data
+        value_part = s[offset:]
+        value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+        offset += suboffset
+    return value, offset
 
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
@@ -966,22 +971,24 @@ class TagSet(HasFSTagsMixin):
       xattr_name_b = xattr_name.encode()
     else:
       xattr_name_b = xattr_name
-    old_xattr_value = cls.xattr_value(filepath, xattr_name=xattr_name)
-    if old_xattr_value is None or old_xattr_value != new_xattr_value:
-      new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
-      with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
-               new_xattr_value_b):
-        try:
-          os.setxattr(
-              filepath, xattr_name_b, new_xattr_value_b, (
-                  os.XATTR_CREATE
-                  if old_xattr_value is None else os.XATTR_REPLACE
-              )
-          )
-        except OSError as e:
-          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
-            raise
-    return old_xattr_value
+    with Pfx("%s.set_xattr_value(%r, %s) <= %s", cls.__name__, filepath,
+             xattr_name, new_xattr_value):
+      old_xattr_value = cls.xattr_value(filepath, xattr_name=xattr_name)
+      if old_xattr_value is None or old_xattr_value != new_xattr_value:
+        new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
+        with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
+                 new_xattr_value_b):
+          try:
+            os.setxattr(
+                filepath, xattr_name_b, new_xattr_value_b, (
+                    os.XATTR_CREATE
+                    if old_xattr_value is None else os.XATTR_REPLACE
+                )
+            )
+          except OSError as e:
+            if e.errno not in (errno.ENOTSUP, errno.ENOENT):
+              raise
+      return old_xattr_value
 
   @fmtdoc
   def update_xattr(self, filepath, xattr_name=None):
@@ -1060,13 +1067,11 @@ class TagFile(HasFSTagsMixin):
         return name
     return json.dumps(name)
 
-  @staticmethod
-  def decode_name(s, offset=0):
+  def decode_name(self, s, offset=0):
     ''' Decode the *name* from the string `s` at `offset` (default `0`).
     '''
     if s.startswith('"'):
-      decoder = JSONDecoder()
-      name, suboffset = decoder.raw_decode(s[offset:])
+      name, suboffset = self.fstags.JSON_DECODER.raw_decode(s[offset:])
       offset += suboffset
     else:
       name, offset = get_nonwhite(s, offset)
@@ -1303,7 +1308,7 @@ class TaggedPath(HasFSTagsMixin):
     '''
     self.direct_tags.pop(tag_name)
 
-  def autotag(self, rules=None, *, no_save=False):
+  def autotag(self, rules=None, *, no_save=False, use_xattrs=None):
     ''' Apply `rules`to this `TaggedPath`,
         update the `direct_tags` with new tags.
 
@@ -1313,6 +1318,8 @@ class TaggedPath(HasFSTagsMixin):
           Each rule will be passed the `TaggedPath.basename` as the `name`.
         * `no_save`: if true (default `False`)
           suppress the save of updated tags back to the filesystem.
+        * `use_xattrs`: control use of extended attributes,
+          default from the `FSTags` context
     '''
     name = self.basename
     tags = self.direct_tags
@@ -1461,6 +1468,8 @@ class FSTagsConfig:
 
   @staticmethod
   def rules_from_config(config):
+    ''' Return a list of the `[autotag]` tag rules from the config.
+    '''
     rules = []
     for rule_name, pattern in config['autotag'].items():
       with Pfx("%s = %s", rule_name, pattern):
