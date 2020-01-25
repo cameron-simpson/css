@@ -149,6 +149,10 @@ class FSTagsCommand(BaseCommand):
         With the form "-tag", remove the tag from the immediate tags.
         A single path named "-" indicates that paths should be read
         from the standard input.
+    {cmd} xattr_import {{-|paths...}}
+        Import tag information from extended attributes.
+    {cmd} xattr_export {{-|paths...}}
+        Update extended attributes from tags.
   '''
 
   def apply_defaults(self, options):
@@ -371,6 +375,32 @@ class FSTagsCommand(BaseCommand):
       paths = argv
     fstags.apply_tag_choices(tag_choices, paths)
 
+  @classmethod
+  def cmd_xattr_export(cls, argv, options, *, cmd):
+    ''' Update extended attributes from fstags.
+    '''
+    fstags = options.fstags
+    if not argv:
+      raise GetoptError("missing paths")
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    fstags.export_xattrs(paths)
+
+  @classmethod
+  def cmd_xattr_import(cls, argv, options, *, cmd):
+    ''' Update fstags from extended attributes.
+    '''
+    fstags = options.fstags
+    if not argv:
+      raise GetoptError("missing paths")
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    fstags.import_xattrs(paths)
+
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
@@ -468,6 +498,26 @@ class FSTags(MultiOpenMixin):
               else:
                 # delete tag
                 tagged_path.discard(tag)
+
+  def export_xattrs(self, paths):
+    ''' Import the extended attributes of `paths`
+        and use them to update the fstags.
+    '''
+    with self:
+      for path in paths:
+        with Pfx(path):
+          tagged_path = TaggedPath(path, fstags=self)
+          tagged_path.export_xattrs()
+
+  def import_xattrs(self, paths):
+    ''' Update the extended attributes of `paths`
+        from their fstags.
+    '''
+    with self:
+      for path in paths:
+        with Pfx(path):
+          tagged_path = TaggedPath(path, fstags=self)
+          tagged_path.import_xattrs()
 
   def find(self, path, tag_choices, use_direct_tags=False):
     ''' Walk the file tree from `path`
@@ -925,83 +975,6 @@ class TagSet(HasFSTagsMixin):
     '''
     return self.titleify('title')
 
-  @staticmethod
-  @fmtdoc
-  def xattr_value(filepath, xattr_name=None):
-    ''' Read the extended attribute `xattr_name` of `filepath`.
-
-        Return the extended attribute value as a string,
-        or `None` if the attribute does not exist.
-
-        Parameters:
-        * `filepath`: the filesystem path to update
-        * `xattr_name`: the extended attribute to update;
-          if this is a `str`, the attribute is the UTF-8 encoding of that name.
-          The default is `XATTR_B` ({XATTR_B!r}).
-    '''
-    if xattr_name is None:
-      xattr_name_b = XATTR_B
-    elif isinstance(xattr_name, str):
-      xattr_name_b = xattr_name.encode()
-    else:
-      xattr_name_b = xattr_name
-    with Pfx("getxattr(%r,%r)", filepath, xattr_name_b):
-      try:
-        old_xattr_value_b = os.getxattr(filepath, xattr_name_b)
-      except OSError as e:
-        if e.errno not in (errno.ENOTSUP, errno.ENOENT, errno.ENODATA):
-          raise
-        old_xattr_value_b = None
-    if old_xattr_value_b is None:
-      old_xattr_value = None
-    else:
-      old_xattr_value = old_xattr_value_b.decode(errors='replace')
-    return old_xattr_value
-
-  @classmethod
-  @fmtdoc
-  def set_xattr_value(cls, filepath, new_xattr_value, xattr_name=None):
-    ''' Update the extended attributes of `filepath`
-        with `new_xattr_value`,
-        the transcription of a `TagSet` as a string.
-
-        Return the extended attribute value as a string,
-        or `None` if the attribute does not exist.
-
-        Parameters:
-        * `filepath`: the filesystem path to update
-        * `new_xattr_value`: the new extended attribute value, a `str`
-          which should be the transcription of `TagSet`
-          i.e. `str(tagset)`
-        * `xattr_name`: the extended attribute to update;
-          if this is a `str`, the attribute is the UTF-8 encoding of that name.
-          The default is `XATTR_B` ({XATTR_B!r}).
-    '''
-    if xattr_name is None:
-      xattr_name_b = XATTR_B
-    elif isinstance(xattr_name, str):
-      xattr_name_b = xattr_name.encode()
-    else:
-      xattr_name_b = xattr_name
-    with Pfx("%s.set_xattr_value(%r, %s) <= %s", cls.__name__, filepath,
-             xattr_name, new_xattr_value):
-      old_xattr_value = cls.xattr_value(filepath, xattr_name=xattr_name)
-      if old_xattr_value is None or old_xattr_value != new_xattr_value:
-        new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
-        with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
-                 new_xattr_value_b):
-          try:
-            os.setxattr(
-                filepath, xattr_name_b, new_xattr_value_b, (
-                    os.XATTR_CREATE
-                    if old_xattr_value is None else os.XATTR_REPLACE
-                )
-            )
-          except OSError as e:
-            if e.errno not in (errno.ENOTSUP, errno.ENOENT):
-              raise
-      return old_xattr_value
-
   @fmtdoc
   def update_xattr(self, filepath, xattr_name=None):
     ''' Update the extended attributes of `filepath`
@@ -1010,20 +983,22 @@ class TagSet(HasFSTagsMixin):
         Parameters:
         * `filepath`: the filesystem path to update
         * `xattr_name`: the extended attribute to update;
-          if this is a `str`, the attribute is the UTF-8 encoding of that name.
-          The default is `XATTR_B` ({XATTR_B!r}).
+          default: `XATTR_B` ({XATTR_B!r})
     '''
-    old_xattr_value = self.xattr_value(filepath, xattr_name=xattr_name)
-    new_xattr_value = str(self)
-    if old_xattr_value is None or old_xattr_value != new_xattr_value:
-      self.set_xattr_value(filepath, new_xattr_value, xattr_name=xattr_name)
+    if xattr_name is None:
+      xattr_name = XATTR_B
+    return update_xattr_value(filepath, xattr_name, str(self))
 
   @classmethod
+  @fmtdoc
   def from_xattr(cls, filepath, xattr_name=None):
     ''' Create a new `TagSet`
         from the extended attribute `xattr_name` of `filepath`.
+        The default `xattr_name` is `XATTR_B` (`{XATTR_B!r}`).
     '''
-    xattr_s = cls.xattr_value(filepath, xattr_name)
+    if xattr_name is None:
+      xattr_name = XATTR_B
+    xattr_s = get_xattr_value(filepath, xattr_name)
     if xattr_s is None:
       return cls()
     return cls.from_line(xattr_s)
@@ -1120,16 +1095,6 @@ class TagFile(HasFSTagsMixin):
               if not line or line.startswith('#'):
                 continue
               name, tags = self.parse_tags_line(line)
-              if self.fstags.use_xattrs:
-                name_path = joinpath(self.dirpath, name)
-                tags.update_from_xattr(name_path, xattr_name=XATTR_B)
-                # import tags from other xattrs if not present
-                for xattr_name, tag_name in self.fstags.config['xattr'].items(
-                ):
-                  if tag_name not in tags:
-                    tag_value = tags.xattr_value(name_path, xattr_name)
-                    if tag_value is not None:
-                      tags.add(tag_name, tag_value)
               tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -1168,15 +1133,6 @@ class TagFile(HasFSTagsMixin):
       # no modified TagSets
       return
     self.save_tagsets(self.filepath, self.tagsets)
-    if self.fstags.use_xattrs:
-      for name, tagset in self.tagsets.items():
-        name_path = joinpath(self.dirpath, name)
-        tagset.update_xattr(name_path, xattr_name=XATTR_B)
-        # export tagset to other xattrs
-        for xattr_name, tag_name in self.fstags.config['xattr'].items():
-          tag_value = tagset.get(tag_name)
-          if tag_value is not None:
-            tagset.set_xattr_value(name_path, tag_value, xattr_name=xattr_name)
 
   @locked_property
   def tagsets(self):
@@ -1348,6 +1304,39 @@ class TaggedPath(HasFSTagsMixin):
         self.save()
     return new_tags
 
+  def import_xattrs(self):
+    ''' Update the direct tags from the file's extended attributes.
+    '''
+    filepath = self.filepath
+    xa_tags = TagSet.from_xattr(filepath)
+    # import tags from other xattrs if not present
+    for xattr_name, tag_name in self.fstags.config['xattr'].items():
+      if tag_name not in xa_tags:
+        tag_value = get_xattr_value(filepath, xattr_name)
+        if tag_value is not None:
+          xa_tags.add(tag_name, tag_value)
+    # merge with the direct tags
+    # if missing from the all_tags
+    all_tags = self.all_tags
+    direct_tags = self.direct_tags
+    for tag in xa_tags:
+      if tag not in all_tags:
+        direct_tags.add(tag)
+
+  def export_xattrs(self):
+    ''' Update the extended attributes of the file.
+    '''
+    filepath = self.filepath
+    all_tags = self.all_tags
+    direct_tags = self.direct_tags
+    update_xattr_value(filepath, XATTR_B, str(direct_tags))
+    # export tags to other xattrs
+    for xattr_name, tag_name in self.fstags.config['xattr'].items():
+      tag_value = all_tags.get(tag_name)
+      update_xattr_value(
+          filepath, xattr_name, None if tag_value is None else str(tag_value)
+      )
+
 def infer_tags(name, rules):
   ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
 
@@ -1508,6 +1497,81 @@ class FSTagsConfig:
 FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
     cmd='fstags'
 ).replace('\n', '\n    ')
+
+@fmtdoc
+def get_xattr_value(filepath, xattr_name):
+  ''' Read the extended attribute `xattr_name` of `filepath`.
+
+      Return the extended attribute value as a string,
+      or `None` if the attribute does not exist.
+
+      Parameters:
+      * `filepath`: the filesystem path to update
+      * `xattr_name`: the extended attribute to obtain
+        if this is a `str`, the attribute is the UTF-8 encoding of that name.
+  '''
+  if isinstance(xattr_name, str):
+    xattr_name_b = xattr_name.encode()
+  else:
+    xattr_name_b = xattr_name
+  with Pfx("get_xattr_value(%r,%r)", filepath, xattr_name_b):
+    try:
+      old_xattr_value_b = os.getxattr(filepath, xattr_name_b)
+    except OSError as e:
+      if e.errno not in (errno.ENOTSUP, errno.ENOENT, errno.ENODATA):
+        raise
+      old_xattr_value_b = None
+  if old_xattr_value_b is None:
+    old_xattr_value = None
+  else:
+    old_xattr_value = old_xattr_value_b.decode(errors='replace')
+  return old_xattr_value
+
+@fmtdoc
+def update_xattr_value(filepath, xattr_name, new_xattr_value):
+  ''' Update the extended attributes of `filepath`
+      with `new_xattr_value` for `xattr_name`.
+      Return the previous value, or `None` if the attribute was missing.
+
+      We avoid calling `os.setxattr` if the value will not change.
+
+      Parameters:
+      * `filepath`: the filesystem path to update
+      * `xattr_name`: the extended attribute to update;
+        if this is a `str`, the attribute is the UTF-8 encoding of that name.
+      * `new_xattr_value`: the new extended attribute value, a `str`
+        which should be the transcription of `TagSet`
+        i.e. `str(tagset)`
+  '''
+  if isinstance(xattr_name, str):
+    xattr_name_b = xattr_name.encode()
+  else:
+    xattr_name_b = xattr_name
+  with Pfx("update_xattr_value(%r, %s) <= %s", filepath, xattr_name,
+           new_xattr_value):
+    old_xattr_value = get_xattr_value(filepath, xattr_name)
+    if new_xattr_value is None:
+      if old_xattr_value is not None:
+        try:
+          os.removexattr(filepath, xattr_name_b)
+        except OSError as e:
+          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
+            raise
+    elif old_xattr_value is None or old_xattr_value != new_xattr_value:
+      new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
+      with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
+               new_xattr_value_b):
+        try:
+          os.setxattr(
+              filepath, xattr_name_b, new_xattr_value_b, (
+                  os.XATTR_CREATE
+                  if old_xattr_value is None else os.XATTR_REPLACE
+              )
+          )
+        except OSError as e:
+          if e.errno not in (errno.ENOTSUP, errno.ENOENT):
+            raise
+    return old_xattr_value
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
