@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience iTunes related functions.
-#       - Cameron Simpson <cs@cskk.id.au> 05jan2013
+# - Cameron Simpson <cs@cskk.id.au> 05jan2013
 #
 
 ''' Convenience iTunes related functions.
@@ -247,6 +247,7 @@ def read_playlist(path):
   with open(path, encoding='utf-16le', newline='\r') as plf:
     # skip the BOM
     plf.seek(2)
+
     def preprocess(context, row):
       ''' Convert some row columns before assimilation.
       '''
@@ -274,8 +275,9 @@ def read_playlist(path):
             row[i] = playlist_date(row[i]) if row[i] else None
       X("row = %r", row)
       return row
+
     _, entries = named_column_tuples(
-        [ line[-1].split('\t') for line in plf ],
+        [line[-1].split('\t') for line in plf],
         class_name='ApplePlaylistEntry',
         preprocess=preprocess
     )
@@ -285,7 +287,7 @@ def read_playlist(path):
 def playlist_date(s):
   ''' Parse a date time field from an Apple playlist file.
   '''
-  return datetime.datetime.strptime( s, '%d/%m/%y %I:%S %p' )
+  return datetime.strptime(s, '%d/%m/%y %I:%S %p')
 
 if __name__ == '__main__':
   import sys
