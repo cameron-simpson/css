@@ -33,6 +33,8 @@ class ITunesISODateTime(datetime):
   def __str__(self):
     return self.strftime(self.ISOFORMAT)
 
+  __repr__ = __str__
+
   @classmethod
   def from_itunes_date(cls, date_text):
     ''' Prepare `ITunesISODateTime` from its text transcription.
