@@ -171,8 +171,7 @@ class ITunes:
 
         Keyword arguments are passed to `parse_dict`.
     '''
-    # pass 1: gather keys and stash the dicts
-    key_list = []
+    # gather keys and stash the dicts
     key_set = set()
     ds = []
     for array_elem in array:
@@ -182,9 +181,9 @@ class ITunes:
       for dk in d:
         if dk not in key_set:
           key_set.add(dk)
-          key_list.append(dk)
-    factory = named_row_tuple(*key_list, class_name=class_name)
     # convert dicts to namedtuples
+    key_list = sorted(key_set)
+    factory = named_row_tuple(*key_list, class_name=class_name)
     return [factory(*[d.get(dk) for dk in key_list]) for d in ds]
 
   def parse_dict_of_dict(
@@ -194,8 +193,7 @@ class ITunes:
 
         Keyword arguments are passed to `parse_dict`.
     '''
-    # pass 1: gather keys and stash the dicts
-    key_list = []
+    # gather keys and stash the dicts
     key_set = set()
     ds = {}
     elements = iter(dict_elem)
@@ -208,9 +206,9 @@ class ITunes:
       for dk in d:
         if dk not in key_set:
           key_set.add(dk)
-          key_list.append(dk)
-    factory = named_row_tuple(*key_list, class_name=class_name)
     # convert dicts to namedtuples
+    key_list = sorted(key_set)
+    factory = named_row_tuple(*key_list, class_name=class_name)
     return {k: factory(*[d.get(dk) for dk in key_list]) for k, d in ds.items()}
 
   def parse_playlists(self, array):
