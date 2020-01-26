@@ -1058,7 +1058,7 @@ class TagFile(HasFSTagsMixin):
     ''' Decode the *name* from the string `s` at `offset` (default `0`).
     '''
     if s.startswith('"'):
-      name, suboffset = self.fstags.JSON_DECODER.raw_decode(s[offset:])
+      name, suboffset = Tag.JSON_DECODER.raw_decode(s[offset:])
       offset += suboffset
     else:
       name, offset = get_nonwhite(s, offset)
