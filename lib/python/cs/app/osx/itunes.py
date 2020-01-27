@@ -186,7 +186,7 @@ class ITunes:
     '''
     # patch `inner_parse_key` to internal parse_dict call
     if inner_parse_key is not None:
-      kw['parse_key']=inner_parse_key
+      kw['parse_key'] = inner_parse_key
     # dissect the `<key><dict>` pairs into a list of keys and parsed `dict`s
     ks = []
     ds = []
@@ -195,9 +195,7 @@ class ITunes:
       key_name = key_elem.text
       ks.append(key_name if parse_key is None else parse_key(key_name))
       inner_dict_elem = next(elements)
-      ds.append(
-          self.parse_dict(inner_dict_elem, **kw)
-      )
+      ds.append(self.parse_dict(inner_dict_elem, **kw))
     # assemble into a `dict` mapping `key` to `namedtuple`
     return dict(zip(ks, dicts_to_namedtuples(ds, class_name)))
 
