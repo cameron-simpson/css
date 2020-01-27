@@ -130,6 +130,17 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  @classmethod
+  def add_usage_to_docstring(cls, **usage_keywords):
+    ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
+        with format substitutions.
+    '''
+    if 'cmd' not in usage_keywords:
+      usage_keywords['cmd'] = cls.__name__
+    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format(
+        **usage_keywords
+    ).replace('\n', '\n    ')
+
   def apply_defaults(self, options):
     ''' Stub `apply_defaults` method.
 
