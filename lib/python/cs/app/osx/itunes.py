@@ -79,13 +79,40 @@ class ITunes:
     )
     return library
 
+  def tracks_indexed(self, attr_list, **attrs):
+    ''' Return a dict mapping a key to a list of matching tracks.
+
+        The tracks are from `track_by(**attrs)`.
+        The key is constructed
+        as `tuple(getattr(track,attr,None) for attr in attr_list)`.
+    '''
+    index = defaultdict(list)
+    for track in self.tracks_by(**attrs):
+      key = tuple(getattr(track, attr, None) for attr in attr_list)
+      index[key].append(track)
+    return index
+
+  def tracks_by(self, **attrs):
+    for track in self.exported_library.tracks.values():
+      selected = True
+      for attr, value in attrs.items():
+        track_value = getattr(track, attr, None)
+        if value is None:
+          if track_value is not None:
+            selected = False
+            break
+        else:
+          if track_value != value:
+            selected = False
+            break
+      if selected:
+        yield track
+
   @property
   def tv_shows(self):
     ''' Iterable of the TV Show tracks.
     '''
-    for track in self.exported_library.tracks.values():
-      if track.tv_show:
-        yield track
+    return self.track_by(tv_show=True)
 
   @locked_property
   def parsed_export(self):
