@@ -8,21 +8,92 @@
 '''
 
 from base64 import b64decode
+from collections import defaultdict
 from datetime import datetime
 try:
   from lxml import etree
 except ImportError:
   import xml.etree.ElementTree as etree
 import os
-from os.path import join as joinpath
+from os.path import basename, join as joinpath
+from pprint import pformat
+import sys
 from threading import RLock
-from cs.logutils import setup_logging, warning
+from cs.cmdutils import BaseCommand
+from cs.fstags import FSTags, TaggedPath, Tag, rpaths
+from cs.logutils import setup_logging, warning, info
 from cs.mappings import named_column_tuples, dicts_to_namedtuples
 from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
 from cs.x import X
 
 ITUNES_LIBRARY_PATH_ENVVAR = 'ITUNES_LIBRARY_PATH'
+
+def main(argv=None):
+  ''' Command line mode.
+  '''
+  if argv is None:
+    argv = sys.argv
+  return ITunesCommand().run(argv)
+
+class ITunesCommand(BaseCommand):
+  ''' `itunes` main command line class.
+  '''
+
+  GETOPT_SPEC = ''
+  USAGE_FORMAT = '''Usage:
+    {cmd} autotag paths...
+        Tag paths based on data from the iTunes library.
+  '''
+
+  def apply_defaults(self, options):
+    ''' Set up the default values in `options`.
+    '''
+    setup_logging(options.cmd)
+    options.fstags = FSTags()
+    options.library = ITunes()
+
+  @staticmethod
+  def cmd_autotag(argv, options, *, cmd):
+    ''' Tag paths based on data from the iTunes library.
+    '''
+    fstags = options.fstags
+    library = options.library
+    if not argv:
+      argv = ['.']
+    rules = fstags.config.rules
+    tracks_by_series_season_episode = library.tracks_indexed(
+        ['series', 'season', 'episode_order'], tv_show=True
+    )
+    ##print(pformat(tracks_by_series_season_episode))
+    with fstags:
+      for top_path in argv:
+        for path in rpaths(top_path):
+          with Pfx(path):
+            tagged_path = TaggedPath(path, fstags)
+            tags = tagged_path.all_tags
+            direct_tags = tagged_path.direct_tags
+            key = (tags.title, tags.get('season'), tags.get('episode'))
+            tracks = tracks_by_series_season_episode.get(key, ())
+            if tracks:
+              if len(tracks) > 1:
+                warning("multiple tracks: %r", tracks)
+              else:
+                track, = tracks
+                for tag_name, track_attr in (
+                    ('title', 'name'),
+                    ('genre', 'genre'),
+                    ('release_date', 'release_date'),
+                ):
+                  tag_value = tags.get(tag_name)
+                  if not tag_value:
+                    tr_value = getattr(track, track_attr, None)
+                    if tr_value is not None:
+                      new_tag = Tag(tag_name, tr_value)
+                      info("+ %s", new_tag)
+                      direct_tags.add(new_tag)
+
+ITunesCommand.add_usage_to_docstring()
 
 class ITunesISODateTime(datetime):
   ''' A `datetime` subclass using the iTunes exported XML date format.
@@ -306,8 +377,5 @@ def playlist_date(s):
   return datetime.strptime(s, '%d/%m/%y %I:%S %p')
 
 if __name__ == '__main__':
-  import sys
-  for argv_path in sys.argv[1:]:
-    print(argv_path)
-    for item in read_playlist(argv_path):
-      print(item)
+  sys.argv[0] = basename(sys.argv[0])
+  sys.exit(main(sys.argv))
