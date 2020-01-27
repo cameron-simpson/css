@@ -17,7 +17,7 @@ import os
 from os.path import join as joinpath
 from threading import RLock
 from cs.logutils import setup_logging, warning
-from cs.mappings import named_row_tuple, named_column_tuples
+from cs.mappings import named_column_tuples, dicts_to_namedtuples
 from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
 from cs.x import X
@@ -73,11 +73,10 @@ class ITunes:
             'Tracks': self.parse_tracks,
         }
     )
-    keys = list(parsed.keys())
-    values = [parsed[key] for key in keys]
-    library = named_row_tuple(
-        *keys, class_name=type(self).__name__ + '_Library_XML'
-    )(*values)
+    library, = dicts_to_namedtuples(
+        (parsed,),
+        type(self).__name__ + '_Library_XML'
+    )
     return library
 
   @property
@@ -167,49 +166,38 @@ class ITunes:
     return d
 
   def parse_array_of_dict(self, array, class_name, **kw):
-    ''' Parse an `<array>` of `<dict>`s, return a list of `namedtuple`s.
+    ''' Yield `namedtuple`s from an `<array>` of `<dict>`s.
 
         Keyword arguments are passed to `parse_dict`.
     '''
-    # gather keys and stash the dicts
-    key_set = set()
-    ds = []
-    for array_elem in array:
-      assert array_elem.tag == 'dict', "unexpected tag %s" % array_elem.tag
-      d = self.parse_dict(array_elem, **kw)
-      ds.append(d)
-      for dk in d:
-        if dk not in key_set:
-          key_set.add(dk)
-    # convert dicts to namedtuples
-    key_list = sorted(key_set)
-    factory = named_row_tuple(*key_list, class_name=class_name)
-    return [factory(*[d.get(dk) for dk in key_list]) for d in ds]
+    yield from dicts_to_namedtuples(
+        (self.parse_dict(array_elem, **kw) for array_elem in array),
+        class_name=class_name
+    )
 
   def parse_dict_of_dict(
       self, dict_elem, class_name, parse_key=None, inner_parse_key=None, **kw
   ):
-    ''' Parse a `<dict>` of `<key><dict>`s, return a dict of `key`=>`namedtuple`s.
+    ''' Yield `(key,namedtuple)` from a `<dict>` of `<key><dict>`s.
 
         Keyword arguments are passed to `parse_dict`.
     '''
-    # gather keys and stash the dicts
-    key_set = set()
-    ds = {}
+    # patch `inner_parse_key` to internal parse_dict call
+    if inner_parse_key is not None:
+      kw['parse_key']=inner_parse_key
+    # dissect the `<key><dict>` pairs into a list of keys and parsed `dict`s
+    ks = []
+    ds = []
     elements = iter(dict_elem)
     for key_elem in elements:
       key_name = key_elem.text
+      ks.append(key_name if parse_key is None else parse_key(key_name))
       inner_dict_elem = next(elements)
-      assert inner_dict_elem.tag == 'dict', "unexpected tag %s" % inner_dict_elem.tag
-      d = self.parse_dict(inner_dict_elem, parse_key=inner_parse_key, **kw)
-      ds[key_name if parse_key is None else parse_key(key_name)] = d
-      for dk in d:
-        if dk not in key_set:
-          key_set.add(dk)
-    # convert dicts to namedtuples
-    key_list = sorted(key_set)
-    factory = named_row_tuple(*key_list, class_name=class_name)
-    return {k: factory(*[d.get(dk) for dk in key_list]) for k, d in ds.items()}
+      ds.append(
+          self.parse_dict(inner_dict_elem, **kw)
+      )
+    # assemble into a `dict` mapping `key` to `namedtuple`
+    return dict(zip(ks, dicts_to_namedtuples(ds, class_name)))
 
   def parse_playlists(self, array):
     ''' Parse the `'Playlists'` array of playlist definitions.
