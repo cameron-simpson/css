@@ -676,9 +676,8 @@ class Tag:
       if isinstance(value, type_):
         value_s = to_str(value)
         # should be nonwhitespace
-        assert skipwhite(value_s) == len(value_s)
-        # should round trip
-        assert from_str(value_s) == value
+        if get_nonwhite(value_s)[0] != value_s:
+          raise ValueError("to_str(%r) => %r: contains whitespace" % (value, value_s))
         return value_s
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
@@ -1494,9 +1493,7 @@ class FSTagsConfig:
     '''
     self.config['general']['tagsfile'] = tagsfile
 
-FSTagsCommand.__doc__ += '\nCommand line usage:\n\n    ' + FSTagsCommand.USAGE_FORMAT.format(
-    cmd='fstags'
-).replace('\n', '\n    ')
+FSTagsCommand.add_usage_to_docstring()
 
 @fmtdoc
 def get_xattr_value(filepath, xattr_name):
