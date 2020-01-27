@@ -180,7 +180,9 @@ class ITunes:
   ):
     ''' Yield `(key,namedtuple)` from a `<dict>` of `<key><dict>`s.
 
-        Keyword arguments are passed to `parse_dict`.
+        Keyword arguments are passed to the internal `parse_dict`
+        use for the internal `<dict>` elements.
+        `inner_parse_key` is passed to `parse_dict` as `parse_key`.
     '''
     # patch `inner_parse_key` to internal parse_dict call
     if inner_parse_key is not None:
@@ -200,7 +202,8 @@ class ITunes:
     return dict(zip(ks, dicts_to_namedtuples(ds, class_name)))
 
   def parse_playlists(self, array):
-    ''' Parse the `'Playlists'` array of playlist definitions.
+    ''' Parse the `'Playlists'` array of playlist definitions
+        into a `dict` mapping `playlist_id` to `Playlist`s.
     '''
     return {
         pl.playlist_id: pl
