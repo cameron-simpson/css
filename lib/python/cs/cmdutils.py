@@ -193,11 +193,11 @@ class BaseCommand:
       cmd = argv.pop(0)
     usage_format = getattr(self, 'USAGE_FORMAT')
     if usage_format:
-      usage=usage_format.format(cmd=cmd)
+      usage = usage_format.format(cmd=cmd)
     else:
-      usage=None
+      usage = None
     if options is None:
-      options = StackableValues(cmd=cmd,usage=usage)
+      options = StackableValues(cmd=cmd, usage=usage)
       self.apply_defaults(options)
     with Pfx(cmd):
       try:
@@ -227,11 +227,11 @@ class BaseCommand:
               return main(argv, options, cmd=None)
       except GetoptError as e:
         handler = getattr(self, 'getopt_error_handler')
-        if handler and handler(cmd,options,e,usage):
+        if handler and handler(cmd, options, e, usage):
           return 2
         raise
 
-  def getopt_error_handler(self,cmd,options,e,usage):
+  def getopt_error_handler(self, cmd, options, e, usage):
     ''' The `getopt_error_handler` method
         is be used to control the handling of `GetoptError`s raised
         during the command line parse
