@@ -14,7 +14,7 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
-__version__ = '20200129.2'
+__version__ = '20200129'
 
 DISTINFO = {
     'description':
