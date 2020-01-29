@@ -170,6 +170,15 @@ class BaseProgress(object):
       return None
     return time.time() + remaining
 
+  @property
+  def count_of_total_bytes_text(self):
+    ''' "count units / total units" using binary units.
+    '''
+    return (
+        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + ' / ' +
+        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+    )
+
   def status(self, label, width):
     ''' A progress string of the form:
         *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
@@ -183,11 +192,7 @@ class BaseProgress(object):
         return label + ': ETA unknown'
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
-    left = (
-        label + ': ' +
-        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + ' / ' +
-        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1) + ' '
-    )
+    left = (label + ': ' + self.count_of_total_bytes_text + ' ')
     if remaining is None:
       right = 'ETA unknown'
     else:
