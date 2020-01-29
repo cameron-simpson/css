@@ -14,6 +14,8 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
+__version__ = 'test__version'
+
 DISTINFO = {
     'description':
     "A progress tracker with methods for throughput, ETA and update notification",
