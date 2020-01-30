@@ -45,7 +45,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import TagSet
+from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -79,6 +79,8 @@ class MP4Command(BaseCommand):
   GETOPT_SPEC = ''
 
   USAGE_FORMAT = '''Usage:
+    {cmd} autotag paths...
+        Tag paths based on embedded MP4 metadata.
     {cmd} extract [-H] filename boxref output
         Extract the referenced Box from the specified filename into output.
         -H  Skip the Box header.
@@ -88,6 +90,41 @@ class MP4Command(BaseCommand):
         Print informative report about each source.
     {cmd} test
         Run unit tests.'''
+
+  @staticmethod
+  def cmd_autotag(argv, options, *, cmd):
+    ''' Tag paths based on embedded MP4 metadata.
+    '''
+    xit = 0
+    fstags = FSTags()
+    if not argv:
+      argv = ['.']
+    with fstags:
+      for top_path in argv:
+        for path in rpaths(top_path):
+          with Pfx(path):
+            tagged_path = TaggedPath(path, fstags)
+            all_tags = tagged_path.all_tags
+            direct_tags = tagged_path.direct_tags
+            try:
+              over_box, = parse(path, discard_data=True)
+              print(path + ":")
+              for top_box in over_box:
+                for box, tags in top_box.gather_metadata():
+                  if tags:
+                    for tag in tags:
+                      if tag in all_tags:
+                        warning(
+                            "autotag %r: %s: tag already present",
+                            tagged_path.basename, tag
+                        )
+                      else:
+                        print("autotag %r + %s" % (tagged_path.basename, tag))
+                        direct_tags.add(tag)
+            except Exception as e:
+              warning("%s", e)
+              xit = 1
+    return xit
 
   @staticmethod
   def cmd_deref(argv, options, *, cmd):
