@@ -45,7 +45,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import TagSet
+from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import setup_logging, debug, warning, error
 from cs.pfx import Pfx
@@ -79,6 +79,8 @@ class MP4Command(BaseCommand):
   GETOPT_SPEC = ''
 
   USAGE_FORMAT = '''Usage:
+    {cmd} autotag paths...
+        Tag paths based on embedded MP4 metadata.
     {cmd} extract [-H] filename boxref output
         Extract the referenced Box from the specified filename into output.
         -H  Skip the Box header.
@@ -88,6 +90,41 @@ class MP4Command(BaseCommand):
         Print informative report about each source.
     {cmd} test
         Run unit tests.'''
+
+  @staticmethod
+  def cmd_autotag(argv, options, *, cmd):
+    ''' Tag paths based on embedded MP4 metadata.
+    '''
+    xit = 0
+    fstags = FSTags()
+    if not argv:
+      argv = ['.']
+    with fstags:
+      for top_path in argv:
+        for path in rpaths(top_path):
+          with Pfx(path):
+            tagged_path = TaggedPath(path, fstags)
+            all_tags = tagged_path.all_tags
+            direct_tags = tagged_path.direct_tags
+            try:
+              over_box, = parse(path, discard_data=True)
+              print(path + ":")
+              for top_box in over_box:
+                for box, tags in top_box.gather_metadata():
+                  if tags:
+                    for tag in tags:
+                      if tag in all_tags:
+                        warning(
+                            "autotag %r: %s: tag already present",
+                            tagged_path.basename, tag
+                        )
+                      else:
+                        print("autotag %r + %s" % (tagged_path.basename, tag))
+                        direct_tags.add(tag)
+            except Exception as e:
+              warning("%s", e)
+              xit = 1
+    return xit
 
   @staticmethod
   def cmd_deref(argv, options, *, cmd):
@@ -170,9 +207,12 @@ class MP4Command(BaseCommand):
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
-        over_box, = parse(parsee)
+        over_box, = parse(parsee, discard_data=True)
         print(spec + ":")
-        report(over_box, indent='  ')
+        for top_box in over_box:
+          for box, tags in top_box.gather_metadata():
+            if tags:
+              print(box.box_type_path, "%d:" % (len(tags),), tags)
 
   @staticmethod
   def cmd_parse(argv, options, *, cmd):
@@ -748,7 +788,7 @@ class Box(Packet):
           )
         except EOFError as e:
           # TODO: recover the data already collected but lost
-          error(
+          debug(
               "EOFError parsing %s: %s at bfr_tail.offset=%d",
               body_class.__name__, e, bfr_tail.offset
           )
@@ -878,13 +918,19 @@ class Box(Packet):
       meta_box = self.META0
       if meta_box:
         tags.update(meta_box.tagset())
+      else:
+        pass  # X("NO .META0")
       udta_box = self.UDTA0
       if udta_box:
+        pass  # X("UDTA?")
         udta_meta_box = udta_box.META0
         if udta_meta_box:
           ilst_box = udta_meta_box.ILST0
           if ilst_box:
             tags.update(ilst_box.tags)
+      else:
+        pass  # X("NO UDTA")
+      ##dump_box(self, crop_length=None)
       return tags
 
   def gather_metadata(self):
@@ -2082,6 +2128,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'\xa9wrt': ILSTTextSchema('composer'),
       b'aART': ILSTTextSchema('album_artist'),
       b'catg': ILSTTextSchema('category'),
+      b'cnID': ILSTUInt32BESchema('itunes_catalogue_id'),
       b'covr': ILSTRawSchema('cover'),
       b'cpil': ILSTUInt8Schema('compilation'),
       b'cprt': ILSTTextSchema('copyright'),
@@ -2089,6 +2136,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'disk': ILSTUInt8Schema('disk_number'),
       b'egid': ILSTRawSchema('episode_guid'),
       b'genr': ILSTTextSchema('genre'),
+      b'hdvd': ILSTUInt8Schema('is_high_definition'),
       b'keyw': ILSTTextSchema('keyword'),
       b'ldes': ILSTTextSchema('long_description'),
       b'pcst': ILSTUInt8Schema('podcast'),
@@ -2099,6 +2147,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'soal': ILSTTextSchema('song_album_title'),
       b'soar': ILSTTextSchema('song_artist'),
       b'sonm': ILSTTextSchema('song_name'),
+      b'stik': ILSTUInt8Schema('itunes_media_type'),
       b'tmpo': ILSTUInt8Schema('bpm'),
       b'trkn': ILSTAofBSchema('track_number'),
       b'tven': ILSTTextSchema('tv_episode_number'),
@@ -2184,7 +2233,7 @@ class ILSTBoxBody(ContainerBoxBody):
             with data_box.reparse_buffer() as databfr:
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                ##warning("%r: no schema", subbox_type)
+                warning("%r: no schema", subbox_type)
                 pass
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)

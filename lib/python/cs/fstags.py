@@ -677,7 +677,9 @@ class Tag:
         value_s = to_str(value)
         # should be nonwhitespace
         if get_nonwhite(value_s)[0] != value_s:
-          raise ValueError("to_str(%r) => %r: contains whitespace" % (value, value_s))
+          raise ValueError(
+              "to_str(%r) => %r: contains whitespace" % (value, value_s)
+          )
         return value_s
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
@@ -871,6 +873,9 @@ class TagSet(HasFSTagsMixin):
     '''
     line = bs.decode(errors='replace')
     return cls.from_line(line)
+
+  def __len__(self):
+    return len(self.tagmap)
 
   def __contains__(self, tag):
     tagmap = self.tagmap

@@ -566,9 +566,7 @@ class CornuCopyBuffer(object):
       for buf in self.takev(bufskip):
         if copy_skip:
           copy_skip(buf)
-        bufskip -= len(buf)
-      assert bufskip == 0
-      toskip -= bufskip
+        toskip -= len(buf)
     assert toskip >= 0
     assert not self.bufs
     assert self.buflen == 0
