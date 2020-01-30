@@ -53,6 +53,8 @@ from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.x import X
 
+__version__ = '20200130'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [

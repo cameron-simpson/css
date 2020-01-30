@@ -532,7 +532,7 @@ class Package:
       with open(toppath, 'w') as tf:
         for line in lines:
           tf.write(line)
-      self.vcs.commit('set __version__ to ' + repr(version), toppath)
+      self.vcs.commit(self.name + ': set __version__ to ' + repr(version), toppath)
 
   @cachedmethod
   def check_basic(self, quiet=False):

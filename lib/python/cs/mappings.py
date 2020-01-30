@@ -23,6 +23,8 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
+__version__ = '20200130'
+
 DISTINFO = {
     'description':
     "Facilities for mappings and objects associated with mappings.",

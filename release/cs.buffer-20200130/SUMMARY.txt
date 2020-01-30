@@ -1,0 +1,1 @@
+CornuCopyBuffer.skip: bugfix adjustment of skipto for already buffered data.
