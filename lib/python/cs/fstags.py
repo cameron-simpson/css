@@ -72,6 +72,8 @@ from cs.resources import MultiOpenMixin
 from cs.threads import locked, locked_property
 from icontract import require
 
+__version__ = '20200130'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
