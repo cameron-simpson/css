@@ -3,6 +3,17 @@
 
 ''' Facilities associated with binary data parsing and transcription.
 
+    The classes in this module support easy parsing of binary data
+    structures.
+
+    These classes work in conjuction with a `cs.buffer.CornuCopyBuffer`
+    (henceforce a "buffer"),
+    which presents an iterable of bytes-like values
+    via various useful methods
+    and with factory methods to make one from a variety of sources
+    such as bytes, iterables, binary files, `mmap`ped files,
+    TCP data streams, etc.
+
     Note: this module requires Python 3 and recommends Python 3.6+
     because it uses abc.ABC, because a Python 2 bytes object is too
     weak (just a `str`) as also is my `cs.py3.bytes` hack class and
@@ -13,9 +24,6 @@
     of binary data obeying the buffer protocol, almost always a
     `bytes` instance or a `memoryview`, but in principle also things
     like `bytearray`.
-
-    The classes in this module support easy parsing of binary data
-    structures.
 
     The functions and classes in this module the following:
 
@@ -28,7 +36,6 @@
       `PacketField`s into a larger structure with ordered named
       fields.
       The fields themselves may be `Packet`s for complex structures.
-
 
     Several presupplied subclasses for common basic types such
     as `UInt32BE` (an unsigned 32 bit big endian integer).

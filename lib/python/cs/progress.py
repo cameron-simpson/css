@@ -14,6 +14,8 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
+__version__ = '20200129.3'
+
 DISTINFO = {
     'description':
     "A progress tracker with methods for throughput, ETA and update notification",
@@ -170,6 +172,14 @@ class BaseProgress(object):
       return None
     return time.time() + remaining
 
+  def count_of_total_bytes_text(self):
+    ''' Return "count units / total units" using binary units.
+    '''
+    return (
+        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + '/' +
+        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+    )
+
   def status(self, label, width):
     ''' A progress string of the form:
         *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
@@ -183,11 +193,7 @@ class BaseProgress(object):
         return label + ': ETA unknown'
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
-    left = (
-        label + ': ' +
-        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + ' / ' +
-        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1) + ' '
-    )
+    left = (label + ': ' + self.count_of_total_bytes_text() + ' ')
     if remaining is None:
       right = 'ETA unknown'
     else:
