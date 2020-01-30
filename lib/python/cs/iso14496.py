@@ -207,9 +207,12 @@ class MP4Command(BaseCommand):
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
-        over_box, = parse(parsee)
+        over_box, = parse(parsee, discard_data=True)
         print(spec + ":")
-        report(over_box, indent='  ')
+        for top_box in over_box:
+          for box, tags in top_box.gather_metadata():
+            if tags:
+              print(box.box_type_path, "%d:" % (len(tags),), tags)
 
   @staticmethod
   def cmd_parse(argv, options, *, cmd):
@@ -785,7 +788,7 @@ class Box(Packet):
           )
         except EOFError as e:
           # TODO: recover the data already collected but lost
-          error(
+          debug(
               "EOFError parsing %s: %s at bfr_tail.offset=%d",
               body_class.__name__, e, bfr_tail.offset
           )
@@ -915,13 +918,19 @@ class Box(Packet):
       meta_box = self.META0
       if meta_box:
         tags.update(meta_box.tagset())
+      else:
+        pass  # X("NO .META0")
       udta_box = self.UDTA0
       if udta_box:
+        pass  # X("UDTA?")
         udta_meta_box = udta_box.META0
         if udta_meta_box:
           ilst_box = udta_meta_box.ILST0
           if ilst_box:
             tags.update(ilst_box.tags)
+      else:
+        pass  # X("NO UDTA")
+      ##dump_box(self, crop_length=None)
       return tags
 
   def gather_metadata(self):
@@ -2224,7 +2233,7 @@ class ILSTBoxBody(ContainerBoxBody):
             with data_box.reparse_buffer() as databfr:
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                ##warning("%r: no schema", subbox_type)
+                warning("%r: no schema", subbox_type)
                 pass
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
