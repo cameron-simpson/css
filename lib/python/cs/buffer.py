@@ -490,6 +490,12 @@ class CornuCopyBuffer(object):
       return taken[0]
     return b''.join(taken)
 
+  def byte0(self):
+    ''' Consume the leading byte and return it as an `int` (`0`..`255`).
+    '''
+    byte0, = self.take(1)
+    return byte0
+
   def tell(self):
     ''' Compatibility method to allow using the buffer like a file.
     '''
