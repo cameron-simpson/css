@@ -123,8 +123,10 @@ class MP4Command(BaseCommand):
                       else:
                         print("autotag %r + %s" % (tagged_path.basename, tag))
                         direct_tags.add(tag)
+            except (TypeError, NameError, AttributeError):
+              raise
             except Exception as e:
-              warning("%s", e)
+              warning("%s: %s", type(e).__name__, e)
               xit = 1
     return xit
 
