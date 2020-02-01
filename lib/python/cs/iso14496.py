@@ -2166,6 +2166,55 @@ class ILSTBoxBody(ContainerBoxBody):
       b'tvsn': ILSTUInt32BESchema('tv_season'),
   }
 
+  itunes_store_country_code = namedtuple(
+      'itunes_store_country_code',
+      'country_name iso_3166_1_code itunes_store_code'
+  )
+
+  SFID_ISO_3166_1_ALPHA_3_CODE = {
+      iscc.itunes_store_code: iscc
+      for iscc in (
+          itunes_store_country_code('Australia', 'AUS', 143460),
+          itunes_store_country_code('Austria', 'AUT', 143445),
+          itunes_store_country_code('Belgium', 'BEL', 143446),
+          itunes_store_country_code('Canada', 'CAN', 143455),
+          itunes_store_country_code('Denmark', 'DNK', 143458),
+          itunes_store_country_code('Finland', 'FIN', 143447),
+          itunes_store_country_code('France', 'FRA', 143442),
+          itunes_store_country_code('Germany', 'DEU', 143443),
+          itunes_store_country_code('Greece', 'GRC', 143448),
+          itunes_store_country_code('Ireland', 'IRL', 143449),
+          itunes_store_country_code('Italy', 'ITA', 143450),
+          itunes_store_country_code('Japan', 'JPN', 143462),
+          itunes_store_country_code('Luxembourg', 'LUX', 143451),
+          itunes_store_country_code('Netherlands', 'NLD', 143452),
+          itunes_store_country_code('New Zealand', 'NZL', 143461),
+          itunes_store_country_code('Norway', 'NOR', 143457),
+          itunes_store_country_code('Portugal', 'PRT', 143453),
+          itunes_store_country_code('Spain', 'ESP', 143454),
+          itunes_store_country_code('Sweden', 'SWE', 143456),
+          itunes_store_country_code('Switzerland', 'CHE', 143459),
+          itunes_store_country_code('United Kingdom', 'GBR', 143444),
+          itunes_store_country_code('United States', 'USA', 143441),
+      )
+  }
+
+  itunes_media_type = namedtuple('itunes_media_type', 'type stik')
+
+  STIK_MEDIA_TYPES = {
+      imt.stik: imt
+      for imt in (
+          itunes_media_type('Movie', 0),
+          itunes_media_type('Music', 1),
+          itunes_media_type('Audiobook', 2),
+          itunes_media_type('Music Video', 6),
+          itunes_media_type('Movie', 9),
+          itunes_media_type('TV Show', 10),
+          itunes_media_type('Booklet', 11),
+          itunes_media_type('Ringtone', 14),
+      )
+  }
+
   SUBSUBBOX_SCHEMA = {
       'com.apple.iTunes': {
           'Browsepath': None,
