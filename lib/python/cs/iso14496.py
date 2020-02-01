@@ -651,7 +651,10 @@ class Box(Packet):
         but might be the samples if the body is a sample box,
         etc.
     '''
-    return iter(self.body)
+    if self.body is None:
+      ##warning("iter(%s): body is None", self)
+      return
+    yield from iter(self.body)
 
   def transcribe(self):
     ''' Transcribe the Box.
