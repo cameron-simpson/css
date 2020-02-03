@@ -103,7 +103,7 @@ def pfx(func):
 def pfx_method(method, use_str=False):
   ''' Decorator to provide a `Pfx` context for an instance method prefixing
       *classname.methodname*
-      (or *str(self).methodname* if `use_str` is true).
+      (or `str(self).`*methodname* if `use_str` is true).
   '''
 
   def wrapper(self, *a, **kw):

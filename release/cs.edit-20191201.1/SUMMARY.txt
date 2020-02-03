@@ -1,0 +1,1 @@
+Initial PyPI release: assorted functions for invoking editors on strings.

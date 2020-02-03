@@ -1,0 +1,5 @@
+Parsing of ILST boxes (iTunes metadata).
+Command line: new "info" subcommand reporting metadata, "autotag" applying metadata to fstags.
+
+Box tree walk, ancestor, iteration.
+Assorted cleanups and internal changes.

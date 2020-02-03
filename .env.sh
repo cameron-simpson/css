@@ -5,3 +5,4 @@
 #
 
 PATH=$ENV_DEV_DIR/bin:$ENV_DEV_DIR/venv/bin:$PATH
+##export PYTHONWARNINGS=default

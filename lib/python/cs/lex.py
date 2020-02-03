@@ -839,6 +839,42 @@ def as_lines(chunks, partials=None):
     if pos < len(chunk):
       partials.append(chunk[pos:])
 
+def cutprefix(s, prefix):
+  ''' Strip a `prefix` from the front of `s`.
+      Return the suffix if `.startswith(prefix)`, else `s`.
+
+      Example:
+
+          >>> abc_def = 'abc.def'
+          >>> cutprefix(abc_def, 'abc.')
+          'def'
+          >>> cutprefix(abc_def, 'zzz.')
+          'abc.def'
+          >>> cutprefix(abc_def, '.zzz') is abc_def
+          True
+  '''
+  if prefix and s.startswith(prefix):
+    return s[len(prefix):]
+  return s
+
+def cutsuffix(s, suffix):
+  ''' Strip a `suffix` from the end of `s`.
+      Return the prefix if `.endswith(suffix)`, else `s`.
+
+      Example:
+
+          >>> abc_def = 'abc.def'
+          >>> cutsuffix(abc_def, '.def')
+          'abc'
+          >>> cutsuffix(abc_def, '.zzz')
+          'abc.def'
+          >>> cutsuffix(abc_def, '.zzz') is abc_def
+          True
+  '''
+  if suffix and s.endswith(suffix):
+    return s[:-len(suffix)]
+  return s
+
 if __name__ == '__main__':
   import cs.lex_tests
   cs.lex_tests.selftest(sys.argv)

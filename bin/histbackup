@@ -89,7 +89,7 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 vecho=:
 symlink=LATEST
 src=
@@ -447,6 +447,28 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# have "cp -ral"? otherwise rely on my linktree script
+if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+then
+  mklinktree(){
+    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+    _mkl_src=$1
+    _mkl_dst=$2
+    case "$_mkl_dst" in
+      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+    esac
+    # make link tree, might fail if hard link limit reached for files
+    $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
+      # failed to make target? fail outright
+      [ -d "$_mkl_dst/." ] || return 1
+      # if we made the target, update from source
+      dorsync "$_mkl_src/" "$_mkl_dst/"
+    }
+  }
+else
+  mklinktree(){ $trace linktree "$1" "$2"; }
+fi
+
 if [ $linkonly ]
 then
   # protect against accidental misused of $src
@@ -545,7 +567,7 @@ lastbackup=$(
 
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
-  echo "DORSYNC $* ..." >&2
+  ##echo "DORSYNC $* ..." >&2
   _drs_src=$1
   _drs_dst=$2
   shift; shift
@@ -553,7 +575,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
@@ -590,6 +612,8 @@ then
   fi
 fi
 
+ok=1
+
 # New backup tree required.
 if [ $linkonly ]
 then
@@ -599,28 +623,33 @@ then
     exit 1
   }
   ( cd "$dest" || exit 1
-    dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
+    mklinktree "./$lastbackup" "$thisbackup" \
+    || dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
   )
 else
   # do a proper hardlinked backup
   ( cd "$dest" || exit 1
-    [ -z "$lastbackup" ] || set -- --link-dest="$absdest/$lastbackup/" ${1+"$@"}
-    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    if [ -n "$lastbackup" ]
+    then
+      mklinktree "./$lastbackup" "$thisbackup"
+      dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
+      || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    else
+      dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    fi
   )
 fi \
 || {
-  $trace rm -rf "$dest/$thisbackup"
-  exit 1
+  echo "$cmd: rsync failed, review errors and check the content of $absdest/$thisbackup" >&2
+  ok=
 }
-
-ok=1
 
 if [ $copytimes ]
 then
   $trace cpt "$src" "$dest/$thisbackup" || ok=
 fi
 
-if [ -n "$symlink" ]
+if [ $ok ] && [ -n "$symlink" ]
 then
   ( cd "$dest" || exit 1
     rm -f "$symlink"

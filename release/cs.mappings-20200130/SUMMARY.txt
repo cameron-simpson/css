@@ -1,0 +1,1 @@
+New dicts_to_namedtuples function to yield namedtuples from an iterable of dicts.
