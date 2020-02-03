@@ -11,6 +11,7 @@ from flask import (
 from cs.logutils import warning
 from cs.resources import RunStateMixin
 from . import defaults
+from .block import IndirectBlock
 from .hash import HashCode, MissingHashcodeError
 
 def main(argv=None):
@@ -49,6 +50,8 @@ def StoreApp(name, S):
 
   @app.route('/h/<hashname>/<hashcode_s>')
   def h(hashname, hashcode_s):
+    ''' Return a direct hashcode block.
+    '''
     try:
       h = HashCode.from_named_hashbytes_hex(hashname, hashcode_s)
     except ValueError as e:
@@ -64,7 +67,28 @@ def StoreApp(name, S):
       raise RuntimeError("NOTREACHED")
     rsp = app.make_response(data)
     rsp.headers.set('Content-Type', 'application/octet-stream')
-    rsp.headers.set('ETag', hashcode.etag)
+    rsp.headers.set('ETag', h.etag)
+    return rsp
+
+  @app.route('/vt/i/<hashname>/<hashcode_s>')
+  def i(hashname, hashcode_s):
+    ''' Return an indirect hashcode block.
+    '''
+    try:
+      h = HashCode.from_named_hashbytes_hex(hashname, hashcode_s)
+    except ValueError as e:
+      warning(
+          "HashCode.from_hashbytes_hex(%r,%r): %s", hashname, hashcode_s, e
+      )
+      abort(404, 'invalid hashcode')
+      raise RuntimeError("NOTREACHED")
+    IB = IndirectBlock.from_hashcode(h, span=None)
+    start = 0
+    length = max(0, len(IB) - start)
+    rsp = Response(IB.datafrom(start=start))
+    rsp.headers.set('Content-Type', 'application/octet-stream')
+    rsp.headers.set('Content-Length', str(length))
+    rsp.headers.set('ETag', '"VTI:' + h.bare_etag) + '"'
     return rsp
 
   return app
