@@ -128,6 +128,13 @@ class FSTagsCommand(BaseCommand):
                     Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
       '{', '{{'
   ).replace('}', '}}') + '''
+    {cmd} json_import {{-|path}} {{-|tags.json}}
+        Apply JSON data to path.
+        A path named "-" indicates that paths should be read from
+        the standard input.
+        The JSON tag data come from the file "tags.json"; the name
+        "-" indicates that the JSON data should be read from the
+        standard input.
     {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         --direct    List direct tags instead of all tags.
@@ -265,6 +272,57 @@ class FSTagsCommand(BaseCommand):
                              ).format_kwargs(direct=use_direct_tags)
             )
         )
+
+  @classmethod
+  def cmd_json_import(cls, argv, options, *, cmd):
+    ''' Find paths matching tag criteria.
+    '''
+    fstags = options.fstags
+    tag_prefix = ''
+    badopts = False
+    options, argv = getopt(argv, '', longopts=['prefix='])
+    for option, value in options:
+      with Pfx(option):
+        if option == '--prefix':
+          tag_prefix = value + '__'
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      warning("missing path")
+      badopts = True
+    else:
+      path = argv.pop(0)
+    if not argv:
+      warning("missing tags.json")
+      badopts = True
+    else:
+      json_path = argv.pop(0)
+    if path == '-' and json_path == '-':
+      warning('path and tags.pjson may not both be "-"')
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    if path == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = [path]
+    if json_path == '-':
+      with Pfx("json.load(sys.stdin)"):
+        data = json.load(sys.stdin)
+    else:
+      with Pfx("open(%r)", json_path):
+        with open(json_path) as f:
+          with Pfx("json.load"):
+            data = json.load(f)
+    if not isinstance(data, dict):
+      error("JSON data do not specify a dict: %s", type(dict))
+      return 1
+    with fstags:
+      for path in paths:
+        with Pfx(path):
+          tagged_path = TaggedPath(path, fstags=fstags)
+          for key, value in data.items():
+            tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
@@ -918,8 +976,13 @@ class TagSet(HasFSTagsMixin):
     ''' Add a tag to these tags.
     '''
     tag = Tag.from_name_value(tag_name, value)
-    self.tagmap[tag.name] = tag.value
-    self.modified = True
+    tag_name = tag.name
+    tagmap = self.tagmap
+    value = tag.value
+    if tag_name not in tagmap or tagmap[tag_name] != value:
+      info("+ %s", tag)
+      tagmap[tag_name] = value
+      self.modified = True
 
   def discard(self, tag_name, value=None):
     ''' Discard the tag matching `(tag_name,value)`.
@@ -939,7 +1002,9 @@ class TagSet(HasFSTagsMixin):
       if value is None or tagmap[tag_name] == value:
         old_value = tagmap.pop(tag_name)
         self.modified = True
-      return Tag(tag_name, old_value)
+        old_tag = Tag(tag_name, old_value)
+        info("- %s", old_tag)
+        return old_tag
     return None
 
   def update(self, other):
