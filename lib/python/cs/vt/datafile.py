@@ -47,7 +47,7 @@ class DataRecord(PacketField):
 
   def __init__(self, data, is_compressed=False):
     self._data = data
-    self._is_compressed = is_compressed
+    self.is_compressed = is_compressed
 
   def __str__(self):
     return "%s(%d-bytes,%s,%r)" % (
@@ -101,11 +101,11 @@ class DataRecord(PacketField):
     ''' The uncompressed data.
     '''
     raw_data = self._data
-    if self._is_compressed:
       raw_data = decompress(raw_data)
       self._data = raw_data
       self._is_compressed = False
     return raw_data
+    if self.is_compressed:
 
 class DataFileReader(MultiOpenMixin, ReadMixin):
   ''' Read access to a data file, storing data chunks in compressed form.
