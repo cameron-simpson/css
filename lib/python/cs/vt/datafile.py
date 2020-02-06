@@ -69,7 +69,8 @@ class DataRecord(PacketField):
     flags = BSUInt.value_from_buffer(bfr)
     data = BSData.value_from_buffer(bfr)
     is_compressed = (flags & DataFlag.COMPRESSED) != 0
-    flags &= ~DataFlag.COMPRESSED
+    if is_compressed:
+      flags &= ~DataFlag.COMPRESSED
     if flags:
       raise ValueError("unsupported flags: 0x%02x" % (flags,))
     return cls(data, is_compressed=is_compressed)
