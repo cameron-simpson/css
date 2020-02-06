@@ -16,7 +16,7 @@ from os import (
 )
 from stat import S_ISREG
 import sys
-from zlib import compress, decompress
+from zlib import decompress
 from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.buffer import CornuCopyBuffer
@@ -81,21 +81,11 @@ class DataRecord(PacketField):
     '''
     return cls.from_buffer(CornuCopyBuffer(datafrom_fd(rfd, offset=offset)))
 
-  def transcribe(self, uncompressed=False):
+  def transcribe(self):
     ''' Transcribe this data chunk as a data record.
     '''
-    data = self._data
-    is_compressed = self._is_compressed
-    if uncompressed:
-      flags = 0x00
-      if is_compressed:
-        data = decompress(data)
-    else:
-      flags = DataFlag.COMPRESSED
-      if not is_compressed:
-        data = compress(data)
-    yield BSUInt.transcribe_value(flags)
-    yield BSData.transcribe_value(data)
+    yield BSUInt.transcribe_value(self.flags)
+    yield BSData.transcribe_value(self._data)
 
   @property
   def data(self):
