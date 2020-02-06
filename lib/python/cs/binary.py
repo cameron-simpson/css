@@ -278,7 +278,6 @@ class PacketField(ABC):
     '''
     value = cls.value_from_buffer(bfr, **kw)
     return cls(value, **kw)
-    ##return cls(cls.value_from_buffer(bfr, **kw))
 
   @staticmethod
   def value_from_buffer(bfr, **kw):
