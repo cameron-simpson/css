@@ -92,7 +92,7 @@
     The leaves of this hierarchy will be `PacketField`s,
     whose attributes are ordinary types.
 
-    By contrast, a `PacketField`'s attributes are "flat" values:
+    By contrast, a `PacketField`'s attributes are expected to be "flat" values:
     the plain post-parse value, such as a `str` or an `int`
     or some other conventional Python type.
 
@@ -271,8 +271,10 @@ class PacketField(ABC):
   def from_buffer(cls, bfr, **kw):
     ''' Factory to return a `PacketField` instance from a `CornuCopyBuffer`.
 
-        This default implementation instantiates the instance from
-        the value returned by `cls.value_from_buffer(bfr, **kw)`.
+        This default implementation is for single value `PacketField`s
+        and instantiates the instance from the value returned
+        by `cls.value_from_buffer(bfr, **kw)`;
+        implementors should implement `value_from_buffer`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
     return cls(value, **kw)
