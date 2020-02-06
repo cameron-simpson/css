@@ -887,7 +887,7 @@ Float64LE.TEST_CASES = (
 )
 
 class BSUInt(PacketField):
-  ''' A binary serialsed unsigned int.
+  ''' A binary serialised unsigned int.
 
       This uses a big endian byte encoding where continuation octets
       have their high bit set. The bits contributing to the value
@@ -1065,12 +1065,12 @@ class ListField(PacketField):
 _multi_struct_fields = {}
 
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
-  ''' Factory for `PacketField` subclasses build around complex struct formats.
+  ''' Factory for `PacketField` subclasses build around complex `struct` formats.
 
       Parameters:
-      * `struct_format`: the struct format string
-      * `subvalue_names`: an optional namedtuple field name list;
-        if supplied then the field value will be a namedtuple with
+      * `struct_format`: the `struct` format string
+      * `subvalue_names`: an optional field name list;
+        if supplied then the field value will be a `namedtuple` with
         these names
       * `class_name`: option name for the generated class
   '''
@@ -1093,7 +1093,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
       @classmethod
       def from_buffer(cls, bfr):
-        ''' Parse via struct.unpack.
+        ''' Parse via `struct.unpack`.
         '''
         bs = bfr.take(struct.size)
         values = struct.unpack(bs)
@@ -1112,14 +1112,14 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     if subvalue_names:
       MultiStructField.__doc__ = (
           ''' A `PacketField` which parses and transcribes the struct
-              format `%r`, whose `.value` is a namedtuple with
+              format `%r`, whose `.value` is a `namedtuple` with
               attributes %r.
           ''' % (struct_format, subvalue_names)
       )
     else:
       MultiStructField.__doc__ = (
           ''' A `PacketField` which parses and transcribes the struct
-              format `%r`, whose `.value` is a tuple of the struct values.
+              format `%r`, whose `.value` is a `tuple` of the struct values.
           ''' % (struct_format,)
       )
     MultiStructField.struct = struct
