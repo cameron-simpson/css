@@ -970,6 +970,12 @@ class BSData(PacketField):
     yield BSUInt.transcribe_value(len(data))
     yield data
 
+  @staticmethod
+  def data_offset_for(bs):
+    ''' Compute the `data_offset` which would obtain for the bytes `bs`.
+    '''
+    return len(BSUInt.transcribe_value(len(bs)))
+
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
