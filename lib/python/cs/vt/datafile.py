@@ -172,7 +172,7 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     return DataRecord.from_buffer(self.bufferfrom(offset))
 
   def fetch(self, offset):
-    ''' Fetch the nucompressed data at `offset`.
+    ''' Fetch the uncompressed data at `offset`.
     '''
     return self.fetch_record(offset).data
 
