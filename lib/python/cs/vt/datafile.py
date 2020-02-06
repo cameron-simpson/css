@@ -100,11 +100,10 @@ class DataRecord(PacketField):
   def data(self):
     ''' The uncompressed data.
     '''
-    raw_data = self._data
-      raw_data = decompress(raw_data)
-      self._data = raw_data
-      self._is_compressed = False
-    return raw_data
+    data = self._data
+    if self.is_compressed:
+      return decompress(data)
+    return data
     if self.is_compressed:
 
 class DataFileReader(MultiOpenMixin, ReadMixin):
