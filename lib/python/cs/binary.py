@@ -178,7 +178,7 @@ def flatten(chunks):
 class PacketField(ABC):
   ''' A record for an individual packet field.
 
-      This normally holds a single value, such as a int of a particular size
+      This normally holds a single value, such as an int of a particular size
       or a string.
 
       There are 2 basic ways to implement a `PacketField` subclass.
@@ -189,7 +189,7 @@ class PacketField(ABC):
       * `transcribe_value`:
         transcribe the value as bytes
 
-      Sometimes a `PacketField` may be slightly more complex
+      Sometimes a `PacketField` may be more complex
       while still not warranting (or perhaps fitting)
       the formality of a `Packet` with its multifield structure.
 
