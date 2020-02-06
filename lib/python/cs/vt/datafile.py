@@ -105,6 +105,15 @@ class DataRecord(PacketField):
       flags |= DataFlag.COMPRESSED
     return flags
 
+  @property
+  def data_offset(self):
+    ''' The offset of the data chunk within the transcribed `DataRecord`.
+    '''
+    return (
+        len(BSUInt.transcribe_value(self.flags)) +
+        BSData.data_offset_for(self._data)
+    )
+
 class DataFileReader(MultiOpenMixin, ReadMixin):
   ''' Read access to a data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local Store.
