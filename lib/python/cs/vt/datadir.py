@@ -103,12 +103,12 @@ INDEX_FLUSH_RATE = 16384
 class DataFileState(SimpleNamespace):
   ''' General state information about a data file
       in use by a files based data dir
-      (any subclass of `_FiledDir`).
+      (any subclass of `FilesdDir`).
 
       Attributes:
-      * `datadir`: the `_FilesDir` tracking this state.
+      * `datadir`: the `FilesDir` tracking this state.
       * `filenum`: the numeric index of this file.
-      * `filename`: path relative to the `_FilesDir`'s data directory.
+      * `filename`: path relative to the `FilesDir`'s data directory.
       * `indexed_to`: the amount of data scanned and indexed so far.
   '''
 
@@ -189,11 +189,11 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
 
         Parameters:
         * `statedirpath`: a directory containing state information about the
-          DataFiles; this is the index-state.csv file and the associated
-          index dbm-ish files.
+          `DataFile`s; this contains the index-state.csv file and the
+          associated index dbm-ish files.
         * `hashclass`: the hashclass used for indexing
-        * `indexclass`: the IndexClass providing the index to chunks in the
-          DataFiles. If not specified, a supported index class with an
+        * `indexclass`: the `IndexClass` providing the index to chunks in the
+          `DataFile`s. If not specified, a supported index class with an
           existing index file will be chosen, otherwise the most favoured
           indexclass available will be chosen.
         * `rollover`: data file roll over size; if a data file grows beyond
@@ -274,7 +274,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
         os.mkdir(datasubdirpath)
 
   def startup(self):
-    ''' Start up the _FilesDir: take locks, start worker threads etc.
+    ''' Start up the FilesDir: take locks, start worker threads etc.
     '''
     X("STARTUP %s ...", type(self).__name__)
     self.initdir()
@@ -309,7 +309,7 @@ class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
     )
 
   def shutdown(self):
-    ''' Shut down the _FilesDir: cancel the runstate, close the
+    ''' Shut down the `FilesDir`: cancel the runstate, close the
         queues, join the worker threads.
     '''
     self.runstate.cancel()
@@ -570,7 +570,7 @@ class SqliteFilemap:
 
       The implementation is an in-memory dict with an SQLite database
       as backing store. SQLite databases are portable across
-      architectures and may have multiple users, so that DataDirs
+      architectures and may have multiple users, so that `DataDir`s
       may be shared.
   '''
 
@@ -633,19 +633,19 @@ class SqliteFilemap:
     return None
 
   def filenums(self):
-    ''' Return the active DFstate filenums.
+    ''' Return the active `DFstate` filenums.
     '''
     with self._lock:
       return list(self.n_to_DFstate.keys())
 
   def items(self):
-    ''' Return the active (filenum, DFstate) pairs.
+    ''' Return the active `(filenum,DFstate)` pairs.
     '''
     with self._lock:
       return list(self.n_to_DFstate.items())
 
   def _map(self, path, filenum, indexed_to=0):
-    ''' Add a DataFileState for `path` and `filenum` to the mapping.
+    ''' Add a `DataFileState` for `path` and `filenum` to the mapping.
     '''
     if path is None:
       error(
@@ -748,6 +748,17 @@ class SqliteFilemap:
 
 class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
   ''' A block record for a `DataDir`.
+
+      This has the following attributes:
+      * `filenum`: the file number of the file containing the block
+      * `data_offset`: the offset within the file of the data chunk
+      * `data_length`: the length of the chunk
+      * `flags`: information about the chunk
+
+      The only defined flag at present is
+      `DataDirIndexEntry.FLAG_COMPRESSED`, indicating that the raw
+      data should be obtained by uncompressing the chunk using
+      `zlib.uncompress`.
   '''
 
   @classmethod
@@ -776,14 +787,14 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
 class DataDir(_FilesDir):
   ''' Maintenance of a collection of DataFiles in a directory.
 
-      A DataDir may be used as the Mapping for a MappingStore.
+      A `DataDir` may be used as the Mapping for a `MappingStore`.
 
       NB: _not_ thread safe; callers must arrange that.
 
       The directory may be maintained by multiple instances of this
-      class as they will not try to add data to the same DataFile.
-      This is intended to address shared Stores such as a Store on
-      a NAS presented via NFS, or a Store replicated by an external
+      class as they will not try to add data to the same `DataFile`.
+      This is intended to address shared `Store`s such as a `Store` on
+      a NAS presented via NFS, or a `Store` replicated by an external
       file-level service such as Dropbox or plain old rsync.
   '''
 
@@ -1055,7 +1066,7 @@ class PlatonicDir(_FilesDir):
         * `archive`: optional `Archive` ducktype instance with a
           .update(Dirent[,when]) method
 
-        Other keyword arguments are passed to `_FilesDir.__init__`.
+        Other keyword arguments are passed to `FilesDir.__init__`.
 
         The directory and file paths tested are relative to the
         data directory path.
