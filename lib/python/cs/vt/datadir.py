@@ -158,8 +158,8 @@ class DataFileState(SimpleNamespace):
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
 
-class _FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin,
-                FlaggedMixin, Mapping):
+class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
+               Mapping):
   ''' Base class indexing locally stored data in files.
       This class is hashclass specific;
       the utilising Store maintains one of these for each supported hashclass.
@@ -784,8 +784,8 @@ class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
     '''
     return DataRecord.from_fd(rfd, self.offset).data
 
-class DataDir(_FilesDir):
-  ''' Maintenance of a collection of DataFiles in a directory.
+class DataDir(FilesDir):
+  ''' Maintenance of a collection of `DataFile`s in a directory.
 
       A `DataDir` may be used as the Mapping for a `MappingStore`.
 
@@ -925,7 +925,7 @@ class RawIndexEntry(namedtuple('RawIndexEntry', 'filenum offset length')):
       )
     return bs
 
-class RawDataDir(_FilesDir):
+class RawDataDir(FilesDir):
   ''' Maintenance of a collection of raw data files in a directory.
 
       This is intended as a fairly fast local data cache directory.
@@ -1014,7 +1014,7 @@ class PlatonicFile(MultiOpenMixin, ReadMixin):
       readsize = DEFAULT_READSIZE
     return datafrom_fd(self._fd, offset, readsize)
 
-class PlatonicDir(_FilesDir):
+class PlatonicDir(FilesDir):
   ''' Presentation of a block map based on a raw directory tree of
       files such as a preexisting media server.
 
