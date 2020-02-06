@@ -104,7 +104,15 @@ class DataRecord(PacketField):
     if self.is_compressed:
       return decompress(data)
     return data
+
+  @property
+  def flags(self):
+    ''' The flags for this `DataRecord`.
+    '''
+    flags = 0x00
     if self.is_compressed:
+      flags |= DataFlag.COMPRESSED
+    return flags
 
 class DataFileReader(MultiOpenMixin, ReadMixin):
   ''' Read access to a data file, storing data chunks in compressed form.
