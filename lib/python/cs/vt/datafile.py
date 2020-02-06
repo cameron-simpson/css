@@ -36,7 +36,11 @@ class DataFlag(IntFlag):
   COMPRESSED = 0x01
 
 class DataRecord(PacketField):
-  ''' A data chunk file record.
+  ''' A data chunk file record for storage in a `.vtd` file.
+
+      The record format is:
+      * `flags`: `BSUInt`
+      * `data`: `BSData`
   '''
 
   TEST_CASES = ((b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),)
@@ -46,11 +50,14 @@ class DataRecord(PacketField):
     self._is_compressed = is_compressed
 
   def __str__(self):
-    return "%s(%d-bytes,%s)" % (
+    return "%s(%d-bytes,%s,%r)" % (
         type(self).__name__,
         len(self._data),
-        "compressed" if self._is_compressed else "raw",
+        "compressed" if self.is_compressed else "raw",
+        self._data,
     )
+
+  __repr__ = __str__
 
   def __eq__(self, other):
     return self.data == other.data
