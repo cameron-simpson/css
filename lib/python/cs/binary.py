@@ -943,20 +943,32 @@ class BSData(PacketField):
       (b'A', b'\x01A'),
   )
 
-  @staticmethod
-  def value_from_buffer(bfr):
-    return bfr.take(BSUInt.value_from_buffer(bfr))
+  def __init__(self, data, data_offset=None):
+    if data_offset is None:
+      data_offset = len(BSUInt(len(data)))
+    else:
+      assert data_offset == len(BSUInt(len(data)))
+    self.data = data
+    self.data_offset = data_offset
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    offset0 = bfr.offset
+    data_length = BSUInt.value_from_buffer(bfr)
+    data_offset = bfr.offset - offset0
+    data = bfr.take(data_length)
+    return cls(data, data_offset=data_offset)
+
+  @property
+  def value(self):
+    return self.data
 
   def transcribe(self):
     ''' Transcribe the payload length and then the payload.
     '''
-    payload = self.value
-    yield BSUInt.transcribe_value(len(payload))
-    yield payload
-
-  @classmethod
-  def transcribe_value(cls, data):
-    return b''.join(cls(data).transcribe())
+    data = self.data
+    yield BSUInt.transcribe_value(len(data))
+    yield data
 
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
