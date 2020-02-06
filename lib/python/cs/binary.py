@@ -279,13 +279,16 @@ class PacketField(ABC):
     value = cls.value_from_buffer(bfr, **kw)
     return cls(value, **kw)
 
-  @staticmethod
-  def value_from_buffer(bfr, **kw):
+  @classmethod
+  def value_from_buffer(cls, bfr, **kw):
     ''' Function to parse and return the core value from a `CornuCopyBuffer`.
 
         For single value fields it is enough to implement this method.
+
+        For multiple value fields it is better to implement `cls.from_buffer`.
     '''
-    raise NotImplementedError("no value_from_buffer method")
+    packet = cls.from_buffer(bfr, **kw)
+    return packet.value
 
   @classmethod
   def parse_buffer(cls, bfr, **kw):
