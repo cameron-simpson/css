@@ -43,7 +43,7 @@ class DataRecord(PacketField):
       * `data`: `BSData`
   '''
 
-  TEST_CASES = ((b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),)
+  TEST_CASES = ((b'', b'\x00\x00'),)
 
   def __init__(self, data, is_compressed=False):
     self._data = data
