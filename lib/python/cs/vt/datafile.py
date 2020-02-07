@@ -166,32 +166,6 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
       readsize = 2048
     return datafrom_fd(self._rfd, offset, readsize)
 
-  def fetch_record(self, offset):
-    ''' Fetch a DataRecord from the supplied `offset`.
-    '''
-    return DataRecord.from_buffer(self.bufferfrom(offset))
-
-  def fetch(self, offset):
-    ''' Fetch the uncompressed data at `offset`.
-    '''
-    return self.fetch_record(offset).data
-
-  @staticmethod
-  def scanbuffer(bfr):
-    ''' Generator yielding `(DataRecords,post_offset)` from a DataFile.
-
-        Parameters:
-        * `bfr`: the buffer.
-    '''
-    for record in DataRecord.parse_buffer(bfr):
-      yield record, bfr.offset
-
-  def scanfrom(self, offset=0):
-    ''' Generator yielding `(DataRecord,post_offset)` from the
-        DataFile starting from `offset`, default `0`.
-    '''
-    return self.scanbuffer(self.bufferfrom(offset))
-
   @require(lambda self, offset: 0 <= offset <= len(self))
   def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
     ''' Push the Blocks from this DataFile to the Store `S2`.
@@ -208,12 +182,12 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     '''
     if progress:
       progress.total += len(self) - offset
-    for DR, post_offset in self.scanfrom(offset=offset):
+    bfr = CornuCopyBuffer(self.datafrom(offset), offset=offset)
+    for pre_offset, DR in DataRecord.parse_buffer_with_offsets(bfr):
       if runstate and runstate.cancelled:
         return False
       data = DR.data
-      Q.put((data, post_offset - offset))
-      offset = post_offset
+      Q.put((data, bfr.offset - pre_offset))
     return True
 
 class DataFileWriter(MultiOpenMixin):
