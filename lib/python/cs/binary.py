@@ -294,20 +294,22 @@ class PacketField(ABC):
   def parse_buffer_with_offsets(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls` from the buffer `bfr`
         until end of input.
-        Yields `(offset,instance)`
-        where `offset` if the buffer offset where the instance commenced.
+        Yields `(offset,instance,post_offset)`
+        where `offset` if the buffer offset where the instance commenced
+        and `post_offset` is the buffer offset after the instance.
     '''
     offset = bfr.offset
     while not bfr.at_eof():
-      yield offset, cls.from_buffer(bfr, **kw)
-      offset = bfr.offset
+      post_offset = bfr.offset
+      yield offset, cls.from_buffer(bfr, **kw), post_offset
+      offset = post_offset
 
   @classmethod
   def parse_buffer(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls` from the buffer `bfr`
         until end of input.
     '''
-    for _, obj in cls.parse_buffer_with_offsets(bfr, **kw):
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
       yield obj
 
   @classmethod
@@ -315,7 +317,7 @@ class PacketField(ABC):
     ''' Function to parse repeated instances of `cls.value`
         from the buffer `bfr` until end of input.
     '''
-    for _, obj in cls.parse_buffer_with_offsets(bfr, **kw):
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
       yield obj.value
 
   def transcribe(self):
@@ -980,6 +982,8 @@ class BSData(PacketField):
 
   @property
   def value(self):
+    ''' The "value", `self.data`.
+    '''
     return self.data
 
   def transcribe(self):
