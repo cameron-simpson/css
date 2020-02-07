@@ -140,8 +140,8 @@ class LMDBIndex(_Index):
   SUFFIX = 'lmdb'
   MAP_SIZE = 1024 * 1024 * 1024
 
-  def __init__(self, lmdbpathbase, hashclass, decode):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._lmdb = None
     self._resize_needed = False
     # Locking around transaction control logic.
@@ -267,10 +267,12 @@ class LMDBIndex(_Index):
     ''' Yield `(hashcode,record)` from index.
     '''
     mkhash = self.hashclass.from_hashbytes
+    mkentry = FileDataIndexEntry.from_bytes
     with self._txn() as txn:
       cursor = txn.cursor()
-      for hashcode, record in cursor.iternext(keys=True, values=True):
-        yield mkhash(hashcode), self.decode(record)
+      for binary_hashcode, binary_record in cursor.iternext(keys=True,
+                                                            values=True):
+        yield (mkhash(binary_hashcode), mkentry(binary_record))
 
   def _get(self, hashcode):
     with self._txn() as txn:
@@ -280,10 +282,9 @@ class LMDBIndex(_Index):
     return self._get(hashcode) is not None
 
   def __getitem__(self, hashcode):
-    record = self._get(hashcode)
-    if record is None:
+    binary_record = self._get(hashcode)
+    if binary_record is None:
       raise KeyError(hashcode)
-    return self.decode(record)
 
   def get(self, hashcode, default=None):
     ''' Get and decode the record for `hashcode`.
@@ -293,14 +294,15 @@ class LMDBIndex(_Index):
     if entry is None:
       return default
     return self.decode(entry)
+    return FileDataIndexEntry(binary_record)
 
   def __setitem__(self, hashcode, entry):
     import lmdb
-    record = entry.encode()
+    binary_record = bytes(entry)
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, record, overwrite=True)
+          txn.put(hashcode, binary_record, overwrite=True)
           txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
@@ -315,8 +317,8 @@ class GDBMIndex(_Index):
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase, hashclass, decode):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._gdbm = None
 
   @classmethod
@@ -372,8 +374,8 @@ class GDBMIndex(_Index):
 
   def __getitem__(self, hashcode):
     with self._gdbm_lock:
-      entry = self._gdbm[hashcode]
-    return self.decode(entry)
+      binary_record = self._gdbm[hashcode]
+    return FileDataIndexEntry(binary_record)
 
   def get(self, hashcode, default=None):
     ''' Get and decode the record for `hashcode`.
@@ -398,8 +400,8 @@ class NDBMIndex(_Index):
   NAME = 'ndbm'
   SUFFIX = 'ndbm'
 
-  def __init__(self, lmdbpathbase, hashclass, decode):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._ndbm = None
 
   @classmethod
@@ -442,8 +444,8 @@ class NDBMIndex(_Index):
 
   def __getitem__(self, hashcode):
     with self._ndbm_lock:
-      entry = self._ndbm[hashcode]
-    return self.decode(entry)
+      binary_entry = self._ndbm[hashcode]
+    return FileDataIndexEntry.from_bytes(binary_entry)
 
   def get(self, hashcode, default=None):
     ''' Get and decode the record for `hashcode`.
@@ -471,8 +473,8 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, lmdbpathbase, hashclass, decode):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._kyoto = None
 
   @classmethod
@@ -520,12 +522,12 @@ class KyotoIndex(_Index):
     if record is None:
       return None
     return self.decode(record)
-
   def __getitem__(self, hashcode):
-    entry = self.get(hashcode)
-    if entry is None:
-      raise IndexError(str(hashcode))
-    return entry
+    binary_record = self._kyoto.get(hashcode)
+    if binary_record is None:
+      raise KeyError(hashcode)
+    return FileDataIndexEntry(binary_record)
+
 
   def __setitem__(self, hashcode, value):
     self._kyoto[hashcode] = value.encode()
