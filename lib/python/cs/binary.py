@@ -291,20 +291,32 @@ class PacketField(ABC):
     return packet.value
 
   @classmethod
+  def parse_buffer_with_offsets(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+        Yields `(offset,instance)`
+        where `offset` if the buffer offset where the instance commenced.
+    '''
+    offset = bfr.offset
+    while not bfr.at_eof():
+      yield offset, cls.from_buffer(bfr, **kw)
+      offset = bfr.offset
+
+  @classmethod
   def parse_buffer(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls` from the buffer `bfr`
         until end of input.
     '''
-    while not bfr.at_eof():
-      yield cls.from_buffer(bfr, **kw)
+    for _, obj in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj
 
   @classmethod
   def parse_buffer_values(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls.value`
         from the buffer `bfr` until end of input.
     '''
-    while not bfr.at_eof():
-      yield cls.from_buffer(bfr, **kw).value
+    for _, obj in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj.value
 
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
