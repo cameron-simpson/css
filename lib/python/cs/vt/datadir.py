@@ -149,14 +149,14 @@ class DataFileState(SimpleNamespace):
       return None
     return S.st_size
 
-  def scanfrom(self, offset=0, **kw):
+  def scanfrom(self, offset=0):
     ''' Scan this datafile from the supplied `offset` (default `0`)
         yielding `(offset,flags,data, post_offset)`.
 
         We use the `DataDir`'s `.scanfrom` method because it knows the
         format of the file.
     '''
-    yield from self.datadir.scanfrom(self.pathname, offset=offset, **kw)
+    yield from self.datadir.scanfrom(self.pathname, offset=offset)
 
 class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
                Mapping):
@@ -1323,10 +1323,10 @@ class PlatonicDir(FilesDir):
       self.flush()
 
   @staticmethod
-  def scanfrom(filepath, offset=0, do_decompress=False):
-    ''' Scan the specified `filepath` from `offset`, yielding data chunks.
+  def scanfrom(filepath, offset=0):
+    ''' Scan the specified `filepath` from `offset`,
+        yielding data `(pre_offset, data, post_offset)`.
     '''
-    assert do_decompress is True
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
