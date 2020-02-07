@@ -10,20 +10,12 @@
 '''
 
 from enum import IntFlag
-import os
-from os import (
-    fstat,
-)
-from stat import S_ISREG
 import sys
 from zlib import decompress
 from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.buffer import CornuCopyBuffer
-from cs.fileutils import ReadMixin, datafrom_fd
-from cs.resources import MultiOpenMixin
-from . import Lock
-from .util import createpath, openfd_read, openfd_append, append_data
+from cs.fileutils import datafrom
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
