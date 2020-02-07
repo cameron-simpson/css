@@ -263,13 +263,9 @@ class LMDBIndex(_Index):
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
-  def keys(self, hashclass=None):
-    if hashclass is not None:
-      if hashclass is not self.hashclass:
-        raise RuntimeError(
-            "%s.keys: hashclass:%s != self.hashclass:%s" %
-            (type(self), hashclass, self.hashclass)
-        )
+  def keys(self):
+    ''' Return an iterator yielding hashcodes.
+    '''
     return iter(self)
 
   def items(self):
