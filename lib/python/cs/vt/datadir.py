@@ -394,7 +394,7 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
         Subclasses must define the `data_save_information(data)` method.
     '''
-    bs = self.data_record(data)
+    bs, data_offset, data_length, flags = self.data_save_information(data)
     with self._lock:
       wfd = self._wfd
       filenum = self._WDFstate.filenum
@@ -746,20 +746,22 @@ class DataDir(FilesDir):
   DATA_DOT_EXT = DATAFILE_DOT_EXT
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-
   @staticmethod
-  def data_record(data):
-    ''' Return the record for data to save in the save file.
+  def data_save_information(data):
+    ''' Return data and associated information to be appended to
+        the current save file.
+
+        A `DataFile` stores a serialised `DataRecord`.
     '''
-    return bytes(DataRecord(data))
+    DR = DataRecord(data)
+    return bytes(DR), DR.data_offset, DR.raw_data_length, DR.flags
 
   @staticmethod
   def scanfrom(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
     bfr = buffer_from_pathname(filepath, offset=offset)
-    for record in DataRecord.parse_buffer(bfr):
-      yield record
+    yield from DataRecord.parse_buffer(bfr)
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
@@ -855,14 +857,14 @@ class RawDataDir(FilesDir):
   DATA_DOT_EXT = RAWFILE_DOT_EXT
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-
-    '''
-
   @staticmethod
-  def data_record(data):
-    ''' Return the record for data to save in the save file.
+  def data_save_information(data):
+    ''' Return data and associated information to be appended to
+        the current save file.
+
+        A raw data file just stores the data directly.
     '''
-    return data
+    return data, 0, len(data), 0
 
   def _monitor_datafiles(self):
     pass
@@ -1171,11 +1173,8 @@ class PlatonicDir(FilesDir):
                     )
                   scan_from = DFstate.scanned_to
                   scan_start = time.time()
-                  for offset, flags, data, post_offset in DFstate.scanfrom(
-                      offset=DFstate.scanned_to,
-                      do_decompress=True,
-                  ):
-                    assert flags == 0
+                  for pre_offset, data, post_offset in DFstate.scanfrom(
+                      offset=DFstate.scanned_to):
                     hashcode = self.hashclass.from_chunk(data)
                     indexQ.put(
                         (
@@ -1187,7 +1186,7 @@ class PlatonicDir(FilesDir):
                     )
                     if meta_store is not None:
                       B = Block(data=data, hashcode=hashcode, added=True)
-                      blockQ.put((offset, B))
+                      blockQ.put((pre_offset, B))
                     DFstate.scanned_to = post_offset
                     if self.cancelled or self.flag_scan_disable:
                       break
@@ -1238,7 +1237,7 @@ class PlatonicDir(FilesDir):
       fp.seek(offset)
       for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE), scanner):
         post_offset = offset + len(data)
-        yield offset, 0, data, post_offset
+        yield offset, data, post_offset
         offset = post_offset
 
 if __name__ == '__main__':
