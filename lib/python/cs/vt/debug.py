@@ -75,7 +75,7 @@ def dump_Store(S, indent=''):
   X("%s%s:%s", indent, type(S).__name__, S.name)
   indent += '  '
   if isinstance(S, DataDirStore):
-    X("%sdir = %s", indent, shortpath(S._datadir.statedirpath))
+    X("%sdir = %s", indent, shortpath(S._datadir.topdirpath))
   elif isinstance(S, FileCacheStore):
     X("%sdatadir = %s", indent, shortpath(S.cache.dirpath))
   elif isinstance(S, ProxyStore):

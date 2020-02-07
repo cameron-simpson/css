@@ -177,7 +177,7 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
 
   def __init__(
       self,
-      statedirpath,
+      topdirpath,
       hashclass,
       *,
       indexclass=None,
@@ -185,10 +185,10 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       flags=None,
       flags_prefix=None,
   ):
-    ''' Initialise the `DataDir` with `statedirpath` and `datadirpath`.
+    ''' Initialise the `DataDir` with `topdirpath`.
 
         Parameters:
-        * `statedirpath`: a directory containing state information about the
+        * `topdirpath`: a directory containing state information about the
           `DataFile`s; this contains the index-state.csv file and the
           associated index dbm-ish files.
         * `hashclass`: the hashclass used for indexing
@@ -208,7 +208,7 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         The monitor thread and runtime state are set up by the `startup` method
         and closed down by the `shutdown` method.
     '''
-    assert isinstance(statedirpath, str)
+    assert isinstance(topdirpath, str)
     assert issubclass(hashclass, HashCode), "hashclass=%r" % (hashclass,)
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self)
@@ -231,10 +231,9 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.rollover = rollover
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
-    self.statedirpath = statedirpath
+    self.topdirpath = topdirpath
     self.statefilepath = joinpath(
-        statedirpath,
-        self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
+        topdirpath, self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
     if indexclass is None:
       indexclass = choose_indexclass(
@@ -251,23 +250,23 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self._lock = RLock()
 
   def __str__(self):
-    return '%s(%s)' % (self.__class__.__name__, shortpath(self.statedirpath))
+    return '%s(%s)' % (self.__class__.__name__, shortpath(self.topdirpath))
 
   def __repr__(self):
     return (
-        '%s(statedirpath=%r,indexclass=%s)' %
-        (self.__class__.__name__, self.statedirpath, self.indexclass)
+        '%s(topdirpath=%r,indexclass=%s)' %
+        (self.__class__.__name__, self.topdirpath, self.indexclass)
     )
 
   def initdir(self):
     ''' Init a directory and its "data" subdirectory.
     '''
-    statedirpath = self.statedirpath
-    if not isdirpath(statedirpath):
-      info("mkdir %r", statedirpath)
-      with Pfx("mkdir(%r)", statedirpath):
-        os.mkdir(statedirpath)
-    datasubdirpath = joinpath(statedirpath, 'data')
+    topdirpath = self.topdirpath
+    if not isdirpath(topdirpath):
+      info("mkdir %r", topdirpath)
+      with Pfx("mkdir(%r)", topdirpath):
+        os.mkdir(topdirpath)
+    datasubdirpath = joinpath(topdirpath, 'data')
     if not isdirpath(datasubdirpath):
       info("mkdir %r", datasubdirpath)
       with Pfx("mkdir(%r)", datasubdirpath):
@@ -349,9 +348,9 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.runstate.stop()
 
   def pathto(self, rpath):
-    ''' Return the path to `rpath`, which is relative to the `statedirpath`.
+    ''' Return the path to `rpath`, which is relative to the `topdirpath`.
     '''
-    return joinpath(self.statedirpath, rpath)
+    return joinpath(self.topdirpath, rpath)
 
   def datapathto(self, rpath):
     ''' Return the path to `rpath`, which is relative to the `datadirpath`.
@@ -428,19 +427,19 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     ''' Return the Archive named `name`.
 
         If `name` is omitted or `None`
-        the Archive path is the `statedirpath`
+        the Archive path is the `topdirpath`
         plus the extension `'.vt'`.
-        Otherwise it is the `statedirpath` plus a dash plus the `name`
+        Otherwise it is the `topdirpath` plus a dash plus the `name`
         plus the extension `'.vt'`.
         The `name` may not be empty or contain a dot or a dash.
     '''
     with Pfx("%s.get_Archive", self):
       if name is None or not name:
-        archivepath = self.statedirpath + '.vt'
+        archivepath = self.topdirpath + '.vt'
       else:
         if '.' in name or '/' in name:
           raise ValueError("invalid name: %r" % (name,))
-        archivepath = self.statedirpath + '-' + name + '.vt'
+        archivepath = self.topdirpath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
 
   def _queue_index(self, hashcode, entry, post_offset):
@@ -1035,7 +1034,7 @@ class PlatonicDir(FilesDir):
 
   def __init__(
       self,
-      statedirpath,
+      topdirpath,
       hashclass,
       *,
       exclude_dir=None,
@@ -1045,10 +1044,10 @@ class PlatonicDir(FilesDir):
       meta_store=None,
       **kw
   ):
-    ''' Initialise the `PlatonicDir` at `statedirpath`.
+    ''' Initialise the `PlatonicDir` at `topdirpath`.
 
         Parameters:
-        * `statedirpath`: a directory containing state information about the
+        * `topdirpath`: a directory containing state information about the
           DataFiles; this is the index-state.sqlite file and the associated
           index dbm-ish files.
         * `hashclass`: the hash class used to index chunk contents.
@@ -1073,7 +1072,7 @@ class PlatonicDir(FilesDir):
     '''
     if meta_store is None:
       raise ValueError("meta_store may not be None")
-    super().__init__(statedirpath, hashclass, **kw)
+    super().__init__(topdirpath, hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
