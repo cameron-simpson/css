@@ -11,7 +11,7 @@
 
 from enum import IntFlag
 import sys
-from zlib import decompress
+from zlib import compress, decompress
 from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.buffer import CornuCopyBuffer
@@ -38,7 +38,28 @@ class DataRecord(PacketField):
 
   TEST_CASES = ((b'', b'\x00\x00'),)
 
-  def __init__(self, data, is_compressed=False):
+  def __init__(self, data, is_compressed=None):
+    ''' Initialise a `DataRecord` directly.
+
+        Parameters:
+        * `data`: the data to store
+        * `is_compressed`: whether the data are already compressed
+
+        Note that if `is_compressed` is not set
+        we presume `data` is uncompressed
+        and try to compress it if it is 16 bytes or more;
+        we keep the compressed form if it achieves more than 10% compression.
+    '''
+    if is_compressed is None:
+      if len(data) < 16:
+        is_compressed = False
+      else:
+        zdata = compress(data)
+        if len(zdata) < len(data) * 0.9:
+          data = zdata
+          is_compressed = True
+        else:
+          is_compressed = False
     self._data = data
     self.is_compressed = is_compressed
 
