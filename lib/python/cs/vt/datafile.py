@@ -75,12 +75,6 @@ class DataRecord(PacketField):
       raise ValueError("unsupported flags: 0x%02x" % (flags,))
     return cls(data, is_compressed=is_compressed)
 
-  @classmethod
-  def from_fd(cls, rfd, offset=None):
-    ''' Parse a DataRecord from a readable file descriptor.
-    '''
-    return cls.from_buffer(CornuCopyBuffer(datafrom_fd(rfd, offset=offset)))
-
   def transcribe(self):
     ''' Transcribe this data chunk as a data record.
     '''
