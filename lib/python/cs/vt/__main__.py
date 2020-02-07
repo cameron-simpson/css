@@ -48,7 +48,6 @@ from .blockify import blocked_chunks_of
 from .compose import (get_clause_archive, get_clause_spec, get_store_spec)
 from .config import Config, Store
 from .convert import expand_path
-from .datadir import DataDirIndexEntry
 from .datafile import DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
@@ -347,30 +346,33 @@ class VTCmd(BaseCommand):
     if columns is None:
       columns = 80
     max_width = columns - 1
+    xit = 0
     for path in args:
-      if path.endswith('.vtd'):
-        print(path)
-        DF = DataFileReader(path)
-        with DF:
+      with Pfx(path):
+        if path.endswith('.vtd'):
+          print(path)
           try:
-            for DR in DF.scanfrom(0):
-              data = DR.data
-              hashcode = hashclass(data)
-              leadin = '%9d %16.16s' % (DR.offset, hashcode)
-              dump_chunk(data, leadin, max_width, one_line)
-          except EOFError:
-            pass
-      elif path.endswith('.lmdb'):
-        print(path)
-        lmdb = LMDBIndex(
-            path[:-5], hashclass, decode=DataDirIndexEntry.from_bytes
-        )
-        with lmdb:
-          for hashcode, entry in lmdb.items():
-            print(hashcode, entry)
-      else:
-        warning("unsupported file type: %r", path)
-    return 0
+            fd = os.open(path, os.O_RDONLY)
+          except OSError as e:
+            warning("open: %s", e)
+            xit = 1
+            continue
+          bfr = CornuCopyBuffer.from_fd(fd)
+          for offset, DR in DataRecord.parse_buffer_with_offsets(bfr):
+            data = DR.data
+            hashcode = hashclass(data)
+            leadin = '%9d %16.16s' % (offset, hashcode)
+            dump_chunk(data, leadin, max_width, one_line)
+          os.close(fd)
+        elif path.endswith('.lmdb'):
+          print(path)
+          lmdb = LMDBIndex(path[:-5], hashclass)
+          with lmdb:
+            for hashcode, entry in lmdb.items():
+              print(hashcode, entry)
+        else:
+          warning("unsupported file type: %r", path)
+    return xit
 
   @staticmethod
   def cmd_fsck(args, options, cmd):
