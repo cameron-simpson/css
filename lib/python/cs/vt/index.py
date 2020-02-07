@@ -4,15 +4,17 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcodes => bytes-records.
+''' An index is a mapping of hashcodes => FileDataIndexEntry.
     This module supports several backends and a mechanism for choosing one.
 '''
 
+from collections import namedtuple
 from contextlib import contextmanager
 from os.path import exists as pathexists
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
+from cs.serialise import get_bs, put_bs
 from . import Lock
 from .hash import HashCodeUtilsMixin
 
@@ -59,21 +61,64 @@ def choose(basepath, preferred_indexclass=None):
       "no supported index classes available: tried %r" % (indexclasses,)
   )
 
-class _Index(HashCodeUtilsMixin, MultiOpenMixin):
+class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
+                                    'filenum data_offset data_length flags')):
+  ''' An index entry describing a data chunk in a `DataDir`.
 
-  def __init__(self, basepath, hashclass, decode):
+      This has the following attributes:
+      * `filenum`: the file number of the file containing the block
+      * `data_offset`: the offset within the file of the data chunk
+      * `data_length`: the length of the chunk
+      * `flags`: information about the chunk
+
+      These enable direct access to the raw data component.
+
+      The only defined flag at present is `FLAG_COMPRESSED`,
+      indicating that the raw data should be obtained
+      by uncompressing the chunk using `zlib.uncompress`.
+  '''
+
+  FLAG_COMPRESSED = 0x01
+
+  @property
+  def is_compressed(self):
+    ''' Whether the chunk data are compressed.
+    '''
+    return self.flags & self.FLAG_COMPRESSED
+
+  @classmethod
+  def from_bytes(cls, bs: bytes, offset: int = 0):
+    ''' Parse a binary index entry, return `(FileDataIndexEntry,offset)`.
+    '''
+    filenum, offset = get_bs(bs, offset)
+    data_offset, offset = get_bs(bs, offset)
+    data_length, offset = get_bs(bs, offset)
+    flags, offset = get_bs(bs, offset)
+    return cls(filenum, data_offset, data_length, flags), offset
+
+  def __bytes__(self) -> bytes:
+    ''' Encode to binary form for use as an index entry.
+    '''
+    return b''.join(
+        put_bs(self.filenum), put_bs(self.data_offset),
+        put_bs(self.data_length), put_bs(self.flags)
+    )
+
+class _Index(HashCodeUtilsMixin, MultiOpenMixin):
+  ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
+  '''
+
+  def __init__(self, basepath, hashclass):
     ''' Initialise an _Index instance.
 
         Parameters:
         * `basepath`: the base path to the index; the index itself
           is at `basepath`.SUFFIX
-        * `decode`: function to decode a binary index record into the
-          return type instance
+        * `hashclass`: the hashclass indexed by this index
     '''
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
     self.hashclass = hashclass
-    self.decode = decode
 
   @classmethod
   def pathof(cls, basepath):
