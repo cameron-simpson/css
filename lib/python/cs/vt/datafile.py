@@ -148,51 +148,6 @@ class DataFilePushable:
         Q.put((data, bfr.offset - pre_offset))
     return True
 
-class DataFileWriter(MultiOpenMixin):
-  ''' Append access to a data file, storing data chunks in compressed form.
-  '''
-
-  def __init__(self, pathname, do_create=False):
-    MultiOpenMixin.__init__(self)
-    self.pathname = pathname
-    if do_create:
-      createpath(pathname)
-    self._wfd = None
-    self._wlock = None
-
-  def __str__(self):
-    return "%s(%s)" % (
-        type(self).__name__,
-        self.pathname,
-    )
-
-  def startup(self):
-    ''' Start up the DataFile: open the read and write file descriptors.
-    '''
-    self._wfd = openfd_append(self.pathname)
-    self._wlock = Lock()
-
-  def shutdown(self):
-    ''' Shut down the DataFIle: close read and write file descriptors.
-    '''
-    os.close(self._wfd)
-    self._wfd = None
-    self._wlock = None
-
-  def add(self, data):
-    ''' Append a chunk of data to the file, return the store start
-        and end offsets.
-
-        The fcntl.flock function is used to hold an OS level lock
-        for the duration of the write to support shared use of the
-        file.
-    '''
-    bs = bytes(DataRecord(data))
-    wfd = self._wfd
-    with self._wlock:
-      offset = append_data(wfd, bs)
-    return offset, offset + len(bs)
-
 if __name__ == '__main__':
   from .datafile_tests import selftest
   selftest(sys.argv)
