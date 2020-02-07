@@ -825,9 +825,10 @@ def datafrom(f, offset, readsize=None, maxlength=None):
       *WARNING*: this function might move the file pointer.
 
       Parameters:
-      * `f`: the file from which to read data; if a string, the file
-        is opened with mode="rb"; if an int, treated as an OS file
-        descriptor; otherwise presumed to be a file-like object.
+      * `f`: the file from which to read data;
+        if a string, the file is opened with mode="rb";
+        if an int, treated as an OS file descriptor;
+        otherwise presumed to be a file-like object.
         If that object has a `.fileno()` method, treat that as an
         OS file descriptor and use it.
       * `offset`: starting offset for the data
