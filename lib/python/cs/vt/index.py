@@ -316,6 +316,7 @@ class GDBMIndex(_Index):
   def __init__(self, lmdbpathbase, hashclass):
     super().__init__(lmdbpathbase, hashclass)
     self._gdbm = None
+    self._gdbm_lock = None
 
   @classmethod
   def is_supported(cls):
@@ -343,7 +344,7 @@ class GDBMIndex(_Index):
     with self._gdbm_lock:
       self._gdbm.close()
       self._gdbm = None
-      del self._gdbm_lock
+      self._gdbm_lock = None
 
   def flush(self):
     ''' Flush the index: sync the gdbm.
@@ -391,6 +392,7 @@ class NDBMIndex(_Index):
   def __init__(self, lmdbpathbase, hashclass):
     super().__init__(lmdbpathbase, hashclass)
     self._ndbm = None
+    self._ndbm_lock = None
 
   @classmethod
   def is_supported(cls):
@@ -418,7 +420,7 @@ class NDBMIndex(_Index):
     with self._ndbm_lock:
       self._ndbm.close()
       self._ndbm = None
-      del self._ndbm_lock
+      self._ndbm_lock = None
 
   def flush(self):
     ''' Flush the index: sync the ndbm.
