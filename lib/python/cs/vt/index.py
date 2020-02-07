@@ -132,6 +132,15 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     return self.pathof(self.basepath)
 
+  def get(self, hashcode, default=None):
+    ''' Get the `FileDataIndexEntry` for `hashcode`.
+        Return `default` for a missing `hashcode` (default `None`).
+    '''
+    try:
+      return self[hashcode]
+    except KeyError:
+      return False
+
 class LMDBIndex(_Index):
   ''' LMDB index for a DataDir.
   '''
@@ -285,15 +294,6 @@ class LMDBIndex(_Index):
     binary_record = self._get(hashcode)
     if binary_record is None:
       raise KeyError(hashcode)
-
-  def get(self, hashcode, default=None):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
-    '''
-    entry = self._get(hashcode)
-    if entry is None:
-      return default
-    return self.decode(entry)
     return FileDataIndexEntry(binary_record)
 
   def __setitem__(self, hashcode, entry):
@@ -377,15 +377,7 @@ class GDBMIndex(_Index):
       binary_record = self._gdbm[hashcode]
     return FileDataIndexEntry(binary_record)
 
-  def get(self, hashcode, default=None):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
-    '''
     with self._gdbm_lock:
-      entry = self._gdbm.get(hashcode, None)
-    if entry is None:
-      return default
-    return self.decode(entry)
 
   def __setitem__(self, hashcode, value):
     entry = value.encode()
@@ -447,15 +439,7 @@ class NDBMIndex(_Index):
       binary_entry = self._ndbm[hashcode]
     return FileDataIndexEntry.from_bytes(binary_entry)
 
-  def get(self, hashcode, default=None):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
-    '''
     with self._ndbm_lock:
-      entry = self._ndbm.get(hashcode, None)
-    if entry is None:
-      return default
-    return self.decode(entry)
 
   def __setitem__(self, hashcode, value):
     entry = value.encode()
@@ -514,14 +498,6 @@ class KyotoIndex(_Index):
   def __contains__(self, hashcode):
     return self._kyoto.check(hashcode) >= 0
 
-  def get(self, hashcode):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
-    '''
-    record = self._kyoto.get(hashcode)
-    if record is None:
-      return None
-    return self.decode(record)
   def __getitem__(self, hashcode):
     binary_record = self._kyoto.get(hashcode)
     if binary_record is None:
