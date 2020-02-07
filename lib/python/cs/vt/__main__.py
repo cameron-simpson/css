@@ -49,7 +49,7 @@ from .compose import (get_clause_archive, get_clause_spec, get_store_spec)
 from .config import Config, Store
 from .convert import expand_path
 from .datadir import DataDirIndexEntry
-from .datafile import DataFileReader
+from .datafile import DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
@@ -763,8 +763,7 @@ class VTCmd(BaseCommand):
         obj = DataDirStore(s, s)
       elif s.endswith('.vtd') and isfilepath(s):
         # /path/to/datafile.vtd
-        obj = DataFileReader(s)
-        obj.open()
+        obj = DataFilePushable(s)
       # TODO: /path/to/archive.vt
       else:
         raise ValueError("path is neither a DataDir nor a data file")
@@ -780,8 +779,7 @@ class VTCmd(BaseCommand):
           # fall back: relative path to .vtd file
           if s.endswith('.vtd') and isfilepath(s):
             # /path/to/datafile.vtd
-            obj = DataFileReader(s)
-            obj.open()
+            obj = DataFilePushable(s)
           else:
             raise
         else:

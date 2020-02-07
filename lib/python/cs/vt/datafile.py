@@ -114,57 +114,13 @@ class DataRecord(PacketField):
     '''
     return len(self._data)
 
-class DataFileReader(MultiOpenMixin, ReadMixin):
+class DataFilePushable:
   ''' Read access to a data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local Store.
   '''
 
   def __init__(self, pathname):
-    MultiOpenMixin.__init__(self)
     self.pathname = pathname
-    self._rfd = None
-    self._rlock = None
-
-  def __str__(self):
-    return "%s(%s)" % (
-        type(self).__name__,
-        self.pathname,
-    )
-
-  def startup(self):
-    ''' Start up the DataFile: open the read and write file descriptors.
-    '''
-    rfd = openfd_read(self.pathname)
-    S = fstat(rfd)
-    if not S_ISREG(S.st_mode):
-      raise RuntimeError(
-          "fd %d: not a regular file: mode=0o%o: %r" %
-          (rfd, S.st_mode, self.pathname)
-      )
-    self._rfd = rfd
-    self._rlock = Lock()
-
-  def shutdown(self):
-    ''' Shut down the DataFIle: close read and write file descriptors.
-    '''
-    os.close(self._rfd)
-    self._rfd = None
-    self._rlock = None
-
-  def __len__(self):
-    return os.fstat(self._rfd).st_size
-
-  def datafrom(self, offset, readsize=None):
-    ''' Yield data from the file starting at `offset`.
-    '''
-    if readsize is None:
-      # Default read size.
-      # This number is arbitrary, chosen on the basis that the
-      # average size of blocks for random data is around 4093 bytes
-      # (from vt.scan) and the size for parsed data is often much
-      # smaller.
-      readsize = 2048
-    return datafrom_fd(self._rfd, offset, readsize)
 
   @require(lambda self, offset: 0 <= offset <= len(self))
   def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
@@ -182,12 +138,14 @@ class DataFileReader(MultiOpenMixin, ReadMixin):
     '''
     if progress:
       progress.total += len(self) - offset
-    bfr = CornuCopyBuffer(self.datafrom(offset), offset=offset)
-    for pre_offset, DR in DataRecord.parse_buffer_with_offsets(bfr):
-      if runstate and runstate.cancelled:
-        return False
-      data = DR.data
-      Q.put((data, bfr.offset - pre_offset))
+    with open(self.pathname, 'rb') as f:
+      f.seek(offset)
+      bfr = CornuCopyBuffer(datafrom(f, offset), offset=offset)
+      for pre_offset, DR in DataRecord.parse_buffer_with_offsets(bfr):
+        if runstate and runstate.cancelled:
+          return False
+        data = DR.data
+        Q.put((data, bfr.offset - pre_offset))
     return True
 
 class DataFileWriter(MultiOpenMixin):
