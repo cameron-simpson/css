@@ -374,12 +374,10 @@ class GDBMIndex(_Index):
       binary_record = self._gdbm[hashcode]
     return FileDataIndexEntry(binary_record)
 
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
     with self._gdbm_lock:
-
-  def __setitem__(self, hashcode, value):
-    entry = value.encode()
-    with self._gdbm_lock:
-      self._gdbm[hashcode] = entry
+      self._gdbm[hashcode] = binary_entry
       self._written = True
 
 class NDBMIndex(_Index):
@@ -437,12 +435,10 @@ class NDBMIndex(_Index):
       binary_entry = self._ndbm[hashcode]
     return FileDataIndexEntry.from_bytes(binary_entry)
 
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
     with self._ndbm_lock:
-
-  def __setitem__(self, hashcode, value):
-    entry = value.encode()
-    with self._ndbm_lock:
-      self._ndbm[hashcode] = entry
+      self._ndbm[hashcode] = binary_entry
       self._written = True
 
 class KyotoIndex(_Index):
@@ -502,9 +498,9 @@ class KyotoIndex(_Index):
       raise KeyError(hashcode)
     return FileDataIndexEntry(binary_record)
 
-
-  def __setitem__(self, hashcode, value):
-    self._kyoto[hashcode] = value.encode()
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
+    self._kyoto[hashcode] = binary_entry
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Generator yielding the keys from the index
