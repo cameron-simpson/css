@@ -281,7 +281,6 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     self.index = self.indexclass(
         self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
         self.hashclass,
-        self.index_entry_class.from_bytes,
     )
     self.index.open()
     self.runstate.start()
@@ -413,7 +412,9 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
           "filenum %d: os.write(%d-bytes) wrote only %d bytes" %
           (filenum, length, n)
       )
-    entry = self.index_entry(filenum, offset, length)
+    entry = FileDataIndexEntry(
+        filenum, offset + data_offset, data_length, flags
+    )
     post_offset = offset + length
     hashcode = hashclass.from_chunk(data)
     self._queue_index(hashcode, entry, post_offset)
@@ -452,7 +453,6 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
     '''
     with Pfx("%s._index_updater", self):
       index = self.index
-      entry_class = self.index_entry_class
       unindexed = self._unindexed
       filemap = self._filemap
       old_DFstate = None
@@ -729,44 +729,6 @@ class SqliteFilemap:
       )
     DFstate.indexed_to = new_indexed_to
 
-class DataDirIndexEntry(namedtuple('DataDirIndexEntry', 'filenum offset')):
-  ''' A block record for a `DataDir`.
-
-      This has the following attributes:
-      * `filenum`: the file number of the file containing the block
-      * `data_offset`: the offset within the file of the data chunk
-      * `data_length`: the length of the chunk
-      * `flags`: information about the chunk
-
-      The only defined flag at present is
-      `DataDirIndexEntry.FLAG_COMPRESSED`, indicating that the raw
-      data should be obtained by uncompressing the chunk using
-      `zlib.uncompress`.
-  '''
-
-  @classmethod
-  def from_bytes(cls, data: bytes):
-    ''' Parse a binary index entry, return `(filenum,offset)`.
-    '''
-    filenum, offset = get_bs(data)
-    file_offset, offset = get_bs(data, offset)
-    if offset != len(data):
-      raise ValueError(
-          "unparsed data from index entry; full entry = %s; filenum=%d, file_offset=%d, unparsed=%r"
-          % (hexlify(data), filenum, file_offset, data[offset:])
-      )
-    return cls(filenum, file_offset)
-
-  def encode(self) -> bytes:
-    ''' Encode (filenum, offset) to binary form for use as an index entry.
-    '''
-    return put_bs(self.filenum) + put_bs(self.offset)
-
-  def fetch_fd(self, rfd):
-    ''' Return the data associated with `entry` from `rfd`.
-    '''
-    return DataRecord.from_fd(rfd, self.offset).data
-
 class DataDir(FilesDir):
   ''' Maintenance of a collection of `DataFile`s in a directory.
 
@@ -784,19 +746,12 @@ class DataDir(FilesDir):
   DATA_DOT_EXT = DATAFILE_DOT_EXT
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-  index_entry_class = DataDirIndexEntry
 
   @staticmethod
   def data_record(data):
     ''' Return the record for data to save in the save file.
     '''
     return bytes(DataRecord(data))
-
-  @staticmethod
-  def index_entry(filenum, offset, _):
-    ''' Construct an index entry from the file number and offset.
-    '''
-    return DataDirIndexEntry(filenum, offset)
 
   @staticmethod
   def scanfrom(filepath, offset=0):
@@ -862,51 +817,24 @@ class DataDir(FilesDir):
               continue
           if new_size > DFstate.scanned_to:
             offset = DFstate.scanned_to
-            for record, post_offset in DFstate.scanfrom(offset=offset):
-              hashcode = self.hashclass.from_chunk(record.data)
+            hashclass = self.hashclass
+            for pre_offset, DR, post_offset in DFstate.scanfrom(offset=offset):
+              hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(
-                  (hashcode, DataDirIndexEntry(filenum, offset), post_offset)
+                  (
+                      hashcode,
+                      FileDataIndexEntry(
+                          filenum, pre_offset + DR.data_offset,
+                          DR.raw_data_length, DR.flags
+                      ), post_offset
+                  )
               )
               DFstate.scanned_to = post_offset
               if self.cancelled:
                 break
-              offset = post_offset
             self.flush()
         self.flush()
       time.sleep(1)
-
-class RawIndexEntry(namedtuple('RawIndexEntry', 'filenum offset length')):
-  ''' A block record for a raw data file.
-  '''
-
-  @classmethod
-  def from_bytes(cls, data: bytes):
-    ''' Parse a binary index entry, return (filenum, offset).
-    '''
-    filenum, offset = get_bs(data)
-    file_offset, offset = get_bs(data, offset)
-    length, offset = get_bs(data, offset)
-    if offset != len(data):
-      raise ValueError(
-          "unparsed data from index entry; full entry = %s" % (hexlify(data),)
-      )
-    return cls(filenum, file_offset, length)
-
-  def encode(self) -> bytes:
-    ''' Encode (filenum, offset) to binary form for use as an index entry.
-    '''
-    return put_bs(self.filenum) + put_bs(self.offset) + put_bs(self.length)
-
-  def fetch_fd(self, rfd):
-    ''' Fetch the bytes associated with this entry from `rfd`.
-    '''
-    bs = os.pread(rfd, self.length, self.offset)
-    if len(bs) != self.length:
-      raise ValueError(
-          "incorrect pread(fd=%d,length=%d,offset=%d): got %d bytes" %
-          (rfd, self.length, self.offset, len(bs))
-      )
-    return bs
 
 class RawDataDir(FilesDir):
   ''' Maintenance of a collection of raw data files in a directory.
@@ -927,13 +855,8 @@ class RawDataDir(FilesDir):
   DATA_DOT_EXT = RAWFILE_DOT_EXT
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-  index_entry_class = RawIndexEntry
 
-  @staticmethod
-  def index_entry(filenum, offset, length):
-    ''' Construct an index entry from the file number and offset.
     '''
-    return RawIndexEntry(filenum, offset, length)
 
   @staticmethod
   def data_record(data):
@@ -1013,8 +936,6 @@ class PlatonicDir(FilesDir):
   # monitoring and updating
   DELAY_INTERSCAN = 1.0  # regular pause between directory scans
   DELAY_INTRASCAN = 0.1  # stalls during scan: per directory and after big files
-
-  index_entry_class = RawIndexEntry
 
   def __init__(
       self,
@@ -1259,8 +1180,9 @@ class PlatonicDir(FilesDir):
                     indexQ.put(
                         (
                             hashcode,
-                            RawIndexEntry(DFstate.filenum, offset,
-                                          len(data)), post_offset
+                            FileDataIndexEntry(
+                                DFstate.filenum, pre_offset, len(data), 0
+                            ), post_offset
                         )
                     )
                     if meta_store is not None:
