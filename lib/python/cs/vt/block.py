@@ -509,7 +509,7 @@ class _Block(Transcriber, ABC):
         * `progress`: optional Progress to update its total
 
         TODO: optional `no_wait` parameter to control waiting,
-        default False, which would support closing the Queue but
+        default `False`, which would support closing the Queue but
         not waiting for the worker completion. This is on the premise
         that the final Store shutdown of `S2` will wait for outstanding
         operations anyway.

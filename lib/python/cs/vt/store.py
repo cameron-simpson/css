@@ -1012,7 +1012,7 @@ class ProxyStore(BasicStoreSync):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A MappingStore using a DataDir or RawDataDir as its backend.
+  ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
   '''
 
   def __init__(
