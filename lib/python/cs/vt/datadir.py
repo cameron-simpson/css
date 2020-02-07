@@ -36,8 +36,6 @@
     to their block data location within the backing files.
 '''
 
-from binascii import hexlify
-from collections import namedtuple
 from collections.abc import Mapping
 import errno
 import os
@@ -68,12 +66,11 @@ from cs.fileutils import (
     shortpath,
 )
 from cs.logutils import debug, info, warning, error, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
-from cs.serialise import get_bs, put_bs
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek
 from cs.x import X
@@ -86,7 +83,7 @@ from .blockify import (
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
-from .index import choose as choose_indexclass
+from .index import choose as choose_indexclass, FileDataIndexEntry
 from .parsers import scanner_from_filename
 from .util import buffer_from_pathname, createpath, openfd_read, openfd_append
 
@@ -396,8 +393,7 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         Roll the internal state over to a new file if the current
         datafile has reached the rollover threshold.
 
-        Subclasses must define the `data_record(data)` method
-        and the `index_entry(filenum,offset)` method.
+        Subclasses must define the `data_save_information(data)` method.
     '''
     bs = self.data_record(data)
     with self._lock:
@@ -443,11 +439,6 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
       return Archive(archivepath, **kw)
 
   def _queue_index(self, hashcode, entry, post_offset):
-    if not isinstance(entry, self.index_entry_class):
-      raise RuntimeError(
-          "expected %s but got %s %r" %
-          (self.index_entry_class, type(entry), entry)
-      )
     with self._lock:
       self._unindexed[hashcode] = entry
     self._indexQ.put((hashcode, entry, post_offset))
@@ -474,10 +465,6 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
             old_DFstate = None
           continue
         hashcode, entry, post_offset = item
-        if not isinstance(entry, entry_class):
-          raise RuntimeError(
-              "expected %s but got %s %r" % (entry_class, type(entry), entry)
-          )
         with self._lock:
           index[hashcode] = entry
           try:
@@ -813,7 +800,7 @@ class DataDir(FilesDir):
 
   @staticmethod
   def scanfrom(filepath, offset=0):
-    ''' Scan the specified `filepath` from `offset`, yielding data chunks.
+    ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
     bfr = buffer_from_pathname(filepath, offset=offset)
     for record in DataRecord.parse_buffer(bfr):
@@ -928,7 +915,7 @@ class RawDataDir(FilesDir):
       Records are read directly from the files, which are not
       compressed or encapsulated.
 
-      Hypothetical use case is the pull the leaf data of a large
+      Intended use case is the pull the leaf data of a large
       file into the store contiguously to effect efficient reads
       of that data later.
 
