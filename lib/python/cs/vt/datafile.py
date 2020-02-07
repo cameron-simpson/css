@@ -16,6 +16,7 @@ from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
+from .block import Block
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
@@ -116,28 +117,27 @@ class DataFilePushable:
 
   @require(lambda self, offset: 0 <= offset <= len(self))
   def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
-    ''' Push the Blocks from this DataFile to the Store `S2`.
+    ''' Push the `Block`s from this `DataFile` to the Queue `Q`.
 
         Note that if the target store is a DataDirStore
-        it is faster and simpler to move/copy the .vtd file
+        it is faster and simpler to move/copy the `.vtd` file
         into its `data` subdirectory directly.
         Of course, that may introduce redundant block copies.
 
         Parameters:
         * `Q`: queue on which to put blocks
         * `offset`: starting offset, default `0`.
-        * `runstate`: optional RunState used to cancel operation.
+        * `runstate`: optional `RunState` used to cancel operation.
     '''
     if progress:
       progress.total += len(self) - offset
     with open(self.pathname, 'rb') as f:
       f.seek(offset)
       bfr = CornuCopyBuffer(datafrom(f, offset), offset=offset)
-      for pre_offset, DR in DataRecord.parse_buffer_with_offsets(bfr):
+      for DR in DataRecord.parse_buffer(bfr):
         if runstate and runstate.cancelled:
           return False
-        data = DR.data
-        Q.put((data, bfr.offset - pre_offset))
+        Q.put(Block(data=DR.data))
     return True
 
 if __name__ == '__main__':
