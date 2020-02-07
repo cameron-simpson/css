@@ -604,6 +604,9 @@ class SqliteFilemap:
     c.close()
     self._load_map()
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.path)
+
   def close(self):
     ''' Close the database.
     '''
@@ -613,6 +616,7 @@ class SqliteFilemap:
   def _execute(self, sql, *a):
     return self.conn.execute(sql, *a)
 
+  @pfx_method(use_str=True)
   def _modify(self, sql, *a, return_cursor=False):
     sql = sql.strip()
     conn = self.conn
@@ -663,11 +667,7 @@ class SqliteFilemap:
 
   def _load_map(self):
     with self._lock:
-      c = self._execute(
-          r'''
-          SELECT id, path, indexed_to FROM filemap
-      '''
-      )
+      c = self._execute('SELECT id, path, indexed_to FROM filemap')
       for filenum, path, indexed_to in c.fetchall():
         self._map(path, filenum, indexed_to)
       c.close()
@@ -682,9 +682,8 @@ class SqliteFilemap:
     with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
       with self._lock:
         c = self._modify(
-            r'''
-            INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)
-        ''', (new_path, 0),
+            'INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)',
+            (new_path, 0),
             return_cursor=True
         )
         if c:
@@ -706,9 +705,8 @@ class SqliteFilemap:
     DFstate = self.path_to_DFstate[old_path]
     with self._lock:
       self._modify(
-          r'''
-          UPDATE filemap SET path=NULL, indexed_to=NULL where id = ?
-      ''', (DFstate.filenum,)
+          'UPDATE filemap SET path=NULL, indexed_to=NULL where id = ?',
+          (DFstate.filenum,)
       )
     del self.n_to_DFstate[DFstate.filenum]
     del self.path_to_DFstate[old_path]
@@ -739,9 +737,8 @@ class SqliteFilemap:
     DFstate = self.n_to_DFstate[filenum]
     with self._lock:
       self._modify(
-          r'''
-          UPDATE filemap SET indexed_to = ? WHERE id = ?
-      ''', (new_indexed_to, filenum)
+          'UPDATE filemap SET indexed_to = ? WHERE id = ?',
+          (new_indexed_to, filenum)
       )
     DFstate.indexed_to = new_indexed_to
 
