@@ -569,7 +569,8 @@ class BytesesField(PacketField):
   def from_buffer(
       cls, bfr, end_offset=None, discard_data=False, short_ok=False
   ):
-    ''' Gather from `bfr` until `end_offset`.
+    ''' Create a new `BytesesField` from a buffer
+        by gathering from `bfr` until `end_offset`.
 
         Parameters:
         * `bfr`: the input buffer
@@ -579,6 +580,12 @@ class BytesesField(PacketField):
         * `short_ok`: if true, do not raise EOFError if there are
           insufficient data; the field's .end_offset value will be
           less than `end_offset`; the default is False
+
+        Note that this method also sets the following attributes
+        on the new `BytesesField`:
+        * `offset`: the starting offset of the gathered bytes
+        * `end_offset`: the ending offset after the gathered bytes
+        * `length`: the length of the data
     '''
     if end_offset is None:
       raise ValueError("missing end_offset")
