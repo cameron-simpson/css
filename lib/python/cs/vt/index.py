@@ -106,6 +106,17 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
         )
     )
 
+  def fetch_fd(self, rfd):
+    bs = pread(rfd, self.data_length, self.data_offset)
+    if len(bs) != self.data_length:
+      raise RuntimeError(
+          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
+          (self, rfd, len(bs), self.data_length)
+      )
+    if self.is_compressed:
+      bs = decompress(bs)
+    return bs
+
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
   ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
   '''
