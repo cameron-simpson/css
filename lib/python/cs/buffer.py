@@ -570,10 +570,11 @@ class CornuCopyBuffer(object):
           copy_skip(buf)
         toskip -= len(buf)
     assert toskip >= 0
-    assert not self.bufs
-    assert self.buflen == 0
     if toskip == 0:
       return
+    # check that we consumed all the buffered data
+    assert not self.bufs
+    assert self.buflen == 0
     # advance the rest of the way
     seekable = False if copy_skip else self.seekable
     if seekable is None or seekable:
