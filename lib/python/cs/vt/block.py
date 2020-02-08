@@ -1000,8 +1000,8 @@ class _SubBlock(_Block):
 
   @require(lambda superB, suboffset: 0 <= suboffset < len(superB))
   @require(
-      lambda superB, suboffset, span: span > 0 and suboffset + span <
-      len(superB)
+      lambda superB, suboffset, span:
+      (span > 0 and suboffset + span <= len(superB))
   )
   def __init__(self, superB, suboffset, span, **kw):
     with Pfx("_SubBlock(suboffset=%d, span=%d)[len(superB)=%d]", suboffset,
