@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# INdex classes.
+# Index classes.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -10,7 +10,9 @@
 
 from collections import namedtuple
 from contextlib import contextmanager
+from os import pread
 from os.path import exists as pathexists
+from zlib import decompress
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
@@ -107,6 +109,8 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
     )
 
   def fetch_fd(self, rfd):
+    ''' Fetch the decompressed data from an open binary file.
+    '''
     bs = pread(rfd, self.data_length, self.data_offset)
     if len(bs) != self.data_length:
       raise RuntimeError(
@@ -145,7 +149,8 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     return self.pathof(self.basepath)
 
-  def decode_binary_record(self, binary_record):
+  @staticmethod
+  def decode_binary_record(binary_record):
     ''' Decode the binary record obtained from the index.
         Return the `FileDataIndexEntry`.
     '''
@@ -302,7 +307,7 @@ class LMDBIndex(_Index):
       cursor = txn.cursor()
       for binary_hashcode, binary_record in cursor.iternext(keys=True,
                                                             values=True):
-        yield (mkhash(binary_hashcode), mkentry(binary_record))
+        yield mkhash(binary_hashcode), mkentry(binary_record)
 
   def _get(self, hashcode):
     with self._txn() as txn:
@@ -312,6 +317,9 @@ class LMDBIndex(_Index):
     return self._get(hashcode) is not None
 
   def __getitem__(self, hashcode):
+    ''' Get the `FileDataIndexEntry` for `hashcode`.
+        Raise `KeyError` for a missing hashcode.
+    '''
     binary_record = self._get(hashcode)
     if binary_record is None:
       raise KeyError(hashcode)
