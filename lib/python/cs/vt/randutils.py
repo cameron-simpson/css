@@ -4,7 +4,7 @@
 '''
 
 import os
-from os.path import join as joinpath, isdirpath
+from os.path import join as joinpath, isdir as isdirpath
 from random import randint
 
 def rand0(maxn):
@@ -22,7 +22,9 @@ def make_randblock(size):
   '''
   return bytes(randint(0, 255) for _ in range(size))
 
-def randomish_chunks(min_size, max_size=None, basis_block=None, total=None):
+def randomish_chunks(
+    min_size, max_size=None, *, basis_block=None, total=None, limit=None
+):
   ''' Generator yielding bytes-like data chunks indefinitely.
 
       Parameters:
@@ -32,6 +34,8 @@ def randomish_chunks(min_size, max_size=None, basis_block=None, total=None):
         default: `make_randblock(max_size)`
       * `total`: a total count of bytes to yield;
         default: `None`, indicating no upper bound
+      * `limit`: limit on the chunks returned;
+        default: `None`, indicating no limit
 
       Each chunk has a random size from `min_size` to `max_size` inclusive
       and is composed of data chosen randomly from `basis_block`.
@@ -60,7 +64,7 @@ def randomish_chunks(min_size, max_size=None, basis_block=None, total=None):
     raise ValueError("total:%s < 0" % (total,))
   basis_block = memoryview(basis_block)
   basis_len = len(basis_block)
-  while total is None or total > 0:
+  while ((total is None or total > 0) and (limit is None or limit > 0)):
     size = randint(min_size, max_size)
     if total is not None:
       size = min(size, total)
@@ -73,6 +77,8 @@ def randomish_chunks(min_size, max_size=None, basis_block=None, total=None):
       size -= bs_len
       if total is not None:
         total -= bs_len
+      if limit is not None:
+        limit -= 1
     if len(bss) == 1:
       yield bss[0]
     else:
