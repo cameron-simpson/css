@@ -100,8 +100,10 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
     ''' Encode to binary form for use as an index entry.
     '''
     return b''.join(
-        put_bs(self.filenum), put_bs(self.data_offset),
-        put_bs(self.data_length), put_bs(self.flags)
+        (
+            put_bs(self.filenum), put_bs(self.data_offset),
+            put_bs(self.data_length), put_bs(self.flags)
+        )
     )
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
