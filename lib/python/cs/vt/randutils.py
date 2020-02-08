@@ -52,8 +52,8 @@ def randomish_chunks(
       which is what happens inside `make_randblock`. Instead we
       make size a block once and assemble chunks from its contents.
   '''
-  if min_size < 1:
-    raise ValueError("min_size:%s < 1" % (min_size,))
+  if min_size < 0:
+    raise ValueError("min_size:%s < 0" % (min_size,))
   if max_size is None:
     max_size = min_size
   elif max_size < min_size:
@@ -79,10 +79,7 @@ def randomish_chunks(
         total -= bs_len
       if limit is not None:
         limit -= 1
-    if len(bss) == 1:
-      yield bss[0]
-    else:
-      yield b''.join(bss)
+    yield b''.join(bss)
 
 def create_random_file(filepath, filesize):
   ''' Create a file of a specified `filesize`
