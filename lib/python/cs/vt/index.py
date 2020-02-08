@@ -145,6 +145,18 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     return self.pathof(self.basepath)
 
+  def decode_binary_record(self, binary_record):
+    ''' Decode the binary record obtained from the index.
+        Return the `FileDataIndexEntry`.
+    '''
+    record, post_offset = FileDataIndexEntry.from_bytes(binary_record)
+    if post_offset < len(binary_record):
+      warning(
+          "short decode of binary FileDataIndexEntry: record=%s, post_offset=%d, remaining binary_record=%r",
+          record, post_offset, binary_record[post_offset:]
+      )
+    return record
+
   def get(self, hashcode, default=None):
     ''' Get the `FileDataIndexEntry` for `hashcode`.
         Return `default` for a missing `hashcode` (default `None`).
