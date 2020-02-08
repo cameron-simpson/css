@@ -297,7 +297,7 @@ class LMDBIndex(_Index):
     ''' Yield `(hashcode,record)` from index.
     '''
     mkhash = self.hashclass.from_hashbytes
-    mkentry = FileDataIndexEntry.from_bytes
+    mkentry = self.decode_binary_record
     with self._txn() as txn:
       cursor = txn.cursor()
       for binary_hashcode, binary_record in cursor.iternext(keys=True,
@@ -315,7 +315,7 @@ class LMDBIndex(_Index):
     binary_record = self._get(hashcode)
     if binary_record is None:
       raise KeyError(hashcode)
-    return FileDataIndexEntry(binary_record)
+    return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
     import lmdb
@@ -397,7 +397,7 @@ class GDBMIndex(_Index):
   def __getitem__(self, hashcode):
     with self._gdbm_lock:
       binary_record = self._gdbm[hashcode]
-    return FileDataIndexEntry(binary_record)
+    return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
     binary_entry = bytes(entry)
@@ -457,8 +457,8 @@ class NDBMIndex(_Index):
 
   def __getitem__(self, hashcode):
     with self._ndbm_lock:
-      binary_entry = self._ndbm[hashcode]
-    return FileDataIndexEntry.from_bytes(binary_entry)
+      binary_record = self._ndbm[hashcode]
+    return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
     binary_entry = bytes(entry)
@@ -521,7 +521,7 @@ class KyotoIndex(_Index):
     binary_record = self._kyoto.get(hashcode)
     if binary_record is None:
       raise KeyError(hashcode)
-    return FileDataIndexEntry(binary_record)
+    return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
     binary_entry = bytes(entry)
