@@ -291,8 +291,7 @@ class FSTagsCommand(BaseCommand):
       for filepath in filepaths:
         print(
             output_format.format(
-                **TaggedPath(filepath, fstags=fstags
-                             ).format_kwargs(direct=use_direct_tags)
+                **fstags[filepath].format_kwargs(direct=use_direct_tags)
             )
         )
 
@@ -370,8 +369,7 @@ class FSTagsCommand(BaseCommand):
         for filepath in rfilepaths(path):
           print(
               output_format.format(
-                  **TaggedPath(filepath, fstags=fstags
-                               ).format_kwargs(direct=use_direct_tags)
+                  **fstags[filepath].format_kwargs(direct=use_direct_tags)
               )
           )
 
@@ -393,7 +391,7 @@ class FSTagsCommand(BaseCommand):
             error("path does not exist")
             xit = 1
             continue
-          src_tags = TaggedPath(path, fstags=fstags).direct_tags
+          src_tags = fstags[path].direct_tags
           src_basename = basename(path)
           target_path = joinpath(target_dirpath, src_basename)
           with Pfx("=>%r", target_path):
@@ -402,7 +400,7 @@ class FSTagsCommand(BaseCommand):
               xit = 1
               continue
             print(path, '=>', target_path)
-            dst_taggedpath = TaggedPath(target_path, fstags=fstags)
+            dst_taggedpath = fstags[target_path]
             with Pfx("shutil.move"):
               shutil.move(path, target_path)
             for tag in src_tags:
@@ -537,6 +535,16 @@ class FSTags(MultiOpenMixin):
     return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
 
   @locked
+  def __getitem__(self, path):
+    ''' Return the `TaggedPath` for `path`.
+    '''
+    path = abspath(path)
+    tagged_path = self._tagged_paths.get(path)
+    if tagged_path is None:
+      tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
+    return tagged_path
+
+  @locked
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
@@ -588,7 +596,7 @@ class FSTags(MultiOpenMixin):
     with self:
       for path in paths:
         with Pfx(path):
-          tagged_path = TaggedPath(path, fstags=self)
+          tagged_path = fstags[path]
           for spec, choice, tag in tag_choices:
             with Pfx(spec):
               if choice:
@@ -605,8 +613,7 @@ class FSTags(MultiOpenMixin):
     with self:
       for path in paths:
         with Pfx(path):
-          tagged_path = TaggedPath(path, fstags=self)
-          tagged_path.export_xattrs()
+          self[path].export_xattrs()
 
   def import_xattrs(self, paths):
     ''' Update the extended attributes of `paths`
@@ -615,8 +622,7 @@ class FSTags(MultiOpenMixin):
     with self:
       for path in paths:
         with Pfx(path):
-          tagged_path = TaggedPath(path, fstags=self)
-          tagged_path.import_xattrs()
+          self[path].import_xattrs()
 
   def find(self, path, tag_choices, use_direct_tags=False):
     ''' Walk the file tree from `path`
@@ -631,7 +637,7 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     for filepath in rpaths(path, yield_dirs=use_direct_tags):
-      tagged_path = TaggedPath(filepath, fstags=self)
+      tagged_path = self[filepath]
       tags = (
           tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
       )
@@ -659,10 +665,7 @@ class FSTags(MultiOpenMixin):
         name for name in os.listdir(dirpath)
         if (name and name not in ('.', '..') and not name.startswith('.'))
     )
-    lines = [
-        tagfile.tags_line(name, tagfile.direct_tags_of(name))
-        for name in sorted(names)
-    ]
+    lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
     changed = edit_strings(lines)
     for old_line, new_line in changed:
       old_name, old_tags = tagfile.parse_tags_line(old_line)
@@ -1282,23 +1285,18 @@ class TagFile(HasFSTagsMixin):
     '''
     return list(self.tagsets.keys())
 
-  def direct_tags_of(self, name):
-    ''' Return the direct tags of `name`.
-    '''
-    return self.tagsets[name]
-
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
     ''' Add a tag to the tags for `name`.
     '''
-    return self.direct_tags_of(name).add(tag, value)
+    return self[name].add(tag, value)
 
   def discard(self, name, tag_name, value=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
     '''
-    return self.tagsets[name].discard(tag_name, value)
+    return self[name].discard(tag_name, value)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
