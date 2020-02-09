@@ -158,7 +158,7 @@ class CornuCopyBuffer(object):
         closing the original.
 
         Parameters:
-        * `fd`: the operation system file descriptor
+        * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
         * `offset`: a starting position for the data; the file
           descriptor will seek to this offset, and the buffer will
@@ -185,7 +185,7 @@ class CornuCopyBuffer(object):
         closing the original.
 
         Parameters:
-        * `fd`: the operation system file descriptor
+        * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
         * `offset`: a starting position for the data; the file
           descriptor will seek to this offset, and the buffer will
