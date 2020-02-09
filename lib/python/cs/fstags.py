@@ -59,8 +59,8 @@ from pathlib import Path
 import re
 import shutil
 import sys
-from threading import Lock
 import threading
+from threading import Lock, RLock
 from cs.cmdutils import BaseCommand
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
@@ -512,7 +512,8 @@ class FSTags(MultiOpenMixin):
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
     self._tagfiles = {}  # cache of per directory `TagFile`s
-    self._lock = Lock()
+    self._tagged_paths = {}  # cache of per abspath `TaggedPath`
+    self._lock = RLock()
 
   def startup(self):
     ''' Stub for startup.
