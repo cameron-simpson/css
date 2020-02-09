@@ -216,13 +216,14 @@ class FSTagsCommand(BaseCommand):
     if not argv:
       argv = ['.']
     rules = fstags.config.rules
-    with fstags:
-      for top_path in argv:
-        for path in rpaths(top_path):
-          with Pfx(path):
-            tagged_path = TaggedPath(path, fstags)
-            for autotag in tagged_path.autotag(rules):
-              print("autotag %r + %s" % (tagged_path.basename, autotag))
+    with state.stack(verbose=True):
+      with fstags:
+        for top_path in argv:
+          for path in rpaths(top_path):
+            with Pfx(path):
+              tagged_path = fstags[path]
+              for autotag in tagged_path.autotag(rules):
+                print("autotag %r + %s" % (tagged_path.basename, autotag))
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -240,9 +241,10 @@ class FSTagsCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-    with fstags:
-      if not fstags.edit_dirpath(path):
-        xit = 1
+    with state.stack(verbose=True):
+      with fstags:
+        if not fstags.edit_dirpath(path):
+          xit = 1
     return xit
 
   @classmethod
@@ -338,12 +340,13 @@ class FSTagsCommand(BaseCommand):
     if not isinstance(data, dict):
       error("JSON data do not specify a dict: %s", type(dict))
       return 1
-    with fstags:
-      for path in paths:
-        with Pfx(path):
-          tagged_path = TaggedPath(path, fstags=fstags)
-          for key, value in data.items():
-            tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
+    with state.stack(verbose=True):
+      with fstags:
+        for path in paths:
+          with Pfx(path):
+            tagged_path = fstags[path]
+            for key, value in data.items():
+              tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
@@ -414,9 +417,10 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       raise GetoptError("missing paths")
-    with fstags:
-      for path in argv:
-        fstags.scrub(path)
+    with state.stack(verbose=True):
+      with fstags:
+        for path in argv:
+          fstags.scrub(path)
 
   @classmethod
   def cmd_tag(cls, argv, options, *, cmd):
@@ -440,7 +444,8 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = [path]
-    fstags.apply_tag_choices(tag_choices, paths)
+    with state.stack(verbose=True):
+      fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_tagpaths(cls, argv, options, *, cmd):
@@ -465,7 +470,8 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    fstags.apply_tag_choices(tag_choices, paths)
+    with state.stack(verbose=True):
+      fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_xattr_export(cls, argv, options, *, cmd):
@@ -491,7 +497,8 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    fstags.import_xattrs(paths)
+    with state.stack(verbose=True):
+      fstags.import_xattrs(paths)
 
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
@@ -693,7 +700,7 @@ class FSTags(MultiOpenMixin):
           with Pfx(name):
             subpath=joinpath(path,name)
             if not existspath(subpath):
-              info("does not exist, delete")
+              verbose("does not exist, delete")
               del tagsets[name]
               modified=True
         if modified:
@@ -704,7 +711,7 @@ class FSTags(MultiOpenMixin):
         tagfile=self.dir_tagfile(dirpath)
         tagsets = tagfile.tagsets
         if base in tagsets:
-          info("%r: does not exist, deleted",base)
+          verbose("%r: does not exist, deleted", base)
           del tagsets[base]
           tagfile.save()
 
@@ -1035,7 +1042,7 @@ class TagSet(HasFSTagsMixin):
     tagmap = self.tagmap
     value = tag.value
     if tag_name not in tagmap or tagmap[tag_name] != value:
-      info("+ %s", tag)
+      verbose("+ %s", tag)
       tagmap[tag_name] = value
       self.modified = True
 
@@ -1058,7 +1065,7 @@ class TagSet(HasFSTagsMixin):
         old_value = tagmap.pop(tag_name)
         self.modified = True
         old_tag = Tag(tag_name, old_value)
-        info("- %s", old_tag)
+        verbose("- %s", old_tag)
         return old_tag
     return None
 
@@ -1215,13 +1222,14 @@ class TagFile(HasFSTagsMixin):
       tagsets = defaultdict(TagSet)
       try:
         with open(filepath) as f:
-          for lineno, line in enumerate(f, 1):
-            with Pfx(lineno):
-              line = line.strip()
-              if not line or line.startswith('#'):
-                continue
-              name, tags = self.parse_tags_line(line)
-              tagsets[name] = tags
+          with state.stack(verbose=False):
+            for lineno, line in enumerate(f, 1):
+              with Pfx(lineno):
+                line = line.strip()
+                if not line or line.startswith('#'):
+                  continue
+                name, tags = self.parse_tags_line(line)
+                tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
@@ -1241,6 +1249,7 @@ class TagFile(HasFSTagsMixin):
     ''' Save a tagmap to `filepath`.
     '''
     with Pfx("savetags(%r)", filepath):
+      verbose("SAVE %r", filepath)
       with open(filepath, 'w') as f:
         for name, tags in sorted(tagsets.items()):
           if not tags:
@@ -1363,9 +1372,10 @@ class TaggedPath(HasFSTagsMixin):
         by merging the tags from the root to the path.
     '''
     tags = TagSet(fstags=self.fstags)
-    for tagfile, name in self._tagfile_entries:
-      for tag in tagfile[name]:
-        tags.add(tag)
+    with state.stack(verbose=False):
+      for tagfile, name in self._tagfile_entries:
+        for tag in tagfile[name]:
+          tags.add(tag)
     return tags
 
   @locked_property
@@ -1418,12 +1428,14 @@ class TaggedPath(HasFSTagsMixin):
     name = self.basename
     tags = self.direct_tags
     all_tags = self.all_tags
-    new_tags = TagSet(fstags=self.fstags)
-    updated = False
-    for autotag in infer_tags(name, rules=rules):
-      if autotag not in all_tags:
-        new_tags.add(autotag)
-        updated = True
+    # compute inferrable tags
+    with state.stack(verbose=False):
+      new_tags = TagSet(fstags=self.fstags)
+      updated = False
+      for autotag in infer_tags(name, rules=rules):
+        if autotag not in all_tags:
+          new_tags.add(autotag)
+          updated = True
     if updated:
       tags.update(new_tags)
       if not no_save:
