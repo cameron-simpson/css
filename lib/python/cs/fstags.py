@@ -60,6 +60,7 @@ import re
 import shutil
 import sys
 from threading import Lock
+import threading
 from cs.cmdutils import BaseCommand
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
@@ -67,6 +68,7 @@ from cs.lex import (
     get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
 )
 from cs.logutils import setup_logging, error, warning, info
+from cs.mappings import StackableValues
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.threads import locked, locked_property
@@ -84,8 +86,8 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.resources', 'cs.threads', 'icontract'
+        'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils',
+        'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.threads', 'icontract'
     ],
 }
 
@@ -106,6 +108,22 @@ def main(argv=None):
   if argv is None:
     argv = sys.argv
   return FSTagsCommand().run(argv)
+
+class _State(threading.local, StackableValues):
+  ''' Per-thread default context stack.
+  '''
+
+  _Ss = []  # global stack of fallback Store values
+
+  def __init__(self, **kw):
+    threading.local.__init__(self)
+    StackableValues.__init__(self, **kw)
+
+state = _State(verbose=False)
+
+def verbose(msg, *a):
+  if state.verbose:
+    info(msg, *a)
 
 class FSTagsCommand(BaseCommand):
   ''' `fstags` main command line class.
