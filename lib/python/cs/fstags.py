@@ -297,7 +297,7 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_json_import(cls, argv, options, *, cmd):
-    ''' Find paths matching tag criteria.
+    ''' Import tags for `path` from `tags.json`.
     '''
     fstags = options.fstags
     tag_prefix = ''
@@ -695,24 +695,24 @@ class FSTags(MultiOpenMixin):
     return ok
 
   def scrub(self, path):
-    with Pfx("scrub %r",path):
+    with Pfx("scrub %r", path):
       if isdirpath(path):
-        tagfile=self.dir_tagfile(path)
+        tagfile = self.dir_tagfile(path)
         tagsets = tagfile.tagsets
-        modified=False
+        modified = False
         for name in sorted(tagsets.keys()):
           with Pfx(name):
-            subpath=joinpath(path,name)
+            subpath = joinpath(path, name)
             if not existspath(subpath):
               verbose("does not exist, delete")
               del tagsets[name]
-              modified=True
+              modified = True
         if modified:
           tagfile.save()
       elif not existspath(path):
-        dirpath=dirname(path)
-        base=basename(path)
-        tagfile=self.dir_tagfile(dirpath)
+        dirpath = dirname(path)
+        base = basename(path)
+        tagfile = self.dir_tagfile(dirpath)
         tagsets = tagfile.tagsets
         if base in tagsets:
           verbose("%r: does not exist, deleted", base)
