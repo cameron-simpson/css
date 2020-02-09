@@ -16,6 +16,10 @@
     there is a line for each entry in the directory with tags
     consisting of the directory entry name and the associated tags.
 
+    Tags may be "bare", or have a value.
+    If there is a value it is expressed with an equals (`'='`)
+    followed by the JSON encoding of the value.
+
     The tags for a file are the union of its direct tags
     and all relevant ancestor tags,
     with priority given to tags closer to the file.
@@ -37,10 +41,6 @@
       `season-02 season=2`
     * tag file `/path/to/series-name/season-02/.fstags`:
       `episode-name--s02e03--something.mp4 episode=3 episode.title="Full Episode Title"`
-
-    Tags may be "bare", or have a value.
-    If there is a value it is expressed with an equals (`'='`)
-    followed by the JSON encoding of the value.
 '''
 
 from collections import defaultdict, namedtuple
