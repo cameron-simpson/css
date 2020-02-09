@@ -1595,9 +1595,9 @@ class FSTagsConfig:
     '''
     with Pfx(rcfilepath):
       config = ConfigParser()
+      config.add_section('autotag')
       config.add_section('general')
       config.add_section('xattr')
-      config.add_section('autotag')
       config['general']['tagsfile'] = TAGSFILE
       try:
         config.read(rcfilepath)
