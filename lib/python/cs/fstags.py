@@ -222,9 +222,9 @@ class FSTagsCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-      with fstags:
-        if not fstags.edit_dirpath(path):
-          xit = 1
+    with fstags:
+      if not fstags.edit_dirpath(path):
+        xit = 1
     return xit
 
   @classmethod
@@ -624,47 +624,45 @@ class FSTags(MultiOpenMixin):
       if choose:
         yield filepath
 
-  @pfx_method(use_str=True)
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
     '''
     ok = True
-    with Pfx("dirpath=%r", dirpath):
-      tagfile = self.dir_tagfile(dirpath)
-      tagsets = tagfile.tagsets
-      names = set(
-          name for name in os.listdir(dirpath)
-          if (name and name not in ('.', '..') and not name.startswith('.'))
-      )
-      lines = [
-          tagfile.tags_line(name, tagfile.direct_tags_of(name))
-          for name in sorted(names)
-      ]
-      changed = edit_strings(lines)
-      for old_line, new_line in changed:
-        old_name, old_tags = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-        with Pfx(old_name):
-          if old_name != new_name:
-            if new_name in tagsets:
-              warning("new name %r already exists", new_name)
-              ok = False
-              continue
-            del tagsets[old_name]
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if not existspath(new_path):
-                with Pfx("rename %r => %r", old_path, new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    continue
-                  info("renamed")
-          tagsets[new_name] = new_tags
-      tagfile.save()
+    tagfile = self.dir_tagfile(dirpath)
+    tagsets = tagfile.tagsets
+    names = set(
+        name for name in os.listdir(dirpath)
+        if (name and name not in ('.', '..') and not name.startswith('.'))
+    )
+    lines = [
+        tagfile.tags_line(name, tagfile.direct_tags_of(name))
+        for name in sorted(names)
+    ]
+    changed = edit_strings(lines)
+    for old_line, new_line in changed:
+      old_name, old_tags = tagfile.parse_tags_line(old_line)
+      new_name, new_tags = tagfile.parse_tags_line(new_line)
+      with Pfx(old_name):
+        if old_name != new_name:
+          if new_name in tagsets:
+            warning("new name %r already exists", new_name)
+            ok = False
+            continue
+          del tagsets[old_name]
+          old_path = joinpath(dirpath, old_name)
+          if existspath(old_path):
+            new_path = joinpath(dirpath, new_name)
+            if not existspath(new_path):
+              with Pfx("rename => %r", new_path):
+                try:
+                  os.rename(old_path, new_path)
+                except OSError as e:
+                  warning("%s", e)
+                  ok = False
+                  continue
+                info("renamed")
+        tagsets[new_name] = new_tags
+    tagfile.save()
     return ok
 
   def scrub(self, path):
