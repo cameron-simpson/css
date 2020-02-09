@@ -115,6 +115,9 @@ class FSTagsCommand(BaseCommand):
   USAGE_FORMAT = '''Usage:
     {cmd} autotag paths...
         Tag paths based on rules from the rc file.
+    {cmd} scrub paths...
+        Remove all tags for missing paths.
+        If a path is a directory, scrub the immediate paths in the directory.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         --direct    Use direct tags instead of all tags.
@@ -387,6 +390,17 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   @classmethod
+  def cmd_scrub(cls, argv, options, *, cmd):
+    ''' Scrub paths.
+    '''
+    fstags = options.fstags
+    if not argv:
+      raise GetoptError("missing paths")
+    with fstags:
+      for path in argv:
+        fstags.scrub(path)
+
+  @classmethod
   def cmd_tag(cls, argv, options, *, cmd):
     ''' Tag a path with multiple tags.
     '''
@@ -652,6 +666,31 @@ class FSTags(MultiOpenMixin):
           tagsets[new_name] = new_tags
       tagfile.save()
     return ok
+
+  def scrub(self, path):
+    with Pfx("scrub %r",path):
+      if isdirpath(path):
+        tagfile=self.dir_tagfile(path)
+        tagsets = tagfile.tagsets
+        modified=False
+        for name in sorted(tagsets.keys()):
+          with Pfx(name):
+            subpath=joinpath(path,name)
+            if not existspath(subpath):
+              info("does not exist, delete")
+              del tagsets[name]
+              modified=True
+        if modified:
+          tagfile.save()
+      elif not existspath(path):
+        dirpath=dirname(path)
+        base=basename(path)
+        tagfile=self.dir_tagfile(dirpath)
+        tagsets = tagfile.tagsets
+        if base in tagsets:
+          info("%r: does not exist, deleted",base)
+          del tagsets[base]
+          tagfile.save()
 
 class HasFSTagsMixin:
   ''' Mixin providing a `.fstags` property.
