@@ -1306,7 +1306,9 @@ class TaggedPath(HasFSTagsMixin):
   '''
 
   def __init__(self, filepath, fstags=None):
-    if fstags is not None:
+    if fstags is None:
+      fstags = self.fstags
+    else:
       self.fstags = fstags
     self.filepath = Path(filepath)
     self._tagfile_entries = fstags.path_tagfiles(filepath)
@@ -1425,7 +1427,6 @@ class TaggedPath(HasFSTagsMixin):
           default from the `FSTags` context
     '''
     name = self.basename
-    tags = self.direct_tags
     all_tags = self.all_tags
     # compute inferrable tags
     with state.stack(verbose=False):
@@ -1436,7 +1437,7 @@ class TaggedPath(HasFSTagsMixin):
           new_tags.add(autotag)
           updated = True
     if updated:
-      tags.update(new_tags)
+      self.direct_tags.update(new_tags)
       if not no_save:
         self.save()
     return new_tags
