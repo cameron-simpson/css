@@ -53,7 +53,7 @@ from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, relpath
+    isdirpath, isfile as isfilepath, join as joinpath, relpath, samefile
 )
 from pathlib import Path
 import re
@@ -373,39 +373,54 @@ class FSTagsCommand(BaseCommand):
               )
           )
 
-  @staticmethod
-  def cmd_mv(argv, options, *, cmd):
-    ''' Move paths and their tags into a destination.
+  def cmd_cp(self, argv, options, *, cmd):
+    ''' POSIX cp equivalent, but copying the tags.
     '''
-    if len(argv) < 2:
-      raise GetoptError("missing paths or targetdir")
-    target_dirpath = argv.pop()
-    if not isdirpath(target_dirpath):
-      raise GetoptError("targetdir %r: not a directory" % (target_dirpath,))
+    return self._cmd_mvcpln(options.fstags.copy, argv, options)
+
+  def cmd_ln(self, argv, options, *, cmd):
+    ''' POSIX ln equivalent, but copying the tags.
+    '''
+    return self._cmd_mvcpln(options.fstags.link, argv, options)
+
+  def cmd_mv(self, argv, options, *, cmd):
+    ''' POSIX mv equivalent, but copying the tags.
+    '''
+    return self._cmd_mvcpln(options.fstags.move, argv, options)
+
+  @staticmethod
+  def _cmd_mvcpln(attach, argv, options):
+    ''' Move/copy/link paths and their tags into a destination.
+    '''
     xit = 0
     fstags = options.fstags
-    with fstags:
-      for path in argv:
-        with Pfx(path):
-          if not existspath(path):
-            error("path does not exist")
+    with state.stack(verbose=True):
+      with fstags:
+        if len(argv) < 2:
+          raise GetoptError("missing paths or targetdir")
+        endpath = argv[-1]
+        if isdirpath(endpath):
+          dirpath = argv.pop()
+          for srcpath in argv:
+            dstpath = joinpath(dirpath, basename(srcpath))
+            print(srcpath, '=>', dstpath)
+            try:
+              attach(srcpath, dstpath)
+            except (ValueError, OSError) as e:
+              print(e, file=sys.stderr)
+        else:
+          if len(argv) != 2:
+            raise GetoptError(
+                "expected exactly 2 arguments if the last is not a directory, got: %r"
+                % (argv,)
+            )
+          srcpath, dstpath = argv
+          print(srcpath, '=>', dstpath)
+          try:
+            attach(srcpath, dstpath)
+          except (ValueError, OSError) as e:
+            print(e, file=sys.stderr)
             xit = 1
-            continue
-          src_tags = fstags[path].direct_tags
-          src_basename = basename(path)
-          target_path = joinpath(target_dirpath, src_basename)
-          with Pfx("=>%r", target_path):
-            if existspath(target_path):
-              error("target already exists")
-              xit = 1
-              continue
-            print(path, '=>', target_path)
-            dst_taggedpath = fstags[target_path]
-            with Pfx("shutil.move"):
-              shutil.move(path, target_path)
-            for tag in src_tags:
-              dst_taggedpath.add(tag)
-            dst_taggedpath.save()
     return xit
 
   @classmethod
@@ -718,6 +733,61 @@ class FSTags(MultiOpenMixin):
           verbose("%r: does not exist, deleted", base)
           del tagsets[base]
           tagfile.save()
+
+  @pfx_method
+  def copy(self, srcpath, dstpath, force=False):
+    ''' Copy `srcpath` to `dstpath`.
+    '''
+    return self.attach_path(shutil.copy2, srcpath, dstpath, force=force)
+
+  @pfx_method
+  def link(self, srcpath, dstpath, force=False):
+    ''' Link `srcpath` to `dstpath`.
+    '''
+    return self.attach_path(os.link, srcpath, dstpath, force=force)
+
+  @pfx_method
+  def move(self, srcpath, dstpath, force=False):
+    ''' Move `srcpath` to `dstpath`.
+    '''
+    return self.attach_path(shutil.move, srcpath, dstpath, force=force)
+
+  def attach_path(self, attach, srcpath, dstpath, *, force=False):
+    ''' Attach `srcpath` to `dstpath` using the `attach` callable.
+
+        Parameters:
+        * `attach`: callable accepting `attach(srcpath,dstpath)`
+          to do the desired attachment,
+          such as a copy, link or move
+        * `srcpath`: the source filesystem object
+        * `dstpath`: the destination filesystem object
+        * `force`: default `False`.
+          If true and the destination exists
+          try to remove it before calling `attach`.
+          Otherwise if the destination exists
+          raise a `ValueError`.
+    '''
+    with Pfx("%r => %r", srcpath, dstpath):
+      if not existspath(srcpath):
+        raise ValueError("source does not exist")
+      src_taggedpath = self[srcpath]
+      dst_taggedpath = self[dstpath]
+      if existspath(dstpath):
+        if samefile(srcpath, dstpath):
+          raise ValueError("these are the same file")
+        if force:
+          warning("removing existing dstpath: %r", dstpath)
+          with Pfx("os.remove(%r)", dstpath):
+            os.remove(dstpath)
+        else:
+          raise ValueError("destination already exists")
+      result = attach(srcpath, dstpath)
+      with Pfx("shutil.move"):
+        shutil.move(srcpath, dstpath)
+      for tag in src_taggedpath.direct_tags():
+        dst_taggedpath.direct_tags.add(tag)
+      dst_taggedpath.save()
+      return result
 
 class HasFSTagsMixin:
   ''' Mixin providing a `.fstags` property.
