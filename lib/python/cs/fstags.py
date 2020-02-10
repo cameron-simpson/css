@@ -135,9 +135,12 @@ class FSTagsCommand(BaseCommand):
   USAGE_FORMAT = '''Usage:
     {cmd} autotag paths...
         Tag paths based on rules from the rc file.
-    {cmd} cp srcpath dstpath
-    {cmd} cp srcpaths... dstdirpath
+    {cmd} cp [-fnv] srcpath dstpath
+    {cmd} cp [-fnv] srcpaths... dstdirpath
         Copy files and their tags into targetdir.
+        -f  Force: remove destination if it exists.
+        -n  No remove: fail if the destination exists.
+        -v  Verbose: show copied files.
     {cmd} scrub paths...
         Remove all tags for missing paths.
         If a path is a directory, scrub the immediate paths in the directory.
@@ -161,9 +164,12 @@ class FSTagsCommand(BaseCommand):
         The JSON tag data come from the file "tags.json"; the name
         "-" indicates that the JSON data should be read from the
         standard input.
-    {cmd} ln srcpath dstpath
-    {cmd} ln srcpaths... dstdirpath
+    {cmd} ln [-fnv] srcpath dstpath
+    {cmd} ln [-fnv] srcpaths... dstdirpath
         Link files and their tags into targetdir.
+        -f  Force: remove destination if it exists.
+        -n  No remove: fail if the destination exists.
+        -v  Verbose: show linked files.
     {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         --direct    List direct tags instead of all tags.
@@ -175,9 +181,12 @@ class FSTagsCommand(BaseCommand):
   ).replace(
       '}', '}}'
   ) + '''
-    {cmd} mv srcpath dstpath
-    {cmd} mv srcpaths... dstdirpath
+    {cmd} mv [-fnv] srcpath dstpath
+    {cmd} mv [-fnv] srcpaths... dstdirpath
         Move files and their tags into targetdir.
+        -f  Force: remove destination if it exists.
+        -n  No remove: fail if the destination exists.
+        -v  Verbose: show moved files.
     {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
@@ -404,6 +413,18 @@ class FSTagsCommand(BaseCommand):
     '''
     xit = 0
     fstags = options.fstags
+    cmd_force=False
+    cmd_verbose=False
+    subopts, argv = getopt(argv, 'fnv')
+    for subopt, value in subopts:
+      if subopt == '-f':
+        cmd_force=True
+      elif subopt == '-n':
+        cmd_force=False
+      elif subopt == '-v':
+        cmd_verbose=True
+      else:
+        raise RuntimeError("unhandled subopt: %r" % (subopt,))
     if len(argv) < 2:
       raise GetoptError("missing paths or targetdir")
     endpath = argv[-1]
@@ -413,12 +434,14 @@ class FSTagsCommand(BaseCommand):
           dirpath = argv.pop()
           for srcpath in argv:
             dstpath = joinpath(dirpath, basename(srcpath))
-            print(srcpath, '=>', dstpath)
             try:
-              attach(srcpath, dstpath)
+              attach(srcpath, dstpath,force=cmd_force)
             except (ValueError, OSError) as e:
               print(e, file=sys.stderr)
               xit = 1
+            else:
+              if cmd_verbose:
+                print(srcpath, '->', dstpath)
     else:
       if len(argv) != 2:
         raise GetoptError(
@@ -428,12 +451,14 @@ class FSTagsCommand(BaseCommand):
       with state.stack(verbose=True):
         with fstags:
           srcpath, dstpath = argv
-          print(srcpath, '=>', dstpath)
           try:
-            attach(srcpath, dstpath)
+            attach(srcpath, dstpath,force=cmd_force)
           except (ValueError, OSError) as e:
             print(e, file=sys.stderr)
             xit = 1
+          else:
+            if cmd_verbose:
+              print(srcpath, '->', dstpath)
     return xit
 
   @classmethod
