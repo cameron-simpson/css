@@ -1337,12 +1337,15 @@ class TagFile(HasFSTagsMixin):
     '''
     with Pfx("savetags(%r)", filepath):
       trace("SAVE %r", filepath)
+      name_tags = sorted(tagsets.items())
       with open(filepath, 'w') as f:
-        for name, tags in sorted(tagsets.items()):
+        for name, tags in name_tags:
           if not tags:
             continue
           f.write(cls.tags_line(name, tags))
           f.write('\n')
+      for _, tags in name_tags:
+        tags.modified = False
 
   @locked
   def save(self):
