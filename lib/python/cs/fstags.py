@@ -621,7 +621,7 @@ class FSTags(MultiOpenMixin):
     with self:
       for path in paths:
         with Pfx(path):
-          tagged_path = fstags[path]
+          tagged_path = self[path]
           for spec, choice, tag in tag_choices:
             with Pfx(spec):
               if choice:
