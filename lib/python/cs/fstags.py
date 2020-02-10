@@ -404,12 +404,12 @@ class FSTagsCommand(BaseCommand):
     '''
     xit = 0
     fstags = options.fstags
-    with state.stack(verbose=True):
-      with fstags:
-        if len(argv) < 2:
-          raise GetoptError("missing paths or targetdir")
-        endpath = argv[-1]
-        if isdirpath(endpath):
+    if len(argv) < 2:
+      raise GetoptError("missing paths or targetdir")
+    endpath = argv[-1]
+    if isdirpath(endpath):
+      with state.stack(verbose=True):
+        with fstags:
           dirpath = argv.pop()
           for srcpath in argv:
             dstpath = joinpath(dirpath, basename(srcpath))
@@ -418,12 +418,15 @@ class FSTagsCommand(BaseCommand):
               attach(srcpath, dstpath)
             except (ValueError, OSError) as e:
               print(e, file=sys.stderr)
-        else:
-          if len(argv) != 2:
-            raise GetoptError(
-                "expected exactly 2 arguments if the last is not a directory, got: %r"
-                % (argv,)
-            )
+              xit = 1
+    else:
+      if len(argv) != 2:
+        raise GetoptError(
+            "expected exactly 2 arguments if the last is not a directory, got: %r"
+            % (argv,)
+        )
+      with state.stack(verbose=True):
+        with fstags:
           srcpath, dstpath = argv
           print(srcpath, '=>', dstpath)
           try:
