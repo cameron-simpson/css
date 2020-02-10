@@ -122,6 +122,8 @@ class _State(threading.local, StackableValues):
 state = _State(verbose=False)
 
 def verbose(msg, *a):
+  ''' Emit message if in verbose mode.
+  '''
   if state.verbose:
     info(msg, *a)
 
@@ -540,7 +542,6 @@ class FSTags(MultiOpenMixin):
   def startup(self):
     ''' Stub for startup.
     '''
-    pass
 
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
@@ -717,6 +718,8 @@ class FSTags(MultiOpenMixin):
     return ok
 
   def scrub(self, path):
+    ''' Scrub tags for names which do not exist in the filesystem.
+    '''
     with Pfx("scrub %r", path):
       if isdirpath(path):
         tagfile = self.dir_tagfile(path)
@@ -875,7 +878,7 @@ class Tag:
   def transcribe_value(cls, value):
     ''' Transcribe `value` for use in `Tag` transcription.
     '''
-    for type_, from_str, to_str in cls.EXTRA_TYPES:
+    for type_, _, to_str in cls.EXTRA_TYPES:
       if isinstance(value, type_):
         value_s = to_str(value)
         # should be nonwhitespace
@@ -986,7 +989,7 @@ class Tag:
       # check for special "nonwhitespace" transcription
       nonwhite, nw_offset = get_nonwhite(s, offset)
       nw_value = None
-      for type_, from_str, to_str in cls.EXTRA_TYPES:
+      for _, from_str, _ in cls.EXTRA_TYPES:
         try:
           nw_value = from_str(nonwhite)
         except ValueError:
@@ -1268,7 +1271,8 @@ class TagFile(HasFSTagsMixin):
         return name
     return json.dumps(name)
 
-  def decode_name(self, s, offset=0):
+  @staticmethod
+  def decode_name(s, offset=0):
     ''' Decode the *name* from the string `s` at `offset` (default `0`).
     '''
     if s.startswith('"'):
@@ -1490,7 +1494,7 @@ class TaggedPath(HasFSTagsMixin):
     '''
     self.direct_tags.pop(tag_name)
 
-  def autotag(self, rules=None, *, no_save=False, use_xattrs=None):
+  def autotag(self, rules=None, *, no_save=False):
     ''' Apply `rules`to this `TaggedPath`,
         update the `direct_tags` with new tags.
 
@@ -1500,8 +1504,6 @@ class TaggedPath(HasFSTagsMixin):
           Each rule will be passed the `TaggedPath.basename` as the `name`.
         * `no_save`: if true (default `False`)
           suppress the save of updated tags back to the filesystem.
-        * `use_xattrs`: control use of extended attributes,
-          default from the `FSTags` context
     '''
     name = self.basename
     all_tags = self.all_tags
