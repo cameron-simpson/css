@@ -796,8 +796,6 @@ class FSTags(MultiOpenMixin):
         else:
           raise ValueError("destination already exists")
       result = attach(srcpath, dstpath)
-      with Pfx("shutil.move"):
-        shutil.move(srcpath, dstpath)
       for tag in src_taggedpath.direct_tags():
         dst_taggedpath.direct_tags.add(tag)
       dst_taggedpath.save()
