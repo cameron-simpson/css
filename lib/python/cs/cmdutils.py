@@ -14,6 +14,8 @@ from cs.mappings import StackableValues
 from cs.pfx import Pfx
 from cs.resources import RunState
 
+__version__ = '20200210'
+
 DISTINFO = {
     'description':
     "convenience functions for working with the Cmd module and other command line related stuff",
