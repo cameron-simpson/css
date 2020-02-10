@@ -1524,6 +1524,18 @@ class TaggedPath(HasFSTagsMixin):
     '''
     return self.direct_tagfile.tagsets[self.basename]
 
+  @property
+  def modified(self):
+    ''' The modification state of the `TagSet`.
+    '''
+    return self.direct_tags.modified
+
+  @modified.setter
+  def modified(self, new_modified):
+    ''' The modification state of the `TagSet`.
+    '''
+    self.direct_tags.modified = new_modified
+
   def save(self):
     ''' Update the associated `TagFile`.
     '''
