@@ -133,6 +133,9 @@ class FSTagsCommand(BaseCommand):
   USAGE_FORMAT = '''Usage:
     {cmd} autotag paths...
         Tag paths based on rules from the rc file.
+    {cmd} cp srcpath dstpath
+    {cmd} cp srcpaths... dstdirpath
+        Copy files and their tags into targetdir.
     {cmd} scrub paths...
         Remove all tags for missing paths.
         If a path is a directory, scrub the immediate paths in the directory.
@@ -156,6 +159,9 @@ class FSTagsCommand(BaseCommand):
         The JSON tag data come from the file "tags.json"; the name
         "-" indicates that the JSON data should be read from the
         standard input.
+    {cmd} ln srcpath dstpath
+    {cmd} ln srcpaths... dstdirpath
+        Link files and their tags into targetdir.
     {cmd} ls [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         --direct    List direct tags instead of all tags.
@@ -167,7 +173,8 @@ class FSTagsCommand(BaseCommand):
   ).replace(
       '}', '}}'
   ) + '''
-    {cmd} mv paths... targetdir
+    {cmd} mv srcpath dstpath
+    {cmd} mv srcpaths... dstdirpath
         Move files and their tags into targetdir.
     {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
