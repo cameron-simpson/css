@@ -197,6 +197,9 @@ class FSTagsCommand(BaseCommand):
         With the form "-tag", remove the tag from the immediate tags.
         A single path named "-" indicates that paths should be read
         from the standard input.
+    {cmd} test --direct] path {{tag[=value]|-tag}}...
+        List files from path matching all the constraints.
+        --direct    Use direct tags instead of all tags.
     {cmd} xattr_import {{-|paths...}}
         Import tag information from extended attributes.
     {cmd} xattr_export {{-|paths...}}
@@ -525,6 +528,41 @@ class FSTagsCommand(BaseCommand):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
+  def cmd_test(cls, argv, options, *, cmd):
+    ''' Find paths matching tag criteria.
+    '''
+    fstags = options.fstags
+    badopts = False
+    use_direct_tags = False
+    options, argv = getopt(argv, '', longopts=['direct'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '--direct':
+          use_direct_tags = True
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      warning("missing path")
+      badopts = True
+    else:
+      path = argv.pop(0)
+      if not argv:
+        warning("missing tag criteria")
+        badopts = True
+      else:
+        try:
+          tag_choices = cls.parse_tag_choices(argv)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    return (
+        0 if fstags.test(path, tag_choices, use_direct_tags=use_direct_tags)
+        else 1
+    )
+
+  @classmethod
   def cmd_xattr_export(cls, argv, options, *, cmd):
     ''' Update extended attributes from fstags.
     '''
@@ -690,23 +728,35 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     for filepath in rpaths(path, yield_dirs=use_direct_tags):
-      tagged_path = self[filepath]
-      tags = (
-          tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
-      )
-      choose = True
-      for _, choice, tag in tag_choices:
-        if choice:
-          # tag_choice not present or not with same nonNone value
-          if tag not in tags:
-            choose = False
-            break
-        else:
-          if tag in tags:
-            choose = False
-            break
-      if choose:
+      if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
         yield filepath
+
+  def test(self, path, tag_choices, use_direct_tags=False):
+    ''' Test a path against `tag_choices`.
+
+        Parameters:
+        * `path`: path to test
+        * `tag_choices`: an iterable of `TagChoice`s
+        * `use_direct_tags`: test the direct_tags if true,
+          otherwise the all_tags.
+          Default: `False`
+    '''
+    tagged_path = self[path]
+    tags = (
+        tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
+    )
+    ok = True
+    for _, choice, tag in tag_choices:
+      if choice:
+        # tag_choice not present or not with same nonNone value
+        if tag not in tags:
+          ok = False
+          break
+      else:
+        if tag in tags:
+          ok = False
+          break
+    return ok
 
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
