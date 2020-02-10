@@ -67,7 +67,7 @@ from cs.edit import edit_strings
 from cs.lex import (
     get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
 )
-from cs.logutils import setup_logging, error, warning, info
+from cs.logutils import setup_logging, error, warning, info, trace
 from cs.mappings import StackableValues
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -1335,7 +1335,7 @@ class TagFile(HasFSTagsMixin):
     ''' Save a tagmap to `filepath`.
     '''
     with Pfx("savetags(%r)", filepath):
-      verbose("SAVE %r", filepath)
+      trace("SAVE %r", filepath)
       with open(filepath, 'w') as f:
         for name, tags in sorted(tagsets.items()):
           if not tags:
