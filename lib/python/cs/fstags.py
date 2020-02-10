@@ -355,6 +355,7 @@ class FSTagsCommand(BaseCommand):
             tagged_path = fstags[path]
             for key, value in data.items():
               tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
+    return 0
 
   @staticmethod
   def cmd_ls(argv, options, *, cmd):
