@@ -416,16 +416,16 @@ class FSTagsCommand(BaseCommand):
     '''
     xit = 0
     fstags = options.fstags
-    cmd_force=False
-    cmd_verbose=False
+    cmd_force = False
+    cmd_verbose = False
     subopts, argv = getopt(argv, 'fnv')
     for subopt, value in subopts:
       if subopt == '-f':
-        cmd_force=True
+        cmd_force = True
       elif subopt == '-n':
-        cmd_force=False
+        cmd_force = False
       elif subopt == '-v':
-        cmd_verbose=True
+        cmd_verbose = True
       else:
         raise RuntimeError("unhandled subopt: %r" % (subopt,))
     if len(argv) < 2:
@@ -438,7 +438,7 @@ class FSTagsCommand(BaseCommand):
           for srcpath in argv:
             dstpath = joinpath(dirpath, basename(srcpath))
             try:
-              attach(srcpath, dstpath,force=cmd_force)
+              attach(srcpath, dstpath, force=cmd_force)
             except (ValueError, OSError) as e:
               print(e, file=sys.stderr)
               xit = 1
@@ -455,7 +455,7 @@ class FSTagsCommand(BaseCommand):
         with fstags:
           srcpath, dstpath = argv
           try:
-            attach(srcpath, dstpath,force=cmd_force)
+            attach(srcpath, dstpath, force=cmd_force)
           except (ValueError, OSError) as e:
             print(e, file=sys.stderr)
             xit = 1
