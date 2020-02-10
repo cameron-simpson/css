@@ -197,8 +197,8 @@ class FSTagsCommand(BaseCommand):
         With the form "-tag", remove the tag from the immediate tags.
         A single path named "-" indicates that paths should be read
         from the standard input.
-    {cmd} test --direct] path {{tag[=value]|-tag}}...
-        List files from path matching all the constraints.
+    {cmd} test [--direct] path {{tag[=value]|-tag}}...
+        Test whether the path matches all the constraints.
         --direct    Use direct tags instead of all tags.
     {cmd} xattr_import {{-|paths...}}
         Import tag information from extended attributes.
