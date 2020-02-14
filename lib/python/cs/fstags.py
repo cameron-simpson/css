@@ -146,6 +146,7 @@ class FSTagsCommand(BaseCommand):
         If a path is a directory, scrub the immediate paths in the directory.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
+        -d          treat directories like files (do no recurse).
         --direct    Use direct tags instead of all tags.
         --for-rsync Instead of listing matching paths, emit a
                     sequence of rsync(1) patterns suitable for use with
@@ -374,12 +375,15 @@ class FSTagsCommand(BaseCommand):
     ''' List paths and their tags.
     '''
     fstags = options.fstags
+    directories_like_files = False
     use_direct_tags = False
     output_format = LS_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'o:', longopts=['direct'])
+    options, argv = getopt(argv, 'do:', longopts=['direct'])
     for option, value in options:
       with Pfx(option):
-        if option == '--direct':
+        if option == '-d':
+          directories_like_files = True
+        elif option == '--direct':
           use_direct_tags = True
         elif option == '-o':
           output_format = value
@@ -388,7 +392,8 @@ class FSTagsCommand(BaseCommand):
     paths = argv or ['.']
     for path in paths:
       with Pfx(path):
-        for filepath in rfilepaths(path):
+        for filepath in ((path,)
+                         if directories_like_files else rfilepaths(path)):
           print(
               output_format.format(
                   **fstags[filepath].format_kwargs(direct=use_direct_tags)
