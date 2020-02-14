@@ -871,9 +871,17 @@ class FSTags(MultiOpenMixin):
         else:
           raise ValueError("destination already exists")
       result = attach(srcpath, dstpath)
+      old_modified = dst_taggedpath.modified
       for tag in src_taggedpath.direct_tags:
         dst_taggedpath.direct_tags.add(tag)
-      dst_taggedpath.save()
+      try:
+        dst_taggedpath.save()
+      except OSError as e:
+        if e.errno == errno.EACCES:
+          warning("save tags: %s", e)
+          dst_taggedpath.modified = old_modified
+        else:
+          raise
       return result
 
 class HasFSTagsMixin:
@@ -1069,7 +1077,7 @@ class Tag:
         if offset == offset2:
           value = None
       if value is not None:
-        offset=offset2
+        offset = offset2
       else:
         # check for special "nonwhitespace" transcription
         nonwhite, nw_offset = get_nonwhite(s, offset)
