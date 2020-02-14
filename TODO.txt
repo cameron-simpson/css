@@ -1,3 +1,4 @@
+cs.fstags: ls,find: emit relative paths
 fstags: autotag: use pathtags.add
 logutils: use cs.tty stuff for the status() function
 BaseCommand: put cmd into options and drop from parameters of subcommands
