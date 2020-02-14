@@ -1060,26 +1060,34 @@ class Tag:
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
-    elif s[offset].isalpha():
-      value, offset = cls.parse_name(s, offset)
     else:
-      # check for special "nonwhitespace" transcription
-      nonwhite, nw_offset = get_nonwhite(s, offset)
-      nw_value = None
-      for _, from_str, _ in cls.EXTRA_TYPES:
-        try:
-          nw_value = from_str(nonwhite)
-        except ValueError:
-          pass
-      if nw_value is not None:
-        # special format found
-        value = nw_value
-        offset = nw_offset
+      try:
+        value, offset2 = cls.parse_name(s, offset)
+      except ValueError:
+        value = None
       else:
-        # decode as plain JSON data
-        value_part = s[offset:]
-        value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
-        offset += suboffset
+        if offset == offset2:
+          value = None
+      if value is not None:
+        offset=offset2
+      else:
+        # check for special "nonwhitespace" transcription
+        nonwhite, nw_offset = get_nonwhite(s, offset)
+        nw_value = None
+        for _, from_str, _ in cls.EXTRA_TYPES:
+          try:
+            nw_value = from_str(nonwhite)
+          except ValueError:
+            pass
+        if nw_value is not None:
+          # special format found
+          value = nw_value
+          offset = nw_offset
+        else:
+          # decode as plain JSON data
+          value_part = s[offset:]
+          value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+          offset += suboffset
     return value, offset
 
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
