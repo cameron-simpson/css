@@ -53,7 +53,8 @@ from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, relpath, samefile
+    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
+    samefile
 )
 from pathlib import Path
 import re
@@ -305,7 +306,9 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    filepaths = fstags.find(path, tag_choices, use_direct_tags=use_direct_tags)
+    filepaths = fstags.find(
+        realpath(path), tag_choices, use_direct_tags=use_direct_tags
+    )
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
         print(include)
@@ -392,8 +395,9 @@ class FSTagsCommand(BaseCommand):
     paths = argv or ['.']
     for path in paths:
       with Pfx(path):
-        for filepath in ((path,)
-                         if directories_like_files else rfilepaths(path)):
+        fullpath = realpath(path)
+        for filepath in ((fullpath,)
+                         if directories_like_files else rfilepaths(fullpath)):
           print(
               output_format.format(
                   **fstags[filepath].format_kwargs(direct=use_direct_tags)
