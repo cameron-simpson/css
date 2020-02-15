@@ -66,5 +66,5 @@ then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
 else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
-echo "$ts $*" >>"$logname"
+echo "$ts $dlog_cats: $*" >>"$logname"
 exec buglog -c "$dlog_cats" -d "$ts" -B dlog "$*"
