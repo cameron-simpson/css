@@ -138,6 +138,20 @@ class CornuCopyBuffer(object):
     input_offset = getattr(input_data, 'offset', 0)
     self.input_offset_displacement = input_offset - offset
 
+  def selfcheck(self, msg=''):
+    msgpfx = type(self).__name__ + '.selfcheck'
+    if msg:
+      msgpfx += ': ' + msg
+    msgpfx += "buflen=%d, bufs=%r" % (
+        self.buflen, [len(buf) for buf in self.bufs]
+    )
+    assert self.buflen == sum(
+        len(buf) for buf in self.bufs
+    ), msgpfx + ": self.buflen != sum of .bufs"
+    assert all(
+        len(buf) > 0 for buf in self.bufs
+    ), msgpfx + ": not all .bufs are nonempty"
+
   @property
   def buf(self):
     ''' The first buffer.
