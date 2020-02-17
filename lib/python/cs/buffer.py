@@ -139,6 +139,8 @@ class CornuCopyBuffer(object):
     self.input_offset_displacement = input_offset - offset
 
   def selfcheck(self, msg=''):
+    ''' Integrity check for the buffer, useful during debugging.
+    '''
     msgpfx = type(self).__name__ + '.selfcheck'
     if msg:
       msgpfx += ': ' + msg
