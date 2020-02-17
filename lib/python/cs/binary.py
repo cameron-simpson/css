@@ -1034,10 +1034,11 @@ class ListField(PacketField):
         "%s cannot be parsed directly from a buffer" % (cls,)
     )
 
-  def transcribe(self):
-    ''' Transcribe each item in the list.
+  @staticmethod
+  def transcribe_value(value):
+    ''' Transcribe each item in `value`.
     '''
-    for item in self.value:
+    for item in value:
       yield item.transcribe()
 
 _multi_struct_fields = {}
