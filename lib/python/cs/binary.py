@@ -192,9 +192,9 @@ class PacketField(ABC):
       Sometimes a `PacketField` may be slightly more complex
       while still not warranting (or perhaps fitting)
       the formality of a `Packet` with its multifield structure.
-
       One example is the `cs.iso14496.UTF8or16Field` class.
-      This supports an ISO14496 UTF8 or UTF16 string field,
+
+      `UTF8or16Field` supports an ISO14496 UTF8 or UTF16 string field,
       as as such has 2 attributes:
       * `value`: the string itself
       * `bom`: a UTF16 byte order marker or `None`;
@@ -1006,7 +1006,7 @@ class BSSFloat(PacketField):
     return BSString.transcribe_value(str(f))
 
 class ListField(PacketField):
-  ''' A field which is a list of other fields.
+  ''' A field which is itself a list of other `PacketField`s.
   '''
 
   def __str__(self):
@@ -1052,9 +1052,11 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
         these names
       * `class_name`: option name for the generated class
   '''
+  # we memoise the class definitions
   key = (struct_format, subvalue_names, class_name)
   MultiStructField = _struct_fields.get(key)
   if not MultiStructField:
+    # new class
     struct = Struct(struct_format)
     if subvalue_names:
       subvalues_type = namedtuple(
@@ -1064,6 +1066,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     class MultiStructField(PacketField):
       ''' A struct field for a complex struct format.
       '''
+
       if subvalue_names:
 
         def __str__(self):
