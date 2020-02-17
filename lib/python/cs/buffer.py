@@ -427,30 +427,43 @@ class CornuCopyBuffer(object):
         See `.take()` to get a flat chunk instead of a list.
     '''
     if size == 0:
-      return b''
-    self.extend(size, short_ok=short_ok)
-    bufs = self.bufs
+      return []
+    if size is Ellipsis or size > self.buflen:
+      # extend the buffered data
+      self.extend(size, short_ok=short_ok)
     if size is Ellipsis:
       # take all the fetched data
-      taken = bufs
+      taken = self.bufs
       self.bufs = []
       self.buflen = 0
     else:
-      # take the leading data
-      size = min(size, self.buflen)
-      taken = []
-      while size > 0 and bufs:
-        buf0 = bufs[0]
-        if len(buf0) <= size:
-          buf = buf0
-          bufs.pop(0)
-        else:
-          buf = buf0[:size]
-          bufs[0] = buf0[size:]
-        self.buflen -= len(buf)
-        taken.append(buf)
-        size -= len(buf)
-    self.offset += sum(len(buf) for buf in taken)
+      if size >= self.buflen:
+        # take the whole buffer
+        taken = self.bufs
+        self.bufs = []
+        self.buflen = 0
+      else:
+        # size < self.buflen
+        # take the leading data from the buffer
+        taken = []
+        bufs = self.bufs
+        while size > 0:
+          buf0 = bufs[0]
+          if len(buf0) <= size:
+            buf = buf0
+            bufs.pop(0)
+          else:
+            # len(buf0) > size: crop from buf0
+            assert len(buf0) > size
+            buf = buf0[:size]
+            bufs[0] = buf0[size:]
+          taken.append(buf)
+          size -= len(buf)
+        # advance offset by the size of the taken data
+        taken_size = sum(len(buf) for buf in taken)
+        ##assert taken_size <= size0 if short_ok else taken_size == size0
+        self.buflen -= taken_size
+        self.offset += taken_size
     return taken
 
   def take(self, size, short_ok=False):
