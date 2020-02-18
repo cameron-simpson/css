@@ -1686,7 +1686,7 @@ def add_generic_sample_boxbody(
       ''' Transcribe the regular fields
           then transcribe the source data of the samples.
       '''
-      yield super().transcribe(self)
+      yield super().transcribe()
       yield self._samples__raw_data
 
     @deferred_field
