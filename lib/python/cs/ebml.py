@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+#
+
+''' yet another implementation of EBML (Extensible Binary Meta Language).
+
+    Cameron Simpson <cs@cskk.id.au>
+'''
+
+from cs.binary import PacketField
+from cs.x import X
+
+def get_length_encoded_bytes(bfr) -> bytes:
+  ''' Read a run length encoded byte sequence
+      using a similar length encoding scheme to UTF-8.
+      Return the leading bitmask (`0x80`, `0x40`, etc)
+      and the bytes.
+  '''
+  b0 = bfr.byte0()
+  assert b0 != 0
+  bitmask = 0b10000000
+  extra_bytes = 0
+  while b0:
+    if b0 & bitmask:
+      break
+    bitmask >>= 1
+    extra_bytes += 1
+  if not bitmask:
+    raise ValueError("invalid leading byte 0x%02x" % (b0,))
+  bs = [b0]
+  if extra_bytes:
+    bs.extend(bfr.take(extra_bytes))
+  return bitmask, bs
+
+def get_length_encoded_value(bfr):
+  ''' Read a run length encoded value
+      using a similar length encoding scheme to UTF-8.
+      Return the value.
+
+      The bytes are read using `get_length_encoded_bytes`
+      and interpreted as a big endian unsigned value.
+  '''
+  bitmask, bs = get_length_encoded_bytes(bfr)
+  bvalues = list(bs)
+  bvalues[0] &= ~bitmask
+  value = 0
+  for b in bvalues:
+    value = (value << 8) | b
+  return value
+
+def transcribe_length_encoded_value(value):
+  ''' Return a `bytes` encoding `value`
+      as a run length encoded string.
+  '''
+  value0 = value
+  bvalues = []
+  while value > 0:
+    bvalues.append(value & 0xff)
+    value >>= 8
+  if not bvalues:
+    bvalues.append(0)
+  extra_bytes = len(bvalues) - 1
+  bitmask = 0b10000000 >> extra_bytes
+  if bvalues[-1] >= bitmask:
+    bitmask >>= 1
+    bvalues.append(0)
+  if not bitmask:
+    raise ValueError(
+        "cannot put enough leading zeroes on the first byte to encode 0x%02x" %
+        (value0,)
+    )
+  bvalues[-1] |= bitmask
+  return bytes(reversed(bvalues))
+
+class ElementID(PacketField):
+  ''' An ElementID.
+  '''
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    bitmask, bs = get_length_encoded_bytes(bfr)
+    assert bs and len(bs) <= 4
+    return bs
+
+  @staticmethod
+  def transcribe_value(bs):
+    return bs
+
+class DataSize(PacketField):
+  ''' A run length encoded data size.
+  '''
+
+  @staticmethod
+  def value_from_buffer(bfr):
+    return get_length_encoded_value(bfr)
+
+  @staticmethod
+  def transcribe_value(value):
+    return transcribe_length_encoded_value(value)
+
+if __name__ == '__main__':
+  from cs.buffer import CornuCopyBuffer
+  for n in (0, 1, 2, 3, 16, 17, 127, 128, 129, 32767, 32768, 32769, 65535,
+            65536, 65537):
+    bs = transcribe_length_encoded_value(n)
+    bfr = CornuCopyBuffer.from_bytes(bs)
+    n2 = get_length_encoded_value(bfr)
+    assert n == n2, "n:%s != n2:%s" % (n, n2)
+    assert bfr.offset == len(
+        bs
+    ), "bfr.offset:%s != len(bs):%s" % (bfr.offset, len(bs))
+    assert bfr.at_eof, "bfr not at EOF"
+    ds, offset = DataSize.from_bytes(bs)
+    assert ds.value == n
+    assert offset == len(bs)
+    bs2 = bytes(ds)
+    assert bs == bs2
+    ds2 = DataSize(n)
+    bs3 = bytes(ds2)
+    assert bs == bs3

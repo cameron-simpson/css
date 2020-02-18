@@ -20,7 +20,6 @@ from datetime import datetime
 from functools import partial
 from getopt import GetoptError
 import os
-from os.path import basename
 import stat
 import sys
 from cs.binary import (
@@ -42,16 +41,16 @@ from cs.binary import (
     EmptyPacketField,
     multi_struct_field,
     structtuple,
+    deferred_field,
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
 from cs.lex import get_identifier, get_decimal_value
-from cs.logutils import setup_logging, debug, warning, error
+from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.x import X
 
 __version__ = '20200130'
 
@@ -104,6 +103,7 @@ class MP4Command(BaseCommand):
     with fstags:
       for top_path in argv:
         for path in rpaths(top_path):
+          print(path, '...')
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
             all_tags = tagged_path.all_tags
@@ -115,16 +115,13 @@ class MP4Command(BaseCommand):
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      if tag in all_tags:
-                        warning(
-                            "autotag %r: %s: tag already present",
-                            tagged_path.basename, tag
-                        )
-                      else:
+                      if tag not in all_tags:
                         print("autotag %r + %s" % (tagged_path.basename, tag))
                         direct_tags.add(tag)
+            except (TypeError, NameError, AttributeError, AssertionError):
+              raise
             except Exception as e:
-              warning("%s", e)
+              warning("%s: %s", type(e).__name__, e)
               xit = 1
     return xit
 
@@ -649,7 +646,10 @@ class Box(Packet):
         but might be the samples if the body is a sample box,
         etc.
     '''
-    return iter(self.body)
+    if self.body is None:
+      ##warning("iter(%s): body is None", self)
+      return
+    yield from iter(self.body)
 
   def transcribe(self):
     ''' Transcribe the Box.
@@ -1649,14 +1649,8 @@ def add_generic_sample_boxbody(
     PACKET_FIELDS = dict(
         FullBoxBody.PACKET_FIELDS,
         entry_count=(False, UInt32BE),
-        samples=ListField,
+        ##samples=ListField,
     )
-
-    def __iter__(self):
-      ''' Iterating over a `SpecificSampleBoxBody`
-          iterates over its `.samples`.
-      '''
-      return iter(self.samples)
 
     def parse_buffer(self, bfr, **kw):
       super().parse_buffer(bfr, **kw)
@@ -1669,29 +1663,36 @@ def add_generic_sample_boxbody(
             "unsupported version %d, treating like version 1", self.version
         )
         sample_type = self.sample_type = sample_type_v1
+      sample_size = sample_type.struct.size
       self.has_inferred_entry_count = has_inferred_entry_count
       if has_inferred_entry_count:
         entry_count = Ellipsis
       else:
         entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-      samples = []
-      with Pfx("gather samples of type %s", sample_type):
-        while entry_count is Ellipsis or entry_count > 0:
-          if bfr.at_eof():
-            if entry_count is not Ellipsis:
-              error(
-                  "expected %d more %r samples", entry_count,
-                  sample_type.__name__
-              )
-            break
-          try:
-            samples.append(sample_type.from_buffer(bfr))
-          except EOFError as e:
-            error("incomplete %r samples: %s", sample_type.__name__, e)
-            break
-          if entry_count is not Ellipsis:
-            entry_count -= 1
-      self.add_field('samples', ListField(samples))
+      # gather the sample data but do not bother to parse it yet
+      # because that can be very expensive
+      if entry_count is Ellipsis:
+        end_offset = bfr.end_offset
+        entry_count = (end_offset - bfr.offset) // sample_size
+      self.samples_count = entry_count
+      self.add_deferred_field('samples', bfr, entry_count * sample_size)
+
+    def transcribe(self):
+      ''' Transcribe the regular fields
+          then transcribe the source data of the samples.
+      '''
+      yield super().transcribe(self)
+      yield self._samples__raw_data
+
+    @deferred_field
+    def samples(self, bfr):
+      ''' The `sample_data` decoded.
+      '''
+      sample_type = self.sample_type
+      decoded = []
+      for _ in range(self.samples_count):
+        decoded.append(sample_type.from_buffer(bfr))
+      return decoded
 
   SpecificSampleBoxBody.__name__ = class_name
   SpecificSampleBoxBody.__doc__ = (
@@ -1841,7 +1842,7 @@ class STSZBoxBody(FullBoxBody):
       FullBoxBody.PACKET_FIELDS,
       sample_size=UInt32BE,
       sample_count=UInt32BE,
-      entry_sizes=(False, ListField),
+      ##entry_sizes=(False, ListField),
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1851,10 +1852,20 @@ class STSZBoxBody(FullBoxBody):
     sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
     if sample_size == 0:
-      entry_sizes = []
-      for _ in range(sample_count):
-        entry_sizes.append(UInt32BE.from_buffer(bfr))
-      self.add_field('entry_sizes', ListField(entry_sizes))
+      # a zero sample size means that each sample's individual size
+      # is specified in `entry_sizes`
+      self.add_deferred_field(
+          'entry_sizes', bfr, sample_count * UInt32BE.length
+      )
+
+  @deferred_field
+  def entry_sizes(self, bfr):
+    ''' Parse the `UInt32BE` entry sizes from stashed buffer.
+      '''
+    entry_sizes = []
+    for _ in range(self.sample_count):
+      entry_sizes.append(UInt32BE.from_buffer(bfr))
+    return entry_sizes
 
 add_body_class(STSZBoxBody)
 
@@ -1897,7 +1908,7 @@ class STSCBoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      entries=ListField,
+      ##entries=ListField,
   )
 
   STSCEntry = structtuple(
@@ -1910,10 +1921,18 @@ class STSCBoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
+    self.add_deferred_field(
+        'entries', bfr, entry_count * STSCBoxBody.STSCEntry.length
+    )
+
+  @deferred_field
+  def entries(self, bfr):
+    ''' Parse the `STSCEntry` list from stashed buffer.
+    '''
     entries = []
-    for _ in range(entry_count):
+    for _ in range(self.entry_count):
       entries.append(STSCBoxBody.STSCEntry.from_buffer(bfr))
-    self.add_field('entries', ListField(entries))
+    return entries
 
 add_body_class(STSCBoxBody)
 
@@ -1924,7 +1943,7 @@ class STCOBoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      chunk_offsets=ListField,
+      ##chunk_offsets=ListField,
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1932,10 +1951,18 @@ class STCOBoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
+    self.add_deferred_field(
+        'chunk_offsets', bfr, entry_count * UInt32BE.length
+    )
+
+  @deferred_field
+  def chunk_offsets(self, bfr):
+    ''' Parse the `UInt32BE` chunk offsets from stashed buffer.
+    '''
     chunk_offsets = []
-    for _ in range(entry_count):
+    for _ in range(self.entry_count):
       chunk_offsets.append(UInt32BE.from_buffer(bfr))
-    self.add_field('chunk_offsets', ListField(chunk_offsets))
+    return chunk_offsets
 
 add_body_class(STCOBoxBody)
 
@@ -1946,7 +1973,7 @@ class CO64BoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      chunk_offsets=ListField,
+      ##chunk_offsets=ListField,
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1954,10 +1981,16 @@ class CO64BoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    chunk_offsets = []
-    for _ in range(entry_count):
-      chunk_offsets.append(UInt64BE.from_buffer(bfr))
-    self.add_field('chunk_offsets', ListField(chunk_offsets))
+    self.add_deferred_field(
+        'chunk_offsets', bfr, entry_count * UInt64BE.length
+    )
+
+  @deferred_field
+  def chunk_offsets(self, bfr):
+    offsets = []
+    for _ in range(self.entry_count):
+      offsets.append(UInt64BE.from_buffer(bfr))
+    return offsets
 
 add_body_class(CO64BoxBody)
 
@@ -2072,14 +2105,22 @@ class ILSTBoxBody(ContainerBoxBody):
       documentation here:
 
           http://atomicparsley.sourceforge.net/mpeg-4files.html
+
+      and additional information from:
+
+          https://github.com/sergiomb2/libmp4v2/wiki/iTunesMetadata
   '''
 
   def ILSTRawSchema(attribute_name):
+    ''' Namedtuple type for ILST raw schema.
+    '''
     return namedtuple(
         'ILSTRawSchema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, lambda bfr: bfr.take(...), lambda bs: bs)
 
   def ILSTTextSchema(attribute_name):
+    ''' Namedtuple type for ILST text schema.
+    '''
     return namedtuple(
         'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2088,16 +2129,22 @@ class ILSTBoxBody(ContainerBoxBody):
     )
 
   def ILSTUInt32BESchema(attribute_name):
+    ''' Namedtuple type for ILST UInt32BE schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, UInt32BE.value_from_buffer, UInt32BE.transcribe_value)
 
   def ILSTUInt8Schema(attribute_name):
+    ''' Namedtuple type for ILST UInt8BE schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, UInt8.value_from_buffer, UInt8.transcribe_value)
 
   def ILSTAofBSchema(attribute_name):
+    ''' Namedtuple type for ILST "A of B" schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2108,6 +2155,8 @@ class ILSTBoxBody(ContainerBoxBody):
     )
 
   def ILSTISOFormatSchema(attribute_name):
+    ''' Namedtuple type for ILST ISO format schema.
+    '''
     return namedtuple(
         'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2121,6 +2170,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'\xa9art': ILSTTextSchema('artist'),
       b'\xa9ART': ILSTTextSchema('album_artist'),
       b'\xa9cmt': ILSTTextSchema('comment'),
+      b'\xa9cpy': ILSTTextSchema('copyright'),
       b'\xa9day': ILSTTextSchema('year'),
       b'\xa9gen': ILSTTextSchema('custom_genre'),
       b'\xa9grp': ILSTTextSchema('grouping'),
@@ -2146,6 +2196,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'purd': ILSTISOFormatSchema('purchase_date'),
       b'purl': ILSTUInt8Schema('podcast_url'),
       b'rtng': ILSTUInt8Schema('rating'),
+      b'sfID': ILSTUInt32BESchema('itunes_store_country_code'),
       b'soal': ILSTTextSchema('song_album_title'),
       b'soar': ILSTTextSchema('song_artist'),
       b'sonm': ILSTTextSchema('song_name'),
@@ -2157,6 +2208,55 @@ class ILSTBoxBody(ContainerBoxBody):
       b'tvnn': ILSTTextSchema('tv_network_name'),
       b'tvsh': ILSTTextSchema('tv_show_name'),
       b'tvsn': ILSTUInt32BESchema('tv_season'),
+  }
+
+  itunes_store_country_code = namedtuple(
+      'itunes_store_country_code',
+      'country_name iso_3166_1_code itunes_store_code'
+  )
+
+  SFID_ISO_3166_1_ALPHA_3_CODE = {
+      iscc.itunes_store_code: iscc
+      for iscc in (
+          itunes_store_country_code('Australia', 'AUS', 143460),
+          itunes_store_country_code('Austria', 'AUT', 143445),
+          itunes_store_country_code('Belgium', 'BEL', 143446),
+          itunes_store_country_code('Canada', 'CAN', 143455),
+          itunes_store_country_code('Denmark', 'DNK', 143458),
+          itunes_store_country_code('Finland', 'FIN', 143447),
+          itunes_store_country_code('France', 'FRA', 143442),
+          itunes_store_country_code('Germany', 'DEU', 143443),
+          itunes_store_country_code('Greece', 'GRC', 143448),
+          itunes_store_country_code('Ireland', 'IRL', 143449),
+          itunes_store_country_code('Italy', 'ITA', 143450),
+          itunes_store_country_code('Japan', 'JPN', 143462),
+          itunes_store_country_code('Luxembourg', 'LUX', 143451),
+          itunes_store_country_code('Netherlands', 'NLD', 143452),
+          itunes_store_country_code('New Zealand', 'NZL', 143461),
+          itunes_store_country_code('Norway', 'NOR', 143457),
+          itunes_store_country_code('Portugal', 'PRT', 143453),
+          itunes_store_country_code('Spain', 'ESP', 143454),
+          itunes_store_country_code('Sweden', 'SWE', 143456),
+          itunes_store_country_code('Switzerland', 'CHE', 143459),
+          itunes_store_country_code('United Kingdom', 'GBR', 143444),
+          itunes_store_country_code('United States', 'USA', 143441),
+      )
+  }
+
+  itunes_media_type = namedtuple('itunes_media_type', 'type stik')
+
+  STIK_MEDIA_TYPES = {
+      imt.stik: imt
+      for imt in (
+          itunes_media_type('Movie', 0),
+          itunes_media_type('Music', 1),
+          itunes_media_type('Audiobook', 2),
+          itunes_media_type('Music Video', 6),
+          itunes_media_type('Movie', 9),
+          itunes_media_type('TV Show', 10),
+          itunes_media_type('Booklet', 11),
+          itunes_media_type('Ringtone', 14),
+      )
   }
 
   SUBSUBBOX_SCHEMA = {
@@ -2236,7 +2336,6 @@ class ILSTBoxBody(ContainerBoxBody):
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
                 warning("%r: no schema", subbox_type)
-                pass
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
                 data_box.add_from_buffer('n2', databfr, UInt32BE)
@@ -2263,11 +2362,8 @@ class ILSTBoxBody(ContainerBoxBody):
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
       if schema.attribute_name == attr:
-        X(".%s: MATCHED %r", attr, schema_code)
         subbox_attr = schema_code.decode('iso8859-1').upper()
-        X("  subbox_attr=%r", subbox_attr)
         subbox = getattr(self, subbox_attr)
-        X("  subbox=%s", subbox)
         return None
     return super().__getattr__(attr)
 
@@ -2427,6 +2523,8 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
 def report(box, indent='', fp=None, indent_incr=None):
+  ''' Report some human friendly information about a box.
+  '''
   if fp is None:
     fp = sys.stdout
   if indent_incr is None:
@@ -2452,7 +2550,6 @@ def report(box, indent='', fp=None, indent_incr=None):
       btype = subbox.box_type_s
       if btype in ('ftyp',):
         continue
-      X("box %s", str(subbox)[:60])
       subreport(subbox)
   else:
     # normal Boxes
@@ -2498,3 +2595,5 @@ def report(box, indent='', fp=None, indent_incr=None):
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
+  ##from cProfile import run
+  ##run('main(sys.argv)', sort='ncalls')
