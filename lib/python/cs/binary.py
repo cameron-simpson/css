@@ -1429,3 +1429,37 @@ class Packet(PacketField):
     field_name = self.field_names[-1]
     field = self.remove_field(field_name)
     return field_name, field
+
+  def add_deferred_field(self, attr_name, bfr, length):
+    ''' Store the unparsed data for attribute `attr_name`
+        comprising the next `length` bytes from `bfr`.
+    '''
+    setattr(self, '_' + attr_name + '__raw_data', bfr.take(length))
+
+  @staticmethod
+  def deferred_field(from_buffer):
+    ''' A decorator for a field property.
+
+        Usage:
+
+            @deferred_field
+            def (self, bfr):
+                ... parse value from `bfr`, return value
+    '''
+    attr_name = from_buffer.__name__
+    _attr_name = '_' + attr_name
+
+    def field_property(self):
+      ''' Boilerplate for the property: test for parsed value, parse
+          from raw data if not yet present.
+      '''
+      attr_value = getattr(self, _attr_name, None)
+      if attr_value is None:
+        raw_data = getattr(self, _attr_name + '__raw_data')
+        attr_value = from_buffer(self, CornuCopyBuffer.from_bytes(raw_data))
+        setattr(self, _attr_name, attr_value)
+      return attr_value
+
+    return property(field_property)
+
+deferred_field = Packet.deferred_field
