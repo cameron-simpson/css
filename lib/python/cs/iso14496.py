@@ -48,10 +48,9 @@ from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import debug, warning, error
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.x import X
 
 __version__ = '20200130'
 
@@ -104,6 +103,7 @@ class MP4Command(BaseCommand):
     with fstags:
       for top_path in argv:
         for path in rpaths(top_path):
+          print(path, '...')
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
             all_tags = tagged_path.all_tags
@@ -605,6 +605,8 @@ class Box(Packet):
   def __init__(self, parent=None):
     super().__init__()
     self.parent = parent
+    ##from cs.x import X
+    ##X("parse Box %r", getattr(self, 'box_type', type(self).__name__))
 
   def __str__(self):
     type_name = self.box_type_path
@@ -2367,11 +2369,8 @@ class ILSTBoxBody(ContainerBoxBody):
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
       if schema.attribute_name == attr:
-        X(".%s: MATCHED %r", attr, schema_code)
         subbox_attr = schema_code.decode('iso8859-1').upper()
-        X("  subbox_attr=%r", subbox_attr)
         subbox = getattr(self, subbox_attr)
-        X("  subbox=%s", subbox)
         return None
     return super().__getattr__(attr)
 
@@ -2558,7 +2557,6 @@ def report(box, indent='', fp=None, indent_incr=None):
       btype = subbox.box_type_s
       if btype in ('ftyp',):
         continue
-      X("box %s", str(subbox)[:60])
       subreport(subbox)
   else:
     # normal Boxes
@@ -2604,3 +2602,5 @@ def report(box, indent='', fp=None, indent_incr=None):
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
+  ##from cProfile import run
+  ##run('main(sys.argv)', sort='ncalls')
