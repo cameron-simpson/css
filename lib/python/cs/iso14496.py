@@ -107,7 +107,7 @@ class MP4Command(BaseCommand):
         for path in rpaths(top_path):
           U.out(path)
           with Pfx(path):
-            tagged_path = TaggedPath(path, fstags)
+            tagged_path = fstags[path]
             try:
               over_box, = parse(path, discard_data=True)
               for top_box in over_box:
@@ -1686,7 +1686,7 @@ def add_generic_sample_boxbody(
       ''' Transcribe the regular fields
           then transcribe the source data of the samples.
       '''
-      yield super().transcribe(self)
+      yield super().transcribe()
       yield self._samples__raw_data
 
     @deferred_field
