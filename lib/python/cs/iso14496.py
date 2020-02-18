@@ -124,7 +124,7 @@ class MP4Command(BaseCommand):
                       else:
                         print("autotag %r + %s" % (tagged_path.basename, tag))
                         direct_tags.add(tag)
-            except (TypeError, NameError, AttributeError):
+            except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
               warning("%s: %s", type(e).__name__, e)
@@ -2112,6 +2112,10 @@ class ILSTBoxBody(ContainerBoxBody):
       documentation here:
 
           http://atomicparsley.sourceforge.net/mpeg-4files.html
+
+      and additional information from:
+
+          https://github.com/sergiomb2/libmp4v2/wiki/iTunesMetadata
   '''
 
   def ILSTRawSchema(attribute_name):
