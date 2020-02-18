@@ -51,6 +51,7 @@ from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
+from cs.upd import Upd
 
 __version__ = '20200130'
 
@@ -100,29 +101,29 @@ class MP4Command(BaseCommand):
     fstags = FSTags()
     if not argv:
       argv = ['.']
+    U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
         for path in rpaths(top_path):
-          print(path, '...')
+          U.out(path)
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
             all_tags = tagged_path.all_tags
             direct_tags = tagged_path.direct_tags
             try:
               over_box, = parse(path, discard_data=True)
-              print(path + ":")
               for top_box in over_box:
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
                       if tag not in all_tags:
-                        print("autotag %r + %s" % (tagged_path.basename, tag))
                         direct_tags.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
               warning("%s: %s", type(e).__name__, e)
               xit = 1
+    U.out('')
     return xit
 
   @staticmethod
