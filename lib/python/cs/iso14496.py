@@ -20,7 +20,6 @@ from datetime import datetime
 from functools import partial
 from getopt import GetoptError
 import os
-from os.path import basename
 import stat
 import sys
 from cs.binary import (
@@ -48,8 +47,8 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
 from cs.lex import get_identifier, get_decimal_value
-from cs.logutils import setup_logging, debug, warning, error
-from cs.pfx import Pfx
+from cs.logutils import debug, warning, error
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.x import X
@@ -1701,10 +1700,9 @@ def add_generic_sample_boxbody(
       ''' The `sample_data` decoded.
       '''
       sample_type = self.sample_type
-      sample_size = sample_type.struct.size
       decoded = []
-      for i in range(self.samples_count):
-        decoded.append(sample_type.from_buffer(samples_buffer))
+      for _ in range(self.samples_count):
+        decoded.append(sample_type.from_buffer(bfr))
       return decoded
 
   SpecificSampleBoxBody.__name__ = class_name
@@ -1876,7 +1874,7 @@ class STSZBoxBody(FullBoxBody):
     ''' Parse the `UInt32BE` entry sizes from stashed buffer.
       '''
     entry_sizes = []
-    for _ in range(sample_count):
+    for _ in range(self.sample_count):
       entry_sizes.append(UInt32BE.from_buffer(bfr))
     return entry_sizes
 
@@ -2119,11 +2117,15 @@ class ILSTBoxBody(ContainerBoxBody):
   '''
 
   def ILSTRawSchema(attribute_name):
+    ''' Namedtuple type for ILST raw schema.
+    '''
     return namedtuple(
         'ILSTRawSchema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, lambda bfr: bfr.take(...), lambda bs: bs)
 
   def ILSTTextSchema(attribute_name):
+    ''' Namedtuple type for ILST text schema.
+    '''
     return namedtuple(
         'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2132,16 +2134,22 @@ class ILSTBoxBody(ContainerBoxBody):
     )
 
   def ILSTUInt32BESchema(attribute_name):
+    ''' Namedtuple type for ILST UInt32BE schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, UInt32BE.value_from_buffer, UInt32BE.transcribe_value)
 
   def ILSTUInt8Schema(attribute_name):
+    ''' Namedtuple type for ILST UInt8BE schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(attribute_name, UInt8.value_from_buffer, UInt8.transcribe_value)
 
   def ILSTAofBSchema(attribute_name):
+    ''' Namedtuple type for ILST "A of B" schema.
+    '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2152,6 +2160,8 @@ class ILSTBoxBody(ContainerBoxBody):
     )
 
   def ILSTISOFormatSchema(attribute_name):
+    ''' Namedtuple type for ILST ISO format schema.
+    '''
     return namedtuple(
         'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
     )(
@@ -2331,7 +2341,6 @@ class ILSTBoxBody(ContainerBoxBody):
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
                 warning("%r: no schema", subbox_type)
-                pass
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
                 data_box.add_from_buffer('n2', databfr, UInt32BE)
@@ -2522,6 +2531,8 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
 def report(box, indent='', fp=None, indent_incr=None):
+  ''' Report some human friendly information about a box.
+  '''
   if fp is None:
     fp = sys.stdout
   if indent_incr is None:
