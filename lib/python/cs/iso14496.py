@@ -42,6 +42,7 @@ from cs.binary import (
     EmptyPacketField,
     multi_struct_field,
     structtuple,
+    deferred_field,
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
@@ -1654,7 +1655,7 @@ def add_generic_sample_boxbody(
     PACKET_FIELDS = dict(
         FullBoxBody.PACKET_FIELDS,
         entry_count=(False, UInt32BE),
-        samples=ListField,
+        ##samples=ListField,
     )
 
     def __iter__(self):
@@ -1674,29 +1675,37 @@ def add_generic_sample_boxbody(
             "unsupported version %d, treating like version 1", self.version
         )
         sample_type = self.sample_type = sample_type_v1
+      sample_size = sample_type.struct.size
       self.has_inferred_entry_count = has_inferred_entry_count
       if has_inferred_entry_count:
         entry_count = Ellipsis
       else:
         entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-      samples = []
-      with Pfx("gather samples of type %s", sample_type):
-        while entry_count is Ellipsis or entry_count > 0:
-          if bfr.at_eof():
-            if entry_count is not Ellipsis:
-              error(
-                  "expected %d more %r samples", entry_count,
-                  sample_type.__name__
-              )
-            break
-          try:
-            samples.append(sample_type.from_buffer(bfr))
-          except EOFError as e:
-            error("incomplete %r samples: %s", sample_type.__name__, e)
-            break
-          if entry_count is not Ellipsis:
-            entry_count -= 1
-      self.add_field('samples', ListField(samples))
+      # gather the sample data but do not bother to parse it yet
+      # because that can be very expensive
+      if entry_count is Ellipsis:
+        end_offset = bfr.end_offset
+        entry_count = (end_offset - bfr.offset) // sample_size
+      self.samples_count = entry_count
+      self.add_deferred_field('samples', bfr, entry_count * sample_size)
+
+    def transcribe(self):
+      ''' Transcribe the regular fields
+          then transcribe the source data of the samples.
+      '''
+      yield super().transcribe(self)
+      yield self._samples__raw_data
+
+    @deferred_field
+    def samples(self, bfr):
+      ''' The `sample_data` decoded.
+      '''
+      sample_type = self.sample_type
+      sample_size = sample_type.struct.size
+      decoded = []
+      for i in range(self.samples_count):
+        decoded.append(sample_type.from_buffer(samples_buffer))
+      return decoded
 
   SpecificSampleBoxBody.__name__ = class_name
   SpecificSampleBoxBody.__doc__ = (
@@ -1846,7 +1855,7 @@ class STSZBoxBody(FullBoxBody):
       FullBoxBody.PACKET_FIELDS,
       sample_size=UInt32BE,
       sample_count=UInt32BE,
-      entry_sizes=(False, ListField),
+      ##entry_sizes=(False, ListField),
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1856,10 +1865,20 @@ class STSZBoxBody(FullBoxBody):
     sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
     if sample_size == 0:
-      entry_sizes = []
-      for _ in range(sample_count):
-        entry_sizes.append(UInt32BE.from_buffer(bfr))
-      self.add_field('entry_sizes', ListField(entry_sizes))
+      # a zero sample size means that each sample's individual size
+      # is specified in `entry_sizes`
+      self.add_deferred_field(
+          'entry_sizes', bfr, sample_count * UInt32BE.length
+      )
+
+  @deferred_field
+  def entry_sizes(self, bfr):
+    ''' Parse the `UInt32BE` entry sizes from stashed buffer.
+      '''
+    entry_sizes = []
+    for _ in range(sample_count):
+      entry_sizes.append(UInt32BE.from_buffer(bfr))
+    return entry_sizes
 
 add_body_class(STSZBoxBody)
 
@@ -1902,7 +1921,7 @@ class STSCBoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      entries=ListField,
+      ##entries=ListField,
   )
 
   STSCEntry = structtuple(
@@ -1915,10 +1934,18 @@ class STSCBoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
+    self.add_deferred_field(
+        'entries', bfr, entry_count * STSCBoxBody.STSCEntry.length
+    )
+
+  @deferred_field
+  def entries(self, bfr):
+    ''' Parse the `STSCEntry` list from stashed buffer.
+    '''
     entries = []
-    for _ in range(entry_count):
+    for _ in range(self.entry_count):
       entries.append(STSCBoxBody.STSCEntry.from_buffer(bfr))
-    self.add_field('entries', ListField(entries))
+    return entries
 
 add_body_class(STSCBoxBody)
 
@@ -1929,7 +1956,7 @@ class STCOBoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      chunk_offsets=ListField,
+      ##chunk_offsets=ListField,
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1937,10 +1964,18 @@ class STCOBoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
+    self.add_deferred_field(
+        'chunk_offsets', bfr, entry_count * UInt32BE.length
+    )
+
+  @deferred_field
+  def chunk_offsets(self, bfr):
+    ''' Parse the `UInt32BE` chunk offsets from stashed buffer.
+    '''
     chunk_offsets = []
-    for _ in range(entry_count):
+    for _ in range(self.entry_count):
       chunk_offsets.append(UInt32BE.from_buffer(bfr))
-    self.add_field('chunk_offsets', ListField(chunk_offsets))
+    return chunk_offsets
 
 add_body_class(STCOBoxBody)
 
