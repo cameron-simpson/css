@@ -1973,7 +1973,7 @@ class CO64BoxBody(FullBoxBody):
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
       entry_count=UInt32BE,
-      chunk_offsets=ListField,
+      ##chunk_offsets=ListField,
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -1981,10 +1981,16 @@ class CO64BoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    chunk_offsets = []
-    for _ in range(entry_count):
-      chunk_offsets.append(UInt64BE.from_buffer(bfr))
-    self.add_field('chunk_offsets', ListField(chunk_offsets))
+    self.add_deferred_field(
+        'chunk_offsets', bfr, entry_count * UInt64BE.length
+    )
+
+  @deferred_field
+  def chunk_offsets(self, bfr):
+    offsets = []
+    for _ in range(self.entry_count):
+      offsets.append(UInt64BE.from_buffer(bfr))
+    return offsets
 
 add_body_class(CO64BoxBody)
 
