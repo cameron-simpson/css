@@ -107,7 +107,7 @@ class MP4Command(BaseCommand):
         for path in rpaths(top_path):
           U.out(path)
           with Pfx(path):
-            tagged_path = TaggedPath(path, fstags)
+            tagged_path = fstags[path]
             try:
               over_box, = parse(path, discard_data=True)
               for top_box in over_box:
