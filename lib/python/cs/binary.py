@@ -739,7 +739,7 @@ def struct_field(struct_format, class_name):
     struct = Struct(struct_format)
 
     class StructField(PacketField):
-      ''' A `PacketField` subclass using a struct.Struct for parse and transcribe.
+      ''' A `PacketField` subclass using a `struct.Struct` for parse and transcribe.
       '''
 
       def __str__(self):
