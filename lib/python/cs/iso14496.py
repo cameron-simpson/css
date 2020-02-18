@@ -2351,7 +2351,7 @@ class ILSTBoxBody(ContainerBoxBody):
             with data_box.reparse_buffer() as databfr:
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                warning("%r: no schema", subbox_type)
+                debug("%r: no schema", subbox_type)
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
                 data_box.add_from_buffer('n2', databfr, UInt32BE)
