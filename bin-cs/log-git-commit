@@ -20,3 +20,4 @@ git log -r '@^..@' \
     }
     exec buglog "commit $revision: $headline"
   }
+}
