@@ -1652,12 +1652,6 @@ def add_generic_sample_boxbody(
         ##samples=ListField,
     )
 
-    def __iter__(self):
-      ''' Iterating over a `SpecificSampleBoxBody`
-          iterates over its `.samples`.
-      '''
-      return iter(self.samples)
-
     def parse_buffer(self, bfr, **kw):
       super().parse_buffer(bfr, **kw)
       if self.version == 0:
