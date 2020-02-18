@@ -1413,6 +1413,7 @@ add_body_class(TREFBoxBody)
 class TrackReferenceTypeBoxBody(BoxBody):
   ''' A TrackReferenceTypeBoxBody contains references to other tracks - ISO14496 section 8.3.3.2.
   '''
+  PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
 
   BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
 
