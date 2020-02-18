@@ -1415,7 +1415,9 @@ class TrackReferenceTypeBoxBody(BoxBody):
   '''
   PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
 
-  BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
+  BOX_TYPES = (
+      b'hint', b'cdsc', b'chap', b'font', b'hind', b'vdep', b'vplx', b'subt'
+  )
 
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `track_ids` field.
