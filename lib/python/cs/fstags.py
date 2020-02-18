@@ -917,15 +917,13 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class Tag:
+class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
 
       The `name` must be a dotted identifier.
 
       A "bare" `Tag` has a `value` of `None`.
   '''
-
-  __slots__ = ('name', 'value')
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -938,11 +936,6 @@ class Tag:
       (date, date.fromisoformat, date.isoformat),
       (datetime, datetime.fromisoformat, datetime.isoformat),
   ]
-
-  @require(lambda name: isinstance(name, str))
-  def __init__(self, name, value):
-    self.name = name
-    self.value = value
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value

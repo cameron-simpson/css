@@ -51,6 +51,7 @@ from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
+from cs.upd import Upd
 
 __version__ = '20200130'
 
@@ -100,29 +101,26 @@ class MP4Command(BaseCommand):
     fstags = FSTags()
     if not argv:
       argv = ['.']
+    U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
         for path in rpaths(top_path):
-          print(path, '...')
+          U.out(path)
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
-            all_tags = tagged_path.all_tags
-            direct_tags = tagged_path.direct_tags
             try:
               over_box, = parse(path, discard_data=True)
-              print(path + ":")
               for top_box in over_box:
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      if tag not in all_tags:
-                        print("autotag %r + %s" % (tagged_path.basename, tag))
-                        direct_tags.add(tag)
+                      tagged_path.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
               warning("%s: %s", type(e).__name__, e)
               xit = 1
+    U.out('')
     return xit
 
   @staticmethod
@@ -775,7 +773,11 @@ class Box(Packet):
     body_class = pick_boxbody_class(header.type, default_type=default_type)
     with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
       if bfr_tail.at_eof():
-        error("no Box body data parsing %s", body_class.__name__)
+        if self.box_type not in (b'free', b'skip'):
+          error(
+              "no Box body data parsing %s (box_type=%r)", body_class.__name__,
+              self.box_type
+          )
         self.add_field('body', EmptyField)
       else:
         try:
@@ -1411,8 +1413,11 @@ add_body_class(TREFBoxBody)
 class TrackReferenceTypeBoxBody(BoxBody):
   ''' A TrackReferenceTypeBoxBody contains references to other tracks - ISO14496 section 8.3.3.2.
   '''
+  PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
 
-  BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
+  BOX_TYPES = (
+      b'hint', b'cdsc', b'chap', b'font', b'hind', b'vdep', b'vplx', b'subt'
+  )
 
   def parse_buffer(self, bfr, **kw):
     ''' Gather the `track_ids` field.
@@ -2245,6 +2250,15 @@ class ILSTBoxBody(ContainerBoxBody):
 
   itunes_media_type = namedtuple('itunes_media_type', 'type stik')
 
+  def decode_itunes_date_field(data):
+    ''' The iTunes 'Date' meta field: a year or an ISO timestamp.
+    '''
+    try:
+      value = datetime.fromisoformat(data)
+    except ValueError:
+      value = datetime(int(data), 1, 1)
+    return value
+
   STIK_MEDIA_TYPES = {
       imt.stik: imt
       for imt in (
@@ -2262,7 +2276,7 @@ class ILSTBoxBody(ContainerBoxBody):
   SUBSUBBOX_SCHEMA = {
       'com.apple.iTunes': {
           'Browsepath': None,
-          'Date': int,
+          'Date': decode_itunes_date_field,
           'HasChapters': int,
           'MaxAudioJump': float,
           'MaxSourceFps': float,
@@ -2305,37 +2319,39 @@ class ILSTBoxBody(ContainerBoxBody):
                   'text',
                   meanbfr.take(...).decode(), str.encode
               )
-            with name_box.reparse_buffer() as namebfr:
-              name_box.add_from_buffer('n1', namebfr, UInt32BE)
-              name_box.add_from_value(
-                  'text',
-                  namebfr.take(...).decode(), str.encode
-              )
-            with data_box.reparse_buffer() as databfr:
-              data_box.add_from_buffer('n1', databfr, UInt32BE)
-              data_box.add_from_buffer('n2', databfr, UInt32BE)
-              data_box.add_from_value(
-                  'text',
-                  databfr.take(...).decode(), str.encode
-              )
-            value = data_box.text
-            decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
-                                                {}).get(name_box.text)
-            if decoder is not None:
-              value = decoder(value)
-            # annotate the subbox and the ilst
-            attribute_name = (
-                mean_box.text.replace('.', '_') + '__' + name_box.text
-            ).lower()
-            setattr(subbox, attribute_name, value)
-            self.tags.add(attribute_name, value)
+            with Pfx("mean %r", mean_box.text):
+              with name_box.reparse_buffer() as namebfr:
+                name_box.add_from_buffer('n1', namebfr, UInt32BE)
+                name_box.add_from_value(
+                    'text',
+                    namebfr.take(...).decode(), str.encode
+                )
+              with Pfx("name %r", name_box.text):
+                with data_box.reparse_buffer() as databfr:
+                  data_box.add_from_buffer('n1', databfr, UInt32BE)
+                  data_box.add_from_buffer('n2', databfr, UInt32BE)
+                  data_box.add_from_value(
+                      'text',
+                      databfr.take(...).decode(), str.encode
+                  )
+                value = data_box.text
+                decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
+                                                    {}).get(name_box.text)
+                if decoder is not None:
+                  value = decoder(value)
+                # annotate the subbox and the ilst
+                attribute_name = (
+                    mean_box.text.replace('.', '_') + '__' + name_box.text
+                ).lower()
+                setattr(subbox, attribute_name, value)
+                self.tags.add(attribute_name, value)
           else:
             # single data box
             data_box, = inner_boxes
             with data_box.reparse_buffer() as databfr:
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                warning("%r: no schema", subbox_type)
+                debug("%r: no schema", subbox_type)
               else:
                 data_box.add_from_buffer('n1', databfr, UInt32BE)
                 data_box.add_from_buffer('n2', databfr, UInt32BE)
