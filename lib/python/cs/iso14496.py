@@ -108,16 +108,13 @@ class MP4Command(BaseCommand):
           U.out(path)
           with Pfx(path):
             tagged_path = TaggedPath(path, fstags)
-            all_tags = tagged_path.all_tags
-            direct_tags = tagged_path.direct_tags
             try:
               over_box, = parse(path, discard_data=True)
               for top_box in over_box:
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      if tag not in all_tags:
-                        direct_tags.add(tag)
+                      tagged_path.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
