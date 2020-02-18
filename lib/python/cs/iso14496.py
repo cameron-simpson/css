@@ -2250,6 +2250,15 @@ class ILSTBoxBody(ContainerBoxBody):
 
   itunes_media_type = namedtuple('itunes_media_type', 'type stik')
 
+  def decode_itunes_date_field(data):
+    ''' The iTunes 'Date' meta field: a year or an ISO timestamp.
+    '''
+    try:
+      value = datetime.fromisoformat(data)
+    except ValueError:
+      value = datetime(int(data), 1, 1)
+    return value
+
   STIK_MEDIA_TYPES = {
       imt.stik: imt
       for imt in (
@@ -2267,7 +2276,7 @@ class ILSTBoxBody(ContainerBoxBody):
   SUBSUBBOX_SCHEMA = {
       'com.apple.iTunes': {
           'Browsepath': None,
-          'Date': int,
+          'Date': decode_itunes_date_field,
           'HasChapters': int,
           'MaxAudioJump': float,
           'MaxSourceFps': float,
@@ -2310,30 +2319,32 @@ class ILSTBoxBody(ContainerBoxBody):
                   'text',
                   meanbfr.take(...).decode(), str.encode
               )
-            with name_box.reparse_buffer() as namebfr:
-              name_box.add_from_buffer('n1', namebfr, UInt32BE)
-              name_box.add_from_value(
-                  'text',
-                  namebfr.take(...).decode(), str.encode
-              )
-            with data_box.reparse_buffer() as databfr:
-              data_box.add_from_buffer('n1', databfr, UInt32BE)
-              data_box.add_from_buffer('n2', databfr, UInt32BE)
-              data_box.add_from_value(
-                  'text',
-                  databfr.take(...).decode(), str.encode
-              )
-            value = data_box.text
-            decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
-                                                {}).get(name_box.text)
-            if decoder is not None:
-              value = decoder(value)
-            # annotate the subbox and the ilst
-            attribute_name = (
-                mean_box.text.replace('.', '_') + '__' + name_box.text
-            ).lower()
-            setattr(subbox, attribute_name, value)
-            self.tags.add(attribute_name, value)
+            with Pfx("mean %r", mean_box.text):
+              with name_box.reparse_buffer() as namebfr:
+                name_box.add_from_buffer('n1', namebfr, UInt32BE)
+                name_box.add_from_value(
+                    'text',
+                    namebfr.take(...).decode(), str.encode
+                )
+              with Pfx("name %r", name_box.text):
+                with data_box.reparse_buffer() as databfr:
+                  data_box.add_from_buffer('n1', databfr, UInt32BE)
+                  data_box.add_from_buffer('n2', databfr, UInt32BE)
+                  data_box.add_from_value(
+                      'text',
+                      databfr.take(...).decode(), str.encode
+                  )
+                value = data_box.text
+                decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
+                                                    {}).get(name_box.text)
+                if decoder is not None:
+                  value = decoder(value)
+                # annotate the subbox and the ilst
+                attribute_name = (
+                    mean_box.text.replace('.', '_') + '__' + name_box.text
+                ).lower()
+                setattr(subbox, attribute_name, value)
+                self.tags.add(attribute_name, value)
           else:
             # single data box
             data_box, = inner_boxes
