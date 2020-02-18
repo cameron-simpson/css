@@ -115,12 +115,7 @@ class MP4Command(BaseCommand):
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      if tag in all_tags:
-                        warning(
-                            "autotag %r: %s: tag already present",
-                            tagged_path.basename, tag
-                        )
-                      else:
+                      if tag not in all_tags:
                         print("autotag %r + %s" % (tagged_path.basename, tag))
                         direct_tags.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
@@ -605,8 +600,6 @@ class Box(Packet):
   def __init__(self, parent=None):
     super().__init__()
     self.parent = parent
-    ##from cs.x import X
-    ##X("parse Box %r", getattr(self, 'box_type', type(self).__name__))
 
   def __str__(self):
     type_name = self.box_type_path
