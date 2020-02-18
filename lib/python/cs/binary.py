@@ -748,6 +748,8 @@ def struct_field(struct_format, class_name):
       def __repr__(self):
         return "%s(%r)" % (type(self).__name__, self.value)
 
+      length = struct.size
+
       @classmethod
       def value_from_buffer(cls, bfr):
         ''' Parse a value from the bytes `bs` at `offset`, default 0.
@@ -1060,6 +1062,11 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     # new class
     struct = Struct(struct_format)
     if subvalue_names:
+      if 'length' in subvalue_names:
+        warning(
+            "conflicting field 'length' in multi_struct_field(class_name=%s) subvalue_names %r",
+            class_name, subvalue_names
+        )
       subvalues_type = namedtuple(
           class_name or "StructSubValues", subvalue_names
       )
@@ -1072,6 +1079,8 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
         def __str__(self):
           return str(self.value)
+
+      length = struct.size
 
       @classmethod
       def from_buffer(cls, bfr):
