@@ -56,7 +56,7 @@ from os.path import (
     isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
     samefile
 )
-from pathlib import Path
+from pathlib import PurePath
 import re
 import shutil
 import sys
@@ -648,8 +648,7 @@ class FSTags(MultiOpenMixin):
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
-    dirpath = Path(dirpath)
-    tagfilepath = dirpath / self.tagsfile
+    tagfilepath = joinpath(dirpath, self.tagsfile)
     tagfile = self._tagfiles.get(tagfilepath)
     if tagfile is None:
       tagfile = self._tagfiles[tagfilepath] = TagFile(
@@ -664,7 +663,7 @@ class FSTags(MultiOpenMixin):
         where `name` is the key within `TagFile`.
     '''
     with Pfx("path_tagfiles(%r)", filepath):
-      absfilepath = Path(abspath(filepath))
+      absfilepath = PurePath(abspath(filepath))
       root, *subparts = absfilepath.parts
       if not subparts:
         raise ValueError("root=%r and no subparts" % (root,))
@@ -1489,7 +1488,7 @@ class TaggedPath(HasFSTagsMixin):
       fstags = self.fstags
     else:
       self.fstags = fstags
-    self.filepath = Path(filepath)
+    self.filepath = PurePath(filepath)
     self._tagfile_entries = fstags.path_tagfiles(filepath)
     self._lock = Lock()
 
