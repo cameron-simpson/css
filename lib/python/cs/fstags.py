@@ -242,7 +242,7 @@ class FSTagsCommand(BaseCommand):
     with state.stack(verbose=True):
       with fstags:
         for top_path in argv:
-          for path in rpaths(top_path):
+          for _, path in rpaths(top_path):
             with Pfx(path):
               tagged_path = fstags[path]
               for autotag in tagged_path.autotag(rules):
@@ -735,7 +735,7 @@ class FSTags(MultiOpenMixin):
           otherwise the all_tags.
           Default: `False`
     '''
-    for filepath in rpaths(path, yield_dirs=use_direct_tags):
+    for _, filepath in rpaths(path, yield_dirs=use_direct_tags):
       if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
         yield filepath
 
@@ -1706,25 +1706,46 @@ class RegexpTagRule:
     return tags
 
 def rpaths(path, yield_dirs=False, name_selector=None):
-  ''' Generator yielding pathnames found under `path`.
+  ''' Recurse over `path`, yielding `(is_dir,subpath)`
+      for all selected subpaths.
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
-  path = abspath(path)
-  if isfilepath(path):
-    yield path
-  else:
-    for dirpath, dirnames, filenames in os.walk(path):
-      if yield_dirs:
-        yield dirpath
-      dirnames[:] = sorted(filter(name_selector, dirnames))
-      for filename in sorted(filter(name_selector, filenames)):
-        yield joinpath(dirpath, filename)
+  if not name_selector(basename(path)):
+    return
+  pending = [path]
+  while pending:
+    dirpath = pending.pop(0)
+    with Pfx(dirpath):
+      with Pfx("scandir"):
+        try:
+          dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
+        except OSError as e:
+          if e.errno == errno.ENOTDIR:
+            yield False, dirpath
+          if e.errno in (errno.ENOENT, errno.EACCES):
+            continue
+          raise
+      for entry in dirents:
+        name = entry.name
+        with Pfx(name):
+          if not name_selector(name):
+            continue
+          entrypath = joinpath(dirpath, name)
+          if entry.is_dir():
+            if yield_dirs:
+              yield True, entrypath
+            pending.append(entrypath)
+          else:
+            yield False,entrypath
 
 def rfilepaths(path, name_selector=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
-  return rpaths(path, yield_dirs=False, name_selector=name_selector)
+  return (
+      subpath for is_dir, subpath in
+      rpaths(path, yield_dirs=False, name_selector=name_selector) if not is_dir
+  )
 
 def rsync_patterns(paths, top_path):
   ''' Return a list of rsync include lines
