@@ -123,7 +123,7 @@ class MP4Command(BaseCommand):
         else:
           raise RuntimeError("unsupported option")
     if not argv:
-      argv = ['.']
+      argv = [os.getcwd()]
     U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
