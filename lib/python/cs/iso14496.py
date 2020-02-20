@@ -2164,8 +2164,8 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: bfr.take(...).decode(), lambda text: text.
-        encode()
+        attribute_name, lambda bfr: bfr.take(...).decode(),
+        lambda text: text.encode()
     )
 
   def ILSTUInt32BESchema(attribute_name):
@@ -2188,10 +2188,10 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')(
-            UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)
-        ), lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) +
-        UInt32BE.transcribe_value(member_n_of.total)
+        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
+        (UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)),
+        lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE
+        .transcribe_value(member_n_of.total)
     )
 
   def ILSTISOFormatSchema(attribute_name):
@@ -2200,9 +2200,9 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: datetime.fromisoformat(
-            bfr.take(...).decode()
-        ), lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
+        attribute_name,
+        lambda bfr: datetime.fromisoformat(bfr.take(...).decode()),
+        lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
     )
 
   SUBBOX_SCHEMA = {
