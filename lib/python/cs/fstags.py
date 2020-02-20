@@ -1720,12 +1720,12 @@ def rpaths(path, yield_dirs=False, name_selector=None):
       with Pfx("scandir"):
         try:
           dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
-        except OSError as e:
-          if e.errno == errno.ENOTDIR:
-            yield False, dirpath
-          if e.errno in (errno.ENOENT, errno.EACCES):
-            continue
-          raise
+        except NotADirectoryError:
+          yield False, dirpath
+          continue
+        except (FileNotFoundError, PermissionError) as e:
+          warning("%s", e)
+          continue
       for entry in dirents:
         name = entry.name
         with Pfx(name):
@@ -1737,7 +1737,7 @@ def rpaths(path, yield_dirs=False, name_selector=None):
               yield True, entrypath
             pending.append(entrypath)
           else:
-            yield False,entrypath
+            yield False, entrypath
 
 def rfilepaths(path, name_selector=None):
   ''' Generator yielding pathnames of files found under `path`.
