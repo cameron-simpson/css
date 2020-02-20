@@ -65,8 +65,16 @@ DISTINFO = {
         "Topic :: Multimedia :: Video",
     ],
     'install_requires': [
-        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.fstags', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.units'
+        'cs.binary',
+        'cs.buffer',
+        'cs.cmdutils',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.units',
+        'cs.upd',
     ],
 }
 
