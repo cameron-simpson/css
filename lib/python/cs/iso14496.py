@@ -141,8 +141,8 @@ class MP4Command(BaseCommand):
                     for tag in tags:
                       new_tag = Tag(
                           (
-                              '__'.join((tag_prefix,
-                                         tag.name)) if tag_prefix else tag.name
+                              '.'.join((tag_prefix,
+                                        tag.name)) if tag_prefix else tag.name
                           ), tag.value
                       )
                       if no_action:
