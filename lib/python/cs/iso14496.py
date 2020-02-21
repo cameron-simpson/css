@@ -45,11 +45,12 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, TagSet, TaggedPath, Tag, rpaths
+from cs.fstags import FSTags, TaggedPath, rpaths
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import Upd
 
@@ -73,6 +74,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
         'cs.units',
         'cs.upd',
     ],
