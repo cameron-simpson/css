@@ -2377,9 +2377,7 @@ class ILSTBoxBody(ContainerBoxBody):
                 if decoder is not None:
                   value = decoder(value)
                 # annotate the subbox and the ilst
-                attribute_name = (
-                    mean_box.text.replace('.', '_') + '__' + name_box.text
-                ).lower()
+                attribute_name = '.'.join((mean_box.text, name_box.text))
                 setattr(subbox, attribute_name, value)
                 self.tags.add(attribute_name, value)
           else:
