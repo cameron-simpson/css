@@ -127,7 +127,7 @@ class MP4Command(BaseCommand):
     U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
-        for path in rpaths(top_path):
+        for _, path in rpaths(top_path):
           U.out(path)
           with Pfx(path):
             tagged_path = fstags[path]
