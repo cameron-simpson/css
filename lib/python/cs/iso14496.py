@@ -18,7 +18,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 import os
 import stat
 import sys
@@ -45,7 +45,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, TagSet, rpaths, TaggedPath
+from cs.fstags import FSTags, TagSet, TaggedPath, Tag, rpaths
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
@@ -65,8 +65,16 @@ DISTINFO = {
         "Topic :: Multimedia :: Video",
     ],
     'install_requires': [
-        'cs.binary', 'cs.buffer', 'cs.cmdutils', 'cs.fstags', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.units'
+        'cs.binary',
+        'cs.buffer',
+        'cs.cmdutils',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.units',
+        'cs.upd',
     ],
 }
 
@@ -81,8 +89,11 @@ class MP4Command(BaseCommand):
   GETOPT_SPEC = ''
 
   USAGE_FORMAT = '''Usage:
-    {cmd} autotag paths...
+    {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
         Tag paths based on embedded MP4 metadata.
+        -n  No action.
+        -p prefix, --prefix=prefix
+            Set the prefix of added tags, default: 'mp4'
     {cmd} extract [-H] filename boxref output
         Extract the referenced Box from the specified filename into output.
         -H  Skip the Box header.
@@ -93,14 +104,26 @@ class MP4Command(BaseCommand):
     {cmd} test
         Run unit tests.'''
 
-  @staticmethod
-  def cmd_autotag(argv, options, *, cmd):
+  TAG_PREFIX = 'mp4'
+
+  def cmd_autotag(self, argv, options, *, cmd):
     ''' Tag paths based on embedded MP4 metadata.
     '''
     xit = 0
     fstags = FSTags()
+    no_action = False
+    tag_prefix = self.TAG_PREFIX
+    options, argv = getopt(argv, 'np:', longopts=['prefix'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '-n':
+          no_action = True
+        elif option in ('-p', '--prefix'):
+          tag_prefix = value
+        else:
+          raise RuntimeError("unsupported option")
     if not argv:
-      argv = ['.']
+      argv = [os.getcwd()]
     U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
@@ -114,7 +137,19 @@ class MP4Command(BaseCommand):
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      tagged_path.add(tag)
+                      new_tag = Tag(
+                          (
+                              '__'.join((tag_prefix,
+                                         tag.name)) if tag_prefix else tag.name
+                          ), tag.value
+                      )
+                      if no_action:
+                        new_tag_s = str(new_tag)
+                        if len(new_tag_s) > 32:
+                          new_tag_s = new_tag_s[:29] + '...'
+                        print(path, '+', new_tag_s)
+                      else:
+                        tagged_path.add(new_tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
@@ -2129,8 +2164,8 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: bfr.take(...).decode(), lambda text: text.
-        encode()
+        attribute_name, lambda bfr: bfr.take(...).decode(),
+        lambda text: text.encode()
     )
 
   def ILSTUInt32BESchema(attribute_name):
@@ -2153,10 +2188,10 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')(
-            UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)
-        ), lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) +
-        UInt32BE.transcribe_value(member_n_of.total)
+        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
+        (UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)),
+        lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE
+        .transcribe_value(member_n_of.total)
     )
 
   def ILSTISOFormatSchema(attribute_name):
@@ -2165,9 +2200,9 @@ class ILSTBoxBody(ContainerBoxBody):
     return namedtuple(
         'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
     )(
-        attribute_name, lambda bfr: datetime.fromisoformat(
-            bfr.take(...).decode()
-        ), lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
+        attribute_name,
+        lambda bfr: datetime.fromisoformat(bfr.take(...).decode()),
+        lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
     )
 
   SUBBOX_SCHEMA = {
