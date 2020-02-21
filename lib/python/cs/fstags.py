@@ -157,7 +157,7 @@ class FSTagsCommand(BaseCommand):
                     Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
       '{', '{{'
   ).replace('}', '}}') + '''
-    {cmd} json_import {{-|path}} {{-|tags.json}}
+    {cmd} json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
         Apply JSON data to path.
         A path named "-" indicates that paths should be read from
         the standard input.
@@ -323,15 +323,18 @@ class FSTagsCommand(BaseCommand):
     ''' Import tags for `path` from `tags.json`.
     '''
     fstags = options.fstags
-    tag_prefix = ''
+    tag_prefix = None
     badopts = False
     options, argv = getopt(argv, '', longopts=['prefix='])
     for option, value in options:
       with Pfx(option):
         if option == '--prefix':
-          tag_prefix = value + '__'
+          tag_prefix = value
         else:
           raise RuntimeError("unsupported option")
+    if tag_prefix is None:
+      warning("missing require --prefix")
+      badopts = True
     if not argv:
       warning("missing path")
       badopts = True
@@ -368,7 +371,8 @@ class FSTagsCommand(BaseCommand):
           with Pfx(path):
             tagged_path = fstags[path]
             for key, value in data.items():
-              tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
+              tag_name = '.'.join(tag_prefix, key) if tag_prefix else key
+              tagged_path.direct_tags.add(Tag(tag_name, value))
     return 0
 
   @staticmethod
