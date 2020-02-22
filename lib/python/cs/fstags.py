@@ -45,11 +45,9 @@
 
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
-from datetime import date, datetime
 import errno
 from getopt import getopt, GetoptError
 import json
-from json import JSONEncoder, JSONDecoder
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
@@ -62,18 +60,17 @@ import shutil
 import sys
 import threading
 from threading import Lock, RLock
+from icontract import require
 from cs.cmdutils import BaseCommand
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.lex import (
-    get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
-)
+from cs.lex import get_nonwhite
 from cs.logutils import setup_logging, error, warning, info, trace
 from cs.mappings import StackableValues
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
+from cs.tagset import TagSet, Tag, TagChoice
 from cs.threads import locked, locked_property
-from icontract import require
 
 __version__ = '20200210'
 
@@ -88,7 +85,8 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils',
-        'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.threads', 'icontract'
+        'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
+        'icontract'
     ],
 }
 
@@ -126,7 +124,7 @@ def verbose(msg, *a):
   ''' Emit message if in verbose mode.
   '''
   if state.verbose:
-    info(msg, *a)
+    trace(msg, *a)
 
 class FSTagsCommand(BaseCommand):
   ''' `fstags` main command line class.
@@ -159,7 +157,7 @@ class FSTagsCommand(BaseCommand):
                     Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
       '{', '{{'
   ).replace('}', '}}') + '''
-    {cmd} json_import {{-|path}} {{-|tags.json}}
+    {cmd} json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
         Apply JSON data to path.
         A path named "-" indicates that paths should be read from
         the standard input.
@@ -325,15 +323,18 @@ class FSTagsCommand(BaseCommand):
     ''' Import tags for `path` from `tags.json`.
     '''
     fstags = options.fstags
-    tag_prefix = ''
+    tag_prefix = None
     badopts = False
     options, argv = getopt(argv, '', longopts=['prefix='])
     for option, value in options:
       with Pfx(option):
         if option == '--prefix':
-          tag_prefix = value + '__'
+          tag_prefix = value
         else:
           raise RuntimeError("unsupported option")
+    if tag_prefix is None:
+      warning("missing require --prefix")
+      badopts = True
     if not argv:
       warning("missing path")
       badopts = True
@@ -370,7 +371,8 @@ class FSTagsCommand(BaseCommand):
           with Pfx(path):
             tagged_path = fstags[path]
             for key, value in data.items():
-              tagged_path.direct_tags.add(Tag(tag_prefix + key, value))
+              tag_name = '.'.join(tag_prefix, key) if tag_prefix else key
+              tagged_path.direct_tags.add(Tag(tag_name, value))
     return 0
 
   @staticmethod
@@ -544,7 +546,7 @@ class FSTagsCommand(BaseCommand):
     badopts = False
     use_direct_tags = False
     options, argv = getopt(argv, '', longopts=['direct'])
-    for option, value in options:
+    for option, _ in options:
       with Pfx(option):
         if option == '--direct':
           use_direct_tags = True
@@ -779,7 +781,7 @@ class FSTags(MultiOpenMixin):
     lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
     changed = edit_strings(lines)
     for old_line, new_line in changed:
-      old_name, old_tags = tagfile.parse_tags_line(old_line)
+      old_name, _ = tagfile.parse_tags_line(old_line)
       new_name, new_tags = tagfile.parse_tags_line(new_line)
       with Pfx(old_name):
         if old_name != new_name:
@@ -916,417 +918,6 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class Tag(namedtuple('Tag', 'name value')):
-  ''' A Tag has a `.name` (`str`) and a `.value`.
-
-      The `name` must be a dotted identifier.
-
-      A "bare" `Tag` has a `value` of `None`.
-  '''
-
-  # A JSON encoder used for tag values which lack a special encoding.
-  # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
-
-  # A JSON decoder.
-  JSON_DECODER = JSONDecoder()
-
-  EXTRA_TYPES = [
-      (date, date.fromisoformat, date.isoformat),
-      (datetime, datetime.fromisoformat, datetime.isoformat),
-  ]
-
-  def __eq__(self, other):
-    return self.name == other.name and self.value == other.value
-
-  def __lt__(self, other):
-    if self.name < other.name:
-      return True
-    if self.name > other.name:
-      return False
-    return self.value < other.value
-
-  def __repr__(self):
-    return "%s(name=%r,value=%r)" % (
-        type(self).__name__, self.name, self.value
-    )
-
-  def __str__(self):
-    ''' Encode `tag_name` and `value`.
-    '''
-    name = self.name
-    value = self.value
-    if value is None:
-      return name
-    return name + '=' + self.transcribe_value(value)
-
-  @classmethod
-  def transcribe_value(cls, value):
-    ''' Transcribe `value` for use in `Tag` transcription.
-    '''
-    for type_, _, to_str in cls.EXTRA_TYPES:
-      if isinstance(value, type_):
-        value_s = to_str(value)
-        # should be nonwhitespace
-        if get_nonwhite(value_s)[0] != value_s:
-          raise ValueError(
-              "to_str(%r) => %r: contains whitespace" % (value, value_s)
-          )
-        return value_s
-    # "bare" dotted identifiers
-    if isinstance(value, str) and is_dotted_identifier(value):
-      return value
-    # fall back to JSON encoded form of value
-    return cls.JSON_ENCODER.encode(value)
-
-  @classmethod
-  def from_name_value(cls, name, value):
-    ''' Support method for functions accepting either a tag or a name and value.
-
-        If `name` is a str make a new Tag from `name` and `value`.
-        Otherwise check that `value is `None`
-        and that `name` has a `.name` and `.value`
-        and return it as a tag ducktype.
-
-        This supports functions of the form:
-
-            def f(x, y, tag_name, value=None):
-              tag = Tag.from_name_value(tag_name, value)
-
-        so that that may accept a `Tag` or a tag name or a tag name and value.
-
-        Exanples:
-
-            >>> Tag.from_name_value('a', 3)
-            Tag(name='a',value=3)
-            >>> T = Tag('b', None)
-            >>> Tag.from_name_value(T, None)
-            Tag(name='b',value=None)
-    '''
-    with Pfx("%s.from_name_value(name=%r,value=%r)", cls.__name__, name,
-             value):
-      if isinstance(name, str):
-        # (name,value) => Tag
-        return cls(name, value)
-      if value is not None:
-        raise ValueError("name is not a str, value must be None")
-      tag = name
-      if not hasattr(tag, 'name'):
-        raise ValueError("tag has no .name attribute")
-      if not hasattr(tag, 'value'):
-        raise ValueError("tag has no .value attribute")
-      # Tag ducktype
-      return tag
-
-  @staticmethod
-  def is_valid_name(name):
-    ''' Test whether a tag name is valid: a dotted identifier including dash.
-    '''
-    return is_dotted_identifier(name, extras='_-')
-
-  @staticmethod
-  def parse_name(s, offset=0):
-    ''' Parse a tag name from `s` at `offset`: a dotted identifier including dash.
-    '''
-    return get_dotted_identifier(s, offset=offset, extras='_-')
-
-  def matches(self, tag_name, value=None):
-    ''' Test whether this `Tag` matches `(tag_name,value)`.
-    '''
-    other_tag = self.from_name_value(tag_name, value)
-    if self.name != other_tag.name:
-      return False
-    return other_tag.value is None or self.value == other_tag.value
-
-  @classmethod
-  def parse(cls, s, offset=0):
-    ''' Parse tag_name[=value], return `(tag,offset)`.
-    '''
-    with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
-      name, offset = cls.parse_name(s, offset)
-      with Pfx(name):
-        if offset < len(s):
-          sep = s[offset]
-          if sep.isspace():
-            value = None
-          elif sep == '=':
-            offset += 1
-            value, offset = cls.parse_value(s, offset)
-          else:
-            name_end, offset = get_nonwhite(s, offset)
-            name += name_end
-            value = None
-            ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
-        else:
-          value = None
-      return cls(name, value), offset
-
-  @classmethod
-  def parse_value(cls, s, offset=0):
-    ''' Parse a value from `s` at `offset` (default `0`).
-        Return the value, or `None` on no data.
-    '''
-    if offset >= len(s) or s[offset].isspace():
-      warning("offset %d: missing value part", offset)
-      value = None
-    else:
-      try:
-        value, offset2 = cls.parse_name(s, offset)
-      except ValueError:
-        value = None
-      else:
-        if offset == offset2:
-          value = None
-      if value is not None:
-        offset = offset2
-      else:
-        # check for special "nonwhitespace" transcription
-        nonwhite, nw_offset = get_nonwhite(s, offset)
-        nw_value = None
-        for _, from_str, _ in cls.EXTRA_TYPES:
-          try:
-            nw_value = from_str(nonwhite)
-          except ValueError:
-            pass
-        if nw_value is not None:
-          # special format found
-          value = nw_value
-          offset = nw_offset
-        else:
-          # decode as plain JSON data
-          value_part = s[offset:]
-          value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
-          offset += suboffset
-    return value, offset
-
-class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
-  ''' A "tag choice", an apply/reject flag and a `Tag`,
-      used to apply changes to a `TagSet`
-      or as a criterion for a tag search.
-
-      Attributes:
-      * `spec`: the source text from which this choice was parsed,
-        possibly `None`
-      * `choice`: the apply/reject flag
-      * `tag`: the `Tag` representing the criterion
-  '''
-
-  @classmethod
-  def parse(cls, s, offset=0):
-    ''' Parse a tag choice from `s` at `offset` (default `0`).
-        Return the `TagChoice` and new offset.
-    '''
-    offset0 = offset
-    if s.startswith('-', offset):
-      choice = False
-      offset += 1
-    else:
-      choice = True
-    tag, offset = Tag.parse(s, offset=offset)
-    return cls(s[offset0:offset], choice, tag), offset
-
-class TagSet(HasFSTagsMixin):
-  ''' A setlike class associating a set of tag names with values.
-      A `TagFile` maintains one of these for each name.
-  '''
-
-  def __init__(self, *, fstags=None, defaults=None):
-    ''' Initialise the `TagSet`.
-
-        Parameters:
-        * `defaults`: a mapping of name->TagSet to provide default values.
-    '''
-    if defaults is None:
-      defaults = {}
-    if fstags is not None:
-      self.fstags = fstags
-    self.tagmap = {}
-    self.defaults = defaults
-    self.modified = False
-
-  def __str__(self):
-    ''' The `TagSet` suitable for writing to a tag file.
-    '''
-    return ' '.join(sorted(str(T) for T in self.as_tags()))
-
-  def __repr__(self):
-    return "%s[%s]" % (
-        type(self).__name__, ','.join(str(T) for T in self.as_tags())
-    )
-
-  @classmethod
-  def from_line(cls, line, offset=0):
-    ''' Create a new `TagSet` from a line of text.
-    '''
-    tags = cls()
-    offset = skipwhite(line, offset)
-    while offset < len(line):
-      tag, offset = Tag.parse(line, offset)
-      tags.add(tag)
-      offset = skipwhite(line, offset)
-    return tags
-
-  @classmethod
-  def from_bytes(cls, bs):
-    ''' Create a new `TagSet` from the bytes `bs`,
-        a UTF-8 encoding of a `TagSet` line.
-    '''
-    line = bs.decode(errors='replace')
-    return cls.from_line(line)
-
-  def __len__(self):
-    return len(self.tagmap)
-
-  def __contains__(self, tag):
-    tagmap = self.tagmap
-    if isinstance(tag, str):
-      return tag in tagmap
-    for mytag in self.as_tags():
-      if mytag.matches(tag):
-        return True
-    return False
-
-  def __getitem__(self, tag_name):
-    ''' Fetch tag value by `tag_name`.
-        Raises `KeyError` for missing `tag_name`.
-    '''
-    try:
-      return self.tagmap[tag_name]
-    except KeyError:
-      return self.defaults[tag_name]
-
-  def get(self, tag_name, default=None):
-    ''' Fetch tag value by `tag_name`, or `default`.
-    '''
-    try:
-      value = self[tag_name]
-    except KeyError:
-      value = default
-    return value
-
-  def as_tags(self):
-    ''' Yield the tag data as `Tag`s.
-    '''
-    for tag_name, value in self.tagmap.items():
-      yield Tag(tag_name, value)
-
-  __iter__ = as_tags
-
-  def add(self, tag_name, value=None):
-    ''' Add a tag to these tags.
-    '''
-    tag = Tag.from_name_value(tag_name, value)
-    tag_name = tag.name
-    tagmap = self.tagmap
-    value = tag.value
-    if tag_name not in tagmap or tagmap[tag_name] != value:
-      verbose("+ %s", tag)
-      tagmap[tag_name] = value
-      self.modified = True
-
-  def discard(self, tag_name, value=None):
-    ''' Discard the tag matching `(tag_name,value)`.
-        Return a `Tag` with the old value,
-        or `None` if there was no matching tag.
-
-        Note that if the tag value is `None`
-        then the tag is unconditionally discarded.
-        Otherwise the tag is only discarded
-        if its value matches.
-    '''
-    tag = Tag.from_name_value(tag_name, value)
-    tag_name = tag.name
-    if tag_name in self:
-      tagmap = self.tagmap
-      value = tag.value
-      if value is None or tagmap[tag_name] == value:
-        old_value = tagmap.pop(tag_name)
-        self.modified = True
-        old_tag = Tag(tag_name, old_value)
-        verbose("- %s", old_tag)
-        return old_tag
-    return None
-
-  def update(self, other):
-    ''' Update this `TagSet` from `other`,
-        a dict or an iterable of taggy things.
-    '''
-    if isinstance(other, dict):
-      self.update(Tag.from_name_value(k, v) for k, v in other.items())
-    else:
-      for tag in other:
-        self.add(tag)
-
-  # Assorted computed properties.
-
-  def titleify(self, tag_name):
-    ''' Return the tag value for `tag_name`.
-        If this is empty or missing,
-        look at `tag_name+'_lc'`;
-        if not empty
-        replace the dashes with spaces and titlecase it.
-    '''
-    value = self.get(tag_name)
-    if value:
-      return value
-    value_lc = self.get(tag_name + '_lc')
-    if value_lc:
-      return value_lc.replace('-', ' ').title()
-    return None
-
-  @property
-  def episode_title(self):
-    ''' File title.
-    '''
-    return self.titleify('episode_title')
-
-  @property
-  def title(self):
-    ''' File title.
-    '''
-    return self.titleify('title')
-
-  @fmtdoc
-  def update_xattr(self, filepath, xattr_name=None):
-    ''' Update the extended attributes of `filepath`
-        with the tags from this `TagSet`.
-
-        Parameters:
-        * `filepath`: the filesystem path to update
-        * `xattr_name`: the extended attribute to update;
-          default: `XATTR_B` ({XATTR_B!r})
-    '''
-    if xattr_name is None:
-      xattr_name = XATTR_B
-    return update_xattr_value(filepath, xattr_name, str(self))
-
-  @classmethod
-  @fmtdoc
-  def from_xattr(cls, filepath, xattr_name=None):
-    ''' Create a new `TagSet`
-        from the extended attribute `xattr_name` of `filepath`.
-        The default `xattr_name` is `XATTR_B` (`{XATTR_B!r}`).
-    '''
-    if xattr_name is None:
-      xattr_name = XATTR_B
-    xattr_s = get_xattr_value(filepath, xattr_name)
-    if xattr_s is None:
-      return cls()
-    return cls.from_line(xattr_s)
-
-  @fmtdoc
-  def update_from_xattr(self, filepath, xattr_name=None):
-    ''' Update the `TagSet` from the extended attributes of `filepath`.
-
-        Parameters:
-        * `filepath`: the filesystem path to update
-        * `xattr_name`: the extended attribute to update;
-          if this is a `str`, the attribute is the UTF-8 encoding of that name.
-          The default is `XATTR_B` ({XATTR_B!r}).
-    '''
-    xattr_tags = self.from_xattr(filepath, xattr_name=xattr_name)
-    self.update(xattr_tags)
-
 class TagFile(HasFSTagsMixin):
   ''' A reference to a specific file containing tags.
 
@@ -1454,7 +1045,7 @@ class TagFile(HasFSTagsMixin):
   @locked_property
   def tagsets(self):
     ''' The tag map from the tag file,
-        a mapping of name=>TagSet.
+        a mapping of name=>`TagSet`.
     '''
     return self.load_tagsets(self.filepath)
 
@@ -1507,7 +1098,7 @@ class TaggedPath(HasFSTagsMixin):
     ''' Format arguments suitable for `str.format`.
     '''
     filepath = str(self.filepath)
-    format_tags = TagSet(defaults=defaultdict(str), fstags=self.fstags)
+    format_tags = TagSet(defaults=defaultdict(str))
     format_tags.update(self.direct_tags if direct else self.all_tags)
     kwargs = dict(
         basename=basename(filepath),
@@ -1562,7 +1153,7 @@ class TaggedPath(HasFSTagsMixin):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
-    tags = TagSet(fstags=self.fstags)
+    tags = TagSet()
     with state.stack(verbose=False):
       for tagfile, name in self._tagfile_entries:
         for tag in tagfile[name]:
@@ -1616,9 +1207,10 @@ class TaggedPath(HasFSTagsMixin):
     '''
     name = self.basename
     all_tags = self.all_tags
+    # TODO: common merge_tags method
     # compute inferrable tags
     with state.stack(verbose=False):
-      new_tags = TagSet(fstags=self.fstags)
+      new_tags = TagSet()
       updated = False
       for autotag in infer_tags(name, rules=rules):
         if autotag not in all_tags:
@@ -1630,11 +1222,24 @@ class TaggedPath(HasFSTagsMixin):
         self.save()
     return new_tags
 
+  @fmtdoc
+  def get_xattr_tagset(self, xattr_name=None):
+    ''' Return a new `TagSet`
+        from the extended attribute `xattr_name` of `self.filepath`.
+        The default `xattr_name` is `XATTR_B` (`{XATTR_B!r}`).
+    '''
+    if xattr_name is None:
+      xattr_name = XATTR_B
+    xattr_s = get_xattr_value(self.filepath, xattr_name)
+    if xattr_s is None:
+      return TagSet()
+    return TagSet.from_line(xattr_s)
+
   def import_xattrs(self):
     ''' Update the direct tags from the file's extended attributes.
     '''
     filepath = self.filepath
-    xa_tags = TagSet.from_xattr(filepath)
+    xa_tags = self.get_xattr_tagset()
     # import tags from other xattrs if not present
     for xattr_name, tag_name in self.fstags.config['xattr'].items():
       if tag_name not in xa_tags:
@@ -1643,6 +1248,7 @@ class TaggedPath(HasFSTagsMixin):
           xa_tags.add(tag_name, tag_value)
     # merge with the direct tags
     # if missing from the all_tags
+    # TODO: common merge_tags method
     all_tags = self.all_tags
     direct_tags = self.direct_tags
     for tag in xa_tags:

@@ -45,11 +45,12 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, TagSet, TaggedPath, Tag, rpaths
+from cs.fstags import FSTags, TaggedPath, rpaths
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import Upd
 
@@ -73,6 +74,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
         'cs.units',
         'cs.upd',
     ],
@@ -127,7 +129,7 @@ class MP4Command(BaseCommand):
     U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
-        for _, path in rpaths(top_path):
+        for path in rpaths(top_path):
           U.out(path)
           with Pfx(path):
             tagged_path = fstags[path]
@@ -139,8 +141,8 @@ class MP4Command(BaseCommand):
                     for tag in tags:
                       new_tag = Tag(
                           (
-                              '__'.join((tag_prefix,
-                                         tag.name)) if tag_prefix else tag.name
+                              '.'.join((tag_prefix,
+                                        tag.name)) if tag_prefix else tag.name
                           ), tag.value
                       )
                       if no_action:
@@ -2375,9 +2377,7 @@ class ILSTBoxBody(ContainerBoxBody):
                 if decoder is not None:
                   value = decoder(value)
                 # annotate the subbox and the ilst
-                attribute_name = (
-                    mean_box.text.replace('.', '_') + '__' + name_box.text
-                ).lower()
+                attribute_name = '.'.join((mean_box.text, name_box.text))
                 setattr(subbox, attribute_name, value)
                 self.tags.add(attribute_name, value)
           else:
