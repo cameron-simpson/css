@@ -128,8 +128,8 @@ class Upd(object):
       #
       if buflen - pfxlen < 1 + pfxlen:
         # backspace and partial overwrite
-        self._backend.write( '\b' * (buflen - pfxlen) )
-        self._backend.write( txt[pfxlen:] )
+        self._backend.write('\b' * (buflen - pfxlen))
+        self._backend.write(txt[pfxlen:])
       else:
         # carriage return and complete overwrite
         self._backend.write('\r')
@@ -138,8 +138,8 @@ class Upd(object):
       extlen = buflen - txtlen
       if extlen > 0:
         # old line was longer - write spaces over the old tail
-        self._backend.write( ' ' * extlen )
-        self._backend.write( '\b' * extlen )
+        self._backend.write(' ' * extlen)
+        self._backend.write('\b' * extlen)
 
       self._backend.flush()
       self._state = txt
