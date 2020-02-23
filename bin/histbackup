@@ -105,6 +105,7 @@ rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
+sshcmd='ssh -o controlpath=none'
 reverse=
 verbose=
 imode=
@@ -117,6 +118,7 @@ usage="Usage:
   $cmd [options...] [-- [rsyncopts...]]
 
   -A, --acls    Preserve ACLs. Passed to rsync.
+  -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
@@ -243,6 +245,15 @@ do
     #
     --delete-excluded)
       rsdelete='--delete --delete-excluded'
+      ;;
+
+    # =item -e ssh-cmd
+    #
+    # Specify ssh command for rsync, passed to rsync.
+    # Default: B<ssh -o controlpath=none>
+    #
+    -e)
+      sshcmd=$2; shift
       ;;
 
     # =item --no-hbfiles
@@ -575,7 +586,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync -e "$sshcmd" $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
