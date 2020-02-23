@@ -51,8 +51,7 @@ import json
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile
+    isdirpath, join as joinpath, realpath, relpath, samefile
 )
 from pathlib import PurePath
 import re
@@ -1220,34 +1219,6 @@ class TaggedPath(HasFSTagsMixin):
             tagset.add(tag)
     return tagset
 
-  def autotag(self, rules=None, *, no_save=False):
-    ''' Apply `rules`to this `TaggedPath`,
-        update the `direct_tags` with new tags.
-
-        Parameters:
-        * `rules`: an iterable of objects with a `.infer_tags(name)` method
-          which returns an iterable of `Tag`s.
-          Each rule will be passed the `TaggedPath.basename` as the `name`.
-        * `no_save`: if true (default `False`)
-          suppress the save of updated tags back to the filesystem.
-    '''
-    name = self.basename
-    all_tags = self.all_tags
-    # TODO: common merge_tags method
-    # compute inferrable tags
-    with state.stack(verbose=False):
-      new_tags = TagSet()
-      updated = False
-      for autotag in infer_tags(name, rules=rules):
-        if autotag not in all_tags:
-          new_tags.add(autotag)
-          updated = True
-    if updated:
-      self.direct_tags.update(new_tags)
-      if not no_save:
-        self.save()
-    return new_tags
-
   @fmtdoc
   def get_xattr_tagset(self, xattr_name=None):
     ''' Return a new `TagSet`
@@ -1295,22 +1266,6 @@ class TaggedPath(HasFSTagsMixin):
           filepath, xattr_name, None if tag_value is None else str(tag_value)
       )
 
-def infer_tags(name, rules):
-  ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
-
-      `rules` is an iterable of objects with a `.infer_tags(name)` method
-      which returns an iterable of `Tag`s.
-  '''
-  with Pfx("infer_tags(%r,..)", name):
-    tags = TagSet()
-    for rule in rules:
-      with Pfx(rule):
-        for autotag in rule.infer_tags(name):
-          with Pfx(autotag):
-            if autotag.name not in tags:
-              tags.add(autotag)
-    return tags
-
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
@@ -1323,13 +1278,14 @@ class RegexpTagRule:
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
 
   def infer_tags(self, s):
-    ''' Apply the rule to the string `s`, return `Tag`s.
+    ''' Apply the rule to the string `s`, return a list of `Tag`s.
     '''
     tags = []
     m = self.regexp.search(s)
     if m:
       for tag_name, value in m.groupdict().items():
         if value is not None:
+          # TODO: honour the JSON decode strings
           try:
             value = int(value)
           except ValueError:
