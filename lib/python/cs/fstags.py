@@ -1317,8 +1317,6 @@ def rpaths(path, yield_dirs=False, name_selector=None):
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
-  if not name_selector(basename(path)):
-    return
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
