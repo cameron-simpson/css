@@ -71,6 +71,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import TagSet, Tag, TagChoice
 from cs.threads import locked, locked_property
+from cs.upd import Upd
 
 __version__ = '20200210'
 
@@ -86,7 +87,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils',
         'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'icontract'
+        'cs.upd', 'icontract'
     ],
 }
 
@@ -236,15 +237,23 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = fstags.config.rules
+    rules = fstags.config.filename_rules
     with state.stack(verbose=True):
       with fstags:
-        for top_path in argv:
-          for _, path in rpaths(top_path):
-            with Pfx(path):
-              tagged_path = fstags[path]
-              for autotag in tagged_path.autotag(rules):
-                print("autotag %r + %s" % (tagged_path.basename, autotag))
+        with Upd(sys.stderr) as U:
+          for top_path in argv:
+            for _, path in rpaths(top_path, yield_dirs=True):
+              U.out(path)
+              with Pfx(path):
+                tagged_path = fstags[path]
+                all_tags = tagged_path.merged_tags()
+                for autotag in tagged_path.infer_from_basename(rules):
+                  U.out(path + ' ' + str(autotag))
+                  if autotag not in all_tags:
+                    with U.without():
+                      tagged_path.direct_tags.add(
+                          autotag, verbose=state.verbose
+                      )
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -1194,6 +1203,23 @@ class TaggedPath(HasFSTagsMixin):
     '''
     self.direct_tags.pop(tag_name)
 
+  def infer_from_basename(self, rules=None):
+    ''' Apply `rules` to the basename of this `TaggedPath`,
+        return a `TagSet` of inferred `Tag`s.
+
+        Tag values from earlier rules override values from later rules.
+    '''
+    if rules is None:
+      rules = self.fstags.config.filename_rules
+    name = self.basename
+    tagset = TagSet()
+    with state.stack(verbose=False):
+      for rule in rules:
+        for tag in rule.infer_tags(name):
+          if tag.name not in tagset:
+            tagset.add(tag)
+    return tagset
+
   def autotag(self, rules=None, *, no_save=False):
     ''' Apply `rules`to this `TaggedPath`,
         update the `direct_tags` with new tags.
@@ -1394,8 +1420,8 @@ class FSTagsConfig:
     if attr == 'config':
       self.config = self.load_config(self.filepath)
       return self.config
-    if attr == 'rules':
-      self.rules = self.rules_from_config(self.config)
+    if attr == 'filename_rules':
+      self.rules = self.filename_rules_from_config(self.config)
       return self.rules
     raise AttributeError(attr)
 
@@ -1420,11 +1446,11 @@ class FSTagsConfig:
       return config
 
   @staticmethod
-  def rules_from_config(config):
-    ''' Return a list of the `[autotag]` tag rules from the config.
+  def filename_rules_from_config(config):
+    ''' Return a list of the `[filename_autotag]` tag rules from the config.
     '''
     rules = []
-    for rule_name, pattern in config['autotag'].items():
+    for rule_name, pattern in config['filename_autotag'].items():
       with Pfx("%s = %s", rule_name, pattern):
         if pattern.startswith('/') and pattern.endswith('/'):
           rules.append(RegexpTagRule(pattern[1:-1]))
