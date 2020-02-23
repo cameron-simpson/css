@@ -1449,10 +1449,8 @@ class FSTagsConfig:
 
 FSTagsCommand.add_usage_to_docstring()
 
-@fmtdoc
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
-
       Return the extended attribute value as a string,
       or `None` if the attribute does not exist.
 
@@ -1478,7 +1476,6 @@ def get_xattr_value(filepath, xattr_name):
     old_xattr_value = old_xattr_value_b.decode(errors='replace')
   return old_xattr_value
 
-@fmtdoc
 def update_xattr_value(filepath, xattr_name, new_xattr_value):
   ''' Update the extended attributes of `filepath`
       with `new_xattr_value` for `xattr_name`.
@@ -1502,6 +1499,7 @@ def update_xattr_value(filepath, xattr_name, new_xattr_value):
            new_xattr_value):
     old_xattr_value = get_xattr_value(filepath, xattr_name)
     if new_xattr_value is None:
+      # remove old xattr if present
       if old_xattr_value is not None:
         try:
           os.removexattr(filepath, xattr_name_b)
@@ -1509,6 +1507,7 @@ def update_xattr_value(filepath, xattr_name, new_xattr_value):
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
             raise
     elif old_xattr_value is None or old_xattr_value != new_xattr_value:
+      # set new value
       new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
       with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
                new_xattr_value_b):
