@@ -80,6 +80,12 @@ class Upd(object):
     global instances
     instances.append(self)
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    self.out('')
+
   @property
   def state(self):
     ''' The current status line text value.
