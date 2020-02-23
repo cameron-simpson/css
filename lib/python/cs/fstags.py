@@ -1068,14 +1068,14 @@ class TagFile(HasFSTagsMixin):
   def add(self, name, tag, value=None):
     ''' Add a tag to the tags for `name`.
     '''
-    return self[name].add(tag, value)
+    return self[name].add(tag, value, verbose=state.verbose)
 
   def discard(self, name, tag_name, value=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
     '''
-    return self[name].discard(tag_name, value)
+    return self[name].discard(tag_name, value, verbose=state.verbose)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
@@ -1337,7 +1337,7 @@ class RegexpTagRule:
           tags.append(Tag(tag_name, value))
     return tags
 
-def rpaths(path, yield_dirs=False, name_selector=None):
+def rpaths(path, *, yield_dirs=False, name_selector=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
   '''
