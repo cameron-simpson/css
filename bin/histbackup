@@ -21,7 +21,8 @@
 # in a set of directories named by dates, or date-time if the date already exists.
 # The new backup is prepopulated by hardlinks of each file from the previous backup
 # and then updated with rsync(1).
-# This arranges that the only new content of each new backup is fresh copies of the changed files.
+# This arranges that the only new content of each new backup
+# is fresh copies of the changed files.
 # In this way each backup directory is a full copy of the source directory
 # but the disc space cost is that of an incremental backup.
 # Because it uses rsync,
@@ -49,7 +50,8 @@
 # If the data to backup are local to this machine
 # you merely need read access to it.
 # If the data are remote
-# you will need ssh(1) access to the remote host as a user with read access to the data there.
+# you will need ssh(1) access to the remote host
+# as a user with read access to the data there.
 # Test it:
 #
 #       ssh user@remote ls -l /path/to/source/directory
@@ -105,6 +107,7 @@ rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
+sshcmd='ssh -o controlpath=none'
 reverse=
 verbose=
 imode=
@@ -117,6 +120,7 @@ usage="Usage:
   $cmd [options...] [-- [rsyncopts...]]
 
   -A, --acls    Preserve ACLs. Passed to rsync.
+  -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
@@ -138,8 +142,10 @@ usage="Usage:
                 Pass --delete --delete-excluded to rsync.
   --no-hbfiles  Do not honour the .hbfiles file in the backup directory.
   --no-hbinclude Do not honour the .hbinclude file in the backup directory.
-  --no-rsync    Don't do the rsync pass - just set up the new link tree and
+  --no-rsync    Do not do the rsync pass - just set up the new link tree and
                 report its basename.
+  --no-symlink-if-unchanged
+                Make a link tree even when there are no changes.
   --link-fail-repair (Obsolete; this is always done.)
                 Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
@@ -148,8 +154,6 @@ usage="Usage:
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
                 and time if the tree is often unchanged.
                 This is the default.
-  --no-symlink-if-unchanged
-                Make a link tree even when there are no changes.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
@@ -169,6 +173,14 @@ while [ $# -gt 0 ]
 do
   case $1 in
 
+    # =item -A, --acls
+    #
+    # Preserve ACLs. Passed to rsync.
+    #
+    -A|--acls)
+      rsopts="$rsopts $1"
+      ;;
+
     # =item --copy-times
     #
     # Copy file timestamps from the source tree to the
@@ -180,48 +192,7 @@ do
     --copy-times)
       copytimes=1
       ;;
-    # =item --no-delete
-    #
-    # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
-    #
-    --no-delete)
-      rsdelete=
-      ;;
 
-    # =item --no-rsync
-    #
-    # Skip the rsync step; just create the new link tree.
-    #
-    --no-rsync)
-      linkonly=1
-      ;;
-
-    # =item --link-fail-repair
-    #
-    # Proceed even if the linktree step fails, presumably due to
-    # reaching the filesystem hard link limit. Does a repair rsync
-    # from the previous to new backup before proceeding.
-    #
-    --link-fail-repair)
-      echo "$cmd: $1: obsolete option; $cmd always tries to cope with hard link failure" >&2
-      ;;
-    # =item --symlink-if-unchanged
-    #
-    # Symlink the top level date if there are no changes to the tree.
-    # This requires a prepass with "rsync -n" but saves time and
-    # hardlinks if there are no changes.
-    #
-    --symlink-if-unchanged)
-        symlink_unchanged=1
-        ;;
-    # =item --no-symlink-if-unchanged
-    #
-    # Do not symlink the top level date if there are no changes to the tree,
-    # instead always make a hard link tree.
-    #
-    --no-symlink-if-unchanged)
-        symlink_unchanged=
-        ;;
     # =item --date datestring
     #
     # Specify datestring for this backup. The default is the current date or date-time.
@@ -229,6 +200,7 @@ do
     --date)
         thisbackup=$2; shift
         ;;
+
     # =item --delete
     #
     # Passed to rsync.
@@ -243,6 +215,42 @@ do
     #
     --delete-excluded)
       rsdelete='--delete --delete-excluded'
+      ;;
+
+    # =item -e ssh-cmd
+    #
+    # Specify ssh command for rsync, passed to rsync.
+    # Default: B<ssh -o controlpath=none>
+    #
+    -e)
+      sshcmd=$2; shift
+      ;;
+
+    # =item -i, --itemize-changes
+    #
+    # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
+    #
+    -i|--itemize-changes)
+      imode=1
+      rsopts="$rsopts -i"
+      ;;
+
+    # =item --link-fail-repair
+    #
+    # Proceed even if the linktree step fails, presumably due to
+    # reaching the filesystem hard link limit. Does a repair rsync
+    # from the previous to new backup before proceeding.
+    #
+    --link-fail-repair)
+      echo "$cmd: $1: obsolete option; $cmd now always tries to cope with hard link failure" >&2
+      ;;
+
+    # =item --no-delete
+    #
+    # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
+    #
+    --no-delete)
+      rsdelete=
       ;;
 
     # =item --no-hbfiles
@@ -260,6 +268,23 @@ do
     --no-hbinclude)
       usehbinclude=
       ;;
+
+    # =item --no-rsync
+    #
+    # Skip the rsync step; just create the new link tree.
+    #
+    --no-rsync)
+      linkonly=1
+      ;;
+
+    # =item --no-symlink-if-unchanged
+    #
+    # Do not symlink the top level date if there are no changes to the tree,
+    # instead always make a hard link tree.
+    #
+    --no-symlink-if-unchanged)
+        symlink_unchanged=
+        ;;
 
     # =item --rsync-path rrsync
     #
@@ -280,26 +305,9 @@ do
     --symlink)
       symlink=$2; shift ;;
 
-    # =item -A, --acls
-    #
-    # Preserve ACLs. Passed to rsync.
-    #
-    -A|--acls)
-      rsopts="$rsopts $1"
-      ;;
-
-    # =item -i, --itemize-changes
-    #
-    # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
-    #
-    -i|--itemize-changes)
-      imode=1
-      rsopts="$rsopts -i"
-      ;;
-
     # -item -r, --reverse
     #
-    # Reverse dates.
+    # Reverse dates, causing the oldest date to be chosen.
     #
     # =item -v, --verbose
     #
@@ -307,6 +315,16 @@ do
       reverse=1
       symlink=
       ;;
+
+    # =item --symlink-if-unchanged
+    #
+    # Symlink the top level date if there are no changes to the tree.
+    # This requires a prepass with B<rsync -n> but saves time and
+    # hardlinks if there are no changes.
+    #
+    --symlink-if-unchanged)
+        symlink_unchanged=1
+        ;;
 
     # Turn on verbose mode.
     #
@@ -340,7 +358,7 @@ done
 #
 # If neither the source not destination appear
 # it is expected that the destination is the current directory
-# and that the source is specified by the .hbsource file in the current directory.
+# and that the source is specified by the B<.hbsource> file in the current directory.
 #
 # Otherwise, the source and destination appear.
 # These may be followed by I<otherbackupdirs>,
@@ -575,7 +593,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync -e "$sshcmd" $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"

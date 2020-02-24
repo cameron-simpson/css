@@ -117,7 +117,7 @@ do
             do
               ddir=$compiled/$date
               [ -d "$ddir" ] || $trace mkdir "$ddir"
-              echo "mv $date-*.jpg $ddir/" >&2
+              echo "mv $date-*.jpg $ddir/ ..." >&2
               mv "$date"-*.jpg "$ddir/"
             done
           )

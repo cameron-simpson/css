@@ -51,10 +51,9 @@ import json
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile
+    isdirpath, join as joinpath, realpath, relpath, samefile
 )
-from pathlib import Path
+from pathlib import PurePath
 import re
 import shutil
 import sys
@@ -71,6 +70,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import TagSet, Tag, TagChoice
 from cs.threads import locked, locked_property
+from cs.upd import Upd
 
 __version__ = '20200210'
 
@@ -86,7 +86,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils',
         'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'icontract'
+        'cs.upd', 'icontract'
     ],
 }
 
@@ -236,15 +236,23 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = fstags.config.rules
+    rules = fstags.config.filename_rules
     with state.stack(verbose=True):
       with fstags:
-        for top_path in argv:
-          for path in rpaths(top_path):
-            with Pfx(path):
-              tagged_path = fstags[path]
-              for autotag in tagged_path.autotag(rules):
-                print("autotag %r + %s" % (tagged_path.basename, autotag))
+        with Upd(sys.stderr) as U:
+          for top_path in argv:
+            for _, path in rpaths(top_path, yield_dirs=True):
+              U.out(path)
+              with Pfx(path):
+                tagged_path = fstags[path]
+                all_tags = tagged_path.merged_tags()
+                for autotag in tagged_path.infer_from_basename(rules):
+                  U.out(path + ' ' + str(autotag))
+                  if autotag not in all_tags:
+                    with U.without():
+                      tagged_path.direct_tags.add(
+                          autotag, verbose=state.verbose
+                      )
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -650,8 +658,7 @@ class FSTags(MultiOpenMixin):
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
-    dirpath = Path(dirpath)
-    tagfilepath = dirpath / self.tagsfile
+    tagfilepath = joinpath(dirpath, self.tagsfile)
     tagfile = self._tagfiles.get(tagfilepath)
     if tagfile is None:
       tagfile = self._tagfiles[tagfilepath] = TagFile(
@@ -666,7 +673,7 @@ class FSTags(MultiOpenMixin):
         where `name` is the key within `TagFile`.
     '''
     with Pfx("path_tagfiles(%r)", filepath):
-      absfilepath = Path(abspath(filepath))
+      absfilepath = PurePath(abspath(filepath))
       root, *subparts = absfilepath.parts
       if not subparts:
         raise ValueError("root=%r and no subparts" % (root,))
@@ -738,7 +745,7 @@ class FSTags(MultiOpenMixin):
           otherwise the all_tags.
           Default: `False`
     '''
-    for filepath in rpaths(path, yield_dirs=use_direct_tags):
+    for _, filepath in rpaths(path, yield_dirs=use_direct_tags):
       if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
         yield filepath
 
@@ -1060,14 +1067,14 @@ class TagFile(HasFSTagsMixin):
   def add(self, name, tag, value=None):
     ''' Add a tag to the tags for `name`.
     '''
-    return self[name].add(tag, value)
+    return self[name].add(tag, value, verbose=state.verbose)
 
   def discard(self, name, tag_name, value=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
     '''
-    return self[name].discard(tag_name, value)
+    return self[name].discard(tag_name, value, verbose=state.verbose)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
@@ -1080,7 +1087,7 @@ class TaggedPath(HasFSTagsMixin):
       fstags = self.fstags
     else:
       self.fstags = fstags
-    self.filepath = Path(filepath)
+    self.filepath = PurePath(filepath)
     self._tagfile_entries = fstags.path_tagfiles(filepath)
     self._lock = Lock()
 
@@ -1195,33 +1202,22 @@ class TaggedPath(HasFSTagsMixin):
     '''
     self.direct_tags.pop(tag_name)
 
-  def autotag(self, rules=None, *, no_save=False):
-    ''' Apply `rules`to this `TaggedPath`,
-        update the `direct_tags` with new tags.
+  def infer_from_basename(self, rules=None):
+    ''' Apply `rules` to the basename of this `TaggedPath`,
+        return a `TagSet` of inferred `Tag`s.
 
-        Parameters:
-        * `rules`: an iterable of objects with a `.infer_tags(name)` method
-          which returns an iterable of `Tag`s.
-          Each rule will be passed the `TaggedPath.basename` as the `name`.
-        * `no_save`: if true (default `False`)
-          suppress the save of updated tags back to the filesystem.
+        Tag values from earlier rules override values from later rules.
     '''
+    if rules is None:
+      rules = self.fstags.config.filename_rules
     name = self.basename
-    all_tags = self.all_tags
-    # TODO: common merge_tags method
-    # compute inferrable tags
+    tagset = TagSet()
     with state.stack(verbose=False):
-      new_tags = TagSet()
-      updated = False
-      for autotag in infer_tags(name, rules=rules):
-        if autotag not in all_tags:
-          new_tags.add(autotag)
-          updated = True
-    if updated:
-      self.direct_tags.update(new_tags)
-      if not no_save:
-        self.save()
-    return new_tags
+      for rule in rules:
+        for tag in rule.infer_tags(name):
+          if tag.name not in tagset:
+            tagset.add(tag)
+    return tagset
 
   @fmtdoc
   def get_xattr_tagset(self, xattr_name=None):
@@ -1270,22 +1266,6 @@ class TaggedPath(HasFSTagsMixin):
           filepath, xattr_name, None if tag_value is None else str(tag_value)
       )
 
-def infer_tags(name, rules):
-  ''' Infer `Tag`s from `name` via `rules`. Return a `TagSet`.
-
-      `rules` is an iterable of objects with a `.infer_tags(name)` method
-      which returns an iterable of `Tag`s.
-  '''
-  with Pfx("infer_tags(%r,..)", name):
-    tags = TagSet()
-    for rule in rules:
-      with Pfx(rule):
-        for autotag in rule.infer_tags(name):
-          with Pfx(autotag):
-            if autotag.name not in tags:
-              tags.add(autotag)
-    return tags
-
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
@@ -1298,13 +1278,14 @@ class RegexpTagRule:
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
 
   def infer_tags(self, s):
-    ''' Apply the rule to the string `s`, return `Tag`s.
+    ''' Apply the rule to the string `s`, return a list of `Tag`s.
     '''
     tags = []
     m = self.regexp.search(s)
     if m:
       for tag_name, value in m.groupdict().items():
         if value is not None:
+          # TODO: honour the JSON decode strings
           try:
             value = int(value)
           except ValueError:
@@ -1312,26 +1293,45 @@ class RegexpTagRule:
           tags.append(Tag(tag_name, value))
     return tags
 
-def rpaths(path, yield_dirs=False, name_selector=None):
-  ''' Generator yielding pathnames found under `path`.
+def rpaths(path, *, yield_dirs=False, name_selector=None):
+  ''' Recurse over `path`, yielding `(is_dir,subpath)`
+      for all selected subpaths.
   '''
   if name_selector is None:
     name_selector = lambda name: name and not name.startswith('.')
-  path = abspath(path)
-  if isfilepath(path):
-    yield path
-  else:
-    for dirpath, dirnames, filenames in os.walk(path):
-      if yield_dirs:
-        yield dirpath
-      dirnames[:] = sorted(filter(name_selector, dirnames))
-      for filename in sorted(filter(name_selector, filenames)):
-        yield joinpath(dirpath, filename)
+  pending = [path]
+  while pending:
+    dirpath = pending.pop(0)
+    with Pfx(dirpath):
+      with Pfx("scandir"):
+        try:
+          dirents = sorted(os.scandir(dirpath), key=lambda entry: entry.name)
+        except NotADirectoryError:
+          yield False, dirpath
+          continue
+        except (FileNotFoundError, PermissionError) as e:
+          warning("%s", e)
+          continue
+      for entry in dirents:
+        name = entry.name
+        with Pfx(name):
+          if not name_selector(name):
+            continue
+          entrypath = joinpath(dirpath, name)
+          if entry.is_dir():
+            if yield_dirs:
+              yield True, entrypath
+            pending.append(entrypath)
+          else:
+            yield False, entrypath
 
 def rfilepaths(path, name_selector=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
-  return rpaths(path, yield_dirs=False, name_selector=name_selector)
+  return (
+      subpath for is_dir, subpath in
+      rpaths(path, yield_dirs=False, name_selector=name_selector) if not is_dir
+  )
 
 def rsync_patterns(paths, top_path):
   ''' Return a list of rsync include lines
@@ -1376,8 +1376,8 @@ class FSTagsConfig:
     if attr == 'config':
       self.config = self.load_config(self.filepath)
       return self.config
-    if attr == 'rules':
-      self.rules = self.rules_from_config(self.config)
+    if attr == 'filename_rules':
+      self.rules = self.filename_rules_from_config(self.config)
       return self.rules
     raise AttributeError(attr)
 
@@ -1402,11 +1402,11 @@ class FSTagsConfig:
       return config
 
   @staticmethod
-  def rules_from_config(config):
-    ''' Return a list of the `[autotag]` tag rules from the config.
+  def filename_rules_from_config(config):
+    ''' Return a list of the `[filename_autotag]` tag rules from the config.
     '''
     rules = []
-    for rule_name, pattern in config['autotag'].items():
+    for rule_name, pattern in config['filename_autotag'].items():
       with Pfx("%s = %s", rule_name, pattern):
         if pattern.startswith('/') and pattern.endswith('/'):
           rules.append(RegexpTagRule(pattern[1:-1]))
@@ -1429,10 +1429,8 @@ class FSTagsConfig:
 
 FSTagsCommand.add_usage_to_docstring()
 
-@fmtdoc
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
-
       Return the extended attribute value as a string,
       or `None` if the attribute does not exist.
 
@@ -1458,7 +1456,6 @@ def get_xattr_value(filepath, xattr_name):
     old_xattr_value = old_xattr_value_b.decode(errors='replace')
   return old_xattr_value
 
-@fmtdoc
 def update_xattr_value(filepath, xattr_name, new_xattr_value):
   ''' Update the extended attributes of `filepath`
       with `new_xattr_value` for `xattr_name`.
@@ -1482,6 +1479,7 @@ def update_xattr_value(filepath, xattr_name, new_xattr_value):
            new_xattr_value):
     old_xattr_value = get_xattr_value(filepath, xattr_name)
     if new_xattr_value is None:
+      # remove old xattr if present
       if old_xattr_value is not None:
         try:
           os.removexattr(filepath, xattr_name_b)
@@ -1489,6 +1487,7 @@ def update_xattr_value(filepath, xattr_name, new_xattr_value):
           if e.errno not in (errno.ENOTSUP, errno.ENOENT):
             raise
     elif old_xattr_value is None or old_xattr_value != new_xattr_value:
+      # set new value
       new_xattr_value_b = new_xattr_value.encode(errors='xmlcharrefreplace')
       with Pfx("setxattr(%r,%r,%r)", filepath, xattr_name_b,
                new_xattr_value_b):

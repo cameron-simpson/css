@@ -16,8 +16,9 @@ try:
   from os import pread
 except ImportError:
   pread = None
-from os.path import basename, dirname, isdir, isabs as isabspath, \
-                    abspath, join as joinpath
+from os.path import (
+    basename, dirname, isdir, isabs as isabspath, abspath, join as joinpath
+)
 import shutil
 import stat
 import sys
@@ -25,7 +26,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.deco import cachedmethod, decorator, strable
+from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines
@@ -69,9 +70,9 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
 
-      First try the .seekable method from IOBase, otherwise try
-      getting a file descriptor from fp.fileno and stat()ing that,
-      otherwise return False.
+      First try the `.seekable` method from `IOBase`, otherwise try
+      getting a file descriptor from `fp.fileno` and `os.stat`()ing that,
+      otherwise return `False`.
   '''
   try:
     test = fp.seekable
@@ -287,7 +288,12 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
 
 @decorator
 def file_based(
-    func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw
+    func,
+    attr_name=None,
+    filename=None,
+    poll_delay=None,
+    sig_func=None,
+    **dkw
 ):
   ''' A decorator which caches a value obtained from a file.
 
@@ -351,7 +357,8 @@ def file_property(func, **dkw):
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.
 
-      This is just the default mode for make_files_property().
+      Note: this is just the default mode for `make_files_property`.
+
       `func` accepts the file path and returns the new value.
       The underlying attribute name is '_' + func.__name__,
       the default from make_files_property().
@@ -366,7 +373,9 @@ def files_property(func):
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
       and those of any included files so that they can be monitored,
-      triggering a fresh parse if one changes. Example:
+      triggering a fresh parse if one changes.
+
+      Example:
 
           class C(object):
             def __init__(self):
@@ -377,7 +386,7 @@ def files_property(func):
               return new_paths, result
 
       The load function is called on the first access and on every
-      access thereafter where an associated file's FileState() has
+      access thereafter where an associated file's `FileState` has
       changed and the time since the last successful load exceeds
       the poll_rate (1s). An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
@@ -386,28 +395,33 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
+@fmtdoc
 def make_files_property(
     attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL
 ):
   ''' Construct a decorator that watches multiple associated files.
 
       Parameters:
-      * `attr_name`: the underlying attribute, default: '_' + func.__name__
-      * `unset_object`: the sentinel value for "uninitialised", default: None
-      * `poll_rate`: how often in seconds to poll the file for changes, default: 1
+      * `attr_name`: the underlying attribute, default: `'_'+func.__name__`
+      * `unset_object`: the sentinel value for "uninitialised", default: `None`
+      * `poll_rate`: how often in seconds to poll the file for changes,
+        default from `DEFAULT_POLL_INTERVAL`: `{DEFAULT_POLL_INTERVAL}`
 
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      The attribute {{attr_name}}_lock controls access to the property.
+      The attributes {{attr_name}}_filestates and {{attr_name}}_paths track the
       associated files' state.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
+      The attribute {{attr_name}}_lastpoll tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
-      One example use would be a configuration file with recurive
+
+      One example use would be a configuration file with recursive
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
       and those of any included files so that they can be monitored,
-      triggering a fresh parse if one changes. Example:
+      triggering a fresh parse if one changes.
+
+      Example:
 
           class C(object):
             def __init__(self):
@@ -418,11 +432,13 @@ def make_files_property(
               return new_paths, result
 
       The load function is called on the first access and on every
-      access thereafter where an associated file's FileState() has
+      access thereafter where an associated file's `FileState` has
       changed and the time since the last successful load exceeds
-      the poll_rate (default 1s). An attempt at avoiding races is made by
+      the `poll_rate`.
+
+      An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
-      where files that were stat()ed during the change check have
+      where files that were `os.stat`()ed during the change check have
       changed state after the load.
   '''
 
