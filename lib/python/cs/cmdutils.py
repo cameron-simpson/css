@@ -14,6 +14,8 @@ from cs.mappings import StackableValues
 from cs.pfx import Pfx
 from cs.resources import RunState
 
+__version__ = '20200210'
+
 DISTINFO = {
     'description':
     "convenience functions for working with the Cmd module and other command line related stuff",
@@ -130,6 +132,17 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  @classmethod
+  def add_usage_to_docstring(cls, **usage_keywords):
+    ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
+        with format substitutions.
+    '''
+    if 'cmd' not in usage_keywords:
+      usage_keywords['cmd'] = cls.__name__
+    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format(
+        **usage_keywords
+    ).replace('\n', '\n    ')
+
   def apply_defaults(self, options):
     ''' Stub `apply_defaults` method.
 
@@ -182,45 +195,44 @@ class BaseCommand:
       cmd = argv.pop(0)
     usage_format = getattr(self, 'USAGE_FORMAT')
     if usage_format:
-      usage=usage_format.format(cmd=cmd)
+      usage = usage_format.format(cmd=cmd)
     else:
-      usage=None
+      usage = None
     if options is None:
-      options = StackableValues(cmd=cmd,usage=usage)
+      options = StackableValues(cmd=cmd, usage=usage)
       self.apply_defaults(options)
-    with Pfx(cmd):
-      try:
-        opts, argv = getopt(argv, self.GETOPT_SPEC)
-        if self.GETOPT_SPEC:
-          self.apply_opts(opts, options)
-        runstate = options.runstate = RunState(cmd)
-        # expose the runstate for use by global caller who only has "self" :-(
-        self.runstate = runstate
-        with runstate:
-          if argv:
-            # see if the first arg is a subcommand name
-            # by check for a cmd_{subcommand} method
-            subcmd_attr = 'cmd_' + argv[0]
-            subcmd_method = getattr(self, subcmd_attr, None)
-            if subcmd_method is not None:
-              subcmd = argv.pop(0)
-              with Pfx(subcmd):
-                with self.run_context(argv, options, cmd=subcmd):
-                  return subcmd_method(argv, options, cmd=subcmd)
-          try:
-            main = self.main
-          except AttributeError:
-            raise GetoptError("missing subcommand")
-          else:
-            with self.run_context(argv, options, cmd=None):
-              return main(argv, options, cmd=None)
-      except GetoptError as e:
-        handler = getattr(self, 'getopt_error_handler')
-        if handler and handler(cmd,options,e,usage):
-          return 2
-        raise
+    try:
+      opts, argv = getopt(argv, self.GETOPT_SPEC)
+      if self.GETOPT_SPEC:
+        self.apply_opts(opts, options)
+      runstate = options.runstate = RunState(cmd)
+      # expose the runstate for use by global caller who only has "self" :-(
+      self.runstate = runstate
+      with runstate:
+        if argv:
+          # see if the first arg is a subcommand name
+          # by check for a cmd_{subcommand} method
+          subcmd_attr = 'cmd_' + argv[0]
+          subcmd_method = getattr(self, subcmd_attr, None)
+          if subcmd_method is not None:
+            subcmd = argv.pop(0)
+            with Pfx(subcmd):
+              with self.run_context(argv, options, cmd=subcmd):
+                return subcmd_method(argv, options, cmd=subcmd)
+        try:
+          main = self.main
+        except AttributeError:
+          raise GetoptError("missing subcommand")
+        else:
+          with self.run_context(argv, options, cmd=None):
+            return main(argv, options, cmd=None)
+    except GetoptError as e:
+      handler = getattr(self, 'getopt_error_handler')
+      if handler and handler(cmd, options, e, usage):
+        return 2
+      raise
 
-  def getopt_error_handler(self,cmd,options,e,usage):
+  def getopt_error_handler(self, cmd, options, e, usage):
     ''' The `getopt_error_handler` method
         is be used to control the handling of `GetoptError`s raised
         during the command line parse

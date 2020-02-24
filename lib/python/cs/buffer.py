@@ -18,6 +18,8 @@ from stat import S_ISREG
 import sys
 from cs.py3 import pread
 
+__version__ = '20200130'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -136,6 +138,22 @@ class CornuCopyBuffer(object):
     input_offset = getattr(input_data, 'offset', 0)
     self.input_offset_displacement = input_offset - offset
 
+  def selfcheck(self, msg=''):
+    ''' Integrity check for the buffer, useful during debugging.
+    '''
+    msgpfx = type(self).__name__ + '.selfcheck'
+    if msg:
+      msgpfx += ': ' + msg
+    msgpfx += "buflen=%d, bufs=%r" % (
+        self.buflen, [len(buf) for buf in self.bufs]
+    )
+    assert self.buflen == sum(
+        len(buf) for buf in self.bufs
+    ), msgpfx + ": self.buflen != sum of .bufs"
+    assert all(
+        len(buf) > 0 for buf in self.bufs
+    ), msgpfx + ": not all .bufs are nonempty"
+
   @property
   def buf(self):
     ''' The first buffer.
@@ -156,7 +174,7 @@ class CornuCopyBuffer(object):
         closing the original.
 
         Parameters:
-        * `fd`: the operation system file descriptor
+        * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
         * `offset`: a starting position for the data; the file
           descriptor will seek to this offset, and the buffer will
@@ -183,7 +201,7 @@ class CornuCopyBuffer(object):
         closing the original.
 
         Parameters:
-        * `fd`: the operation system file descriptor
+        * `fd`: the operating system file descriptor
         * `readsize`: an optional preferred read size
         * `offset`: a starting position for the data; the file
           descriptor will seek to this offset, and the buffer will
@@ -411,30 +429,43 @@ class CornuCopyBuffer(object):
         See `.take()` to get a flat chunk instead of a list.
     '''
     if size == 0:
-      return b''
-    self.extend(size, short_ok=short_ok)
-    bufs = self.bufs
+      return []
+    if size is Ellipsis or size > self.buflen:
+      # extend the buffered data
+      self.extend(size, short_ok=short_ok)
     if size is Ellipsis:
       # take all the fetched data
-      taken = bufs
+      taken = self.bufs
       self.bufs = []
       self.buflen = 0
     else:
-      # take the leading data
-      size = min(size, self.buflen)
-      taken = []
-      while size > 0 and bufs:
-        buf0 = bufs[0]
-        if len(buf0) <= size:
-          buf = buf0
-          bufs.pop(0)
-        else:
-          buf = buf0[:size]
-          bufs[0] = buf0[size:]
-        self.buflen -= len(buf)
-        taken.append(buf)
-        size -= len(buf)
-    self.offset += sum(len(buf) for buf in taken)
+      if size >= self.buflen:
+        # take the whole buffer
+        taken = self.bufs
+        self.bufs = []
+        self.buflen = 0
+      else:
+        # size < self.buflen
+        # take the leading data from the buffer
+        taken = []
+        bufs = self.bufs
+        while size > 0:
+          buf0 = bufs[0]
+          if len(buf0) <= size:
+            buf = buf0
+            bufs.pop(0)
+          else:
+            # len(buf0) > size: crop from buf0
+            assert len(buf0) > size
+            buf = buf0[:size]
+            bufs[0] = buf0[size:]
+          taken.append(buf)
+          size -= len(buf)
+        # advance offset by the size of the taken data
+        taken_size = sum(len(buf) for buf in taken)
+        ##assert taken_size <= size0 if short_ok else taken_size == size0
+        self.buflen -= taken_size
+        self.offset += taken_size
     return taken
 
   def take(self, size, short_ok=False):
@@ -487,6 +518,12 @@ class CornuCopyBuffer(object):
     if len(taken) == 1:
       return taken[0]
     return b''.join(taken)
+
+  def byte0(self):
+    ''' Consume the leading byte and return it as an `int` (`0`..`255`).
+    '''
+    byte0, = self.take(1)
+    return byte0
 
   def tell(self):
     ''' Compatibility method to allow using the buffer like a file.
@@ -566,9 +603,7 @@ class CornuCopyBuffer(object):
       for buf in self.takev(bufskip):
         if copy_skip:
           copy_skip(buf)
-        bufskip -= len(buf)
-      assert bufskip == 0
-      toskip -= bufskip
+        toskip -= len(buf)
     assert toskip >= 0
     assert not self.bufs
     assert self.buflen == 0

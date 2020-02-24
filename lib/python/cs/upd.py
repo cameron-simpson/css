@@ -80,6 +80,12 @@ class Upd(object):
     global instances
     instances.append(self)
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    self.out('')
+
   @property
   def state(self):
     ''' The current status line text value.
@@ -122,8 +128,8 @@ class Upd(object):
       #
       if buflen - pfxlen < 1 + pfxlen:
         # backspace and partial overwrite
-        self._backend.write( '\b' * (buflen - pfxlen) )
-        self._backend.write( txt[pfxlen:] )
+        self._backend.write('\b' * (buflen - pfxlen))
+        self._backend.write(txt[pfxlen:])
       else:
         # carriage return and complete overwrite
         self._backend.write('\r')
@@ -132,8 +138,8 @@ class Upd(object):
       extlen = buflen - txtlen
       if extlen > 0:
         # old line was longer - write spaces over the old tail
-        self._backend.write( ' ' * extlen )
-        self._backend.write( '\b' * extlen )
+        self._backend.write(' ' * extlen)
+        self._backend.write('\b' * extlen)
 
       self._backend.flush()
       self._state = txt
@@ -152,7 +158,8 @@ class Upd(object):
     '''
     if a:
       txt = txt % a
-    self.without(self._backend.write, txt + '\n')
+    with self.without():
+      self._backend.write(txt + '\n')
 
   def flush(self):
     ''' Flush the output stream.
@@ -172,18 +179,17 @@ class Upd(object):
     '''
     return self._backend is None
 
-  def without(self, func, *args, **kw):
-    ''' Call `func` with the upd output suspended.
-    '''
-    with self._withoutContext():
-      ret = func(*args, **kw)
-    return ret
-
   @contextmanager
-  def _withoutContext(self):
+  def without(self, temp_state=''):
+    ''' Context manager to clear the status line around a suite.
+        Returns the status line text as it was outside the suite.
+
+        The `temp_state` parameter may be used to set the inner status line
+        content if a value other than `''` is desired.
+    '''
     with self._lock:
-      old = self.out('')
+      old = self.out(temp_state)
       try:
-        yield
+        yield old
       finally:
         self.out(old)

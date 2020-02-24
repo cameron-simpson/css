@@ -192,9 +192,9 @@ class PacketField(ABC):
       Sometimes a `PacketField` may be slightly more complex
       while still not warranting (or perhaps fitting)
       the formality of a `Packet` with its multifield structure.
-
       One example is the `cs.iso14496.UTF8or16Field` class.
-      This supports an ISO14496 UTF8 or UTF16 string field,
+
+      `UTF8or16Field` supports an ISO14496 UTF8 or UTF16 string field,
       as as such has 2 attributes:
       * `value`: the string itself
       * `bom`: a UTF16 byte order marker or `None`;
@@ -739,7 +739,7 @@ def struct_field(struct_format, class_name):
     struct = Struct(struct_format)
 
     class StructField(PacketField):
-      ''' A `PacketField` subclass using a struct.Struct for parse and transcribe.
+      ''' A `PacketField` subclass using a `struct.Struct` for parse and transcribe.
       '''
 
       def __str__(self):
@@ -747,6 +747,8 @@ def struct_field(struct_format, class_name):
 
       def __repr__(self):
         return "%s(%r)" % (type(self).__name__, self.value)
+
+      length = struct.size
 
       @classmethod
       def value_from_buffer(cls, bfr):
@@ -1006,7 +1008,7 @@ class BSSFloat(PacketField):
     return BSString.transcribe_value(str(f))
 
 class ListField(PacketField):
-  ''' A field which is a list of other fields.
+  ''' A field which is itself a list of other `PacketField`s.
   '''
 
   def __str__(self):
@@ -1034,10 +1036,11 @@ class ListField(PacketField):
         "%s cannot be parsed directly from a buffer" % (cls,)
     )
 
-  def transcribe(self):
-    ''' Transcribe each item in the list.
+  @staticmethod
+  def transcribe_value(value):
+    ''' Transcribe each item in `value`.
     '''
-    for item in self.value:
+    for item in value:
       yield item.transcribe()
 
 _multi_struct_fields = {}
@@ -1052,11 +1055,18 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
         these names
       * `class_name`: option name for the generated class
   '''
+  # we memoise the class definitions
   key = (struct_format, subvalue_names, class_name)
   MultiStructField = _struct_fields.get(key)
   if not MultiStructField:
+    # new class
     struct = Struct(struct_format)
     if subvalue_names:
+      if 'length' in subvalue_names:
+        warning(
+            "conflicting field 'length' in multi_struct_field(class_name=%s) subvalue_names %r",
+            class_name, subvalue_names
+        )
       subvalues_type = namedtuple(
           class_name or "StructSubValues", subvalue_names
       )
@@ -1064,10 +1074,13 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     class MultiStructField(PacketField):
       ''' A struct field for a complex struct format.
       '''
+
       if subvalue_names:
 
         def __str__(self):
           return str(self.value)
+
+      length = struct.size
 
       @classmethod
       def from_buffer(cls, bfr):
@@ -1416,3 +1429,37 @@ class Packet(PacketField):
     field_name = self.field_names[-1]
     field = self.remove_field(field_name)
     return field_name, field
+
+  def add_deferred_field(self, attr_name, bfr, length):
+    ''' Store the unparsed data for attribute `attr_name`
+        comprising the next `length` bytes from `bfr`.
+    '''
+    setattr(self, '_' + attr_name + '__raw_data', bfr.take(length))
+
+  @staticmethod
+  def deferred_field(from_buffer):
+    ''' A decorator for a field property.
+
+        Usage:
+
+            @deferred_field
+            def (self, bfr):
+                ... parse value from `bfr`, return value
+    '''
+    attr_name = from_buffer.__name__
+    _attr_name = '_' + attr_name
+
+    def field_property(self):
+      ''' Boilerplate for the property: test for parsed value, parse
+          from raw data if not yet present.
+      '''
+      attr_value = getattr(self, _attr_name, None)
+      if attr_value is None:
+        raw_data = getattr(self, _attr_name + '__raw_data')
+        attr_value = from_buffer(self, CornuCopyBuffer.from_bytes(raw_data))
+        setattr(self, _attr_name, attr_value)
+      return attr_value
+
+    return property(field_property)
+
+deferred_field = Packet.deferred_field
