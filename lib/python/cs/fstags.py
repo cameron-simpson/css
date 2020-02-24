@@ -245,14 +245,27 @@ class FSTagsCommand(BaseCommand):
               U.out(path)
               with Pfx(path):
                 tagged_path = fstags[path]
+                direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(rules):
+                for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
                     with U.without():
-                      tagged_path.direct_tags.add(
-                          autotag, verbose=state.verbose
-                      )
+                      direct_tags.add(autotag, verbose=state.verbose)
+                # update the
+                all_tags = tagged_path.merged_tags()
+                cascaded = set()
+                for cascade_rule in fstags.config.cascade_rules:
+                  if cascade_rule.target in direct_tags:
+                    continue
+                  if cascade_rule.target in cascaded:
+                    continue
+                  tag = cascade_rule.infer_tag(all_tags)
+                  if tag is None:
+                    continue
+                  if tag not in all_tags:
+                    with U.without():
+                      direct_tags.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
