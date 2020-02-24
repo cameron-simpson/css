@@ -1266,6 +1266,28 @@ class TaggedPath(HasFSTagsMixin):
           filepath, xattr_name, None if tag_value is None else str(tag_value)
       )
 
+class CascadeRule:
+  ''' A cascade rule of possible source tag names to provide a target tag.
+  '''
+
+  def __init__(self, target, cascade):
+    self.target = target
+    self.cascade = cascade
+
+  def __str__(self):
+    return "%s(%s<=%r)" % (type(self).__name__, self.target, self.cascade)
+
+  def infer_tag(self, tagset):
+    ''' Apply the rule to the `TagSet` `tagset`.
+        Return a new `Tag(self.target,value)`
+        for the first cascade `value` found in `tagset`,
+        or `None` if there is no match.
+    '''
+    for tag_name in self.cascade:
+      if tag_name in tagset:
+        return Tag(self.target, tagset[tag_name])
+    return None
+
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
