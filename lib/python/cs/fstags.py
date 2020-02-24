@@ -1401,6 +1401,9 @@ class FSTagsConfig:
     if attr == 'filename_rules':
       self.filename_rules = self.filename_rules_from_config(self.config)
       return self.filename_rules
+    if attr == 'cascade_rules':
+      self.cascade_rules = self.cascade_rules_from_config(self.config)
+      return self.cascade_rules
     raise AttributeError(attr)
 
   def __getitem__(self, section):
@@ -1434,6 +1437,16 @@ class FSTagsConfig:
           rules.append(RegexpTagRule(pattern[1:-1]))
         else:
           warning("invalid autotag rule")
+    return rules
+
+  @staticmethod
+  def cascade_rules_from_config(config):
+    ''' Return a list of the `[cascade]` tag rules from the config.
+    '''
+    rules = []
+    for target, cascade in config['cascade'].items():
+      with Pfx("%s = %s", target, cascade):
+        rules.append(CascadeRule(target, cascade.split()))
     return rules
 
   @property
