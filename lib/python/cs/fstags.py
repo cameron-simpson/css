@@ -236,7 +236,7 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = fstags.config.filename_rules
+    filename_rules = fstags.config.filename_rules
     with state.stack(verbose=True):
       with fstags:
         with Upd(sys.stderr) as U:
@@ -1399,8 +1399,8 @@ class FSTagsConfig:
       self.config = self.load_config(self.filepath)
       return self.config
     if attr == 'filename_rules':
-      self.rules = self.filename_rules_from_config(self.config)
-      return self.rules
+      self.filename_rules = self.filename_rules_from_config(self.config)
+      return self.filename_rules
     raise AttributeError(attr)
 
   def __getitem__(self, section):
