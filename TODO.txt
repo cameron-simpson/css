@@ -1,3 +1,4 @@
+cs.upd: multiline status area
 BaseCommand: locate Usage: blocks in cmd_ methods, merge into usage doc
 cs.fstags: tag -f: update direct tags regardless of content of merged tags
 cs.fstags: ls,find: emit relative paths
