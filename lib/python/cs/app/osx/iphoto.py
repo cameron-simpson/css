@@ -1131,36 +1131,37 @@ class Master_Mixin(iPhotoRow):
   def latest_version(self):
     vs = self.versions
     if not vs:
-      raise RuntimeError(
+      warning(
           "no versions for master %d: %r", self.modelId, self.pathname
       )
+      return None
     if len(vs) == 1:
       return vs[0]
     return max(*vs, key=lambda v: v.versionNumber)
 
   @prop
   def width(self):
-    return self.latest_version.processedWidth
+    return self.latest_version and self.latest_version.processedWidth
 
   @prop
   def height(self):
-    return self.latest_version.processedHeight
+    return self.latest_version and self.latest_version.processedHeight
 
   @prop
   def detected_faces(self):
-    return self.latest_version.detected_faces
+    return self.latest_version and self.latest_version.detected_faces
 
   @prop
   def faces(self):
-    return self.latest_version.faces
+    return self.latest_version and self.latest_version.faces
 
   @prop
   def keywords(self):
-    return self.latest_version.keywords
+    return self.latest_version and self.latest_version.keywords
 
   @prop
   def keyword_names(self):
-    return self.latest_version.keyword_names
+    return self.latest_version and self.latest_version.keyword_names
 
   def Image(self):
     ''' Obtain an open Image of this master.
