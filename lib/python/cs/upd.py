@@ -39,16 +39,6 @@ DISTINFO = {
 instances = []
 instances_by_id = {}
 
-def upd_for(stream):
-  ''' Factory for Upd singletons keyed by the id of their backend.
-  '''
-  global instances_by_id
-  U = instances_by_id.get(id(stream))
-  if not U:
-    U = Upd(stream)
-    instances_by_id[id(stream)] = U
-  return U
-
 def cleanupAtExit():
   ''' Cleanup function called at programme exit to clear the status line.
   '''
@@ -193,3 +183,18 @@ class Upd(object):
         yield old
       finally:
         self.out(old)
+
+# make Upd the singleton factory
+_Upd = Upd
+
+def Upd(stream):
+  ''' Factory for `Upd` singletons keyed by the id of their backend.
+  '''
+  global instances_by_id
+  U = instances_by_id.get(id(stream))
+  if not U:
+    U = _Upd(stream)
+    instances_by_id[id(stream)] = U
+  return U
+
+upd_for = Upd
