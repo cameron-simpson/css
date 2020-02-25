@@ -66,6 +66,7 @@ class Upd(object):
     self._backend = backend
     self.columns = columns
     self._state = ''
+    self._above = None
     self._lock = RLock()
     global instances
     instances.append(self)
@@ -147,20 +148,56 @@ class Upd(object):
 
     return old
 
-  def nl(self, txt, *a):
+  def nl(self, txt, *a, raw=False):
     ''' Write `txt` to the backend followed by a newline.
-
-        Clears the status line, writes the text line, restores the status line.
 
         Parameters:
         * `txt`: the message to write.
         * `a`: optional positional parameters;
           if not empty, `txt` is percent formatted against this list.
+        * `raw`: if true (default `False`) use the "clear, newline,
+          restore" method.
+
+        This uses one of two methods:
+        * insert above:
+          insert a line above the status line and write the message there.
+        * clear, newline, restore:
+          clears the status line, writes the text line, restores
+          the status line.
+
+        The former method is used if the terminal supports the
+        `il1` (insert one line) capability;
+        this are probed for on the first use and remembered.
     '''
     if a:
       txt = txt % a
-    with self.without():
-      self._backend.write(txt + '\n')
+    if raw or len(txt) >= self.columns:
+      # force a clear-newline-restore method
+      above = False
+    else:
+      # try to insert the output above the status line
+      above = self._above
+      if above is None:
+        try:
+          import curses
+        except ImportError:
+          above = False
+        else:
+          curses.setupterm()
+          il1 = curses.tigetstr('il1')
+          if il1:
+            above = ((il1 + b'\r').decode(), '\n')
+          else:
+            above = False
+        self._above = above
+    if above:
+      with self._lock:
+        self._backend.write(above[0] + txt + above[1] + self._state)
+        self._backend.flush()
+    else:
+      with self.without():
+        with self._lock:
+          self._backend.write(txt + '\n')
 
   def flush(self):
     ''' Flush the output stream.
