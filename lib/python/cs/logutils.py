@@ -689,8 +689,7 @@ class UpdHandler(StreamHandler):
         elif logrec.levelno >= logging.WARN:
           logrec.msg = colourise(logrec.msg, 'yellow')
       with self.__lock:
-        with self.upd.without():
-          StreamHandler.emit(self, logrec)
+        self.upd.nl(self.format(logrec))
     else:
       with self.__lock:
         self.upd.out(logrec.getMessage())
