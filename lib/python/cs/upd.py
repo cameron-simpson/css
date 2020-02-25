@@ -6,17 +6,15 @@
 r'''
 Single line status updates with minimal update sequences.
 
-This is available as an output mode in cs.logutils.
+This is available as an output mode in `cs.logutils`.
 
 Example:
 
-    upd = Upd(sys.stdout)
-    ...
-    upd.out('status line text: position = %d', position_value)
-    ...
-    upd.nl('an informational line')
-    ...
-    upd.out('new status text')
+    with Upd() as U:
+        for filename in filenames:
+            U.out(filename)
+            ... process filename ...
+            upd.nl('an informational line')
 '''
 
 from __future__ import with_statement
@@ -87,6 +85,18 @@ class Upd(object):
       else:
         self.out('')
 
+  def close(self):
+    ''' Close this Upd.
+    '''
+    if self._backend is not None:
+      self.out('')
+      self._backend = None
+
+  def closed(self):
+    ''' Test whether this Upd is closed.
+    '''
+    return self._backend is None
+
   @property
   def state(self):
     ''' The current status line text value.
@@ -95,6 +105,7 @@ class Upd(object):
 
   def out(self, txt, *a):
     ''' Update the status line to `txt`.
+        Return the previous status line content.
 
         Parameters:
         * `txt`: the status line text.
@@ -204,18 +215,6 @@ class Upd(object):
     '''
     if self._backend:
       self._backend.flush()
-
-  def close(self):
-    ''' Close this Upd.
-    '''
-    if self._backend is not None:
-      self.out('')
-      self._backend = None
-
-  def closed(self):
-    ''' Test whether this Upd is closed.
-    '''
-    return self._backend is None
 
   @contextmanager
   def without(self, temp_state=''):
