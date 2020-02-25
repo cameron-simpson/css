@@ -8,6 +8,7 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+from os.path import isabs as isabspath
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatch
 from functools import partial
@@ -1151,7 +1152,10 @@ class Master_Mixin(iPhotoRow):
 
   @prop
   def pathname(self):
-    return os.path.join(self.iphoto.pathto('Masters'), self.imagePath)
+    imagepath = self.imagePath
+    if not isabspath(imagepath):
+      imagepath= os.path.join(self.iphoto.pathto('Masters'), imagepath)
+    return imagepath
 
   @locked_property
   def versions(self):
