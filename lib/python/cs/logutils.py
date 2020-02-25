@@ -61,7 +61,7 @@ from cs.lex import is_dotted_identifier
 from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import upd_for
+from cs.upd import Upd
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -669,7 +669,7 @@ class UpdHandler(StreamHandler):
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.upd = upd_for(strm)
+    self.upd = Upd(strm)
     self.nl_level = nl_level
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
