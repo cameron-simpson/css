@@ -1154,7 +1154,10 @@ class Master_Mixin(iPhotoRow):
   def pathname(self):
     imagepath = self.imagePath
     if not isabspath(imagepath):
-      imagepath= os.path.join(self.iphoto.pathto('Masters'), imagepath)
+      if imagepath[:4].isdigit():
+        imagepath= os.path.join(self.iphoto.pathto('Masters'), imagepath)
+      else:
+        imagepath= os.path.join('/', imagepath)
     return imagepath
 
   @locked_property
@@ -1231,7 +1234,6 @@ class Master_Mixin(iPhotoRow):
 
   def tags(self):
     yield Tag('imagepath', self.imagePath)
-    yield Tag('pathname', self.pathname)
     yield Tag('dx', self.width)
     yield Tag('dy', self.height)
     faces=self.faces
