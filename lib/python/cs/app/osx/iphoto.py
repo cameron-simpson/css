@@ -8,7 +8,7 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatch
 from functools import partial
 import pprint
@@ -31,6 +31,7 @@ from cs.pfx import Pfx, XP
 from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
+from cs.tagset import Tag
 from cs.threads import locked, locked_property
 from cs.x import X
 
@@ -1194,6 +1195,44 @@ class Master_Mixin(iPhotoRow):
   @prop
   def format(self):
     return self.image_info.format
+
+  def tags(self):
+    yield Tag('dx', self.width)
+    yield Tag('dy', self.height)
+    faces=self.faces
+    if faces:
+      face_names = sorted(face.name for face in self.faces)
+      if face_names:
+        yield Tag('faces', face_names)
+    kwnames = self.keyword_names
+    if kwnames:
+      kwmap = defaultdict(list)
+      for kwname in sorted(kwnames):
+        m = re.match('(?P<field>[a-z]+)-0*(?P<value>\d+)$', kwname)
+        if m:
+          kwmap[m.group('field')].append(int(m.group('value')))
+          continue
+        while True:
+          m = re.match(
+              '\s*(?P<prefix>.*\S)\s+\(\s*(?P<category>.*\S)\s*\)\s*$', kwname
+          )
+          if m:
+            kwname = m.group('category') + '.' + m.group('prefix')
+            continue
+          break
+        kwname = kwname.lower().replace(' ', '-')
+        try:
+          kwname, kwvalue = kwname.rsplit(':', 1)
+        except ValueError:
+          kwvalue = None
+        kwmap[kwname].append(kwvalue)
+      for kw, values in sorted(kwmap.items()):
+        if not values:
+          continue
+        if len(values) == 1:
+          yield Tag('kw.' + kw, values[0])
+        else:
+          yield Tag('kw.' + kw, values)
 
 class Version_Mixin(iPhotoRow):
 
