@@ -106,9 +106,10 @@ class Upd(object):
     txt = txt.rstrip()
     txt = unctrl(txt)
     # crop for terminal width
-    if self.columns is not None:
-      txt = txt[:self.columns - 1]
     txtlen = len(txt)
+    if txtlen >= self.columns:
+      txt = txt[:self.columns - 1]
+      txtlen = len(txt)
     with self._lock:
       old = self._state
       buflen = len(old)
