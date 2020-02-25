@@ -73,8 +73,18 @@ class Upd(object):
   def __enter__(self):
     return self
 
-  def __exit__(self, *_):
-    self.out('')
+  def __exit__(self, exc_type, *_):
+    ''' Tidy up on exiting the context.
+
+        If we are exiting because of an exception and the status
+        line is not empty, output a newline to preserve the status
+        line on the screen.  Otherwise just clear the status line.
+    '''
+    if self._state:
+      if exc_type:
+        self._backend.write('\n')
+      else:
+        self.out('')
 
   @property
   def state(self):
