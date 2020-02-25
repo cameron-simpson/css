@@ -695,14 +695,6 @@ class UpdHandler(StreamHandler):
       with self.__lock:
         self.upd.out(logrec.getMessage())
 
-  def upd(self, msg, *a):
-    ''' Update the status text.
-    '''
-    if a:
-      msg = msg % a
-    with self.__lock:
-      self.upd.out(msg)
-
   def flush(self):
     ''' Flush the update status.
     '''
