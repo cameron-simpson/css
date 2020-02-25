@@ -1230,6 +1230,8 @@ class Master_Mixin(iPhotoRow):
     return self.image_info.format
 
   def tags(self):
+    yield Tag('imagepath', self.imagePath)
+    yield Tag('pathname', self.pathname)
     yield Tag('dx', self.width)
     yield Tag('dy', self.height)
     faces=self.faces
