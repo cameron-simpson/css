@@ -24,6 +24,7 @@ from .plist import ingest_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
+from cs.fstags import FSTags
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
 from cs.mediainfo import EpisodeInfo
@@ -33,6 +34,7 @@ from cs.py.func import prop
 from cs.seq import the
 from cs.tagset import Tag
 from cs.threads import locked, locked_property
+from cs.upd import Upd
 from cs.x import X
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -109,6 +111,8 @@ def main_iphoto(I, argv):
   with Pfx(op):
     if op == '-':
       xit = cmd_(I, argv)
+    elif op == 'fstags_export':
+      xit = cmd_fstags_export(I, argv)
     elif op == 'info':
       xit = cmd_info(I, argv)
     elif op == 'ls':
@@ -149,6 +153,31 @@ def cmd_(I, argv):
           xit = sub_xit
   if badopts and xit == 0:
     xit = 2
+  return xit
+
+def cmd_fstags_export(I, argv):
+  ''' Usage: fstags_export masters
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing masters")
+  fstags = FSTags()
+  U = Upd(sys.stderr)
+  with fstags:
+    obclass = argv.pop(0)
+    with Pfx(obclass):
+      if obclass == 'masters':
+        for master in sorted(I.masters, key=lambda m: m.pathname):
+          U.out(master.pathname)
+          with Pfx(master.pathname):
+            tags = fstags[master.pathname].direct_tags
+            for tag in master.tags():
+              export_tag = Tag('iphoto.' + tag.name, tag.value)
+              if export_tag not in tags:
+                with U.without():
+                  tags.add(export_tag, verbose=True)
+      else:
+        raise GetoptError("unknown class: %r" % (obclass,))
   return xit
 
 def cmd_info(I, argv):
