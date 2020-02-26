@@ -1320,8 +1320,8 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
         with Pfx(name):
           if not name_selector(name):
             continue
-          entrypath = joinpath(dirpath, name)
-          if entry.is_dir():
+          entrypath=entry.path
+          if entry.is_dir(follow_symlinks=False):
             if yield_dirs:
               yield True, entrypath
             pending.append(entrypath)
