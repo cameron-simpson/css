@@ -163,22 +163,21 @@ def cmd_fstags_export(I, argv):
   if not argv:
     raise GetoptError("missing masters")
   fstags = FSTags()
-  U = Upd(sys.stderr)
-  with fstags:
-    obclass = argv.pop(0)
-    with Pfx(obclass):
-      if obclass == 'masters':
-        for master in sorted(I.masters, key=lambda m: m.pathname):
-          U.out(master.pathname)
-          with Pfx(master.pathname):
-            tags = fstags[master.pathname].direct_tags
-            for tag in master.tags():
-              export_tag = Tag('iphoto.' + tag.name, tag.value)
-              if export_tag not in tags:
-                with U.without():
+  with Upd(sys.stderr) as U:
+    with fstags:
+      obclass = argv.pop(0)
+      with Pfx(obclass):
+        if obclass == 'masters':
+          for master in sorted(I.masters, key=lambda m: m.pathname):
+            U.out(master.pathname)
+            with Pfx(master.pathname):
+              tags = fstags[master.pathname].direct_tags
+              for tag in master.tags():
+                export_tag = Tag('iphoto.' + tag.name, tag.value)
+                if export_tag not in tags:
                   tags.add(export_tag, verbose=True)
-      else:
-        raise GetoptError("unknown class: %r" % (obclass,))
+        else:
+          raise GetoptError("unknown class: %r" % (obclass,))
   return xit
 
 def cmd_info(I, argv):
