@@ -316,19 +316,24 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
+    U = Upd(sys.stderr)if sys.stderr.isatty()else None
     filepaths = fstags.find(
-        realpath(path), tag_choices, use_direct_tags=use_direct_tags
+        realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
     )
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
         print(include)
     else:
       for filepath in filepaths:
+        if U:
+          oldU=U.out('')
         print(
             output_format.format(
                 **fstags[filepath].format_kwargs(direct=use_direct_tags)
             )
         )
+        if U:
+          U.out(oldU)
 
   @classmethod
   def cmd_json_import(cls, argv, options, *, cmd):
@@ -740,7 +745,7 @@ class FSTags(MultiOpenMixin):
         with Pfx(path):
           self[path].import_xattrs()
 
-  def find(self, path, tag_choices, use_direct_tags=False):
+  def find(self, path, tag_choices, use_direct_tags=False, U=None):
     ''' Walk the file tree from `path`
         searching for files matching the supplied `tag_choices`.
         Yield the matching file paths.
@@ -752,7 +757,7 @@ class FSTags(MultiOpenMixin):
           otherwise the all_tags.
           Default: `False`
     '''
-    for _, filepath in rpaths(path, yield_dirs=use_direct_tags):
+    for _, filepath in rpaths(path, yield_dirs=use_direct_tags, U=U):
       if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
         yield filepath
 
@@ -1294,7 +1299,7 @@ class RegexpTagRule:
           tags.append(Tag(tag_name, value))
     return tags
 
-def rpaths(path, *, yield_dirs=False, name_selector=None):
+def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
   '''
@@ -1303,6 +1308,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
+    U and U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:
@@ -1326,12 +1332,13 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
           else:
             yield False, entrypath
 
-def rfilepaths(path, name_selector=None):
+def rfilepaths(path, name_selector=None, U=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
   return (
       subpath for is_dir, subpath in
-      rpaths(path, yield_dirs=False, name_selector=name_selector) if not is_dir
+      rpaths(path, yield_dirs=False, name_selector=name_selector, U=U)
+      if not is_dir
   )
 
 def rsync_patterns(paths, top_path):
