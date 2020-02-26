@@ -633,7 +633,10 @@ class FSTags(MultiOpenMixin):
     ''' Save any modified tag files on shutdown.
     '''
     for tagfile in self._tagfiles.values():
-      tagfile.save()
+      try:
+        tagfile.save()
+      except FileNotFoundError as e:
+        error("%s.save: %s",tagfile,e)
 
   @property
   def tagsfile(self):
