@@ -241,7 +241,7 @@ class FSTagsCommand(BaseCommand):
       with fstags:
         with Upd(sys.stderr) as U:
           for top_path in argv:
-            for _, path in rpaths(top_path, yield_dirs=True):
+            for isdir, path in rpaths(top_path, yield_dirs=True):
               U.out(path)
               with Pfx(path):
                 tagged_path = fstags[path]
@@ -249,10 +249,14 @@ class FSTagsCommand(BaseCommand):
                 for autotag in tagged_path.infer_from_basename(rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
-                    with U.without():
-                      tagged_path.direct_tags.add(
-                          autotag, verbose=state.verbose
-                      )
+                    tagged_path.direct_tags.add(autotag, verbose=state.verbose)
+                if not isdir:
+                  try:
+                    S = os.stat(filepath)
+                  except OSError:
+                    pass
+                  else:
+                    tagged_path.direct_tags.add('filesize', S.st_size)
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -636,7 +640,7 @@ class FSTags(MultiOpenMixin):
       try:
         tagfile.save()
       except FileNotFoundError as e:
-        error("%s.save: %s",tagfile,e)
+        error("%s.save: %s", tagfile, e)
 
   @property
   def tagsfile(self):
@@ -1117,12 +1121,6 @@ class TaggedPath(HasFSTagsMixin):
         filepath_encoded=TagFile.encode_name(filepath),
         tags=format_tags,
     )
-    try:
-      S = os.stat(filepath)
-    except OSError:
-      pass
-    else:
-      kwargs.update(filesize=S.st_size)
     return kwargs
 
   @property
@@ -1320,7 +1318,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
         with Pfx(name):
           if not name_selector(name):
             continue
-          entrypath=entry.path
+          entrypath = entry.path
           if entry.is_dir(follow_symlinks=False):
             if yield_dirs:
               yield True, entrypath
