@@ -21,7 +21,6 @@ from threading import RLock
 from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import ingest_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
@@ -29,14 +28,15 @@ from cs.fstags import FSTags
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
 from cs.mediainfo import EpisodeInfo
-from cs.pfx import Pfx, XP
 from cs.obj import O
+from cs.pfx import Pfx, XP
 from cs.py.func import prop
 from cs.seq import the
 from cs.tagset import Tag
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 from cs.x import X
+from .plist import ingest_plist
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
@@ -404,10 +404,10 @@ def cmd_tag(I, argv):
         kw_name = arg[1:]
         try:
           kw = I.keyword(kw_name)
-        except KeyError as e:
+        except KeyError:
           warning("unknown tag, CREATE")
           kw = I.create_keyword(kw_name)
-        except ValueError as e:
+        except ValueError:
           warning("ambiguous tag")
           continue
         tagging.append((kw_op == '+', kw))
@@ -904,7 +904,7 @@ class iPhoto(O):
             else:
               try:
                 kw = self.keyword(kwname)
-              except KeyError as e:
+              except KeyError:
                 warning(
                     "no match for keyword %r, using dummy selector", kwname
                 )
@@ -1154,9 +1154,9 @@ class Master_Mixin(iPhotoRow):
     imagepath = self.imagePath
     if not isabspath(imagepath):
       if imagepath[:4].isdigit():
-        imagepath= os.path.join(self.iphoto.pathto('Masters'), imagepath)
+        imagepath = os.path.join(self.iphoto.pathto('Masters'), imagepath)
       else:
-        imagepath= os.path.join('/', imagepath)
+        imagepath = os.path.join('/', imagepath)
     return imagepath
 
   @locked_property
@@ -1167,9 +1167,7 @@ class Master_Mixin(iPhotoRow):
   def latest_version(self):
     vs = self.versions
     if not vs:
-      warning(
-          "no versions for master %d: %r", self.modelId, self.pathname
-      )
+      warning("no versions for master %d: %r", self.modelId, self.pathname)
       return None
     if len(vs) == 1:
       return vs[0]
@@ -1235,7 +1233,7 @@ class Master_Mixin(iPhotoRow):
     yield Tag('imagepath', self.imagePath)
     yield Tag('dx', self.width)
     yield Tag('dy', self.height)
-    faces=self.faces
+    faces = self.faces
     if faces:
       face_names = sorted(face.name for face in self.faces)
       if face_names:
@@ -1244,13 +1242,13 @@ class Master_Mixin(iPhotoRow):
     if kwnames:
       kwmap = defaultdict(list)
       for kwname in sorted(kwnames):
-        m = re.match('(?P<field>[a-z]+)-0*(?P<value>\d+)$', kwname)
+        m = re.match(r'(?P<field>[a-z]+)-0*(?P<value>\d+)$', kwname)
         if m:
           kwmap[m.group('field')].append(int(m.group('value')))
           continue
         while True:
           m = re.match(
-              '\s*(?P<prefix>.*\S)\s+\(\s*(?P<category>.*\S)\s*\)\s*$', kwname
+              r'\s*(?P<prefix>.*\S)\s+\(\s*(?P<category>.*\S)\s*\)\s*$', kwname
           )
           if m:
             kwname = m.group('category') + '.' + m.group('prefix')
@@ -1545,12 +1543,18 @@ class SelectByKeyword_Name(_SelectMasters):
     return super().select(masters)
 
   def select_from_all(self):
+    ''' Yield all matching masters.
+    '''
     if self.invert:
+      # invert requires more work
       return self.select_masters(self.iphoto.masters)
     else:
+      # no invert can use a faster method
       return self.iphoto.masters_by_keyword(self.kwname)
 
   def select_masters(self, masters):
+    ''' Yield from `masters` matching `self.kwname`.
+    '''
     kwname = self.kwname
     if self.invert:
       for master in masters:
