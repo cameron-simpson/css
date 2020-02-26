@@ -241,7 +241,7 @@ class FSTagsCommand(BaseCommand):
       with fstags:
         with Upd(sys.stderr) as U:
           for top_path in argv:
-            for _, path in rpaths(top_path, yield_dirs=True):
+            for isdir, path in rpaths(top_path, yield_dirs=True):
               U.out(path)
               with Pfx(path):
                 tagged_path = fstags[path]
@@ -249,10 +249,14 @@ class FSTagsCommand(BaseCommand):
                 for autotag in tagged_path.infer_from_basename(rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
-                    with U.without():
-                      tagged_path.direct_tags.add(
-                          autotag, verbose=state.verbose
-                      )
+                    tagged_path.direct_tags.add(autotag, verbose=state.verbose)
+                if not isdir:
+                  try:
+                    S = os.stat(filepath)
+                  except OSError:
+                    pass
+                  else:
+                    tagged_path.direct_tags.add('filesize', S.st_size)
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -312,19 +316,24 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
+    U = Upd(sys.stderr)if sys.stderr.isatty()else None
     filepaths = fstags.find(
-        realpath(path), tag_choices, use_direct_tags=use_direct_tags
+        realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
     )
     if as_rsync_includes:
       for include in rsync_patterns(filepaths, path):
         print(include)
     else:
       for filepath in filepaths:
+        if U:
+          oldU=U.out('')
         print(
             output_format.format(
                 **fstags[filepath].format_kwargs(direct=use_direct_tags)
             )
         )
+        if U:
+          U.out(oldU)
 
   @classmethod
   def cmd_json_import(cls, argv, options, *, cmd):
@@ -636,7 +645,7 @@ class FSTags(MultiOpenMixin):
       try:
         tagfile.save()
       except FileNotFoundError as e:
-        error("%s.save: %s",tagfile,e)
+        error("%s.save: %s", tagfile, e)
 
   @property
   def tagsfile(self):
@@ -736,7 +745,7 @@ class FSTags(MultiOpenMixin):
         with Pfx(path):
           self[path].import_xattrs()
 
-  def find(self, path, tag_choices, use_direct_tags=False):
+  def find(self, path, tag_choices, use_direct_tags=False, U=None):
     ''' Walk the file tree from `path`
         searching for files matching the supplied `tag_choices`.
         Yield the matching file paths.
@@ -748,7 +757,7 @@ class FSTags(MultiOpenMixin):
           otherwise the all_tags.
           Default: `False`
     '''
-    for _, filepath in rpaths(path, yield_dirs=use_direct_tags):
+    for _, filepath in rpaths(path, yield_dirs=use_direct_tags, U=U):
       if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
         yield filepath
 
@@ -1117,12 +1126,6 @@ class TaggedPath(HasFSTagsMixin):
         filepath_encoded=TagFile.encode_name(filepath),
         tags=format_tags,
     )
-    try:
-      S = os.stat(filepath)
-    except OSError:
-      pass
-    else:
-      kwargs.update(filesize=S.st_size)
     return kwargs
 
   @property
@@ -1296,7 +1299,7 @@ class RegexpTagRule:
           tags.append(Tag(tag_name, value))
     return tags
 
-def rpaths(path, *, yield_dirs=False, name_selector=None):
+def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
   '''
@@ -1305,6 +1308,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
+    U and U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:
@@ -1320,20 +1324,21 @@ def rpaths(path, *, yield_dirs=False, name_selector=None):
         with Pfx(name):
           if not name_selector(name):
             continue
-          entrypath = joinpath(dirpath, name)
-          if entry.is_dir():
+          entrypath = entry.path
+          if entry.is_dir(follow_symlinks=False):
             if yield_dirs:
               yield True, entrypath
             pending.append(entrypath)
           else:
             yield False, entrypath
 
-def rfilepaths(path, name_selector=None):
+def rfilepaths(path, name_selector=None, U=None):
   ''' Generator yielding pathnames of files found under `path`.
   '''
   return (
       subpath for is_dir, subpath in
-      rpaths(path, yield_dirs=False, name_selector=name_selector) if not is_dir
+      rpaths(path, yield_dirs=False, name_selector=name_selector, U=U)
+      if not is_dir
   )
 
 def rsync_patterns(paths, top_path):
