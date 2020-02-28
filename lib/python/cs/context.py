@@ -5,6 +5,8 @@
 
 from contextlib import contextmanager
 
+__version__ = '20200228.1'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
