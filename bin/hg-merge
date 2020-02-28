@@ -88,6 +88,13 @@ echo "merging $obranch ==> $branch"
   fi
 }
 
+unclean=$( hg status -nmard )
+if [ -n "$unclean" ]
+then
+  shelf=$cmd-$( date +%Y%m%d%H%M%S )-$$
+  $trace hg shelve -n "$shelf"
+fi
+
 $trace hg merge "$obranch" || {
   echo "$cmd: merge from $obranch failed" >&2
   hg resolve -l >&2
@@ -97,3 +104,5 @@ $trace hg merge "$obranch" || {
 comsg="merge $obranch ==> $branch"
 [ -z "$msg" ] || comsg="$comsg: $msg"
 $trace hg commit -m "$comsg"
+
+[ -z "$unclean" ] || $trace hg unshelve "$shelf"
