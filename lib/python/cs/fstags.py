@@ -252,7 +252,7 @@ class FSTagsCommand(BaseCommand):
                     direct_tags.add(autotag, verbose=state.verbose)
                 if not isdir:
                   try:
-                    S = os.stat(filepath)
+                    S = os.stat(path)
                   except OSError:
                     pass
                   else:
