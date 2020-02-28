@@ -67,5 +67,6 @@ else
     ls -ld -- "$filename"
     filepfx=$( expr "x$filename" : 'x\(.*\)\..*' )
     info=$filepfx.info.json
-    $trace fstags json_import --prefix=youtube-dl "$filename" "$info"
+    $trace fstags json_import --prefix=youtube-dl "$filename" "$info" \
+    && $trace rm "$info"
 fi

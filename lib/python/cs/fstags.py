@@ -236,7 +236,7 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       argv = ['.']
-    rules = fstags.config.filename_rules
+    filename_rules = fstags.config.filename_rules
     with state.stack(verbose=True):
       with fstags:
         with Upd(sys.stderr) as U:
@@ -245,18 +245,32 @@ class FSTagsCommand(BaseCommand):
               U.out(path)
               with Pfx(path):
                 tagged_path = fstags[path]
+                direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(rules):
+                for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
-                    tagged_path.direct_tags.add(autotag, verbose=state.verbose)
+                    direct_tags.add(autotag, verbose=state.verbose)
                 if not isdir:
                   try:
                     S = os.stat(filepath)
                   except OSError:
                     pass
                   else:
-                    tagged_path.direct_tags.add('filesize', S.st_size)
+                    direct_tags.add('filesize', S.st_size)
+                # update the
+                all_tags = tagged_path.merged_tags()
+                cascaded = set()
+                for cascade_rule in fstags.config.cascade_rules:
+                  if cascade_rule.target in direct_tags:
+                    continue
+                  if cascade_rule.target in cascaded:
+                    continue
+                  tag = cascade_rule.infer_tag(all_tags)
+                  if tag is None:
+                    continue
+                  if tag not in all_tags:
+                    direct_tags.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options, *, cmd):
@@ -1272,6 +1286,28 @@ class TaggedPath(HasFSTagsMixin):
           filepath, xattr_name, None if tag_value is None else str(tag_value)
       )
 
+class CascadeRule:
+  ''' A cascade rule of possible source tag names to provide a target tag.
+  '''
+
+  def __init__(self, target, cascade):
+    self.target = target
+    self.cascade = cascade
+
+  def __str__(self):
+    return "%s(%s<=%r)" % (type(self).__name__, self.target, self.cascade)
+
+  def infer_tag(self, tagset):
+    ''' Apply the rule to the `TagSet` `tagset`.
+        Return a new `Tag(self.target,value)`
+        for the first cascade `value` found in `tagset`,
+        or `None` if there is no match.
+    '''
+    for tag_name in self.cascade:
+      if tag_name in tagset:
+        return Tag(self.target, tagset[tag_name])
+    return None
+
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
   '''
@@ -1385,8 +1421,11 @@ class FSTagsConfig:
       self.config = self.load_config(self.filepath)
       return self.config
     if attr == 'filename_rules':
-      self.rules = self.filename_rules_from_config(self.config)
-      return self.rules
+      self.filename_rules = self.filename_rules_from_config(self.config)
+      return self.filename_rules
+    if attr == 'cascade_rules':
+      self.cascade_rules = self.cascade_rules_from_config(self.config)
+      return self.cascade_rules
     raise AttributeError(attr)
 
   def __getitem__(self, section):
@@ -1420,6 +1459,16 @@ class FSTagsConfig:
           rules.append(RegexpTagRule(pattern[1:-1]))
         else:
           warning("invalid autotag rule")
+    return rules
+
+  @staticmethod
+  def cascade_rules_from_config(config):
+    ''' Return a list of the `[cascade]` tag rules from the config.
+    '''
+    rules = []
+    for target, cascade in config['cascade'].items():
+      with Pfx("%s = %s", target, cascade):
+        rules.append(CascadeRule(target, cascade.split()))
     return rules
 
   @property
