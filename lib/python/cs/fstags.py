@@ -61,11 +61,11 @@ import threading
 from threading import Lock, RLock
 from icontract import require
 from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.lex import get_nonwhite
 from cs.logutils import setup_logging, error, warning, info, trace
-from cs.mappings import StackableValues
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import TagSet, Tag, TagChoice
@@ -84,8 +84,8 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.deco', 'cs.edit', 'cs.lex', 'cs.logutils',
-        'cs.mappings', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.lex',
+        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
         'cs.upd', 'icontract'
     ],
 }
@@ -108,15 +108,14 @@ def main(argv=None):
     argv = sys.argv
   return FSTagsCommand().run(argv)
 
-class _State(threading.local, StackableValues):
+class _State(threading.local):
   ''' Per-thread default context stack.
   '''
 
-  _Ss = []  # global stack of fallback Store values
-
   def __init__(self, **kw):
     threading.local.__init__(self)
-    StackableValues.__init__(self, **kw)
+    for k, v in kw.items():
+      setattr(self, k, v)
 
 state = _State(verbose=False)
 
@@ -237,7 +236,7 @@ class FSTagsCommand(BaseCommand):
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       with fstags:
         with Upd(sys.stderr) as U:
           for top_path in argv:
@@ -288,7 +287,7 @@ class FSTagsCommand(BaseCommand):
       if not isdirpath(path):
         error("not a directory")
         return 1
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       with fstags:
         if not fstags.edit_dirpath(path):
           xit = 1
@@ -330,7 +329,7 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    U = Upd(sys.stderr)if sys.stderr.isatty()else None
+    U = Upd(sys.stderr) if sys.stderr.isatty() else None
     filepaths = fstags.find(
         realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
     )
@@ -340,7 +339,7 @@ class FSTagsCommand(BaseCommand):
     else:
       for filepath in filepaths:
         if U:
-          oldU=U.out('')
+          oldU = U.out('')
         print(
             output_format.format(
                 **fstags[filepath].format_kwargs(direct=use_direct_tags)
@@ -396,7 +395,7 @@ class FSTagsCommand(BaseCommand):
     if not isinstance(data, dict):
       error("JSON data do not specify a dict: %s", type(dict))
       return 1
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       with fstags:
         for path in paths:
           with Pfx(path):
@@ -474,7 +473,7 @@ class FSTagsCommand(BaseCommand):
       raise GetoptError("missing paths or targetdir")
     endpath = argv[-1]
     if isdirpath(endpath):
-      with state.stack(verbose=True):
+      with stackattrs(state, verbose=True):
         with fstags:
           dirpath = argv.pop()
           for srcpath in argv:
@@ -493,7 +492,7 @@ class FSTagsCommand(BaseCommand):
             "expected exactly 2 arguments if the last is not a directory, got: %r"
             % (argv,)
         )
-      with state.stack(verbose=True):
+      with stackattrs(state, verbose=True):
         with fstags:
           srcpath, dstpath = argv
           try:
@@ -513,7 +512,7 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     if not argv:
       raise GetoptError("missing paths")
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       with fstags:
         for path in argv:
           fstags.scrub(path)
@@ -540,7 +539,7 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = [path]
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
@@ -566,7 +565,7 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
@@ -628,7 +627,7 @@ class FSTagsCommand(BaseCommand):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    with state.stack(verbose=True):
+    with stackattrs(state, verbose=True):
       fstags.import_xattrs(paths)
 
 class FSTags(MultiOpenMixin):
@@ -1026,7 +1025,7 @@ class TagFile(HasFSTagsMixin):
       tagsets = defaultdict(TagSet)
       try:
         with open(filepath) as f:
-          with state.stack(verbose=False):
+          with stackattrs(state, verbose=False):
             for lineno, line in enumerate(f, 1):
               with Pfx(lineno):
                 line = line.strip()
@@ -1182,7 +1181,7 @@ class TaggedPath(HasFSTagsMixin):
         by merging the tags from the root to the path.
     '''
     tags = TagSet()
-    with state.stack(verbose=False):
+    with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_entries:
         for tag in tagfile[name]:
           tags.add(tag)
@@ -1232,7 +1231,7 @@ class TaggedPath(HasFSTagsMixin):
       rules = self.fstags.config.filename_rules
     name = self.basename
     tagset = TagSet()
-    with state.stack(verbose=False):
+    with stackattrs(state, verbose=False):
       for rule in rules:
         for tag in rule.infer_tags(name):
           if tag.name not in tagset:
