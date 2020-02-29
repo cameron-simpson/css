@@ -18,7 +18,7 @@ from cs.lex import cutprefix
 from cs.pfx import Pfx
 from cs.resources import RunState
 
-__version__ = '20200210'
+__version__ = '20200229'
 
 DISTINFO = {
     'description':
