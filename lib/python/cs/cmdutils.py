@@ -202,6 +202,7 @@ class BaseCommand:
     if cmd is None:
       cmd = argv.pop(0)
     usage_format = getattr(self, 'USAGE_FORMAT')
+    # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
       usage = usage_format.format(cmd=cmd)
     else:
