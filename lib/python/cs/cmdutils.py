@@ -51,9 +51,11 @@ def docmd(dofunc):
             def do_something(...):
               ... do something ...
   '''
+  funcname = dofunc.__name__
 
   def wrapped(self, *a, **kw):
-    funcname = dofunc.__name__
+    ''' Run a `Cmd` "do" method with some context and handling.
+    '''
     if not funcname.startswith('do_'):
       raise ValueError("function does not start with 'do_': %s" % (funcname,))
     argv0 = funcname[3:]
@@ -68,6 +70,7 @@ def docmd(dofunc):
         exception("%s", e)
         return None
 
+  wrapped.__name__ = '@docmd(%s)' % (funcname,)
   wrapped.__doc__ = dofunc.__doc__
   return wrapped
 
