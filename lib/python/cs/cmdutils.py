@@ -237,9 +237,10 @@ class BaseCommand:
         return 2
       raise
 
-  def getopt_error_handler(self, cmd, options, e, usage):
+  @staticmethod
+  def getopt_error_handler(cmd, options, e, usage):
     ''' The `getopt_error_handler` method
-        is be used to control the handling of `GetoptError`s raised
+        is used to control the handling of `GetoptError`s raised
         during the command line parse
         or during the `main` or `cmd_`*subcmd*` calls.
 
