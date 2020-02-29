@@ -273,7 +273,11 @@ class BaseCommand:
 
   @staticmethod
   @contextmanager
-  def run_context(argv, options, cmd):
-    ''' Stub context manager which surronds `main` or `cmd_`*subcmd*.
+  def run_context(argv, options):
+    ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
-    yield
+    # redundant try/finally to remind subclassers of correct structure
+    try:
+      yield
+    finally:
+      pass
