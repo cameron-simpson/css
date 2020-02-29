@@ -296,7 +296,7 @@ class VTCmd(BaseCommand):
     if ifdebug():
       dump_debug_threads()
 
-  def cmd_profile(self, options, argv, cmd):
+  def cmd_profile(self, options, argv):
     ''' Wrapper to profile other subcommands and report.
     '''
     try:
@@ -316,7 +316,7 @@ class VTCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_cat(argv, options, cmd):
+  def cmd_cat(argv, options):
     ''' Concatentate the contents of the supplied filerefs to stdout.
     '''
     if not argv:
@@ -326,7 +326,7 @@ class VTCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_config(args, options, cmd):
+  def cmd_config(args, options):
     ''' Recite the configuration.
     '''
     if args:
@@ -335,7 +335,7 @@ class VTCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_dump(args, options, cmd):
+  def cmd_dump(args, options):
     ''' Dump various file types.
     '''
     if not args:
@@ -372,7 +372,7 @@ class VTCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_fsck(args, options, cmd):
+  def cmd_fsck(args, options):
     ''' Data structure inspection/repair.
     '''
     if not args:
@@ -404,7 +404,7 @@ class VTCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_import(args, options, cmd):
+  def cmd_import(args, options):
     ''' Import paths into the Store, print top Dirent for each.
 
         TODO: hook into vt.merge.
@@ -482,7 +482,7 @@ class VTCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_init(args, options, cmd):
+  def cmd_init(args, options):
     ''' Install a default config and initialise the configured datadir Stores.
     '''
     xit = 0
@@ -520,7 +520,7 @@ class VTCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_ls(args, options, cmd):
+  def cmd_ls(args, options):
     ''' Do a directory listing of the specified I<dirrefs>.
     '''
     recurse = False
@@ -541,7 +541,7 @@ class VTCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_mount(args, options, cmd):
+  def cmd_mount(args, options):
     ''' Mount the specified special on the specified mountpoint directory.
         Requires FUSE support.
     '''
@@ -711,7 +711,7 @@ class VTCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_pack(args, options, cmd):
+  def cmd_pack(args, options):
     ''' Replace the _path_ with an archive file _path_`.vt`
         referring to the stored content of _path_.
     '''
@@ -812,7 +812,7 @@ class VTCmd(BaseCommand):
       T.join()
       return xit
 
-  def cmd_pullfrom(self, args, options, cmd):
+  def cmd_pullfrom(self, args, options):
     ''' Pull missing content from other Stores.
 
         Usage: pullfrom other_store objects...
@@ -835,7 +835,7 @@ class VTCmd(BaseCommand):
         pushables.append(obj)
     return self._push(options, srcS, dstS, pushables)
 
-  def cmd_pushto(self, args, options, cmd):
+  def cmd_pushto(self, args, options):
     ''' Push something to a secondary Store,
         such that the secondary store has all the required Blocks.
 
@@ -860,7 +860,7 @@ class VTCmd(BaseCommand):
     return self._push(srcS, dstS, pushables)
 
   @staticmethod
-  def cmd_serve(args, options, cmd):
+  def cmd_serve(args, options):
     ''' Start a service daemon listening on a TCP port
         or on a UNIX domain socket or on stdin/stdout.
 
@@ -955,7 +955,7 @@ class VTCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_test(args, options, cmd):
+  def cmd_test(args, options):
     ''' Test various facilites.
     '''
     if not args:
@@ -981,7 +981,7 @@ class VTCmd(BaseCommand):
       raise GetoptError("unrecognised subcommand")
 
   @staticmethod
-  def cmd_unpack(args, options, cmd):
+  def cmd_unpack(args, options):
     ''' Unpack the archive file _archive_`.vt` as _archive_.
     '''
     if not args:

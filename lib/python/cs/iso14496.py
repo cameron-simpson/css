@@ -108,7 +108,7 @@ class MP4Command(BaseCommand):
 
   TAG_PREFIX = 'mp4'
 
-  def cmd_autotag(self, argv, options, *, cmd):
+  def cmd_autotag(self, argv, options):
     ''' Tag paths based on embedded MP4 metadata.
     '''
     xit = 0
@@ -161,7 +161,7 @@ class MP4Command(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_deref(argv, options, *, cmd):
+  def cmd_deref(argv, options):
     ''' Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
@@ -178,7 +178,7 @@ class MP4Command(BaseCommand):
           print(path, "offset=%d" % B.offset, B)
 
   @staticmethod
-  def cmd_extract(argv, options, *, cmd):
+  def cmd_extract(argv, options):
     ''' Extract the content of the specified Box.
     '''
     skip_header = False
@@ -230,7 +230,7 @@ class MP4Command(BaseCommand):
       os.close(fd)
 
   @staticmethod
-  def cmd_info(argv, options, *, cmd):
+  def cmd_info(argv, options):
     ''' Produce a human friendly report.
     '''
     if not argv:
@@ -249,7 +249,7 @@ class MP4Command(BaseCommand):
               print(box.box_type_path, "%d:" % (len(tags),), tags)
 
   @staticmethod
-  def cmd_parse(argv, options, *, cmd):
+  def cmd_parse(argv, options):
     ''' Parse an ISO14496 based file.
     '''
     if not argv:
@@ -264,7 +264,7 @@ class MP4Command(BaseCommand):
         over_box.dump(crop_length=None)
 
   @staticmethod
-  def cmd_test(argv, options, *, cmd):
+  def cmd_test(argv, options):
     ''' Run self tests.
     '''
     import cs.iso14496_tests
