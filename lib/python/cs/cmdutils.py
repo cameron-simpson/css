@@ -1,9 +1,11 @@
 #!/usr/bin/python
 #
-# Convenience functions for working with the Cmd module
-# and other command line related stuff.
-# - Cameron Simpson <cs@cskk.id.au> 03sep2015
+# Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
+
+''' Convenience functions for working with the Cmd module
+    and other command line related stuff.
+'''
 
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
