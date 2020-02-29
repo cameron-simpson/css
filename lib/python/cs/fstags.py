@@ -229,7 +229,7 @@ class FSTagsCommand(BaseCommand):
     return choices
 
   @staticmethod
-  def cmd_autotag(argv, options, *, cmd):
+  def cmd_autotag(argv, options):
     ''' Tag paths based on rules from the rc file.
     '''
     fstags = options.fstags
@@ -272,7 +272,7 @@ class FSTagsCommand(BaseCommand):
                     direct_tags.add(tag)
 
   @staticmethod
-  def cmd_edit(argv, options, *, cmd):
+  def cmd_edit(argv, options):
     ''' Edit filenames and tags in a directory.
     '''
     fstags = options.fstags
@@ -294,7 +294,7 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   @classmethod
-  def cmd_find(cls, argv, options, *, cmd):
+  def cmd_find(cls, argv, options):
     ''' Find paths matching tag criteria.
     '''
     fstags = options.fstags
@@ -349,7 +349,7 @@ class FSTagsCommand(BaseCommand):
           U.out(oldU)
 
   @classmethod
-  def cmd_json_import(cls, argv, options, *, cmd):
+  def cmd_json_import(cls, argv, options):
     ''' Import tags for `path` from `tags.json`.
     '''
     fstags = options.fstags
@@ -406,7 +406,7 @@ class FSTagsCommand(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_ls(argv, options, *, cmd):
+  def cmd_ls(argv, options):
     ''' List paths and their tags.
     '''
     fstags = options.fstags
@@ -436,17 +436,17 @@ class FSTagsCommand(BaseCommand):
               )
           )
 
-  def cmd_cp(self, argv, options, *, cmd):
+  def cmd_cp(self, argv, options):
     ''' POSIX cp equivalent, but copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.copy, argv, options)
 
-  def cmd_ln(self, argv, options, *, cmd):
+  def cmd_ln(self, argv, options):
     ''' POSIX ln equivalent, but copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.link, argv, options)
 
-  def cmd_mv(self, argv, options, *, cmd):
+  def cmd_mv(self, argv, options):
     ''' POSIX mv equivalent, but copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.move, argv, options)
@@ -506,7 +506,7 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   @classmethod
-  def cmd_scrub(cls, argv, options, *, cmd):
+  def cmd_scrub(cls, argv, options):
     ''' Scrub paths.
     '''
     fstags = options.fstags
@@ -518,7 +518,7 @@ class FSTagsCommand(BaseCommand):
           fstags.scrub(path)
 
   @classmethod
-  def cmd_tag(cls, argv, options, *, cmd):
+  def cmd_tag(cls, argv, options):
     ''' Tag a path with multiple tags.
     '''
     badopts = False
@@ -543,7 +543,7 @@ class FSTagsCommand(BaseCommand):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
-  def cmd_tagpaths(cls, argv, options, *, cmd):
+  def cmd_tagpaths(cls, argv, options):
     ''' Tag multiple paths with a single tag.
     '''
     badopts = False
@@ -569,7 +569,7 @@ class FSTagsCommand(BaseCommand):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
-  def cmd_test(cls, argv, options, *, cmd):
+  def cmd_test(cls, argv, options):
     ''' Find paths matching tag criteria.
     '''
     fstags = options.fstags
@@ -604,7 +604,7 @@ class FSTagsCommand(BaseCommand):
     )
 
   @classmethod
-  def cmd_xattr_export(cls, argv, options, *, cmd):
+  def cmd_xattr_export(cls, argv, options):
     ''' Update extended attributes from fstags.
     '''
     fstags = options.fstags
@@ -617,7 +617,7 @@ class FSTagsCommand(BaseCommand):
     fstags.export_xattrs(paths)
 
   @classmethod
-  def cmd_xattr_import(cls, argv, options, *, cmd):
+  def cmd_xattr_import(cls, argv, options):
     ''' Update fstags from extended attributes.
     '''
     fstags = options.fstags
