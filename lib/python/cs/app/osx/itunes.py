@@ -54,7 +54,7 @@ class ITunesCommand(BaseCommand):
     options.library = ITunes()
 
   @staticmethod
-  def cmd_autotag(argv, options, *, cmd):
+  def cmd_autotag(argv, options):
     ''' Tag paths based on data from the iTunes library.
     '''
     fstags = options.fstags

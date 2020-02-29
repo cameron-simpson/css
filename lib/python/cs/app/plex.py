@@ -52,7 +52,7 @@ class PlexCommand(BaseCommand):
     options.fstags = FSTags()
 
   @staticmethod
-  def cmd_linktree(argv, options, *, cmd):
+  def cmd_linktree(argv, options):
     ''' Produce a symlink tree for Plex from source trees.
     '''
     if len(argv) < 2:
