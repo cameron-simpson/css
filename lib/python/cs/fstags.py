@@ -72,7 +72,7 @@ from cs.tagset import TagSet, Tag, TagChoice
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200210'
+__version__ = '20200229'
 
 DISTINFO = {
     'keywords': ["python3"],
