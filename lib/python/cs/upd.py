@@ -24,6 +24,8 @@ from threading import RLock
 from cs.lex import unctrl
 from cs.tty import ttysize
 
+__version__ = '20200229'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
