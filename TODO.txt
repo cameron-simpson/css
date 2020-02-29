@@ -1,3 +1,4 @@
+cs.cmdutils: extract Usage: from cmd_ methods to augument main USAGE
 cs.context.stack ctxt mgr to put obj attr values
 cs.upd: multiline status area
 BaseCommand: locate Usage: blocks in cmd_ methods, merge into usage doc
