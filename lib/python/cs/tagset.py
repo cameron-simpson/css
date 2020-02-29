@@ -12,6 +12,8 @@ from cs.lex import (
 from cs.logutils import info, warning
 from cs.pfx import Pfx
 
+__version__ = '20200229.1'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
