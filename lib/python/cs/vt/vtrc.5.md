@@ -64,6 +64,9 @@ Parameters:
 `path`:
   the location of the Store,
   by default *basedir*`/`*clausename*.
+`raw`:
+  Default: `False`.
+  If true this is a `RawDataDir` otherwise a `DataDir`.
 
 #### `type = filecache`
 

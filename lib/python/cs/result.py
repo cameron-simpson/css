@@ -28,8 +28,8 @@ Trite example::
   R = Result(name="my demo")
 
   Thread 1:
+    # this blocks until the Result is ready
     value = R()
-    # blocks...
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 
@@ -53,18 +53,16 @@ You can also collect multiple Results in completion order using the report() fun
 try:
   from enum import Enum
 except ImportError:
-  try:
-    from enum34 import Enum
-  except ImportError:
-    Enum = None
+  from enum34 import Enum # type: ignore
 from functools import partial
-from icontract import require
 import sys
 from threading import Lock
+from icontract import require
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx, PfxThread as Thread
-from cs.seq import seq
+from cs.pfx import Pfx
 from cs.py3 import Queue, raise3, StringTypes
+from cs.seq import seq
+from cs.threads import bg as bg_thread
 
 DISTINFO = {
     'description':
@@ -76,27 +74,17 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3', 'icontract'],
+    'install_requires':
+    ['cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.threads', 'icontract'],
 }
 
-if Enum:
-
-  class ResultState(Enum):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
-else:
-
-  class ResultState(object):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
+class ResultState(Enum):
+  ''' State tokens for `Result`s.
+  '''
+  pending = 'pending'
+  running = 'running'
+  ready = 'ready'
+  cancelled = 'cancelled'
 
 # compatability name
 AsynchState = ResultState
@@ -119,10 +107,12 @@ class Result(object):
   '''
 
   def __init__(self, name=None, lock=None, result=None):
-    ''' Base initialiser for Result objects and subclasses.
-        `name`: optional parameter naming this object.
-        `lock`: optional locking object, defaults to a new Lock
-        `result`: if not None, prefill the .result property
+    ''' Base initialiser for `Result` objects and subclasses.
+
+        Parameter:
+        * `name`: optional parameter naming this object.
+        * `lock`: optional locking object, defaults to a new `threading.Lock`.
+        * `result`: if not `None`, prefill the `.result` property.
     '''
     if lock is None:
       lock = Lock()
@@ -160,8 +150,7 @@ class Result(object):
   def ready(self):
     ''' Whether the Result state is ready or cancelled.
     '''
-    state = self.state
-    return state == ResultState.ready or state == ResultState.cancelled
+    return self.state in (ResultState.ready, ResultState.cancelled)
 
   @property
   def cancelled(self):
@@ -193,7 +182,7 @@ class Result(object):
       if state == ResultState.ready:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state == ResultState.running or state == ResultState.pending:
+      if state in (ResultState.running, ResultState.pending):
         # in progress or not commenced - change state to cancelled and fall through to ._complete
         self.state = ResultState.cancelled
       else:
@@ -280,21 +269,24 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate Thread,
-        returning the Thread.
+    ''' Submit a function to compute the result in a separate `Thread`;
+        returning the `Thread`.
 
-        The Result must be in "pending" state, and transitions to "running".
+        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        and as such the `Result` must be in "pending" state,
+        and transitions to "running".
     '''
-    T = Thread(
+    return bg_thread(
+        self.call,
         name="<%s>.bg(func=%s,...)" % (self, func),
-        target=self.call,
         args=[func] + list(a),
         kwargs=kw
     )
-    T.start()
-    return T
 
-  @require(lambda self: self.state in (ResultState.pending, ResultState.running, ResultState.cancelled))
+  @require(
+      lambda self: self.state in
+      (ResultState.pending, ResultState.running, ResultState.cancelled)
+  )
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
@@ -306,8 +298,8 @@ class Result(object):
           (result, exc_info)
       )
     state = self.state
-    if (state == ResultState.cancelled or state == ResultState.running
-        or state == ResultState.pending):
+    if state in (ResultState.cancelled, ResultState.running,
+                 ResultState.pending):
       self._result = result
       self._exc_info = exc_info
       if state != ResultState.cancelled:
@@ -387,6 +379,7 @@ class Result(object):
 
   def notify(self, notifier):
     ''' After the function completes, run notifier(self).
+
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
@@ -419,17 +412,18 @@ class Result(object):
     self.notify(notifier)
 
 def bg(func, *a, **kw):
-  ''' Dispatch a Thread to run `func`, return a Result to collect its value.
+  ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
   '''
   R = Result()
   R.bg(func, *a, **kw)
   return R
 
 def report(LFs):
-  ''' Generator which yields completed Results.
-      This is a generator that yields Results as they complete, useful
-      for waiting for a sequence of Results that may complete in an
-      arbitrary order.
+  ''' Generator which yields completed `Result`s.
+
+      This is a generator that yields `Result`s as they complete,
+      useful for waiting for a sequence of `Result`s
+      that may complete in an arbitrary order.
   '''
   Q = Queue()
   n = 0
@@ -441,13 +435,14 @@ def report(LFs):
     yield Q.get()
 
 def after(Rs, R, func, *a, **kw):
-  ''' After the completion of `Rs` call `func(*a, **kw)` and return
-      its result via `R`; return the Result object.
+  ''' After the completion of `Rs` call `func(*a,**kw)` and return
+      its result via `R`; return the `Result` object.
 
-      `Rs`: an iterable of Results.
-      `R`: a Result to collect to result of calling `func`. If None,
-           one will be created.
-      `func`, `a`, `kw`: a callable and its arguments.
+      Parameters:
+      * `Rs`: an iterable of Results.
+      * `R`: a `Result` to collect to result of calling `func`.
+        If `None`, one will be created.
+      * `func`, `a`, `kw`: a callable and its arguments.
   '''
   if R is None:
     R = Result("after-%d" % (seq(),))

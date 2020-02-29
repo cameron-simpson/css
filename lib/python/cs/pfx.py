@@ -43,6 +43,7 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
+from cs.deco import decorator
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
@@ -56,6 +57,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.py3',
         'cs.x',
     ],
@@ -93,6 +95,21 @@ def pfx(func):
 
   wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
   return wrapped
+
+@decorator
+def pfx_method(method, use_str=False):
+  ''' Decorator to provide a `Pfx` context for an instance method prefixing
+      *classname.methodname*
+      (or `str(self).`*methodname* if `use_str` is true).
+  '''
+
+  def wrapper(self, *a, **kw):
+    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
+      return method(self, *a, **kw)
+
+  wrapper.__doc__ = method.__doc__
+  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
+  return wrapper
 
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
@@ -311,42 +328,40 @@ class Pfx(object):
             try:
               value = getattr(e, attr)
             except AttributeError:
-              pass
+              continue
+            if isinstance(value, StringTypes):
+              value = prefixify(value)
+            elif isinstance(value, Exception):
+              # set did_prefix if we modify this in place
+              did_prefix = prefixify_exc(value)
             else:
-              if isinstance(value, StringTypes):
-                value = prefixify(value)
-              elif isinstance(value, Exception):
-                # set did_prefix if we modify this in place
-                did_prefix = prefixify_exc(value)
+              try:
+                vlen = len(value)
+              except TypeError:
+                print(
+                    "warning: %s: %s.%s: " % (current_prefix, e, attr),
+                    prefixify(
+                        "do not know how to prefixify: %s:%r" %
+                        (type(value), value)
+                    ),
+                    file=sys.stderr
+                )
+                continue
               else:
-                try:
-                  vlen = len(value)
-                except TypeError:
-                  print(
-                      "warning: %s: %s.%s: " % (current_prefix, e, attr),
-                      prefixify(
-                          "do not know how to prefixify: %s:%r" %
-                          (type(value), value)
-                      ),
-                      file=sys.stderr
-                  )
-                  continue
+                if vlen < 1:
+                  value = [prefixify(repr(value))]
                 else:
-                  if vlen < 1:
-                    value = [prefixify(repr(value))]
-                  else:
-                    value = [prefixify(value[0])] + list(value[1:])
-              if not did_prefix:
-                try:
-                  setattr(e, attr, value)
-                except AttributeError as e2:
-                  print(
-                      "warning: %s: %s.%s: cannot set to %r: %s" %
-                      (current_prefix, e, attr, value, e2),
-                      file=sys.stderr
-                  )
-                  continue
-              did_prefix = True
+                  value = [prefixify(value[0])] + list(value[1:])
+            try:
+              setattr(e, attr, value)
+            except AttributeError as e2:
+              print(
+                  "warning: %s: %s.%s: cannot set to %r: %s" %
+                  (current_prefix, e, attr, value, e2),
+                  file=sys.stderr
+              )
+              continue
+            did_prefix = True
           return did_prefix
 
         did_prefix = prefixify_exc(exc_value)

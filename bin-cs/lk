@@ -5,6 +5,7 @@
 
 if [ "x$OS" = xdarwin ]
 then
+  osascript -e 'set Volume 0'
   brightness 0
   osx-screen-saver
   ##osx-login-screen

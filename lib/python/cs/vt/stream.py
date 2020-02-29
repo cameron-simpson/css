@@ -13,6 +13,7 @@ from __future__ import with_statement
 from enum import IntEnum
 from functools import lru_cache
 from subprocess import Popen, PIPE
+from threading import Lock
 import time
 from icontract import require
 from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
@@ -20,7 +21,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import ClosedError
 from cs.result import CancellationError
@@ -34,7 +35,6 @@ from .hash import (
     HASHCLASS_BY_ENUM,
     HashCode,
     HashCodeField,
-    MissingHashcodeError,
 )
 from .pushpull import missing_hashcodes_by_checksum
 from .store import StoreError, BasicStoreSync
@@ -69,11 +69,20 @@ class StreamStore(BasicStoreSync):
       connect=None,
       local_store=None,
       exports=None,
+      capacity=None,
       **kw
   ):
     ''' Initialise the Stream Store.
 
         Parameters:
+        * `addif`: optional mode causing .add to probe the peer for
+          the data chunk's hash and to only submit a ADD request
+          if the block is missing; this is a bandwith optimisation
+          at the expense of latency.
+        * `connect`: if not None, a function to return `recv` and `send`.
+          If specified, the `recv` and `send` parameters must be None.
+        * `exports`: a mapping of name=>Store providing requestable Stores
+        * `local_store`: optional local Store for serving requests from the peer.
         * `name`: the Store name.
         * `recv`: inbound binary stream.
           If this is an `int` it is taken to be an OS file descriptor,
@@ -86,24 +95,19 @@ class StreamStore(BasicStoreSync):
           For a file descriptor sending is done via an os.dup() of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
-        * `addif`: optional mode causing .add to probe the peer for
-          the data chunk's hash and to only submit a ADD request
-          if the block is missing; this is a bandwith optimisation
-          at the expense of latency.
-        * `connect`: if not None, a function to return `recv` and `send`.
-          If specified, the `recv` and `send` parameters must be None.
-        * `local_store`: optional local Store for serving requests from the peer.
-        * `exports`: a mapping of name=>Store providing requestable Stores
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
-    super().__init__('StreamStore:%s' % (name,), **kw)
+    if capacity is None:
+      capacity = 1024
+    super().__init__('StreamStore:%s' % (name,), capacity=capacity, **kw)
+    self._lock = Lock()
     self.mode_addif = addif
     self._local_store = local_store
     self.exports = exports
     # parameters controlling connection hysteresis
     self._conn_attempt_last = 0.0
-    self._conn_attempt_delay = 1.0
+    self._conn_attempt_delay = 10.0
     if connect is None:
       # set up protocol on existing stream
       # no reconnect facility
@@ -172,9 +176,10 @@ class StreamStore(BasicStoreSync):
         local_store.close()
       super().shutdown()
 
+  @pfx_method
   def connection(self):
     ''' Return the current connection, creating it if necessary.
-        Returns None if there was no current connection
+        Returns `None` if there was no current connection
         and it is too soon since the last connection attempt.
     '''
     with self._lock:
@@ -183,7 +188,7 @@ class StreamStore(BasicStoreSync):
         next_attempt = self._conn_attempt_last + self._conn_attempt_delay
         now = time.time()
         if now >= next_attempt:
-          self._conn_attemp_last = now
+          self._conn_attempt_last = now
           try:
             recv, send = self.connect()
           except Exception as e:
@@ -199,7 +204,12 @@ class StreamStore(BasicStoreSync):
     ''' Wrap a pair of binary streams in a PacketConnection.
     '''
     conn = PacketConnection(
-        recv, send, self._handle_request, name='PacketConnection:' + self.name
+        recv,
+        send,
+        self._handle_request,
+        name='PacketConnection:' + self.name,
+        packet_grace=0,
+        tick=True
     )
     return conn
 
@@ -209,7 +219,7 @@ class StreamStore(BasicStoreSync):
     oconn = self._conn
     if oconn is conn:
       self._conn = None
-      self._conn_attemp_last = time.time()
+      self._conn_attempt_last = time.time()
     else:
       debug(
           "disconnect of %s, but that is not the current connection, ignoring",
@@ -266,7 +276,6 @@ class StreamStore(BasicStoreSync):
         )
       return rq
 
-  @logexc
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
         Return as for the `request_handler` parameter to `PacketConnection`.
@@ -277,6 +286,7 @@ class StreamStore(BasicStoreSync):
     rq = self.decode_request(rq_type, flags, payload)
     return rq.do(self)
 
+  @pfx_method
   def add(self, data, hashclass=None):
     h = self.hash(data, hashclass)
     if self.mode_addif:
@@ -296,11 +306,13 @@ class StreamStore(BasicStoreSync):
       )
     return h
 
+  @pfx_method
   def get(self, h):
     try:
       flags, payload = self.do(GetRequest(h))
     except StoreError as e:
-      raise MissingHashcodeError(str(e)) from e
+      error("h=%s: %s", h, e)
+      return None
     found = flags & 0x01
     if found:
       flags &= ~0x01

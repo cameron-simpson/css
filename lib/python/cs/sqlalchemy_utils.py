@@ -18,7 +18,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Database",
     ],
@@ -38,7 +37,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       nested if the session already exists.
 
       This is the inner mechanism of `@auto_session` and
-      `ORM.auto_session_method`.
+      `ORM.auto_session`.
 
       Parameters:
       * `func`: the function to call
@@ -46,6 +45,7 @@ def with_session(func, *a, orm=None, session=None, **kw):
       * `orm`: optional ORM class with a `.session()` context manager method
         such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
+      * `kw`: other keyword arguments, passed to `func`
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
@@ -67,6 +67,8 @@ def auto_session(func):
   ''' Decorator to run a function in a session if one is not presupplied.
       The function `func` runs within a transaction,
       nested if the session already exists.
+
+      See `with_session` for details.
   '''
 
   @require(lambda orm, session: orm is not None or session is not None)
@@ -77,6 +79,7 @@ def auto_session(func):
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
   wrapper.__doc__ = func.__doc__
+  wrapper.__module__ = getattr(func, '__module__', None)
   return wrapper
 
 @contextmanager
@@ -87,7 +90,7 @@ def push_log_level(level):
       *NOTE*: this is not MT safe - competing Threads can mix log levels up.
   '''
   logger = logging.getLogger('sqlalchemy.engine')
-  old_level =logger.level
+  old_level = logger.level
   logger.setLevel(level)
   yield logger
   logger.setLevel(old_level)
@@ -98,12 +101,14 @@ def log_level(func, level=None):
   '''
   if level is None:
     level = logging.DEBUG
-  def wrapper(*a,**kw):
+
+  def wrapper(*a, **kw):
     ''' Push the desired log level and run the function.
     '''
     with push_log_level(level):
-      return func(*a,**kw)
-  wrapper.__name__="@log_level(%s,%s)" %(func,level)
+      return func(*a, **kw)
+
+  wrapper.__name__ = "@log_level(%s,%s)" % (func, level)
   return wrapper
 
 class ORM(MultiOpenMixin):
@@ -127,13 +132,13 @@ class ORM(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
 
   @contextmanager
-  def session(self):
+  def session(self, *a, **kw):
     ''' Context manager to issue a new session and close it down.
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
     with self:
-      new_session = self.Session()
+      new_session = self.Session(*a, **kw)
       try:
         yield new_session
         new_session.commit()
@@ -147,6 +152,8 @@ class ORM(MultiOpenMixin):
   def auto_session(method):
     ''' Decorator to run a method in a session derived from this ORM
         if a session is not presupplied.
+
+        See `with_session` for details.
     '''
 
     def wrapper(self, *a, session=None, **kw):
@@ -156,12 +163,15 @@ class ORM(MultiOpenMixin):
 
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
+    wrapper.__module__ = getattr(method, '__module__', None)
     return wrapper
 
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
       Intended to assist classes with a `.orm` attribute.
+
+      See `with_session` for details.
   '''
 
   def wrapper(self, *a, session=None, **kw):
@@ -171,6 +181,7 @@ def orm_auto_session(method):
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
+  wrapper.__module__ = getattr(method, '__module__', None)
   return wrapper
 
 @require(
@@ -347,7 +358,9 @@ def json_column(
 
       This annotates the class with a `.virtual_name` property
       which can be accessed or set,
-      accessing or modifying the associated JSON column.
+      accessing or modifying the associated JSON column
+      (in this instance, the column `info`,
+      accessing `info['json']['field']['name']`).
   '''
   if json_field_name is None:
     json_field_name = attr
