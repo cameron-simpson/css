@@ -296,7 +296,7 @@ def get_md_doc(
     full_doc = full_doc.rstrip() + '\n\n' + postamble_md
   return doc_head, full_doc
 
-class Package(O):
+class PackageVersion(O):
 
   def __init__(self, package_name):
     super().__init__(name=package_name)
@@ -339,7 +339,7 @@ class PyPI_Package(O):
       else:
         defaults['author_email'] = author_email
     self.pypi_url = pypi_url
-    self.package = Package(package_name)
+    self.package = PackageVersion(package_name)
     self.package.version = package_version
     self._pypi_package_name = pypi_package_name
     self._pypi_package_version = pypi_package_version
