@@ -1,5 +1,6 @@
 #!/usr/bin/python
 #
+
 ''' Convenience functions related to modules and importing.
 '''
 
@@ -12,7 +13,8 @@ import sys
 from cs.context import stackattrs
 
 DISTINFO = {
-    'description': "module/import related stuff",
+    'description':
+    "module/import related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -51,7 +53,9 @@ def import_module_name(module_name, name, path=None, lock=None):
     try:
       return getattr(M, name)
     except AttributeError as e:
-      raise ImportError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
+      raise ImportError(
+          "%s: no entry named %r: %s: %s" % (module_name, name, type(e), e)
+      )
   return None
 
 def import_module_from_file(module_name, source_file, sys_path=None):
@@ -101,4 +105,4 @@ def module_names(M):
   ''' Return a list of the names of attributes from a module which were
       defined in the module.
   '''
-  return [ attr for attr, value in module_attributes(M) ]
+  return [attr for attr, value in module_attributes(M)]
