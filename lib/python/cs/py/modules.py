@@ -4,9 +4,12 @@
 '''
 
 import importlib
+from importlib.machinery import SourceFileLoader
+from importlib.util import spec_from_loader, module_from_spec
 from inspect import getmodule
 import os.path
 import sys
+from cs.context import stackattrs
 
 DISTINFO = {
     'description': "module/import related stuff",
@@ -16,7 +19,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.context'],
 }
 
 def import_module_name(module_name, name, path=None, lock=None):
@@ -50,6 +53,29 @@ def import_module_name(module_name, name, path=None, lock=None):
     except AttributeError as e:
       raise ImportError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
   return None
+
+def import_module_from_file(module_name, source_file, sys_path=None):
+  ''' Import a specific file as a module instance,
+      return the module instance.
+
+      Parameters:
+      * `module_name`: the name to assign to the module
+      * `source_file`: the source file to load
+      * `sys_path`: optional list of paths to set as `sys.path`
+        for the duration of this import;
+        the default is the current value of `sys.path`
+
+      Note that this is a "bare" import;
+      the module instance is not inserted into `sys.modules`.
+  '''
+  if sys_path is None:
+    sys_path = sys.path
+  with stackattrs(sys, path=sys_path):
+    loader = SourceFileLoader(module_name, source_file)
+    spec = spec_from_loader(loader.name, loader)
+    M = module_from_spec(spec)
+    loader.exec_module(M)
+  return M
 
 def module_files(M):
   ''' Generator yielding .py pathnames involved in a module.
