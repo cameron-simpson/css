@@ -1000,11 +1000,12 @@ class TagFile(HasFSTagsMixin):
       name, offset = get_nonwhite(s, offset)
     return name, offset
 
-  def parse_tags_line(self, line):
+  @classmethod
+  def parse_tags_line(cls, line):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
-    name, offset = self.decode_name(line)
+    name, offset = cls.decode_name(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
@@ -1017,7 +1018,8 @@ class TagFile(HasFSTagsMixin):
     tags = TagSet.from_line(line, offset)
     return name, tags
 
-  def load_tagsets(self, filepath):
+  @classmethod
+  def load_tagsets(cls, filepath):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
@@ -1031,7 +1033,7 @@ class TagFile(HasFSTagsMixin):
                 line = line.strip()
                 if not line or line.startswith('#'):
                   continue
-                name, tags = self.parse_tags_line(line)
+                name, tags = cls.parse_tags_line(line)
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
