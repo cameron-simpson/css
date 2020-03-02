@@ -974,6 +974,19 @@ class TagFile(HasFSTagsMixin):
     '''
     return self.tagsets[name]
 
+  @locked_property
+  def tagsets(self):
+    ''' The tag map from the tag file,
+        a mapping of name=>`TagSet`.
+    '''
+    return self.load_tagsets(self.filepath)
+
+  @property
+  def names(self):
+    ''' The names from this `TagFile`.
+    '''
+    return list(self.tagsets.keys())
+
   @staticmethod
   def encode_name(name):
     ''' Encode `name`.
@@ -1076,19 +1089,6 @@ class TagFile(HasFSTagsMixin):
       # no modified TagSets
       return
     self.save_tagsets(self.filepath, self.tagsets)
-
-  @locked_property
-  def tagsets(self):
-    ''' The tag map from the tag file,
-        a mapping of name=>`TagSet`.
-    '''
-    return self.load_tagsets(self.filepath)
-
-  @property
-  def names(self):
-    ''' The names from this `TagFile`.
-    '''
-    return list(self.tagsets.keys())
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
