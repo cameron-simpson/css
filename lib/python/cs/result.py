@@ -28,8 +28,8 @@ Trite example::
   R = Result(name="my demo")
 
   Thread 1:
+    # this blocks until the Result is ready
     value = R()
-    # blocks...
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 

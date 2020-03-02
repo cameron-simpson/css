@@ -7,13 +7,14 @@
 r'''
 Aids for code sharing between python2 and python3.
 
-Presents various names in python 3 flavour for common use in python 2 and python 3.
+This package presents various names in python 3 flavour for common use in
+python 2 and python 3.
 '''
 
 try:
   from configparser import ConfigParser
 except ImportError:
-  from ConfigParser import SafeConfigParser as ConfigParser # type: ignore
+  from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
 import os
 try:
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
@@ -26,12 +27,14 @@ except ImportError:
 try:
   from subprocess import DEVNULL
 except ImportError:
-  DEVNULL = open(os.devnull, 'rb').fileno()
+  DEVNULL = os.open(os.devnull, os.O_RDWR)
 import sys
 try:
   from types import StringTypes # type: ignore
 except ImportError:
   StringTypes = (str,)
+
+__version__ = '20200229'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -76,7 +79,7 @@ if sys.hexversion >= 0x03000000:
 else:
 
   globals()['unicode'] = unicode
-  bytesjoin = ''.join
+  joinbytes = ''.join
 
   def iteritems(o):
     return o.iteritems()

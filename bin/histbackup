@@ -21,7 +21,8 @@
 # in a set of directories named by dates, or date-time if the date already exists.
 # The new backup is prepopulated by hardlinks of each file from the previous backup
 # and then updated with rsync(1).
-# This arranges that the only new content of each new backup is fresh copies of the changed files.
+# This arranges that the only new content of each new backup
+# is fresh copies of the changed files.
 # In this way each backup directory is a full copy of the source directory
 # but the disc space cost is that of an incremental backup.
 # Because it uses rsync,
@@ -49,7 +50,8 @@
 # If the data to backup are local to this machine
 # you merely need read access to it.
 # If the data are remote
-# you will need ssh(1) access to the remote host as a user with read access to the data there.
+# you will need ssh(1) access to the remote host
+# as a user with read access to the data there.
 # Test it:
 #
 #       ssh user@remote ls -l /path/to/source/directory
@@ -89,7 +91,7 @@
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 vecho=:
 symlink=LATEST
 src=
@@ -105,24 +107,26 @@ rsopts=
 copytimes=
 rsdelete=--delete
 thisbackup=
+sshcmd='ssh -o controlpath=none'
 reverse=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
 
-cmd=`basename "$0"`
+cmd=$( basename "$0" )
 usage="Usage:
   $cmd [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
   $cmd [options...] --no-rsync backupdir
   $cmd [options...] [-- [rsyncopts...]]
 
   -A, --acls    Preserve ACLs. Passed to rsync.
+  -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
                 of the oldest younger date as the reference tree.
                 Clears any --symlink setting; --symlink must come
-                later than this option is required.
+                later than this if that option is required.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --copy-times  Copy file timestamps from the source tree to the
@@ -138,8 +142,10 @@ usage="Usage:
                 Pass --delete --delete-excluded to rsync.
   --no-hbfiles  Do not honour the .hbfiles file in the backup directory.
   --no-hbinclude Do not honour the .hbinclude file in the backup directory.
-  --no-rsync    Don't do the rsync pass - just set up the new link tree and
+  --no-rsync    Do not do the rsync pass - just set up the new link tree and
                 report its basename.
+  --no-symlink-if-unchanged
+                Make a link tree even when there are no changes.
   --link-fail-repair (Obsolete; this is always done.)
                 Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
@@ -148,8 +154,6 @@ usage="Usage:
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
                 and time if the tree is often unchanged.
                 This is the default.
-  --no-symlink-if-unchanged
-                Make a link tree even when there are no changes.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
@@ -158,37 +162,8 @@ usage="Usage:
 
 badopts=
 
-# have "cp -ral"? otherwise rely on my linktree script
-if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
-then
-  mklinktree(){
-    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
-    _mkl_src=$1
-    _mkl_dst=$2
-    case "$_mkl_dst" in
-      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
-    esac
-    # make link tree, might fail if hard link limit reached for files
-    $trace cp -ral "$1" "$2" && return 0
-    # failed to make target? fail outright
-    [ -d "$2/." ] || return 1
-    # if we made the target, update from source
-    $trace rsync -iaO "$1/." "$2/."
-  }
-else
-  mklinktree(){ $trace linktree "$1" "$2"; }
-fi
 daycode(){ date '+%Y-%m-%d'; }
 datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
-
-### rsync capabilities at local end
-##rsync_has_link_dest=
-##rsv=`rsync --version | sed -n 's/^rsync *version \([1-9]\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1 \2 \3/p'`
-##if [ -n "$rsv" ] && rsvn=`set -- $rsv; printf "%d%03d%03d\n" "$@"`
-##then
-##  [ "$rsvn" -ge 2005006 ] && rsync_has_link_dest=1
-##  ## other end needs proto 29 also ## [ "$rsvn" -ge 2006004 ] && rsopts="$rsopts --fuzzy"
-##fi
 
 # =head1 OPTIONS
 #
@@ -197,6 +172,14 @@ datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
 while [ $# -gt 0 ]
 do
   case $1 in
+
+    # =item -A, --acls
+    #
+    # Preserve ACLs. Passed to rsync.
+    #
+    -A|--acls)
+      rsopts="$rsopts $1"
+      ;;
 
     # =item --copy-times
     #
@@ -209,48 +192,7 @@ do
     --copy-times)
       copytimes=1
       ;;
-    # =item --no-delete
-    #
-    # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
-    #
-    --no-delete)
-      rsdelete=
-      ;;
 
-    # =item --no-rsync
-    #
-    # Skip the rsync step; just create the new link tree.
-    #
-    --no-rsync)
-      linkonly=1
-      ;;
-
-    # =item --link-fail-repair
-    #
-    # Proceed even if the linktree step fails, presumably due to
-    # reaching the filesystem hard link limit. Does a repair rsync
-    # from the previous to new backup before proceeding.
-    #
-    --link-fail-repair)
-      echo "$cmd: $1: obsolete option; $cmd always tries to cope with hard link failure" >&2
-      ;;
-    # =item --symlink-if-unchanged
-    #
-    # Symlink the top level date if there are no changes to the tree.
-    # This requires a prepass with "rsync -n" but saves time and
-    # hardlinks if there are no changes.
-    #
-    --symlink-if-unchanged)
-        symlink_unchanged=1
-        ;;
-    # =item --no-symlink-if-unchanged
-    #
-    # Do not symlink the top level date if there are no changes to the tree,
-    # instead always make a hard link tree.
-    #
-    --no-symlink-if-unchanged)
-        symlink_unchanged=
-        ;;
     # =item --date datestring
     #
     # Specify datestring for this backup. The default is the current date or date-time.
@@ -258,6 +200,7 @@ do
     --date)
         thisbackup=$2; shift
         ;;
+
     # =item --delete
     #
     # Passed to rsync.
@@ -272,6 +215,42 @@ do
     #
     --delete-excluded)
       rsdelete='--delete --delete-excluded'
+      ;;
+
+    # =item -e ssh-cmd
+    #
+    # Specify ssh command for rsync, passed to rsync.
+    # Default: B<ssh -o controlpath=none>
+    #
+    -e)
+      sshcmd=$2; shift
+      ;;
+
+    # =item -i, --itemize-changes
+    #
+    # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
+    #
+    -i|--itemize-changes)
+      imode=1
+      rsopts="$rsopts -i"
+      ;;
+
+    # =item --link-fail-repair
+    #
+    # Proceed even if the linktree step fails, presumably due to
+    # reaching the filesystem hard link limit. Does a repair rsync
+    # from the previous to new backup before proceeding.
+    #
+    --link-fail-repair)
+      echo "$cmd: $1: obsolete option; $cmd now always tries to cope with hard link failure" >&2
+      ;;
+
+    # =item --no-delete
+    #
+    # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
+    #
+    --no-delete)
+      rsdelete=
       ;;
 
     # =item --no-hbfiles
@@ -289,6 +268,23 @@ do
     --no-hbinclude)
       usehbinclude=
       ;;
+
+    # =item --no-rsync
+    #
+    # Skip the rsync step; just create the new link tree.
+    #
+    --no-rsync)
+      linkonly=1
+      ;;
+
+    # =item --no-symlink-if-unchanged
+    #
+    # Do not symlink the top level date if there are no changes to the tree,
+    # instead always make a hard link tree.
+    #
+    --no-symlink-if-unchanged)
+        symlink_unchanged=
+        ;;
 
     # =item --rsync-path rrsync
     #
@@ -309,26 +305,9 @@ do
     --symlink)
       symlink=$2; shift ;;
 
-    # =item -A, --acls
-    #
-    # Preserve ACLs. Passed to rsync.
-    #
-    -A|--acls)
-      rsopts="$rsopts $1"
-      ;;
-
-    # =item -i, --itemize-changes
-    #
-    # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
-    #
-    -i|--itemize-changes)
-      imode=1
-      rsopts="$rsopts -i"
-      ;;
-
     # -item -r, --reverse
     #
-    # Reverse dates.
+    # Reverse dates, causing the oldest date to be chosen.
     #
     # =item -v, --verbose
     #
@@ -336,6 +315,16 @@ do
       reverse=1
       symlink=
       ;;
+
+    # =item --symlink-if-unchanged
+    #
+    # Symlink the top level date if there are no changes to the tree.
+    # This requires a prepass with B<rsync -n> but saves time and
+    # hardlinks if there are no changes.
+    #
+    --symlink-if-unchanged)
+        symlink_unchanged=1
+        ;;
 
     # Turn on verbose mode.
     #
@@ -369,10 +358,11 @@ done
 #
 # If neither the source not destination appear
 # it is expected that the destination is the current directory
-# and that the source is specified by the .hbsource file in the current directory.
+# and that the source is specified by the B<.hbsource> file in the current directory.
 #
 # Otherwise, the source and destination appear.
-# These may be followed by I<otherbackupdirs>, the full paths of other directories like the one B<histbackup> is copying;
+# These may be followed by I<otherbackupdirs>,
+# the full paths of other directories like the one B<histbackup> is copying;
 # these will be handed to rsync(1) as B<--link-dest> options.
 # After the I<otherbackupdirs>, other rsync(1) options may be supplied;
 # these will be passed to rsync.
@@ -422,7 +412,7 @@ else
                   if [ "$obackup_count" -lt 20 ]
                   then
                     obackup_options="$obackup_options --link-dest=$obackup"
-                    obackup_count=`expr $obackup_count + 1`
+                    obackup_count=$( expr $obackup_count + 1 )
                   else
                     $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
                   fi
@@ -442,9 +432,18 @@ then
     badopts=1
 fi
 
-[ -d "$dest/." ] || { echo "$cmd: backup dir $dest: not a directory" >&2
-                      badopts=1
-                    }
+# needed from here on
+wd=$( pwd )
+
+if [ -d "$dest/." ]
+then
+  case "$dest" in
+      /*) absdest=$dest ;; *) absdest=$wd/$dest ;;
+  esac
+else
+  echo "$cmd: backup dir $dest: not a directory" >&2
+  badopts=1
+fi
 
 # sanity check $src
 case "$src" in
@@ -452,13 +451,41 @@ case "$src" in
                 ;;
     *:*)        # remote - don't check
                 ;;
-    *)          [ -d "$src/."  ] || { echo "$cmd: source dir $src: not a directory" >&2
-                                      badopts=1
-                                    }
+    *)          if [ -d "$src/."  ]
+                then
+                  case "$src" in
+                    /*) ;; *) src=$wd/$src ;;
+                  esac
+                else
+                  echo "$cmd: source dir $src: not a directory" >&2
+                  badopts=1
+                fi
                 ;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# have "cp -ral"? otherwise rely on my linktree script
+if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+then
+  mklinktree(){
+    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+    _mkl_src=$1
+    _mkl_dst=$2
+    case "$_mkl_dst" in
+      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+    esac
+    # make link tree, might fail if hard link limit reached for files
+    $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
+      # failed to make target? fail outright
+      [ -d "$_mkl_dst/." ] || return 1
+      # if we made the target, update from source
+      dorsync "$_mkl_src/" "$_mkl_dst/"
+    }
+  }
+else
+  mklinktree(){ $trace linktree "$1" "$2"; }
+fi
 
 if [ $linkonly ]
 then
@@ -470,7 +497,9 @@ fi
 if [ $imode ]
 then
   # filter out mention of directories, symlink times and hard links
-  filteroutput=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d; /^\.d/d; /^hf/d'`
+  filteroutput=$(
+    shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d; /^\.d/d; /^hf/d'
+  )
 fi
 
 # =head1 CUSTOMISATION FILES
@@ -519,11 +548,11 @@ then
   fi
 else
   # allocate a backup name
-  today=`daycode` || exit 1
+  today=$( daycode ) || exit 1
   thisbackup=$today
   if [ -d "$dest/$thisbackup/." ]
   then
-    now=`datecode` || exit 1
+    now=$( datecode ) || exit 1
     thisbackup=$now
     if [ -d "$dest/$thisbackup/." ]
     then
@@ -533,8 +562,8 @@ else
   fi
 fi
 
-# locate to most recent backup younger than this one, if any
-# if $reverse, locate oldest backup later than this one
+# Locate to most recent backup younger than this one, if any.
+# If $reverse, locate oldest backup later than this one.
 lastbackup=$(
         cd "$dest" || exit 1
         (
@@ -556,6 +585,7 @@ lastbackup=$(
 
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
+  ##echo "DORSYNC $* ..." >&2
   _drs_src=$1
   _drs_dst=$2
   shift; shift
@@ -563,7 +593,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync -e "$sshcmd" $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
@@ -574,78 +604,75 @@ dorsync()
 
 ok=
 
-dolink=1
-if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
+# Probe for changes since last backup.
+# If none, make symlink to last real backup and exit.
+if [ $symlink_unchanged ] \
+&& [ -z "$linkonly" ] \
+&& [ -n "$lastbackup" ] \
+&& [ -d "$dest/$lastbackup/." ]
 then
-    if [ $symlink_unchanged ] && [ -z "$linkonly" ]
-    then
-      $vecho "checking for changes to $src from $lastbackup ..."
-      changes=$( dorsync "$src" "$dest/$lastbackup" ${1+"$@"} -niO \
-               | sed -n '/^..         /!{ p; q; }' \
-               )
-      if [ -z "$changes" ]
-      then
-        $vecho "no changes, symlinking last tree"
-        ( set -ue
-          cd "$dest" || exit 1
-          $trace ln -s "$lastbackup" "$thisbackup"
-          [ -z "$symlink" ] \
-          || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
-        )
-        exit
-      else
-        $vecho "changes, proceeding with regular backup ..."
-      fi
-    fi
-    $vecho "existing backup: linking $lastbackup to $thisbackup ..."
-    if ( cd "$dest" || exit 1
-         mklinktree "$lastbackup" "$thisbackup" \
-         || {
-           dolink=
-           $trace rm -rf "$thisbackup"
-           false
-         }
-       )
-    then
-      ok=1
-      if [ $linkonly ]
-      then  echo "$dest/$thisbackup" >&3
-      else  $vecho "updating $thisbackup from $src ..."
-            if [ $copytimes ]
-            then
-              $trace cpt "$src" "$dest/$thisbackup" || ok=
-            fi
-      fi
-    fi
-else
-    if [ $linkonly ]
-    then
-        echo "$cmd: $dest: no subdirectory to link from" >&2
-        ls -la "$dest" >&2
-        exit 1
-    else
-        $vecho "fresh backup, just copying source ..."
-        $trace mkdir "$dest/$thisbackup" && ok=1
-    fi
-fi
-
-if [ $ok ] && [ -z "$linkonly" ]
-then
-  dorsync "$src" "$dest/$thisbackup" ${1+"$@"} $obackup_options
-fi
-
-if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
-then
-  if [ $dolink ]
+  $vecho "checking for changes to $src from $lastbackup ..."
+  changes=$( dorsync "$src" "$dest/$lastbackup" ${1+"$@"} -niO \
+           | sed -n '/^..         /!{ p; q; }'
+           )
+  if [ -z "$changes" ]
   then
-    ( cd "$dest" || exit 1
-      rm -f "$symlink"
-      $trace ln -s "$thisbackup" "$symlink"
-    ) || ok=
+    $vecho "no changes, symlinking last tree"
+    ( set -ue
+      cd "$dest" || exit 1
+      $trace ln -s "$lastbackup" "$thisbackup"
+      [ -z "$symlink" ] \
+      || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
+    )
+    exit
   else
-    echo "$cmd: new directory worse than old, symlink \"$symlink\" not made" >&2
-    ok=
+    $vecho "changes, proceeding with regular backup ..."
   fi
+fi
+
+ok=1
+
+# New backup tree required.
+if [ $linkonly ]
+then
+  # just make the hard link tree
+  [ -n "$lastbackup" ] || {
+    echo "$cmd: no previous backup, cannot make link tree" >&2
+    exit 1
+  }
+  ( cd "$dest" || exit 1
+    mklinktree "./$lastbackup" "$thisbackup" \
+    || dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
+  )
+else
+  # do a proper hardlinked backup
+  ( cd "$dest" || exit 1
+    if [ -n "$lastbackup" ]
+    then
+      mklinktree "./$lastbackup" "$thisbackup"
+      dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
+      || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    else
+      dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    fi
+  )
+fi \
+|| {
+  echo "$cmd: rsync failed, review errors and check the content of $absdest/$thisbackup" >&2
+  ok=
+}
+
+if [ $copytimes ]
+then
+  $trace cpt "$src" "$dest/$thisbackup" || ok=
+fi
+
+if [ $ok ] && [ -n "$symlink" ]
+then
+  ( cd "$dest" || exit 1
+    rm -f "$symlink"
+    $trace ln -s "$thisbackup" "$symlink"
+  ) || ok=
 fi
 
 [ $ok ]

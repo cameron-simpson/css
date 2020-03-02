@@ -13,8 +13,9 @@ from contextlib import contextmanager
 from heapq import heappush, heappop
 import sys
 from threading import Semaphore, Thread, current_thread, Lock
+from cs.deco import decorator
 from cs.excutils import logexc, transmute
-from cs.logutils import LogTime, error, debug, exception
+from cs.logutils import LogTime, error, warning, debug, exception
 from cs.pfx import Pfx
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
@@ -31,6 +32,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.excutils',
         'cs.logutils',
         'cs.pfx',
@@ -330,23 +332,55 @@ class AdjustableSemaphore(object):
           delta += 1
       self.__value = newvalue
 
-def locked(func):
-  ''' A decorator for monitor functions that must run within a lock.
-      Relies upon a ._lock attribute for locking.
+@decorator
+def locked(func, initial_timeout=2.0, lockattr='_lock'):
+  ''' A decorator for instance methods that must run within a lock.
+
+      Decorator keyword arguments:
+      * `initial_timeout`:
+        the initial lock attempt timeout;
+        if this is `>0` and exceeded a warning is issued
+        and then an indefinite attempt is made.
+        Default: `2.0`s
+      * `lockattr`:
+        the name of the attribute of `self`
+        which references the lock object.
+        Default `'_lock'`
   '''
 
   def lockfunc(self, *a, **kw):
-    with self._lock:
-      return func(self, *a, **kw)
+    ''' Obtain the lock and then call `func`.
+    '''
+    lock = getattr(self, lockattr)
+    if initial_timeout > 0 and lock.acquire(timeout=initial_timeout):
+      try:
+        return func(self, *a, **kw)
+      finally:
+        lock.release()
+    else:
+      if initial_timeout > 0:
+        warning(
+            "timeout after %gs waiting for %s<%s>.%s, continuing to wait",
+            initial_timeout,
+            type(self).__name__, self, lockattr
+        )
+      with lock:
+        return func(self, *a, **kw)
 
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
+@decorator
 def locked_property(
     func, lock_name='_lock', prop_name=None, unset_object=None
 ):
   ''' A thread safe property whose value is cached.
       The lock is taken if the value needs to computed.
+
+      The default lock attribute is `._lock`.
+      The default attribute for the cached value is `._`funcname
+      where funcname is `func.__name__`.
+      The default "unset" value for the cache is `None`.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
