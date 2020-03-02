@@ -1103,6 +1103,12 @@ class TagFile(HasFSTagsMixin):
     '''
     return self[name].discard(tag_name, value, verbose=state.verbose)
 
+  def update(self, name, tags, *, prefix=None):
+    ''' Update the tags for `name` from the supplied `tags`
+        as for `Tagset.update`.
+    '''
+    return self[name].update(tags, prefix=prefix, verbose=state.verbose)
+
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
 class TaggedPath(HasFSTagsMixin):
@@ -1216,6 +1222,12 @@ class TaggedPath(HasFSTagsMixin):
         such as a `Tag`.
     '''
     self.direct_tagfile.discard(self.basename, tag, value)
+
+  def update(self, tags, *, prefix=None):
+    ''' Update the direct tags from `tags`
+        as for `TagSet.update`.
+    '''
+    self.direct_tagfile.update(self.basename, tags, prefix=prefix)
 
   def pop(self, tag_name):
     ''' Remove the tag named `tag_name` from the direct tags.
