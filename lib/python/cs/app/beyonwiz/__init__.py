@@ -22,10 +22,12 @@ from cs.app.ffmpeg import (
     ConversionSource as FFSource,
 )
 from cs.deco import strable
+from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.tagset import Tag
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -92,6 +94,13 @@ class RecordingMetaData(NS):
   def as_json(self, indent=None):
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
+  def as_tags(self):
+    yield from (Tag(tag, None) for tag in self.tags)
+    yield from self.episodeinfo.as_tags()
+    for rawkey, rawvalue in self.raw.items():
+      for field, value in rawvalue.items():
+        yield Tag(rawkey + '.' + field, value)
+
   @property
   def start_dt(self):
     ''' Start of recording as a datetime.datetime.
@@ -115,7 +124,7 @@ def Recording(path):
     return Enigma2(path)
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(ABC):
+class _Recording(ABC, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
@@ -124,7 +133,8 @@ class _Recording(ABC):
       'source_name', 'start_dt_iso', 'description'
   )
 
-  def __init__(self, path):
+  def __init__(self, path, fstags=None):
+    self._fstags = fstags
     self.path = path
     self._lock = Lock()
 
@@ -242,6 +252,9 @@ class _Recording(ABC):
               "can't infer output format from dstpath, no extension"
           )
         dstfmt = ext[1:]
+      fstags = self.fstags
+      with fstags:
+        fstags[dstpath].update(self.metadata.as_tags(), prefix='beyonwiz')
       ffmeta = self.ffmpeg_metadata(dstfmt)
       sources = []
       for start_s, end_s in timespans:
