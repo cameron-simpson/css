@@ -54,7 +54,8 @@ DISTINFO = {
 
 # UNUSED
 def trailing_nul(bs):
-  # strip trailing NULs
+  ''' Strip trailing `NUL`s
+  '''
   bs = bs.rstrip(b'\x00')
   # locate preceeding NUL padded area
   start = bs.rfind(b'\x00')
@@ -65,6 +66,8 @@ def trailing_nul(bs):
   return start, bs[start:]
 
 class MetaJSONEncoder(json.JSONEncoder):
+  ''' `json.JSONEncoder` sublass with handlers for `set` and `datetime`.
+  '''
 
   def default(self, o):
     if isinstance(o, set):
@@ -89,14 +92,20 @@ class RecordingMetaData(NS):
       raise AttributeError(attr)
 
   def as_dict(self):
+    ''' Return the metadata as a `dict`.
+    '''
     d = dict(self.__dict__)
     d["start_dt_iso"] = self.start_dt_iso
     return d
 
   def as_json(self, indent=None):
+    ''' Return the metadat as JSON.
+    '''
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
   def as_tags(self):
+    ''' Generator yielding the metadata as `Tag`s.
+    '''
     yield from (Tag(tag, None) for tag in self.tags)
     yield from self.episodeinfo.as_tags()
     for rawkey, rawvalue in self.raw.items():
@@ -157,6 +166,8 @@ class _Recording(ABC, HasFSTagsMixin):
 
   @abstractmethod
   def data(self):
+    ''' Stub method for the raw video data method.
+    '''
     raise NotImplementedError('data')
 
   @strable(open_func=lambda filename: open(filename, 'wb'))
@@ -169,10 +180,14 @@ class _Recording(ABC, HasFSTagsMixin):
 
   @prop
   def tags_part(self):
+    ''' A filename component representing the metadata tags.
+    '''
     return '+'.join(self.tags)
 
   @prop
   def episode_info_part(self):
+    ''' A filename component representing the episode info.
+    '''
     return str(self.metadata.episodeinfo)
 
   def converted_path(self, outext):
@@ -283,6 +298,8 @@ class _Recording(ABC, HasFSTagsMixin):
       return ok
 
   def ffmpeg_metadata(self, dstfmt='mp4'):
+    ''' Return a new `FFmpegMetaData` containing our metadata.
+    '''
     M = self.metadata
     comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
               % (self.path, M.start_dt_iso)
