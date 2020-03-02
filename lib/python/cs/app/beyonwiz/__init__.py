@@ -38,10 +38,12 @@ DISTINFO = {
     'requires': [
         'cs.app.ffmpeg',
         'cs.deco',
+        'cs.fstags',
         'cs.logutils',
         'cs.mediainfo',
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
     ],
     'entry_points': {
         'console_scripts': [
