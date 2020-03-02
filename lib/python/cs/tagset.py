@@ -275,6 +275,9 @@ class Tag(namedtuple('Tag', 'name value')):
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
       return value
+    # convert some values to a suitable type
+    if isinstance(value, (tuple, set)):
+      value = list(value)
     # fall back to JSON encoded form of value
     return cls.JSON_ENCODER.encode(value)
 
