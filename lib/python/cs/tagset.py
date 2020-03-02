@@ -146,18 +146,34 @@ class TagSet:
         return old_tag
     return None
 
-  def update(self, other, *, verbose=False):
-    ''' Update this `TagSet` from `other`,
-        a dict or an iterable of taggy things.
+  def update(self, other, *, prefix=None, verbose=False):
+    ''' Update this `TagSet` from `other`.
+
+        Parameters:
+        * `other`: a mapping of name->value
+          or an iterable of `Tag`like things
+        * `prefix`: an optional prefix for the update names;
+          if a nonempty string, the update names will be
+          `prefix+'.'+name`.
+        * `verbose`: verbosity flag (default `False`)
+          passed to `self.add`.
     '''
-    if isinstance(other, dict):
+    try:
+      other_kvs = other.items()
+    except AttributeError:
+      # not a mapping, presume an iterable
+      for tag in other:
+        self.add(tag.prefix_name(prefix), verbose=verbose)
+    else:
+      # a mapping, convert to iterable and recurse
       self.update(
-          (Tag.from_name_value(k, v) for k, v in other.items()),
+          (
+              Tag.from_name_value(k, v)
+              for k, v in other_kvs
+          ),
+          prefix=prefix,
           verbose=verbose
       )
-    else:
-      for tag in other:
-        self.add(tag, verbose=verbose)
 
   # Assorted computed properties.
 
@@ -231,6 +247,17 @@ class Tag(namedtuple('Tag', 'name value')):
     if value is None:
       return name
     return name + '=' + self.transcribe_value(value)
+
+  def prefix_name(self, prefix):
+    ''' Return a `Tag` whose `.name` has an additional prefix.
+
+        If `prefix` is `None` or empty, return this `Tag`.
+        Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
+    '''
+    return (
+        self.from_name_value('.'.join((prefix, self.name)), self.value)
+        if prefix else self
+    )
 
   @classmethod
   def transcribe_value(cls, value):
