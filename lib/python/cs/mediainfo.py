@@ -42,6 +42,7 @@ from types import SimpleNamespace as NS
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.x import X
+from cs.tagset import Tag
 
 DISTINFO = {
     'description': "Simple facilities for media information",
@@ -54,6 +55,7 @@ DISTINFO = {
     'install_requires': [
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
     ],
 }
 
@@ -143,6 +145,22 @@ class EpisodeInfo(NS):
     self.episode = episode
     self.part = part
     self.scene = scene
+
+  def as_dict(self):
+    ''' Return the episode info as a `dict`.
+    '''
+    d = {}
+    for attr in 'series', 'episode', 'part', 'scene':
+      value = getattr(self, attr)
+      if value is not None:
+        d[attr] = value
+    return d
+
+  def as_tags(self):
+    ''' Generator yielding the episode info as `Tag`s.
+    '''
+    for field, value in self.as_dict().items():
+      yield Tag(field, value)
 
   def __str__(self):
     marks = []
