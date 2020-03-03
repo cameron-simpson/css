@@ -46,7 +46,8 @@ DISTINFO_DEFAULTS = {
 }
 
 USAGE = '''Usage: %s [-f] cs.module [op]
-  -f  Force. Sanity checks that would stop some actions normally  will not prevent them.
+  -f  Force. Sanity checks that would stop some actions normally
+      will not prevent them.
   The default op is "check".
   Supported ops:
     check       Check simple things about a module's DISTINFO map.
