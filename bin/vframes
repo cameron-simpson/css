@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# Extract video frames using ffmpeg. - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+fps=1
+
+cmd=$0
+usage="Usage: $cmd [fps] video-file [ffmpeg-output-options]
+  Default fps: 1
+  Example: extract 2 frames per second from the video foo.mp4:
+    $cmd 2 foo.mp4"
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9]|I)
+      fps=$1
+      shift
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing video-file" >&2
+  badopts=1
+else
+  video=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$video" in
+  -)  prefix=stdin ;;
+  *)  if [ -s "$video" ]
+      then
+        base=$( basename "$video" )
+        case "$base" in
+          *.*)  prefix=$( expr "x$base" : 'x\(.*\)\..*' ) ;;
+          *)    prefix=$base ;;
+        esac
+        case "$prefix" in
+          *%*)  prefix=$( printf '%s\n' "$prefix" | sed 's/%/&&/g' ) ;;
+        esac
+        case "$prefix" in
+          -*)   prefix="frame$prefix" ;;
+        esac
+      else
+        prefix=frame
+      fi
+      ;;
+esac
+
+set -x
+##exec mplayer -nosound -vo png:z=9 -vf "framestep=$framestep" ${1+"$@"}
+exec ffmpeg -i "$video" -f image2 -r "$fps" ${1+"$@"} "$prefix-%04d.png"

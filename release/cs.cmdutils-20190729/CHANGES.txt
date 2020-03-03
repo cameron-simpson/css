@@ -1,0 +1,1 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: support for a USAGE_FORMAT usage message format string and a getopt_error_handler method to control response to GetoptError exceptions; drop instance .getopt_spec attribute

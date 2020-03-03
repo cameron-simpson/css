@@ -1,0 +1,6 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: minor docstring fixes
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: docstring improvements
+lib/python/cs/sqlalchemy_utils.py: cs.resources: get_json_field: use forgotten `default` parameter
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: make ORM a MultiOpenMixin
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: fix a shadowed name, tweak imports
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: tweak docstring, tidy wrapper.__name__ value

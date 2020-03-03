@@ -22,9 +22,11 @@ class TestAll(NodeTestAll):
 
   def setUp(self):
     self.sql_url = 'sqlite:///:memory:'
-    self.engine = create_engine(self.sql_url,
-                                poolclass=StaticPool,
-                                echo=len(os.environ.get('DEBUG','')) > 0)
+    self.engine = create_engine(
+        self.sql_url,
+        poolclass=StaticPool,
+        echo=len(os.environ.get('DEBUG', '')) > 0
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

@@ -49,14 +49,16 @@ import os
 from os.path import basename, join as joinpath, splitext
 from pwd import getpwnam, getpwuid
 from signal import signal, SIGHUP, SIGINT, SIGTERM
-from subprocess import Popen, PIPE, DEVNULL, call as callproc
+from subprocess import Popen, PIPE
 import sys
+from threading import Lock
 from time import sleep, time as now
 from cs.app.flag import Flags, FlaggedMixin
 from cs.env import VARRUN
-from cs.logutils import setup_logging, warning, info, debug
-from cs.pfx import Pfx, PfxThread as Thread, XP
+from cs.logutils import setup_logging, warning, info, debug, exception
+from cs.pfx import Pfx, PfxThread as Thread
 from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
+from cs.py3 import DEVNULL
 from cs.sh import quotecmd
 
 DISTINFO = {
@@ -65,6 +67,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
+        "Topic :: Utilities",
     ],
     'install_requires': [
         'cs.app.flag',
@@ -72,18 +75,17 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.psutils',
+        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': [
-            'svcd = cs.app.svcd:main'
-        ],
+        'console_scripts': ['svcd = cs.app.svcd:main'],
     },
 }
 
-TEST_RATE = 7       # frequency of polling of test condition
-KILL_TIME = 5       # how long to wait for a terminated process to exit
-RESTART_DELAY = 3   # delay be restart of an exited process
+TEST_RATE = 7  # frequency of polling of test condition
+KILL_TIME = 5  # how long to wait for a terminated process to exit
+RESTART_DELAY = 3  # delay be restart of an exited process
 
 USAGE = '''Usage:
   {cmd} disable names...
@@ -131,7 +133,9 @@ USAGE = '''Usage:
           Run test and related commands as the specified username.
     -x    Trace execution.'''
 
-def main(argv=None, environ=None):
+def main(argv=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   cmd = basename(argv.pop(0))
@@ -167,7 +171,7 @@ def main(argv=None, environ=None):
     lock_name = None
     name = None
     svc_pidfile = None  # pid file for the service process
-    mypidfile = None    # pid file for the svcd
+    mypidfile = None  # pid file for the svcd
     quiet = False
     sig_shcmd = None
     test_shcmd = None
@@ -242,37 +246,59 @@ def main(argv=None, environ=None):
   if sig_shcmd is None:
     sig_func = None
   else:
+
     def sig_func():
-      argv = ['sh', '-c', sig_shcmd]
+      argv = ['sh', ('-xc' if trace else '-c'), sig_shcmd]
       if test_uid != uid:
-        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
-      P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
+        su_shcmd = 'exec ' + quotecmd(argv)
+        if trace:
+          su_shcmd = 'set -x; ' + su_shcmd
+        argv = ['su', test_username, '-c', su_shcmd]
+      P = LockedPopen(argv, stdin=DEVNULL, stdout=PIPE)
       sig_text = P.stdout.read()
       returncode = P.wait()
       if returncode != 0:
         warning("returncode %s from %r", returncode, sig_shcmd)
         sig_text = None
       return sig_text
+
   if test_shcmd is None:
     test_func = None
   else:
+
     def test_func():
-      argv = ['sh', '-c', test_shcmd]
-      if test_uid != uid:
-        argv = ['su', test_username, 'exec ' + quotecmd(argv)]
-      return callproc(argv, stdin=DEVNULL) == 0
+      with Pfx("main.test_func: shcmd=%r", test_shcmd):
+        argv = ['sh', '-c', test_shcmd]
+        if test_uid != uid:
+          argv = ['su', test_username, 'exec ' + quotecmd(argv)]
+        shcmd_ok = callproc(argv, stdin=DEVNULL) == 0
+        if not quiet:
+          info("exit status != 0")
+        return shcmd_ok
+
   if run_uid != uid:
     argv = ['su', run_username, 'exec ' + quotecmd(argv)]
   if use_lock:
     argv = ['lock', '--', 'svcd-' + name] + argv
-  S = SvcD(argv, name=name, pidfile=svc_pidfile, sig_func=sig_func,
-           test_flags=test_flags, test_func=test_func, test_rate=test_rate,
-           once=once, quiet=quiet, trace=trace)
-  def signal_handler(signum, frame):
+  S = SvcD(
+      argv,
+      name=name,
+      pidfile=svc_pidfile,
+      sig_func=sig_func,
+      test_flags=test_flags,
+      test_func=test_func,
+      test_rate=test_rate,
+      once=once,
+      quiet=quiet,
+      trace=trace
+  )
+
+  def signal_handler(*_):
     S.stop()
     S.wait()
     S.flag_stop = False
     sys.exit(1)
+
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
   signal(SIGTERM, signal_handler)
@@ -287,51 +313,84 @@ def main(argv=None, environ=None):
     S.start()
     S.wait()
 
-class SvcD(FlaggedMixin, object):
+_Popen_lock = Lock()
 
-  def __init__(self, argv, name=None,
-        environ=None,
-        flags=None,
-        pidfile=None,
-        sig_func=None,
-        test_flags=None,
-        test_func=None,
-        test_rate=None,
-        restart_delay=None,
-        once=False,
-        quiet=False,
-        trace=False,
-        on_spawn=None,
-        on_reap=None,
-    ):
+def LockedPopen(*a, **kw):
+  ''' Serialise the Popen calls.
+
+      My long term multithreaded SvcD programmes sometimes coredump.
+      My working theory is that Popen, maybe only on MacOS, is
+      slightly not multithead safe. This function exists to test
+      that theory.
+  '''
+  global _Popen_lock
+  with _Popen_lock:
+    P = Popen(*a, **kw)
+  return P
+
+def callproc(*a, **kw):
+  ''' Workalike for subprocess.call, using LockedPopen.
+  '''
+  P = LockedPopen(*a, **kw)
+  P.wait()
+  return P.returncode
+
+class SvcD(FlaggedMixin, object):
+  ''' A process based service.
+  '''
+
+  def __init__(
+      self,
+      argv,
+      name=None,
+      environ=None,
+      flags=None,
+      group_name=None,
+      pidfile=None,
+      sig_func=None,
+      test_flags=None,
+      test_func=None,
+      test_rate=None,
+      restart_delay=None,
+      once=False,
+      quiet=False,
+      trace=False,
+      on_spawn=None,
+      on_reap=None,
+  ):
     ''' Initialise the SvcD.
-        `argv`: command to run as a subprocess.
-        `flags`: a cs.app.flag.Flags -like object, default None;
+
+        Parameters:
+        * `argv`: command to run as a subprocess.
+        * `flags`: a cs.app.flag.Flags -like object, default None;
           if None the default flags will be used.
-        `pidfile`: path to pid file, default $VARRUN/{name}.pid.
-        `sig_func`: signature function to compute a string which
+        * `group_name`: alert group name, default "SVCD " + `name`.
+        * `pidfile`: path to pid file, default $VARRUN/{name}.pid.
+        * `sig_func`: signature function to compute a string which
           causes a restart if it changes
-        `test_flags`: map of {flagname: truthiness} which should
+        * `test_flags`: map of {flagname: truthiness} which should
           be monitored at test time; truthy flags must be true and
           untruthy flags must be false
-        `test_func`: test function with must return true if the comannd can run
-        `test_rate`: frequency of tests, default TEST_RATE
-        `restart_delay`: delay before start of an exiting command,
+        * `test_func`: test function with must return true if the comannd can run
+        * `test_rate`: frequency of tests, default TEST_RATE
+        * `restart_delay`: delay before start of an exiting command,
           default RESTART_DELAY
-        `once`: if true, run the command only once
-        `quiet`: if true, do not issue alerts
-        `trace`: trace actions, default False
-        `on_spawn`: to be called after a new subprocess is spawned
-        `on_reap`: to be called after a subprocess is reaped
+        * `once`: if true, run the command only once
+        * `quiet`: if true, do not issue alerts
+        * `trace`: trace actions, default False
+        * `on_spawn`: to be called after a new subprocess is spawned
+        * `on_reap`: to be called after a subprocess is reaped
     '''
+    if name is None:
+      name = 'UNNAMED'
     if environ is None:
       environ = os.environ
     if pidfile is None and name is not None:
       pidfile = joinpath(VARRUN(environ=environ), name + '.pid')
     if flags is None:
       flags = Flags(environ=environ, debug=trace)
-    if name is None:
-      name = 'UNNAMED'
+    if group_name is None:
+      group_name = "SVCD " + name
     if test_flags is None:
       test_flags = {}
     if test_rate is None:
@@ -341,6 +400,7 @@ class SvcD(FlaggedMixin, object):
     FlaggedMixin.__init__(self, flags=flags)
     self.argv = argv
     self.name = name
+    self.group_name = group_name
     self.test_flags = test_flags
     self.test_func = test_func
     self.test_rate = test_rate
@@ -350,9 +410,9 @@ class SvcD(FlaggedMixin, object):
     self.trace = trace
     self.on_spawn = on_spawn
     self.on_reap = on_reap
-    self.active = False # flag to end the monitor Thread
-    self.subp = None    # current subprocess
-    self.monitor = None # monitoring Thread
+    self.active = False  # flag to end the monitor Thread
+    self.subp = None  # current subprocess
+    self.monitor = None  # monitoring Thread
     self.pidfile = pidfile
     self.sig_func = sig_func
 
@@ -365,12 +425,23 @@ class SvcD(FlaggedMixin, object):
     return str(self) + repr(self.argv)
 
   def dbg(self, msg, *a):
+    ''' Log a debug message if not tracing.
+    '''
     if not self.trace:
       return
     debug("%s: " + msg, self, *a)
 
   def test(self):
-    with Pfx("test"):
+    ''' Test whther the service should run.
+
+        In order:
+        * `True` if the override flag is true.
+        * `False` if the disable flag is true.
+        * `False` if any of the specified test flags are false.
+        * `False` if the test function fails.
+        * Otherwise `True`.
+    '''
+    with Pfx("%s[%s].test", type(self).__name__, self.name):
       if self.flag_override:
         self.dbg("flag_override true -> True")
         return True
@@ -394,20 +465,29 @@ class SvcD(FlaggedMixin, object):
       return True
 
   def alert(self, msg, *a):
+    ''' Issue an alert message via the "alert" command.
+    '''
     if self.quiet:
       return
     if a:
       msg = msg % a
-    alert_argv = ['alert', 'SVCD %s: %s' % (self.name, msg)]
+    alert_argv = [
+        'alert', '-g', self.group_name,
+        'SVCD %s: %s' % (self.name, msg)
+    ]
     if self.trace:
       info("alert: %s: %s" % (self.name, msg))
-    Popen(alert_argv, stdin=DEVNULL)
+    LockedPopen(alert_argv, stdin=DEVNULL)
 
   def spawn(self):
+    ''' Spawn the subprocess.
+
+        Calls the `on_spwan` function if any.
+    '''
     if self.subp is not None:
       raise RuntimeError("already running")
     self.dbg("%s: spawn %r", self.name, self.argv)
-    self.subp = Popen(self.argv, stdin=DEVNULL)
+    self.subp = LockedPopen(self.argv, stdin=DEVNULL)
     self.flag_running = True
     self.alert('STARTED')
     if self.pidfile is not None:
@@ -416,6 +496,10 @@ class SvcD(FlaggedMixin, object):
       self.on_spawn()
 
   def reap(self):
+    ''' Collect the subprocess status after termination.
+
+        Calls the `on_reap` function if any.
+    '''
     if self.subp is None:
       raise RuntimeError("not running")
     returncode = self.subp.wait()
@@ -442,7 +526,10 @@ class SvcD(FlaggedMixin, object):
     return self.reap()
 
   def start(self):
+    ''' Start the subprocess and its monitor.
+    '''
     with Pfx("SvcD.start(%s)", self):
+
       def monitor():
         old_sig = None
         next_test_time = now()
@@ -450,7 +537,6 @@ class SvcD(FlaggedMixin, object):
         while True:
           # check for termination state
           if self.flag_stop:
-            XP("flag_stop(%s): was true, set to False and break", self.flagname_stop)
             self.flag_stop = False
             break
           # check for process exit
@@ -465,8 +551,6 @@ class SvcD(FlaggedMixin, object):
               if self.test():
                 # test passes, start service
                 self.spawn()
-              else:
-                XP("self.test() failed")
               next_test_time = now() + self.test_rate
           else:
             # running - see if it should stop
@@ -479,7 +563,11 @@ class SvcD(FlaggedMixin, object):
                 stop = True
               next_test_time = now() + self.test_rate
             if not stop and self.sig_func is not None:
-              new_sig = self.sig_func()
+              try:
+                new_sig = self.sig_func()
+              except Exception as e:
+                exception("sig_func: %s", e)
+                new_sig = None
               if new_sig is not None:
                 if old_sig is None:
                   # initial signature probe
@@ -489,8 +577,10 @@ class SvcD(FlaggedMixin, object):
                     changed = new_sig != old_sig
                   except TypeError as e:
                     warning(
-                        "type error comparing old_sig %s with new_sig %s",
-                        type(old_sig), type(new_sig),
+                        "type error comparing old_sig %s with new_sig %s: %s",
+                        type(old_sig),
+                        type(new_sig),
+                        e,
                     )
                     old_sig = new_sig
                   else:
@@ -503,7 +593,8 @@ class SvcD(FlaggedMixin, object):
           sleep(1)
         if self.subp is not None:
           self._kill_subproc()
-      T = Thread(name=str(self)+':monitor', target=monitor)
+
+      T = Thread(name=str(self) + ':monitor', target=monitor)
       if self.flag_stop:
         warning("clear flag %s before starting thread", self.flagname_stop)
         self.flag_stop = False
@@ -511,23 +602,35 @@ class SvcD(FlaggedMixin, object):
       self.monitor = T
 
   def stop(self):
+    ''' Set the stop flag.
+    '''
     self.flag_stop = True
 
   def wait(self):
+    ''' Wait for the subprocess by waiting for the monitor.
+    '''
     if self.monitor:
       self.monitor.join()
       self.monitor = None
 
   def restart(self):
+    ''' Set the restart flag, will be cleared by the restart.
+    '''
     self.flag_restart = True
 
   def disable(self):
+    ''' Turn on the disable flag.
+    '''
     self.flag_disable = True
 
   def enable(self):
+    ''' Turn of the disable flag.
+    '''
     self.flag_disable = False
 
   def probe(self):
+    ''' Probe the subprocess: true if running.
+    '''
     if self.subp is None:
       return False
     return self.subp.poll() is None

@@ -1,0 +1,1 @@
+Better handling of seekable and unseekable input data. Tiny bugfix for from_bytes sanity check.

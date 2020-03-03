@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Emit configuration lines computed from my proxy peerage file.
 #   - Cameron Simpson <cs@cskk.id.au> 09sep2015
@@ -305,11 +305,13 @@ class Config(_Config):
       if proxy_name in proxy_names:
         if P.host is None:
           yield 'always_direct allow %s' % (acl_name,)
+          yield 'never_direct deny %s' % (acl_name,)
         else:
           yield 'cache_peer_access %s allow %s' % (P.host, acl_name)
       else:
         if P.host is None:
           yield 'never_direct allow %s' % (acl_name,)
+          yield 'always_direct deny %s' % (acl_name,)
         else:
           yield 'cache_peer_access %s deny %s' % (P.host, acl_name)
 
@@ -379,6 +381,7 @@ class Pattern(_Pattern):
       # n.* - ip-prefix
       if pattern[0].isdigit() and '.' in pattern:
         words = pattern.split('.')
+        # a.b.*
         if words[-1] == '*':
           words.pop(-1)
           if ( len(words) > 3
@@ -391,15 +394,17 @@ class Pattern(_Pattern):
           if style == 'squid_acl':
             return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
           raise ValueError('unsupported ip-prefix.* pattern')
+        # too many octets or not numeric or octet out of range
         if ( len(words) > 4
           or not(all(word.isdigit() and int(word) < 256 for word in words))
            ):
           raise ValueError('invalid IPv4 pattern')
+        # IP address
         if style == 'haproxy_acl':
           return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
                  (haquote(pattern), haquote(escape(pattern)))
         if style == 'proxy.pac': return 'isInNet(host, %r)' % (pattern,)
-        if style == 'squid_acl': return 'dstdomain %s' % (pattern,)
+        if style == 'squid_acl': return 'dst %s' % (pattern,)
         raise ValueError('unsupported ip-prefix pattern')
       # .ext - file extension
       if pattern.startswith('.'):

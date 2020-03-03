@@ -1,0 +1,6 @@
+some kind of pass mode, probably DEFAULT=.
+translate mailfiler.1.pod and .5.pod to md
++target adds the target but does not count as "filed" - for crossfiling
+use a runstate for global control and SIGINT
+make + rules not set the "filed" flag - for xref, labels etc
+prepend received lines on pickup and filing

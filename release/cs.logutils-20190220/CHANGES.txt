@@ -1,0 +1,6 @@
+  lib/python/cs/logutils.py: cs.logutils: docstring updates
+  lib/python/cs/logutils.py: cs.lgutils: status: rename internal var `file` to `f`, no semantic changes
+  lib/python/cs/logutils.py: cs.logutils: new upd() function to update the status text in upd_mode, write an info() otherwise
+  lib/python/cs/logutils.py: cs.logutils: back off the upd_mode newline level from WARNING to INFO
+  lib/python/cs/logutils.py: cs.logutils: UpdHandler: narrow the locking around updates, add a .upd method
+  lib/python/cs/logutils.py: cs.logutils: clean some lint

@@ -1,0 +1,2 @@
+_Frame: rename .functionname to .funcname; caller: turn raw frames into Frames.
+caller(): accept optional frame_index, default -3.

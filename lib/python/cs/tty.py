@@ -4,16 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-r'''
-Functions related to terminals.
-
-``ttysize(fd)``
-  return a namedtuple (rows, columns) with the current terminal size;
-  UNIX only (uses the stty command)
-``statusline(text,...)``
-  update the terminal status line with ``text``
-``statusline_bs(text,...)``
-  return a byte string to update the terminal status line with ``text``
+''' Functions related to terminals.
 '''
 
 from __future__ import print_function
@@ -40,8 +31,11 @@ WinSize = namedtuple('WinSize', 'rows columns')
 
 def ttysize(fd):
   ''' Return a (rows, columns) tuple for the specified file descriptor.
+
       If the window size cannot be determined, None will be returned
       for either or both of rows and columns.
+
+      This function relies on the UNIX `stty` command.
   '''
   if not isinstance(fd, int):
     fd = fd.fileno()
@@ -86,6 +80,7 @@ def setupterm(*args):
   import curses
   curses.setupterm(termstr, fd)
   _ti_setup = True
+  return True
 
 def statusline_bs(text, reverse=False, xpos=None, ypos=None):
   ''' Return a byte string to update the status line.

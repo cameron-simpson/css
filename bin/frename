@@ -59,14 +59,12 @@ for my $path (@ARGV)
   -e $path || next PATH;
   my $base = basename($path);
   $_ = ($fullpath ? $path : basename($path));
-  warn "_=$_\n";
   eval $perlop;
   die $@ if $@;
-  warn "_ => $_\n";
   my $npath = ($fullpath ? $_ : dirname($path).'/'.$_);
-  warn "napth => $npath\n";
   if ($npath ne $path)
   {
+    warn "path => $npath\n";
     my $ndir = dirname($npath);
     -d "$ndir/." || mkpath($ndir);
     if (-e $npath)

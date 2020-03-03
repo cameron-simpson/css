@@ -9,55 +9,66 @@
 
 from __future__ import print_function
 from collections import defaultdict
+from contextlib import contextmanager
+import errno
 from getopt import GetoptError
-import sys
+import importlib
 import os
 import os.path
+from os.path import (
+    basename, dirname,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    exists as pathexists,
+)
 import re
-from subprocess import Popen, PIPE, check_call
-from contextlib import contextmanager
-import importlib
+from subprocess import check_call
+import sys
+from types import SimpleNamespace as NS
 from cs.app.lastvalue import LastValues
 from cs.dateutils import isodate
-from cs.deco import cached
+from cs.deco import cachedmethod
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
-from cs.logutils import setup_logging, exception, error, warning, info
-from cs.pfx import Pfx, XP
+from cs.logutils import setup_logging, error, warning, info
+from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.func import prop
-from cs.py.modules import module_files
 from cs.x import X
 
 PYLIBTOP = 'lib/python'
+MODULE_PREFIX = 'cs.'
 
 # defaults for packages without their own specifics
 DISTINFO_DEFAULTS = {
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
 }
 
-USAGE = '''Usage: %s [-f] [op [names...]]
-  -f  Force. Sanity checks that would stop some actions will not prevent them.
-  With no op, report all pypi lastvalues.
-  op:
+USAGE = '''Usage: %s [-f] cs.module [op]
+  -f  Force. Sanity checks that would stop some actions normally  will not prevent them.
+  The default op is "check".
+  Supported ops:
     check       Check simple things about a module's DISTINFO map.
+    export      Export a setup.py ready package tree.
     last        Report last release issued.
     log         Changelog from last release to now.
-    ls          List all release prefixes in use.
+    ls          List latest release prefixes.
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
-    status      Report latest release tag and differing releases at pypi.
 '''
 
 ##  export      Export release to temporary directory, report directory.
 ##  freshmeat-submit Announce last release to freshmeat.
 
 def main(argv):
+  argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
   setup_logging(cmd)
 
   force = False
+  op = None
 
   xit = 0
   badopts = False
@@ -65,126 +76,563 @@ def main(argv):
   if argv and argv[0] == '-f':
     argv.pop(0)
     force = True
-  modules = Modules()
-  LV = LastValues()
-  VCS = VCS_Hg()
+
+  vcs = VCS_Hg()
+  last_values = LastValues()
+  state = NS(
+      modules=Modules(),
+      packages=Packages(),
+      last_values=last_values,
+      vcs=vcs,
+  )
+  state.modules.state = state
+  state.packages.state = state
 
   if not argv:
-    for k in sorted(LV.keys()):
-      if k.startswith("pypi-css-cs."):
-        print(k[9:], LV[k])
-    return 0
+    op = "check"
+    name = None
+  else:
+    name = argv.pop(0)
+    if name in ("ls", "check"):
+      op = name
+      name = None
+    elif not name.startswith(MODULE_PREFIX):
+      error("invalid module name, should start with %r: %r", MODULE_PREFIX, name)
+      badopts = True
 
-  op = argv.pop(0)
-  with Pfx(op):
-    if argv:
-      names = argv
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  if op is None:
+    if not argv:
+      op = 'check'
     else:
-      # all the release tags starting with "cs."
-      names = [
-          name
-          for name in sorted(VCS.release_prefixes())
-          if name.startswith('cs.')
-      ]
+      op = argv.pop(0)
+
+  if name is None:
+    # All the release tag prefixes which commence with "cs.".
+    names = [
+        name
+        for name in sorted(vcs.release_prefixes())
+        if name.startswith(MODULE_PREFIX)
+    ]
+  else:
+    names = (name,)
+
+  with Pfx(op):
     for name in names:
-      if xit != 0:
-        break
       with Pfx(name):
-        N = ReleaseName(name, modules, VCS, LV)
+        pkg = state.packages[name]
         if op == 'check':
-          if name.startswith('cs.'):
-            if N.check():
-              print(name, 'OK')
-            else:
-              print(name, 'NOT OK')
-              xit = 1
+          if argv and argv[0] == '-v':
+            argv.pop(0)
+            verbose = True
           else:
-            warning('not a "cs." module name')
-            xit = 1
+            verbose = True
+          if not name.startswith(MODULE_PREFIX):
+            warning('skipping, not a %r module name', MODULE_PREFIX)
+          else:
+            ok = False
+            if not pkg.check_basic(quiet=not verbose):
+              status = 'FLAWED'
+            elif not pkg.check_uptodate(quiet=not verbose):
+              status = 'RELEASE OUT OF DATE'
+            elif not pkg.check_release_uptodate(quiet=not verbose):
+              status = 'NEEDS NEW RELEASE'
+            else:
+              rel_tag = pkg.latest_release_tag()
+              if rel_tag is None:
+                status = 'NEVER RELEASED'
+              else:
+                rel_pfx, rel_suffix = rel_tag.split('-', 1)
+                upload_suffix = pkg.last_upload_suffix()
+                if rel_suffix != upload_suffix:
+                  status = (
+                      'RELEASE:%s DOES NOT MATCH UPLOAD:%s'
+                      % (rel_suffix, upload_suffix))
+                else:
+                  status = 'OK'
+                  ok = True
+            print(name, status)
+            if not ok:
+              xit = 1
+        elif op == 'checkout':
+          if argv:
+            revision = argv.pop(0)
+          else:
+            revision = pkg.latest_release_tag() or "tip"
+            info("checking out revision %r", revision)
+          checkout_dir = pkg.name + '--' + revision
+          pkg.checkout(revision, checkout_dir)
         elif op == 'last':
-          print(name, N.last_suffix())
+          tag = pkg.latest_release_tag()
+          if tag is None:
+            suffix = "NONE"
+          else:
+            prefix, suffix = tag.split('-', 1)
+          print(name, suffix)
         elif op == 'log':
           first = True
-          for files, firstline in N.log_since():
+          for files, firstline in pkg.log_since():
             if first:
               print(name)
               first = False
-            files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
+            files = [
+                filename[11:]
+                if filename.startswith('lib/python/')
+                else filename for filename in files ]
             print(' ', ' '.join(files)+':', firstline)
         elif op == 'ls':
-          for suffix in sorted(N.release_suffixes()):
-            print(name, suffix)
+          for k in sorted(last_values.keys()):
+            if k.startswith("pypi-css-cs."):
+              print(k[9:], last_values[k])
+          return 0
+        elif op == 'export':
+          path = pkg.export()
+          print(path)
         elif op == 'next':
-          print(name, N.next_suffix())
+          next_prefix, next_suffix = pkg.next_release_tag().split('-')
+          assert next_prefix == pkg.name
+          print(name, next_suffix)
         elif op == 'pypi':
           # upload latest release to pypi
-          N.submit_pypi(force=force)
+          tag = pkg.latest_release_tag()
+          pkg.submit_pypi(force=force)
         elif op == 'release':
           # issue new release tag
           print("new release for %s ..." % (name,))
-          outstanding = N.uncommitted()
+          outstanding = list(pkg.uncommitted_paths())
           if outstanding:
-            print("Uncommited changes exist for these files:")
+            print("uncommitted changes exist for these files:")
             for path in sorted(outstanding):
               print(' ', path)
-            print("These changes will not be included in the release.")
-            if not ask("Proceed with release anyway"):
-              error("aborting release at user request")
-              return 1
-          changes = list(N.log_since())
+            error("Aborting release; please commit or shelve/stash these changes.")
+            return 1
+          changes = list(pkg.log_since())
           if not changes:
-            error("no changes since last release, not making new release")
+            if force:
+              warning("no commits since last release, making release anyway")
+            else:
+              error("no changes since last release, not making new release")
+              return 1
+          print("Changes since the last release:")
+          for files, firstline in changes:
+            print(" ", ' '.join(files) + ': ' + firstline)
+          print()
+          with pipefrom('readdottext', keep_stdin=True) as dotfp:
+            release_message = dotfp.read().rstrip()
+          if not release_message:
+            error("empty release message, not making new release")
             xit = 1
           else:
-            print("Changes since the last release:")
-            for files, firstline in changes:
-              print(" ", ' '.join(files) + ': ' + firstline)
-            print()
-            with pipefrom('readdottext', keep_stdin=True) as dotfp:
-              release_message = dotfp.read().rstrip()
-            if not release_message:
-              error("empty release message, not making new release")
+            next_tag = pkg.next_release_tag()
+            _, tag_version = next_tag.split('-')
+            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+              error("aborting release at user request")
               xit = 1
             else:
-              next_tag = N.next_release_tag()
-              if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-                error("aborting release at user request")
-                xit = 1
-              else:
-                rel_dir = os.path.join('release', next_tag)
-                with Pfx("mkdir(%s)", rel_dir):
-                  os.mkdir(rel_dir)
-                summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-                with Pfx(summary_filename):
-                  with open(summary_filename, 'w') as sfp:
-                    print(release_message, file=sfp)
-                changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-                with Pfx(changes_filename):
-                  with open(changes_filename, 'w') as cfp:
-                    for files, firstline in changes:
-                      print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-                VCS = N.vcs
-                VCS.add_files(summary_filename, changes_filename)
-                VCS.commit('Release information for %s.\nSummary:\n%s'
-                           % (next_tag, release_message),
-                           summary_filename, changes_filename)
-                VCS.tag(next_tag)
-        elif op == 'status':
-          tagged = N.last_suffix()
-          result = [name, tagged]
-          for pypi_flavour in ('pypi',):
-            lvkey, last_upload = N.last_upload(pypi_flavour)
-            if last_upload != tagged:
-              result.append("%s:%s" % (pypi_flavour, last_upload))
-          print(*result)
+              rel_dir = joinpath('release', next_tag)
+              with Pfx("mkdir(%s)", rel_dir):
+                os.mkdir(rel_dir)
+              summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
+              with Pfx(summary_filename):
+                with open(summary_filename, 'w') as sfp:
+                  print(release_message, file=sfp)
+              changes_filename = joinpath(rel_dir, 'CHANGES.txt')
+              with Pfx(changes_filename):
+                with open(changes_filename, 'w') as cfp:
+                  for files, firstline in changes:
+                    print(' '.join(files) + ': ' + firstline, file=cfp)
+              pkg.patch__version__(tag_version)
+              vcs.add_files(summary_filename, changes_filename)
+              vcs.commit('Release information for %s.\nSummary:\n%s'
+                         % (next_tag, release_message),
+                         summary_filename, changes_filename)
+              vcs.tag(next_tag)
         else:
           warning("unrecognised op %r", op)
           badopts = True
-          break
+
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
   return xit
+
+def clean_release_entry(entry):
+  lines = entry.strip().split('\n')
+  return '\n'.join([
+      line for line in lines
+      if line and line != 'Summary:'
+      and not line.startswith('Release information for ') ])
+
+def pypipkg(pkgname, vcs, pypi_url=None):
+  ''' Return a `PyPI_Package` for `pkgname`.
+  '''
+  if pypi_url is None:
+    pypi_url = URL_PYPI_PROD
+  release_log = list(vcs.release_log(pkgname))
+  tag, entry = release_log[0]
+  release_number = tag.split('-', 1)[1]
+  latest_suffix = release_number
+  release_entry = clean_release_entry(entry)
+  preamble_md = f'*Latest release {release_number}*:\n{release_entry}'
+  postamble_parts=[]
+  for tag, entry in release_log:
+    release_number = tag.split('-', 1)[1]
+    release_entry = clean_release_entry(entry)
+    postamble_parts.append(f'*Release {release_number}*:\n{release_entry}')
+  postamble_md = '\n\n# Release Log\n\n' + '\n\n'.join(postamble_parts)
+  return PyPI_Package(
+      pypi_url, pkgname, latest_suffix, defaults=dict(DISTINFO_DEFAULTS),
+      preamble_md=preamble_md, postamble_md=postamble_md)
+
+class Packages(defaultdict):
+  ''' An autopopulating dict of pkg_name->Package.
+  '''
+  def __missing__(self, pkg_name):
+    P = Package(pkg_name, self.state)
+    self[pkg_name] = P
+    return P
+
+class Package:
+  ''' Facilities to work with a package.
+  '''
+
+  def __init__(self, name, state):
+    if name.endswith('_tests'):
+      raise ValueError("Package(%r): unexpected _tests package" % (name,))
+    self.name = name
+    self.state = state              # shared state
+    self.vcs = state.vcs            # convenience
+    self.modules = state.modules    # convenience
+    self.packages = state.packages  # convenience
+
+  def __str__(self):
+    return "%s[%r]" % (type(self).__name__, self.name)
+
+  @cachedmethod
+  def release_tags(self):
+    ''' Return the release tags for this package.
+    '''
+    prefix = self.name + '-'
+    return [ tag for tag in self.vcs.release_tags() if tag.startswith(prefix) ]
+
+  def release_log(self):
+    ''' Generator yeilding `(tag,log_entry)` for our release tags
+        in reverse tag order (most recent first).
+    '''
+    return self.vcs.release_log(self.name)
+
+  def latest_release_tag(self):
+    ''' Return the latest release tag or None.
+    '''
+    tags = self.release_tags()
+    if not tags:
+      return None
+    return max(tags)
+
+  def next_release_tag(self):
+    ''' Compute the next release suffix.
+    '''
+    last_tag = self.latest_release_tag()
+    today = isodate(dashed=False)
+    if last_tag:
+      with Pfx(last_tag):
+        prefix, suffix = last_tag.split('-')
+        assert prefix == self.name, (
+            "last_tag %r prefix does not match package name %r"
+            % (prefix, self.name))
+        if suffix == today:
+          next_suffix = today + '.1'
+        elif suffix < today:
+          next_suffix = today
+        else:
+          # suffix > today: compute next .n extension
+          base_suffix, numerator = suffix.split('.')
+          if base_suffix > today:
+            warning(
+                "issuing a future suffix: today=%r, base suffix=%r",
+                today, base_suffix)
+          next_suffix = base_suffix + '.' + str(int(numerator) + 1)
+    else:
+      next_suffix = today + '.1'
+    return self.name + '-' + next_suffix
+
+  def last_upload_key(self, target='pypi'):
+    return "%s-css-%s" % (target, self.name)
+
+  def last_upload_suffix(self, target='pypi'):
+    lastvalue_key = self.last_upload_key(target=target)
+    return self.state.last_values.get(lastvalue_key, None)
+
+  def submit_pypi(self, force=False):
+    return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
+
+  def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+    ''' Submit the latest release of this package to PyPI.
+    '''
+    if not self.check_uptodate():
+      warning("check fails")
+      if force:
+        warning("submitting anyway")
+      else:
+        return
+    with Pfx(pypi_flavour):
+      tag = self.latest_release_tag()
+      latest_prefix, latest_suffix = tag.split('-', 1)
+      last_pypi_suffix = self.last_upload_suffix(pypi_flavour)
+      if latest_suffix == last_pypi_suffix:
+        info("already released %r", last_pypi_suffix)
+        if force:
+          warning("submitting anyway")
+        else:
+          return
+      with Pfx(
+          "%s->%r",
+          repr(last_pypi_suffix) if last_pypi_suffix else '',
+          latest_suffix):
+        PKG = pypipkg(self.name, self.vcs)
+        PKG.upload()
+        self.state.last_values[self.last_upload_key()] = latest_suffix
+
+  def export(self):
+    tag = self.latest_release_tag()
+    latest_prefix, latest_suffix = tag.split('-', 1)
+    pkg_dir = "%s-%s" % (self.name, latest_suffix)
+    print('create %s ...' % (pkg_dir,))
+    with Pfx("mkdir(%s)", pkg_dir):
+      os.mkdir(pkg_dir)
+    PKG = pypipkg(self.name, self.vcs)
+    PKG.make_package(pkg_dir)
+    return pkg_dir
+
+  @prop
+  def basename(self):
+    ''' The last component of the package name.
+    '''
+    return self.name.split('.')[-1]
+
+  @prop
+  def basepath(self):
+    ''' The base path for this package.
+    '''
+    return os.sep.join([PYLIBTOP] + self.name.split('.'))
+
+  @prop
+  def toppath(self):
+    ''' The top file of the package:
+        basepath/__init__.py for packages
+        and basepath.py for modules.
+    '''
+    basepath = self.basepath
+    if isdirpath(basepath):
+      return joinpath(basepath, '__init__.py')
+    return basepath + '.py'
+
+  @prop
+  def module(self):
+    ''' The Module for this package name.
+    '''
+    return self.modules[self.name]
+
+  def paths(self):
+    ''' Yield the paths associated with this package.
+
+        Note: this is based on the current checkout state instead
+        of some revision because "hg archive" complains if globs
+        match no paths, and aborts.
+    '''
+    basepath = self.basepath
+    if isdirpath(basepath):
+      for subpath, dirnames, filenames in os.walk(basepath):
+        if not subpath.startswith(basepath):
+          info("SKIP %s", subpath)
+          continue
+        for filename in sorted(filenames):
+          if not (
+              filename.endswith('.pyc')
+              or filename.endswith('.o')
+          ):
+            yield joinpath(subpath, filename)
+    else:
+      base = self.basename
+      updir = dirname(basepath)
+      for filename in sorted(os.listdir(updir)):
+        filepath = joinpath(updir, filename)
+        if (
+            ( filename.startswith(base + '.')
+              or filename.startswith(base + '_')
+            )
+            and not (
+                filename.endswith('.pyc')
+                or filename.endswith('.o')
+            )
+            and isfilepath(filepath)
+        ):
+          if isfilepath(filepath):
+            yield filepath
+          else:
+            info("ignore %r, not a file", filepath)
+
+  def checkout(self, revision, dirpath):
+    ''' Check out the specified `revision` to the directory `dirpath`.
+    '''
+    with Pfx("checkout %r ==> %r", revision, dirpath):
+      if pathexists(dirpath):
+        raise ValueError("already exists")
+      hg_argv = ['archive', '-r', revision]
+      hg_argv.extend(vcs.hg_include(self.paths()))
+      hg_argv.extend(['--', dirpath])
+      return self.vcs.hg_cmd(*hg_argv)
+
+  def log_since(self, tag=None):
+    ''' Generator yielding (files, line) tuples
+        for log lines since the last release for the supplied `prefix`.
+    '''
+    with Pfx("log_since"):
+      if tag is None:
+        tag = self.latest_release_tag()
+        if tag is None:
+          tag = "0"
+          warning(f"no release tags, starting from revision {tag}")
+      paths = list(self.paths())
+      for files, firstline in self.vcs.log_since(tag, paths):
+        files = [ filename for filename in files if filename in paths ]
+        yield files, firstline
+
+  def uncommitted_paths(self):
+    ''' Generator yielding paths relevant to this package
+        with uncommitted changes.
+    '''
+    return self.vcs.uncommitted(set(self.paths()))
+
+  @pfx_method
+  def patch__version__(self, version):
+    version_line = '__version__ = ' + repr(version) + '\n'
+    toppath = self.toppath
+    with Pfx(toppath):
+      if toppath in self.uncommitted_paths():
+        raise ValueError("has uncommited changes")
+      with open(toppath) as tf:
+        lines = tf.readlines()
+      patched = False
+      distinfo_index = None
+      for i, line in enumerate(lines):
+        if line.startswith('DISTINFO = '):
+          distinfo_index = i
+        elif line.startswith('__version__ = '):
+          lines[i] = version_line
+          patched = True
+          break
+      if not patched:
+        if distinfo_index is None:
+          raise ValueError("no __version__ line and no DISTINFO line")
+        lines[distinfo_index:distinfo_index] = version_line, '\n'
+      with open(toppath, 'w') as tf:
+        for line in lines:
+          tf.write(line)
+      self.vcs.commit(self.name + ': set __version__ to ' + repr(version), toppath)
+
+  @cachedmethod
+  def check_basic(self, quiet=False):
+    ''' Basic package checks.
+    '''
+    ok = True
+    with Pfx('paths'):
+      paths = list(self.paths())
+      if not paths:
+        quiet or warning("no files")
+        ok = False
+    return ok
+
+  @cachedmethod
+  def check_imports(self, quiet=False):
+    ''' Check that this package's imported modules are ok.
+    '''
+    ok = True
+    M = self.module
+    for subM in M.imported_modules():
+      with Pfx(subM):
+        if not subM.check(silent=quiet):
+          quiet or warning("module NOT OK")
+          ok = False
+    return ok
+
+  @cachedmethod
+  def check_release_uptodate(self, quiet=False):
+    ''' Check that this package is released.
+        * basic correctness
+        * there are no commits since the latest release
+        * there are no uncommited changes awaiting commit
+        * all the required modules are up to date
+    '''
+    ok = True
+    paths = list(self.paths())
+    if not self.check_basic(quiet=quiet):
+      ok = False
+    unreleased_logs = list(self.log_since())
+    if unreleased_logs:
+      quiet or warning("unreleased commits")
+      ok = False
+    changed_paths = [
+        changed_path
+        for changed_path in self.vcs.uncommitted()
+        if changed_path in paths
+    ]
+    if changed_paths:
+      quiet or warning("%d modified files", len(changed_paths))
+      ok = False
+    with Pfx("out of date requirements"):
+      checked_packages = set()
+      import_names = sorted(self.module.imported_names)
+      for import_name in sorted(self.module.imported_names):
+        with Pfx(import_name):
+          if import_name == self.name:
+            ##info("SKIP self %r", import_name)
+            continue
+          if not import_name.startswith(MODULE_PREFIX):
+            ##info("SKIP non-cs %r", import_name)
+            continue
+          M = self.modules[import_name]
+          subpkg = M.package
+          if subpkg in checked_packages:
+            info("skipping, package %s already checked", subpkg.name)
+            continue
+          checked_packages.add(subpkg)
+          if not subpkg.check_uptodate(quiet=False):
+            quiet or warning("release not up to date")
+            ok = False
+      self.check_imports(quiet=quiet)
+    return ok
+
+  @cachedmethod
+  def check_uptodate(self, quiet=False):
+    ''' Check that this package has is up to date:
+        * there are no commits since the latest release
+        * there are no uncommited changes awaiting commit
+        * all the required modules are up to date
+    '''
+    ok = True
+    paths = list(self.paths())
+    with Pfx("unreleased logs"):
+      tag = self.latest_release_tag() or "0"
+      unreleased_logs = list(self.log_since(tag))
+      if unreleased_logs:
+        quiet or warning(
+            "%d unreleased commits since revision %s",
+            len(unreleased_logs), tag)
+        ok = False
+    with Pfx("uncommitted changes"):
+      changed_paths = [
+          changed_path
+          for changed_path in self.vcs.uncommitted()
+          if changed_path in paths
+      ]
+      if changed_paths:
+        quiet or warning("%d modified files", len(changed_paths))
+        ok = False
+    return ok
 
 def ask(message):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
@@ -208,15 +656,19 @@ class Modules(defaultdict):
   ''' An autopopulating dict of mod_name->Module.
   '''
   def __missing__(self, mod_name):
-    return Module(mod_name, self)
+    M = Module(mod_name, self.state)
+    self[mod_name] = M
+    return M
 
 class Module(object):
   ''' Metadata about a Python module.
   '''
 
-  def __init__(self, name, modules):
+  def __init__(self, name, state):
     self.name = name
-    self.modules = modules
+    self.state = state
+    self.modules = state.modules
+    self.packages = state.packages
     self._distinfo = None
     self._checking = False
     self._check_status = None
@@ -231,29 +683,61 @@ class Module(object):
       self.module = None
       self.check_status = False
 
+  def __str__(self):
+    return "%s[%r]" % (type(self).__name__, self.name)
+
   @prop
+  @cachedmethod
   def package_name(self):
-    ''' The name of the package containing this module, or None if this is not inside a package.
+    ''' The name of the package containing this module,
+        or None if this is not inside a package.
     '''
     M = self.module
     if M is None:
-      X("%r.package_name: self.module is None", self.name)
+      error("%r.package_name: self.module is None", self.name)
       return None
+    if M.__file__.endswith('_tests.py'):
+      mainname = self.name[:-6]
+      X("%r: test suite, get package name from modules[%r]", M.__file__, mainname)
+      return self.modules[mainname].package_name
     try:
       pkg_name = M.__package__
     except AttributeError:
       X("%r.package_name: self.module has no __package__: %r", self.name, sorted(dir(M)))
       return None
+    # Probe for zero length __init__.py file.
+    # If empty then this module is just a module,
+    # otherwise it really is part of a package.
+    init_py = joinpath(dirname(M.__file__), '__init__.py')
+    try:
+      S = os.stat(init_py)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        warning("%s: M.__package__=%r but no %r", M.__file__, M.__package__, init_py)
+        return None
+      raise
+    else:
+      if S.st_size == 0:
+        # empty __init__.py, not a package for release purposes
+        return None
     return pkg_name
+
+  @prop
+  def package(self):
+    name = self.package_name
+    if name is None:
+      name = self.name
+      if name.endswith('_tests'):
+        name = name[:-6]
+    if self.name != name:
+      X("%s.package => packages[%r]", self, name)
+    return self.packages[name]
 
   @prop
   def in_package(self):
     ''' Is this module part of a package?
     '''
-    M = self.module
-    if M is None:
-      return False
-    return hasattr(M, '__package__')
+    return self.package_name is not None
 
   @prop
   def is_package(self):
@@ -286,7 +770,7 @@ class Module(object):
       for dirpath, dirnames, filenames in os.walk(moddir):
         for basename in filenames:
           if basename.endswith('.py'):
-            yield os.path.join(dirpath, basename)
+            yield joinpath(dirpath, basename)
 
   @prop
   def DISTINFO(self):
@@ -328,7 +812,7 @@ class Module(object):
     return self.DISTINFO.get('install_requires')
 
   def check(self, silent=False):
-    ''' Sanity check a package.
+    ''' Sanity check this module.
     '''
     if self._check_status is not None:
       return self._check_status
@@ -339,8 +823,10 @@ class Module(object):
     return self._check_status
 
   def _check(self, silent):
+    distinfo = self.module.DISTINFO
+    if not distinfo:
+      return False
     ok = True
-    distinfo = self.DISTINFO
     install_requires = self.requires
     if install_requires is None:
       silent or error("missing DISTINFO[install_requires]")
@@ -357,45 +843,79 @@ class Module(object):
     else:
       pkg_prefix = pkg_name + '.'
     # check imports against install_requires
-    for name in sorted(self.imports):
-      if not name.startswith('cs.'):
+    for name in sorted(self.imported_names):
+      if not name.startswith(MODULE_PREFIX):
+        M = self.modules[name]
+        Mpath = getattr(M.module, '__file__', None)
+        if Mpath and '/site-ackages/' in Mpath:
+          silent or warning("third party import %r not mentioned in install_requires", name)
+          ok = False
+        continue
+      if name.endswith('_tests'):
+        # tests are part of another package: ignore
+        continue
+      if name == pkg_name:
+        # tests usually import the package - this is not a dependency
         continue
       if pkg_prefix and name.startswith(pkg_prefix):
+        # package components are not a dependency
         continue
       if name not in install_requires:
         silent or warning("import %r not mentioned in install_requires", name)
         ok = False
+        continue
+      M = self.modules[name]
+      if not M.check(silent):
+        ok = False
+        continue
     for name in sorted(install_requires):
-      if name not in self.imports:
+      if name not in self.imported_names:
         silent or warning("requirement %r not imported", name)
         ok = False
     return ok
 
   @prop
-  @cached
-  def imports(self):
+  @cachedmethod
+  def imported_names(self):
+    ''' Return a set containing the modules names imported by this module
+        both directly and indirectly.
+    '''
     subnames = set()
     for path in self.paths():
-      for name in self._direct_imports(self.name, path):
-        if name in subnames:
-          continue
+      for name in self.directly_imported_names(self.name, path):
         subnames.add(name)
     return subnames
 
-  def _direct_imports(self, module_name, filename, silent=False):
+  def imported_modules(self, prefix=MODULE_PREFIX):
+    ''' Generator yielding directly imported Modules.
+    '''
+    for name in sorted(self.imported_names):
+      if name.startswith(prefix) and name != self.name:
+        yield self.modules[name]
+
+  def directly_imported_names(self, module_name, filename, silent=False):
+    ''' Yield the module names mentioned by "import" statements
+        in the given file.
+    '''
     with Pfx(filename):
       with open(filename) as codefp:
         for lineno, line in enumerate(codefp, 1):
           with Pfx(lineno):
             if line.startswith('import ') or line.startswith('from '):
-              words = line.strip().split()
+              line = line.strip()
+              # quick hack to strip trailing "; second-statement"
+              try:
+                line, _ = line.split(';', 1)
+              except ValueError:
+                pass
+              words = line.split()
               if not words:
                 continue
               if words[0] == 'import' or words[0] == 'from':
                 if len(words) < 2:
                   silent or warning("missing module name")
                   continue
-                subimport0 = subimport = words[1]
+                subimport = words[1]
                 if subimport == '.':
                   # don't recurse into ourself
                   pkg_name = self.package_name
@@ -416,18 +936,19 @@ class Module(object):
                   subimport = '.'.join(preparts)
                 yield subimport
 
-#                              name       - YYYYMMDD                            [.n]
-re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
-
 class VCS(object):
 
+  re_RELEASE_TAG = re.compile(
+      #  name       - YYYYMMDD                            [.n]
+      r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
+
+  @cachedmethod
   def release_tags(self):
     ''' Generator yielding the current release tags.
     '''
-    for tag in self.tags():
-      m = re_RELEASE_TAG.match(tag)
-      if m:
-        yield tag
+    regexp = self.re_RELEASE_TAG
+    release_tags = [ tag for tag in self.tags() if regexp.match(tag) ]
+    return release_tags
 
   def release_prefixes(self):
     ''' Return a set of the existing release prefixes.
@@ -444,10 +965,18 @@ class VCS_Hg(VCS):
     hgargv = ['hg'] + list(hgargs) + ['|']
     return pipefrom('hg', *hgargs)
 
-  def _hgcmd(self, *hgargs):
+  def hg_cmd(self, *hgargs):
     print('hg', *hgargs, file=sys.stderr)
     check_call(['hg'] + list(hgargs))
 
+  def hg_include(self, paths):
+    ''' Generator yielding hg(1) -I/-X option strings to include the `paths`.
+    '''
+    for subpath in self.paths():
+      yield '-I'
+      yield 'path:' + subpath
+
+  @cachedmethod
   def tags(self):
     ''' Generator yielding the current tags.
     '''
@@ -455,21 +984,44 @@ class VCS_Hg(VCS):
       tags = set()
       for tagline in hgfp:
         tag, _ = tagline.split(None, 1)
-        yield tag
+        tags.add(tag)
+    return tags
 
   def tag(self, tag_name, revision=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
     '''
     if revision is None:
       revision = 'tip'
-    self._hgcmd('tag',  '-r', revision, '--', tag_name)
+    self.hg_cmd('tag',  '-r', revision, '--', tag_name)
+
+  def log_entry(self, rev):
+    ''' Return the log entry for the specified revision `rev`.
+    '''
+    with self._pipefrom(
+        'log',
+        '-r', rev,
+        '--template', '{desc}\n',
+        '--') as piped:
+      return ''.join(piped)
+
+  def release_log(self, package_name):
+    ''' Generator yeilding `(tag,log_entry)` for the release tags
+        of `package_name` in reverse tag order (most recent first).
+    '''
+    tag_prefix = package_name + '-'
+    for tag in sorted(
+        [ tag for tag in self.tags()
+          if tag.startswith(tag_prefix)
+        ], reverse=True):
+      yield tag, self.log_entry(tag)
 
   def log_since(self, tag, paths):
-    with self._pipefrom('log',
-                     '-r', tag+':',
-                     '--template', '{files}\t{desc|firstline}\n',
-                     '--',
-                     *paths) as hgfp:
+    with self._pipefrom(
+        'log',
+        '-r', tag + ':',
+        '--template', '{files}\t{desc|firstline}\n',
+        '--',
+        *paths) as hgfp:
       for hgline in hgfp:
         files, firstline = hgline.split('\t', 1)
         files = files.split()
@@ -479,17 +1031,17 @@ class VCS_Hg(VCS):
   def add_files(self, *paths):
     ''' Add the specified paths to the repository.
     '''
-    self._hgcmd('add', *paths)
+    self.hg_cmd('add', *paths)
 
   def commit(self, message, *paths):
     ''' Commit the specified `paths` with the specified `message`.
     '''
-    self._hgcmd('commit', '-m', message, '--', *paths)
+    self.hg_cmd('commit', '-m', message, '--', *paths)
 
-  def uncommitted(self):
-    ''' Generator yielding uncommited but tracked paths.
+  def uncommitted(self, paths=()):
+    ''' Generator yielding uncommitted but tracked paths.
     '''
-    with self._pipefrom('status') as hgfp:
+    with self._pipefrom('status', '--', *paths) as hgfp:
       for hgline in hgfp:
         s, path = hgline.rstrip().split(' ', 1)
         if s != '?':
@@ -499,11 +1051,11 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, modules, VCS, LV):
+  def __init__(self, prefix, modules, vcs, last_values):
     self.prefix = prefix
     self.modules = modules
-    self.vcs = VCS
-    self.lv = LV
+    self.vcs = vcs
+    self.last_values = last_values
 
   def check(self, silent=False):
     ''' Perform various sanity checks on the named module, return true if all pass.
@@ -513,10 +1065,10 @@ class ReleaseName(object):
       ok = False
     unreleased_changes = list(self.log_since())
     if unreleased_changes:
-      show_log = not silent and ok
+      show_log = False and not silent and ok
       ok = False
       if not silent:
-        error("unreleased changes")
+        error("%d unreleased changes", len(unreleased_changes))
         if show_log:
           for files, firstline in unreleased_changes:
             files = [
@@ -588,13 +1140,14 @@ class ReleaseName(object):
     ''' List of paths relevant this name, for use with hg log.
     '''
     prefix = self.prefix
-    base = os.path.join(PYLIBTOP, prefix.replace('.', os.sep))
+    base = joinpath(PYLIBTOP, prefix.replace('.', os.sep))
     basepy = base + '.py'
-    readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
+    readme = joinpath(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
     return base, basepy, readme
 
   def log_since(self):
-    ''' Generator yielding (files, line) tuples for log lines since the last release for the supplied `prefix`.
+    ''' Generator yielding (files, line) tuples
+        for log lines since the last release for the supplied `prefix`.
     '''
     suffix = self.last_suffix()
     if suffix is None:
@@ -607,7 +1160,7 @@ class ReleaseName(object):
       yield files, firstline
 
   def uncommitted(self):
-    ''' List of paths relevant to this release with uncommited changes.
+    ''' List of paths relevant to this release with uncommitted changes.
     '''
     pathset = set(self.paths())
     changed = []
@@ -621,7 +1174,7 @@ class ReleaseName(object):
 
   def last_upload(self, pypi_flavour):
     lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
-    last_pypi_release = self.lv.get(lastvalue_key, "")
+    last_pypi_release = self.last_values.get(lastvalue_key, "")
     return lastvalue_key, last_pypi_release
 
   def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
@@ -642,11 +1195,13 @@ class ReleaseName(object):
           warning("submitting anyway")
         else:
           return
-      with Pfx("%r->%r", last_pypi_release, last_suffix):
-        defaults = dict(DISTINFO_DEFAULTS)
-        PKG = PyPI_Package(pypi_url, self.prefix, last_suffix, defaults=defaults)
+      with Pfx(
+          "%s->%r",
+          repr(last_pypi_release) if last_pypi_release else '',
+          last_suffix):
+        PKG = pypipkg(self.prefix, self.vcs, pypi_url=pypi_url)
         PKG.upload()
-        self.lv[lastvalue_key] = last_suffix
+        self.last_values[lastvalue_key] = last_suffix
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

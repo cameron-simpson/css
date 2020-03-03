@@ -83,12 +83,14 @@ class TestOpenSocket_TCP(_TestOpenSocket, unittest.TestCase):
   def _setUp_sock12(self):
     self.sock0 = socket.socket()
     self.sock0_port = bind_next_port(self.sock0, '127.0.0.1', 10000)
-    T = Thread(name='%s:server:listen(%d)' % (self._testMethodName, self.sock0_port),
-               target = self.accept_once)
+    T = Thread(
+        name='%s:server:listen(%d)' % (self._testMethodName, self.sock0_port),
+        target=self.accept_once
+    )
     self.sock0.listen(1)
     T.start()
     self.sock1 = socket.socket()
-    self.sock1.connect( ('127.0.0.1', self.sock0_port) )
+    self.sock1.connect(('127.0.0.1', self.sock0_port))
     T.join()
 
   def tearDown(self):

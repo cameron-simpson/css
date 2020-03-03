@@ -10,7 +10,7 @@ from cs.fileutils import BackedFile_TestMethods
 from . import defaults
 from .blockify import blockify, top_block_for
 from .store import MappingStore
-from .file import File
+from .file import RWBlockFile
 
 class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
 
@@ -22,18 +22,26 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     with open(__file__, "rb") as fp:
       self.backing_text = fp.read()
     self.vt_block = top_block_for(blockify([self.backing_text]))
-    self.backed_fp = File(self.vt_block)
+    self.vt_file = RWBlockFile(self.vt_block)
+    self.backed_fp = self.vt_file._file
 
   def tearDown(self):
-    self.backed_fp.close()
+    self.vt_file.close()
     defaults.popStore()
 
   def test_flush(self):
     self.test_BackedFile()
+    B2 = self.vt_file.sync()
+    self.backed_fp = self.vt_file._file
+    self.assertEqual(B2, self.vt_file._backing_block)
     bfp = self.backed_fp
-    B2 = bfp.flush()
-    self.assertEqual(B2, bfp.backing_block)
-    self.assertEqual(bfp.front_range.end, 0)
+    self.assertEqual(
+        bfp.front_range.end, 0,
+        "bfp(id=%d).front_range.end should be 0, range is: %s" % (
+            id(bfp),
+            bfp.front_range,
+        )
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
