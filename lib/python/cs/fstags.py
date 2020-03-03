@@ -974,6 +974,19 @@ class TagFile(HasFSTagsMixin):
     '''
     return self.tagsets[name]
 
+  @locked_property
+  def tagsets(self):
+    ''' The tag map from the tag file,
+        a mapping of name=>`TagSet`.
+    '''
+    return self.load_tagsets(self.filepath)
+
+  @property
+  def names(self):
+    ''' The names from this `TagFile`.
+    '''
+    return list(self.tagsets.keys())
+
   @staticmethod
   def encode_name(name):
     ''' Encode `name`.
@@ -1000,11 +1013,12 @@ class TagFile(HasFSTagsMixin):
       name, offset = get_nonwhite(s, offset)
     return name, offset
 
-  def parse_tags_line(self, line):
+  @classmethod
+  def parse_tags_line(cls, line):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
-    name, offset = self.decode_name(line)
+    name, offset = cls.decode_name(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
@@ -1017,7 +1031,8 @@ class TagFile(HasFSTagsMixin):
     tags = TagSet.from_line(line, offset)
     return name, tags
 
-  def load_tagsets(self, filepath):
+  @classmethod
+  def load_tagsets(cls, filepath):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
@@ -1031,7 +1046,7 @@ class TagFile(HasFSTagsMixin):
                 line = line.strip()
                 if not line or line.startswith('#'):
                   continue
-                name, tags = self.parse_tags_line(line)
+                name, tags = cls.parse_tags_line(line)
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -1075,19 +1090,6 @@ class TagFile(HasFSTagsMixin):
       return
     self.save_tagsets(self.filepath, self.tagsets)
 
-  @locked_property
-  def tagsets(self):
-    ''' The tag map from the tag file,
-        a mapping of name=>`TagSet`.
-    '''
-    return self.load_tagsets(self.filepath)
-
-  @property
-  def names(self):
-    ''' The names from this `TagFile`.
-    '''
-    return list(self.tagsets.keys())
-
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
     ''' Add a tag to the tags for `name`.
@@ -1100,6 +1102,12 @@ class TagFile(HasFSTagsMixin):
         or `None` if there was no matching tag.
     '''
     return self[name].discard(tag_name, value, verbose=state.verbose)
+
+  def update(self, name, tags, *, prefix=None):
+    ''' Update the tags for `name` from the supplied `tags`
+        as for `Tagset.update`.
+    '''
+    return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
@@ -1214,6 +1222,12 @@ class TaggedPath(HasFSTagsMixin):
         such as a `Tag`.
     '''
     self.direct_tagfile.discard(self.basename, tag, value)
+
+  def update(self, tags, *, prefix=None):
+    ''' Update the direct tags from `tags`
+        as for `TagSet.update`.
+    '''
+    self.direct_tagfile.update(self.basename, tags, prefix=prefix)
 
   def pop(self, tag_name):
     ''' Remove the tag named `tag_name` from the direct tags.
