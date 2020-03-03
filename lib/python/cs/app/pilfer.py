@@ -993,14 +993,14 @@ one_test = {
     'reject_re':
     lambda P, regexp: not regexp.search(P._),
     'same_domain':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.domain == P._.referer.domain,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.domain == P._.referer.domain,
     'same_hostname':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P
-    ._.referer.hostname,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.hostname == P._.referer.hostname,
     'same_scheme':
-    lambda P: notNone(P._.referer, "%r.referer" % (P._,)
-                      ) and P._.scheme == P._.referer.scheme,
+    lambda P: notNone(P._.referer, "%r.referer" %
+                      (P._,)) and P._.scheme == P._.referer.scheme,
     'select_re':
     lambda P, regexp: regexp.search(P._),
 }
