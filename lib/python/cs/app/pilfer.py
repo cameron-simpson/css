@@ -41,7 +41,7 @@ from cs.logutils import (
     setup_logging, logTo, debug, error, warning, exception, trace, D
 )
 from cs.mappings import MappingChain, SeenSet
-from cs.obj import O, copy as obj_copy
+from cs.obj import copy as obj_copy
 import cs.pfx
 from cs.pfx import Pfx
 from cs.pipeline import (
@@ -1635,7 +1635,7 @@ def retriable(func):
   retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
-class _Action(O):
+class _Action:
 
   def __init__(self, srctext, sig):
     self.srctext = srctext
