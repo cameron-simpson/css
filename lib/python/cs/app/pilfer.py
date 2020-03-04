@@ -2007,8 +2007,8 @@ class PilferRC(O):
     trace("load %s", filename)
     with Pfx(filename):
       cfg = ConfigParser()
-      with open(filename) as fp:
-        cfg.readfp(fp)
+      with open(filename) as f:
+        cfg.read_file(f)
       self.defaults.update(cfg.defaults().items())
       if cfg.has_section('actions'):
         for action_name in cfg.options('actions'):
