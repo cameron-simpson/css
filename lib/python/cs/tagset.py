@@ -17,7 +17,7 @@ try:
   date_fromisoformat = date.fromisoformat
 except AttributeError:
 
-  def date_from_isoformat(datestr):
+  def date_fromisoformat(datestr):
     ''' Placeholder for `date.fromisoformat`.
     '''
     parsed = strptime(datestr, '%Y-%m-%d')
@@ -27,7 +27,7 @@ try:
   datetime_fromisoformat = datetime.fromisoformat
 except AttributeError:
 
-  def datetime_from_isoformat(datestr):
+  def datetime_fromisoformat(datestr):
     ''' Placeholder for `datetime.fromisoformat`.
     '''
     parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
