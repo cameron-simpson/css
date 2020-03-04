@@ -26,14 +26,15 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from icontract import require
 from cs.app.flag import PolledFlags
+from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import mkdirn
 from cs.later import Later, RetryError
 from cs.lex import (
-    get_dotted_identifier, get_identifier, is_identifier, get_other_chars,
-    get_qstr
+    cutprefix, cutsuffix, get_dotted_identifier, get_identifier, is_identifier,
+    get_other_chars, get_qstr
 )
 import cs.logutils
 from cs.logutils import (
@@ -62,249 +63,220 @@ DEFAULT_JOBS = 4
 # default flag status probe
 DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
-usage = '''Usage: %s [options...] op [args...]
-  %s url URL actions...
-      URL may be "-" to read URLs from standard input.
-  Options:
-    -c config
-        Load rc file.
-    -F flag-conjunction
-        Space separated list of flag or !flag to satisfy as a conjunction.
-    -j jobs
-	How many jobs (actions: URL fetches, minor computations)
-	to run at a time.
-        Default: %d
-    -q  Quiet. Don't recite surviving URLs at the end.
-    -u  Unbuffered. Flush print actions as they occur.
-    -x  Trace execution.'''
+class PilferCommand(BaseCommand):
 
-def main(argv, stdin=None):
-  if stdin is None:
-    stdin = sys.stdin
-  argv = list(argv)
-  xit = 0
-  argv0 = argv.pop(0)
-  cmd = os.path.basename(argv0)
-  setup_logging(cmd)
-  logTo('.pilfer.log')
+  GETOPT_SPEC = 'c:F:j:qux'
 
-  P = Pilfer()
-  quiet = False
-  jobs = DEFAULT_JOBS
-  flagnames = DEFAULT_FLAGS_CONJUNCTION
+  USAGE_FORMAT = '''Usage: {cmd} [options...] op [args...]
+    {cmd} url URL actions...
+        URL may be "-" to read URLs from standard input.
+    Options:
+      -c config
+          Load rc file.
+      -F flag-conjunction
+          Space separated list of flag or !flag to satisfy as a conjunction.
+      -j jobs
+      How many jobs (actions: URL fetches, minor computations)
+      to run at a time.
+          Default: ''' + str(DEFAULT_JOBS) + '''
+      -q  Quiet. Don't recite surviving URLs at the end.
+      -u  Unbuffered. Flush print actions as they occur.
+      -x  Trace execution.'''
 
-  badopts = False
+  @staticmethod
+  def apply_defaults(options):
+    options.pilfer = Pilfer()
+    options.quiet = False
+    options.jobs = DEFAULT_JOBS
+    options.flagnames = DEFAULT_FLAGS_CONJUNCTION
 
-  try:
-    opts, argv = getopt(argv, 'c:F:j:qux')
-  except GetoptError as e:
-    warning("%s", e)
-    badopts = True
-    opts = ()
-
-  for opt, val in opts:
-    with Pfx("%s", opt):
-      if opt == '-c':
-        P.rcs[0:0] = load_pilferrcs(val)
-      elif opt == '-F':
-        flagnames = val
-      elif opt == '-j':
-        jobs = int(val)
-      elif opt == '-q':
-        quiet = True
-      elif opt == '-u':
-        P.flush_print = True
-      elif opt == '-x':
-        P.do_trace = True
-      else:
-        raise NotImplementedError("unimplemented option")
-
-  # break the flags into separate words and syntax check
-  flagnames = flagnames.split()
-  for flagname in flagnames:
-    if flagname.startswith('!'):
-      flag_ok = is_identifier(flagname, 1)
-    else:
-      flag_ok = is_identifier(flagname)
-    if not flag_ok:
-      error('invalid flag specifier: %r', flagname)
-      badopts = True
-
-  dflt_rc = os.environ.get('PILFERRC')
-  if dflt_rc is None:
-    dflt_rc = envsub('$HOME/.pilferrc')
-  if dflt_rc:
-    with Pfx("$PILFERRC: %s", dflt_rc):
-      P.rcs.extend(load_pilferrcs(dflt_rc))
-
-  if not argv:
-    error("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    if op.startswith('http://') or op.startswith('https://'):
-      # push the URL back and infer missing "url" op word
-      argv.insert(0, op)
-      op = 'url'
-    with Pfx(op):
-      if op == 'url':
-        if not argv:
-          error("missing URL")
-          badopts = True
+  @staticmethod
+  def apply_opts(opts, options):
+    badopts = False
+    P = options.pilfer
+    for opt, val in opts:
+      with Pfx("%s", opt):
+        if opt == '-c':
+          P.rcs[0:0] = load_pilferrcs(val)
+        elif opt == '-F':
+          options.flagnames = val
+        elif opt == '-j':
+          options.jobs = int(val)
+        elif opt == '-q':
+          options.quiet = True
+        elif opt == '-u':
+          P.flush_print = True
+        elif opt == '-x':
+          P.do_trace = True
         else:
-          url = argv.pop(0)
+          raise NotImplementedError("unimplemented option")
+    # sanity check the flagnames
+    for raw_flagname in options.flagnames.split():
+      with Pfx(raw_flagname):
+        flagname = cutprefix(raw_flagname, '!')
+        if not is_identifier(flagname):
+          error('invalid flag specifier')
+          badopts = True
 
-          # prepare a blank PilferRC and supply as first in chain for this Pilfer
-          rc = PilferRC(None)
-          P.rcs.insert(0, rc)
+    dflt_rc = os.environ.get('PILFERRC')
+    if dflt_rc is None:
+      dflt_rc = envsub('$HOME/.pilferrc')
+    if dflt_rc:
+      with Pfx("$PILFERRC: %s", dflt_rc):
+        P.rcs.extend(load_pilferrcs(dflt_rc))
 
-          # Load any named pipeline definitions on the command line.
-          #
-          # A pipeline specification is specified by a leading argument
-          # of the form "pipe_name:{", followed by arguments defining
-          # functions for the pipeline, and a terminating argument of the
-          # form "}".
-          #
-          # Return `(spec, argv2, errors)` where `spec` is a PipeSpec
-          # embodying the specification, `argv2` is the list of arguments
-          # after the specification and `errors` is a list of error
-          # messages encountered parsing the function arguments.
-          #
-          # If the leading argument does not commence a function specification
-          # then `spec` will be None and `argv2` will be `argv`.
-          #
-          # Note: this syntax works well with traditional Bourne shells.
-          # Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
-          # sensible behaviour. Bash users may be out of luck.
-          #
-          while len(argv) and argv[0].endswith(':{'):
-            openarg = argv.pop(0)
-            with Pfx(openarg):
-              pipe_name = openarg[:-2]
-              argv2 = []
-              end_pos = None
-              for pos, arg in enumerate(argv):
-                if arg == '}':
-                  end_pos = pos
-                  break
-              if end_pos is None:
-                error("no closing '}'")
-                badopts = True
-                argv = []
-              else:
-                spec = PipeSpec(pipe_name, argv[:end_pos])
-                try:
-                  rc.add_pipespec(spec)
-                except KeyError as e:
-                  error("add pipe: %s", e)
-                  badopts = True
-                argv = argv[end_pos + 1:]
+  @staticmethod
+  def hack_postopts_argv(argv, options):
+    ''' Infer "url" subcommand if the first argument looks like an URL.
+    '''
+    if argv:
+      op = argv[0]
+      if op.startswith('http://') or op.startswith('https://'):
+        # push the URL back and infer missing "url" op word
+        argv.insert(0, 'url')
+    return argv
 
-          # now load the main pipeline
-          if not argv:
-            error("missing main pipeline")
-            badopts = True
-          else:
-            main_spec = PipeSpec(None, argv)
+  @staticmethod
+  def cmd_url(argv, options):
+    ''' Usage: url start_urlurl> [pipeline-defns..]
+    '''
+    P = options.pilfer
+    if not argv:
+      raise GetoptError("missing URL")
+    url = argv.pop(0)
 
-          # gather up the remaining definition as the running pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
+    # prepare a blank PilferRC and supply as first in chain for this Pilfer
+    rc = PilferRC(None)
+    P.rcs.insert(0, rc)
 
-          # report accumulated errors and set badopts
-          if errors:
-            for err in errors:
-              error(err)
-            badopts = True
-          if not badopts:
-            LTR = Later(jobs)
-            P.flagnames = flagnames
-            if cs.logutils.D_mode or ifdebug():
-              # poll the status of the Later regularly
-              def pinger(L):
-                while True:
-                  D(
-                      "PINGER: L: quiescing=%s, state=%r: %s", L._quiescing,
-                      L._state, L
-                  )
-                  sleep(2)
+    # Load any named pipeline definitions on the command line.
+    argv_offset = 0
+    while argv and argv[argv_offset].endswith(':{'):
+      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
+      try:
+        rc.add_pipespec(spec)
+      except KeyError as e:
+        raise GetoptError("add pipe: %s", e)
 
-              ping = Thread(target=pinger, args=(LTR,))
-              ping.daemon = True
-              ping.start()
-            with LTR as L:
-              P.later = L
-              # construct the pipeline
-              pipeline = pipeline(
-                  L,
-                  pipe_funcs,
-                  name="MAIN",
-                  outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                 blocking=True).open(),
-              )
-              X("MAIN: RUN PIPELINE...")
-              with pipeline:
-                for U in urls(url, stdin=stdin, cmd=cmd):
-                  X("MAIN: PUT %r", U)
-                  pipeline.put(P.copy_with_vars(_=U))
-              X("MAIN: RUN PIPELINE: ALL ITEMS .put")
-              # wait for main pipeline to drain
-              LTR.state("drain main pipeline")
-              for item in pipeline.outQ:
-                warning("main pipeline output: escaped: %r", item)
-              # At this point everything has been dispatched from the input queue
-              # and the only remaining activity is in actions in the diversions.
-              # As long as there are such actions, the Later will be busy.
-              # In fact, even after the Later first quiesces there may
-              # be stalled diversions waiting for EOF in order to process
-              # their "func_final" actions. Releasing these may pass
-              # tasks to other diversions.
-              # Therefore we iterate:
-              #  - wait for the Later to quiesce
-              #  - [missing] topologically sort the diversions
-              #  - pick the [most-ancestor-like] diversion that is busy
-              #    or exit loop if they are all idle
-              #  - close the div
-              #  - wait for that div to drain
-              #  - repeat
-              # drain all the divserions, choosing the busy ones first
-              divnames = P.open_diversion_names
-              while divnames:
-                busy_name = None
-                for divname in divnames:
-                  div = P.diversion(divname)
-                  if div._busy:
-                    busy_name = divname
-                    break
-                # nothing busy? pick the first one arbitrarily
-                if not busy_name:
-                  busy_name = divnames[0]
-                busy_div = P.diversion(busy_name)
-                LTR.state("CLOSE DIV %s", busy_div)
-                busy_div.close(enforce_final_close=True)
-                outQ = busy_div.outQ
-                D("DRAIN DIV %s", busy_div)
-                LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
-                for item in outQ:
-                  # diversions are supposed to discard their outputs
-                  error("%s: RECEIVED %r", busy_div, item)
-                LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
-                divnames = P.open_diversion_names
-              LTR.state("quiescing")
-              L.wait_outstanding(until_idle=True)
-              # Now the diversions should have completed and closed.
-            # out of the context manager, the Later should be shut down
-            LTR.state("WAIT...")
-            L.wait()
-            LTR.state("WAITED")
-      else:
-        error("unsupported op")
-        badopts = True
+    # now load the main pipeline
+    if not argv:
+      raise GetoptError("missing main pipeline")
 
-  if badopts:
-    print(usage % (cmd, cmd, DEFAULT_JOBS), file=sys.stderr)
-    xit = 2
+    # TODO: main_spec never used?
+    main_spec = PipeSpec(None, argv)
 
-  return xit
+    # gather up the remaining definition as the running pipeline
+    pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
+
+    # report accumulated errors and set badopts
+    if errors:
+      for err in errors:
+        error(err)
+      raise GetoptError("invalid main pipeline")
+
+    LTR = Later(options.jobs)
+    P.flagnames = options.flagnames
+    if cs.logutils.D_mode or ifdebug():
+      # poll the status of the Later regularly
+      def pinger(L):
+        while True:
+          D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+          sleep(2)
+
+      ping = Thread(target=pinger, args=(LTR,))
+      ping.daemon = True
+      ping.start()
+
+    with LTR as L:
+      P.later = L
+      # construct the pipeline
+      pipe = pipeline(
+          L,
+          pipe_funcs,
+          name="MAIN",
+          outQ=NullQueue(name="MAIN_PIPELINE_END_NQ", blocking=True).open(),
+      )
+      X("MAIN: RUN PIPELINE...")
+      with pipe:
+        for U in urls(url, stdin=sys.stdin, cmd=options.cmd):
+          X("MAIN: PUT %r", U)
+          pipe.put(P.copy_with_vars(_=U))
+      X("MAIN: RUN PIPELINE: ALL ITEMS .put")
+      # wait for main pipeline to drain
+      LTR.state("drain main pipeline")
+      for item in pipe.outQ:
+        warning("main pipeline output: escaped: %r", item)
+      # At this point everything has been dispatched from the input queue
+      # and the only remaining activity is in actions in the diversions.
+      # As long as there are such actions, the Later will be busy.
+      # In fact, even after the Later first quiesces there may
+      # be stalled diversions waiting for EOF in order to process
+      # their "func_final" actions. Releasing these may pass
+      # tasks to other diversions.
+      # Therefore we iterate:
+      #  - wait for the Later to quiesce
+      #  - [missing] topologically sort the diversions
+      #  - pick the [most-ancestor-like] diversion that is busy
+      #    or exit loop if they are all idle
+      #  - close the div
+      #  - wait for that div to drain
+      #  - repeat
+      # drain all the divserions, choosing the busy ones first
+      divnames = P.open_diversion_names
+      while divnames:
+        busy_name = None
+        for divname in divnames:
+          div = P.diversion(divname)
+          if div._busy:
+            busy_name = divname
+            break
+        # nothing busy? pick the first one arbitrarily
+        if not busy_name:
+          busy_name = divnames[0]
+        busy_div = P.diversion(busy_name)
+        LTR.state("CLOSE DIV %s", busy_div)
+        busy_div.close(enforce_final_close=True)
+        outQ = busy_div.outQ
+        D("DRAIN DIV %s", busy_div)
+        LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
+        for item in outQ:
+          # diversions are supposed to discard their outputs
+          error("%s: RECEIVED %r", busy_div, item)
+        LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
+        divnames = P.open_diversion_names
+      LTR.state("quiescing")
+      L.wait_outstanding(until_idle=True)
+      # Now the diversions should have completed and closed.
+    # out of the context manager, the Later should be shut down
+    LTR.state("WAIT...")
+    L.wait()
+    LTR.state("WAITED")
+
+  @staticmethod
+  def get_argv_pipespec(argv, argv_offset=0):
+    ''' Parse a pipeline specification from the argument list `argv`.
+        Return `(PipeSpec,new_argv_offset)`.
+
+        A pipeline specification is specified by a leading argument of the
+        form `'pipe_name:{'`, followed by arguments defining functions for the
+        pipeline, and a terminating argument of the form `'}'`.
+
+        Note: this syntax works well with traditional Bourne shells.
+        Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+        sensible behaviour. Bash users may be out of luck.
+    '''
+    start_arg = argv[argv_offset]
+    pipe_name = cutsuffix(start_arg, ':{')
+    if pipe_name is start_arg:
+      raise ValueError("expected \"pipe_name:{\", got: %r" % (start_arg,))
+    with Pfx(start_arg):
+      argv_offset += 1
+      spec_offset = argv_offset
+      while argv[argv_offset] != '}':
+        argv_offset += 1
+      spec = PipeSpec(pipe_name, argv[spec_offset:argv_offset])
+      argv_offset += 1
+      return spec, argv_offset
 
 @yields_str
 def urls(url, stdin=None, cmd=None):
@@ -2069,4 +2041,4 @@ class PilferRC(O):
     specs[pipename] = pipespec
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv))
+  sys.exit(PilferCommand().run(sys.argv))
