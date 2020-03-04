@@ -4,9 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07jul2010
 #
 
-from __future__ import with_statement, print_function
-from collections import defaultdict
-from configutils import ConfigParser
+from configparser import ConfigParser
 import os
 import os.path
 import errno
@@ -27,7 +25,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from icontract import require
 from cs.app.flag import PolledFlags
-from cs.debug import thread_dump, ifdebug
+from cs.debug import ifdebug
 from cs.env import envsub
 from cs.excutils import logexc, LogExceptions
 from cs.fileutils import mkdirn
