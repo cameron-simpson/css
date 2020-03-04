@@ -9,7 +9,7 @@ from configparser import ConfigParser
 import os
 import os.path
 import errno
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import re
 import shlex
 from string import Formatter, whitespace
@@ -38,7 +38,7 @@ from cs.lex import (
 )
 import cs.logutils
 from cs.logutils import (
-    setup_logging, logTo, debug, error, warning, exception, trace, D
+    debug, error, warning, exception, trace, D
 )
 from cs.mappings import MappingChain, SeenSet
 from cs.obj import copy as obj_copy
@@ -117,7 +117,8 @@ class PilferCommand(BaseCommand):
         if not is_identifier(flagname):
           error('invalid flag specifier')
           badopts = True
-
+    if badopts:
+      raise GetoptError("invalid options")
     dflt_rc = os.environ.get('PILFERRC')
     if dflt_rc is None:
       dflt_rc = envsub('$HOME/.pilferrc')
@@ -137,7 +138,7 @@ class PilferCommand(BaseCommand):
     return argv
 
   @staticmethod
-  def cmd_url(argv, options):
+  def cmd_url(cls, argv, options):
     ''' Usage: url start_urlurl> [pipeline-defns..]
     '''
     P = options.pilfer
@@ -152,7 +153,7 @@ class PilferCommand(BaseCommand):
     # Load any named pipeline definitions on the command line.
     argv_offset = 0
     while argv and argv[argv_offset].endswith(':{'):
-      spec, argv_offset = self.get_argv_pipespec(argv, argv_offset)
+      spec, argv_offset = cls.get_argv_pipespec(argv, argv_offset)
       try:
         rc.add_pipespec(spec)
       except KeyError as e:
@@ -351,14 +352,14 @@ def argv_pipefuncs(argv, action_map, do_trace):
         pipespec = PipeSpec(name, argv)
 
         def per(P):
-          pipeline = pipeline(
+          pipe = pipeline(
               P.later,
               pipespec.actions,
               inputs=(P,),
               name="%s(%s)" % (name, P)
           )
           with P.later.release():
-            for P2 in pipeline.outQ:
+            for P2 in pipe.outQ:
               yield P2
 
         pipe_funcs.append((FUNC_ONE_TO_MANY, per))
@@ -626,7 +627,7 @@ class Pilfer:
       if self.flush_print:
         file.flush()
 
-  @require(lambda kw: all(isinstance(v, str) for v in kw.values()))
+  @require(lambda kw: all(isinstance(v, str) for v in kw))
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
@@ -1593,8 +1594,11 @@ def parse_action(action, do_trace):
   return sig, func
 
 def parse_action_args(action, offset, delim=None):
-  ''' Parse [[kw=]arg[,[kw=]arg...] from `action` at `offset`, return (args, kwargs, offset).
-     An arg is a quoted string or a sequence of nonwhitespace excluding `delim` and comma.
+  ''' Parse `[[kw=]arg[,[kw=]arg...]` from `action` at `offset`,
+     return `(args,kwargs,offset)`.
+
+     An `arg` is a quoted string or a sequence of nonwhitespace
+     excluding `delim` and comma.
   '''
   other_chars = ',' + whitespace
   if delim is not None:
@@ -1622,11 +1626,12 @@ def parse_action_args(action, offset, delim=None):
   return args, kwargs, offset
 
 def retriable(func):
-  ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
+  ''' A decorator for a function to probe the `Pilfer` flags
+      and raise `RetryError` if unsatisfied.
   '''
 
   def retry_func(P, *a, **kw):
-    ''' Call func after testing flags.
+    ''' Call `func` after testing `P.test_flags()`.
     '''
     if not P.test_flags():
       raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
@@ -1734,8 +1739,12 @@ class ShellProcFilter(MultiOpenMixin):
 
   def __init__(self, shcmd, outQ):
     ''' Set up a subprocess running `shcmd`.
-        `no_flush`: do not flush input lines for the subprocess, block buffer instead.
-        `discard`: discard .put items, close subprocess stdin immediately after startup.
+
+        Parameters:
+        * `no_flush`: do not flush input lines for the subprocess,
+          block buffer instead
+        * `discard`: discard .put items, close subprocess stdin
+          immediately after startup
     '''
     MultiOpenMixin.__init__(self)
     self.shcmd = shcmd
@@ -1747,7 +1756,7 @@ class ShellProcFilter(MultiOpenMixin):
     self.shproc = Popen(shcmd, shell=True, stdin=PIPE, stdout=PIPE)
 
     def copy_out(fp, outQ):
-      ''' Copy lines from the shell output, put new Pilfers onto the outQ.
+      ''' Copy lines from the shell output, put new `Pilfer`s onto the `outQ`.
       '''
       for line in fp:
         if not line.endswith('\n'):
@@ -1941,6 +1950,7 @@ class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   @logexc
   def pipe_funcs(self, L, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
+
         It is important that this list is constructed anew for each
         new pipeline instance because many of the functions rely
         on closures to track state.
@@ -1950,8 +1960,9 @@ class PipeSpec(namedtuple('PipeSpec', 'name argv')):
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
-  ''' Load PilferRC instances from the supplied `pathname`, recursing if this is a directory.
-      Return a list of the PilferRC instances obtained.
+  ''' Load `PilferRC` instances from the supplied `pathname`,
+      recursing if this is a directory.
+      Return a list of the `PilferRC` instances obtained.
   '''
   rcs = []
   with Pfx(pathname):
@@ -1978,7 +1989,8 @@ def load_pilferrcs(pathname):
 class PilferRC:
 
   def __init__(self, filename):
-    ''' Initialise the PilferRC instance. Load values from `filename` if not None.
+    ''' Initialise the `PilferRC` instance.
+        Load values from `filename` if not `None`.
     '''
     self.filename = filename
     self._lock = Lock()
@@ -1994,7 +2006,8 @@ class PilferRC:
 
   @locked
   def add_pipespec(self, spec, pipe_name=None):
-    ''' Add a PipeSpec to this Pilfer's collection, optionally with a different `pipe_name`.
+    ''' Add a `PipeSpec` to this `Pilfer`'s collection,
+        optionally with a different `pipe_name`.
     '''
     if pipe_name is None:
       pipe_name = spec.name
