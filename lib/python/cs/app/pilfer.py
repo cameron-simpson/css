@@ -1975,12 +1975,11 @@ def load_pilferrcs(pathname):
       warning("neither a file nor a directory, ignoring")
   return rcs
 
-class PilferRC(O):
+class PilferRC:
 
   def __init__(self, filename):
     ''' Initialise the PilferRC instance. Load values from `filename` if not None.
     '''
-    O.__init__(self)
     self.filename = filename
     self._lock = Lock()
     self.defaults = {}
@@ -1989,6 +1988,9 @@ class PilferRC(O):
     self.seen_backing_paths = {}
     if filename is not None:
       self.loadrc(filename)
+
+  def __str__(self):
+    return type(self).__name__ + '(' + repr(self.filename) + ')'
 
   @locked
   def add_pipespec(self, spec, pipe_name=None):
