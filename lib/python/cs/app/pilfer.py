@@ -381,15 +381,16 @@ def url_xml_find(U, match):
   for found in url_io(URL(U, None).xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-class Pilfer(O):
+class Pilfer:
   ''' State for the pilfer app.
-      Notable attribute include:
-        .flush_print    Flush output after print(), default False.
-        .user_agent     Specify user-agent string, default None.
-        .user_vars      Mapping of user variables for arbitrary use.
+
+      Notable attributes include:
+      * `flush_print`: flush output after print(), default `False`.
+      * `user_agent`: specify user-agent string, default `None`.
+      * `user_vars`: mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self, *a, **kw):
+  def __init__(self):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
     self.user_vars = {'save_dir': '.'}
@@ -407,7 +408,6 @@ class Pilfer(O):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.opener.add_handler(HTTPCookieProcessor())
-    O.__init__(self, **kw)
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
