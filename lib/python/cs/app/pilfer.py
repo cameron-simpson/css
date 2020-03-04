@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au> 07jul2010
 #
 
+from collections import namedtuple
 from configparser import ConfigParser
 import os
 import os.path
@@ -1961,14 +1962,9 @@ def action_pipecmd(shcmd):
 
   return function, FUNC_MANY_TO_MANY
 
-class PipeSpec(O):
+class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   ''' A pipeline specification: a name and list of actions.
   '''
-
-  def __init__(self, name, argv):
-    O.__init__(self)
-    self.name = name
-    self.argv = argv
 
   @logexc
   def pipe_funcs(self, L, action_map, do_trace):
