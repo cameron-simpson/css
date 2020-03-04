@@ -6,11 +6,35 @@
 from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
+from time import strptime
 from cs.lex import (
     get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
 )
 from cs.logutils import info, warning
 from cs.pfx import Pfx
+
+try:
+  date_fromisoformat = date.fromisoformat
+except AttributeError:
+
+  def date_from_isoformat(datestr):
+    ''' Placeholder for `date.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%d')
+    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
+
+try:
+  datetime_fromisoformat = datetime.fromisoformat
+except AttributeError:
+
+  def datetime_from_isoformat(datestr):
+    ''' Placeholder for `datetime.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
+    return datetime(
+        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
+        parsed.tm_min, parsed.tm_sec
+    )
 
 __version__ = '20200229.1'
 
@@ -167,10 +191,7 @@ class TagSet:
     else:
       # a mapping, convert to iterable and recurse
       self.update(
-          (
-              Tag.from_name_value(k, v)
-              for k, v in other_kvs
-          ),
+          (Tag.from_name_value(k, v) for k, v in other_kvs),
           prefix=prefix,
           verbose=verbose
       )
@@ -220,8 +241,8 @@ class Tag(namedtuple('Tag', 'name value')):
   JSON_DECODER = JSONDecoder()
 
   EXTRA_TYPES = [
-      (date, date.fromisoformat, date.isoformat),
-      (datetime, datetime.fromisoformat, datetime.isoformat),
+      (date, date_fromisoformat, date.isoformat),
+      (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
   def __eq__(self, other):
