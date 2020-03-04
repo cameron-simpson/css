@@ -102,10 +102,15 @@ class BaseCommand:
       * `apply_defaults(options)`:
         prepare the initial state of `options`
         before any command line options are applied
-      * `apply_opts(options,opts)`:
+      * `apply_opts(opts,options)`:
         apply the `opts` to `options`.
         `opts` is an option value mapping
         as returned by `getopot.getopt`.
+      * `hack_postopts_argv(argv,options)`:
+        make any adjustments to `argv` after parsing the options,
+        return the adjusted `argv` list.
+        This might mean supplying a default argument list if `argv` is empty
+        or inferring a subcommand from the leading argument, etc.
       * `cmd_`*subcmd*`(argv,options)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
@@ -216,6 +221,8 @@ class BaseCommand:
       if self.GETOPT_SPEC:
         self.apply_opts(opts, options)
 
+      argv = self.hack_postopts_argv(argv, options)
+
       subcmd_prefix = self.SUBCOMMAND_METHOD_PREFIX
       subcmd_names = list(
           map(
@@ -258,6 +265,16 @@ class BaseCommand:
       if handler and handler(cmd, options, e, usage):
         return 2
       raise
+
+  @staticmethod
+  def hack_postopts_argv(argv, options):
+    ''' Make any adjustments to `argv` after parsing the options.
+        Return the adjusted `argv` list.
+
+        This might mean supplying a default argument list if `argv` is empty
+        or inferring a subcommand from the leading argument, etc.
+    '''
+    return argv
 
   @staticmethod
   def getopt_error_handler(cmd, options, e, usage):
