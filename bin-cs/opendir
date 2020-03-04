@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Pop up a desktop finder on a directory.
+# - Cameron Simpson <cs@cskk.id.au> 05feb2020
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd dirpath"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+dirpath=$1
+
+: ${OS:=`uname -s`}
+
+case "$OS" in
+  [Dd]arwin)
+    reattach-to-user-namespace open "$dirpath"
+    ;;
+  *)echo "$cmd: unsupported OS: $OS" >&2
+    exit 1
+    ;;
+esac
