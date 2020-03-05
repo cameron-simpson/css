@@ -137,6 +137,7 @@ class FSTagsCommand(BaseCommand):
     {cmd} cp [-fnv] srcpaths... dstdirpath
         Copy files and their tags into targetdir.
         -f  Force: remove destination if it exists.
+        -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
     {cmd} scrub paths...
@@ -167,6 +168,7 @@ class FSTagsCommand(BaseCommand):
     {cmd} ln [-fnv] srcpaths... dstdirpath
         Link files and their tags into targetdir.
         -f  Force: remove destination if it exists.
+        -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show linked files.
     {cmd} ls [--direct] [-o output_format] [paths...]
@@ -184,6 +186,7 @@ class FSTagsCommand(BaseCommand):
     {cmd} mv [-fnv] srcpaths... dstdirpath
         Move files and their tags into targetdir.
         -f  Force: remove destination if it exists.
+        -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
     {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
@@ -459,10 +462,12 @@ class FSTagsCommand(BaseCommand):
     fstags = options.fstags
     cmd_force = False
     cmd_verbose = False
-    subopts, argv = getopt(argv, 'fnv')
+    subopts, argv = getopt(argv, 'finv')
     for subopt, value in subopts:
       if subopt == '-f':
         cmd_force = True
+      elif subopt == '-i':
+        cmd_force = False
       elif subopt == '-n':
         cmd_force = False
       elif subopt == '-v':
