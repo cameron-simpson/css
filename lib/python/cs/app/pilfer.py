@@ -137,7 +137,7 @@ class PilferCommand(BaseCommand):
         argv.insert(0, 'url')
     return argv
 
-  @staticmethod
+  @classmethod
   def cmd_url(cls, argv, options):
     ''' Usage: url start_urlurl> [pipeline-defns..]
     '''
