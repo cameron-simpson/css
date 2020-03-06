@@ -107,6 +107,11 @@ class TagSet:
 
   __iter__ = as_tags
 
+  def as_dict(self):
+    ''' Return a `dict` mapping tag name to value.
+    '''
+    return dict(self.tagmap)
+
   def add(self, tag_name, value=None, *, verbose=False):
     ''' Add a tag to these tags.
     '''
