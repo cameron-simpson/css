@@ -259,16 +259,8 @@ class FSTagsCommand(BaseCommand):
                     direct_tags.add('filesize', S.st_size)
                 # update the
                 all_tags = tagged_path.merged_tags()
-                cascaded = set()
-                for cascade_rule in fstags.config.cascade_rules:
-                  if cascade_rule.target in direct_tags:
-                    continue
-                  if cascade_rule.target in cascaded:
-                    continue
-                  tag = cascade_rule.infer_tag(all_tags)
-                  if tag is None:
-                    continue
-                  if tag not in all_tags:
+                for tag in fstags.cascade_tags(all_tags):
+                  if tag.name not in direct_tags:
                     direct_tags.add(tag)
 
   @staticmethod
@@ -739,6 +731,26 @@ class FSTags(MultiOpenMixin):
               else:
                 # delete tag
                 tagged_path.discard(tag)
+
+  def cascade_tags(self, tags, cascade_rules=None):
+    ''' Yield `Tag`s
+        which cascade from the `TagSet` `tags`
+        via `cascade_rules` (an iterable of `CascadeRules`).
+    '''
+    if cascade_rules is None:
+      cascade_rules = self.config.cascade_rules
+    cascaded = set()
+    for cascade_rule in cascade_rules:
+      if cascade_rule.target in tags:
+        continue
+      if cascade_rule.target in cascaded:
+        continue
+      tag = cascade_rule.infer_tag(tags)
+      if tag is None:
+        continue
+      if tag.name not in tags:
+        yield tag
+        cascaded.add(tag.name)
 
   def export_xattrs(self, paths):
     ''' Import the extended attributes of `paths`
