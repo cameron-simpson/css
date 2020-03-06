@@ -199,6 +199,11 @@ def rewrite_cmgr(
       * `empty_ok`: do not consider empty output an error.
       * `overwrite_anyway`: do not update the original if the new
         data are identical.
+
+      Example:
+
+          with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
+             ... write new content to f ...
   '''
   if backup_ext is None:
     backuppath = None
