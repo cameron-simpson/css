@@ -64,7 +64,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.lex import get_nonwhite
+from cs.lex import get_nonwhite, cutsuffix
 from cs.logutils import setup_logging, error, warning, info, trace
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -140,9 +140,6 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
-    {cmd} scrub paths...
-        Remove all tags for missing paths.
-        If a path is a directory, scrub the immediate paths in the directory.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         -d          treat directories like files (do no recurse).
@@ -189,6 +186,14 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} rename -n newbasename_format paths...
+        Rename paths according to a format string.
+        -n newbasename_format
+            Use newbasename_format as a Python format string to
+            compute the new basename for each path.
+    {cmd} scrub paths...
+        Remove all tags for missing paths.
+        If a path is a directory, scrub the immediate paths in the directory.
     {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
@@ -262,16 +267,8 @@ class FSTagsCommand(BaseCommand):
                     direct_tags.add('filesize', S.st_size)
                 # update the
                 all_tags = tagged_path.merged_tags()
-                cascaded = set()
-                for cascade_rule in fstags.config.cascade_rules:
-                  if cascade_rule.target in direct_tags:
-                    continue
-                  if cascade_rule.target in cascaded:
-                    continue
-                  tag = cascade_rule.infer_tag(all_tags)
-                  if tag is None:
-                    continue
-                  if tag not in all_tags:
+                for tag in fstags.cascade_tags(all_tags):
+                  if tag.name not in direct_tags:
                     direct_tags.add(tag)
 
   @staticmethod
@@ -463,7 +460,7 @@ class FSTagsCommand(BaseCommand):
     cmd_force = False
     cmd_verbose = False
     subopts, argv = getopt(argv, 'finv')
-    for subopt, value in subopts:
+    for subopt, _ in subopts:
       if subopt == '-f':
         cmd_force = True
       elif subopt == '-i':
@@ -508,6 +505,63 @@ class FSTagsCommand(BaseCommand):
           else:
             if cmd_verbose:
               print(srcpath, '->', dstpath)
+    return xit
+
+  @staticmethod
+  def cmd_rename(argv, options):
+    ''' Rename paths based on a format string.
+    '''
+    xit = 0
+    fstags = options.fstags
+    name_format = None
+    subopts, argv = getopt(argv, 'n:')
+    for subopt, value in subopts:
+      if subopt == '-n':
+        name_format = value
+      else:
+        raise RuntimeError("unhandled subopt: %r" % (subopt,))
+    if name_format is None:
+      raise GetoptError("missing -n option")
+    if not argv:
+      raise GetoptError("missing paths")
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    xit = 0
+    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    with stackattrs(state, verbose=True):
+      with fstags:
+        for filepath in paths:
+          if U:
+            oldU = U.out('')
+          with Pfx(filepath):
+            if filepath == '-':
+              warning(
+                  "ignoring name %r: standard input is only supported alone",
+                  filepath
+              )
+              xit = 1
+              continue
+            dirpath = dirname(filepath)
+            base = basename(filepath)
+            format_kwargs = fstags[filepath].format_kwargs(direct=False)
+            try:
+              newbase = name_format.format(**format_kwargs)
+            except KeyError as e:
+              error(
+                  "format fails: %s; available keywords: %s", e,
+                  ' '.join(sorted(format_kwargs.keys()))
+              )
+              xit = 1
+              continue
+            if base == newbase:
+              continue
+            dstpath = joinpath(dirpath, newbase)
+            info("%s -> %s", filepath, dstpath)
+            options.fstags.move(filepath, dstpath)
+    if U:
+      U.out(oldU)
     return xit
 
   @classmethod
@@ -744,6 +798,26 @@ class FSTags(MultiOpenMixin):
               else:
                 # delete tag
                 tagged_path.discard(tag)
+
+  def cascade_tags(self, tags, cascade_rules=None):
+    ''' Yield `Tag`s
+        which cascade from the `TagSet` `tags`
+        via `cascade_rules` (an iterable of `CascadeRules`).
+    '''
+    if cascade_rules is None:
+      cascade_rules = self.config.cascade_rules
+    cascaded = set()
+    for cascade_rule in cascade_rules:
+      if cascade_rule.target in tags:
+        continue
+      if cascade_rule.target in cascaded:
+        continue
+      tag = cascade_rule.infer_tag(tags)
+      if tag is None:
+        continue
+      if tag.name not in tags:
+        yield tag
+        cascaded.add(tag.name)
 
   def export_xattrs(self, paths):
     ''' Import the extended attributes of `paths`
@@ -1144,13 +1218,37 @@ class TaggedPath(HasFSTagsMixin):
     ''' Format arguments suitable for `str.format`.
     '''
     filepath = str(self.filepath)
-    format_tags = TagSet(defaults=defaultdict(str))
-    format_tags.update(self.direct_tags if direct else self.all_tags)
-    kwargs = dict(
+    source_tags = self.direct_tags if direct else self.all_tags
+    format_tags = TagSet()
+    format_tags.update(source_tags)
+    # add in cascaded values
+    for tag in self.fstags.cascade_tags(format_tags):
+      if tag.name not in format_tags:
+        format_tags.add(tag)
+    kwargs = defaultdict(str)
+    # fill out _lc flavours of tags
+    tag_dict = format_tags.as_dict()
+    for tag_name, value in format_tags.as_dict().items():
+      if tag_name in kwargs:
+        continue
+      kwargs[tag_name] = value
+      if isinstance(value, str):
+        tag_name_prefix = cutsuffix(tag_name, '_lc')
+        if tag_name_prefix is tag_name:
+          # not a _lc tag_name
+          tag_name_lc = tag_name + '_lc'
+          if tag_name_lc not in tag_dict:
+            kwargs[tag_name_lc] = value.lower()
+        else:
+          # tag_name is foo_lc, compute title version if missing
+          if tag_name_prefix not in tag_dict:
+            kwargs[tag_name_prefix] = value.title()
+    # hardwire some specific values
+    kwargs.update(
         basename=basename(filepath),
         filepath=filepath,
         filepath_encoded=TagFile.encode_name(filepath),
-        tags=format_tags,
+        tags=source_tags,
     )
     return kwargs
 
