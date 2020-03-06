@@ -421,17 +421,27 @@ class FSTagsCommand(BaseCommand):
           output_format = value
         else:
           raise RuntimeError("unsupported option")
+    xit = 0
     paths = argv or ['.']
     for path in paths:
-      with Pfx(path):
-        fullpath = realpath(path)
-        for filepath in ((fullpath,)
-                         if directories_like_files else rfilepaths(fullpath)):
-          print(
-              output_format.format(
-                  **fstags[filepath].format_kwargs(direct=use_direct_tags)
-              )
+      fullpath = realpath(path)
+      for filepath in ((fullpath,)
+                       if directories_like_files else rfilepaths(fullpath)):
+        with Pfx(filepath):
+          format_kwargs = fstags[filepath].format_kwargs(
+              direct=use_direct_tags
           )
+          try:
+            listing = output_format.format(**format_kwargs)
+          except KeyError as e:
+            error(
+                "format fails: %s; available keywords: %s", e,
+                ' '.join(sorted(format_kwargs.keys()))
+            )
+            xit = 1
+            continue
+          print(listing)
+    return xit
 
   def cmd_cp(self, argv, options):
     ''' POSIX cp equivalent, but copying the tags.
