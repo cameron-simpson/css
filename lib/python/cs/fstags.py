@@ -64,7 +64,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.lex import get_nonwhite
+from cs.lex import get_nonwhite, cutsuffix
 from cs.logutils import setup_logging, error, warning, info, trace
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -139,9 +139,6 @@ class FSTagsCommand(BaseCommand):
         -f  Force: remove destination if it exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
-    {cmd} scrub paths...
-        Remove all tags for missing paths.
-        If a path is a directory, scrub the immediate paths in the directory.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         -d          treat directories like files (do no recurse).
@@ -186,6 +183,14 @@ class FSTagsCommand(BaseCommand):
         -f  Force: remove destination if it exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} rename -n newbasename_format paths...
+        Rename paths according to a format string.
+        -n newbasename_format
+            Use newbasename_format as a Python format string to
+            compute the new basename for each path.
+    {cmd} scrub paths...
+        Remove all tags for missing paths.
+        If a path is a directory, scrub the immediate paths in the directory.
     {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
@@ -452,7 +457,7 @@ class FSTagsCommand(BaseCommand):
     cmd_force = False
     cmd_verbose = False
     subopts, argv = getopt(argv, 'fnv')
-    for subopt, value in subopts:
+    for subopt, _ in subopts:
       if subopt == '-f':
         cmd_force = True
       elif subopt == '-n':
@@ -495,6 +500,63 @@ class FSTagsCommand(BaseCommand):
           else:
             if cmd_verbose:
               print(srcpath, '->', dstpath)
+    return xit
+
+  @staticmethod
+  def cmd_rename(argv, options):
+    ''' Rename paths based on a format string.
+    '''
+    xit = 0
+    fstags = options.fstags
+    name_format = None
+    subopts, argv = getopt(argv, 'n:')
+    for subopt, value in subopts:
+      if subopt == '-n':
+        name_format = value
+      else:
+        raise RuntimeError("unhandled subopt: %r" % (subopt,))
+    if name_format is None:
+      raise GetoptError("missing -n option")
+    if not argv:
+      raise GetoptError("missing paths")
+    if len(argv) == 1 and argv[0] == '-':
+      paths = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      paths = argv
+    xit = 0
+    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    with stackattrs(state, verbose=True):
+      with fstags:
+        for filepath in paths:
+          if U:
+            oldU = U.out('')
+          with Pfx(filepath):
+            if filepath == '-':
+              warning(
+                  "ignoring name %r: standard input is only supported alone",
+                  filepath
+              )
+              xit = 1
+              continue
+            dirpath = dirname(filepath)
+            base = basename(filepath)
+            format_kwargs = fstags[filepath].format_kwargs(direct=False)
+            try:
+              newbase = name_format.format(**format_kwargs)
+            except KeyError as e:
+              error(
+                  "format fails: %s; available keywords: %s", e,
+                  ' '.join(sorted(format_kwargs.keys()))
+              )
+              xit = 1
+              continue
+            if base == newbase:
+              continue
+            dstpath = joinpath(dirpath, newbase)
+            info("%s -> %s", filepath, dstpath)
+            options.fstags.move(filepath, dstpath)
+    if U:
+      U.out(oldU)
     return xit
 
   @classmethod
