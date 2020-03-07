@@ -1214,39 +1214,22 @@ class TaggedPath(HasFSTagsMixin):
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
     '''
-    filepath = str(self.filepath)
     source_tags = self.direct_tags if direct else self.all_tags
-    format_tags = TagSet()
-    format_tags.update(source_tags)
+    kwargs = source_tags.format_kwargs()
     # add in cascaded values
-    for tag in self.fstags.cascade_tags(format_tags):
-      if tag.name not in format_tags:
-        format_tags.add(tag)
-    kwargs = defaultdict(str)
-    # fill out _lc flavours of tags
-    tag_dict = format_tags.as_dict()
-    for tag_name, value in format_tags.as_dict().items():
-      if tag_name in kwargs:
-        continue
-      kwargs[tag_name] = value
-      if isinstance(value, str):
-        tag_name_prefix = cutsuffix(tag_name, '_lc')
-        if tag_name_prefix is tag_name:
-          # not a _lc tag_name
-          tag_name_lc = tag_name + '_lc'
-          if tag_name_lc not in tag_dict:
-            kwargs[tag_name_lc] = value.lower()
-        else:
-          # tag_name is foo_lc, compute title version if missing
-          if tag_name_prefix not in tag_dict:
-            kwargs[tag_name_prefix] = value.title()
+    # TODO: what about cascaded tags whose names contain dots?
+    for tag in self.fstags.cascade_tags(source_tags):
+      if tag.name not in kwargs:
+        kwargs[tag.name] = tag.value
     # hardwire some specific values
+    filepath = str(self.filepath)
     kwargs.update(
         basename=basename(filepath),
         filepath=filepath,
         filepath_encoded=TagFile.encode_name(filepath),
         tags=source_tags,
     )
+    warning("format_kwargs = %r", kwargs)
     return kwargs
 
   @property
