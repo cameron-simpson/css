@@ -695,6 +695,8 @@ class FSTagsCommand(BaseCommand):
     with stackattrs(state, verbose=True):
       fstags.import_xattrs(paths)
 
+FSTagsCommand.add_usage_to_docstring()
+
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
@@ -1579,8 +1581,6 @@ class FSTagsConfig:
     ''' Set the tags filename.
     '''
     self.config['general']['tagsfile'] = tagsfile
-
-FSTagsCommand.add_usage_to_docstring()
 
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
