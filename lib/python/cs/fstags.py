@@ -560,6 +560,7 @@ class FSTagsCommand(BaseCommand):
               )
               xit = 1
               continue
+            newbase = newbase.replace(os.sep, ':')
             if base == newbase:
               continue
             dstpath = joinpath(dirpath, newbase)
