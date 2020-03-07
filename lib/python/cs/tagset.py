@@ -7,8 +7,10 @@ from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 from time import strptime
+from types import SimpleNamespace as NS
 from cs.lex import (
-    get_dotted_identifier, get_nonwhite, is_dotted_identifier, skipwhite
+    cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
+    skipwhite, lc_, titleify_lc
 )
 from cs.logutils import info, warning
 from cs.pfx import Pfx
@@ -201,34 +203,66 @@ class TagSet:
           verbose=verbose
       )
 
-  # Assorted computed properties.
-
-  def titleify(self, tag_name):
-    ''' Return the tag value for `tag_name`.
-        If this is empty or missing,
-        look at `tag_name+'_lc'`;
-        if not empty
-        replace the dashes with spaces and titlecase it.
-    '''
-    value = self.get(tag_name)
-    if value:
-      return value
-    value_lc = self.get(tag_name + '_lc')
-    if value_lc:
-      return value_lc.replace('-', ' ').title()
-    return None
-
-  @property
-  def episode_title(self):
-    ''' File title.
-    '''
-    return self.titleify('episode_title')
-
-  @property
-  def title(self):
-    ''' File title.
-    '''
-    return self.titleify('title')
+  def format_kwargs(self):
+    kwargs = {}
+    # initial kwargs: all tags directly
+    for tag_name, value in self.as_dict().items():
+      kwargs[tag_name] = value
+    # fill out computed/impled tags
+    for tag_name, value in self.as_dict().items():
+      # provide _lc versions of strings unless called _lc, in which
+      # case the reverse
+      if isinstance(value, str):
+        tag_name_prefix = cutsuffix(tag_name, '_lc')
+        if tag_name_prefix is tag_name:
+          # not a _lc tag_name
+          tag_name_lc = tag_name + '_lc'
+          if tag_name_lc not in kwargs:
+            kwargs[tag_name_lc] = lc_(value)
+        else:
+          # tag_name is foo_lc, compute title version if missing
+          if tag_name_prefix not in kwargs:
+            kwargs[tag_name_prefix] = titleify_lc(value)
+    # convert dashes and dots
+    for k, v in sorted(kwargs.items()):
+      # a-b synonym as a_b
+      if '-' in k:
+        k_ = k.replace('-', '_')
+        if k_ not in kwargs:
+          kwargs[k_] = v
+      # a.b.c as nested SimpleNamespace
+      if '.' in k:
+        # TODO: utility function
+        parts = list(filter(None, k.split('.')))
+        if not parts:
+          continue
+        kbase = parts.pop(0)
+        try:
+          ns0 = kwargs[kbase]
+        except KeyError:
+          ns0 = NS()
+        ns = ns0
+        while parts:
+          attr = parts.pop(0)
+          if parts:
+            # more substructure, descend into it
+            try:
+              subns = getattr(ns, attr)
+            except AttributeError:
+              # make subns
+              subns = NS()
+              setattr(ns, attr, subns)
+            ns = subns
+        # no more parts, assign value
+        try:
+          setattr(ns, attr, v)
+        except AttributeError as e:
+          warning("could not set k: %s", e)
+        else:
+          # attach the namespace if not originally present
+          if kbase not in kwargs:
+            kwargs[kbase] = ns0
+    return kwargs
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.

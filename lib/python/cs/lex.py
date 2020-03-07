@@ -80,6 +80,25 @@ def unctrl(s, tabsize=8):
 
   return s2.expandtabs(tabsize)
 
+def lc_(value):
+  ''' Return `value.lower()`
+      with `'-'` translated into `'_'` and `' '` translated into `'-'`.
+
+      I use this to construct lowercase filenames containing a
+      readable transcription of a title string.
+
+      See also `titleify_lc()`, an imperfect reversal of this.
+  '''
+  return value.lower().replace('-', '_').replace(' ', '-')
+
+def titleify_lc(lc_value):
+  ''' Translate `'-'` into `' '` and `'_'` translated into `'-'`,
+      then titlecased.
+
+      See also `lc_()`, which this reverses imperfectly.
+  '''
+  return value_lc.replace('-', ' ').replace('_', '-').title()
+
 def tabpadding(padlen, tabsize=8, offset=0):
   ''' Compute some spaces to use a tab padding at an offfset.
   '''

@@ -424,17 +424,27 @@ class FSTagsCommand(BaseCommand):
           output_format = value
         else:
           raise RuntimeError("unsupported option")
+    xit = 0
     paths = argv or ['.']
     for path in paths:
-      with Pfx(path):
-        fullpath = realpath(path)
-        for filepath in ((fullpath,)
-                         if directories_like_files else rfilepaths(fullpath)):
-          print(
-              output_format.format(
-                  **fstags[filepath].format_kwargs(direct=use_direct_tags)
-              )
+      fullpath = realpath(path)
+      for filepath in ((fullpath,)
+                       if directories_like_files else rfilepaths(fullpath)):
+        with Pfx(filepath):
+          format_kwargs = fstags[filepath].format_kwargs(
+              direct=use_direct_tags
           )
+          try:
+            listing = output_format.format(**format_kwargs)
+          except KeyError as e:
+            error(
+                "format fails: %s\n  available keywords: %s", e,
+                ' '.join(sorted(format_kwargs.keys()))
+            )
+            xit = 1
+            continue
+          print(listing)
+    return xit
 
   def cmd_cp(self, argv, options):
     ''' POSIX cp equivalent, but copying the tags.
@@ -550,7 +560,7 @@ class FSTagsCommand(BaseCommand):
               newbase = name_format.format(**format_kwargs)
             except KeyError as e:
               error(
-                  "format fails: %s; available keywords: %s", e,
+                  "format fails: %s\n  available keywords: %s", e,
                   ' '.join(sorted(format_kwargs.keys()))
               )
               xit = 1
@@ -1217,33 +1227,15 @@ class TaggedPath(HasFSTagsMixin):
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
     '''
-    filepath = str(self.filepath)
     source_tags = self.direct_tags if direct else self.all_tags
-    format_tags = TagSet()
-    format_tags.update(source_tags)
+    kwargs = source_tags.format_kwargs()
     # add in cascaded values
-    for tag in self.fstags.cascade_tags(format_tags):
-      if tag.name not in format_tags:
-        format_tags.add(tag)
-    kwargs = defaultdict(str)
-    # fill out _lc flavours of tags
-    tag_dict = format_tags.as_dict()
-    for tag_name, value in format_tags.as_dict().items():
-      if tag_name in kwargs:
-        continue
-      kwargs[tag_name] = value
-      if isinstance(value, str):
-        tag_name_prefix = cutsuffix(tag_name, '_lc')
-        if tag_name_prefix is tag_name:
-          # not a _lc tag_name
-          tag_name_lc = tag_name + '_lc'
-          if tag_name_lc not in tag_dict:
-            kwargs[tag_name_lc] = value.lower()
-        else:
-          # tag_name is foo_lc, compute title version if missing
-          if tag_name_prefix not in tag_dict:
-            kwargs[tag_name_prefix] = value.title()
+    # TODO: what about cascaded tags whose names contain dots?
+    for tag in self.fstags.cascade_tags(source_tags):
+      if tag.name not in kwargs:
+        kwargs[tag.name] = tag.value
     # hardwire some specific values
+    filepath = str(self.filepath)
     kwargs.update(
         basename=basename(filepath),
         filepath=filepath,
@@ -1444,10 +1436,15 @@ class RegexpTagRule:
       for tag_name, value in m.groupdict().items():
         if value is not None:
           # TODO: honour the JSON decode strings
-          try:
-            value = int(value)
-          except ValueError:
-            pass
+          tag_name_prefix = cutsuffix(tag_name, '_n')
+          if tag_name is not tag_name_prefix:
+            # numeric rule
+            try:
+              value = int(value)
+            except ValueError:
+              pass
+            else:
+              tag_name = tag_name_prefix
           tags.append(Tag(tag_name, value))
     return tags
 
