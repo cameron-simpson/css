@@ -1435,10 +1435,15 @@ class RegexpTagRule:
       for tag_name, value in m.groupdict().items():
         if value is not None:
           # TODO: honour the JSON decode strings
-          try:
-            value = int(value)
-          except ValueError:
-            pass
+          tag_name_prefix = cutsuffix(tag_name, '_n')
+          if tag_name is not tag_name_prefix:
+            # numeric rule
+            try:
+              value = int(value)
+            except ValueError:
+              pass
+            else:
+              tag_name = tag_name_prefix
           tags.append(Tag(tag_name, value))
     return tags
 
