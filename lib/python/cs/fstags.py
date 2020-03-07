@@ -1229,7 +1229,6 @@ class TaggedPath(HasFSTagsMixin):
         filepath_encoded=TagFile.encode_name(filepath),
         tags=source_tags,
     )
-    warning("format_kwargs = %r", kwargs)
     return kwargs
 
   @property
