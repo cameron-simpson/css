@@ -435,7 +435,7 @@ class FSTagsCommand(BaseCommand):
             listing = output_format.format(**format_kwargs)
           except KeyError as e:
             error(
-                "format fails: %s; available keywords: %s", e,
+                "format fails: %s\n  available keywords: %s", e,
                 ' '.join(sorted(format_kwargs.keys()))
             )
             xit = 1
@@ -555,7 +555,7 @@ class FSTagsCommand(BaseCommand):
               newbase = name_format.format(**format_kwargs)
             except KeyError as e:
               error(
-                  "format fails: %s; available keywords: %s", e,
+                  "format fails: %s\n  available keywords: %s", e,
                   ' '.join(sorted(format_kwargs.keys()))
               )
               xit = 1
