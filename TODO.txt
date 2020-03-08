@@ -1,3 +1,4 @@
+cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
 cs.cmdutils: extract Usage: from cmd_ methods to augument main USAGE
 cs.upd: multiline status area
 cs.fstags: tag -f: update direct tags regardless of content of merged tags
