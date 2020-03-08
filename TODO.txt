@@ -1,3 +1,4 @@
+cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
 cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
 cs.cmdutils: extract Usage: from cmd_ methods to augument main USAGE
 cs.upd: multiline status area
