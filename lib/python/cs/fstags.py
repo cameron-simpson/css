@@ -750,9 +750,7 @@ class FSTags(MultiOpenMixin):
     tagfilepath = joinpath(dirpath, self.tagsfile)
     tagfile = self._tagfiles.get(tagfilepath)
     if tagfile is None:
-      tagfile = self._tagfiles[tagfilepath] = TagFile(
-          str(tagfilepath), fstags=self
-      )
+      tagfile = self._tagfiles[tagfilepath] = TagFile(str(tagfilepath))
     return tagfile
 
   def path_tagfiles(self, filepath):
@@ -1035,7 +1033,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class TagFile(HasFSTagsMixin):
+class TagFile:
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -1043,9 +1041,7 @@ class TagFile(HasFSTagsMixin):
   '''
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath, *, fstags=None):
-    if fstags is not None:
-      self.fstags = fstags
+  def __init__(self, filepath):
     self.filepath = filepath
     self.dirpath = dirname(filepath)
     self._lock = Lock()
