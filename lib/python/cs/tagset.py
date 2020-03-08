@@ -192,7 +192,23 @@ class TagSet:
 
   @pfx_method
   def as_namespace(self):
-    ''' Compute and return view of this `TagSet` as a nested namespace.
+    ''' Compute and return a presentation of this `TagSet` as a
+        nested namespace.
+
+        Note that if the `TagSet` includes tags named `'a.b'` and
+        also `'a.b.c'` then only the `'a.b.c'` `Tag` will be reflected
+        in the namespace due to the conflict between the value for
+        `'a.b'` and namespace named `a.b` which holds the `c`
+        attribute for `'a.b.c'`.
+
+        Also note that multiple dots in `Tag` names are collapsed;
+        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
+        `'..a.b'` will all map to the namespace entry `a.b`.
+
+        `Tag`s are processed in reverse lexical order by name in
+        order to effect the shadowing of `a.b` by `a.b.c` and this
+        order also dictates which of the conflicting multidot names
+        takes effect in the namespace - the first found is used.
     '''
     ns0 = ns = NS()
     for tag in sorted(self, key=lambda tag: tag.name, reverse=True):
