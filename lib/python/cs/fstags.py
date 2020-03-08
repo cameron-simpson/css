@@ -1130,9 +1130,16 @@ class TagFile:
   @classmethod
   def save_tagsets(cls, filepath, tagsets):
     ''' Save a tagmap to `filepath`.
+
+        This method will create the required intermediate directories
+        if missing.
     '''
     with Pfx("savetags(%r)", filepath):
       trace("SAVE %r", filepath)
+      dirpath = dirname(filepath)
+      if not isdirpath(dirpath):
+        with Pfx("makedirs(%r)", dirpath):
+          os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       with open(filepath, 'w') as f:
         for name, tags in name_tags:
