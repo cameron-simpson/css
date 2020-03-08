@@ -12,7 +12,7 @@ from cs.lex import (
     skipwhite, lc_, titleify_lc
 )
 from cs.logutils import info, warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -184,46 +184,44 @@ class TagSet:
           # tag_name is foo_lc, compute title version if missing
           if tag_name_prefix not in kwargs:
             kwargs[tag_name_prefix] = titleify_lc(value)
-    # convert dashes and dots
-    for k, v in sorted(kwargs.items()):
-      # a-b synonym as a_b
-      if '-' in k:
-        k_ = k.replace('-', '_')
-        if k_ not in kwargs:
-          kwargs[k_] = v
-      # a.b.c as nested SimpleNamespace
-      if '.' in k:
-        # TODO: utility function
-        parts = list(filter(None, k.split('.')))
-        if not parts:
-          continue
-        kbase = parts.pop(0)
-        try:
-          ns0 = kwargs[kbase]
-        except KeyError:
-          ns0 = NS()
-        ns = ns0
-        while parts:
-          attr = parts.pop(0)
-          if parts:
-            # more substructure, descend into it
-            try:
-              subns = getattr(ns, attr)
-            except AttributeError:
-              # make subns
-              subns = NS()
-              setattr(ns, attr, subns)
-            ns = subns
-        # no more parts, assign value
-        try:
-          setattr(ns, attr, v)
-        except AttributeError as e:
-          warning("could not set k: %s", e)
-        else:
-          # attach the namespace if not originally present
-          if kbase not in kwargs:
-            kwargs[kbase] = ns0
+    ns = self.as_namespace()
+    for ns_name in dir(ns):
+      if ns_name not in kwargs and not ns_name.startswith('__'):
+        kwargs[ns_name] = getattr(ns, ns_name)
     return kwargs
+
+  @pfx_method
+  def as_namespace(self):
+    ''' Compute and return view of this `TagSet` as a nested namespace.
+    '''
+    ns0 = ns = NS()
+    for tag in sorted(self, key=lambda tag: tag.name, reverse=True):
+      with Pfx(tag):
+        subnames = [subname for subname in tag.name.split('.') if subname]
+        if not subnames:
+          warning("skipping weirdly named tag")
+          continue
+        subpath = []
+        while len(subnames) > 1:
+          subname = subnames.pop(0)
+          subpath.append(subname)
+          with Pfx('.'.join(subpath)):
+            try:
+              subns = getattr(ns, subname)
+            except AttributeError:
+              subns = NS()
+              setattr(ns, subname, subns)
+            ns = subns
+        subname, = subnames
+        subpath.append(subname)
+        with Pfx('.'.join(subpath)):
+          try:
+            existing_value = getattr(ns, subname)
+          except AttributeError:
+            setattr(ns, subname, tag.value)
+          else:
+            warning("skipping existing subpath, has value %s", existing_value)
+    return ns0
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
