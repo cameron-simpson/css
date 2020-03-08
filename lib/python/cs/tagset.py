@@ -93,7 +93,7 @@ class TagSet:
       return self.defaults[tag_name]
 
   def get(self, tag_name, default=None):
-    ''' Fetch tag value by `tag_name`, or `default`.
+    ''' Fetch tag value by `tag_name`, or `default` (default `None`).
     '''
     try:
       value = self[tag_name]
