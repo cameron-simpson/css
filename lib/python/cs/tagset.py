@@ -10,7 +10,7 @@ from time import strptime
 from types import SimpleNamespace as NS
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
-    skipwhite, lc_, titleify_lc
+    skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import info, warning
 from cs.pfx import Pfx, pfx_method
@@ -53,7 +53,7 @@ DISTINFO = {
     ],
 }
 
-class TagSet(dict):
+class TagSet(dict, FormatableMixin):
   ''' A setlike class associating a set of tag names with values.
   '''
 
