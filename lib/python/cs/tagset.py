@@ -195,6 +195,25 @@ class TagSet:
       )
 
   def format_kwargs(self):
+    ''' Compute a `dict` for use as the `format_kwargs` for a formatted string
+        based on this `TagSet`.
+
+        This dict includes:
+        * a direct entry of `tag.name` => `tag.value` for every tag
+        * a titlecased entry `foo` for every `str` tag named `foo_lc`
+          if `foo` is not already present,
+          using `cs.lex.titleify_lc` to provide a pretty good title
+          from a lowercased tag
+        * a lowercased entry `foo_lc` for every `str` tag `foo`
+          if `foo_lc` is not already present,
+          using `cs.lex.lc_` to provide a the lowercased value
+        * an entry `foo_bah` for every `kwargs` entry `foo-bah`
+          if `foo_bah` is not already present
+        * a nested `SimpleNamespace` named `foo` for every tag named
+          `foo.bah.baz` with attributes for each subpath,
+          supporting direct use of `foo.bar.baz` in the format string,
+          if `foo` is not already present
+    '''
     kwargs = {}
     # initial kwargs: all tags directly
     for tag_name, value in self.as_dict().items():
