@@ -1289,7 +1289,7 @@ class TaggedPath(HasFSTagsMixin):
     tags = TagSet()
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_entries:
-        for tag in tagfile[name]:
+        for tag in tagfile[name].as_tags():
           tags.add(tag)
     return tags
 
