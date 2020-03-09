@@ -106,7 +106,7 @@ do
     continue
   }
   backup_names=$(
-    $trace fstags ls -o "{tags[$tag_name]}" "$src_path" | grep . | sort -u
+    $trace fstags ls -o "{$tag_name}" "$src_path" | grep . | sort -u
   )
   [ -n "$backup_names" ] || {
     echo "$cmd: $src_dst: no $tag_name tags in $src_path, skipping ALL BACKUPS" >&2

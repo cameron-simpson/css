@@ -11,7 +11,7 @@ revision=$HG_NODE
 hg log -r "$revision" --template='{desc}\n' --limit 1 \
 | \
 { read -r headline
-  dlog_tags=$( fstags ls -d -o '{tags[cs.dlog]}' . )
+  dlog_tags=$( fstags ls -d -o '{cs.dlog}' . )
   [ -z "$dlog_tags" ] || {
     wdbase=$( basename "$(pwd)" )
     dlog "$dlog_tags: $wdbase: $headline [$revision]" </dev/null
