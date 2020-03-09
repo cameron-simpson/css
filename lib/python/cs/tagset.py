@@ -27,20 +27,14 @@ DISTINFO = {
     ],
 }
 
-class TagSet:
+class TagSet(dict):
   ''' A setlike class associating a set of tag names with values.
   '''
 
-  def __init__(self, *, defaults=None):
+  def __init__(self):
     ''' Initialise the `TagSet`.
-
-        Parameters:
-        * `defaults`: a mapping of name->`TagSet` to provide default values.
     '''
-    if defaults is None:
-      defaults = {}
-    self.tagmap = {}
-    self.defaults = defaults
+    super().__init__()
     self.modified = False
 
   def __str__(self):
@@ -49,7 +43,7 @@ class TagSet:
     return ' '.join(sorted(str(T) for T in self.as_tags()))
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, self.tagmap)
+    return "%s:%r" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
   def from_line(cls, line, offset=0):
@@ -71,61 +65,50 @@ class TagSet:
     line = bs.decode(errors='replace')
     return cls.from_line(line)
 
-  def __len__(self):
-    return len(self.tagmap)
-
   def __contains__(self, tag):
-    tagmap = self.tagmap
     if isinstance(tag, str):
-      return tag in tagmap
+      return super().__contains__(tag)
     for mytag in self.as_tags():
       if mytag.matches(tag):
         return True
     return False
 
-  def __getitem__(self, tag_name):
-    ''' Fetch tag value by `tag_name`.
-        Raises `KeyError` for missing `tag_name`.
-    '''
-    try:
-      return self.tagmap[tag_name]
-    except KeyError:
-      return self.defaults[tag_name]
-
-  def get(self, tag_name, default=None):
-    ''' Fetch tag value by `tag_name`, or `default` (default `None`).
-    '''
-    try:
-      value = self[tag_name]
-    except KeyError:
-      value = default
-    return value
-
   def as_tags(self):
     ''' Yield the tag data as `Tag`s.
     '''
-    for tag_name, value in self.tagmap.items():
+    for tag_name, value in self.items():
       yield Tag(tag_name, value)
-
-  __iter__ = as_tags
 
   def as_dict(self):
     ''' Return a `dict` mapping tag name to value.
     '''
-    return dict(self.tagmap)
+    return dict(self)
+
+  def __setitem__(self, tag_name, value):
+    self.set(tag_name, value)
 
   def add(self, tag_name, value=None, *, verbose=False):
-    ''' Add a tag to these tags.
+    ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag.from_name_value(tag_name, value)
-    tag_name = tag.name
-    tagmap = self.tagmap
-    value = tag.value
-    if tag_name not in tagmap or tagmap[tag_name] != value:
-      if verbose:
-        info("+ %s", tag)
-      tagmap[tag_name] = value
-      self.modified = True
+    self.set(tag.name, tag.value, verbose=verbose)
+
+  def set(self, tag_name, value, *, verbose=False):
+    ''' Set `self[tag_name]=value`.
+        If `verbose`, emit an info message if this changes the previous value.
+    '''
+    if verbose:
+      old_value = self.get(tag_name)
+      if tag_name not in self or old_value is not value:
+        self.modified = True
+      if tag_name not in self or old_value != value:
+        info("+ %s", Tag(tag_name, value))
+    super().__setitem__(tag_name, value)
+
+  def __delitem__(self, tag_name):
+    if tag_name not in self:
+      raise KeyError(tag_name)
+    self.discard(tag_name)
 
   def discard(self, tag_name, value=None, *, verbose=False):
     ''' Discard the tag matching `(tag_name,value)`.
@@ -140,10 +123,9 @@ class TagSet:
     tag = Tag.from_name_value(tag_name, value)
     tag_name = tag.name
     if tag_name in self:
-      tagmap = self.tagmap
       value = tag.value
-      if value is None or tagmap[tag_name] == value:
-        old_value = tagmap.pop(tag_name)
+      if value is None or self[tag_name] == value:
+        old_value = self.pop(tag_name)
         self.modified = True
         old_tag = Tag(tag_name, old_value)
         if verbose:
@@ -151,20 +133,42 @@ class TagSet:
         return old_tag
     return None
 
-  def update(self, other, *, verbose=False):
+  def update(self, *others, **kw):
     ''' Update this `TagSet` from `other`,
         a dict or an iterable of taggy things.
     '''
-    if isinstance(other, dict):
-      self.update(
-          (Tag.from_name_value(k, v) for k, v in other.items()),
-          verbose=verbose
-      )
-    else:
-      for tag in other:
-        self.add(tag, verbose=verbose)
+    for other in others:
+      try:
+        keys = other.keys
+      except AttributeError:
+        for k, v in other:
+          self[k] = v
+      else:
+        for k in keys():
+          self[k] = other[k]
+    for k, v in kw.items():
+      self[k] = v
 
   def format_kwargs(self):
+    ''' Compute a `dict` for use as the `format_kwargs` for a formatted string
+        based on this `TagSet`.
+
+        This dict includes:
+        * a direct entry of `tag.name` => `tag.value` for every tag
+        * a titlecased entry `foo` for every `str` tag named `foo_lc`
+          if `foo` is not already present,
+          using `cs.lex.titleify_lc` to provide a pretty good title
+          from a lowercased tag
+        * a lowercased entry `foo_lc` for every `str` tag `foo`
+          if `foo_lc` is not already present,
+          using `cs.lex.lc_` to provide a the lowercased value
+        * an entry `foo_bah` for every `kwargs` entry `foo-bah`
+          if `foo_bah` is not already present
+        * a nested `SimpleNamespace` named `foo` for every tag named
+          `foo.bah.baz` with attributes for each subpath,
+          supporting direct use of `foo.bar.baz` in the format string,
+          if `foo` is not already present
+    '''
     kwargs = {}
     # initial kwargs: all tags directly
     for tag_name, value in self.as_dict().items():
@@ -211,9 +215,9 @@ class TagSet:
         takes effect in the namespace - the first found is used.
     '''
     ns0 = ns = NS()
-    for tag in sorted(self, key=lambda tag: tag.name, reverse=True):
-      with Pfx(tag):
-        subnames = [subname for subname in tag.name.split('.') if subname]
+    for tag_name in sorted(self, reverse=True):
+      with Pfx(tag_name):
+        subnames = [subname for subname in tag_name.split('.') if subname]
         if not subnames:
           warning("skipping weirdly named tag")
           continue
@@ -234,7 +238,7 @@ class TagSet:
           try:
             existing_value = getattr(ns, subname)
           except AttributeError:
-            setattr(ns, subname, tag.value)
+            setattr(ns, subname, self[tag_name])
           else:
             warning("skipping existing subpath, has value %s", existing_value)
     return ns0
