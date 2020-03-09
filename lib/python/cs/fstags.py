@@ -64,7 +64,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.lex import get_nonwhite, cutsuffix
+from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
 from cs.logutils import setup_logging, error, warning, info, trace
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -329,6 +329,7 @@ class FSTagsCommand(BaseCommand):
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
+    xit = 0
     U = Upd(sys.stderr) if sys.stderr.isatty() else None
     filepaths = fstags.find(
         realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
@@ -340,13 +341,18 @@ class FSTagsCommand(BaseCommand):
       for filepath in filepaths:
         if U:
           oldU = U.out('')
-        print(
-            output_format.format(
-                **fstags[filepath].format_kwargs(direct=use_direct_tags)
-            )
-        )
+        try:
+          output = fstags[filepath].format_as(
+              output_format, error_sep='\n  ', direct=use_direct_tags
+          )
+        except FormatAsError as e:
+          error(str(e))
+          xit = 1
+          continue
+        print(output)
         if U:
           U.out(oldU)
+    return xit
 
   @classmethod
   def cmd_json_import(cls, argv, options):
@@ -431,16 +437,12 @@ class FSTagsCommand(BaseCommand):
       for filepath in ((fullpath,)
                        if directories_like_files else rfilepaths(fullpath)):
         with Pfx(filepath):
-          format_kwargs = fstags[filepath].format_kwargs(
-              direct=use_direct_tags
-          )
           try:
-            listing = output_format.format(**format_kwargs)
-          except KeyError as e:
-            error(
-                "format fails: %s\n  available keywords: %s", e,
-                ' '.join(sorted(format_kwargs.keys()))
+            listing = fstags[filepath].format_as(
+                output_format, error_sep='\n  ', direct=use_direct_tags
             )
+          except FormatAsError as e:
+            error(str(e))
             xit = 1
             continue
           print(listing)
@@ -557,12 +559,11 @@ class FSTagsCommand(BaseCommand):
             base = basename(filepath)
             format_kwargs = fstags[filepath].format_kwargs(direct=False)
             try:
-              newbase = name_format.format(**format_kwargs)
-            except KeyError as e:
-              error(
-                  "format fails: %s\n  available keywords: %s", e,
-                  ' '.join(sorted(format_kwargs.keys()))
+              newbase = fstags[filepath].format_as(
+                  name_format, error_sep='\n  ', direct=False
               )
+            except FormatAsError as e:
+              error(str(e))
               xit = 1
               continue
             newbase = newbase.replace(os.sep, ':')
@@ -1203,7 +1204,7 @@ class TagFile:
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
 
-class TaggedPath(HasFSTagsMixin):
+class TaggedPath(HasFSTagsMixin, FormatableMixin):
   ''' Class to manipulate the tags for a specific path.
   '''
 
