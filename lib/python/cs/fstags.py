@@ -449,17 +449,17 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   def cmd_cp(self, argv, options):
-    ''' POSIX cp equivalent, but copying the tags.
+    ''' POSIX cp(1) equivalent, but also copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.copy, argv, options)
 
   def cmd_ln(self, argv, options):
-    ''' POSIX ln equivalent, but copying the tags.
+    ''' POSIX ln(1) equivalent, but also copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.link, argv, options)
 
   def cmd_mv(self, argv, options):
-    ''' POSIX mv equivalent, but copying the tags.
+    ''' POSIX mv(1) equivalent, but also copying the tags.
     '''
     return self._cmd_mvcpln(options.fstags.move, argv, options)
 
