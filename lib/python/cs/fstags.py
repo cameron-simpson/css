@@ -1243,7 +1243,7 @@ class TaggedPath(HasFSTagsMixin):
         basename=basename(filepath),
         filepath=filepath,
         filepath_encoded=TagFile.encode_name(filepath),
-        tags=source_tags,
+        tags=str(source_tags),
     )
     return kwargs
 
