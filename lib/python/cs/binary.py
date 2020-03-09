@@ -124,6 +124,8 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 
+__version__ = '20200229'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [

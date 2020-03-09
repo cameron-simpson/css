@@ -54,7 +54,7 @@ from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import Upd
 
-__version__ = '20200130'
+__version__ = '20200229'
 
 DISTINFO = {
     'keywords': ["python3"],

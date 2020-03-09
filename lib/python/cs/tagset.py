@@ -6,6 +6,7 @@
 from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
+from time import strptime
 from types import SimpleNamespace as NS
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
@@ -13,6 +14,31 @@ from cs.lex import (
 )
 from cs.logutils import info, warning
 from cs.pfx import Pfx, pfx_method
+
+try:
+  date_fromisoformat = date.fromisoformat
+except AttributeError:
+
+  def date_fromisoformat(datestr):
+    ''' Placeholder for `date.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%d')
+    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
+
+try:
+  datetime_fromisoformat = datetime.fromisoformat
+except AttributeError:
+
+  def datetime_fromisoformat(datestr):
+    ''' Placeholder for `datetime.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
+    return datetime(
+        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
+        parsed.tm_min, parsed.tm_sec
+    )
+
+__version__ = '20200229.1'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -260,8 +286,8 @@ class Tag(namedtuple('Tag', 'name value')):
   JSON_DECODER = JSONDecoder()
 
   EXTRA_TYPES = [
-      (date, date.fromisoformat, date.isoformat),
-      (datetime, datetime.fromisoformat, datetime.isoformat),
+      (date, date_fromisoformat, date.isoformat),
+      (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
   def __eq__(self, other):
@@ -288,6 +314,17 @@ class Tag(namedtuple('Tag', 'name value')):
       return name
     return name + '=' + self.transcribe_value(value)
 
+  def prefix_name(self, prefix):
+    ''' Return a `Tag` whose `.name` has an additional prefix.
+
+        If `prefix` is `None` or empty, return this `Tag`.
+        Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
+    '''
+    return (
+        self.from_name_value('.'.join((prefix, self.name)), self.value)
+        if prefix else self
+    )
+
   @classmethod
   def transcribe_value(cls, value):
     ''' Transcribe `value` for use in `Tag` transcription.
@@ -304,6 +341,9 @@ class Tag(namedtuple('Tag', 'name value')):
     # "bare" dotted identifiers
     if isinstance(value, str) and is_dotted_identifier(value):
       return value
+    # convert some values to a suitable type
+    if isinstance(value, (tuple, set)):
+      value = list(value)
     # fall back to JSON encoded form of value
     return cls.JSON_ENCODER.encode(value)
 

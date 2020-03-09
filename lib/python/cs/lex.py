@@ -19,6 +19,8 @@ import sys
 from textwrap import dedent
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
+__version__ = '20200229'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [

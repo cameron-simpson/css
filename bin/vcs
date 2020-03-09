@@ -100,7 +100,7 @@ else    op=$1; shift
 fi
 
 hg(){   $trace hg -R "$vcs_top" ${1+"$@"}; }
-git(){  $trace git --git-dir "$vcs_top/.git" ${1+"$@"}; }
+git(){  $trace git ${1+"$@"}; }
 
 # Compute working directory VCS type.
 # All other commands are split on type below.

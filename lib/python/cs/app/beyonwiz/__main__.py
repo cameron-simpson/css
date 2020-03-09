@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-''' Commandline main programme.
+''' Command line utility for working with Beyonwiz PVR devices.
 '''
 
 from __future__ import print_function

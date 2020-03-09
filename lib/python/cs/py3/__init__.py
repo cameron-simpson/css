@@ -34,6 +34,8 @@ try:
 except ImportError:
   StringTypes = (str,)
 
+__version__ = '20200229'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
