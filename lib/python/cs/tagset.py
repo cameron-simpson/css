@@ -57,16 +57,10 @@ class TagSet:
   ''' A setlike class associating a set of tag names with values.
   '''
 
-  def __init__(self, *, defaults=None):
+  def __init__(self):
     ''' Initialise the `TagSet`.
-
-        Parameters:
-        * `defaults`: a mapping of name->`TagSet` to provide default values.
     '''
-    if defaults is None:
-      defaults = {}
     self.tagmap = {}
-    self.defaults = defaults
     self.modified = False
 
   def __str__(self):
@@ -113,10 +107,7 @@ class TagSet:
     ''' Fetch tag value by `tag_name`.
         Raises `KeyError` for missing `tag_name`.
     '''
-    try:
-      return self.tagmap[tag_name]
-    except KeyError:
-      return self.defaults[tag_name]
+    return self.tagmap[tag_name]
 
   def get(self, tag_name, default=None):
     ''' Fetch tag value by `tag_name`, or `default`.
