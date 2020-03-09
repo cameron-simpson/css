@@ -13,7 +13,7 @@ from cs.lex import (
     skipwhite, lc_, titleify_lc
 )
 from cs.logutils import info, warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 
 try:
   date_fromisoformat = date.fromisoformat
@@ -53,14 +53,14 @@ DISTINFO = {
     ],
 }
 
-class TagSet:
+class TagSet(dict):
   ''' A setlike class associating a set of tag names with values.
   '''
 
   def __init__(self):
     ''' Initialise the `TagSet`.
     '''
-    self.tagmap = {}
+    super().__init__()
     self.modified = False
 
   def __str__(self):
@@ -69,7 +69,7 @@ class TagSet:
     return ' '.join(sorted(str(T) for T in self.as_tags()))
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, self.tagmap)
+    return "%s:%r" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
   def from_line(cls, line, offset=0):
@@ -91,58 +91,50 @@ class TagSet:
     line = bs.decode(errors='replace')
     return cls.from_line(line)
 
-  def __len__(self):
-    return len(self.tagmap)
-
   def __contains__(self, tag):
-    tagmap = self.tagmap
     if isinstance(tag, str):
-      return tag in tagmap
+      return super().__contains__(tag)
     for mytag in self.as_tags():
       if mytag.matches(tag):
         return True
     return False
 
-  def __getitem__(self, tag_name):
-    ''' Fetch tag value by `tag_name`.
-        Raises `KeyError` for missing `tag_name`.
-    '''
-    return self.tagmap[tag_name]
-
-  def get(self, tag_name, default=None):
-    ''' Fetch tag value by `tag_name`, or `default`.
-    '''
-    try:
-      value = self[tag_name]
-    except KeyError:
-      value = default
-    return value
-
   def as_tags(self):
     ''' Yield the tag data as `Tag`s.
     '''
-    for tag_name, value in self.tagmap.items():
+    for tag_name, value in self.items():
       yield Tag(tag_name, value)
-
-  __iter__ = as_tags
 
   def as_dict(self):
     ''' Return a `dict` mapping tag name to value.
     '''
-    return dict(self.tagmap)
+    return dict(self)
+
+  def __setitem__(self, tag_name, value):
+    self.set(tag_name, value)
 
   def add(self, tag_name, value=None, *, verbose=False):
-    ''' Add a tag to these tags.
+    ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag.from_name_value(tag_name, value)
-    tag_name = tag.name
-    tagmap = self.tagmap
-    value = tag.value
-    if tag_name not in tagmap or tagmap[tag_name] != value:
-      if verbose:
-        info("+ %s", tag)
-      tagmap[tag_name] = value
-      self.modified = True
+    self.set(tag.name, tag.value, verbose=verbose)
+
+  def set(self, tag_name, value, *, verbose=False):
+    ''' Set `self[tag_name]=value`.
+        If `verbose`, emit an info message if this changes the previous value.
+    '''
+    if verbose:
+      old_value = self.get(tag_name)
+      if tag_name not in self or old_value is not value:
+        self.modified = True
+      if tag_name not in self or old_value != value:
+        info("+ %s", Tag(tag_name, value))
+    super().__setitem__(tag_name, value)
+
+  def __delitem__(self, tag_name):
+    if tag_name not in self:
+      raise KeyError(tag_name)
+    self.discard(tag_name)
 
   def discard(self, tag_name, value=None, *, verbose=False):
     ''' Discard the tag matching `(tag_name,value)`.
@@ -157,10 +149,9 @@ class TagSet:
     tag = Tag.from_name_value(tag_name, value)
     tag_name = tag.name
     if tag_name in self:
-      tagmap = self.tagmap
       value = tag.value
-      if value is None or tagmap[tag_name] == value:
-        old_value = tagmap.pop(tag_name)
+      if value is None or self[tag_name] == value:
+        old_value = self.pop(tag_name)
         self.modified = True
         old_tag = Tag(tag_name, old_value)
         if verbose:
@@ -168,31 +159,21 @@ class TagSet:
         return old_tag
     return None
 
-  def update(self, other, *, prefix=None, verbose=False):
-    ''' Update this `TagSet` from `other`.
-
-        Parameters:
-        * `other`: a mapping of name->value
-          or an iterable of `Tag`like things
-        * `prefix`: an optional prefix for the update names;
-          if a nonempty string, the update names will be
-          `prefix+'.'+name`.
-        * `verbose`: verbosity flag (default `False`)
-          passed to `self.add`.
+  def update(self, *others, **kw):
+    ''' Update this `TagSet` from `other`,
+        a dict or an iterable of taggy things.
     '''
-    try:
-      other_kvs = other.items()
-    except AttributeError:
-      # not a mapping, presume an iterable
-      for tag in other:
-        self.add(tag.prefix_name(prefix), verbose=verbose)
-    else:
-      # a mapping, convert to iterable and recurse
-      self.update(
-          (Tag.from_name_value(k, v) for k, v in other_kvs),
-          prefix=prefix,
-          verbose=verbose
-      )
+    for other in others:
+      try:
+        keys = other.keys
+      except AttributeError:
+        for k, v in other:
+          self[k] = v
+      else:
+        for k in keys():
+          self[k] = other[k]
+    for k, v in kw.items():
+      self[k] = v
 
   def format_kwargs(self):
     ''' Compute a `dict` for use as the `format_kwargs` for a formatted string
@@ -233,46 +214,61 @@ class TagSet:
           # tag_name is foo_lc, compute title version if missing
           if tag_name_prefix not in kwargs:
             kwargs[tag_name_prefix] = titleify_lc(value)
-    # convert dashes and dots
-    for k, v in sorted(kwargs.items()):
-      # a-b synonym as a_b
-      if '-' in k:
-        k_ = k.replace('-', '_')
-        if k_ not in kwargs:
-          kwargs[k_] = v
-      # a.b.c as nested SimpleNamespace
-      if '.' in k:
-        # TODO: utility function
-        parts = list(filter(None, k.split('.')))
-        if not parts:
-          continue
-        kbase = parts.pop(0)
-        try:
-          ns0 = kwargs[kbase]
-        except KeyError:
-          ns0 = NS()
-        ns = ns0
-        while parts:
-          attr = parts.pop(0)
-          if parts:
-            # more substructure, descend into it
-            try:
-              subns = getattr(ns, attr)
-            except AttributeError:
-              # make subns
-              subns = NS()
-              setattr(ns, attr, subns)
-            ns = subns
-        # no more parts, assign value
-        try:
-          setattr(ns, attr, v)
-        except AttributeError as e:
-          warning("could not set k: %s", e)
-        else:
-          # attach the namespace if not originally present
-          if kbase not in kwargs:
-            kwargs[kbase] = ns0
+    ns = self.as_namespace()
+    for ns_name in dir(ns):
+      if ns_name not in kwargs and not ns_name.startswith('__'):
+        kwargs[ns_name] = getattr(ns, ns_name)
     return kwargs
+
+  @pfx_method
+  def as_namespace(self):
+    ''' Compute and return a presentation of this `TagSet` as a
+        nested namespace.
+
+        Note that if the `TagSet` includes tags named `'a.b'` and
+        also `'a.b.c'` then only the `'a.b.c'` `Tag` will be reflected
+        in the namespace due to the conflict between the value for
+        `'a.b'` and namespace named `a.b` which holds the `c`
+        attribute for `'a.b.c'`.
+
+        Also note that multiple dots in `Tag` names are collapsed;
+        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
+        `'..a.b'` will all map to the namespace entry `a.b`.
+
+        `Tag`s are processed in reverse lexical order by name in
+        order to effect the shadowing of `a.b` by `a.b.c` and this
+        order also dictates which of the conflicting multidot names
+        takes effect in the namespace - the first found is used.
+    '''
+    ns0 = NS()
+    for tag_name in sorted(self, reverse=True):
+      with Pfx(tag_name):
+        subnames = [subname for subname in tag_name.split('.') if subname]
+        if not subnames:
+          warning("skipping weirdly named tag")
+          continue
+        ns = ns0
+        subpath = []
+        while len(subnames) > 1:
+          subname = subnames.pop(0)
+          subpath.append(subname)
+          with Pfx('.'.join(subpath)):
+            try:
+              subns = getattr(ns, subname)
+            except AttributeError:
+              subns = NS()
+              setattr(ns, subname, subns)
+            ns = subns
+        subname, = subnames
+        subpath.append(subname)
+        with Pfx('.'.join(subpath)):
+          try:
+            existing_value = getattr(ns, subname)
+          except AttributeError:
+            setattr(ns, subname, self[tag_name])
+          else:
+            warning("skipping existing subpath, has value %s", existing_value)
+    return ns0
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.

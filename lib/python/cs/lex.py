@@ -91,7 +91,7 @@ def lc_(value):
   '''
   return value.lower().replace('-', '_').replace(' ', '-')
 
-def titleify_lc(lc_value):
+def titleify_lc(value_lc):
   ''' Translate `'-'` into `' '` and `'_'` translated into `'-'`,
       then titlecased.
 

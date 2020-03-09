@@ -565,6 +565,7 @@ class FSTagsCommand(BaseCommand):
               )
               xit = 1
               continue
+            newbase = newbase.replace(os.sep, ':')
             if base == newbase:
               continue
             dstpath = joinpath(dirpath, newbase)
@@ -699,17 +700,16 @@ class FSTagsCommand(BaseCommand):
     with stackattrs(state, verbose=True):
       fstags.import_xattrs(paths)
 
+FSTagsCommand.add_usage_to_docstring()
+
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile=None, use_xattrs=None):
+  def __init__(self, tagsfile=None):
     MultiOpenMixin.__init__(self)
     if tagsfile is None:
       tagsfile = TAGSFILE
-    if use_xattrs is None:
-      use_xattrs = XATTR_B is not None
-    self.use_xattrs = use_xattrs
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
     self._tagfiles = {}  # cache of per directory `TagFile`s
@@ -755,9 +755,7 @@ class FSTags(MultiOpenMixin):
     tagfilepath = joinpath(dirpath, self.tagsfile)
     tagfile = self._tagfiles.get(tagfilepath)
     if tagfile is None:
-      tagfile = self._tagfiles[tagfilepath] = TagFile(
-          str(tagfilepath), fstags=self
-      )
+      tagfile = self._tagfiles[tagfilepath] = TagFile(str(tagfilepath))
     return tagfile
 
   def path_tagfiles(self, filepath):
@@ -1040,7 +1038,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class TagFile(HasFSTagsMixin):
+class TagFile:
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -1048,9 +1046,7 @@ class TagFile(HasFSTagsMixin):
   '''
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath, *, fstags=None):
-    if fstags is not None:
-      self.fstags = fstags
+  def __init__(self, filepath):
     self.filepath = filepath
     self.dirpath = dirname(filepath)
     self._lock = Lock()
@@ -1154,9 +1150,16 @@ class TagFile(HasFSTagsMixin):
   @classmethod
   def save_tagsets(cls, filepath, tagsets):
     ''' Save a tagmap to `filepath`.
+
+        This method will create the required intermediate directories
+        if missing.
     '''
     with Pfx("savetags(%r)", filepath):
       trace("SAVE %r", filepath)
+      dirpath = dirname(filepath)
+      if not isdirpath(dirpath):
+        with Pfx("makedirs(%r)", dirpath):
+          os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       with open(filepath, 'w') as f:
         for name, tags in name_tags:
@@ -1240,7 +1243,7 @@ class TaggedPath(HasFSTagsMixin):
         basename=basename(filepath),
         filepath=filepath,
         filepath_encoded=TagFile.encode_name(filepath),
-        tags=source_tags,
+        tags=str(source_tags),
     )
     return kwargs
 
@@ -1286,7 +1289,7 @@ class TaggedPath(HasFSTagsMixin):
     tags = TagSet()
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_entries:
-        for tag in tagfile[name]:
+        for tag in tagfile[name].as_tags():
           tags.add(tag)
     return tags
 
@@ -1597,8 +1600,6 @@ class FSTagsConfig:
     ''' Set the tags filename.
     '''
     self.config['general']['tagsfile'] = tagsfile
-
-FSTagsCommand.add_usage_to_docstring()
 
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
