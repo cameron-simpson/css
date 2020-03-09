@@ -214,13 +214,14 @@ class TagSet(dict):
         order also dictates which of the conflicting multidot names
         takes effect in the namespace - the first found is used.
     '''
-    ns0 = ns = NS()
+    ns0 = NS()
     for tag_name in sorted(self, reverse=True):
       with Pfx(tag_name):
         subnames = [subname for subname in tag_name.split('.') if subname]
         if not subnames:
           warning("skipping weirdly named tag")
           continue
+        ns = ns0
         subpath = []
         while len(subnames) > 1:
           subname = subnames.pop(0)
