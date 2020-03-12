@@ -134,7 +134,9 @@ do
       fi
       if [ -d "$backup_path/" ]
       then
-        { $trace fstags find --for-rsync "$src_path" "$archive_tag" >"$tmpf" \
+        { { echo + .fstags
+            $trace fstags find --for-rsync "$src_path" "$archive_tag"
+          } >"$tmpf" \
           && $trace histbackup $hbopts --copy-times \
                -- "$src_path" "$backup_path" \
                "--include-from=$tmpf" \
