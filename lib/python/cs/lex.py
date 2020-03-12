@@ -918,7 +918,7 @@ class FormatAsError(LookupError):
         (
             "format fails, missing key: %s" % (key,),
             "format string was: %r" % (format_s,),
-            "available key: %s" % (' '.join(sorted(format_mapping.keys()))),
+            "available keys: %s" % (' '.join(sorted(format_mapping.keys()))),
         )
     )
 
