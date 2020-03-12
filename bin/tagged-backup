@@ -130,6 +130,7 @@ do
           echo "$cmd: $src_dst: mount fails for $backup_tree, skipping" >&2
           continue
         }
+        df -h "$backup_tree" | tail -1
       fi
       if [ -d "$backup_path/" ]
       then
@@ -148,6 +149,7 @@ do
       fi
       if [ $do_mount ]
       then
+        df -h "$backup_tree" | tail -1
         $trace umount "$backup_tree" || xit=1
       fi
     done
