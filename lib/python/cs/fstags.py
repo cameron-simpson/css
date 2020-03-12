@@ -1144,7 +1144,7 @@ class TagFile:
     ''' Transcribe a `name` and its `tagmap` for use as a `.fstags` file line.
     '''
     fields = [cls.encode_name(name)]
-    for tag in tagmap:
+    for tag in tagmap.as_tags():
       fields.append(str(tag))
     return ' '.join(fields)
 
