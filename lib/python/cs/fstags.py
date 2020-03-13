@@ -557,7 +557,6 @@ class FSTagsCommand(BaseCommand):
               continue
             dirpath = dirname(filepath)
             base = basename(filepath)
-            format_kwargs = fstags[filepath].format_kwargs(direct=False)
             try:
               newbase = fstags[filepath].format_as(
                   name_format, error_sep='\n  ', direct=False
