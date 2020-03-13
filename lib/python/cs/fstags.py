@@ -766,8 +766,8 @@ class FSTags(MultiOpenMixin):
         where `name` is the key within `TagFile`.
     '''
     with Pfx("path_tagfiles(%r)", filepath):
-      absfilepath = PurePath(abspath(filepath))
-      root, *subparts = absfilepath.parts
+      absfilepath = abspath(filepath)
+      root, *subparts = PurePath(absfilepath).parts
       if not subparts:
         raise ValueError("root=%r and no subparts" % (root,))
       tagfiles = []
@@ -1215,7 +1215,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       fstags = self.fstags
     else:
       self.fstags = fstags
-    self.filepath = PurePath(filepath)
+    self.filepath = filepath
     self._tagfile_entries = fstags.path_tagfiles(filepath)
     self._lock = Lock()
 
