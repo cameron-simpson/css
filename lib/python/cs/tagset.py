@@ -8,6 +8,7 @@ from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 from time import strptime
 from types import SimpleNamespace as NS
+from types import SimpleNamespace
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
     skipwhite, lc_, titleify_lc, FormatableMixin
@@ -492,3 +493,46 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       choice = True
     tag, offset = Tag.parse(s, offset=offset)
     return cls(s[offset0:offset], choice, tag), offset
+
+class ExtendedNamespace(SimpleNamespace):
+  ''' Subclass `SimpleNamespace` with inferred attributes.
+      This also presents attributes as `[]` elements via `__getitem__`.
+  '''
+
+  def __getattr__(self, attr):
+    ''' Look up an indirect attribute, whose value is inferred from another.
+    '''
+    if attr == 'keys':
+      return self.__dict__.keys
+    with Pfx("%s(%r)", type(self).__name__, attr):
+      getns = self.__dict__.get
+      # attr vs attr_lc
+      title_attr = cutsuffix(attr, '_lc')
+      if title_attr is not attr:
+        value = getns(title_attr)
+        if value is not None:
+          return lc_(value)
+      value = getns(attr + '_lc')
+      if value is not None:
+        return titleify_lc(value)
+      # plural from singular
+      for pl_suffix in 's', 'es':
+        single_attr = cutsuffix(attr, pl_suffix)
+        if single_attr is not attr:
+          value = getns(single_attr)
+          if value is not None:
+            return [value]
+      # singular from plural
+      for pl_suffix in 's', 'es':
+        plural_attr = attr + pl_suffix
+        value = getns(plural_attr)
+        if isinstance(value, list) and value:
+          return value[0]
+      raise AttributeError(attr)
+
+  def __getitem__(self, attr):
+    try:
+      value = getattr(self, attr)
+    except AttributeError as e:
+      raise KeyError(attr) from e
+    return value
