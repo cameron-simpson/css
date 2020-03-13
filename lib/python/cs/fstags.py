@@ -1232,10 +1232,10 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
 
-        This returns an `ExtendedNamespace` from `TagSet.as_namespace`
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
         for a computed `TagSet`.
 
-        In addition to the normal `TagSet.as_namespace` names
+        In addition to the normal `TagSet.ns()` names
         the following additional names are available:
         * `filepath.basename`: basename of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
@@ -1259,7 +1259,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
     kwtags['tags'] = str(kwtags)
-    return kwtags.as_namespace()
+    return kwtags.ns()
 
   @property
   def basename(self):

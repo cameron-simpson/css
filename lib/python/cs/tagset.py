@@ -176,7 +176,7 @@ class TagSet(dict, FormatableMixin):
       self[k] = v
 
   @pfx_method
-  def as_namespace(self):
+  def ns(self):
     ''' Compute and return a presentation of this `TagSet` as a
         nested `ExtendedNamespace`.
 
@@ -222,7 +222,7 @@ class TagSet(dict, FormatableMixin):
           setattr(ns, '_' if hasattr(ns, subname) else subname, self[tag_name])
     return ns0
 
-  format_kwargs = as_namespace
+  format_kwargs = ns
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
