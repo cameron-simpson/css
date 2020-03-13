@@ -340,6 +340,13 @@ class Tag(namedtuple('Tag', 'name value')):
       # Tag ducktype
       return tag
 
+  @classmethod
+  def from_string(cls, s, offset=0):
+    tag, post_offset=cls.parse(s, offset=offset)
+    if post_offset < len(s):
+      raise ValueError("unparsed text after Tag %s: %r" % (tag,s[post_offset:]))
+    return tag
+
   @staticmethod
   def is_valid_name(name):
     ''' Test whether a tag name is valid: a dotted identifier including dash.
@@ -362,7 +369,7 @@ class Tag(namedtuple('Tag', 'name value')):
 
   @classmethod
   def parse(cls, s, offset=0):
-    ''' Parse tag_name[=value], return `(tag,offset)`.
+    ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
       name, offset = cls.parse_name(s, offset)
