@@ -1055,7 +1055,7 @@ class TagFile:
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.filepath)
 
-  __repr__=__str__
+  __repr__ = __str__
 
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
