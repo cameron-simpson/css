@@ -7,7 +7,6 @@ from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 from time import strptime
-from types import SimpleNamespace as NS
 from types import SimpleNamespace
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
@@ -176,72 +175,29 @@ class TagSet(dict, FormatableMixin):
     for k, v in kw.items():
       self[k] = v
 
-  def format_kwargs(self):
-    ''' Compute a `dict` for use as the `format_kwargs` for a formatted string
-        based on this `TagSet`.
-
-        This dict includes:
-        * a direct entry of `tag.name` => `tag.value` for every tag
-        * a titlecased entry `foo` for every `str` tag named `foo_lc`
-          if `foo` is not already present,
-          using `cs.lex.titleify_lc` to provide a pretty good title
-          from a lowercased tag
-        * a lowercased entry `foo_lc` for every `str` tag `foo`
-          if `foo_lc` is not already present,
-          using `cs.lex.lc_` to provide a the lowercased value
-        * an entry `foo_bah` for every `kwargs` entry `foo-bah`
-          if `foo_bah` is not already present
-        * a nested `SimpleNamespace` named `foo` for every tag named
-          `foo.bah.baz` with attributes for each subpath,
-          supporting direct use of `foo.bar.baz` in the format string,
-          if `foo` is not already present
-    '''
-    kwargs = {}
-    # initial kwargs: all tags directly
-    for tag_name, value in self.as_dict().items():
-      kwargs[tag_name] = value
-    # fill out computed/impled tags
-    for tag_name, value in self.as_dict().items():
-      # provide _lc versions of strings unless called _lc, in which
-      # case the reverse
-      if isinstance(value, str):
-        tag_name_prefix = cutsuffix(tag_name, '_lc')
-        if tag_name_prefix is tag_name:
-          # not a _lc tag_name
-          tag_name_lc = tag_name + '_lc'
-          if tag_name_lc not in kwargs:
-            kwargs[tag_name_lc] = lc_(value)
-        else:
-          # tag_name is foo_lc, compute title version if missing
-          if tag_name_prefix not in kwargs:
-            kwargs[tag_name_prefix] = titleify_lc(value)
-    ns = self.as_namespace()
-    for ns_name in dir(ns):
-      if ns_name not in kwargs and not ns_name.startswith('__'):
-        kwargs[ns_name] = getattr(ns, ns_name)
-    return kwargs
-
   @pfx_method
   def as_namespace(self):
     ''' Compute and return a presentation of this `TagSet` as a
-        nested namespace.
+        nested `ExtendedNamespace`.
+
+        `ExtendedNamespaces` provide a number of convenience attibutes
+        derived from the concrete attributes. They are also usable
+        as mapping in `str.format_map` and the like as they implement
+        the `keys` and `__getitem__` methods.
 
         Note that if the `TagSet` includes tags named `'a.b'` and
-        also `'a.b.c'` then only the `'a.b.c'` `Tag` will be reflected
-        in the namespace due to the conflict between the value for
-        `'a.b'` and namespace named `a.b` which holds the `c`
-        attribute for `'a.b.c'`.
+        also `'a.b.c'` then the `'a.b'` value will be reflected as
+        `'a.b._'` in order to keep `'a.b.c'` available.
 
         Also note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
         `'..a.b'` will all map to the namespace entry `a.b`.
 
-        `Tag`s are processed in reverse lexical order by name in
-        order to effect the shadowing of `a.b` by `a.b.c` and this
-        order also dictates which of the conflicting multidot names
-        takes effect in the namespace - the first found is used.
+        `Tag`s are processed in reverse lexical order by name, which
+        dictates which of the conflicting multidot names takes
+        effect in the namespace - the first found is used.
     '''
-    ns0 = NS()
+    ns0 = ExtendedNamespace()
     for tag_name in sorted(self, reverse=True):
       with Pfx(tag_name):
         subnames = [subname for subname in tag_name.split('.') if subname]
@@ -257,19 +213,16 @@ class TagSet(dict, FormatableMixin):
             try:
               subns = getattr(ns, subname)
             except AttributeError:
-              subns = NS()
+              subns = ExtendedNamespace()
               setattr(ns, subname, subns)
             ns = subns
         subname, = subnames
         subpath.append(subname)
         with Pfx('.'.join(subpath)):
-          try:
-            existing_value = getattr(ns, subname)
-          except AttributeError:
-            setattr(ns, subname, self[tag_name])
-          else:
-            warning("skipping existing subpath, has value %s", existing_value)
+          setattr(ns, '_' if hasattr(ns, subname) else subname, self[tag_name])
     return ns0
+
+  format_kwargs = as_namespace
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
