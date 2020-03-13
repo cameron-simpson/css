@@ -1236,9 +1236,12 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         This returns an `ExtendedNamespace` from `TagSet.as_namespace`
         for a computed `TagSet`.
 
-        In addition to the normal `TagSet.as_namespace` names the following additional names are available:
-        * `filepath._`: the `TaggedPath.filepath`
-        * `filepath.basename`
+        In addition to the normal `TagSet.as_namespace` names
+        the following additional names are available:
+        * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.pathname`: the `TaggedPath.filepath`
+        * `filepath.encoded`: the JSON encoded filepath
+        * `tags`: the `TagSet` as a string
     '''
     kwtags = TagSet()
     kwtags.update(self.direct_tags if direct else self.all_tags)
@@ -1250,7 +1253,6 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     # tags based on the filepath
     filepath = self.filepath
     for pathtag in (
-        Tag('filepath',filepath),
         Tag('filepath.basename', basename(filepath)),
         Tag('filepath.pathname', filepath),
         Tag('filepath.encoded', TagFile.encode_name(filepath)),
