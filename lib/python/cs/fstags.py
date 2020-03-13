@@ -98,8 +98,8 @@ XATTR_B = (
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{filepath}'
-LS_OUTPUT_FORMAT_DEFAULT = '{filepath_encoded} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{filepath.pathname}'
+LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -1232,23 +1232,33 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
 
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
+
+        This returns an `ExtendedNamespace` from `TagSet.as_namespace`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.as_namespace` names the following additional names are available:
+        * `filepath._`: the `TaggedPath.filepath`
+        * `filepath.basename`
     '''
-    source_tags = self.direct_tags if direct else self.all_tags
-    kwargs = source_tags.format_kwargs()
+    kwtags = TagSet()
+    kwtags.update(self.direct_tags if direct else self.all_tags)
     # add in cascaded values
     # TODO: what about cascaded tags whose names contain dots?
-    for tag in self.fstags.cascade_tags(source_tags):
-      if tag.name not in kwargs:
-        kwargs[tag.name] = tag.value
-    # hardwire some specific values
-    filepath = str(self.filepath)
-    kwargs.update(
-        basename=basename(filepath),
-        filepath=filepath,
-        filepath_encoded=TagFile.encode_name(filepath),
-        tags=str(source_tags),
-    )
-    return kwargs
+    for tag in list(self.fstags.cascade_tags(kwtags)):
+      if tag.name not in kwtags:
+        kwtags.add(tag)
+    # tags based on the filepath
+    filepath = self.filepath
+    for pathtag in (
+        Tag('filepath',filepath),
+        Tag('filepath.basename', basename(filepath)),
+        Tag('filepath.pathname', filepath),
+        Tag('filepath.encoded', TagFile.encode_name(filepath)),
+    ):
+      if pathtag.name not in kwtags:
+        kwtags.add(pathtag)
+    kwtags['tags'] = str(kwtags)
+    return kwtags.as_namespace()
 
   @property
   def basename(self):
