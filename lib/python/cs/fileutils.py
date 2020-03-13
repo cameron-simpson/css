@@ -713,6 +713,19 @@ def tmpdirn(tmp=None):
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
+def findup(path, test):
+  ''' Locate the closest ancestor of `abspath(path)`
+      (potentially `path` itself) satisfying `test`.
+  '''
+  path = abspath(path)
+  while True:
+    if test(path):
+      return path
+    up = dirname(path)
+    if up == path:
+      return None
+    path = up
+
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
 def shortpath(path, environ=None, prefixes=None):
