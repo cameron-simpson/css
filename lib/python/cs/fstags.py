@@ -710,6 +710,18 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
+  class OntPathDict(dict):
+    ''' A `dict` subclass which autofills with `TagOntology`s.
+    '''
+
+    def __init__(self, fstags):
+      self.fstags = fstags
+
+    def __missing__(self, ontpath):
+      tagfile = self.fstags._tagfile(ontpath)
+      ont = self[ontpath] = TagsOntology(tagfile)
+      return ont
+
   def __init__(self, tagsfile=None, ontologyfile=None):
     MultiOpenMixin.__init__(self)
     if tagsfile is None:
@@ -721,7 +733,9 @@ class FSTags(MultiOpenMixin):
     self.config.ontologyfile = ontologyfile
     self._raw_tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
-    self._ontologies = {}    # cache of per abspath `TagsOntology`
+    self._ontologies = {}  # cache of per abspath `TagsOntology`
+    # cache of per ontologypath `TagOntologies`
+    self._raw_ontologies = self.OntPathDict(self)
     self._lock = RLock()
 
   def startup(self):
@@ -775,8 +789,9 @@ class FSTags(MultiOpenMixin):
           findup(path, lambda p: isfilepath(joinpath(p, ontbase)), first=True)
       )
       if ontdirpath is not None:
-        tagfile = self._tagfile(joinpath(ontdirpath, ontbase))
-        ont = self._ontologies[path] = TagsOntology(tagfile)
+        ontpath = joinpath(ontdirpath, ontbase)
+        ont = self._raw_ontologies[ontpath]
+        self._ontologies[path] = ont
     return ont
 
   def path_tagfiles(self, filepath):
