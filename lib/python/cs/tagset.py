@@ -308,7 +308,7 @@ class Tag(namedtuple('Tag', 'name value')):
         If `name` is a str make a new Tag from `name` and `value`.
         Otherwise check that `value is `None`
         and that `name` has a `.name` and `.value`
-        and return it as a tag ducktype.
+        and return directly as a tag ducktype.
 
         This supports functions of the form:
 
