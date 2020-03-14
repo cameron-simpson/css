@@ -713,18 +713,32 @@ def tmpdirn(tmp=None):
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
-def findup(path, test):
-  ''' Locate the closest ancestor of `abspath(path)`
-      (potentially `path` itself) satisfying `test`.
+def findup(path, test, first=False):
+  ''' Test the pathname `abspath(path)` and each of its ancestors
+      against the callable `test`,
+      yielding paths satisfying the test.
+
+      If `first` is true (default `False`)
+      this function always yields exactly one value,
+      either the first path satisfying the test or `None`.
+      This mode supports a use such as:
+
+          matched_path = next(findup(path, test, first=True))
+          # post condition: matched_path will be `None` on no match
+          # otherwise the first matching path
   '''
   path = abspath(path)
   while True:
     if test(path):
-      return path
+      yield path
+      if first:
+        return
     up = dirname(path)
     if up == path:
-      return None
+      break
     path = up
+  if first:
+    yield None
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 
