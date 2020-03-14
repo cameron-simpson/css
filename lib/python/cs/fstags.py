@@ -51,7 +51,8 @@ import json
 import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, join as joinpath, realpath, relpath, samefile
+    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
+    samefile
 )
 from pathlib import PurePath
 import re
@@ -64,6 +65,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
+from cs.fileutils import findup
 from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
 from cs.logutils import setup_logging, error, warning, info, trace
 from cs.pfx import Pfx, pfx_method
@@ -1614,6 +1616,192 @@ class FSTagsConfig:
     ''' Set the tags filename.
     '''
     self.config['general']['tagsfile'] = tagsfile
+
+class TagsOntology:
+  ''' An ontology for tag names.
+
+      This is based around a `TagFile` mapping tag names
+      to ontological information expressed as `Tag`s.
+  '''
+
+  BASE = '.fstags-ontology'
+
+  def __init__(self, tagfilepath, parent=None):
+    self.tagfile = TagFile(tagfilepath)
+    self.parent = parent
+
+  def __str__(self):
+    return "%s(%s)" % (type(self).__name__, self.tagfile)
+
+  __repr__ = __str__
+
+  @classmethod
+  def frompath(cls, path, *, base=None):
+    ''' Return a new `TagsOntology` based on `path`.
+
+        Parameters:
+        * `path`: the file path whose ontology is desired
+        * `base`: the basename of the ontology `TagFile`,
+          default from `TagsOntology.BASE`
+
+        Raises `ValueError` if no ontology file can be found.
+    '''
+    if base is None:
+      base = cls.BASE
+    ontdirpath = next(
+        findup(path, lambda p: isfilepath(joinpath(p, base)), first=True)
+    )
+    if ontdirpath is None:
+      raise ValueError(
+          "no %s found for path=%r, base=%r" % (cls.__name__, path, base)
+      )
+    return cls(joinpath(ontdirpath, base))
+
+  def __getitem__(self, index):
+    ''' If `index` is a `str`
+        presume it is a `Tag.name`
+        and return the defining `TagSet`.
+        Otherwise presume `index` is `Tag`like
+        and return a `TypedTag` for the index
+        (a `Tag`like object with type information).
+    '''
+    return (
+        self.defn_tagset(index)
+        if isinstance(index, str) else TypedTag(index, ontology=self)
+    )
+
+  def defn_tagset(self, tag):
+    ''' Return the `TagSet` defining ontology entry specified by `tag`.
+
+        `tag` may be a `str` (a tag name) or a `Tag` like thing
+        in which case `tag.name` is used.
+    '''
+    return self.tagfile[tag if isinstance(tag, str) else tag.name]
+
+  def value_tags(self, type_name, value):
+    ''' Return the `TagSet` for `type_name.value`
+    '''
+    name = type_name + '.' + '_'.join(value.lower().split())
+    return self[name]
+
+class TypedTag(FormatableMixin):
+  ''' A `Tag`like object linked to a `TagOntology`,
+      providing associated detail about a `Tag`.
+
+      Like `Tag`, this has a `.name` and `.value`.
+
+      Additionally it has the following attributes:
+      * `ontology`: the supporting `TagOntology`
+      * `tag`: the originating `Tag`
+        (computed from the `(name,value)` tuple if supplied)
+      * `defn`: the `TagSet` from `.ontology`
+        which defines this
+      * `type`: `defn['type']`
+      * `member_type`: `defn['member_type']` if present;
+        we expect `type` to be a list or mapping type name
+
+      Indexing a `TypedTag` indexes its `.value`
+      and returns a tuple `(element,TagSet)`
+      where the `TagSet` is information from the ontology
+      about the element's value (if `element` is a `str`).
+
+      If the `.value` looks like a mapping
+      .ie. it has a `.keys()` method
+      then a `TypedTag` has `.keys()` and `.items()` methods.
+      The `.keys()` call returns `.value.keys()`.
+      The `.items()` call yields `(key,self[key])`
+      for each of `self.keys()`.
+
+      Iterating over ` TypedTag`
+      yields its keys if it has a `.keys()` method,
+      otherwise values from `range(len(self.value))`.
+  '''
+
+  def __init__(self, name, value=None, *, ontology):
+    ''' Prepare the `TypedTag` from a `Tag` or `(name,value)` tuple.
+    '''
+    tag = Tag.from_name_value(name, value)
+    self.tag = tag
+    self.name = tag.name
+    self.value = tag.value
+    self.ontology = ontology
+
+  def __str__(self):
+    return "%s(%s:%s,%s)" % (
+        type(self).__name__, self.type, self.tag, self.ontology
+    )
+
+  __repr__ = __str__
+
+  @property
+  def defn(self):
+    ''' The defining `TagSet` for this tag name.
+    '''
+    return self.ontology.defn_tagset(self.name)
+
+  @property
+  def type(self):
+    ''' The type name for this tag.
+    '''
+    return self.defn['type']
+
+  @property
+  def member_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if 
+    '''
+    try:
+      return self.defn['member_type']
+    except KeyError:
+      raise AttributeError('member_type')
+
+  @property
+  def keys(self):
+    ''' The `keys` attribute if `self.value`, if present.
+    '''
+    return self.value.keys
+
+  def items(self):
+    ''' Generator yielding `(key,self[key])`
+        for `key` in `self.keys()`.
+
+        As such, the `self[key]` component
+        is a `(element,TagSet)` tuple.
+    '''
+    for k in self.value.keys():
+      yield k, self[k]
+
+  def __getitem__(self, index):
+    ''' Return a tuple `(element,TagSet)`
+        providing an element and its associated information.
+
+        The `element` is `self.value[index]`.
+
+        The `TagSet` is `self.ontology.value_tags(member_type,element)`
+        if the element is a `str`, otherwise `None`.
+    '''
+    element = self.value[index]
+    member_type = self.member_type
+    return element, (
+        self.ontology.value_tags(member_type, element)
+        if isinstance(element, str) else None
+    )
+
+  def __iter__(self):
+    try:
+      indices = self.value.keys()
+    except AttributeError:
+      indices = range(len(self.value))
+    for index in indices:
+      yield self[index]
+
+  def ns(self):
+    ''' Return an `ExtendedNamespace` derived from `self.tagset.ns()`.
+    '''
+    return self.tagset.ns()
+
+  format_kwargs = ns
 
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
