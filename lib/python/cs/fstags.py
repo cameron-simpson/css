@@ -1254,7 +1254,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     else:
       self.fstags = fstags
     self.filepath = filepath
-    self._tagfile_entries = fstags.path_tagfiles(filepath)
+    self._tagfile_stack = fstags.path_tagfiles(filepath)
     self._lock = Lock()
 
   def __repr__(self):
@@ -1304,13 +1304,13 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
   def basename(self):
     ''' The name of the final path component.
     '''
-    return self._tagfile_entries[-1].name
+    return self._tagfile_stack[-1].name
 
   @property
   def direct_tagfile(self):
     ''' The `TagFile` for the final path component.
     '''
-    return self._tagfile_entries[-1].tagfile
+    return self._tagfile_stack[-1].tagfile
 
   @property
   def direct_tags(self):
@@ -1341,7 +1341,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     '''
     tags = TagSet()
     with stackattrs(state, verbose=False):
-      for tagfile, name in self._tagfile_entries:
+      for tagfile, name in self._tagfile_stack:
         for tag in tagfile[name].as_tags():
           tags.add(tag)
     return tags
