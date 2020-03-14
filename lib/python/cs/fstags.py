@@ -612,7 +612,8 @@ class FSTagsCommand(BaseCommand):
     else:
       paths = [path]
     with stackattrs(state, verbose=True):
-      fstags.apply_tag_choices(tag_choices, paths)
+      with fstags:
+        fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_tagpaths(cls, argv, options):
@@ -638,7 +639,8 @@ class FSTagsCommand(BaseCommand):
     else:
       paths = argv
     with stackattrs(state, verbose=True):
-      fstags.apply_tag_choices(tag_choices, paths)
+      with fstags:
+        fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_test(cls, argv, options):
