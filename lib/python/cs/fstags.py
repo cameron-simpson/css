@@ -717,10 +717,7 @@ class FSTags(MultiOpenMixin):
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
     self.config.ontologyfile = ontologyfile
-    self._tagfiles = {}  # cache of per directory `TagFile`s
-    self._raw_tagfiles = defaultdict(
-        TagFile
-    )  # cache of `TagFile`s from their actual paths
+    self._raw_tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._ontologies = {}  # cache of per abspath `TagsOntology`
     self._lock = RLock()
@@ -732,7 +729,7 @@ class FSTags(MultiOpenMixin):
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
     '''
-    for tagfile in self._tagfiles.values():
+    for tagfile in self._raw_tagfiles.values():
       try:
         tagfile.save()
       except FileNotFoundError as e:
