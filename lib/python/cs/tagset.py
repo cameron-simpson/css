@@ -342,9 +342,13 @@ class Tag(namedtuple('Tag', 'name value')):
 
   @classmethod
   def from_string(cls, s, offset=0):
-    tag, post_offset=cls.parse(s, offset=offset)
+    ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
+    '''
+    tag, post_offset = cls.parse(s, offset=offset)
     if post_offset < len(s):
-      raise ValueError("unparsed text after Tag %s: %r" % (tag,s[post_offset:]))
+      raise ValueError(
+          "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
+      )
     return tag
 
   @staticmethod
@@ -508,8 +512,6 @@ class TagsOntology:
   '''
 
   def __init__(self, tagset_mapping, parent=None):
-    ''' Initialise 
-    '''
     self.tagsets = tagset_mapping
     self.parent = parent
 
@@ -610,7 +612,7 @@ class TypedTag(FormatableMixin):
   def member_type(self):
     ''' The type name for members of this tag.
 
-        This is required if 
+        This is required if `.value` is a sequence or mapping.
     '''
     try:
       return self.defn['member_type']
@@ -660,6 +662,6 @@ class TypedTag(FormatableMixin):
   def ns(self):
     ''' Return an `ExtendedNamespace` derived from `self.tagset.ns()`.
     '''
-    return self.tagset.ns()
+    return self.defn.ns()
 
   format_kwargs = ns
