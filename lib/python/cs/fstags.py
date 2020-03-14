@@ -718,6 +718,9 @@ class FSTags(MultiOpenMixin):
     self.config.tagsfile = tagsfile
     self.config.ontologyfile = ontologyfile
     self._tagfiles = {}  # cache of per directory `TagFile`s
+    self._raw_tagfiles = defaultdict(
+        TagFile
+    )  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._ontologies = {}  # cache of per abspath `TagsOntology`
     self._lock = RLock()
@@ -768,20 +771,14 @@ class FSTags(MultiOpenMixin):
     path = abspath(path)
     ont = self._ontologies.get(path)
     if ont is None:
-      ont = self._ontologies[path] = TagsOntology.frompath(
-          path, base=self.ontologyfile
+      ontbase = self.ontologyfile
+      ontdirpath = next(
+          findup(path, lambda p: isfilepath(joinpath(p, ontbase)), first=True)
       )
+      if ontdirpath is not None:
+        tagfile = self._tagfile(joinpath(ontdirpath, ontbase))
+        ont = self._ontologies[path] = TagsOntology(tagfile)
     return ont
-
-  @locked
-  def dir_tagfile(self, dirpath):
-    ''' Return the `TagFile` associated with `dirpath`.
-    '''
-    tagfilepath = joinpath(dirpath, self.tagsfile)
-    tagfile = self._tagfiles.get(tagfilepath)
-    if tagfile is None:
-      tagfile = self._tagfiles[tagfilepath] = TagFile(str(tagfilepath))
-    return tagfile
 
   def path_tagfiles(self, filepath):
     ''' Return a list of `TagFileEntry`s
@@ -801,6 +798,23 @@ class FSTags(MultiOpenMixin):
         tagfiles.append(TagFileEntry(self.dir_tagfile(current), next_part))
         current = joinpath(current, next_part)
       return tagfiles
+
+  @locked
+  def dir_tagfile(self, dirpath):
+    ''' Return the `TagFile` associated with `dirpath`.
+    '''
+    tagfilepath = joinpath(dirpath, self.tagsfile)
+    return self._tagfile(tagfilepath)
+
+  @locked
+  def _tagfile(self, tagfilepath):
+    ''' Cache of `TagFile` by its actual path.
+    '''
+    cache = self._raw_tagfiles
+    tagfile = cache.get(tagfilepath)
+    if tagfile is None:
+      tagfile = cache[tagfilepath] = TagFile(tagfilepath)
+    return tagfile
 
   def apply_tag_choices(self, tag_choices, paths):
     ''' Apply the `tag_choices` to `paths`.
