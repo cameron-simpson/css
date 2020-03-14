@@ -708,14 +708,18 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile=None):
+  def __init__(self, tagsfile=None, ontologyfile=None):
     MultiOpenMixin.__init__(self)
     if tagsfile is None:
       tagsfile = TAGSFILE
+    if ontologyfile is None:
+      ontologyfile = tagsfile + '-ontology'
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
+    self.config.ontologyfile = ontologyfile
     self._tagfiles = {}  # cache of per directory `TagFile`s
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
+    self._ontologies = {}  # cache of per abspath `TagsOntology`
     self._lock = RLock()
 
   def startup(self):
@@ -737,6 +741,12 @@ class FSTags(MultiOpenMixin):
     '''
     return self.config.tagsfile
 
+  @property
+  def ontologyfile(self):
+    ''' The ontology file basename.
+    '''
+    return self.config.ontologyfile
+
   def __str__(self):
     return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
 
@@ -749,6 +759,19 @@ class FSTags(MultiOpenMixin):
     if tagged_path is None:
       tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
     return tagged_path
+
+  @locked
+  def ontology(self, path):
+    ''' Return the `TagsOntology` associated with `path`.
+        Raises `ValueError` if an ontology cannot be found.
+    '''
+    path = abspath(path)
+    ont = self._ontologies.get(path)
+    if ont is None:
+      ont = self._ontologies[path] = TagsOntology.frompath(
+          path, base=self.ontologyfile
+      )
+    return ont
 
   @locked
   def dir_tagfile(self, dirpath):
