@@ -1,3 +1,4 @@
+cs.fstags: TagsOntology: support arbitrary tagname=>TagSet mappings and shift to cs.tagset
 fstags: accept 'single quoted string', transcribe as JSON dq string
 fstags: sqlite fast index of tag values to aid lookups
 fstags: ontology in .fstags-ontology TagFile
