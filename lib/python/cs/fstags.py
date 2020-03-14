@@ -721,7 +721,7 @@ class FSTags(MultiOpenMixin):
     self.config.ontologyfile = ontologyfile
     self._raw_tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
-    self._ontologies = {}  # cache of per abspath `TagsOntology`
+    self._ontologies = {}    # cache of per abspath `TagsOntology`
     self._lock = RLock()
 
   def startup(self):
