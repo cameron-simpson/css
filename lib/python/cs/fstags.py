@@ -778,6 +778,7 @@ class FSTags(MultiOpenMixin):
     path = abspath(path)
     ont = self._ontologies.get(path)
     if ont is None:
+      # locate the ancestor directory containing the first ontology file
       ontbase = self.ontologyfile
       ontdirpath = next(
           findup(path, lambda p: isfilepath(joinpath(p, ontbase)), first=True)
@@ -1154,8 +1155,7 @@ class TagFile(SingletonMixin):
     ''' Encode `name`.
 
         If the `name` is not empty and does not start with a double quote
-        and contains no whitespace,
-        return it as-is
+        and contains no whitespace, return it as-is
         otherwise JSON encode the name.
     '''
     if name and not name.startswith('"'):
@@ -1167,6 +1167,11 @@ class TagFile(SingletonMixin):
   @staticmethod
   def decode_name(s, offset=0):
     ''' Decode the *name* from the string `s` at `offset` (default `0`).
+        Return the *name* and the new offset.
+
+        If the *name* commences with a double quote,
+        decode it as a JSON string value.
+        Otherwise gather up all the available nonwhitespace.
     '''
     if s.startswith('"'):
       name, suboffset = Tag.JSON_DECODER.raw_decode(s[offset:])
