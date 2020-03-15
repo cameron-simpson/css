@@ -189,6 +189,8 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} ont tags tag[=value]...
+        Query ontology information for the specified tags.
     {cmd} rename -n newbasename_format paths...
         Rename paths according to a format string.
         -n newbasename_format
@@ -521,6 +523,36 @@ class FSTagsCommand(BaseCommand):
             if cmd_verbose:
               print(srcpath, '->', dstpath)
     return xit
+
+  @staticmethod
+  def cmd_ont(argv, options):
+    ont = options.fstags.ontology('.')
+    if not argv:
+      raise GetoptError("missing subcommand")
+    subcmd=argv.pop(0)
+    with Pfx(subcmd):
+      if subcmd == 'tags':
+        for tag_arg in argv:
+          with Pfx(tag_arg):
+            tag = Tag.from_string(tag_arg)
+            typed = ont[tag]
+            print(tag, typed)
+            if typed.type == 'list':
+              for element, detail in typed:
+                print(" ", element)
+                print(
+                    "   ",
+                    detail.format_as("fullname={fullname} all_names={fullnames}")
+                )
+            else:
+              element = typed
+              detail = typed.detail
+              print(
+                  " ",
+                  detail.format_as("fullname={fullname} all_names={fullnames}")
+              )
+      else:
+        raise GetoptError("unrecognised subcommand")
 
   @staticmethod
   def cmd_rename(argv, options):
