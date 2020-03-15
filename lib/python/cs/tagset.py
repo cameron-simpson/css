@@ -548,6 +548,14 @@ class TagsOntology(SingletonMixin):
   def value_tags(self, type_name, value):
     ''' Return the `TagSet` for `type_name.value`
     '''
+    if value is None:
+      return None
+    if isinstance(value, str):
+      pass
+    elif isinstance(value, (int, float)):
+      value = str(value)
+    else:
+      return None
     name = type_name + '.' + '_'.join(value.lower().split())
     return self[name]
 
@@ -616,6 +624,8 @@ class TypedTag(FormatableMixin):
   def detail(self):
     ''' The `TagSet` providing detailed information about this tag,
         derived through the ontology from the tag name and value.
+
+        Returns `None` for unsupported value types.
     '''
     return self.ontology.value_tags(self.name, self.value)
 
