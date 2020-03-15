@@ -13,6 +13,7 @@ from cs.lex import (
     skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import info, warning
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 
 try:
@@ -501,7 +502,7 @@ class ExtendedNamespace(SimpleNamespace):
       raise KeyError(attr) from e
     return value
 
-class TagsOntology:
+class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
 
       This is based around a mapping of tag names
@@ -511,7 +512,11 @@ class TagsOntology:
       containing ontology mappings.
   '''
 
-  def __init__(self, tagset_mapping):
+  @classmethod
+  def _singleton_key(cls, tagset_mapping):
+    return id(tagset_mapping), cls
+
+  def _singleton_init(self, tagset_mapping):
     self.tagsets = tagset_mapping
 
   def __str__(self):
