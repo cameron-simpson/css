@@ -529,7 +529,7 @@ class FSTagsCommand(BaseCommand):
     ont = options.fstags.ontology('.')
     if not argv:
       raise GetoptError("missing subcommand")
-    subcmd=argv.pop(0)
+    subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'tags':
         if not argv:
@@ -542,17 +542,21 @@ class FSTagsCommand(BaseCommand):
             if typed.type == 'list':
               for element, detail in typed:
                 print(" ", element)
-                print(
-                    "   ",
-                    detail.format_as("fullname={fullname} all_names={fullnames}")
-                )
+                if detail is not None:
+                  print(
+                      "   ",
+                      detail
+                      .format_as("fullname={fullname} all_names={fullnames}")
+                  )
             else:
               element = typed
               detail = typed.detail
-              print(
-                  " ",
-                  detail.format_as("fullname={fullname} all_names={fullnames}")
-              )
+              if detail is not None:
+                print(
+                    " ",
+                    detail
+                    .format_as("fullname={fullname} all_names={fullnames}")
+                )
       else:
         raise GetoptError("unrecognised subcommand")
 
