@@ -532,6 +532,8 @@ class FSTagsCommand(BaseCommand):
     subcmd=argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'tags':
+        if not argv:
+          raise GetoptError("missing tags")
         for tag_arg in argv:
           with Pfx(tag_arg):
             tag = Tag.from_string(tag_arg)
