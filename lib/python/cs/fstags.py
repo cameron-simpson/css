@@ -1100,10 +1100,40 @@ class TagFile(SingletonMixin):
         type(self).__name__, self.filepath, self.find_parent
     )
 
+  def __getattr__(self, attr):
+    if attr == 'parent':
+      # locate parent TagFile
+      dirpath = dirname(self.filepath)
+      updirpath = dirname(dirpath)
+      if updirpath == dirpath:
+        parent = None
+      else:
+        filebase = basename(self.filepath)
+        parent_dirpath = next(
+            findup(
+                updirpath,
+                lambda dirpath: isfilepath(joinpath(dirpath, filebase)),
+                first=True
+            )
+        )
+        if parent_dirpath:
+          parent_filepath = joinpath(parent_dirpath, filebase)
+          parent = type(self)(parent_filepath, find_parent=True)
+        else:
+          parent = None
+      self.parent = parent
+      return parent
+    raise AttributeError(attr)
 
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
     '''
+    tagfile = self
+    while tagfile is not None:
+      if name in tagfile.tagsets:
+        return tagfile.tagsets[name]
+      tagfile = self.parent if self.find_parent else None
+    # not available in parents, autocreate empty TagSet
     return self.tagsets[name]
 
   @locked_property
@@ -1217,17 +1247,19 @@ class TagFile(SingletonMixin):
       for _, tags in name_tags:
         tags.modified = False
 
-  @locked
   def save(self):
     ''' Save the tag map to the tag file.
     '''
     if getattr(self, '_tagsets', None) is None:
       # TagSets never loaded
       return
-    if not any(map(lambda tagset: tagset.modified, self._tagsets.values())):
-      # no modified TagSets
-      return
-    self.save_tagsets(self.filepath, self.tagsets)
+    with self._lock:
+      if not any(map(lambda tagset: tagset.modified, self._tagsets.values())):
+        # no modified TagSets
+        return
+      self.save_tagsets(self.filepath, self.tagsets)
+    if self.find_parent and 'parent' in self.__dict__:
+      self.parent.save()
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
