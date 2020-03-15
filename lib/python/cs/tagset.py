@@ -511,9 +511,8 @@ class TagsOntology:
       containing ontology mappings.
   '''
 
-  def __init__(self, tagset_mapping, parent=None):
+  def __init__(self, tagset_mapping):
     self.tagsets = tagset_mapping
-    self.parent = parent
 
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagsets)
@@ -606,7 +605,14 @@ class TypedTag(FormatableMixin):
   def type(self):
     ''' The type name for this tag.
     '''
-    return self.defn['type']
+    return self.defn.get('type')
+
+  @property
+  def detail(self):
+    ''' The `TagSet` providing detailed information about this tag,
+        derived through the ontology from the tag name and value.
+    '''
+    return self.ontology.value_tags(self.name, self.value)
 
   @property
   def member_type(self):
