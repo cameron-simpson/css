@@ -68,6 +68,7 @@ from cs.edit import edit_strings
 from cs.fileutils import findup
 from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
 from cs.logutils import setup_logging, error, warning, info, trace
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import TagSet, Tag, TagChoice, TagsOntology
@@ -731,7 +732,7 @@ class FSTags(MultiOpenMixin):
     self.config = FSTagsConfig()
     self.config.tagsfile = tagsfile
     self.config.ontologyfile = ontologyfile
-    self._raw_tagfiles = {}  # cache of `TagFile`s from their actual paths
+    self._tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._ontologies = {}  # cache of per abspath `TagsOntology`
     # cache of per ontologypath `TagOntologies`
@@ -745,11 +746,17 @@ class FSTags(MultiOpenMixin):
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
     '''
-    for tagfile in self._raw_tagfiles.values():
+    for tagfile in self._tagfiles.values():
       try:
         tagfile.save()
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
+
+  def _tagfile(self, path, *, find_parent=False):
+    ''' Obtain and cache the `TagFile` at `path`.
+    '''
+    tagfile = self._tagfiles[path] = TagFile(path, find_parent=find_parent)
+    return tagfile
 
   @property
   def tagsfile(self):
@@ -817,18 +824,7 @@ class FSTags(MultiOpenMixin):
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
-    tagfilepath = joinpath(dirpath, self.tagsfile)
-    return self._tagfile(tagfilepath)
-
-  @locked
-  def _tagfile(self, tagfilepath):
-    ''' Cache of `TagFile` by its actual path.
-    '''
-    cache = self._raw_tagfiles
-    tagfile = cache.get(tagfilepath)
-    if tagfile is None:
-      tagfile = cache[tagfilepath] = TagFile(tagfilepath)
-    return tagfile
+    return self._tagfile(joinpath(dirpath, self.tagsfile))
 
   def apply_tag_choices(self, tag_choices, paths):
     ''' Apply the `tag_choices` to `paths`.
@@ -1091,23 +1087,32 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class TagFile:
+class TagFile(SingletonMixin):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
 
+  @classmethod
+  def _singleton_key(cls, filepath, *, find_parent=False):
+    return filepath, find_parent
+
+  @pfx_method
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath):
+  def _singleton_init(self, filepath, find_parent=False):
     self.filepath = filepath
-    self.dirpath = dirname(filepath)
+    self.find_parent = find_parent
     self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.filepath)
+    return "%s(%r,%s)" % (type(self).__name__, self.filepath, self.find_parent)
 
-  __repr__ = __str__
+  def __repr__(self):
+    return "%s(%r,find_parent=%r)" % (
+        type(self).__name__, self.filepath, self.find_parent
+    )
+
 
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
