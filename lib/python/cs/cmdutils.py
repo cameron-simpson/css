@@ -158,15 +158,16 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `options`.
     '''
 
-  def run(self, argv, options=None, cmd=None):
+  def run(self, argv=None, options=None, cmd=None):
     ''' Run a command from `argv`.
         Returns the exit status of the command.
         Raises `GetoptError` for unrecognised options.
 
         Parameters:
         * `argv`:
-          the command line arguments
+          optional command line arguments
           including the main command name if `cmd` is not specified.
+          The default is copied from `sys.argv`.
         * `options`:
           a object for command state and context.
           If not specified a new `SimpleNamespace`
@@ -199,12 +200,20 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if argv is None:
+      argv = list(sys.argv)
+      if cmd is not None:
+        # we consume the first argument anyway
+        argv.pop(0)
     if cmd is None:
       cmd = argv.pop(0)
+    # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
     # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
-      usage = usage_format.format(cmd=cmd)
+      usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
+      usage_kwargs['cmd'] = cmd
+      usage = usage_format.format_map(usage_kwargs)
     else:
       usage = None
     if options is None:
@@ -271,6 +280,7 @@ class BaseCommand:
         * `options`: the `options` object
         * `e`: the `GetoptError` exception
         * `usage`: the command usage or `None` if this was not provided
+
         It returns a true value if the exception is considered handled,
         in which case the main `run` method returns 2.
         It returns a false value if the exception is considered unhandled,
