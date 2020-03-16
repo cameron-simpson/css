@@ -12,9 +12,13 @@ import sys
 import tempfile
 import unittest
 from .randutils import rand0, randblock
-from .datadir import DataDir, DataDirIndexEntry
+from .datadir import DataDir, RawDataDir
 from .hash import HASHCLASS_BY_NAME
 from .index import class_names as indexclass_names, class_by_name as indexclass_by_name
+from cs.logutils import setup_logging
+from cs.x import X
+import cs.x
+cs.x.X_via_tty = True
 
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
@@ -38,6 +42,7 @@ class TestDataDir(unittest.TestCase):
     method_name = a.pop()
     if a:
       raise ValueError("unexpected arguments: %r" % (a,))
+    self.datadirclass = None
     self.indexdirpath = None
     self.datadirpath = None
     self.indexclass = None
@@ -62,7 +67,7 @@ class TestDataDir(unittest.TestCase):
     random.seed()
 
   def _open_default_datadir(self):
-    return DataDir(
+    return self.datadirclass(
         self.indexdirpath,
         self.hashclass,
         indexclass=self.indexclass,
@@ -81,17 +86,18 @@ class TestDataDir(unittest.TestCase):
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
     '''
+    index_entry_class = self.datadirclass.index_entry_class
     for _ in range(RUN_SIZE):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
-      entry = DataDirIndexEntry(rand_n, rand_offset)
-      self.assertEqual(entry.n, rand_n)
+      entry = self.datadir.index_entry(rand_n, rand_offset, 0)
+      self.assertEqual(entry.filenum, rand_n)
       self.assertEqual(entry.offset, rand_offset)
       encoded = entry.encode()
       self.assertIsInstance(encoded, bytes)
-      entry2 = DataDirIndexEntry.from_bytes(encoded)
+      entry2 = index_entry_class.from_bytes(encoded)
       self.assertEqual(entry, entry2)
-      self.assertEqual(entry2.n, rand_n)
+      self.assertEqual(entry2.filenum, rand_n)
       self.assertEqual(entry2.offset, rand_offset)
 
   def test002randomblocks(self):
@@ -163,11 +169,15 @@ def selftest(argv):
     hashclass = HASHCLASS_BY_NAME[hashname]
     for indexname in sorted(indexclass_names()):
       indexclass = indexclass_by_name(indexname)
-      suite.addTest(
-          multitest_suite(
-              TestDataDir, hashclass=hashclass, indexclass=indexclass
-          )
-      )
+      for datadirclass in DataDir, RawDataDir:
+        suite.addTest(
+            multitest_suite(
+                TestDataDir,
+                datadirclass=datadirclass,
+                hashclass=hashclass,
+                indexclass=indexclass
+            )
+        )
   runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)
   ##if False:
@@ -178,4 +188,5 @@ def selftest(argv):
   ##thread_dump()
 
 if __name__ == '__main__':
+  setup_logging(sys.argv[0])
   selftest(sys.argv)

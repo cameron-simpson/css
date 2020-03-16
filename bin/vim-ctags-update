@@ -7,18 +7,5 @@
 
 set -ue
 
-cmd=$0
-usage="Usage: $cmd filenames..."
-
-badopts=
-
-if [ $# = 0 ]
-then
-  echo "$cmd: missing filenames" >&2
-  badopts=1
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-tags=$( ctags-update -- "$@" & )
+tags=$( ctags-update -- "$@" 2>/dev/null & )
 echo "set tags=$tags"

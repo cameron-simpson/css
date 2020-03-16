@@ -235,7 +235,8 @@ class FilePathArchive(BaseArchive):
 
   def __init__(self, arpath):
     ''' Initialise this Archive.
-        `arpath`: path to file holding the archive records
+
+        `arpath`: path to file holding the archive records.
     '''
     super().__init__()
     self.path = arpath

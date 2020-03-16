@@ -9,9 +9,9 @@ Assorted decorator functions.
 '''
 
 from collections import defaultdict
+from contextlib import contextmanager
 import sys
 import time
-from cs.pfx import Pfx
 try:
   from cs.logutils import warning
 except ImportError:
@@ -24,14 +24,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.pfx',
-    ],
+    'install_requires': [],
 }
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
-      formatted against the function's module's `__dict__`.
+      formatted against the function's module `__dict__`.
 
       This supports simple formatted docstrings:
 
@@ -55,21 +53,24 @@ def fmtdoc(func):
 
 def decorator(deco):
   ''' Wrapper for decorator functions to support optional arguments.
+
       The actual decorator function ends up being called as:
 
-          deco(func, *da, **dkw)
+          mydeco(func, *da, **dkw)
 
-      allowing `da` and `dkw` to affect the behaviour of the decorator `deco`.
+      allowing `da` and `dkw` to affect the behaviour of the decorator `mydeco`.
 
       Examples:
 
           @decorator
-          def deco(func, *da, kw=None):
+          def mydeco(func, *da, kw=None):
             ... decorate func subject to the values of da and kw
-          @deco
+
+          @mydeco
           def func1(...):
             ...
-          @deco('foo', arg2='bah')
+
+          @mydeco('foo', arg2='bah')
           def func2(...):
             ...
   '''
@@ -86,6 +87,11 @@ def decorator(deco):
       func = da[0]
       decorated = deco(func)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
@@ -93,16 +99,22 @@ def decorator(deco):
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
+      func_module = getattr(func, '__module__', None)
+      try:
+        decorated.__module__ = func_module
+      except AttributeError:
+        pass
       return decorated
 
     return overdeco
 
   metadeco.__doc__ = getattr(deco, '__doc__', '')
+  metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
 
 @decorator
-def cached(
-    func, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
+def cachedmethod(
+    method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
   ''' Decorator to cache the result of a method and keep a revision
       counter for changes.
@@ -113,12 +125,12 @@ def cached(
       This decorator may be used in 2 modes.
       Directly:
 
-          @cached
+          @cachedmethod
           def method(self, ...)
 
       or indirectly:
 
-          @cached(poll_delay=0.25)
+          @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
       Optional keyword arguments:
@@ -141,7 +153,7 @@ def cached(
       If the method raises an exception, this will be logged and
       the method will return the previously cached value,
       unless there is not yet a cached value
-      in which case the exception will raise.
+      in which case the exception will be reraised.
 
       If the signature function raises an exception
       then a log message is issued and the signature is considered unchanged.
@@ -152,7 +164,10 @@ def cached(
       might provide a signature function which called `os.stat()` on
       the file to check for changes before invoking a full read and
       parse of the file.
+
+      *Note*: use of this decorator requires the `cs.pfx` module.
   '''
+  from cs.pfx import Pfx
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
@@ -160,7 +175,7 @@ def cached(
         "invalid poll_delay, should be >0, got: %r" % (poll_delay,)
     )
 
-  attr = attr_name if attr_name else func.__name__
+  attr = attr_name if attr_name else method.__name__
   val_attr = '_' + attr
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
@@ -170,6 +185,7 @@ def cached(
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       first = getattr(self, firstpoll_attr, True)
+      sig = getattr(self, sig_attr, None)
       setattr(self, firstpoll_attr, False)
       value0 = getattr(self, val_attr, unset_value)
       if not first and value0 is not unset_value:
@@ -203,11 +219,11 @@ def cached(
         setattr(self, sig_attr, sig)
       # compute the current value
       try:
-        value = func(self, *a, **kw)
+        value = method(self, *a, **kw)
       except Exception as e:
         if value0 is unset_value:
           raise
-        warning("exception calling %s(self): %s", func, e, exc_info=True)
+        warning("exception calling %s(self): %s", method, e, exc_info=True)
         return value0
       setattr(self, val_attr, value)
       if sig_func is not None and not first:
@@ -224,6 +240,35 @@ def cached(
 
   return wrapper
 
+def cached(*a, **kw):
+  ''' Compatibility wrapper for `@cachedmethod`, issuing a warning.
+  '''
+  warning("obsolete use of @cached, please update to @cachedmethod")
+  return cachedmethod(*a, **kw)
+
+def contextual(func):
+  ''' Wrap a simple function as a context manager.
+
+      This was written to support `@strable`,
+      which requires its `open_func` to be a context manager.
+
+      >>> f = lambda: 3
+      >>> cf = contextual(f)
+      >>> with cf() as x: print(x)
+      3
+  '''
+
+  @contextmanager
+  def cmgr(*a, **kw):
+    ''' Wrapper for `func` as a context manager.
+    '''
+    yield func(*a, **kw)
+
+  func_name = getattr(func, '__name__', str(func))
+  cmgr.__name__ = '@contextual(%s)' % func_name
+  cmgr.__doc__ = func.__doc__
+  return cmgr
+
 @decorator
 def strable(func, open_func=None):
   ''' Decorator for functions which may accept a `str`
@@ -233,7 +278,10 @@ def strable(func, open_func=None):
       * `func`: the function to decorate
       * `open_func`: the "open" factory to produce the core type
         if a string is provided;
-        the default is the builtin "open" function
+        the default is the builtin "open" function.
+        The returned value should be a context manager.
+        Simpler functions can be decorated with `@contextual`
+        to turn them into context managers if need be.
 
       The usual (and default) example is a function to process an
       open file, designed to be handed a file object but which may
@@ -253,7 +301,10 @@ def strable(func, open_func=None):
           @strable(open_func=Recording)
           def process_video(r):
             ... do stuff with `r` as a Recording instance ...
+
+      *Note*: use of this decorator requires the `cs.pfx` module.
   '''
+  from cs.pfx import Pfx
   if open_func is None:
     open_func = open
 
@@ -273,7 +324,7 @@ def observable_class(property_names, only_unequal=False):
       * `property_names`:
         an interable of instance property names to set up as
         observable properties. As a special case a single `str` can
-        be supplied of only one attribute is to be observed.
+        be supplied if only one attribute is to be observed.
       * `only_unequal`:
         only call the observers if the new property value is not
         equal to the previous proerty value. This requires property
@@ -335,7 +386,7 @@ def observable_class(property_names, only_unequal=False):
     cls.report_observation = report_observation
 
     def make_property(cls, attr):
-      ''' make `cls.attr` into a property which reports setattr events.
+      ''' Make `cls.attr` into a property which reports setattr events.
       '''
       val_attr = '_' + attr
 
@@ -370,10 +421,14 @@ def observable_class(property_names, only_unequal=False):
 if __name__ == '__main__':
 
   class Foo:
+    ''' Dummy class.
+    '''
 
-    @cached(poll_delay=2)
-    def x(self, y):
-      return str(y)
+    @cachedmethod(poll_delay=2)
+    def x(self, arg):
+      ''' Dummy `x` method.
+      '''
+      return str(self) + str(arg)
 
   F = Foo()
   y = F.x(1)

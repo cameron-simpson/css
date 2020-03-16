@@ -28,10 +28,10 @@ import sys
 from types import SimpleNamespace as NS
 from cs.app.lastvalue import LastValues
 from cs.dateutils import isodate
-from cs.deco import cached
+from cs.deco import cachedmethod
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
 from cs.logutils import setup_logging, error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.func import prop
 from cs.x import X
@@ -207,14 +207,12 @@ def main(argv):
             print("uncommitted changes exist for these files:")
             for path in sorted(outstanding):
               print(' ', path)
-            print("These changes will not be included in the release.")
-            if not ask("Proceed with release anyway"):
-              error("aborting release at user request")
-              return 1
+            error("Aborting release; please commit or shelve/stash these changes.")
+            return 1
           changes = list(pkg.log_since())
           if not changes:
             if force:
-              warning("no changes since last release, making release anyway")
+              warning("no commits since last release, making release anyway")
             else:
               error("no changes since last release, not making new release")
               return 1
@@ -229,22 +227,24 @@ def main(argv):
             xit = 1
           else:
             next_tag = pkg.next_release_tag()
+            _, tag_version = next_tag.split('-')
             if not ask("Confirm new release for %r as %r" % (name, next_tag)):
               error("aborting release at user request")
               xit = 1
             else:
-              rel_dir = os.path.join('release', next_tag)
+              rel_dir = joinpath('release', next_tag)
               with Pfx("mkdir(%s)", rel_dir):
                 os.mkdir(rel_dir)
-              summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+              summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
               with Pfx(summary_filename):
                 with open(summary_filename, 'w') as sfp:
                   print(release_message, file=sfp)
-              changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+              changes_filename = joinpath(rel_dir, 'CHANGES.txt')
               with Pfx(changes_filename):
                 with open(changes_filename, 'w') as cfp:
                   for files, firstline in changes:
                     print(' '.join(files) + ': ' + firstline, file=cfp)
+              pkg.patch__version__(tag_version)
               vcs.add_files(summary_filename, changes_filename)
               vcs.commit('Release information for %s.\nSummary:\n%s'
                          % (next_tag, release_message),
@@ -267,6 +267,8 @@ def clean_release_entry(entry):
       and not line.startswith('Release information for ') ])
 
 def pypipkg(pkgname, vcs, pypi_url=None):
+  ''' Return a `PyPI_Package` for `pkgname`.
+  '''
   if pypi_url is None:
     pypi_url = URL_PYPI_PROD
   release_log = list(vcs.release_log(pkgname))
@@ -274,7 +276,7 @@ def pypipkg(pkgname, vcs, pypi_url=None):
   release_number = tag.split('-', 1)[1]
   latest_suffix = release_number
   release_entry = clean_release_entry(entry)
-  preamble_md = f'*Release {release_number}*:\n{release_entry}'
+  preamble_md = f'*Latest release {release_number}*:\n{release_entry}'
   postamble_parts=[]
   for tag, entry in release_log:
     release_number = tag.split('-', 1)[1]
@@ -309,7 +311,7 @@ class Package:
   def __str__(self):
     return "%s[%r]" % (type(self).__name__, self.name)
 
-  @cached
+  @cachedmethod
   def release_tags(self):
     ''' Return the release tags for this package.
     '''
@@ -418,6 +420,17 @@ class Package:
     return os.sep.join([PYLIBTOP] + self.name.split('.'))
 
   @prop
+  def toppath(self):
+    ''' The top file of the package:
+        basepath/__init__.py for packages
+        and basepath.py for modules.
+    '''
+    basepath = self.basepath
+    if isdirpath(basepath):
+      return joinpath(basepath, '__init__.py')
+    return basepath + '.py'
+
+  @prop
   def module(self):
     ''' The Module for this package name.
     '''
@@ -494,7 +507,34 @@ class Package:
     '''
     return self.vcs.uncommitted(set(self.paths()))
 
-  @cached
+  @pfx_method
+  def patch__version__(self, version):
+    version_line = '__version__ = ' + repr(version) + '\n'
+    toppath = self.toppath
+    with Pfx(toppath):
+      if toppath in self.uncommitted_paths():
+        raise ValueError("has uncommited changes")
+      with open(toppath) as tf:
+        lines = tf.readlines()
+      patched = False
+      distinfo_index = None
+      for i, line in enumerate(lines):
+        if line.startswith('DISTINFO = '):
+          distinfo_index = i
+        elif line.startswith('__version__ = '):
+          lines[i] = version_line
+          patched = True
+          break
+      if not patched:
+        if distinfo_index is None:
+          raise ValueError("no __version__ line and no DISTINFO line")
+        lines[distinfo_index:distinfo_index] = version_line, '\n'
+      with open(toppath, 'w') as tf:
+        for line in lines:
+          tf.write(line)
+      self.vcs.commit(self.name + ': set __version__ to ' + repr(version), toppath)
+
+  @cachedmethod
   def check_basic(self, quiet=False):
     ''' Basic package checks.
     '''
@@ -506,7 +546,7 @@ class Package:
         ok = False
     return ok
 
-  @cached
+  @cachedmethod
   def check_imports(self, quiet=False):
     ''' Check that this package's imported modules are ok.
     '''
@@ -519,7 +559,7 @@ class Package:
           ok = False
     return ok
 
-  @cached
+  @cachedmethod
   def check_release_uptodate(self, quiet=False):
     ''' Check that this package is released.
         * basic correctness
@@ -566,7 +606,7 @@ class Package:
       self.check_imports(quiet=quiet)
     return ok
 
-  @cached
+  @cachedmethod
   def check_uptodate(self, quiet=False):
     ''' Check that this package has is up to date:
         * there are no commits since the latest release
@@ -647,7 +687,7 @@ class Module(object):
     return "%s[%r]" % (type(self).__name__, self.name)
 
   @prop
-  @cached
+  @cachedmethod
   def package_name(self):
     ''' The name of the package containing this module,
         or None if this is not inside a package.
@@ -730,7 +770,7 @@ class Module(object):
       for dirpath, dirnames, filenames in os.walk(moddir):
         for basename in filenames:
           if basename.endswith('.py'):
-            yield os.path.join(dirpath, basename)
+            yield joinpath(dirpath, basename)
 
   @prop
   def DISTINFO(self):
@@ -835,7 +875,7 @@ class Module(object):
     return ok
 
   @prop
-  @cached
+  @cachedmethod
   def imported_names(self):
     ''' Return a set containing the modules names imported by this module
         both directly and indirectly.
@@ -902,7 +942,7 @@ class VCS(object):
       #  name       - YYYYMMDD                            [.n]
       r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
 
-  @cached
+  @cachedmethod
   def release_tags(self):
     ''' Generator yielding the current release tags.
     '''
@@ -936,7 +976,7 @@ class VCS_Hg(VCS):
       yield '-I'
       yield 'path:' + subpath
 
-  @cached
+  @cachedmethod
   def tags(self):
     ''' Generator yielding the current tags.
     '''
@@ -1100,9 +1140,9 @@ class ReleaseName(object):
     ''' List of paths relevant this name, for use with hg log.
     '''
     prefix = self.prefix
-    base = os.path.join(PYLIBTOP, prefix.replace('.', os.sep))
+    base = joinpath(PYLIBTOP, prefix.replace('.', os.sep))
     basepy = base + '.py'
-    readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
+    readme = joinpath(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
     return base, basepy, readme
 
   def log_since(self):

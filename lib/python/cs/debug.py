@@ -30,14 +30,14 @@ import sys
 import threading
 import time
 import traceback
+from types import SimpleNamespace as NS
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug
-from cs.obj import O, Proxy
+from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
-from cs.result import Result
 from cs.seq import seq
 from cs.x import X
 
@@ -176,6 +176,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
 def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
+  from cs.result import Result
   def inner(*a, **kw):
     if not force and not ifdebug():
       return f(*a, **kw)
@@ -219,12 +220,9 @@ def DF(func, *a, **kw):
   '''
   return DEBUG(func, force=True)(*a, **kw)
 
-class DebugWrapper(O):
+class DebugWrapper(NS):
   ''' Base class for classes presenting debugging wrappers.
   '''
-
-  def __init__(self, **kw):
-    O.__init__(self, **kw)
 
   def debug(self, msg, *a):
     if a:

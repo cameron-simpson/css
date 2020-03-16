@@ -6,23 +6,16 @@
 #
 
 from __future__ import print_function
+import abc
 from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import (
-    cleandoc,
-    getmodule,
-    isfunction, isclass,
-    signature
-)
+from inspect import (cleandoc, getmodule, isfunction, isclass, signature)
 import os
 import os.path
 from os.path import (
-    basename,
-    exists as pathexists,
-    isdir as pathisdir,
-    join as joinpath,
+    basename, exists as pathexists, isdir as pathisdir, join as joinpath,
     splitext
 )
 from pprint import pprint
@@ -31,9 +24,9 @@ import shutil
 import sys
 from tempfile import mkdtemp
 from textwrap import dedent
+from types import SimpleNamespace as NS
 from cs.lex import stripped_dedent
 from cs.logutils import setup_logging, info, warning, error
-from cs.obj import O
 from cs.pfx import Pfx
 import cs.sh
 from cs.x import X
@@ -53,9 +46,9 @@ DISTINFO_CLASSIFICATION = {
     "Intended Audience": "Developers",
     "Operating System": "OS Independent",
     "Topic": "Software Development :: Libraries :: Python Modules",
-    "License": "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License":
+    "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 }
-
 
 USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-args...]
   -n pypi-pkgname
@@ -142,8 +135,12 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(pypi_url, package_name, pypi_version,
-                     pypi_package_name=pypi_package_name)
+  PKG = PyPI_Package(
+      pypi_url,
+      package_name,
+      pypi_version,
+      pypi_package_name=pypi_package_name
+  )
 
   xit = 0
 
@@ -252,12 +249,12 @@ def get_md_doc(
     doc_head, _ = full_doc.split('\n\n', 1)
   except ValueError:
     doc_head = full_doc
-  X("dir=%r,sort_key=%r",dir,sort_key)
   for Mname in sorted(dir(M), key=sort_key):
     if not filter_key(Mname):
       continue
     o = getattr(M, Mname, None)
-    if getmodule(o) is not M:
+    oM = getmodule(o)
+    if oM and oM is not M:
       # name imported from another module
       continue
     if not isclass(o) and not isfunction(o):
@@ -270,16 +267,19 @@ def get_md_doc(
       sig = signature(o)
       full_doc += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
     elif isclass(o):
+      classname_etc = Mname
       mro_names = []
       for superclass in o.__mro__:
-        if superclass is not object and superclass is not o:
+        if (superclass is not object and superclass is not o
+            and superclass is not abc.ABC):
           name = superclass.__name__
           supermod = getmodule(superclass)
           if supermod is not M:
             name = supermod.__name__ + '.' + name
-          mro_names.append('`' + name + '`')
+          mro_names.append(name)
       if mro_names:
-        odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
+        classname_etc += '(' + ','.join(mro_names) + ')'
+        ##odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
       init_method = o.__dict__.get('__init__', None)
       if init_method:
         init_doc = getattr(init_method, '__doc__', None)
@@ -287,15 +287,16 @@ def get_md_doc(
           init_doc = stripped_dedent(init_doc)
           msig = signature(init_method)
           odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
-      full_doc += f'\n\n## Class `{Mname}`\n\n{odoc}'
+      full_doc += f'\n\n## Class `{classname_etc}`\n\n{odoc}'
+    else:
+      X("UNHANDLED %r, neither function nor class", Mname)
   if preamble_md:
     full_doc = preamble_md.rstrip() + '\n\n' + full_doc
   if postamble_md:
     full_doc = full_doc.rstrip() + '\n\n' + postamble_md
   return doc_head, full_doc
 
-
-class Package(O):
+class Package(NS):
 
   def __init__(self, package_name):
     super().__init__(name=package_name)
@@ -304,16 +305,20 @@ class Package(O):
   def hg_tag(self):
     return self.name + '-' + self.version
 
-class PyPI_Package(O):
+class PyPI_Package(NS):
   ''' Operations for a package at PyPI.
   '''
 
-  def __init__(self, pypi_url,
-    package_name, package_version,
-    pypi_package_name=None, pypi_package_version=None,
-    defaults=None,
-    preamble_md='',
-    postamble_md='',
+  def __init__(
+      self,
+      pypi_url,
+      package_name,
+      package_version,
+      pypi_package_name=None,
+      pypi_package_version=None,
+      defaults=None,
+      preamble_md='',
+      postamble_md='',
   ):
     ''' Initialise: save package_name and its name in PyPI.
     '''
@@ -373,7 +378,9 @@ class PyPI_Package(O):
     dinfo = dict(self.defaults)
     M = importlib.import_module(self.package_name)
     dinfo.update(M.DISTINFO)
-    doc_head, full_doc = get_md_doc(M, preamble_md=preamble_md, postamble_md=postamble_md)
+    doc_head, full_doc = get_md_doc(
+        M, preamble_md=preamble_md, postamble_md=postamble_md
+    )
 
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description', 'include_package_data':
@@ -392,12 +399,12 @@ class PyPI_Package(O):
     dinfo['package_dir'] = {'': self.libdir}
 
     classifiers = dinfo['classifiers']
-    for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
+    for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items(
+    ):
       classifier_prefix = classifier_topic + " ::"
       classifier_value = classifier_topic + " :: " + classifier_subsection
       if not any(classifier.startswith(classifier_prefix)
-                 for classifier in classifiers
-                 ):
+                 for classifier in classifiers):
         dinfo['classifiers'].append(classifier_value)
 
     # derive some stuff from the classifiers
@@ -431,10 +438,15 @@ class PyPI_Package(O):
             dinfo[kw] = value
 
     self.distinfo = dinfo
-    for kw in ('name',
-               'description', 'author', 'author_email', 'version',
-               'license', 'url',
-              ):
+    for kw in (
+        'name',
+        'description',
+        'author',
+        'author_email',
+        'version',
+        'license',
+        'url',
+    ):
       if kw not in dinfo:
         error('no %r in distinfo', kw)
 
@@ -508,10 +520,14 @@ class PyPI_Package(O):
         out("setup(")
         # mandatory fields, in preferred order
         written = set()
-        for kw in ('name',
-                   'description', 'author', 'author_email', 'version',
-                   'url',
-                   ):
+        for kw in (
+            'name',
+            'description',
+            'author',
+            'author_email',
+            'version',
+            'url',
+        ):
           if kw in distinfo:
             out("  %s = %r," % (kw, distinfo[kw]))
             written.add(kw)
@@ -555,7 +571,8 @@ class PyPI_Package(O):
       # packages - all .py and .md files in directory
       # warning about unexpected other files
       libprefix = libdir + os.path.sep
-      for dirpath, dirnames, filenames in os.walk(joinpath(libdir, package_subpath)):
+      for dirpath, dirnames, filenames in os.walk(joinpath(libdir,
+                                                           package_subpath)):
         for filename in filenames:
           if filename.startswith('.'):
             continue
@@ -572,10 +589,13 @@ class PyPI_Package(O):
         Return the subpaths of dstdir created.
     '''
     included = []
-    hgargv = ['set-x', 'hg',
-              'archive',
-              '-r', '"%s"' % self.hg_tag,
-              ]
+    hgargv = [
+        'set-x',
+        'hg',
+        'archive',
+        '-r',
+        '"%s"' % self.hg_tag,
+    ]
     first = True
     package_parts = self.package_name.split('.')
     while package_parts:
@@ -598,7 +618,7 @@ class PyPI_Package(O):
     runcmd(hgargv)
     return included
 
-class PyPI_PackageCheckout(O):
+class PyPI_PackageCheckout(NS):
   ''' Facilities available with a checkout of a package.
   '''
 

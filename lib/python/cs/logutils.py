@@ -56,12 +56,14 @@ import sys
 import time
 from threading import Lock
 import traceback
+from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
-from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
-from cs.upd import upd_for
+from cs.upd import Upd
+
+__version__ = '20200229'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -70,21 +72,17 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-        'cs.ansi_colour',
-        'cs.lex',
-        'cs.obj',
-        'cs.pfx',
-        'cs.py.func',
-        'cs.upd'
-    ],
+    'install_requires':
+    ['cs.ansi_colour', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
-loginfo = O(upd_mode=None)
+TRACK = logging.INFO + 5  # over INFO, under WARNING
+
+loginfo = NS(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -97,9 +95,16 @@ def ifdebug():
 
 def setup_logging(
     cmd_name=None,
-    main_log=None, format=None, level=None,
-    flags=None, upd_mode=None, ansi_mode=None, trace_mode=None,
-    module_names=None, function_names=None, verbose=None
+    main_log=None,
+    format=None,
+    level=None,
+    flags=None,
+    upd_mode=None,
+    ansi_mode=None,
+    trace_mode=None,
+    module_names=None,
+    function_names=None,
+    verbose=None
 ):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
@@ -132,7 +137,7 @@ def setup_logging(
       * `upd_mode`: a Boolean to activate cs.upd as the `main_log` method;
         if `None`, set it to `True` if `flags` contains 'UPD',
         otherwise to `False` if `flags` contains 'NOUPD',
-        otherwise set it to `False` (was from main_log.isatty()).
+        otherwise set it from `main_log.isatty()`.
         A true value causes the root logger to use `cs.upd` for logging.
       * `ansi_mode`: if `None`, set it from `main_log.isatty()`.
         A true value causes the root logger to colour certain logging levels
@@ -202,8 +207,7 @@ def setup_logging(
     elif 'NOUPD' in flags:
       upd_mode = False
     else:
-      ##upd_mode = is_tty
-      upd_mode = False
+      upd_mode = is_tty
   loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
@@ -221,8 +225,10 @@ def setup_logging(
     # do a thread dump to the main_log on SIGHUP
     import signal
     import cs.debug
+
     def handler(sig, frame):
       cs.debug.thread_dump(None, main_log)
+
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
@@ -247,8 +253,9 @@ def setup_logging(
     if importlib is None:
       warning(
           "setup_logging: no importlib (python<2.7?),"
-          " ignoring module_names=%r/function_names=%r",
-          module_names, function_names)
+          " ignoring module_names=%r/function_names=%r", module_names,
+          function_names
+      )
     else:
       for module_name in module_names:
         try:
@@ -279,21 +286,26 @@ def setup_logging(
   return loginfo
 
 def ftrace(func):
-  ''' Decorator to trace a function if __module__.DEBUG is true.
+  ''' Decorator to trace a function if `__module__.DEBUG` is true.
   '''
   M = func.__module__
+
   def func_wrap(*a, **kw):
     do_debug = M.__dict__.get('DEBUG', False)
     wrapper = _ftrace(func) if do_debug else func
     return wrapper(*a, **kw)
+
   return func_wrap
 
 def _ftrace(func):
   ''' Decorator to trace the call and return of a function.
   '''
-  fname = '.'.join( (func.__module__, funccite(func)) )
+  fname = '.'.join((func.__module__, funccite(func)))
+
   def traced_func(*a, **kw):
-    citation = "%s(*%s, **%s)" % (fname, pformat(a, depth=1), pformat(kw, depth=2))
+    citation = "%s(*%s, **%s)" % (
+        fname, pformat(a, depth=1), pformat(kw, depth=2)
+    )
     XP("CALL %s", citation)
     try:
       result = func(*a, **kw)
@@ -303,6 +315,7 @@ def _ftrace(func):
     else:
       XP("RESULT from %s: %r", citation, result)
       return result
+
   return traced_func
 
 class PfxFormatter(Formatter):
@@ -329,7 +342,10 @@ class PfxFormatter(Formatter):
     try:
       s = Formatter.format(self, record)
     except TypeError as e:
-      XP("cs.logutils: PfxFormatter.format: record=%r, self=%s: %s", record, self, e)
+      XP(
+          "cs.logutils: PfxFormatter.format: record=%r, self=%s: %s", record,
+          self, e
+      )
       raise
     record.message = s
     return s
@@ -371,7 +387,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     level = logging.INFO
   else:
     level = logging.WARNING
-  flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
+  flags = [F.upper() for F in env_debug.split(',') if len(F)]
   module_names = []
   function_names = []
   for flag in env_debug.split(','):
@@ -393,7 +409,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       # module:funcname
       module_name, func_name = flag.split(':', 1)
       if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
-        function_names.append( (module_name, func_name) )
+        function_names.append((module_name, func_name))
     else:
       uc_flag = flag.upper()
       if uc_flag == 'DEBUG':
@@ -404,11 +420,16 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
         level = logging.WARNING
       elif uc_flag == 'ERROR':
         level = logging.ERROR
-  return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
+  return NS(
+      level=level,
+      flags=flags,
+      module_names=module_names,
+      function_names=function_names
+  )
 
 def D(msg, *args):
-  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
-      bypassing the logging modules entirely.
+  ''' Print formatted debug string straight to `sys.stderr` if
+      `D_mode` is true, bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
   global D_mode
@@ -445,7 +466,8 @@ def status(msg, *args, **kwargs):
       has_status = curses.tigetflag('hs')
       if has_status == -1:
         warning(
-            'status: curses.tigetflag(hs): not a Boolean capability, presuming false')
+            'status: curses.tigetflag(hs): not a Boolean capability, presuming false'
+        )
         has_ansi_status = None
       elif has_status > 0:
         has_ansi_status = (
@@ -463,8 +485,15 @@ def status(msg, *args, **kwargs):
   f.write(msg)
   f.flush()
 
-def add_logfile(filename, logger=None, mode='a',
-                encoding=None, delay=False, format=None, no_prefix=False):
+def add_logfile(
+    filename,
+    logger=None,
+    mode='a',
+    encoding=None,
+    delay=False,
+    format=None,
+    no_prefix=False
+):
   ''' Add a FileHandler logging to the specified `filename`;
       return the chosen logger and the new handler.
 
@@ -507,12 +536,14 @@ def with_log(filename, **kw):
 class NullHandler(logging.Handler):
   ''' A Handler which discards its requests.
   '''
+
   def emit(self, record):
     ''' Discard the log record.
     '''
     pass
 
 __logExLock = Lock()
+
 def logException(exc_type, exc_value, exc_tb):
   ''' Replacement for sys.excepthook that reports via the cs.logutils
       logging wrappers.
@@ -535,16 +566,18 @@ def OBSOLETE(func):
 
       This emits a warning log message before calling the decorated function.
   '''
+
   def wrapped(*args, **kwargs):
     ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
     '''
     frame = traceback.extract_stack(None, 2)[0]
     warning(
         "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-        func.__code__.co_filename, func.__code__.co_firstlineno,
-        func.__name__, frame[0], frame[1], frame[2]
+        func.__code__.co_filename, func.__code__.co_firstlineno, func.__name__,
+        frame[0], frame[1], frame[2]
     )
     return func(*args, **kwargs)
+
   return wrapped
 
 # Logger public functions
@@ -552,30 +585,42 @@ def exception(msg, *args):
   ''' Emit an exception log with the current Pfx prefix.
   '''
   Pfx._state.cur.exception(msg, *args)
+
 def log(level, msg, *args, **kwargs):
   ''' Emit a log at the specified `level` with the current Pfx prefix.
   '''
   Pfx._state.cur.log(level, msg, *args, **kwargs)
+
 def debug(msg, *args, **kwargs):
   ''' Emit a log at `logging.DEBUG` `level` with the current Pfx prefix.
   '''
   log(logging.DEBUG, msg, *args, **kwargs)
+
 def info(msg, *args, **kwargs):
   ''' Emit a log at `logging.INFO` `level` with the current Pfx prefix.
   '''
   log(logging.INFO, msg, *args, **kwargs)
+
+def track(msg, *args, **kwargs):
+  ''' Emit a log at `TRACK` `level` with the current Pfx prefix.
+  '''
+  log(TRACK, msg, *args, **kwargs)
+
 def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` `level` with the current Pfx prefix.
   '''
   log(logging.WARNING, msg, *args, **kwargs)
+
 def error(msg, *args, **kwargs):
   ''' Emit a log at `logging.ERROR` `level` with the current Pfx prefix.
   '''
   log(logging.ERROR, msg, *args, **kwargs)
+
 def critical(msg, *args, **kwargs):
   ''' Emit a log at `logging.CRITICAL` `level` with the current Pfx prefix.
   '''
   log(logging.CRITICAL, msg, *args, **kwargs)
+
 def trace(msg, *args, **kwargs):
   ''' Emit a log message at `trace_level` with the current Pfx prefix.
   '''
@@ -596,6 +641,7 @@ class LogTime(object):
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
+
   def __init__(self, tag, *args, **kwargs):
     ''' Set up a LogTime.
 
@@ -622,10 +668,14 @@ class LogTime(object):
     self.level = level
     self.warning_threshold = warning_threshold
     self.warning_level = warning_level
+    self.start = None
+    self.elapsed = None
+
   def __enter__(self):
     self.start = time.time()
     return self
-  def __exit__(self, exc_type, exc_value, traceback):
+
+  def __exit__(self, *_):
     now = time.time()
     elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
@@ -664,7 +714,7 @@ class UpdHandler(StreamHandler):
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.upd = upd_for(strm)
+    self.upd = Upd(strm)
     self.nl_level = nl_level
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
@@ -673,7 +723,7 @@ class UpdHandler(StreamHandler):
     ''' Emit a LogRecord `logrec`.
 
         For log levels at or above `self.nl_level` write a distinct line
-        to the output stream, possible colourised.
+        to the output stream, possibly colourised.
 
         For log levels below `self.nl_level` update the status text.
     '''
@@ -684,18 +734,10 @@ class UpdHandler(StreamHandler):
         elif logrec.levelno >= logging.WARN:
           logrec.msg = colourise(logrec.msg, 'yellow')
       with self.__lock:
-        self.upd.without(StreamHandler.emit, self, logrec)
+        self.upd.nl(self.format(logrec))
     else:
       with self.__lock:
         self.upd.out(logrec.getMessage())
-
-  def upd(self, msg, *a):
-    ''' Update the status text.
-    '''
-    if a:
-      msg = msg % a
-    with self.__lock:
-      self.upd.out(msg)
 
   def flush(self):
     ''' Flush the update status.

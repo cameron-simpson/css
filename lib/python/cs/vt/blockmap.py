@@ -6,7 +6,7 @@
 
 '''
 A flat index of leaf offsets and their hashcodes to speed data
-lookup from an indirect Block. This produces memory mapped indices
+lookup from an `IndirectBlock`. This produces memory mapped indices
 to bypass the need to walk the block tree to fetch leaf data.
 '''
 
@@ -26,7 +26,7 @@ from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.x import X
 from . import defaults
-from .block import HashCodeBlock
+from .block import HashCodeBlock, IndirectBlock
 
 # The record format uses 4 byte integer offsets
 # so this is the maximum (and default) scale for the memory maps.
@@ -68,13 +68,16 @@ class MappedFD:
 
   def __init__(self, f, hashclass):
     ''' Initialise a MappedFD from a file.
-        `f`: the file whose contents will be mapped
+
+        Parameters:
+        * `f`: the file whose contents will be mapped
           This may be an open file object or the path to a persistent map file.
           The file is expected to be prefilled with complete records.
-        `hashclass`: the type of hashcodes stored in the map, used
+        * `hashclass`: the type of hashcodes stored in the map, used
           for sizing and for returning this type from the entry bytes
+
         If `f` is a file path it is opened for read.
-        If `f` is an open file, the file's file descriptor is dup()ed
+        If `f` is an open file, the file's file descriptor is `dup()`ed
         and the dup used to manage the memory map, allowing the
         original file to be closed by the caller.
     '''
@@ -109,10 +112,10 @@ class MappedFD:
     return self.record_count
 
   def locate(self, offset):
-    ''' Locate and return the MapEntry containing the specified `offset`.
+    ''' Locate and return the `MapEntry` containing the specified `offset`.
 
         If the offset is not contained within this map then the returned
-        MapEntry will contain (index=-1, offset=None, span=None, hashcode=None).
+        `MapEntry` will contain (index=-1, offset=None, span=None, hashcode=None).
     '''
     if offset < 0 or offset >= OFFSET_SCALE:
       raise ValueError("offset(%s) out of range 0:%s" % (offset, OFFSET_SCALE))
@@ -135,7 +138,7 @@ class MappedFD:
     return offset
 
   def entries(self, i):
-    ''' Yield MapEntry instances starting at index `i`.
+    ''' Yield `MapEntry` instances starting at index `i`.
     '''
     record_count = self.record_count
     if i < 0 or i >= record_count:
@@ -145,7 +148,7 @@ class MappedFD:
       i += 1
 
   def entry(self, i):
-    ''' Fetch the MapEntry at index `i`.
+    ''' Fetch the `MapEntry` at index `i`.
     '''
     i0 = i
     if i < 0:
@@ -199,10 +202,12 @@ class BlockMap(RunStateMixin):
   '''
 
   def __init__(self, block, mapsize=None, blockmapdir=None):
-    ''' Initialise the BlockMap, dispatch the index generator.
-        `block`: the source Block
-        `mapsize`: the size of each index map, default `OFFSET_SCALE`
-        `blockmapdir`: the pathname for persistent storage of BlockMaps
+    ''' Initialise the `BlockMap`, dispatch the index generator.
+
+        Parameters:
+        * `block`: the source `Block`
+        * `mapsize`: the size of each index map, default `OFFSET_SCALE`
+        * `blockmapdir`: the pathname for persistent storage of `BlockMaps`
     '''
     if mapsize is None:
       mapsize = OFFSET_SCALE
@@ -218,10 +223,9 @@ class BlockMap(RunStateMixin):
     else:
       X("BlockMap: supplied blockmapdir=%r", blockmapdir)
     RunStateMixin.__init__(self, "BlockMap")
-    from .block import _IndirectBlock
-    if not isinstance(block, _IndirectBlock):
+    if not isinstance(block, IndirectBlock):
       raise TypeError(
-          "block needs to be a _IndirectBlock, got a %s instead" %
+          "block needs to be an IndirectBlock, got a %s instead" %
           (type(block),)
       )
     hashcode = block.superblock.hashcode
@@ -282,7 +286,7 @@ class BlockMap(RunStateMixin):
     self.close()
 
   def close(self):
-    ''' Release the resources associated with the BlockMap.
+    ''' Release the resources associated with the `BlockMap`.
     '''
     X("BlockMap.close...")
     self.cancel()
@@ -412,7 +416,7 @@ class BlockMap(RunStateMixin):
 
         Parameters:
         * `offset`: starting offset within `self.block`, default `0`
-        * `span`: number of bytes to cover; if omitted or None, the
+        * `span`: number of bytes to cover; if omitted or `None`, the
           span runs to the end of `self.block`
     '''
     for leaf, start, end in self.slices(offset, span):
@@ -423,12 +427,12 @@ class BlockMap(RunStateMixin):
 
   # TODO: accept start,end instead of start,span like other slices methods
   def slices(self, offset, span=None):
-    ''' Generator yielding (leaf, start, end) from [offset:offset+span].
+    ''' Generator yielding `(leaf,start,end)` from [offset:offset+span].
 
         Parameters:
-        `offset`: starting offset within `self.block`
-        `span`: number of bytes to cover; if omitted or None, the
-          span runs to the end of self.block
+        * `offset`: starting offset within `self.block`
+        * `span`: number of bytes to cover; if omitted or `None`, the
+          span runs to the end of `self.block`
     '''
     if span is None:
       span = len(self.block) - offset
@@ -480,25 +484,28 @@ class BlockMap(RunStateMixin):
         entry = submap.entry(entry.index + 1)
 
   def data(self, offset, span):
-    ''' Return the data from [offset:offset+span] as a single bytes object.
+    ''' Return the data from `[offset:offset+span]` as a single `bytes` object.
     '''
     return b''.join(self.datafrom(offset, span))
 
   def __getitem__(self, index):
-    ''' Return a single byte from the BlockMap.
+    ''' Return a single byte or a slice from the `BlockMap`.
     '''
     if isinstance(index, int):
       return next(self.datafrom(index))[0]
     if index.step is not None and index.step != 1:
       raise ValueError("invalid slice: step=%s" % (index.step,))
     start = 0 if index.start is None else index.start
-    span = None if index.stop is None else index.stop - start
-    if span < 0:
-      raise ValueError(
-          "invalid span: stop(%s) < start(%s)" % (index.stop, index.start)
-      )
-    if span == 0:
-      return b''
+    if index.stop is None:
+      span = None
+    else:
+      span = index.stop - start
+      if span < 0:
+        raise ValueError(
+            "invalid span: stop(%s) < start(%s)" % (index.stop, index.start)
+        )
+      if span == 0:
+        return b''
     return b''.join(self.datafrom(start, span))
 
 if __name__ == '__main__':

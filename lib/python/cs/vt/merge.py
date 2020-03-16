@@ -8,14 +8,21 @@ from os.path import basename, dirname
 from icontract import require
 from cs.logutils import warning
 from cs.pfx import Pfx
+from cs.resources import RunState
 from .dir import Dir, FileDirent
 from .paths import DirLike
 
 @require(lambda target_root: isinstance(target_root, DirLike))
 @require(lambda source_root: isinstance(source_root, DirLike))
-def merge(target_root, source_root):
+@require(lambda runstate: isinstance(runstate, RunState))
+def merge(target_root, source_root, runstate):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
+
+      Parameters:
+      * `target_root`: a `DirLike` to receive contents
+      * `source_root`: a `DirLike` from which to obtain contents
+      * `runstate`: a `RunState` to support cancellation
 
       TODO: apply .stat results to merge targets.
       TODO: many modes for conflict resolution.
@@ -27,6 +34,9 @@ def merge(target_root, source_root):
     target_root.create()
   for rpath, dirnames, filenames in source_root.walk():
     with Pfx(rpath):
+      if runstate.cancelled:
+        warning("cancelled")
+        break
       source = source_root.resolve(rpath)
       if source is None:
         warning("no longer resolves, pruning this branch")
@@ -49,6 +59,9 @@ def merge(target_root, source_root):
       # import files
       for name in filenames:
         with Pfx(name):
+          if runstate.cancelled:
+            warning("cancelled")
+            break
           sourcef = source.get(name)
           if sourcef is None:
             # no longer available
@@ -69,4 +82,6 @@ def merge(target_root, source_root):
           else:
             warning("conflicting target file")
             ok = False
+  if runstate.cancelled:
+    ok = False
   return ok

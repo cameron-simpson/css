@@ -1,0 +1,6 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: provide module docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: tweak @docmd
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_context: tweak docstring and provide pointless but well structured try/finally as exemplar code
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.getopt_error_handler: make into static method, tweak docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: improve subcommand selection logic, replace StackableValues with stackattrs, drop `cmd` from arguments passed to main/cmd_* methods (present in `options`)
+lib/python/cs/cmdutils.py: cs.cmdutils: not possible formatting problem for the future

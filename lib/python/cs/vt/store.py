@@ -28,8 +28,7 @@ from cs.seq import Seq
 from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults, Lock, RLock
-from .block import HashCodeBlock, _IndirectBlock, LiteralBlock
-from .datadir import DataDir, PlatonicDir, init_datadir
+from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
     HashCode, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME, HashCodeUtilsMixin,
     MissingHashcodeError
@@ -195,7 +194,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
         capacity = 4
       if runstate is None:
         runstate = RunState(name)
-      MultiOpenMixin.__init__(self, lock=lock)
+      MultiOpenMixin.__init__(self)
       RunStateMixin.__init__(self, runstate=runstate)
       self._str_attrs = {}
       self.name = name
@@ -261,7 +260,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
-        Raise KeyError if the hashcode is not present.
+        Raise `MissingHashcodeError` (a subclass of `KeyError`)
+        if the hashcode is not present.
     '''
     block = self.get(h)
     if block is None:
@@ -288,9 +288,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     return MultiOpenMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
-    if exc_value:
-      import traceback as TB
-      TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
     return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
@@ -555,7 +552,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
                 This will be called after `addR` completes.
             '''
             with lock:
-              B = pending_blocks.pop(addR)
+              pending_blocks.pop(addR)
             sem.release()
 
           addR.notify(after_add_block)
@@ -1015,7 +1012,7 @@ class ProxyStore(BasicStoreSync):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A MappingStore using a DataDir as its backend.
+  ''' A MappingStore using a DataDir or RawDataDir as its backend.
   '''
 
   def __init__(
@@ -1027,8 +1024,21 @@ class DataDirStore(MappingStore):
       indexclass=None,
       rollover=None,
       lock=None,
+      raw=False,
       **kw
   ):
+    ''' Initialise the DataDirStore.
+
+        Parameters:
+        * `name`: Store name.
+        * `statedirpath`: data directory path.
+        * `hashclass`: hash class, default: `DEFAULT_HASHCLASS`.
+        * `indexclass`: passed to the data dir.
+        * `rollover`: passed to the data dir.
+        * `lock`: passed to the mapping.
+        * `raw`: option, default `False`.
+          If true use a `RawDataDir` otherwise a `DataDir`.
+    '''
     if lock is None:
       lock = RLock()
     self._lock = lock
@@ -1037,8 +1047,9 @@ class DataDirStore(MappingStore):
       hashclass = DEFAULT_HASHCLASS
     self.indexclass = indexclass
     self.rollover = rollover
+    datadirclass = RawDataDir if raw else DataDir
     self._datadir = _PerHashclassMapping(
-        lambda hcls: DataDir(
+        lambda hcls: datadirclass(
             self.statedirpath,
             hcls,
             indexclass=self.indexclass,
@@ -1062,7 +1073,7 @@ class DataDirStore(MappingStore):
   def init(self):
     ''' Init the supporting data dir.
     '''
-    init_datadir(self.statedirpath)
+    self._datadir.initdir()
 
   def pathto(self, rpath):
     ''' Compute the full path from a relative path.
@@ -1137,7 +1148,7 @@ class _PlatonicStore(MappingStore):
     self.readonly = True
 
   def init(self):
-    init_datadir(self.statedirpath)
+    self._datadir.initdir()
 
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.

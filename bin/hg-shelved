@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Shelve uncommitted changes, run command, unshelve.
+# - Cameron Simpson <cs@cskk.id.au> 29feb2020
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd command [args...]"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing command" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+unclean=$( hg status -nmard )
+if [ -n "$unclean" ]
+then
+  shelf=$cmd-$( date +%Y%m%d%H%M%S )-$$
+  $trace hg shelve -n "$shelf"
+fi
+
+if $trace "$@"
+then
+  xit=0
+  [ -z "$unclean" ] || $trace hg unshelve "$shelf" || xit=$?
+else
+  xit=$?
+  [ -z "$unclean" ] || {
+    echo "$cmd: command failed, leaving shelved changes in $shelf" >&2
+  }
+fi
+
+exit $xit

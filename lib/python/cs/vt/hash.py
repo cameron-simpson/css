@@ -7,11 +7,12 @@
 from binascii import unhexlify
 from bisect import bisect_left
 from hashlib import sha1, sha256
+from os.path import splitext
 import sys
 from icontract import require
 from cs.binary import PacketField, BSUInt
 from cs.excutils import exc_fold
-from cs.lex import hexify, get_identifier
+from cs.lex import get_identifier, hexify
 from cs.resources import MultiOpenMixin
 from cs.serialise import put_bs
 from .pushpull import missing_hashcodes
@@ -30,9 +31,9 @@ class MissingHashcodeError(KeyError):
     return "missing hashcode: %s" % (self.hashcode,)
 
 def io_fail(func):
-  ''' Decorator to transmute a MissingHashcodeError into a return of False.
+  ''' Decorator to transmute a `MissingHashcodeError` into a return of `False`.
   '''
-  return exc_fold(func, exc_types=(MissingHashcodeError,))
+  return exc_fold(exc_types=(MissingHashcodeError,))(func)
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
@@ -139,6 +140,26 @@ class HashCode(bytes, Transcriber):
     ''' A file basename for files related to this hashcode: {hashcodehex}.{hashtypename}
     '''
     return hexify(self) + '.' + self.HASHNAME
+
+  @classmethod
+  def from_filename(cls, filename):
+    ''' Take a *hashcodehex*`.`*hashname* string
+        and return a `HashCode` subclass instance.
+
+        If `cls` has a `.HASHNAME` attribute then that is taken as
+        a default if there is no `.`*hashname*.
+    '''
+    hexpart, ext = splitext(filename)
+    if ext:
+      hashname = ext[1:]
+    else:
+      try:
+        hashname = cls.HASHNAME
+      except AttributeError as e:
+        raise ValueError("no .hashname extension") from e
+    hashclass = HASHCLASS_BY_NAME[hashname]
+    hashbytes = bytes.fromhex(hexpart)
+    return hashclass.from_hashbytes(hashbytes)
 
   def transcribe_inner(self, T, fp):
     fp.write(self.HASHNAME)
@@ -465,12 +486,10 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   def startup(self):
     ''' Dummy method to support unit tests with open/close.
     '''
-    pass
 
   def shutdown(self):
     ''' Dummy method to support unit tests with open/close.
     '''
-    pass
 
 if __name__ == '__main__':
   from .hash_tests import selftest

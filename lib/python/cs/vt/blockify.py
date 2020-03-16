@@ -77,7 +77,7 @@ def indirect_blocks(blocks):
             len(enc), MAX_BLOCKSIZE
         )
       else:
-        yield IndirectBlock(subblocks)
+        yield IndirectBlock.from_subblocks(subblocks)
         subblocks = []
         subsize = 0
     subblocks.append(block)
@@ -89,7 +89,7 @@ def indirect_blocks(blocks):
       # one block unyielded - don't bother wrapping into an iblock
       block = subblocks[0]
     else:
-      block = IndirectBlock(subblocks)
+      block = IndirectBlock.from_subblocks(subblocks)
     yield block
 
 def blockify(chunks, scanner=None, min_block=None, max_block=None):

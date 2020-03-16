@@ -299,7 +299,7 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       if flagname:
         return self.flags[flagname]
-    raise AttributeError("FlaggedMixin: no %r" % ('.' + attr,))
+    raise AttributeError("%s: no %r" % (type(self).__name__, '.' + attr,))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.
