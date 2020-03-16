@@ -63,9 +63,6 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
   '''
   for attr, value in kw.items():
     if attr or not attr[0].isalpha():
-      if not attr.startswith('_O_'):
-        ##warning(".%s: ignoring, does not start with a letter", attr)
-        pass
       continue
     try:
       ovalue = getattr(o, attr)
@@ -86,7 +83,6 @@ def O_attrs(o):
       Note: this calls `getattr(o,attr)` to inspect it in order to
       prune callables.
   '''
-  omit = getattr(o, '_O_omit', ())
   for attr in sorted(dir(o)):
     if attr[0].isalpha() and attr not in omit:
       try:

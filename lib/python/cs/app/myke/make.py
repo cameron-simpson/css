@@ -52,7 +52,6 @@ class Maker(MultiOpenMixin):
     if name is None:
       name = cs.pfx.cmd
     MultiOpenMixin.__init__(self)
-    self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.name = name
     self.debug = MakeDebugFlags()
@@ -356,7 +355,6 @@ class TargetMap(NS):
     ''' Initialise the TargetMap.
         `maker` is the Maker using this TargetMap.
     '''
-    self._O_omit = ['maker', 'targets']
     self.maker = maker
     self.targets = {}
     self._lock = RLock()

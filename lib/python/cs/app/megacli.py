@@ -98,6 +98,7 @@ import os
 import re
 import sys
 from subprocess import call, Popen, PIPE
+from types import SimpleNamespace as NS
 
 DISTINFO = {
     'keywords': ["python2"],
@@ -167,8 +168,8 @@ def main(argv=None):
         print "  %d drives:" % (len(A.physical_disks),)
         for DRV in A.physical_disks.values():
           print "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
-                                                             getattr(DRV, 'virtual_drive', O(number=None)).number,
-                                                             getattr(DRV, 'disk_group', O(number=None)).number,
+                                                             getattr(DRV, 'virtual_drive', NS(number=None)).number,
+                                                             getattr(DRV, 'disk_group', NS(number=None)).number,
                                                              DRV.fru, DRV.raw_size, DRV.raw_size_units,
                                                              DRV.firmware_state
                                                             ),
@@ -233,7 +234,7 @@ def main(argv=None):
           if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
             adapter_errs.append("drive:%s[%s]/VD:%s/%s"
                                 % (DRV.id, DRV.enc_slot,
-                                   getattr(DRV, 'virtual_drive', O(number=None)).number,
+                                   getattr(DRV, 'virtual_drive', NS(number=None)).number,
                                    DRV.firmware_state))
         if adapter_errs:
           print "FAIL A%d %s" % (An, ",".join(adapter_errs))
@@ -249,14 +250,7 @@ def main(argv=None):
 
   return xit
 
-class O(object):
-
-  def __init__(self, **kw):
-    for attr, value in kw.items():
-      setattr(self, attr, value)
-    self._O_omit = []
-
-class MegaRAID(O):
+class MegaRAID(NS):
 
   def __init__(self, megacli=None):
     if megacli is None:
@@ -307,7 +301,7 @@ class MegaRAID(O):
         Update 
     '''
     cmd_append("megacli " + " ".join(megacli_args))
-    M = O(adapters={})
+    M = NS(adapters={})
     A = None
     V = None
     SP = None
@@ -428,7 +422,7 @@ class MegaRAID(O):
       elif attr in ('default_cache_policy', 'current_cache_policy'):
         info = info.split(', ')
       elif attr == 'drives_postion':
-        DPOS = O()
+        DPOS = NS()
         for posinfo in info.split(', '):
           dposk, dposv = posinfo.split(': ')
           setattr(DPOS, dposk.lower(), int(dposv))
@@ -539,7 +533,7 @@ class MegaRAID(O):
       return False
     return self.docmd('-CfgSave', '-f', save_file, '-a%d' % (adapter,))
 
-class Adapter(O):
+class Adapter(NS):
   def DRV_by_enc_slot(self, enc_slot):
     ''' Find first matching drive by enclosure id and slot number.
         Report errors on multiple matches - serious misconfiguration.
@@ -555,17 +549,15 @@ class Adapter(O):
                 self.number, enc_slot, DRV.id, aDRV.id)
     return DRV
 
-class Virtual_Drive(O):
+class Virtual_Drive(NS):
   def __init__(self, **kw):
-    O.__init__(self, **kw)
-    self._O_omit.append('adapter')
-class Disk_Group(O):
+    NS.__init__(self, **kw)
+class Disk_Group(NS):
   def __init__(self, **kw):
-    O.__init__(self, **kw)
-    self._O_omit.append('adapter')
-class Span(O):
+    NS.__init__(self, **kw)
+class Span(NS):
   pass
-class Physical_Disk(O):
+class Physical_Disk(NS):
 
   def __init__(self, **kw):
     self.enclosure_device_id = None
@@ -575,7 +567,7 @@ class Physical_Disk(O):
     self.ibm_fru_cru = None
     self.raw_size = None
     self.raw_size_units = None
-    O.__init__(self, **kw)
+    NS.__init__(self, **kw)
 
   @property
   def id(self):
@@ -593,7 +585,7 @@ class Physical_Disk(O):
   @property
   def fru(self):
     return self.ibm_fru_cru
-class Disk_Port(O):
+class Disk_Port(NS):
   pass
 
 def cmd_append(msg, *a):
