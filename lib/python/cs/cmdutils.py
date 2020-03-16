@@ -142,14 +142,15 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
-  def add_usage_to_docstring(cls, **usage_keywords):
+  def add_usage_to_docstring(cls):
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
     '''
-    if 'cmd' not in usage_keywords:
-      usage_keywords['cmd'] = cls.__name__
-    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format(
-        **usage_keywords
+    format_kwargs=dict(getattr(cls,'USAGE_KEYWORDS',{}))
+    if 'cmd' not in format_kwargs:
+      format_kwargs['cmd'] = cls.__name__
+    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
+        format_kwargs
     ).replace('\n', '\n    ')
 
   def apply_defaults(self, options):
