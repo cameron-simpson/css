@@ -8,8 +8,7 @@ Convenience facilities for objects.
 
 Presents:
 * flavour, for deciding whether an object resembles a mapping or sequence.
-* O, an object subclass with a nice __str__ and convenient __init__.
-* Some O_* functions for working with objects, particularly O subclasses.
+* Some O_* functions for working with objects
 * Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
@@ -50,12 +49,8 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
-# Assorted functions for working with O instances.
-# These are not methods because I don't want to pollute O subclasses
-# with lots of extra method noise.
-#
 def O_merge(o, _conflict=None, _overwrite=False, **kw):
-  ''' Merge key:value pairs from a mapping into an O as attributes.
+  ''' Merge key:value pairs from a mapping into an object.
 
       Ignore keys that do not start with a letter.
       New attributes or attributes whose values compare equal are
@@ -153,57 +148,6 @@ def O_str(o, no_recurse=False, seen=None):
   s = "<%s %s>" % (o.__class__.__name__, ",".join(attrdesc_strs))
   seen.remove(id(o))
   return s
-
-class O(object):
-  ''' A bare object subclass to allow storing arbitrary attributes.
-
-      It also has a nice default `__str__`
-      and `__eq__` and `__ne__` based on the `O_attrs` of the object.
-  '''
-
-  _O_recurse = True
-
-  def __init__(self, **kw):
-    ''' Initialise this O.
-
-        Fill in attributes from any keyword arguments if supplied.
-        This call can be omitted in subclasses if desired.
-    '''
-    self._O_omit = []
-    for k in kw:
-      setattr(self, k, kw[k])
-
-  def __str__(self):
-    recurse = self._O_recurse
-    self._O_recurse = False
-    s = O_str(self, no_recurse=not recurse)
-    self._O_recurse = recurse
-    return s
-
-  def __eq__(self, other):
-    attrs = tuple(O_attrs(self))
-    oattrs = tuple(O_attrs(other))
-    if attrs != oattrs:
-      return False
-    for attr in O_attrs(self):
-      if getattr(self, attr) != getattr(other, attr):
-        return False
-    return True
-
-  __hash__ = object.__hash__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def D(self, msg, *a):
-    ''' Call cs.logutils.D() if this object is being traced.
-    '''
-    if getattr(self, '_O_trace', False):
-      from cs.logutils import D as dlog
-      if a:
-        dlog("%s: " + msg, self, *a)
-      else:
-        dlog(': '.join((str(self), msg)))
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.

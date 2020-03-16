@@ -33,6 +33,7 @@ import stat
 import mimetypes
 from getopt import getopt, GetoptError
 from tempfile import NamedTemporaryFile
+from types import SimpleNamespace
 import boto3
 from botocore.exceptions import ClientError
 from urllib.parse import quote, unquote
@@ -44,7 +45,6 @@ from cs.later import Later
 from cs.logutils import setup_logging, D, error, warning, info
 from cs.x import X
 from cs.pfx import XP
-from cs.obj import O, O_str
 from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.resources import Pool
@@ -257,11 +257,10 @@ def cmd_s3(argv):
         raise GetoptError("bad arguments")
   return xit
 
-class Differences(O):
+class Differences(NS):
 
-  def __init__(self, *a, **kw):
+  def __init__(self):
     self.hashcodes = {}
-    O.__init__(self, *a, **kw)
 
   def summary(self):
     return ( ( '-' if self.same_content else 'C' )

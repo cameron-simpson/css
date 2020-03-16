@@ -10,12 +10,12 @@ import getopt
 import logging
 from subprocess import Popen
 import time
+from types import SimpleNamespace as NS
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
 from cs.logutils import debug, info, error, D
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -51,7 +51,6 @@ class Maker(MultiOpenMixin):
       )
     if name is None:
       name = cs.pfx.cmd
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
@@ -347,7 +346,7 @@ class Maker(MultiOpenMixin):
         self.default_target = first_target
     return ok
 
-class TargetMap(O):
+class TargetMap(NS):
   ''' A mapping interface to the known targets.
       Makes targets as needed if inferrable.
       Raise KeyError for missing Targets which are not inferrable.
@@ -683,7 +682,7 @@ class Target(Result):
         # all done, record success
         self.succeed()
 
-class Action(O):
+class Action(NS):
   ''' A make ation.
   '''
 

@@ -18,6 +18,7 @@ import re
 import shlex
 import sqlite3
 from threading import RLock
+from types import SimpleNamespace as NS
 from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
@@ -28,7 +29,6 @@ from cs.fstags import FSTags
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
 from cs.mediainfo import EpisodeInfo
-from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import prop
 from cs.seq import the
@@ -569,7 +569,7 @@ def cmd_test(I, argv):
 
 Image_Info = namedtuple('Image_Info', 'dx dy format')
 
-class iPhoto(O):
+class iPhoto(NS):
   ''' Access an iPhoto library.
       This contains multiple sqlite3 databases.
   '''
@@ -1110,11 +1110,11 @@ def FilterQuery(ifilter):
     return MultiItemQuery(ifilter)
   raise ValueError("unsupported filter query class name %r", classname)
 
-class BaseFilterQuery(O):
+class BaseFilterQuery(NS):
 
   def __init__(self, ifilter):
     ##XP("BaseFilterQuery: ifilter=%r", ifilter)
-    O.__init__(self, **ifilter)
+    super().__init__(**ifilter)
     self._ifilter = ifilter
 
 class SingleItemQuery(BaseFilterQuery):

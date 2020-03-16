@@ -14,6 +14,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.debug', 'cs.logutils', 'cs.inttypes', 'cs.threads', 'cs.later',
-        'cs.queues', 'cs.result', 'cs.obj', 'cs.lex'
+        'cs.queues', 'cs.result', 'cs.lex'
     ],
 }

@@ -47,6 +47,7 @@ from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
 from time import sleep
+from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.configutils import ConfigWatcher
 from cs.deco import cachedmethod, fmtdoc
@@ -63,7 +64,6 @@ from cs.logutils import setup_logging, with_log, \
                         LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
@@ -93,7 +93,6 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.mailutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py.modules',
@@ -255,7 +254,7 @@ def scrub_header(value):
     new_value = make_header(decode_header(value))
   return new_value
 
-class MailFiler(O):
+class MailFiler(NS):
   ''' A mail filer.
   '''
 
@@ -636,7 +635,7 @@ def save_to_folderpath(folderpath, M, message_path, flags):
     info("    OK >> %s" % (shortpath(folderpath)))
   return message_path
 
-class MessageFiler(O):
+class MessageFiler(NS):
   ''' A message filing object, filtering state information used during rule evaluation.
 
       Attributes:
@@ -658,7 +657,7 @@ class MessageFiler(O):
     self.context = context
     self.environ = dict(environ)
     self.labels = set()
-    self.flags = O(
+    self.flags = NS(
         alert=0,
         flagged=False,
         passed=False,
@@ -1241,7 +1240,7 @@ def parserules(fp):
         continue
 
     # parse condition and add to current rule
-    condition_flags = O(invert=False)
+    condition_flags = NS(invert=False)
 
     if line[offset:] == '.':
       # placeholder for no condition
@@ -1529,7 +1528,7 @@ def get_target(s, offset, quoted=False):
   error("parse failure at %d: %s", offset, s)
   raise ValueError("syntax error")
 
-class Target_Assign(O):
+class Target_Assign(NS):
   ''' A filing target to set a filing state environment variable.
   '''
 
@@ -1547,7 +1546,7 @@ class Target_Assign(O):
       debug("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
 
-class Target_EnvSub(O):
+class Target_EnvSub(NS):
   ''' A filing target to delivery to a string
       which is subject to environment subject to environment variable expansion
       where the environment variables are derived from the filing state.
@@ -1567,7 +1566,7 @@ class Target_EnvSub(O):
       T = Target_MailFolder(target)
     T.apply(filer)
 
-class Target_SetFlag(O):
+class Target_SetFlag(NS):
   ''' A filing target to apply a flag to a message.
   '''
 
@@ -1594,7 +1593,7 @@ class Target_SetFlag(O):
     '''
     setattr(filer.flags, self.flag_attr, True)
 
-class Target_Substitution(O):
+class Target_Substitution(NS):
   ''' A filing target to apply a regular expression string substitution
       to message headers.
   '''
@@ -1642,7 +1641,7 @@ class Target_Substitution(O):
           )
         filer.modify(header_name.title(), new_value)
 
-class Target_Function(O):
+class Target_Function(NS):
   ''' A filing target to run a Python function against a message.
   '''
 
@@ -1708,7 +1707,7 @@ class Target_Function(O):
           )
           filer.modify(header_name, new_header_values)
 
-class Target_PipeLine(O):
+class Target_PipeLine(NS):
   ''' A filing target to pipe the message contents to a shell command.
   '''
 
@@ -1721,7 +1720,7 @@ class Target_PipeLine(O):
     '''
     filer.save_to_cmds.append((self.shcmd, filer.process_environ()))
 
-class Target_MailAddress(O):
+class Target_MailAddress(NS):
   ''' A filing target for an email address.
   '''
 
@@ -1734,7 +1733,7 @@ class Target_MailAddress(O):
     '''
     filer.save_to_addresses.add(self.address)
 
-class Target_MailFolder(O):
+class Target_MailFolder(NS):
   ''' A filing target for a mail folder.
   '''
 
@@ -1755,7 +1754,7 @@ class Target_MailFolder(O):
       mailpath = filer.resolve(self.mailfolder)
       filer.save_to_folders.add(mailpath)
 
-class _Condition(O):
+class _Condition(NS):
 
   def __init__(self, flags, header_names):
     self.flags = flags
@@ -1924,7 +1923,7 @@ def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
       )
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
-class Rule(O):
+class Rule(NS):
   ''' A filing rule.
   '''
 
@@ -1933,7 +1932,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = []
     self.targets = []
-    self.flags = O(alert=0, halt=False)
+    self.flags = NS(alert=0, halt=False)
     self.label = ''
 
   def __str__(self):
@@ -1995,7 +1994,7 @@ class Rules(list):
           if R.flags.halt:
             break
 
-class WatchedMaildir(O):
+class WatchedMaildir(NS):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
