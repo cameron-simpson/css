@@ -165,9 +165,9 @@ class MailFilerCommand(BaseCommand):
     '''
     for opt, val in opts:
       if opt == '-R':
-        options.rules_pattern=val
+        options.rules_pattern = val
       else:
-        raise RuntimeError("unhandled option: %s=%s" % (opt,val))
+        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
   def cmd_monitor(self, argv, options):
     ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
@@ -241,7 +241,14 @@ class MailFilerCommand(BaseCommand):
   def mailfiler(self, options):
     ''' Prepare a `MailFiler` from the `options`.
     '''
-    return MailFiler(**{k: v for k, v in options.__dict__.items() if k in ('config_path','environ','rules_pattern') and v is not None})
+    return MailFiler(
+        **{
+            k: v
+            for k, v in options.__dict__.items()
+            if k in ('config_path', 'environ',
+                     'rules_pattern') and v is not None
+        }
+    )
 
 MailFilerCommand.add_usage_to_docstring()
 
@@ -282,11 +289,9 @@ class MailFiler(NS):
     self._cfg = ConfigWatcher(self.config_path)
     self.environ = environ or dict(os.environ)
     self.rules_pattern = rules_pattern or current_value(
-            'MAILFILER_RULES_PATTERN',
-            self.cfg,
-            'rules_pattern',
-            DEFAULT_RULES_PATTERN,
-            self.environ)
+        'MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern',
+        DEFAULT_RULES_PATTERN, self.environ
+    )
     self._lock = RLock()
     self._maildb_path = None
     self._maildb_lock = self._lock
