@@ -18,7 +18,7 @@ from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
 
-__version__ = '20200229'
+__version__ = '20200318'
 
 DISTINFO = {
     'description':
