@@ -38,6 +38,8 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 
+__version__ = '20200318'
+
 DISTINFO = {
     'description':
     "convenience functions and classes for files and filenames/pathnames",
