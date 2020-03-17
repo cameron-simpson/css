@@ -371,27 +371,6 @@ class MailFiler(NS):
   def maildir_path(self, path):
     self._maildir_path = path
 
-  @locked_property
-  def rules_pattern(self):
-    ''' The filer's `.rules_pattern`.
-    '''
-    pattern \
-        = self._rules_pattern \
-        = current_value(
-            'MAILFILER_RULES_PATTERN',
-            self.cfg,
-            'rules_pattern',
-            DEFAULT_RULES_PATTERN,
-            self.environ)
-    debug(".rules_pattern=%r", pattern)
-    return pattern
-
-  @rules_pattern.setter
-  def rules_pattern(self, pattern):
-    ''' Set the filer's `.rules_pattern`.
-    '''
-    self._rules_pattern = pattern
-
   def maildir_from_folderspec(self, folderspec):
     ''' Return the Maildir from `folderspec`.
     '''
