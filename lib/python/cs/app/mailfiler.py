@@ -49,6 +49,7 @@ import time
 from time import sleep
 from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
+from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
@@ -120,16 +121,16 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
-  if argv is None:
-    argv = sys.argv
-  if stdin is None:
-    stdin = sys.stdin
-  argv = list(argv)
-  cmd = os.path.basename(argv.pop(0))
-  setup_logging(cmd)
-  usage = (
-      '''Usage:
-    %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+  return MailFilerCommand().run(argv, options=NS(stdin=stdin))
+
+class MailFilerCommand(BaseCommand):
+  ''' MailFiler commandline implementation.
+  '''
+
+  USAGE_KEYWORDS={'DEFAULT_RULES_PATTERN': DEFAULT_RULES_PATTERN}
+
+  USAGE_FORMAT = r'''Usage:
+    {cmd} monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
       Monitor Maildirs for new messages and file them.
       -1  File at most 1 message per Maildir.
       -d delay
@@ -138,100 +139,99 @@ def main(argv=None, stdin=None):
       -n  No remove. Keep filed messages in the origin Maildir.
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from Maildir names.
-          Default: %s
-    %s save target[,target...] <message
+          Default: {DEFAULT_RULES_PATTERN}
+    {cmd} save target[,target...] <message
       Save a message from standard input to the specified targets.
-    %s report <message
-      Report various things about a message from standard input.''' %
-      (cmd, DEFAULT_RULES_PATTERN, cmd, cmd)
-  )
-  badopts = False
+    {cmd} report <message
+      Report various things about a message from standard input.'''
 
-  config_path = None
-  maildb_path = None
-  msgiddb_path = None
-  maildir = None
-  rules_pattern = None
+  def apply_defaults(self, options):
+    ''' Set up default options.
+    '''
+    options.stdin = getattr(options, 'stdin', None) or sys.stdin
+    options.config_path = None
+    options.maildb_path = None
+    options.msgiddb_path = None
+    options.maildir = None
+    options.rules_pattern = self.DEFAULT_RULES_PATTERN
 
-  if not argv:
-    warning("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    with Pfx(op):
-      if op == 'monitor':
-        justone = False
-        delay = None
-        no_remove = False
-        try:
-          opts, argv = getopt(argv, '1d:nR:')
-        except GetoptError as e:
-          warning("%s", e)
-          badopts = True
-        else:
-          for opt, val in opts:
-            with Pfx(opt):
-              if opt == '-1':
-                justone = True
-              elif opt == '-d':
-                try:
-                  delay = int(val)
-                except ValueError as e:
-                  warning("%s: %s", e, val)
-                  badopts = True
-                else:
-                  if delay <= 0:
-                    warning("delay must be positive, got: %d", delay)
-                    badopts = True
-              elif opt == '-n':
-                no_remove = True
-              elif opt == '-R':
-                rules_pattern = val
-              else:
-                warning("unimplemented option")
-                badopts = True
-        mdirpaths = argv
-      elif op == 'save':
-        if not argv:
-          warning("missing target")
-          badopts = True
-        else:
-          targets = argv.pop(0)
-          if argv:
-            warning("extra arguments after target: %r", argv)
+  def cmd_monitor(self, argv, options):
+    ''' Usage: monitor [-1] [-d delay] [-n] [-R rules_pattern] [maildirs...]
+    '''
+    justone = False
+    delay = None
+    no_remove = False
+    opts, argv = getopt(argv, '1d:nR:')
+    badopts = False
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-1':
+          justone = True
+        elif opt == '-d':
+          try:
+            delay = int(val)
+          except ValueError as e:
+            warning("%s: %s", e, val)
             badopts = True
-        message_fp = sys.stdin
-        if message_fp.isatty():
-          warning("stdin: will not read from a tty")
+          else:
+            if delay <= 0:
+              warning("delay must be positive, got: %d", delay)
+              badopts = True
+        elif opt == '-n':
+          no_remove = True
+        elif opt == '-R':
+          rules_pattern = val
+        else:
+          warning("unimplemented option")
           badopts = True
-      elif op == 'report':
-        if argv:
-          warning("extra arguments: %r", argv)
-          badopts = True
-      else:
-        warning("unrecognised op")
+    mdirpaths = argv
+    if badopts:
+      raise GetoptError("invalid arguments")
+    if not mdirpaths:
+      mdirpaths = None
+    return self.mailfiler(options).monitor(
+        mdirpaths, delay=delay, justone=justone, no_remove=no_remove
+    )
+
+  def cmd_save(self, argv, options):
+    ''' Usage: save targets < message
+
+        Save message to the `targets`,
+        a single command line argument of the form
+        of a mailfiler targets field.
+    '''
+    badopts = False
+    if not argv:
+      warning("missing targets")
+      badopts = True
+    else:
+      targets = argv.pop(0)
+      if argv:
+        warning("extra arguments after targets: %r", argv)
         badopts = True
+    message_fp = options.stdin
+    if message_fp.isatty():
+      warning("stdin %s: will not read from a tty", message_fp)
+      badopts = True
+    if badopts:
+      raise GetoptError("invalid arguments")
+    return self.mailfiler(options).save(targets, message_fp)
 
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
+  def cmd_report(self, argv, options):
+    ''' Usage: report < message
 
-  MF = MailFiler(config_path)
+        Report of the processing of `message`.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    return self.mailfiler(options).report(options.stdin)
 
-  with Pfx(op):
-    if op == 'monitor':
-      if not mdirpaths:
-        mdirpaths = None
-      return MF.monitor(
-          mdirpaths, delay=delay, justone=justone, no_remove=no_remove
-      )
-    if op == 'save':
-      return MF.save(targets, sys.stdin)
-    if op == 'report':
-      return MF.report(sys.stdin)
-    raise RuntimeError("unimplemented op")
+  def mailfiler(self, options):
+    ''' Prepare a `MailFiler` from the `options`.
+    '''
+    return MailFiler(**{k: v for k, v in options.__dict__.items() if k in ('config_path','environ','rules_pattern') and v is not None})
 
-  return 0
+MailFilerCommand.add_usage_to_docstring()
 
 def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
