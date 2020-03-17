@@ -1144,8 +1144,7 @@ def parserules(fp):
   '''
   if isinstance(fp, StringTypes):
     with open(fp) as rfp:
-      for R in parserules(rfp):
-        yield R
+      yield from parserules(rfp)
     return
 
   filename = getattr(fp, 'name', None)
@@ -1153,7 +1152,6 @@ def parserules(fp):
     file_label = str(type(fp))
   else:
     file_label = shortpath(filename)
-  info("PARSE RULES: %s", file_label)
   lineno = 0
   R = None
   for line in fp:
@@ -2005,7 +2003,7 @@ class WatchedMaildir(NS):
     self.lurking = set()
     self.filed = set()
     self.flush()
-    warning("%d rules", len(self.rules))
+    warning("%s: %d rules", self.shortname, len(self.rules))
 
   def __str__(self):
     return "<WatchedMaildir %s, %s rules, %d lurking>" \
