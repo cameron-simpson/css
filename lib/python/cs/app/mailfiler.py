@@ -33,6 +33,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from copy import deepcopy
+from datetime import datetime
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
@@ -63,8 +64,10 @@ from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
 from cs.logutils import setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         LogTime
-from cs.mailutils import Maildir, message_addresses, modify_header, \
-                         shortpath, ismaildir, make_maildir
+from cs.mailutils import (
+    RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
+    ismaildir, make_maildir
+)
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
@@ -157,7 +160,7 @@ class MailFilerCommand(BaseCommand):
     options.maildb_path = None
     options.msgiddb_path = None
     options.maildir = None
-    options.rules_pattern = self.DEFAULT_RULES_PATTERN
+    options.rules_pattern = DEFAULT_RULES_PATTERN
 
   @staticmethod
   def apply_opts(opts, options):
@@ -655,6 +658,7 @@ class MessageFiler(NS):
     self.header_addresses = {}
     self.context = context
     self.environ = dict(environ)
+    self.matched_rules = []
     self.labels = set()
     self.flags = NS(
         alert=0,
@@ -695,7 +699,6 @@ class MessageFiler(NS):
         info("  " + shortpath(self.message_path) + " " + msg_id)
       else:
         info("  " + msg_id)
-
       # match the rules, gathering labels and save destinations
       try:
         rules.match(self)
@@ -743,7 +746,7 @@ class MessageFiler(NS):
       # apply labels
       if self.labels:
         xlabels = set()
-        for labelhdr in M.get_all('X-Label', ()):
+        for labelhdr in M.get_all('X1-Label', ()):
           for label in labelhdr.split(','):
             label = label.strip()
             if label:
@@ -754,6 +757,26 @@ class MessageFiler(NS):
           self.labels.update(new_labels)
           self.modify('X-Label', ', '.join(sorted(list(self.labels))))
 
+      rcvd = []
+      if self.message_path:
+        rcvd.append("from " + shortpath(self.message_path))
+      rcvd.append("by " + type(self).__module__)
+      ## leaks privacy ## rcvd_for_list = []
+      ## leaks privacy ## for folder in sorted(self.save_to_folders):
+      ## leaks privacy ##   rcvd_for_list.append(shortpath(folder))
+      ## leaks privacy ## for address in sorted(self.save_to_addresses):
+      ## leaks privacy ##   rcvd_for_list.append(address)
+      ## leaks privacy ## rcvd.append("for " + ','.join(rcvd_for_list) if rcvd_for_list else '')
+      rcvd_datetime = datetime.now().strftime(RFC5322_DATE_TIME)
+
+      M.add_header('Received', '\n        '.join(rcvd) + '; ' + rcvd_datetime)
+      self.message_path = None
+
+      for R in self.matched_rules:
+        M.add_header('X-Matched-Mailfiler-Rule', str(R))
+
+      for R in self.matched_rules:
+        info("    MATCH %s", R)
       return self.save_message()
 
   def save_message(self):
@@ -827,6 +850,7 @@ class MessageFiler(NS):
         Each target is applied to the state.
     '''
     with Pfx(R.context):
+      self.matched_rules.append(R)
       self.flags.alert = max(self.flags.alert, R.flags.alert)
       if R.label:
         self.labels.add(R.label)
@@ -1533,6 +1557,9 @@ class Target_Assign(NS):
     self.varname = varname
     self.varexpr = varexpr
 
+  def __str__(self):
+    return '%s=%s' % (self.varname, self.varexpr)
+
   def apply(self, filer):
     ''' Apply the target by updating the filer environment.
     '''
@@ -1551,6 +1578,9 @@ class Target_EnvSub(NS):
 
   def __init__(self, target_expr):
     self.target_expr = target_expr
+
+  def __str__(self):
+    return f'"{self.target_expr}"'
 
   def apply(self, filer):
     ''' Perform environment substitution on target string and then
@@ -1584,6 +1614,9 @@ class Target_SetFlag(NS):
       raise ValueError("unsupported flag \"%s\"" % (flag_letter,))
     self.flag_attr = flag_attr
 
+  def __str__(self):
+    return f'flag={flag_attr}'
+
   def apply(self, filer):
     ''' Apply this target:
         set a flag on the message.
@@ -1599,6 +1632,12 @@ class Target_Substitution(NS):
     self.header_names = header_names
     self.subst_re = subst_re
     self.subst_replacement = subst_replacement
+
+  def __str__(self):
+    return (
+        ','.join(self.header_names) + ':s/' + str(self.subst_re) + '/' +
+        self.subst_replacement
+    )
 
   def apply(self, filer):
     ''' Apply this target:
@@ -1646,6 +1685,12 @@ class Target_Function(NS):
     self.header_names = header_names
     self.funcname = funcname
     self.args = args
+
+  def __str__(self):
+    return (
+        ','.join(self.header_names) + ':' + self.funcname + '(' +
+        ','.join(self.args) + ')'
+    )
 
   def apply(self, filer):
     ''' Apply this target:
@@ -1711,6 +1756,9 @@ class Target_PipeLine(NS):
   def __init__(self, shcmd):
     self.shcmd = shcmd
 
+  def __str__(self):
+    return f'|"{self.shcmd}"'
+
   def apply(self, filer):
     ''' Apply this target:
         append `self.shcmd` to the list of save commands.
@@ -1724,6 +1772,9 @@ class Target_MailAddress(NS):
   def __init__(self, address):
     self.address = address
 
+  def __str__(self):
+    return self.address
+
   def apply(self, filer):
     ''' Apply this target:
         add `self.address` to the set of target forwarding email addresses.
@@ -1736,6 +1787,9 @@ class Target_MailFolder(NS):
 
   def __init__(self, mailfolder):
     self.mailfolder = mailfolder
+
+  def __str__(self):
+    return shortpath(self.mailfolder)
 
   @fmtdoc
   def apply(self, filer):
@@ -1920,7 +1974,7 @@ def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
       )
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
-class Rule(NS):
+class Rule:
   ''' A filing rule.
   '''
 
@@ -1934,14 +1988,15 @@ class Rule(NS):
 
   def __str__(self):
     return "%s:%d: %r %r" % (
-        self.filename, self.lineno, self.targets, self.conditions
+        shortpath(self.filename), self.lineno,
+        ','.join(map(str, self.targets)), ', '.join(map(str, self.conditions))
     )
 
   def __repr__(self):
     return (
-        "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" % (
-            self.filename, self.lineno, self.targets, self.conditions,
-            self.flags, self.label
+        "%s(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" % (
+            type(self).__name__, self.filename, self.lineno, self.targets,
+            self.conditions, self.flags, self.label
         )
     )
 
