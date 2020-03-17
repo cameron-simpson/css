@@ -127,9 +127,16 @@ class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
   '''
 
-  USAGE_KEYWORDS={'DEFAULT_RULES_PATTERN': DEFAULT_RULES_PATTERN}
+  GETOPT_SPEC = 'R:'
 
-  USAGE_FORMAT = r'''Usage:
+  USAGE_KEYWORDS = {'DEFAULT_RULES_PATTERN': DEFAULT_RULES_PATTERN}
+
+  USAGE_FORMAT = r'''Usage: {cmd} [-R rules_pattern] subopt [subopt-args...]
+      -R rules_pattern
+          Specify the rules file pattern used to specify rules files from
+          Maildir names.
+          Default: {DEFAULT_RULES_PATTERN}
+  Subcommands:
     {cmd} monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
       Monitor Maildirs for new messages and file them.
       -1  File at most 1 message per Maildir.
@@ -137,9 +144,6 @@ class MailFilerCommand(BaseCommand):
           Delay between runs in seconds.
           Default is to make only one run over the Maildirs.
       -n  No remove. Keep filed messages in the origin Maildir.
-      -R rules_pattern
-          Specify the rules file pattern used to specify rules files from Maildir names.
-          Default: {DEFAULT_RULES_PATTERN}
     {cmd} save target[,target...] <message
       Save a message from standard input to the specified targets.
     {cmd} report <message
@@ -155,13 +159,23 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = self.DEFAULT_RULES_PATTERN
 
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, val in opts:
+      if opt == '-R':
+        options.rules_pattern=val
+      else:
+        raise RuntimeError("unhandled option: %s=%s" % (opt,val))
+
   def cmd_monitor(self, argv, options):
-    ''' Usage: monitor [-1] [-d delay] [-n] [-R rules_pattern] [maildirs...]
+    ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
     '''
     justone = False
     delay = None
     no_remove = False
-    opts, argv = getopt(argv, '1d:nR:')
+    opts, argv = getopt(argv, '1d:n')
     badopts = False
     for opt, val in opts:
       with Pfx(opt):
@@ -179,8 +193,6 @@ class MailFilerCommand(BaseCommand):
               badopts = True
         elif opt == '-n':
           no_remove = True
-        elif opt == '-R':
-          rules_pattern = val
         else:
           warning("unimplemented option")
           badopts = True
