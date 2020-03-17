@@ -222,8 +222,10 @@ class BaseCommand:
       self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
-      opts, argv = getopt(argv, self.GETOPT_SPEC)
-      if self.GETOPT_SPEC:
+      getopt_spec = getattr(self,'GETOPT_SPEC','')
+      # we do this regardless in order to honour --
+      opts, argv = getopt(argv, getopt_spec, '')
+      if getopt_spec:
         self.apply_opts(opts, options)
 
       subcmd_prefix = self.SUBCOMMAND_METHOD_PREFIX
