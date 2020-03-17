@@ -20,6 +20,8 @@ from types import SimpleNamespace
 from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
 
+__version__ = '20200318'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
