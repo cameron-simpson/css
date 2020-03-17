@@ -59,11 +59,13 @@ from cs.excutils import LogExceptions
 from cs.filestate import FileState
 from cs.fileutils import abspath_from_file, longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
-                   get_qstr, match_tokens, get_delimited
-from cs.logutils import setup_logging, with_log, \
-                        debug, info, warning, error, exception, \
-                        LogTime
+from cs.lex import (
+    get_white, get_nonwhite, skipwhite, get_other_chars, get_qstr,
+    match_tokens, get_delimited
+)
+from cs.logutils import (
+    with_log, debug, info, warning, error, exception, LogTime
+)
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
     ismaildir, make_maildir
@@ -88,6 +90,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.maildb',
+        'cs.cmdutils',
         'cs.configutils',
         'cs.deco',
         'cs.env',
