@@ -415,7 +415,7 @@ class MailFiler(NS):
             except KeyboardInterrupt:
               raise
             except Exception as e:
-              exception("exception during sweep(%r): %s", wmdir, e)
+              exception("exception during sweep: %s", e)
         if delay is None:
           break
         debug("sleep %ds", delay)
@@ -1996,7 +1996,7 @@ class WatchedMaildir(NS):
     warning("%d rules", len(self.rules))
 
   def __str__(self):
-    return "<WatchedMaildir modes=%s, %s rules, %d lurking>" \
+    return "<WatchedMaildir %s, %s rules, %d lurking>" \
            % (self.shortname,
               "NO" if self._rules is None else len(self._rules),
               len(self.lurking))
