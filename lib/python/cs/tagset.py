@@ -39,7 +39,7 @@ except AttributeError:
         parsed.tm_min, parsed.tm_sec
     )
 
-__version__ = '20200229.1'
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python3"],
