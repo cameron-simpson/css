@@ -67,7 +67,7 @@ from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import findup
 from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
-from cs.logutils import setup_logging, error, warning, info, trace
+from cs.logutils import error, warning, info, trace
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -221,7 +221,6 @@ class FSTagsCommand(BaseCommand):
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    setup_logging(options.cmd)
     options.fstags = FSTags()
 
   @staticmethod
