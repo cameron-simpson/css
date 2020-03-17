@@ -15,6 +15,8 @@ Presents:
 from __future__ import print_function
 from copy import copy as copy0
 import sys
+import traceback
+from types import SimpleNamespace
 from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
 
@@ -48,6 +50,24 @@ def flavour(obj):
   if hasattr(obj, '__iter__'):
     return T_SEQ
   return T_SCALAR
+
+class O(SimpleNamespace):
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  '''
+
+  callers = set()
+
+  def __init__(self, **kw):
+    frame = traceback.extract_stack(None, 2)[0]
+    caller=(frame[0], frame[1])
+    if caller not in self.callers:
+      self.callers.add(caller)
+      print(
+          "WARNING: %s:%d %s: obsolete use of cs.obj.O, please shift to types.SimpleNamespace."
+          % (frame[0], frame[1], frame[2]),
+          file=sys.stderr
+      )
+    SimpleNamespace.__init__(self, **kw)
 
 def O_merge(o, _conflict=None, _overwrite=False, **kw):
   ''' Merge key:value pairs from a mapping into an object.
