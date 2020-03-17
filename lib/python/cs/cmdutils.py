@@ -10,11 +10,11 @@
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
-from logging import warning, exception
 import sys
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
+from cs.logutils import setup_logging, warning, error, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
 
@@ -208,6 +208,7 @@ class BaseCommand:
         argv.pop(0)
     if cmd is None:
       cmd = argv.pop(0)
+    setup_logging(cmd)
     # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
     # TODO: is this valid in the case of an already formatted usage string
