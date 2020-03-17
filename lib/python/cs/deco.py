@@ -230,10 +230,12 @@ def cachedmethod(
         setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
-      try:
-        changed = value0 is unset_value or value != value0
-      except TypeError:
-        changed = True
+      changed = value0 is unset_value or value0 is not value
+      if not changed:
+        try:
+          changed = value0 != value
+        except TypeError:
+          changed = True
       if changed:
         setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
       return value

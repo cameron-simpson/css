@@ -723,7 +723,7 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-class NodeDB(dict, NS):
+class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
 

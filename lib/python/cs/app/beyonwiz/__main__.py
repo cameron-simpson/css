@@ -10,7 +10,7 @@ import json
 import os.path
 import sys
 from cs.cmdutils import BaseCommand
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.x import X
 from . import Recording
@@ -22,12 +22,6 @@ TRY_N = 32
 def main(argv=None, cmd=None):
   ''' Main command line.
   '''
-  if argv is None:
-    argv = sys.argv
-  argv0 = argv.pop(0)
-  if cmd is None:
-    cmd = argv0
-  setup_logging(os.path.basename(cmd))
   return BWizCmd().run(argv, cmd=cmd)
 
 class BWizCmd(BaseCommand):
