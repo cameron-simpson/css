@@ -2008,7 +2008,7 @@ class WatchedMaildir(NS):
     self.lurking = set()
     self.filed = set()
     self.flush()
-    warning("%s: %d rules", self.shortname, len(self.rules))
+    info("%s: %d rules", self.shortname, len(self.rules))
 
   def __str__(self):
     return "<WatchedMaildir %s, %s rules, %d lurking>" \
