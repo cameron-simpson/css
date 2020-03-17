@@ -33,7 +33,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
@@ -59,11 +59,13 @@ from cs.excutils import LogExceptions
 from cs.filestate import FileState
 from cs.fileutils import abspath_from_file, longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
-                   get_qstr, match_tokens, get_delimited
-from cs.logutils import setup_logging, with_log, \
-                        debug, info, warning, error, exception, \
-                        LogTime
+from cs.lex import (
+    get_white, get_nonwhite, skipwhite, get_other_chars, get_qstr,
+    match_tokens, get_delimited
+)
+from cs.logutils import (
+    with_log, debug, info, warning, error, exception, LogTime
+)
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
     ismaildir, make_maildir
@@ -88,6 +90,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.maildb',
+        'cs.cmdutils',
         'cs.configutils',
         'cs.deco',
         'cs.env',
@@ -767,13 +770,16 @@ class MessageFiler(NS):
       ## leaks privacy ## for address in sorted(self.save_to_addresses):
       ## leaks privacy ##   rcvd_for_list.append(address)
       ## leaks privacy ## rcvd.append("for " + ','.join(rcvd_for_list) if rcvd_for_list else '')
-      rcvd_datetime = datetime.now().strftime(RFC5322_DATE_TIME)
+      dtutc = datetime.now(timezone.utc)
+      dt = dtutc.astimezone()
+      rcvd_datetime = dt.strftime(RFC5322_DATE_TIME)
 
       M.add_header('Received', '\n        '.join(rcvd) + '; ' + rcvd_datetime)
       self.message_path = None
 
-      for R in self.matched_rules:
-        M.add_header('X-Matched-Mailfiler-Rule', str(R))
+      # leaks privacy
+      ##for R in self.matched_rules:
+      ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
 
       for R in self.matched_rules:
         info("    MATCH %s", R)
