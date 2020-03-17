@@ -258,21 +258,24 @@ class MailFiler(NS):
   ''' A mail filer.
   '''
 
-  def __init__(self, config_path, environ=None):
+  def __init__(self, config_path=None, environ=None, rules_pattern=None):
     ''' Initialise the MailFiler.
 
         Parameters:
         * `config_path`: location of config file, default from `DEFAULT_MAILFILER_RC`.
         * `environ`: initial environment, default from `os.environ`.
+        * `rules_pattern`: rules pattenr, default from `envsub(DEFAULT_RULES_PATTERN)`
     '''
-    if config_path is None:
-      config_path = envsub(DEFAULT_MAILFILER_RC)
-    if environ is None:
-      environ = dict(os.environ)
-    self.config_path = config_path
-    self.environ = environ
+    self.config_path = config_path or envsub(DEFAULT_MAILFILER_RC)
+    self._cfg = ConfigWatcher(self.config_path)
+    self.environ = environ or dict(os.environ)
+    self.rules_pattern = rules_pattern or current_value(
+            'MAILFILER_RULES_PATTERN',
+            self.cfg,
+            'rules_pattern',
+            DEFAULT_RULES_PATTERN,
+            self.environ)
     self._lock = RLock()
-    self._cfg = ConfigWatcher(config_path)
     self._maildb_path = None
     self._maildb_lock = self._lock
     self._maildb = None
