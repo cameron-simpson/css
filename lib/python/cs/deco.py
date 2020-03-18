@@ -12,6 +12,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 import sys
 import time
+import traceback
 try:
   from cs.logutils import warning
 except ImportError:
@@ -244,11 +245,44 @@ def cachedmethod(
 
   return wrapper
 
-def cached(*a, **kw):
-  ''' Compatibility wrapper for `@cachedmethod`, issuing a warning.
+@decorator
+def OBSOLETE(func, suggestion=None):
+  ''' Decorator for obsolete functions.
+
+      Use:
+
+          @OBSOLETE
+          def func(...):
+
+      This emits a warning log message before calling the decorated function.
   '''
-  warning("obsolete use of @cached, please update to @cachedmethod")
-  return cachedmethod(*a, **kw)
+
+  def wrapped(*args, **kwargs):
+    ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
+    '''
+    frame = traceback.extract_stack(None, 2)[0]
+    caller = frame[0], frame[1]
+    try:
+      callers = func._OBSOLETE_callers
+    except AttributeError:
+      callers = func._OBSOLETE_callers = set()
+    if caller not in callers:
+      callers.add(caller)
+      warning(
+          "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
+          func.__code__.co_filename, func.__code__.co_firstlineno, func.__name__,
+          frame[0], frame[1], frame[2]
+      )
+    return func(*args, **kwargs)
+
+  wrapped.__name__ = '@OBSOLETE(%s)' % (getattr(func, '__name__', str(func)),)
+  wrapped.__doc__ = (
+      (wrapped.__name__ + ': ' + suggestion if suggestion else wrapped.__name__)
+      + '\n\n' + (getattr(func, '__doc__', None) or '')
+  )
+  return wrapped
+
+cached = OBSOLETE(cachedmethod)
 
 def contextual(func):
   ''' Wrap a simple function as a context manager.
