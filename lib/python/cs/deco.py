@@ -18,7 +18,7 @@ try:
 except ImportError:
   from logging import warning
 
-__version__ = '20200318'
+__version__ = '20200318.1'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
