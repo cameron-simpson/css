@@ -38,6 +38,8 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 
+__version__ = '20200318'
+
 DISTINFO = {
     'description':
     "convenience functions and classes for files and filenames/pathnames",
@@ -199,6 +201,11 @@ def rewrite_cmgr(
       * `empty_ok`: do not consider empty output an error.
       * `overwrite_anyway`: do not update the original if the new
         data are identical.
+
+      Example:
+
+          with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
+             ... write new content to f ...
   '''
   if backup_ext is None:
     backuppath = None
@@ -707,6 +714,33 @@ def tmpdirn(tmp=None):
   if tmp is None:
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
+
+def findup(path, test, first=False):
+  ''' Test the pathname `abspath(path)` and each of its ancestors
+      against the callable `test`,
+      yielding paths satisfying the test.
+
+      If `first` is true (default `False`)
+      this function always yields exactly one value,
+      either the first path satisfying the test or `None`.
+      This mode supports a use such as:
+
+          matched_path = next(findup(path, test, first=True))
+          # post condition: matched_path will be `None` on no match
+          # otherwise the first matching path
+  '''
+  path = abspath(path)
+  while True:
+    if test(path):
+      yield path
+      if first:
+        return
+    up = dirname(path)
+    if up == path:
+      break
+    path = up
+  if first:
+    yield None
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 

@@ -34,7 +34,7 @@ from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import exception, error, warning, info, upd, debug, \
-                        setup_logging, logTo, loginfo
+                        logTo, loginfo
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.resources import RunState
@@ -217,7 +217,6 @@ class VTCmd(BaseCommand):
       cmd = options.cmd
     else:
       cmd = options.cmd + ': ' + cmd
-    setup_logging(cmd_name=options.cmd, upd_mode=sys.stderr.isatty())
     runstate = options.runstate
     progress = options.progress
     if progress is None:
