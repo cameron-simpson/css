@@ -1348,18 +1348,19 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     '''
     return tag in self.all_tags
 
-  def format_kwargs(self, *, direct=False):
-    ''' Format arguments suitable for `str.format`.
+  def format_tagset(self, *, direct=False):
+    ''' Compute a `TagSet` from this file's tags
+        with additional derived tags.
 
-        This returns an `ExtendedNamespace` from `TagSet.ns()`
-        for a computed `TagSet`.
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        vai the `TagSet`'s `.ns()` method.
 
         In addition to the normal `TagSet.ns()` names
         the following additional names are available:
         * `filepath.basename`: basename of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
-        * `tags`: the `TagSet` as a string
     '''
     kwtags = TagSet()
     kwtags.update(self.direct_tags if direct else self.all_tags)
@@ -1377,6 +1378,22 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
+    return kwtags
+
+  def format_kwargs(self, *, direct=False):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.pathname`: the `TaggedPath.filepath`
+        * `filepath.encoded`: the JSON encoded filepath
+        * `tags`: the `TagSet` as a string
+    '''
+    kwtags = self.format_tagset(direct=direct)
     kwtags['tags'] = str(kwtags)
     return kwtags.ns()
 
