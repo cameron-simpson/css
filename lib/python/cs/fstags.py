@@ -524,6 +524,37 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   @staticmethod
+  def cmd_ns(argv, options):
+    ''' List paths and their namespace form.
+    '''
+    fstags = options.fstags
+    directories_like_files = False
+    use_direct_tags = False
+    options, argv = getopt(argv, 'do:', longopts=['direct'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '-d':
+          directories_like_files = True
+        elif option == '--direct':
+          use_direct_tags = True
+        elif option == '-o':
+          output_format = value
+        else:
+          raise RuntimeError("unsupported option")
+    xit = 0
+    paths = argv or ['.']
+    for path in paths:
+      fullpath = realpath(path)
+      for filepath in ((fullpath,)
+                       if directories_like_files else rfilepaths(fullpath)):
+        with Pfx(filepath):
+          tags = fstags[filepath].format_tagset(direct=use_direct_tags)
+          print(filepath)
+          for tag in sorted(tags.as_tags()):
+            print(" ", tag)
+    return xit
+
+  @staticmethod
   def cmd_ont(argv, options):
     ont = options.fstags.ontology('.')
     if not argv:
