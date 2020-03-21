@@ -568,7 +568,6 @@ class _MailDB(NodeDB):
   '''
 
   def __init__(self, backend, readonly=False):
-    self._O_omit = ('address_groups',)
     NodeDB.__init__(self, backend, readonly=readonly,
                     type_factories=_MailDB_TypeFactories)
 

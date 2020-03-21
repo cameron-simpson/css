@@ -20,4 +20,4 @@ fi
   exit 2
 }
 
-exec fstags ls -d -o '{tags[cs.dlog]}' -- "$path"
+exec fstags ls -d -o '{cs.dlog}' -- "$path"

@@ -56,9 +56,9 @@ import sys
 import time
 from threading import Lock
 import traceback
+from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
 from cs.lex import is_dotted_identifier
-from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
@@ -73,7 +73,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.ansi_colour', 'cs.lex', 'cs.obj', 'cs.pfx', 'cs.py.func', 'cs.upd'],
+    ['cs.ansi_colour', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -82,7 +82,7 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 TRACK = logging.INFO + 5  # over INFO, under WARNING
 
-loginfo = O(upd_mode=None)
+loginfo = NS(upd_mode=None)
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
@@ -420,7 +420,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
         level = logging.WARNING
       elif uc_flag == 'ERROR':
         level = logging.ERROR
-  return O(
+  return NS(
       level=level,
       flags=flags,
       module_names=module_names,

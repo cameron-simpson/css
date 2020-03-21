@@ -1,10 +1,12 @@
 #!/usr/bin/python
 
 r'''
-Lexical analysis functions, tokenisers.
+Lexical analysis functions, tokenisers, transcribers.
 
 An arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
+There are also some transcription function for producing text
+from various objects, such as `hexify` and `unctrl`.
 
 Generally the get_* functions accept a source string and an offset
 (usually optional, default `0`) and return a token and the new offset,
@@ -17,9 +19,10 @@ import os
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
+from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200229'
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 unhexify = binascii.unhexlify
@@ -901,6 +904,79 @@ def cutsuffix(s, suffix):
   if suffix and s.endswith(suffix):
     return s[:-len(suffix)]
   return s
+
+class FormatAsError(LookupError):
+  ''' Subclass of `LookupError` for use by `format_as`.
+  '''
+
+  DEFAULT_SEPARATOR = '; '
+
+  def __init__(self, key, format_s, format_mapping, error_sep=None):
+    if error_sep is None:
+      error_sep = self.DEFAULT_SEPARATOR
+    LookupError.__init__(self, key)
+    self.args = (key, format_s, format_mapping, error_sep)
+
+  def __str__(self):
+    key, format_s, format_mapping, error_sep = self.args
+    return error_sep.join(
+        (
+            "format fails, missing key: %s" % (key,),
+            "format string was: %r" % (format_s,),
+            "available keys: %s" % (' '.join(sorted(format_mapping.keys()))),
+        )
+    )
+
+@fmtdoc
+def format_as(format_s, format_mapping, error_sep=None):
+  ''' Format the string `format_s` using `format_mapping`,
+      return the formatted result.
+      This is a wrapper for `str.format_map`
+      which raises a more informative `FormatAsError` exception on failure.
+
+      Parameters:
+      * `format_s`: the format string to use as the template
+      * `format_mapping`: the mapping of available replacement fields
+      * `error_sep`: optional separator for the multipart error message,
+        default from FormatAsError.DEFAULT_SEPARATOR:
+        `'{FormatAsError.DEFAULT_SEPARATOR}'`
+  '''
+  try:
+    formatted = format_s.format_map(format_mapping)
+  except KeyError as e:
+    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep=error_sep)
+  return formatted
+
+_format_as = format_as
+
+class FormatableMixin(object):
+  ''' A mixin to supply a `format_as` method for classes with an
+      existing `format_kwargs` method.
+
+      The `format_as` method is like an inside out `str.format` or
+      `object._format__` method.
+      `str.format` is designed for formatting a string from a variety
+      of other obejcts supplied in the keyword arguments,
+      and `object.__format__` is for filling out a single `str.format`
+      replacement field from a single object.
+      By contrast, `format_as` is designed to fill out an entire format
+      string from the current object.
+
+      For example, the `cs.tagset.TagSet` class
+      uses `FormatableMixin` to provide a `format_as` method
+      whose replacement fields are derived from the tags in the tag set.
+  '''
+
+  def format_as(self, format_s, error_sep=None, **control_kw):
+    ''' Return the string `format_s` formatted using the mapping
+        returned by `self.format_kwargs(**control_kw)`.
+
+        The class using this mixin must provide
+        a `format_kwargs(**control_kw)` method
+        to compute the mapping provided to `str.format_map`.
+    '''
+    format_mapping = self.format_kwargs(**control_kw)
+    return _format_as(format_s, format_mapping, error_sep=error_sep)
 
 if __name__ == '__main__':
   import cs.lex_tests
