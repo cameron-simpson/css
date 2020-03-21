@@ -308,7 +308,7 @@ class Pfx(object):
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
         # now hack the exception attributes
-        if not prefixify_exception(exc_value):
+        if not self.prefixify_exception(exc_value):
           print(
               "warning: %s: %s:%s: message not prefixed" %
               (self._state.prefix, type(exc_value).__name__, exc_value),
@@ -376,17 +376,17 @@ class Pfx(object):
       except AttributeError:
         continue
       if isinstance(value, StringTypes):
-        value = prefixify(value)
+        value = cls.prefixify(value)
       elif isinstance(value, Exception):
         # set did_prefix if we modify this in place
-        did_prefix = prefixify_exception(value)
+        did_prefix = cls.prefixify_exception(value)
       else:
         try:
           vlen = len(value)
         except TypeError:
           print(
               "warning: %s: %s.%s: " % (current_prefix, e, attr),
-              prefixify(
+              cls.prefixify(
                   "do not know how to prefixify: %s:%r" %
                   (type(value), value)
               ),
@@ -395,9 +395,9 @@ class Pfx(object):
           continue
         else:
           if vlen < 1:
-            value = [prefixify(repr(value))]
+            value = [cls.prefixify(repr(value))]
           else:
-            value = [prefixify(value[0])] + list(value[1:])
+            value = [cls.prefixify(value[0])] + list(value[1:])
       try:
         setattr(e, attr, value)
       except AttributeError as e2:
