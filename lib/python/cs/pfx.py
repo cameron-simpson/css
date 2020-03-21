@@ -308,67 +308,10 @@ class Pfx(object):
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
         # now hack the exception attributes
-        current_prefix = self._state.prefix
-
-        def prefixify(text):
-          if not isinstance(text, StringTypes):
-            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-            ##  current_prefix, text.__class__, text, sys.exc_info())
-            return text
-          return current_prefix \
-              + ': ' \
-              + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
-
-        def prefixify_exc(e):
-          ''' Modify the supplied exception `e` with the current prefix.
-              Return true if modified, false if unable to modify.
-          '''
-          did_prefix = False
-          for attr in 'args', 'message', 'msg', 'reason':
-            try:
-              value = getattr(e, attr)
-            except AttributeError:
-              continue
-            if isinstance(value, StringTypes):
-              value = prefixify(value)
-            elif isinstance(value, Exception):
-              # set did_prefix if we modify this in place
-              did_prefix = prefixify_exc(value)
-            else:
-              try:
-                vlen = len(value)
-              except TypeError:
-                print(
-                    "warning: %s: %s.%s: " % (current_prefix, e, attr),
-                    prefixify(
-                        "do not know how to prefixify: %s:%r" %
-                        (type(value), value)
-                    ),
-                    file=sys.stderr
-                )
-                continue
-              else:
-                if vlen < 1:
-                  value = [prefixify(repr(value))]
-                else:
-                  value = [prefixify(value[0])] + list(value[1:])
-            try:
-              setattr(e, attr, value)
-            except AttributeError as e2:
-              print(
-                  "warning: %s: %s.%s: cannot set to %r: %s" %
-                  (current_prefix, e, attr, value, e2),
-                  file=sys.stderr
-              )
-              continue
-            did_prefix = True
-          return did_prefix
-
-        did_prefix = prefixify_exc(exc_value)
-        if not did_prefix:
+        if not prefixify_exception(exc_value):
           print(
               "warning: %s: %s:%s: message not prefixed" %
-              (current_prefix, type(exc_value).__name__, exc_value),
+              (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
           )
     _state.pop()
@@ -405,6 +348,67 @@ class Pfx(object):
           u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
+
+  @classmethod
+  def prefixify(cls, text):
+    ''' Return `text` with the current prefix prepended.
+        Returns `text` unchanged if it is not a string.
+    '''
+    current_prefix = cls._state.prefix
+    if not isinstance(text, StringTypes):
+      ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+      ##  current_prefix, text.__class__, text, sys.exc_info())
+      return text
+    return current_prefix \
+        + ': ' \
+        + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
+
+  @classmethod
+  def prefixify_exception(cls, e):
+    ''' Modify the supplied exception `e` with the current prefix.
+        Return `True` if modified, `False` if unable to modify.
+    '''
+    current_prefix = cls._state.prefix
+    did_prefix = False
+    for attr in 'args', 'message', 'msg', 'reason':
+      try:
+        value = getattr(e, attr)
+      except AttributeError:
+        continue
+      if isinstance(value, StringTypes):
+        value = prefixify(value)
+      elif isinstance(value, Exception):
+        # set did_prefix if we modify this in place
+        did_prefix = prefixify_exception(value)
+      else:
+        try:
+          vlen = len(value)
+        except TypeError:
+          print(
+              "warning: %s: %s.%s: " % (current_prefix, e, attr),
+              prefixify(
+                  "do not know how to prefixify: %s:%r" %
+                  (type(value), value)
+              ),
+              file=sys.stderr
+          )
+          continue
+        else:
+          if vlen < 1:
+            value = [prefixify(repr(value))]
+          else:
+            value = [prefixify(value[0])] + list(value[1:])
+      try:
+        setattr(e, attr, value)
+      except AttributeError as e2:
+        print(
+            "warning: %s: %s.%s: cannot set to %r: %s" %
+            (current_prefix, e, attr, value, e2),
+            file=sys.stderr
+        )
+        continue
+      did_prefix = True
+    return did_prefix
 
   def logto(self, new_loggers):
     ''' Define the Loggers anew.
