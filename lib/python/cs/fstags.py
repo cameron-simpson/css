@@ -171,8 +171,9 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show linked files.
-    {cmd} ls [--direct] [-o output_format] [paths...]
+    {cmd} ls [-d] [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
+        -d          Treat directories like files, do not recurse.
         --direct    List direct tags instead of all tags.
         -o output_format
                     Use output_format as a Python format string to lay out
@@ -189,6 +190,13 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} ns [-d] [--direct] [paths...]
+        Report on the available primary namespace fields for formatting.
+        Note that because the namespace used for formatting has
+        inferred field names there are also unshown secondary field
+        names available in format strings.
+        -d          Treat directories like files, do not recurse.
+        --direct    List direct tags instead of all tags.
     {cmd} ont tags tag[=value]...
         Query ontology information for the specified tags.
     {cmd} rename -n newbasename_format paths...
@@ -525,20 +533,18 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_ns(argv, options):
-    ''' List paths and their namespace form.
+    ''' List paths and their namespace primary values.
     '''
     fstags = options.fstags
     directories_like_files = False
     use_direct_tags = False
-    options, argv = getopt(argv, 'do:', longopts=['direct'])
-    for option, value in options:
+    options, argv = getopt(argv, 'd', longopts=['direct'])
+    for option, _ in options:
       with Pfx(option):
         if option == '-d':
           directories_like_files = True
         elif option == '--direct':
           use_direct_tags = True
-        elif option == '-o':
-          output_format = value
         else:
           raise RuntimeError("unsupported option")
     xit = 0
