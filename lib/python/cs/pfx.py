@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Pfx: a framework for easy to use dynamic message prefixes.
-#   - Cameron Simpson <cs@cskk.id.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 r'''
@@ -9,10 +9,14 @@ Dynamic message prefixes providing execution context.
 
 The primary facility here is Pfx,
 a context manager which maintains a per thread stack of context prefixes.
+There are also decorators for functions.
 
 Usage is like this:
 
+    from cs.logutils import setup_logging, info
     from cs.pfx import Pfx
+    ...
+    setup_logging()
     ...
     def parser(filename):
       with Pfx("parse(%r)", filename):
@@ -21,7 +25,7 @@ Usage is like this:
             with Pfx("%d", lineno) as P:
               if line_is_invalid(line):
                 raise ValueError("problem!")
-              P.info("line = %r", line)
+              info("line = %r", line)
 
 This produces log messages like:
 
@@ -81,7 +85,7 @@ def pfx_iter(tag, iterable):
     yield i
 
 class _PfxThreadState(threading.local):
-  ''' _PfxThreadState is a thread local class to track Pfx stack state.
+  ''' A Thread local class to track `Pfx` stack state.
   '''
 
   def __init__(self):
@@ -94,7 +98,7 @@ class _PfxThreadState(threading.local):
 
   @property
   def cur(self):
-    ''' .cur is the current/topmost Pfx instance.
+    ''' The current/topmost `Pfx` instance.
     '''
     global cmd
     stack = self.stack
@@ -203,9 +207,9 @@ class Pfx(object):
         Parameters:
         * `mark`: message prefix string
         * `args`: if not empty, apply to the prefix string with `%`
-        * `absolute`: optional keyword argument, default False. If
+        * `absolute`: optional keyword argument, default `False`. If
           true, this message forms the base of the message prefixes;
-          existing prefixes will be suppressed.
+          earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
 
         *Note*:
@@ -214,12 +218,14 @@ class Pfx(object):
         Otherwise, they are not combined.
         Therefore the values interpolated are as they are when the `Pfx` is used,
         not necessarily as they were when the `Pfx` was created.
-        If `args` is subject to change and you require the original values,
+        If the `args` are subject to change and you require the original values,
         apply them to `mark` immediately, for example:
 
             with Pfx('message %s ...' % (arg1, arg2, ...)):
 
-        This is a bit more expensive, and the common usage is:
+        This is a bit more expensive as it incurs the formatting cost
+        whenever you enter the `with` clause.
+        The common usage is:
 
             with Pfx('message %s ...', arg1, arg2, ...):
     '''
@@ -239,6 +245,7 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
+    # push this Pfx onto the per-Thread stack
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
