@@ -559,6 +559,32 @@ def pfx(func, message=None, message_args=(), use_str=False):
     wrapper.__doc__ += '\n\n' + fdoc
   return wrapper
 
+@decorator
+def pfx_method(method, use_str=False):
+  ''' Decorator to provide a `Pfx` context for an instance method prefixing
+      *classname.methodname*
+      (or `str(self).`*methodname* if `use_str` is true).
+
+      Example usage:
+
+          class O:
+              @pfx_method
+              def foo(self, .....):
+                  ....
+  '''
+
+  fname = method.__name__
+
+  def wrapper(self, *a, **kw):
+    ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
+    '''
+    with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
+      return method(self, *a, **kw)
+
+  wrapper.__doc__ = method.__doc__
+  wrapper.__name__ = "@pfx_method(%s)" % (fname,)
+  return wrapper
+
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
       which prefixes the message with the current Pfx prefix.
