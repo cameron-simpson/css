@@ -338,8 +338,7 @@ class Pfx(object):
           print(
               "warning: %s: %s.%s: " % (current_prefix, e, attr),
               cls.prefixify(
-                  "do not know how to prefixify: %s:%r" %
-                  (type(value), value)
+                  "do not know how to prefixify: %s:%r" % (type(value), value)
               ),
               file=sys.stderr
           )
@@ -504,11 +503,12 @@ def pfx(func, message=None, message_args=()):
           def f(....):
               ....
   '''
-  fname=funcname(func)
+  fname = funcname(func)
   if message is None:
-    message=fname
+    message = fname
 
   if isgeneratorfunction(func):
+
     def wrapper(*a, **kw):
       ''' Before running the generator the current stack height is
           noted.  After yield, the stack above that height is trimmed
@@ -538,6 +538,7 @@ def pfx(func, message=None, message_args=()):
         stack[height:] = []
         yield value
   else:
+
     def wrapper(*a, **kw):
       ''' Run function inside `Pfx` context manager.
       '''
