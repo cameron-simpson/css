@@ -507,10 +507,20 @@ def PfxThread(target=None, **kw):
   return threading.Thread(target=run, **kw)
 
 @decorator
-def pfx(func, message=None, message_args=(), use_str=False):
+def pfx(func, message=None, message_args=()):
   ''' General purpose @pfx for generators, methods etc.
-      Needs to support use_str as well.
       Pfx needs a .overPfx attribute to hook up chained Pfx stacks.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `message`: optional prefix to use instead of the function name
+      * `message_args`: optional arguments to embed in the preifx using `%`
+
+      Example usage:
+
+          @pfx
+          def f(....):
+              ....
   '''
   fname=funcname(func)
   if message is None:
