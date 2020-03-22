@@ -599,17 +599,17 @@ def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
       which prefixes the message with the current Pfx prefix.
   '''
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
-  elif file is not None:
-    if isinstance(file, StringTypes):
-      with open(file, "a") as fp:
-        return XP(msg, *args, file=fp)
-  file.write(prefix())
-  file.write(': ')
-  file.flush()
-  return X(msg, *args, file=file)
+  f = kwargs.pop('file', None)
+  if f is None:
+    f = sys.stderr
+  elif f is not None:
+    if isinstance(f, StringTypes):
+      with open(f, "a") as f2:
+        return XP(msg, *args, file=f2)
+  f.write(prefix())
+  f.write(': ')
+  f.flush()
+  return X(msg, *args, file=f)
 
 def XX(prepfx, msg, *args, **kwargs):
   ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
