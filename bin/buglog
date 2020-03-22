@@ -180,7 +180,7 @@ do
       if    dlog_cats=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
       then  dlog_headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
       else  dlog_cats=$categories
-            [ -n "$dlog_cats" ] || dlog_cats=`dlog-category`
+            [ -n "$dlog_cats" ] || dlog_cats=`dlog-category` || dlog_cats=UNKNOWN
             dlog_headline=$headline
       fi
       $trace buglog-daily "$dlog_cats: $dlog_headline"
