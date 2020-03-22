@@ -44,6 +44,7 @@ import logging
 import sys
 import threading
 from cs.deco import decorator
+from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
@@ -58,6 +59,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
+        'cs.py.func',
         'cs.py3',
         'cs.x',
     ],
@@ -77,39 +79,6 @@ def pfx_iter(tag, iterable):
       except StopIteration:
         break
     yield i
-
-def pfx(func):
-  ''' Decorator for functions that should run inside:
-
-          with Pfx(func_name):
-
-      Use:
-
-          @pfx
-          def f(...):
-  '''
-
-  def wrapped(*args, **kwargs):
-    with Pfx(func.__name__):
-      return func(*args, **kwargs)
-
-  wrapped.__name__ = "@pfx(%s)" % (func.__name__,)
-  return wrapped
-
-@decorator
-def pfx_method(method, use_str=False):
-  ''' Decorator to provide a `Pfx` context for an instance method prefixing
-      *classname.methodname*
-      (or `str(self).`*methodname* if `use_str` is true).
-  '''
-
-  def wrapper(self, *a, **kw):
-    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
-      return method(self, *a, **kw)
-
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
-  return wrapper
 
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
@@ -536,6 +505,59 @@ def PfxThread(target=None, **kw):
         target(*a, **kw)
 
   return threading.Thread(target=run, **kw)
+
+@decorator
+def pfx(func, message=None, message_args=(), use_str=False):
+  ''' General purpose @pfx for generators, methods etc.
+      Needs to support use_str as well.
+      Pfx needs a .overPfx attribute to hook up chained Pfx stacks.
+  '''
+  fname=funcname(func)
+  if message is None:
+    message=fname
+
+  if isgeneratorfunction(func):
+    def wrapper(*a, **kw):
+      ''' Before running the generator the current stack height is
+          noted.  After yield, the stack above that height is trimmed
+          and saved, and the value yielded.  On recommencement the saved
+          stack is reapplied to the current stack (which may have
+          changed) and the generator continued.
+      '''
+      # commence the generator
+      g = func(*a, **kw)
+      # prepare an initial generator Pfx stack
+      saved = []
+      while True:
+        # note the current Thread's Pfx stack
+        stack = Pfx._state.stack
+        height = len(stack)
+        stack.extend(saved)
+        try:
+          with Pfx(message, *message_args):
+            value = next(g)
+        except StopIteration:
+          # clean up and return
+          stack[height:] = []
+          return
+          # other exceptions raise cleanly out of the generator
+        # save generator Pfx stack, reset caller Pfx stack, yield
+        saved = stack[height:]
+        stack[height:] = []
+        yield value
+  else:
+    def wrapper(*a, **kw):
+      ''' Run function inside `Pfx` context manager.
+      '''
+      with Pfx(message, *message_args):
+        return func(*a, **kw)
+
+  wrapper.__name__ = "@pfx(%s)" % (fname,)
+  fdoc = func.__doc__
+  wrapper.__doc__ = wrapper.__name__ + ":\n" + wrapper.__doc__
+  if fdoc:
+    wrapper.__doc__ += '\n\n' + fdoc
+  return wrapper
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
