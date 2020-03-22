@@ -75,11 +75,11 @@ def pfx_iter(tag, iterable):
   ''' Wrapper for iterables to prefix exceptions with `tag`.
   '''
   with Pfx(tag):
-    I = iter(iterable)
+    it = iter(iterable)
   while True:
     with Pfx(tag):
       try:
-        i = next(I)
+        i = next(it)
       except StopIteration:
         break
     yield i
