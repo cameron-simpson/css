@@ -80,31 +80,6 @@ def pfx_iter(tag, iterable):
         break
     yield i
 
-def pfxtag(tag, loggers=None):
-  ''' Decorator for functions that should run inside:
-
-          with Pfx(tag, loggers=loggers):
-
-      Use:
-
-          @pfxtag(tag)
-          def f(...):
-  '''
-
-  def wrap(func):
-    if tag is None:
-      wraptag = func.__name__
-    else:
-      wraptag = tag
-
-    def wrapped(*args, **kwargs):
-      with Pfx(wraptag, loggers=loggers):
-        return func(*args, **kwargs)
-
-    return wrapped
-
-  return wrap
-
 class _PfxThreadState(threading.local):
   ''' _PfxThreadState is a thread local class to track Pfx stack state.
   '''
