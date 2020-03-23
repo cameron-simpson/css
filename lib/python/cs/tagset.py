@@ -6,6 +6,7 @@
 from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
+import re
 from time import strptime
 from types import SimpleNamespace
 from cs.lex import (
@@ -545,18 +546,46 @@ class TagsOntology(SingletonMixin):
     '''
     return self.tagsets[tag if isinstance(tag, str) else tag.name]
 
-  def value_tags(self, type_name, value):
-    ''' Return the `TagSet` for `type_name.value`
+  @staticmethod
+  def value_to_tag_name(value):
+    ''' Convert a tag value to a tagnamelike dotted identifierish string
+        for use in ontology lookup.
+        Returns `None` for unconvertable values.
+
+        Nonnegative `int`s are converted to `str`.
+
+        Strings are converted as follows:
+        * a trailing `(.*)` is turned into a prefix with a dot,
+          for example `"Captain America (Marvel)"`
+          becomes `"Marvel.Captain America"`.
+        * the string is split into words (nonwhitespace),
+          lowercased and joined with underscores,
+          for example `"Marvel.Captain America"`
+          becomes `"marvel.captain_america"`.
     '''
-    if value is None:
-      return None
+    if isinstance(value, int) and value >= 0:
+      return str(value)
     if isinstance(value, str):
-      pass
-    elif isinstance(value, (int, float)):
-      value = str(value)
-    else:
-      return None
-    name = type_name + '.' + '_'.join(value.lower().split())
+      value = value.strip()
+      m = re.match(r'(.*)\(([^()]*)\)\s*$', value)
+      if m:
+        value = m.group(2).strip() + '.' + m.group(1).strip()
+      value = '_'.join(value.lower().split())
+      return value
+    return None
+
+  def value_tags(self, type_name, value):
+    ''' Return the `TagSet` for `type_name.value_to_tag_name(value)`.
+
+        This implements the mapping between a type's value and its semantics.
+    '''
+    value_tag_name = self.value_to_tag_name(value)
+    if value is None:
+      raise KeyError(
+          "cannot convert %s:%r to tag name form" %
+          (type(value).__name__, value)
+      )
+    name = type_name + '.' + '_'.join(value_tag_name.lower().split())
     return self[name]
 
 class TypedTag(FormatableMixin):
