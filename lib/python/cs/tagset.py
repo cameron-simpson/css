@@ -635,7 +635,10 @@ class TypedTag(FormatableMixin):
         type(self).__name__, self.type, self.tag, self.ontology
     )
 
-  __repr__ = __str__
+  def __repr__(self):
+    return "%s[tag=%s]" % (
+        type(self).__name__, self.tag
+    )
 
   @property
   def defn(self):
