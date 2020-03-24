@@ -544,7 +544,8 @@ class TagsOntology(SingletonMixin):
         `tag` may be a `str` (a tag name) or a `Tag` like thing
         in which case `tag.name` is used.
     '''
-    return self.tagsets[tag if isinstance(tag, str) else tag.name]
+    tagset_name = tag if isinstance(tag, str) else tag.name
+    return self.tagsets[tagset_name]
 
   @staticmethod
   def value_to_tag_name(value):
