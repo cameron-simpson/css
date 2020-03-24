@@ -515,7 +515,7 @@ class TagsOntology(SingletonMixin):
 
   @classmethod
   def _singleton_key(cls, tagset_mapping):
-    return id(tagset_mapping), cls
+    return id(tagset_mapping)
 
   def _singleton_init(self, tagset_mapping):
     self.tagsets = tagset_mapping
