@@ -478,9 +478,10 @@ class ExtendedNamespace(SimpleNamespace):
         value = getns(title_attr)
         if value is not None:
           return lc_(value)
-      value = getns(attr + '_lc')
-      if value is not None:
-        return titleify_lc(value)
+      else:
+        value = getns(attr + '_lc')
+        if value is not None:
+          return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
