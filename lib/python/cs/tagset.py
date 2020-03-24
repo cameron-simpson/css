@@ -198,8 +198,14 @@ class TagSet(dict, FormatableMixin):
         `Tag`s are processed in reverse lexical order by name, which
         dictates which of the conflicting multidot names takes
         effect in the namespace - the first found is used.
+
+        Finally, the `ExtendedNamespaces.__getitem__` method
+        uses a special mode
+        where a missing attribute returns the value `None`.
+        This is to support use in `str.formap_map`
     '''
     ns0 = ExtendedNamespace()
+    ns0._return_None_if_missing = True
     for tag_name in sorted(self, reverse=True):
       with Pfx(tag_name):
         subnames = [subname for subname in tag_name.split('.') if subname]
@@ -216,6 +222,7 @@ class TagSet(dict, FormatableMixin):
               subns = getattr(ns, subname)
             except AttributeError:
               subns = ExtendedNamespace()
+              subns._return_None_if_missing = True
               setattr(ns, subname, subns)
             ns = subns
         subname, = subnames
