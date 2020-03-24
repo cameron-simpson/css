@@ -501,6 +501,8 @@ class ExtendedNamespace(SimpleNamespace):
     try:
       value = getattr(self, attr)
     except AttributeError as e:
+      if getattr(self, '_return_None_if_missing', False):
+        return None
       raise KeyError(attr) from e
     return value
 
