@@ -1123,7 +1123,6 @@ class TagFile(SingletonMixin):
   def _singleton_key(cls, filepath, *, find_parent=False):
     return filepath, find_parent
 
-  @pfx_method
   @require(lambda filepath: isinstance(filepath, str))
   def _singleton_init(self, filepath, find_parent=False):
     self.filepath = filepath
@@ -1169,10 +1168,13 @@ class TagFile(SingletonMixin):
     tagfile = self
     while tagfile is not None:
       if name in tagfile.tagsets:
-        return tagfile.tagsets[name]
-      tagfile = self.parent if self.find_parent else None
-    # not available in parents, autocreate empty TagSet
-    return self.tagsets[name]
+        break
+      tagfile = tagfile.parent if tagfile.find_parent else None
+    if tagfile is None:
+      # not available in parents, use self
+      # this will autocreate an empty TagSet in self
+      tagfile = self
+    return tagfile.tagsets[name]
 
   @locked_property
   def tagsets(self):
