@@ -1,3 +1,4 @@
+include .meta.blah for tags with ontology info in ns()
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
 cs-release: generate and commit cs/module_README.md files (does markdown have a comment syntax?) so I can point to them as the module homepage
 setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
