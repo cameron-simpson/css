@@ -14,7 +14,7 @@ import sys
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
-from cs.logutils import setup_logging, warning, error, exception
+from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
 
@@ -146,7 +146,7 @@ class BaseCommand:
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
     '''
-    format_kwargs=dict(getattr(cls,'USAGE_KEYWORDS',{}))
+    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     if 'cmd' not in format_kwargs:
       format_kwargs['cmd'] = cls.__name__
     cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
@@ -227,7 +227,7 @@ class BaseCommand:
       self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
-      getopt_spec = getattr(self,'GETOPT_SPEC','')
+      getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # we do this regardless in order to honour --
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
