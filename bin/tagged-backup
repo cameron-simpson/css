@@ -106,7 +106,7 @@ do
     xit=1
     continue
   }
-  $vecho "scan $src_path for {$tag_name}= tags"
+  $vecho "scan $src_path for ${tag_name}= tags"
   backup_names=$(
     $trace fstags find -o "{$tag_name}" "$src_path" "$tag_name" | grep . | sort -u
   )
