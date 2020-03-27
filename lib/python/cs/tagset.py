@@ -606,11 +606,11 @@ class TypedTag(FormatableMixin):
       Like `Tag`, this has a `.name` and `.value`.
 
       Additionally it has the following attributes:
-      * `ontology`: the supporting `TagOntology`
+      * `ontology`: the supporting `TagsOntology`
       * `tag`: the originating `Tag`
         (computed from the `(name,value)` tuple if supplied)
-      * `defn`: the `TagSet` from `.ontology`
-        which defines this
+      * `defn`: the `TagSet` from the ontology
+        which defines this `TypedTag`'s metadata
       * `type`: `defn['type']`
       * `member_type`: `defn['member_type']` if present;
         we expect `type` to be a list or mapping type name
@@ -654,6 +654,7 @@ class TypedTag(FormatableMixin):
   @property
   def defn(self):
     ''' The defining `TagSet` for this tag name.
+        This is how its type is defined.
     '''
     return self.ontology.defn_tagset(self.name)
 
@@ -665,7 +666,8 @@ class TypedTag(FormatableMixin):
 
   @property
   def detail(self):
-    ''' The `TagSet` providing detailed information about this tag,
+    ''' The `TagSet` providing detailed information
+        about this specific tag value,,
         derived through the ontology from the tag name and value.
 
         Returns `None` for unsupported value types.
@@ -724,7 +726,7 @@ class TypedTag(FormatableMixin):
       yield self[index]
 
   def ns(self):
-    ''' Return an `ExtendedNamespace` derived from `self.tagset.ns()`.
+    ''' Return an `ExtendedNamespace` derived from `self.defn.ns()`.
     '''
     return self.defn.ns()
 
