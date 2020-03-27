@@ -168,7 +168,9 @@ class BaseCommand:
         * `argv`:
           optional command line arguments
           including the main command name if `cmd` is not specified.
-          The default is copied from `sys.argv`.
+          The default is `sys.argv`.
+          The contents of `argv` are copied,
+          permitting desctructive parsing of `argv`.
         * `options`:
           a object for command state and context.
           If not specified a new `SimpleNamespace`
@@ -206,6 +208,8 @@ class BaseCommand:
       if cmd is not None:
         # we consume the first argument anyway
         argv.pop(0)
+    else:
+      argv = list(argv)
     if cmd is None:
       cmd = argv.pop(0)
     setup_logging(cmd)
