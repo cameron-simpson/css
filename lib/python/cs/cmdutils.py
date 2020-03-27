@@ -256,6 +256,14 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmd_names))
           )
+        if isinstance(main, BaseCommand):
+
+          def run_main(argv, options):
+            ''' Invoke the run method of an instance of the subcommand class.
+            '''
+            return main().run(argv, options=options, cmd=subcmd)
+
+          main = run_main
       else:
         subcmd = cmd
         try:
