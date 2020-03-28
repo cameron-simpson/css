@@ -28,6 +28,7 @@ import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
 from time import sleep
+from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
@@ -37,7 +38,6 @@ from cs.logutils import exception, error, warning, info, upd, debug, \
                         logTo, loginfo
 from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.resources import RunState
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
 import cs.x
@@ -45,10 +45,10 @@ from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
-from .compose import (get_clause_archive, get_clause_spec, get_store_spec)
+from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
-from .datafile import DataFilePushable
+from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
@@ -407,7 +407,9 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_httpd(args, options):
-    httpd_main([cmd + ': ' + 'httpd'] + args)
+    ''' Run the HTTP daemon.
+    '''
+    httpd_main([options.cmd + ': ' + 'httpd'] + args)
 
   @staticmethod
   def cmd_import(args, options):
@@ -827,7 +829,7 @@ class VTCmd(BaseCommand):
     with Pfx("other_store %r", srcSspec):
       srcS = Store(srcSspec, options.config)
     if not args:
-      args = (srcSpec,)
+      args = (srcSspec,)
     dstS = defaults.S
     pushables = []
     for obj_spec in args:
@@ -850,7 +852,7 @@ class VTCmd(BaseCommand):
     srcS = defaults.S
     dstSspec = args.pop(0)
     if not args:
-      args = (dstSpec,)
+      args = (dstSspec,)
     with Pfx("other_store %r", dstSspec):
       dstS = Store(dstSspec, options.config)
     pushables = []
