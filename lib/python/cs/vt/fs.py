@@ -14,6 +14,7 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O
 import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
+from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
@@ -124,14 +125,13 @@ class FileHandle:
     self.E.parent.changed = True
     S.open()
     # NB: additional S.open/close around self.E.close
-    R.notify(
-        logexc(
-            lambda _: (
-                defaults.pushStore(S), self.E.close(), defaults.popStore(),
-                S.close()
-            )
-        )
-    )
+    @logexc
+    def withR(R):
+      with stackattrs(defaults, S=S):
+        self.E.close()
+      S.close()
+
+    R.notify(withR)
 
   def write(self, data, offset):
     ''' Write data to the file.
@@ -458,7 +458,7 @@ class FileSystem(object):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with defaults.stack(fs=self):
+        with stackattrs(defaults, fs=self):
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
