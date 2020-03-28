@@ -1350,6 +1350,15 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     '''
     return tag in self.all_tags
 
+  @property
+  def ontology(self):
+    ''' The ontology for use with this file, or `None`.
+    '''
+    try:
+      return self.fstags.ontology(self.filepath)
+    except ValueError:
+      return None
+
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
 
