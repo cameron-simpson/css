@@ -1380,7 +1380,8 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
     kwtags['tags'] = str(kwtags)
-    return kwtags.ns()
+    # convert the TagSet to an ExtendedNamespace
+    return kwtags.format_kwargs()
 
   @property
   def basename(self):
