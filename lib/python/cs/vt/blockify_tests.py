@@ -17,11 +17,14 @@ import unittest
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
 from .randutils import rand0, randblock
-from cs.x import X
 from .blockify import blockify, blocked_chunks_of, \
                       MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
+
+from cs.x import X
+import cs.x
+cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
@@ -40,7 +43,6 @@ class TestAll(unittest.TestCase):
   with open(__file__, 'rb') as myfp:
     mycode = myfp.read()
 
-  X("generate random test data")
   if QUICK:
     random_data = list(random_blocks(max_size=1200, count=12))
   else:
