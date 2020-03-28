@@ -1,3 +1,4 @@
+completed-indirect-block index supporting efficient indirect-block completion code
 blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
 datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
 blockmap: continues running even after connection shutdown
