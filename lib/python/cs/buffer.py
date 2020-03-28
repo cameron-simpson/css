@@ -407,7 +407,8 @@ class CornuCopyBuffer(object):
       if next_chunk:
         self.bufs.append(next_chunk)
         self.buflen += len(next_chunk)
-    assert self.buflen >= min_size
+    ##assert self.buflen >= min_size
+    ##assert self.buflen == sum(len(buf) for buf in self.bufs)
 
   def tail_extend(self, size):
     ''' Extend method for parsers reading "tail"-like chunk streams,
@@ -433,17 +434,16 @@ class CornuCopyBuffer(object):
     if size is Ellipsis or size > self.buflen:
       # extend the buffered data
       self.extend(size, short_ok=short_ok)
+      # post: the buffer is as big as it is going to get for this call
     if size is Ellipsis:
       # take all the fetched data
       taken = self.bufs
       self.bufs = []
-      self.buflen = 0
     else:
       if size >= self.buflen:
         # take the whole buffer
         taken = self.bufs
         self.bufs = []
-        self.buflen = 0
       else:
         # size < self.buflen
         # take the leading data from the buffer
@@ -461,11 +461,10 @@ class CornuCopyBuffer(object):
             bufs[0] = buf0[size:]
           taken.append(buf)
           size -= len(buf)
-        # advance offset by the size of the taken data
-        taken_size = sum(len(buf) for buf in taken)
-        ##assert taken_size <= size0 if short_ok else taken_size == size0
-        self.buflen -= taken_size
-        self.offset += taken_size
+    # advance offset by the size of the taken data
+    taken_size = sum(len(buf) for buf in taken)
+    self.buflen -= taken_size
+    self.offset += taken_size
     return taken
 
   def take(self, size, short_ok=False):
