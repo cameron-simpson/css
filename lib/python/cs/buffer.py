@@ -1009,9 +1009,7 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
   def close(self):
     ''' Detach from the file and close it.
     '''
-    if self.fp is not None:
-      self.fp.close()
-      self.fp = None
+    self.fp = None
 
   def _fetch(self, readsize):
     return self.read1(readsize)
