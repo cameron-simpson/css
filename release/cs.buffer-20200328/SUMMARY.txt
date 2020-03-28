@@ -1,0 +1,2 @@
+CornuCopyBuffer.takev: bugfix adjustment of buf.offset, was not always done.
+CornuCopyBuffer.__getitem__: add slice support, note how expensive it is to use.
