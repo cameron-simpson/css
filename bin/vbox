@@ -3,4 +3,4 @@
 # Convenience wrapper for VirtualBox command line tools.
 #   - Cameron Simpson <cs@cskk.id.au> 06may2016
 #
-exec python -m cs.app.virtualbox ${1+"$@"}
+exec python3 -m cs.app.virtualbox ${1+"$@"}

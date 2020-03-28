@@ -1,18 +1,24 @@
 #!/usr/bin/python
 #
-# Convenience functions for working with the Cmd module
-# and other command line related stuff.
-# - Cameron Simpson <cs@cskk.id.au> 03sep2015
+# Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
+
+''' Convenience functions for working with the Cmd module
+    and other command line related stuff.
+'''
 
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
-from logging import warning, exception
 import sys
-from cs.mappings import StackableValues
+from types import SimpleNamespace as NS
+from cs.context import stackattrs
+from cs.lex import cutprefix
+from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
+
+__version__ = '20200318'
 
 DISTINFO = {
     'description':
@@ -23,7 +29,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.mappings', 'cs.pfx', 'cs.resources'],
+    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.resources'],
 }
 
 def docmd(dofunc):
@@ -47,9 +53,11 @@ def docmd(dofunc):
             def do_something(...):
               ... do something ...
   '''
+  funcname = dofunc.__name__
 
   def wrapped(self, *a, **kw):
-    funcname = dofunc.__name__
+    ''' Run a `Cmd` "do" method with some context and handling.
+    '''
     if not funcname.startswith('do_'):
       raise ValueError("function does not start with 'do_': %s" % (funcname,))
     argv0 = funcname[3:]
@@ -64,6 +72,7 @@ def docmd(dofunc):
         exception("%s", e)
         return None
 
+  wrapped.__name__ = '@docmd(%s)' % (funcname,)
   wrapped.__doc__ = dofunc.__doc__
   return wrapped
 
@@ -130,15 +139,18 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  SUBCOMMAND_METHOD_PREFIX = 'cmd_'
+
   @classmethod
-  def add_usage_to_docstring(cls, **usage_keywords):
+  def add_usage_to_docstring(cls):
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
     '''
-    if 'cmd' not in usage_keywords:
-      usage_keywords['cmd'] = cls.__name__
-    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format(
-        **usage_keywords
+    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+    if 'cmd' not in format_kwargs:
+      format_kwargs['cmd'] = cls.__name__
+    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
+        format_kwargs
     ).replace('\n', '\n    ')
 
   def apply_defaults(self, options):
@@ -147,26 +159,28 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `options`.
     '''
 
-  def run(self, argv, options=None, cmd=None):
+  def run(self, argv=None, options=None, cmd=None):
     ''' Run a command from `argv`.
         Returns the exit status of the command.
         Raises `GetoptError` for unrecognised options.
 
         Parameters:
         * `argv`:
-          the command line arguments
+          optional command line arguments
           including the main command name if `cmd` is not specified.
+          The default is `sys.argv`.
+          The contents of `argv` are copied,
+          permitting desctructive parsing of `argv`.
         * `options`:
           a object for command state and context.
-          If not specified a new `cs.mappings.StackableValues`
+          If not specified a new `SimpleNamespace`
           is allocated for use as `options`,
           and prefilled with `.cmd` set to `cmd`
           and other values as set by `.apply_default(options)`
           if such a method is provided.
         * `cmd`:
           optional command name for context;
-          if this is not specified it is taken as `argv[0]`
-          which is then popped from the list.
+          if this is not specified it is taken from `argv.pop(0)`.
 
         The command line arguments are parsed according to `getopt_spec`.
         If `getopt_spec` is not empty
@@ -189,51 +203,91 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if argv is None:
+      argv = list(sys.argv)
+      if cmd is not None:
+        # we consume the first argument anyway
+        argv.pop(0)
+    else:
+      argv = list(argv)
     if cmd is None:
       cmd = argv.pop(0)
+    setup_logging(cmd)
+    # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
+    # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
-      usage = usage_format.format(cmd=cmd)
+      usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
+      usage_kwargs['cmd'] = cmd
+      usage = usage_format.format_map(usage_kwargs)
     else:
       usage = None
     if options is None:
-      options = StackableValues(cmd=cmd, usage=usage)
+      options = NS(cmd=cmd, usage=usage)
       self.apply_defaults(options)
-    with Pfx(cmd):
-      try:
-        opts, argv = getopt(argv, self.GETOPT_SPEC)
-        if self.GETOPT_SPEC:
-          self.apply_opts(opts, options)
-        runstate = options.runstate = RunState(cmd)
-        # expose the runstate for use by global caller who only has "self" :-(
-        self.runstate = runstate
-        with runstate:
-          if argv:
-            # see if the first arg is a subcommand name
-            # by check for a cmd_{subcommand} method
-            subcmd_attr = 'cmd_' + argv[0]
-            subcmd_method = getattr(self, subcmd_attr, None)
-            if subcmd_method is not None:
-              subcmd = argv.pop(0)
-              with Pfx(subcmd):
-                with self.run_context(argv, options, cmd=subcmd):
-                  return subcmd_method(argv, options, cmd=subcmd)
-          try:
-            main = self.main
-          except AttributeError:
-            raise GetoptError("missing subcommand")
-          else:
-            with self.run_context(argv, options, cmd=None):
-              return main(argv, options, cmd=None)
-      except GetoptError as e:
-        handler = getattr(self, 'getopt_error_handler')
-        if handler and handler(cmd, options, e, usage):
-          return 2
-        raise
+    # we catch GetoptError from this suite...
+    try:
+      getopt_spec = getattr(self, 'GETOPT_SPEC', '')
+      # we do this regardless in order to honour --
+      opts, argv = getopt(argv, getopt_spec, '')
+      if getopt_spec:
+        self.apply_opts(opts, options)
 
-  def getopt_error_handler(self, cmd, options, e, usage):
+      subcmd_prefix = self.SUBCOMMAND_METHOD_PREFIX
+      subcmd_names = list(
+          map(
+              lambda attr: cutprefix(attr, subcmd_prefix),
+              (attr for attr in dir(self) if attr.startswith(subcmd_prefix))
+          )
+      )
+      if subcmd_names:
+        # look for a subcommand
+        if not argv:
+          raise GetoptError(
+              "missing subcommand, expected one of %r" %
+              (sorted(subcmd_names))
+          )
+        subcmd = argv.pop(0)
+        subcmd_attr = subcmd_prefix + subcmd
+        try:
+          main = getattr(self, subcmd_attr)
+        except AttributeError:
+          raise GetoptError(
+              "%s: unrecognised subcommand, expected one of: %r" %
+              (subcmd, sorted(subcmd_names))
+          )
+        if isinstance(main, BaseCommand):
+
+          def run_main(argv, options):
+            ''' Invoke the run method of an instance of the subcommand class.
+            '''
+            return main().run(argv, options=options, cmd=subcmd)
+
+          main = run_main
+      else:
+        subcmd = cmd
+        try:
+          main = self.main
+        except AttributeError:
+          raise GetoptError(
+              "no main method and no %s* subcommand methods" %
+              (subcmd_prefix,)
+          )
+      with RunState(cmd) as runstate:
+        with stackattrs(options, cmd=subcmd, runstate=runstate):
+          with self.run_context(argv, options):
+            with Pfx(subcmd):
+              return main(argv, options)
+    except GetoptError as e:
+      handler = getattr(self, 'getopt_error_handler')
+      if handler and handler(cmd, options, e, usage):
+        return 2
+      raise
+
+  @staticmethod
+  def getopt_error_handler(cmd, options, e, usage):
     ''' The `getopt_error_handler` method
-        is be used to control the handling of `GetoptError`s raised
+        is used to control the handling of `GetoptError`s raised
         during the command line parse
         or during the `main` or `cmd_`*subcmd*` calls.
 
@@ -242,6 +296,7 @@ class BaseCommand:
         * `options`: the `options` object
         * `e`: the `GetoptError` exception
         * `usage`: the command usage or `None` if this was not provided
+
         It returns a true value if the exception is considered handled,
         in which case the main `run` method returns 2.
         It returns a false value if the exception is considered unhandled,
@@ -267,7 +322,11 @@ class BaseCommand:
 
   @staticmethod
   @contextmanager
-  def run_context(argv, options, cmd):
-    ''' Stub context manager which surronds `main` or `cmd_`*subcmd*.
+  def run_context(argv, options):
+    ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
-    yield
+    # redundant try/finally to remind subclassers of correct structure
+    try:
+      yield
+    finally:
+      pass

@@ -1,0 +1,5 @@
+New "json_import" subcommand to import a JSON dict as tags, initial use case to load the metadata from youtube-dl.
+New "scrub" command line operation, to purge tags of paths which do not exist.
+New "cp", "ln" and "mv" subcommands to copy/link/move paths and take their tags with them.
+New "test" subcommand to test paths against tag criteria, useful for find and scripts.
+Small bugfixes.

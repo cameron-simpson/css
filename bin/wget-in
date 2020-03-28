@@ -1,4 +1,3 @@
-
 #!/bin/sh
 #
 # Read URLs from standard input, fetch in random sequence with random delays.

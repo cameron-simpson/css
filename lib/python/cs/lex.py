@@ -1,14 +1,16 @@
 #!/usr/bin/python
 
 r'''
-Lexical analysis functions, tokenisers.
+Lexical analysis functions, tokenisers, transcribers.
 
 An arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
+There are also some transcription function for producing text
+from various objects, such as `hexify` and `unctrl`.
 
 Generally the get_* functions accept a source string and an offset
-(usually optional, default 0) and return a token and the new offset,
-raising ValueError on failed tokenisation.
+(usually optional, default `0`) and return a token and the new offset,
+raising `ValueError` on failed tokenisation.
 '''
 
 import binascii
@@ -17,7 +19,10 @@ import os
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
+from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
+
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -26,14 +31,14 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
 
   def hexify(bs):
-    ''' A Python 2 flavour of binascii.hexlify.
+    ''' A flavour of `binascii.hexlify` returning a `str`.
     '''
     return binascii.hexlify(bs).decode()
 else:
@@ -77,6 +82,25 @@ def unctrl(s, tabsize=8):
     s2 += s[sofar:]
 
   return s2.expandtabs(tabsize)
+
+def lc_(value):
+  ''' Return `value.lower()`
+      with `'-'` translated into `'_'` and `' '` translated into `'-'`.
+
+      I use this to construct lowercase filenames containing a
+      readable transcription of a title string.
+
+      See also `titleify_lc()`, an imperfect reversal of this.
+  '''
+  return value.lower().replace('-', '_').replace(' ', '-')
+
+def titleify_lc(value_lc):
+  ''' Translate `'-'` into `' '` and `'_'` translated into `'-'`,
+      then titlecased.
+
+      See also `lc_()`, which this reverses imperfectly.
+  '''
+  return value_lc.replace('-', ' ').replace('_', '-').title()
 
 def tabpadding(padlen, tabsize=8, offset=0):
   ''' Compute some spaces to use a tab padding at an offfset.
@@ -166,6 +190,10 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
       the decimal digits and the punctuation characters '_-+.,'.
       The default shiftin and shiftout markers are '[' and ']'.
 
+      String objects converted with either `hexify` and `texthexify`
+      output strings may be freely concatenated and decoded with
+      `untexthexify`.
+
       Example:
 
           >>> texthexify(b'&^%&^%abcdefghi)(*)(*')
@@ -179,11 +207,9 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         shift from text mode back into hexadecimal transcription,
         default `']'`.
       * `whitelist`: an optional bytes or string object indicating byte
-        values which may be represented directly in text; string objects are
-        converted to hexify() and texthexify() output strings may be freely
-        concatenated and decoded with untexthexify().
-        The default value is the ASCII letters, the decimal digits
-        and the punctuation characters '_-+.,'.
+        values which may be represented directly in text;
+        the default value is the ASCII letters, the decimal digits
+        and the punctuation characters `'_-+.,'`.
   '''
   if whitelist is None:
     whitelist = _texthexify_white_chars
@@ -262,7 +288,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     s = s[hexlen + len(shiftin):]
     textlen = s.find(shiftout)
     if textlen < 0:
-      raise ValueError("missing shift out marker \"%s\"" % (shiftout,))
+      raise ValueError("missing shift out marker %r" % (shiftout,))
     if sys.hexversion < 0x03000000:
       chunks.append(s[:textlen])
     else:
@@ -270,13 +296,13 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     s = s[textlen + len(shiftout):]
   if s:
     if len(s) % 2 != 0:
-      raise ValueError("uneven hex sequence \"%s\"" % (s,))
+      raise ValueError("uneven hex sequence %r" % (s,))
     chunks.append(unhexify(s))
   return joinbytes(chunks)
 
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
-      Return (match, new_offset).
+      Return `(match,new_offset)`.
   '''
   ooffset = offset
   while offset < len(s) and s[offset] in gochars:
@@ -284,9 +310,9 @@ def get_chars(s, offset, gochars):
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
-  ''' Scan the string `s` for characters in string.whitespace
-      starting at `offset` (default 0).
-      Return (match, new_offset).
+  ''' Scan the string `s` for characters in `string.whitespace`
+      starting at `offset` (default `0`).
+      Return `(match,new_offset)`.
   '''
   return get_chars(s, offset, whitespace)
 
@@ -300,8 +326,12 @@ def skipwhite(s, offset=0):
 def stripped_dedent(s):
   ''' Slightly smarter dedent which ignores a string's opening indent.
 
-      Strip the supplied string `s`. Pull off the leading line.
-      Dedent the rest. Put back the leading line.
+      Algorithm:
+      strip the supplied string `s`, pull off the leading line,
+      dedent the rest, put back the leading line.
+
+      This supports my preferred docstring layout, where the opening
+      line of text is on the same line as the opening quote.
 
       Example:
 
@@ -329,21 +359,21 @@ def stripped_dedent(s):
   return line1 + '\n' + adjusted
 
 def get_nonwhite(s, offset=0):
-  ''' Scan the string `s` for characters not in string.whitespace
+  ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default 0).
-      Return (match, new_offset).
+      Return `(match,new_offset)`.
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 def get_decimal(s, offset=0):
   ''' Scan the string `s` for decimal characters starting at `offset`.
-      Return (dec_string, new_offset).
+      Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
 def get_decimal_value(s, offset=0):
   ''' Scan the string `s` for a decimal value starting at `offset`.
-      Return (value, new_offset).
+      Return `(value,new_offset)`.
   '''
   value_s, offset = get_decimal(s, offset)
   if not value_s:
@@ -352,13 +382,13 @@ def get_decimal_value(s, offset=0):
 
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
-      Return hex_string, new_offset.
+      Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_hexadecimal_value(s, offset=0):
   ''' Scan the string `s` for a hexadecimal value starting at `offset`.
-      Return (value, new_offset).
+      Return `(value,new_offset)`.
   '''
   value_s, offset = get_hexadecimal(s, offset)
   if not value_s:
@@ -368,7 +398,7 @@ def get_hexadecimal_value(s, offset=0):
 def get_decimal_or_float_value(s, offset=0):
   ''' Fetch a decimal or basic float (nnn.nnn) value
       from the str `s` at `offset`.
-      Return (value, new_offset).
+      Return `(value,new_offset)`.
   '''
   int_part, offset = get_decimal(s, offset)
   if not int_part:
@@ -384,14 +414,14 @@ def get_identifier(
   ''' Scan the string `s` for an identifier (by default an ASCII
       letter or underscore followed by letters, digits or underscores)
       starting at `offset` (default 0).
-      Return (match, new_offset).
+      Return `(match,new_offset)`.
 
-      Note: the empty string and an unchanged offset will be returned if
+      *Note*: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
 
       Parameters:
       * `s`: the string to scan
-      * `offset`: the starting offset, default 0.
+      * `offset`: the starting offset, default `0`.
       * `alpha`: the characters considered alphabetic,
         default `string.ascii_letters`.
       * `number`: the characters considered numeric,
@@ -414,7 +444,7 @@ def is_identifier(s, offset=0, **kw):
   return s2 and offset2 == len(s)
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier as for get_identifier(),
+  ''' Scan the string `s` for an identifier as for `get_identifier`,
       but require the letters to be uppercase.
   '''
   return get_identifier(
@@ -425,8 +455,8 @@ def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
       ASCII letter or underscore followed by letters, digits or
       underscores) with optional trailing dot and another dotted
-      identifier, starting at `offset` (default 0).
-      Return (match, new_offset).
+      identifier, starting at `offset` (default `0`).
+      Return `(match,new_offset)`.
 
       Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
@@ -449,8 +479,8 @@ def is_dotted_identifier(s, offset=0, **kw):
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
-      at `offset` (default 0).
-      Return (match, new_offset).
+      at `offset` (default `0`).
+      Return `(match,new_offset)`.
   '''
   ooffset = offset
   while offset < len(s) and s[offset] not in stopchars:
@@ -469,7 +499,7 @@ SLOSH_CHARMAP = {
 }
 
 def slosh_mapper(c, charmap=None):
-  ''' Return a string to replace backslash-`c`, or None.
+  ''' Return a string to replace backslash-`c`, or `None`.
   '''
   if charmap is None:
     charmap = SLOSH_CHARMAP
@@ -479,12 +509,12 @@ def get_sloshed_text(
     s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None
 ):
   ''' Collect slosh escaped text from the string `s` from position
-      `offset` (default 0) and return the decoded unicode string and
+      `offset` (default `0`) and return the decoded unicode string and
       the offset of the completed parse.
 
       Parameters:
       * `delim`: end of string delimiter, such as a single or double quote.
-      * `offset`: starting offset within `s`, default 0.
+      * `offset`: starting offset within `s`, default `0`.
       * `slosh`: escape character, default a slosh ('\\').
       * `mapper`: a mapping function which accepts a single character
         and returns a replacement string or `None`; this is used the
@@ -874,6 +904,79 @@ def cutsuffix(s, suffix):
   if suffix and s.endswith(suffix):
     return s[:-len(suffix)]
   return s
+
+class FormatAsError(LookupError):
+  ''' Subclass of `LookupError` for use by `format_as`.
+  '''
+
+  DEFAULT_SEPARATOR = '; '
+
+  def __init__(self, key, format_s, format_mapping, error_sep=None):
+    if error_sep is None:
+      error_sep = self.DEFAULT_SEPARATOR
+    LookupError.__init__(self, key)
+    self.args = (key, format_s, format_mapping, error_sep)
+
+  def __str__(self):
+    key, format_s, format_mapping, error_sep = self.args
+    return error_sep.join(
+        (
+            "format fails, missing key: %s" % (key,),
+            "format string was: %r" % (format_s,),
+            "available keys: %s" % (' '.join(sorted(format_mapping.keys()))),
+        )
+    )
+
+@fmtdoc
+def format_as(format_s, format_mapping, error_sep=None):
+  ''' Format the string `format_s` using `format_mapping`,
+      return the formatted result.
+      This is a wrapper for `str.format_map`
+      which raises a more informative `FormatAsError` exception on failure.
+
+      Parameters:
+      * `format_s`: the format string to use as the template
+      * `format_mapping`: the mapping of available replacement fields
+      * `error_sep`: optional separator for the multipart error message,
+        default from FormatAsError.DEFAULT_SEPARATOR:
+        `'{FormatAsError.DEFAULT_SEPARATOR}'`
+  '''
+  try:
+    formatted = format_s.format_map(format_mapping)
+  except KeyError as e:
+    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep=error_sep)
+  return formatted
+
+_format_as = format_as
+
+class FormatableMixin(object):
+  ''' A mixin to supply a `format_as` method for classes with an
+      existing `format_kwargs` method.
+
+      The `format_as` method is like an inside out `str.format` or
+      `object._format__` method.
+      `str.format` is designed for formatting a string from a variety
+      of other obejcts supplied in the keyword arguments,
+      and `object.__format__` is for filling out a single `str.format`
+      replacement field from a single object.
+      By contrast, `format_as` is designed to fill out an entire format
+      string from the current object.
+
+      For example, the `cs.tagset.TagSet` class
+      uses `FormatableMixin` to provide a `format_as` method
+      whose replacement fields are derived from the tags in the tag set.
+  '''
+
+  def format_as(self, format_s, error_sep=None, **control_kw):
+    ''' Return the string `format_s` formatted using the mapping
+        returned by `self.format_kwargs(**control_kw)`.
+
+        The class using this mixin must provide
+        a `format_kwargs(**control_kw)` method
+        to compute the mapping provided to `str.format_map`.
+    '''
+    format_mapping = self.format_kwargs(**control_kw)
+    return _format_as(format_s, format_mapping, error_sep=error_sep)
 
 if __name__ == '__main__':
   import cs.lex_tests

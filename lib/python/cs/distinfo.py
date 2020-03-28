@@ -24,9 +24,9 @@ import shutil
 import sys
 from tempfile import mkdtemp
 from textwrap import dedent
+from types import SimpleNamespace as NS
 from cs.lex import stripped_dedent
 from cs.logutils import setup_logging, info, warning, error
-from cs.obj import O
 from cs.pfx import Pfx
 import cs.sh
 from cs.x import X
@@ -296,7 +296,7 @@ def get_md_doc(
     full_doc = full_doc.rstrip() + '\n\n' + postamble_md
   return doc_head, full_doc
 
-class Package(O):
+class Package(NS):
 
   def __init__(self, package_name):
     super().__init__(name=package_name)
@@ -305,7 +305,7 @@ class Package(O):
   def hg_tag(self):
     return self.name + '-' + self.version
 
-class PyPI_Package(O):
+class PyPI_Package(NS):
   ''' Operations for a package at PyPI.
   '''
 
@@ -618,7 +618,7 @@ class PyPI_Package(O):
     runcmd(hgargv)
     return included
 
-class PyPI_PackageCheckout(O):
+class PyPI_PackageCheckout(NS):
   ''' Facilities available with a checkout of a package.
   '''
 

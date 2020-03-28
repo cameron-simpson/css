@@ -21,7 +21,7 @@ import sys
 from threading import RLock
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, TaggedPath, Tag, rpaths
-from cs.logutils import setup_logging, warning, info
+from cs.logutils import warning, info
 from cs.mappings import named_column_tuples, dicts_to_namedtuples
 from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
@@ -32,8 +32,6 @@ ITUNES_LIBRARY_PATH_ENVVAR = 'ITUNES_LIBRARY_PATH'
 def main(argv=None):
   ''' Command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
   return ITunesCommand().run(argv)
 
 class ITunesCommand(BaseCommand):
@@ -49,12 +47,11 @@ class ITunesCommand(BaseCommand):
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    setup_logging(options.cmd)
     options.fstags = FSTags()
     options.library = ITunes()
 
   @staticmethod
-  def cmd_autotag(argv, options, *, cmd):
+  def cmd_autotag(argv, options):
     ''' Tag paths based on data from the iTunes library.
     '''
     fstags = options.fstags

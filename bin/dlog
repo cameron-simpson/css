@@ -7,8 +7,10 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [-d datetime] [-l {log|logfile}] [--] [remark...]"
+usage="Usage: $cmd [-c cats] [-d datetime] [-l {log|logfile}] [--] [remark...]"
 
+dlog_cats=
+logname=dlog-quick
 trace=  ##set-x
 echo=:
 [ -t 2 ] && echo=eecho
@@ -32,13 +34,12 @@ then
   fi
 fi
 
-logname=dlog-quick
-
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -c) dlog_cats=$2; shift ;;
     -d) when=$2; shift ;;
     -l) logname=$2; shift ;;
     --) shift; break ;;
@@ -55,6 +56,8 @@ case "$logname" in
   *) logname=$LOGDIR/$logname ;;
 esac
 
+[ -n "$dlog_cats" ] || dlog_cats=`dlog-category`
+
 [ $# = 0 ] && exec pageif cat "$logname"
 
 # compute ISO8601 timestamp string
@@ -63,5 +66,5 @@ then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
 else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
-echo "$ts $*" >>"$logname"
-exec buglog -d "$ts" -B dlog "$*"
+echo "$ts $dlog_cats: $*" >>"$logname"
+exec buglog -c "$dlog_cats" -d "$ts" -B dlog "$*"

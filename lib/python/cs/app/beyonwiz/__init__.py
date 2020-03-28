@@ -22,10 +22,12 @@ from cs.app.ffmpeg import (
     ConversionSource as FFSource,
 )
 from cs.deco import strable
+from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx
 from cs.py.func import prop
+from cs.tagset import Tag
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -36,10 +38,12 @@ DISTINFO = {
     'requires': [
         'cs.app.ffmpeg',
         'cs.deco',
+        'cs.fstags',
         'cs.logutils',
         'cs.mediainfo',
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
     ],
     'entry_points': {
         'console_scripts': [
@@ -50,7 +54,8 @@ DISTINFO = {
 
 # UNUSED
 def trailing_nul(bs):
-  # strip trailing NULs
+  ''' Strip trailing `NUL`s
+  '''
   bs = bs.rstrip(b'\x00')
   # locate preceeding NUL padded area
   start = bs.rfind(b'\x00')
@@ -61,6 +66,8 @@ def trailing_nul(bs):
   return start, bs[start:]
 
 class MetaJSONEncoder(json.JSONEncoder):
+  ''' `json.JSONEncoder` sublass with handlers for `set` and `datetime`.
+  '''
 
   def default(self, o):
     if isinstance(o, set):
@@ -85,12 +92,25 @@ class RecordingMetaData(NS):
       raise AttributeError(attr)
 
   def as_dict(self):
+    ''' Return the metadata as a `dict`.
+    '''
     d = dict(self.__dict__)
     d["start_dt_iso"] = self.start_dt_iso
     return d
 
   def as_json(self, indent=None):
+    ''' Return the metadat as JSON.
+    '''
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
+
+  def as_tags(self):
+    ''' Generator yielding the metadata as `Tag`s.
+    '''
+    yield from (Tag(tag, None) for tag in self.tags)
+    yield from self.episodeinfo.as_tags()
+    for rawkey, rawvalue in self.raw.items():
+      for field, value in rawvalue.items():
+        yield Tag(rawkey + '.' + field, value)
 
   @property
   def start_dt(self):
@@ -115,7 +135,7 @@ def Recording(path):
     return Enigma2(path)
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(ABC):
+class _Recording(ABC, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
@@ -124,7 +144,8 @@ class _Recording(ABC):
       'source_name', 'start_dt_iso', 'description'
   )
 
-  def __init__(self, path):
+  def __init__(self, path, fstags=None):
+    self._fstags = fstags
     self.path = path
     self._lock = Lock()
 
@@ -145,6 +166,8 @@ class _Recording(ABC):
 
   @abstractmethod
   def data(self):
+    ''' Stub method for the raw video data method.
+    '''
     raise NotImplementedError('data')
 
   @strable(open_func=lambda filename: open(filename, 'wb'))
@@ -157,10 +180,14 @@ class _Recording(ABC):
 
   @prop
   def tags_part(self):
+    ''' A filename component representing the metadata tags.
+    '''
     return '+'.join(self.tags)
 
   @prop
   def episode_info_part(self):
+    ''' A filename component representing the episode info.
+    '''
     return str(self.metadata.episodeinfo)
 
   def converted_path(self, outext):
@@ -242,6 +269,9 @@ class _Recording(ABC):
               "can't infer output format from dstpath, no extension"
           )
         dstfmt = ext[1:]
+      fstags = self.fstags
+      with fstags:
+        fstags[dstpath].update(self.metadata.as_tags(), prefix='beyonwiz')
       ffmeta = self.ffmpeg_metadata(dstfmt)
       sources = []
       for start_s, end_s in timespans:
@@ -268,6 +298,8 @@ class _Recording(ABC):
       return ok
 
   def ffmpeg_metadata(self, dstfmt='mp4'):
+    ''' Return a new `FFmpegMetaData` containing our metadata.
+    '''
     M = self.metadata
     comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
               % (self.path, M.start_dt_iso)

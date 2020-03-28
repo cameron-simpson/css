@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Pfx: a framework for easy to use dynamic message prefixes.
-#   - Cameron Simpson <cs@cskk.id.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 r'''
@@ -9,10 +9,14 @@ Dynamic message prefixes providing execution context.
 
 The primary facility here is Pfx,
 a context manager which maintains a per thread stack of context prefixes.
+There are also decorators for functions.
 
 Usage is like this:
 
+    from cs.logutils import setup_logging, info
     from cs.pfx import Pfx
+    ...
+    setup_logging()
     ...
     def parser(filename):
       with Pfx("parse(%r)", filename):
@@ -21,7 +25,7 @@ Usage is like this:
             with Pfx("%d", lineno) as P:
               if line_is_invalid(line):
                 raise ValueError("problem!")
-              P.info("line = %r", line)
+              info("line = %r", line)
 
 This produces log messages like:
 
@@ -71,76 +75,17 @@ def pfx_iter(tag, iterable):
   ''' Wrapper for iterables to prefix exceptions with `tag`.
   '''
   with Pfx(tag):
-    I = iter(iterable)
+    it = iter(iterable)
   while True:
     with Pfx(tag):
       try:
-        i = next(I)
+        i = next(it)
       except StopIteration:
         break
     yield i
 
-def pfx(func):
-  ''' Decorator for functions that should run inside:
-
-          with Pfx(func_name):
-
-      Use:
-
-          @pfx
-          def f(...):
-  '''
-  name = funcname(func)
-
-  def pfx_wrapper(*args, **kwargs):
-    with Pfx(name):
-      return func(*args, **kwargs)
-
-  pfx_wrapper.__name__ = "@pfx(%s)" % (name,)
-  return pfx_wrapper
-
-@decorator
-def pfx_method(method, use_str=False):
-  ''' Decorator to provide a `Pfx` context for an instance method prefixing
-      *classname.methodname*
-      (or `str(self).`*methodname* if `use_str` is true).
-  '''
-
-  def wrapper(self, *a, **kw):
-    with Pfx("%s.%s", self if use_str else type(self).__name__, method.__name__):
-      return method(self, *a, **kw)
-
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(%s)" % (method.__name__,)
-  return wrapper
-
-def pfxtag(tag, loggers=None):
-  ''' Decorator for functions that should run inside:
-
-          with Pfx(tag, loggers=loggers):
-
-      Use:
-
-          @pfxtag(tag)
-          def f(...):
-  '''
-
-  def wrap(func):
-    if tag is None:
-      wraptag = func.__name__
-    else:
-      wraptag = tag
-
-    def wrapped(*args, **kwargs):
-      with Pfx(wraptag, loggers=loggers):
-        return func(*args, **kwargs)
-
-    return wrapped
-
-  return wrap
-
 class _PfxThreadState(threading.local):
-  ''' _PfxThreadState is a thread local class to track Pfx stack state.
+  ''' A Thread local class to track `Pfx` stack state.
   '''
 
   def __init__(self):
@@ -153,7 +98,7 @@ class _PfxThreadState(threading.local):
 
   @property
   def cur(self):
-    ''' .cur is the current/topmost Pfx instance.
+    ''' The current/topmost `Pfx` instance.
     '''
     global cmd
     stack = self.stack
@@ -262,9 +207,9 @@ class Pfx(object):
         Parameters:
         * `mark`: message prefix string
         * `args`: if not empty, apply to the prefix string with `%`
-        * `absolute`: optional keyword argument, default False. If
+        * `absolute`: optional keyword argument, default `False`. If
           true, this message forms the base of the message prefixes;
-          existing prefixes will be suppressed.
+          earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
 
         *Note*:
@@ -273,12 +218,14 @@ class Pfx(object):
         Otherwise, they are not combined.
         Therefore the values interpolated are as they are when the `Pfx` is used,
         not necessarily as they were when the `Pfx` was created.
-        If `args` is subject to change and you require the original values,
+        If the `args` are subject to change and you require the original values,
         apply them to `mark` immediately, for example:
 
             with Pfx('message %s ...' % (arg1, arg2, ...)):
 
-        This is a bit more expensive, and the common usage is:
+        This is a bit more expensive as it incurs the formatting cost
+        whenever you enter the `with` clause.
+        The common usage is:
 
             with Pfx('message %s ...', arg1, arg2, ...):
     '''
@@ -298,6 +245,7 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
+    # push this Pfx onto the per-Thread stack
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -311,67 +259,10 @@ class Pfx(object):
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
         # now hack the exception attributes
-        current_prefix = self._state.prefix
-
-        def prefixify(text):
-          if not isinstance(text, StringTypes):
-            ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
-            ##  current_prefix, text.__class__, text, sys.exc_info())
-            return text
-          return current_prefix \
-              + ': ' \
-              + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
-
-        def prefixify_exc(e):
-          ''' Modify the supplied exception `e` with the current prefix.
-              Return true if modified, false if unable to modify.
-          '''
-          did_prefix = False
-          for attr in 'args', 'message', 'msg', 'reason':
-            try:
-              value = getattr(e, attr)
-            except AttributeError:
-              continue
-            if isinstance(value, StringTypes):
-              value = prefixify(value)
-            elif isinstance(value, Exception):
-              # set did_prefix if we modify this in place
-              did_prefix = prefixify_exc(value)
-            else:
-              try:
-                vlen = len(value)
-              except TypeError:
-                print(
-                    "warning: %s: %s.%s: " % (current_prefix, e, attr),
-                    prefixify(
-                        "do not know how to prefixify: %s:%r" %
-                        (type(value), value)
-                    ),
-                    file=sys.stderr
-                )
-                continue
-              else:
-                if vlen < 1:
-                  value = [prefixify(repr(value))]
-                else:
-                  value = [prefixify(value[0])] + list(value[1:])
-            try:
-              setattr(e, attr, value)
-            except AttributeError as e2:
-              print(
-                  "warning: %s: %s.%s: cannot set to %r: %s" %
-                  (current_prefix, e, attr, value, e2),
-                  file=sys.stderr
-              )
-              continue
-            did_prefix = True
-          return did_prefix
-
-        did_prefix = prefixify_exc(exc_value)
-        if not did_prefix:
+        if not self.prefixify_exception(exc_value):
           print(
               "warning: %s: %s:%s: message not prefixed" %
-              (current_prefix, type(exc_value).__name__, exc_value),
+              (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
           )
     _state.pop()
@@ -408,6 +299,66 @@ class Pfx(object):
           u = u + ' % ' + repr(self.mark_args)
       self._umark = u
     return u
+
+  @classmethod
+  def prefixify(cls, text):
+    ''' Return `text` with the current prefix prepended.
+        Returns `text` unchanged if it is not a string.
+    '''
+    current_prefix = cls._state.prefix
+    if not isinstance(text, StringTypes):
+      ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+      ##  current_prefix, text.__class__, text, sys.exc_info())
+      return text
+    return current_prefix \
+        + ': ' \
+        + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
+
+  @classmethod
+  def prefixify_exception(cls, e):
+    ''' Modify the supplied exception `e` with the current prefix.
+        Return `True` if modified, `False` if unable to modify.
+    '''
+    current_prefix = cls._state.prefix
+    did_prefix = False
+    for attr in 'args', 'message', 'msg', 'reason':
+      try:
+        value = getattr(e, attr)
+      except AttributeError:
+        continue
+      if isinstance(value, StringTypes):
+        value = cls.prefixify(value)
+      elif isinstance(value, Exception):
+        # set did_prefix if we modify this in place
+        did_prefix = cls.prefixify_exception(value)
+      else:
+        try:
+          vlen = len(value)
+        except TypeError:
+          print(
+              "warning: %s: %s.%s: " % (current_prefix, e, attr),
+              cls.prefixify(
+                  "do not know how to prefixify: %s:%r" % (type(value), value)
+              ),
+              file=sys.stderr
+          )
+          continue
+        else:
+          if vlen < 1:
+            value = [cls.prefixify(repr(value))]
+          else:
+            value = [cls.prefixify(value[0])] + list(value[1:])
+      try:
+        setattr(e, attr, value)
+      except AttributeError as e2:
+        print(
+            "warning: %s: %s.%s: cannot set to %r: %s" %
+            (current_prefix, e, attr, value, e2),
+            file=sys.stderr
+        )
+        continue
+      did_prefix = True
+    return did_prefix
 
   def logto(self, new_loggers):
     ''' Define the Loggers anew.
@@ -536,21 +487,112 @@ def PfxThread(target=None, **kw):
 
   return threading.Thread(target=run, **kw)
 
+@decorator
+def pfx(func, message=None, message_args=()):
+  ''' General purpose @pfx for generators, methods etc.
+      Pfx needs a .overPfx attribute to hook up chained Pfx stacks.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `message`: optional prefix to use instead of the function name
+      * `message_args`: optional arguments to embed in the preifx using `%`
+
+      Example usage:
+
+          @pfx
+          def f(....):
+              ....
+  '''
+  fname = funcname(func)
+  if message is None:
+    message = fname
+
+  if isgeneratorfunction(func):
+
+    def wrapper(*a, **kw):
+      ''' Before running the generator the current stack height is
+          noted.  After yield, the stack above that height is trimmed
+          and saved, and the value yielded.  On recommencement the saved
+          stack is reapplied to the current stack (which may have
+          changed) and the generator continued.
+      '''
+      # commence the generator
+      g = func(*a, **kw)
+      # prepare an initial generator Pfx stack
+      saved = []
+      while True:
+        # note the current Thread's Pfx stack
+        stack = Pfx._state.stack
+        height = len(stack)
+        stack.extend(saved)
+        try:
+          with Pfx(message, *message_args):
+            value = next(g)
+        except StopIteration:
+          # clean up and return
+          stack[height:] = []
+          return
+          # other exceptions raise cleanly out of the generator
+        # save generator Pfx stack, reset caller Pfx stack, yield
+        saved = stack[height:]
+        stack[height:] = []
+        yield value
+  else:
+
+    def wrapper(*a, **kw):
+      ''' Run function inside `Pfx` context manager.
+      '''
+      with Pfx(message, *message_args):
+        return func(*a, **kw)
+
+  wrapper.__name__ = "@pfx(%s)" % (fname,)
+  fdoc = func.__doc__
+  wrapper.__doc__ = wrapper.__name__ + ":\n" + wrapper.__doc__
+  if fdoc:
+    wrapper.__doc__ += '\n\n' + fdoc
+  return wrapper
+
+@decorator
+def pfx_method(method, use_str=False):
+  ''' Decorator to provide a `Pfx` context for an instance method prefixing
+      *classname.methodname*
+      (or `str(self).`*methodname* if `use_str` is true).
+
+      Example usage:
+
+          class O:
+              @pfx_method
+              def foo(self, .....):
+                  ....
+  '''
+
+  fname = method.__name__
+
+  def wrapper(self, *a, **kw):
+    ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
+    '''
+    with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
+      return method(self, *a, **kw)
+
+  wrapper.__doc__ = method.__doc__
+  wrapper.__name__ = "@pfx_method(%s)" % (fname,)
+  return wrapper
+
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
       which prefixes the message with the current Pfx prefix.
   '''
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
-  elif file is not None:
-    if isinstance(file, StringTypes):
-      with open(file, "a") as fp:
-        return XP(msg, *args, file=fp)
-  file.write(prefix())
-  file.write(': ')
-  file.flush()
-  return X(msg, *args, file=file)
+  f = kwargs.pop('file', None)
+  if f is None:
+    f = sys.stderr
+  elif f is not None:
+    if isinstance(f, StringTypes):
+      with open(f, "a") as f2:
+        return XP(msg, *args, file=f2)
+  f.write(prefix())
+  f.write(': ')
+  f.flush()
+  return X(msg, *args, file=f)
 
 def XX(prepfx, msg, *args, **kwargs):
   ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.

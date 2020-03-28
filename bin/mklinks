@@ -4,4 +4,4 @@
 #       - Cameron Simpson <cs@cskk.id.au> 01dec2011
 #
 
-exec python -m cs.app.mklinks ${1+"$@"}
+exec python3 -m cs.app.mklinks ${1+"$@"}
