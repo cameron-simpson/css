@@ -30,6 +30,7 @@ import sys
 from time import sleep
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
@@ -232,8 +233,8 @@ class VTCmd(BaseCommand):
           sleep(0.25)
 
       ticker = bg_thread(ticker, name='status-line', daemon=True)
-    with options.stack(progress=progress, ticker=ticker):
-      with defaults.stack(runstate=runstate):
+    with stackattrs(options, progress=progress, ticker=ticker):
+      with stackattrs(defaults, runstate=runstate):
         if cmd in ("config", "dump", "init", "profile", "scan", "test"):
           yield
         else:

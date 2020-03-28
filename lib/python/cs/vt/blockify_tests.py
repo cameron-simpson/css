@@ -16,12 +16,15 @@ import time
 import unittest
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
-from cs.x import X
 from .randutils import randomish_chunks
 from .blockify import blockify, blocked_chunks_of, \
                       MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
+
+from cs.x import X
+import cs.x
+cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 

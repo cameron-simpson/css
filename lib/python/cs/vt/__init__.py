@@ -43,7 +43,6 @@ import os
 import tempfile
 import threading
 from cs.logutils import error, warning
-from cs.mappings import StackableValues
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
@@ -62,6 +61,8 @@ DISTINFO = {
         'cs.app.flag',
         'cs.binary',
         'cs.cache',
+        'cs.cmdutils',
+        'cs.context',
         'cs.debug',
         'cs.deco',
         'cs.excutils',
@@ -70,7 +71,6 @@ DISTINFO = {
         'cs.later',
         'cs.lex',
         'cs.logutils',
-        'cs.mappings',
         'cs.packetstream',
         'cs.pfx',
         'cs.progress',
@@ -156,21 +156,24 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-class _Defaults(threading.local, StackableValues):
+class _Defaults(threading.local):
   ''' Per-thread default context stack.
 
       A Store's __enter__/__exit__ methods push/pop that store
       from the `.S` attribute.
   '''
 
-  _Ss = []  # global stack of fallback Store values
+  # Global stack of fallback Store values.
+  # These are pushed by things like main or the fuse setup
+  # to provide a shared default across Threads.
+  _Ss = []
 
   def __init__(self):
     threading.local.__init__(self)
-    StackableValues.__init__(self)
-    self.push('runstate', RunState())
-    self.push('fs', None)
-    self.push('block_cache', None)
+    self.runstate = RunState(self.__module__ + " _Defaults initial")
+    self.fs = None
+    self.block_cache = None
+    self.Ss = []
 
   def _fallback(self, key):
     ''' Fallback function for empty stack.
@@ -188,16 +191,43 @@ class _Defaults(threading.local, StackableValues):
       return None
     raise ValueError("no fallback for %r" % (key,))
 
+  @property
+  def S(self):
+    ''' The topmost Store.
+    '''
+    Ss = self.Ss
+    if Ss:
+      return self.Ss[-1]
+    _Ss = self._Ss
+    if _Ss:
+      return self._Ss[-1]
+    raise AttributeError('S')
+
+  @S.setter
+  def S(self, newS):
+    ''' Set the topmost Store.
+        Sets the topmost global Store
+        if there's no current perThread Store stack.
+    '''
+    Ss = self.Ss
+    if Ss:
+      Ss[-1] = newS
+    else:
+      _Ss = self._Ss
+      if _Ss:
+        _Ss[-1] = newS
+      else:
+        _Ss.append(newS)
+
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
     '''
-    self.push('S', newS)
+    self.Ss.append(newS)
 
   def popStore(self):
     ''' Pop and return the topmost Store from the per-Thread stack.
     '''
-    oldS = self.pop('S')
-    return oldS
+    return self.Ss.pop()
 
   def push_Ss(self, newS):
     ''' Push a new Store onto the global stack.
