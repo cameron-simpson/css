@@ -288,15 +288,33 @@ class CornuCopyBuffer(object):
   __nonzero__ = __bool__
 
   def __getitem__(self, index):
-    ''' Fetch a byte form the internal buffer.
+    ''' Fetch from the internal buffer.
+        Note that this is an expensive way to access the buffer,
+        particularly if `index` is a slice.
+
+        If `index` is a `slice`, slice the join of the internal subbuffers.
+        This is quite expensive
+        and it is probably better to `take` or `takev`
+        some data from the buffer.
+
+        Otherwise `index` should be an `int` and the corresponding
+        buffered byte is returned.
     '''
+    if isinstance(index, slice):
+      # slice the joined up bufs - expensive
+      start, end, step = index.indices(self.buflen)
+      return b''.join(self.bufs)[index]
     index0 = index
     if index < 0:
       index = self.buflen - index
       if index < 0:
-        raise ValueError(
+        raise IndexError(
             "index %s out of range (buflen=%d)" % (index0, self.buflen)
         )
+    if index >= self.buflen:
+      raise IndexError(
+          "index %s out of range (buflen=%d)" % (index0, self.buflen)
+      )
     buf_offset = 0
     for i, buf in enumerate(self.bufs):
       if index < buf_offset + len(buf):
