@@ -129,7 +129,7 @@ class DataRecord(PacketField):
     return len(self._data)
 
 class DataFilePushable:
-  ''' Read access to a data file, storing data chunks in compressed form.
+  ''' Read access to a data file, which stores data chunks in compressed form.
       This is the usual file based persistence layer of a local Store.
   '''
 
@@ -158,7 +158,10 @@ class DataFilePushable:
       for DR in DataRecord.parse_buffer(bfr):
         if runstate and runstate.cancelled:
           return False
-        Q.put(Block(data=DR.data))
+        data = DR.data
+        Q.put(Block(data=data))
+        if progress:
+          progress += len(data)
     return True
 
 if __name__ == '__main__':
