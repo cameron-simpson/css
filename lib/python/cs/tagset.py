@@ -543,12 +543,12 @@ class TagsOntology(SingletonMixin):
         presume it is a `Tag.name`
         and return the defining `TagSet`.
         Otherwise presume `index` is `Tag`like
-        and return a `TypedTag` for the index
+        and return a `TagInfo` for the index
         (a `Tag`like object with type information).
     '''
     return (
         self.defn_tagset(index)
-        if isinstance(index, str) else TypedTag(index, ontology=self)
+        if isinstance(index, str) else TagInfo(index, ontology=self)
     )
 
   def defn_tagset(self, tag):
@@ -602,7 +602,7 @@ class TagsOntology(SingletonMixin):
     name = type_name + '.' + '_'.join(value_tag_name.lower().split())
     return self[name]
 
-class TypedTag(FormatableMixin):
+class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
       providing associated detail about a `Tag`.
 
@@ -613,30 +613,30 @@ class TypedTag(FormatableMixin):
       * `tag`: the originating `Tag`
         (computed from the `(name,value)` tuple if supplied)
       * `defn`: the `TagSet` from the ontology
-        which defines this `TypedTag`'s metadata
+        which defines this `TagInfo`'s metadata
       * `type`: `defn['type']`
       * `member_type`: `defn['member_type']` if present;
         we expect `type` to be a list or mapping type name
 
-      Indexing a `TypedTag` indexes its `.value`
+      Indexing a `TagInfo` indexes its `.value`
       and returns a tuple `(element,TagSet)`
       where the `TagSet` is information from the ontology
       about the element's value (if `element` is a `str`).
 
       If the `.value` looks like a mapping
       .ie. it has a `.keys()` method
-      then a `TypedTag` has `.keys()` and `.items()` methods.
+      then a `TagInfo` has `.keys()` and `.items()` methods.
       The `.keys()` call returns `.value.keys()`.
       The `.items()` call yields `(key,self[key])`
       for each of `self.keys()`.
 
-      Iterating over a `TypedTag`
+      Iterating over a `TagInfo`
       yields its keys if it has a `.keys()` method,
       otherwise values from `range(len(self.value))`.
   '''
 
   def __init__(self, name, value=None, *, ontology):
-    ''' Prepare the `TypedTag` from a `Tag` or `(name,value)` tuple.
+    ''' Prepare the `TagInfo` from a `Tag` or `(name,value)` tuple.
     '''
     tag = Tag.from_name_value(name, value)
     self.tag = tag
