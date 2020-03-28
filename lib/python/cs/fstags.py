@@ -6,8 +6,8 @@
     Why `fstags`?
     By storing the tags in a separate file we:
     * can store tags without modifying a file
-    * do no need to know the file's format,
-      whether that supports metadata or not
+    * do not need to know the file's format,
+      or even whether that format supports metadata
     * can process tags on any kind of file
     * because tags are inherited from parent directories,
       tags can be automatically acquired merely by arranging your file tree
