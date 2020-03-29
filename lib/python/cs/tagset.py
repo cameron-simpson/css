@@ -648,9 +648,11 @@ class TagsOntology(SingletonMixin):
         ready for lookup in the ontology
         to obtain the "detail" `TagSet` for each specific value.
     '''
-    value_tag_name = self.value_to_tag_name(value)
-    ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
-    return ValueDetail(self, ontkey, value)
+    if isinstance(value, str):
+      value_tag_name = self.value_to_tag_name(value)
+      ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
+      return ValueDetail(self, ontkey, value)
+    return None
 
 class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
