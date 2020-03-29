@@ -15,7 +15,8 @@ from cs.lex import (
 )
 from cs.logutils import info, warning
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method
+from icontract import require
 
 try:
   date_fromisoformat = date.fromisoformat
@@ -516,6 +517,45 @@ class ExtendedNamespace(SimpleNamespace):
       raise KeyError(attr) from e
     return value
 
+class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
+    ''' Detail information about a value.
+        * `ontology`: the reference ontology
+        * `ontkey`: the key within the ontology providing the detail
+        * `value`: the value
+    '''
+
+    @property
+    def detail(self):
+      ''' The detail, the `TagSet` from `ontology[ontkey]`.
+      '''
+      return self.ontology[self.ontkey]
+
+class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
+    ''' Detail information about a value.
+        * `ontology`: the reference ontology
+        * `ontkey`: the key within the ontology providing the detail
+        * `value`: the value
+        * `detail`: the detail, the `TagSet` from `ontology[ontkey]`
+    '''
+
+    @property
+    def ontology(self):
+      ''' The reference ontology.
+      '''
+      return self.key_detail.ontology
+
+    @property
+    def key(self):
+      ''' The key.
+      '''
+      return self.key_detail.value
+
+    @property
+    def value(self):
+      ''' The value.
+      '''
+      return self.value_detail.value
+
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
 
@@ -561,6 +601,7 @@ class TagsOntology(SingletonMixin):
     return self.tagsets[tagset_name]
 
   @staticmethod
+  @pfx
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
@@ -586,21 +627,28 @@ class TagsOntology(SingletonMixin):
         value = m.group(2).strip() + '.' + m.group(1).strip()
       value = '_'.join(value.lower().split())
       return value
-    return None
+    raise ValueError(value)
 
-  def value_tags(self, type_name, value):
-    ''' Return the `TagSet` for `type_name.value_to_tag_name(value)`.
+  @pfx_method
+  @require(lambda type_name: isinstance(type_name, str))
+  def value_detail(self, type_name, value):
+    ''' Return a `ValueDetail` for `type_name` and `value`.
+        This provides the mapping between a type's value and its semantics.
 
-        This implements the mapping between a type's value and its semantics.
+        For example,
+        if a `TagSet` had a list of characters such as:
+
+            characters=["Captain America (Marvel)","Black Widow (Marvel)"]
+
+        then these values could be converted to the dotted identifiers
+        `character.marvel.captain_america`
+        and `character.marvel.black_widow` respectively,
+        ready for lookup in the ontology
+        to obtain the "detail" `TagSet` for each specific value.
     '''
     value_tag_name = self.value_to_tag_name(value)
-    if value is None:
-      raise KeyError(
-          "cannot convert %s:%r to tag name form" %
-          (type(value).__name__, value)
-      )
-    name = type_name + '.' + '_'.join(value_tag_name.lower().split())
-    return self[name]
+    ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
+    return ValueDetail(self, ontkey, value)
 
 class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
@@ -614,8 +662,8 @@ class TagInfo(FormatableMixin):
         (computed from the `(name,value)` tuple if supplied)
       * `defn`: the `TagSet` from the ontology
         which defines this `TagInfo`'s metadata
-      * `type`: `defn['type']`
-      * `member_type`: `defn['member_type']` if present;
+      * `type`: `self.defn['type']`
+      * `member_type`: `self.defn['member_type']` if present;
         we expect `type` to be a list or mapping type name
 
       Indexing a `TagInfo` indexes its `.value`
@@ -650,32 +698,113 @@ class TagInfo(FormatableMixin):
     )
 
   def __repr__(self):
-    return "%s[tag=%s]" % (
-        type(self).__name__, self.tag
-    )
+    return "%s[tag=%s]" % (type(self).__name__, self.tag)
 
   @property
   def defn(self):
     ''' The defining `TagSet` for this tag name.
-        This is how its type is defined.
+
+        This is how its type is defined,
+        and is obtained from:
+        `self.ontology.defn_tagset(self.name)`
     '''
     return self.ontology.defn_tagset(self.name)
 
   @property
   def type(self):
     ''' The type name for this tag.
+
+        Unless the definition for `self.name` has a `type` tag,
+        the type is `self.ontology.value_to_tag_name(self.name)`.
+
+        For example, the tag `series="Avengers (Marvel)"`
+        would look up the definition for `series`.
+        If that had no `type=` tag, then the type
+        would default to `series`
+        which is what would be returned.
+
+        The corresponding detail `TagSet`
+        would have the the name `series.marvel.avengers`.
+
+        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
+        would look up the definition for `cast`
+        which might look like this:
+
+            cast type=dict key_type=person member_type=character
+
+        That says that the type name is `dict`,
+        which is what would be returned.
+
+        Because the type is `dict`
+        the definition also has `key_type` and `member_type` tags
+        identifying the type names for the keys and values
+        of the `cast=` tag.
+        As such, the corresponding detail `TagSet`s
+        in this example would be named
+        `person.scarlett_johasson`
+        and `character.marvel.black_widow` respectively.
     '''
-    return self.defn.get('type')
+    type_name = self.defn.get('type')
+    if type_name is None:
+      type_name = self.ontology.value_to_tag_name(self.name)
+    return type_name
 
   @property
+  @require(lambda self: isinstance(self.type, str))
   def detail(self):
-    ''' The `TagSet` providing detailed information
-        about this specific tag value,,
+    ''' The detailed information about this specific tag value,
         derived through the ontology from the tag name and value.
 
-        Returns `None` for unsupported value types.
+        For a scalar type this is a `ValueDetail`
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `ontkey`: the ontology key providing the detail for the `value`
+        * `value`: the value `self.value`
+        * `detail`: the detail, a `TagSet`
+
+        However, note that the types `'list'` and `'dict'` are special,
+        indicating that the value is a sequence or mapping respectively.
+
+        For `'list'` types
+        this property is a list of `ValueDetail` instances
+        for each element of the sequence.
+
+        For `'dict'` types
+        this property is a list of `KeyValueDetail` instances
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `key`: the key
+        * `key_detail`: a `ValueDetail` for the key
+        * `value`: the value
+        * `value_detail`: a `ValueDetail` for the value
     '''
-    return self.ontology.value_tags(self.name, self.value)
+    ont = self.ontology
+    if self.type == 'list':
+      member_type = self.member_type
+      return [
+          ont.value_detail(member_type, value)
+          for value in self.value
+      ]
+    if self.type == 'dict':
+      key_type = self.key_type
+      member_type = self.member_type
+      return [
+          KeyValueDetail(ont.value_detail(key_type, key),
+            ont.value_detail(member_type, value))
+          for key, value in self.value.items()
+      ]
+    return ont.value_detail(self.type, self.value)
+
+  @property
+  def key_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a mapping.
+    '''
+    try:
+      return self.defn['key_type']
+    except KeyError:
+      raise AttributeError('key_type')
 
   @property
   def member_type(self):
@@ -687,46 +816,6 @@ class TagInfo(FormatableMixin):
       return self.defn['member_type']
     except KeyError:
       raise AttributeError('member_type')
-
-  @property
-  def keys(self):
-    ''' The `keys` attribute if `self.value`, if present.
-    '''
-    return self.value.keys
-
-  def items(self):
-    ''' Generator yielding `(key,self[key])`
-        for `key` in `self.keys()`.
-
-        As such, the `self[key]` component
-        is a `(element,TagSet)` tuple.
-    '''
-    for k in self.value.keys():
-      yield k, self[k]
-
-  def __getitem__(self, index):
-    ''' Return a tuple `(element,TagSet)`
-        providing an element and its associated information.
-
-        The `element` is `self.value[index]`.
-
-        The `TagSet` is `self.ontology.value_tags(member_type,element)`
-        if the element is a `str`, otherwise `None`.
-    '''
-    element = self.value[index]
-    member_type = self.member_type
-    return element, (
-        self.ontology.value_tags(member_type, element)
-        if isinstance(element, str) else None
-    )
-
-  def __iter__(self):
-    try:
-      indices = self.value.keys()
-    except AttributeError:
-      indices = range(len(self.value))
-    for index in indices:
-      yield self[index]
 
   def ns(self):
     ''' Return an `ExtendedNamespace` derived from `self.defn.ns()`.
