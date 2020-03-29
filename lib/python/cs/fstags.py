@@ -6,8 +6,8 @@
     Why `fstags`?
     By storing the tags in a separate file we:
     * can store tags without modifying a file
-    * do no need to know the file's format,
-      whether that supports metadata or not
+    * do not need to know the file's format,
+      or even whether that format supports metadata
     * can process tags on any kind of file
     * because tags are inherited from parent directories,
       tags can be automatically acquired merely by arranging your file tree
@@ -52,7 +52,7 @@ import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
     isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile
+    samefile, splitext
 )
 from pathlib import PurePath
 import re
@@ -189,6 +189,8 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} ont
+        Locate the ontology.
     {cmd} ont tags tag[=value]...
         Query ontology information for the specified tags.
     {cmd} rename -n newbasename_format paths...
@@ -525,9 +527,12 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_ont(argv, options):
+    ''' Ontology operations.
+    '''
     ont = options.fstags.ontology('.')
     if not argv:
-      raise GetoptError("missing subcommand")
+      print(ont)
+      return 0
     subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'tags':
@@ -536,26 +541,12 @@ class FSTagsCommand(BaseCommand):
         for tag_arg in argv:
           with Pfx(tag_arg):
             tag = Tag.from_string(tag_arg)
-            typed = ont[tag]
-            print(tag, typed)
-            if typed.type == 'list':
-              for element, detail in typed:
-                print(" ", element)
-                if detail is not None:
-                  print(
-                      "   ",
-                      detail
-                      .format_as("fullname={fullname} all_names={fullnames}")
-                  )
-            else:
-              element = typed
-              detail = typed.detail
-              if detail is not None:
-                print(
-                    " ",
-                    detail
-                    .format_as("fullname={fullname} all_names={fullnames}")
-                )
+            taginfo = ont[tag]
+            print(tag, taginfo)
+            defn = taginfo.defn
+            print(" ", defn)
+            print(" ", repr(taginfo.value))
+            print(" ", repr(taginfo.detail))
       else:
         raise GetoptError("unrecognised subcommand")
 
@@ -1350,6 +1341,15 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     '''
     return tag in self.all_tags
 
+  @property
+  def ontology(self):
+    ''' The ontology for use with this file, or `None`.
+    '''
+    try:
+      return self.fstags.ontology(self.filepath)
+    except ValueError:
+      return None
+
   def format_kwargs(self, *, direct=False):
     ''' Format arguments suitable for `str.format`.
 
@@ -1359,6 +1359,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         In addition to the normal `TagSet.ns()` names
         the following additional names are available:
         * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.ext`: the fileextension of the basename of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
         * `tags`: the `TagSet` as a string
@@ -1366,7 +1367,6 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     kwtags = TagSet()
     kwtags.update(self.direct_tags if direct else self.all_tags)
     # add in cascaded values
-    # TODO: what about cascaded tags whose names contain dots?
     for tag in list(self.fstags.cascade_tags(kwtags)):
       if tag.name not in kwtags:
         kwtags.add(tag)
@@ -1374,13 +1374,15 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     filepath = self.filepath
     for pathtag in (
         Tag('filepath.basename', basename(filepath)),
+        Tag('filepath.ext', splitext(basename(filepath))[1]),
         Tag('filepath.pathname', filepath),
         Tag('filepath.encoded', TagFile.encode_name(filepath)),
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
     kwtags['tags'] = str(kwtags)
-    return kwtags.ns()
+    # convert the TagSet to an ExtendedNamespace
+    return kwtags.format_kwargs(ontology=self.ontology)
 
   @property
   def basename(self):
