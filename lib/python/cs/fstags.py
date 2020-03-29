@@ -52,7 +52,7 @@ import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
     isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile
+    samefile, splitext
 )
 from pathlib import PurePath
 import re
@@ -1359,6 +1359,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         In addition to the normal `TagSet.ns()` names
         the following additional names are available:
         * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.ext`: the fileextension of the basename of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
         * `tags`: the `TagSet` as a string
@@ -1374,6 +1375,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     filepath = self.filepath
     for pathtag in (
         Tag('filepath.basename', basename(filepath)),
+        Tag('filepath.ext', splitext(basename(filepath)))[1],
         Tag('filepath.pathname', filepath),
         Tag('filepath.encoded', TagFile.encode_name(filepath)),
     ):
