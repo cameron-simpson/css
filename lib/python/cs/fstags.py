@@ -1367,7 +1367,6 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     kwtags = TagSet()
     kwtags.update(self.direct_tags if direct else self.all_tags)
     # add in cascaded values
-    # TODO: what about cascaded tags whose names contain dots?
     for tag in list(self.fstags.cascade_tags(kwtags)):
       if tag.name not in kwtags:
         kwtags.add(tag)
