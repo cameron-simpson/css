@@ -179,7 +179,7 @@ class TagSet(dict, FormatableMixin):
       self[k] = v
 
   @pfx_method
-  def ns(self):
+  def ns(self, ontology=None):
     ''' Compute and return a presentation of this `TagSet` as a
         nested `ExtendedNamespace`.
 
@@ -201,8 +201,9 @@ class TagSet(dict, FormatableMixin):
         effect in the namespace - the first found is used.
     '''
     ns0 = ExtendedNamespace()
-    for tag_name in sorted(self, reverse=True):
-      with Pfx(tag_name):
+    for tag in sorted(self.as_tags(), reverse=True):
+      with Pfx(tag):
+        tag_name = tag.name
         subnames = [subname for subname in tag_name.split('.') if subname]
         if not subnames:
           warning("skipping weirdly named tag")
@@ -223,17 +224,44 @@ class TagSet(dict, FormatableMixin):
         subname, = subnames
         subpath.append(subname)
         with Pfx('.'.join(subpath)):
-          setattr(ns, '_' if hasattr(ns, subname) else subname, self[tag_name])
+          subattr = '_' if hasattr(ns, subname) else subname
+          setattr(ns, subattr, tag.value)
+          if ontology:
+            # add defn and meta information
+            taginfo = ontology[tag]
+            defn_ns = taginfo.defn.ns()
+            defn_subattr = '_defn' if subattr == '_' else subattr + '__defn'
+            setattr(ns, defn_subattr, defn_ns)
+            detail = taginfo.detail
+            if detail is not None:
+              if isinstance(detail, ValueDetail):
+                meta = detail.detail.ns()
+              else:
+                meta = []
+                for subdetail in detail:
+                  if subdetail is None:
+                    submeta=None
+                  elif isinstance(subdetail,ValueDetail):
+                    submeta=subdetail.detail.ns()
+                  elif isinstance(subdetail,KeyValueDetail):
+                    submeta= SimpleNameSpace(
+                        key=subdetail.key,key_detail=subdetail.key_detail.ns(),
+                        value=subdetail.value,value_detail=subdetail.value_detail.ns())
+                  else:
+                    submeta=subdetail
+                  meta.append(submeta)
+              meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
+              setattr(ns, meta_subattr, meta)
     return ns0
 
-  def format_kwargs(self):
+  def format_kwargs(self, ontology=None):
     ''' Return an `ExtendedNamespace` as from `self.ns()`
         with a special mode activated
 
         where a missing attribute returns the value `None`.
         This is to support use in `str.formap_map`
     '''
-    fkwargs = self.ns()
+    fkwargs = self.ns(ontology=ontology)
     fkwargs._return_None_if_missing = True
     return fkwargs
 
