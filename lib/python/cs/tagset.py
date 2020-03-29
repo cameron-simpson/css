@@ -533,9 +533,11 @@ class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
 class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
     ''' Detail information about a value.
         * `ontology`: the reference ontology
-        * `ontkey`: the key within the ontology providing the detail
+        * `key_detail`: the detail for the `key`,
+          the `TagSet` from `ontology[key_detail.ontkey]`
         * `value`: the value
-        * `detail`: the detail, the `TagSet` from `ontology[ontkey]`
+        * `value_detail`: the detail for the `value`,
+          the `TagSet` from `ontology[value_detail.ontkey]`
     '''
 
     @property
