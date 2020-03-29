@@ -1382,7 +1382,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         kwtags.add(pathtag)
     kwtags['tags'] = str(kwtags)
     # convert the TagSet to an ExtendedNamespace
-    return kwtags.format_kwargs()
+    return kwtags.format_kwargs(ontology=self.ontology)
 
   @property
   def basename(self):
