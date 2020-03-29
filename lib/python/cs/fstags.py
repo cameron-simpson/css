@@ -1375,7 +1375,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     filepath = self.filepath
     for pathtag in (
         Tag('filepath.basename', basename(filepath)),
-        Tag('filepath.ext', splitext(basename(filepath)))[1],
+        Tag('filepath.ext', splitext(basename(filepath))[1]),
         Tag('filepath.pathname', filepath),
         Tag('filepath.encoded', TagFile.encode_name(filepath)),
     ):
