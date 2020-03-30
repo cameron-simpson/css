@@ -28,19 +28,19 @@
     `/path/to/series-name/season-02/episode-name--s02e03--something.mp4`
     might obtain the tags:
 
-        series.title="Series Full Name"
+        series_title="Series Full Name"
         season=2
         sf
         episode=3
-        episode.title="Full Episode Title"
+        episode_title="Full Episode Title"
 
     from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series.title="Series Full Name"`
+      `series-name sf series_title="Series Full Name"`
     * tag file `/path/to/series-name/.fstags`:
       `season-02 season=2`
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode.title="Full Episode Title"`
+      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
 '''
 
 from collections import defaultdict, namedtuple
