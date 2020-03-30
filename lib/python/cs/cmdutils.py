@@ -10,8 +10,8 @@
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
+from os.path import basename
 import sys
-from sys.path import basename
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
