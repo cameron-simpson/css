@@ -177,11 +177,24 @@ do
     #
     dlog)
       # handle FOO: headlines
+      dlog_headline=$headline
       if    dlog_cats=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
-      then  dlog_headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
-      else  dlog_cats=$categories
-            [ -n "$dlog_cats" ] || dlog_cats=`dlog-category` || dlog_cats=UNKNOWN
-            dlog_headline=$headline
+      then
+        if [ -n "$categories" ]
+        then
+          echo "$cmd: dlog: -c \"$categories\" specified, ignoring headline categories \"$dlog_cats\"" >&2
+          dlog_cats=$categories
+        else
+          dlog_headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
+        fi
+      else
+        if [ -n "$categories" ]
+        then
+          dlog_cats=$categories
+        else
+          echo "$cmd: dlog: no -c option and no headline categories, using UNKNOWN" >&2
+          dlog_cats=UNKNOWN
+        fi
       fi
       $trace buglog-daily "$dlog_cats: $dlog_headline"
       for category in `printf "%s\n" "$dlog_cats" | tr , ' '`
