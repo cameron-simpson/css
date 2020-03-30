@@ -11,6 +11,7 @@ from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 import sys
+from sys.path import basename
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
@@ -211,7 +212,7 @@ class BaseCommand:
     else:
       argv = list(argv)
     if cmd is None:
-      cmd = argv.pop(0)
+      cmd = basename(argv.pop(0))
     setup_logging(cmd)
     # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
