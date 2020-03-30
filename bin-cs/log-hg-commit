@@ -16,5 +16,5 @@ hg log -r "$revision" --template='{desc}\n' --limit 1 \
     wdbase=$( basename "$(pwd)" )
     dlog -c "$dlog_tags" -- "$wdbase: $headline [$revision]" </dev/null
   }
-  exec dlog "commit $headline [$revision]" <
+  exec dlog "commit $headline [$revision]" </dev/null
 }
