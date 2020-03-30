@@ -49,6 +49,8 @@ do
   shift
 done
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 if [ $# = 0 ]
 then
   read -r headline || {
@@ -59,23 +61,17 @@ else
   headline=$*
 fi
 
-if    dlog_cats2=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
-then
-  if [ -n "$dlog_cats" ]
+# use -c or headline or dlog-category or UNKNOWN
+[ -n "$dlog_cats" ] || {
+  if    dlog_cats=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
   then
-    echo "$cmd: -c \"$dlog_cats\" conflicts with headline categories \"$dlog_cats2\"" >&2
-    badopts=1
-  else
-    dlog_cats=$dlog_cats2
     headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
+  else
+    dlog_cats=`dlog-category` || {
+      echo "$cmd: WARNING: no -c option and no headline categories and no dlog-category, using UNKNOWN" >&2
+      dlog_cats=UNKNOWN
+    }
   fi
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ -n "$dlog_cats" ] || dlog_cats=`dlog-category` || {
-  echo "$cmd: cannot infer logging categories, NOT LOGGING: $headline" >&2
-  exit 1
 }
 
 case "$logname" in
@@ -90,4 +86,8 @@ else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
 echo "$ts $dlog_cats: $headline" >>"$logname"
-exec buglog -c "$dlog_cats" -d "$ts" -B dlog "$headline"
+$trace buglog-daily "$dlog_cats: $headline"
+for category in `printf "%s\n" "$dlog_cats" | tr , ' '`
+do
+  $trace log-tsline -\? -d "$when" -- "$category" "$headline"
+done
