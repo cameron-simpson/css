@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [-c cats] [-d datetime] [-l {log|logfile}] [--] [remark...]"
+usage="Usage: $cmd [-c cats] [-d datetime] [-l {log|logfile}] [--] [CATEGORIES:] [remark...]"
 
 dlog_cats=
 logname=dlog-quick
@@ -49,16 +49,39 @@ do
   shift
 done
 
+if [ $# = 0 ]
+then
+  read -r headline || {
+    echo "$cmd: no headline on standard input" >&2
+    exit 1
+  }
+else
+  headline=$*
+fi
+
+if    dlog_cats2=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
+then
+  if [ -n "$dlog_cats" ]
+  then
+    echo "$cmd: -c \"$dlog_cats\" conflicts with headline categories \"$dlog_cats2\"" >&2
+    badopts=1
+  else
+    dlog_cats=$dlog_cats2
+    headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
+  fi
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$dlog_cats" ] || dlog_cats=`dlog-category` || {
+  echo "$cmd: cannot infer logging categories, NOT LOGGING: $headline" >&2
+  exit 1
+}
 
 case "$logname" in
   /*) ;;
   *) logname=$LOGDIR/$logname ;;
 esac
-
-[ -n "$dlog_cats" ] || dlog_cats=`dlog-category`
-
-[ $# = 0 ] && exec pageif cat "$logname"
 
 # compute ISO8601 timestamp string
 if [ -n "$when" ]
@@ -66,5 +89,5 @@ then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
 else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
-echo "$ts $dlog_cats: $*" >>"$logname"
-exec buglog -c "$dlog_cats" -d "$ts" -B dlog "$*"
+echo "$ts $dlog_cats: $headline" >>"$logname"
+exec buglog -c "$dlog_cats" -d "$ts" -B dlog "$headline"
