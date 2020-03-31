@@ -280,6 +280,8 @@ class FSTagsCommand(BaseCommand):
   @staticmethod
   def cmd_edit(argv, options):
     ''' Edit filenames and tags in a directory.
+
+        Usage: edit [dirpath]
     '''
     fstags = options.fstags
     xit = 0
@@ -306,7 +308,6 @@ class FSTagsCommand(BaseCommand):
         Usage: edittags path
     '''
     fstags = options.fstags
-    xit = 0
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
@@ -317,7 +318,6 @@ class FSTagsCommand(BaseCommand):
         with fstags:
           tags = fstags[path].direct_tags
           tags.edit(verbose=state.verbose)
-    return xit
 
   @classmethod
   def cmd_find(cls, argv, options):
@@ -1245,7 +1245,7 @@ class TagFile(SingletonMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset)
+    tags = TagSet.from_line(line, offset, verbose=state.verbose)
     return name, tags
 
   @classmethod
@@ -1253,7 +1253,7 @@ class TagFile(SingletonMixin):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
-    with Pfx("loadtags(%r)", filepath):
+    with Pfx("%r", filepath):
       tagsets = defaultdict(TagSet)
       try:
         with open(filepath) as f:
