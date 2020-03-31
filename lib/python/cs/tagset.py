@@ -9,6 +9,7 @@ from json import JSONEncoder, JSONDecoder
 import re
 from time import strptime
 from types import SimpleNamespace
+from icontract import require
 from cs.edit import edit as edit_lines
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
@@ -17,7 +18,6 @@ from cs.lex import (
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
-from icontract import require
 
 try:
   date_fromisoformat = date.fromisoformat
@@ -51,8 +51,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.edit',
         'cs.lex',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
     ],
 }
