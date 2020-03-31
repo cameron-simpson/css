@@ -606,6 +606,19 @@ def track(msg, *args, **kwargs):
   '''
   log(TRACK, msg, *args, **kwargs)
 
+def ifverbose(verbose, msg, *args, **kwargs):
+  ''' Conditionally log a message.
+      If verbose is `None`
+      then the caller has not indicated a specific verbosity
+      and we use the `track` function.
+      If verbose is true
+      then we use the `info` function.
+  '''
+  if verbose is None:
+    info(msg, *args, **kwargs)
+  elif verbose:
+    track(msg, *args, **kwargs)
+
 def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` `level` with the current Pfx prefix.
   '''
