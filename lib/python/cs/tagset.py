@@ -9,6 +9,7 @@ from json import JSONEncoder, JSONDecoder
 import re
 from time import strptime
 from types import SimpleNamespace
+from cs.edit import edit as edit_lines
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
     skipwhite, lc_, titleify_lc, FormatableMixin
@@ -262,6 +263,25 @@ class TagSet(dict, FormatableMixin):
     fkwargs = self.ns(ontology=ontology)
     fkwargs._return_None_if_missing = True
     return fkwargs
+
+  def edit(self, verbose=None):
+    ''' Edit this `TagSet`.
+    '''
+    lines = [str(tag) for tag in self.as_tags()]
+    new_lines = edit_lines(lines)
+    new_values = {}
+    for lineno, line in enumerate(new_lines):
+      with Pfx("%d: %r", lineno, line):
+        line = line.strip()
+        if not line or line.startswith('#'):
+          continue
+        tag = Tag.from_string(line)
+        new_values[tag.name] = tag.value
+    for name, value in sorted(new_values.items()):
+      self.set(name, value, verbose=verbose)
+    for name in list(self.keys()):
+      if name not in new_values:
+        self.discard(name, verbose=verbose)
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
