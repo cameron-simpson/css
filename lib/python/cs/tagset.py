@@ -126,10 +126,9 @@ class TagSet(dict, FormatableMixin):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
-    if verbose:
-      old_value = self.get(tag_name)
-      if tag_name not in self or old_value is not value:
-        self.modified = True
+    old_value = self.get(tag_name)
+    if tag_name not in self or old_value is not value:
+      self.modified = True
       if tag_name not in self or old_value != value:
         ifverbose(verbose, "+ %s", Tag(tag_name, value))
     super().__setitem__(tag_name, value)
