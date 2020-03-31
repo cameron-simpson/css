@@ -299,6 +299,26 @@ class FSTagsCommand(BaseCommand):
           xit = 1
     return xit
 
+  @staticmethod
+  def cmd_edittags(argv, options):
+    ''' Edit the direct tags of a specific path.
+
+        Usage: edittags path
+    '''
+    fstags = options.fstags
+    xit = 0
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after path: %r" % (argv,))
+    with Pfx(path):
+      with stackattrs(state, verbose=True):
+        with fstags:
+          tags = fstags[path].direct_tags
+          tags.edit(verbose=state.verbose)
+    return xit
+
   @classmethod
   def cmd_find(cls, argv, options):
     ''' Find paths matching tag criteria.
