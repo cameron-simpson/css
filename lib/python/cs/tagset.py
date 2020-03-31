@@ -241,15 +241,18 @@ class TagSet(dict, FormatableMixin):
                 meta = []
                 for subdetail in detail:
                   if subdetail is None:
-                    submeta=None
-                  elif isinstance(subdetail,ValueDetail):
-                    submeta=subdetail.detail.ns()
-                  elif isinstance(subdetail,KeyValueDetail):
-                    submeta= SimpleNameSpace(
-                        key=subdetail.key,key_detail=subdetail.key_detail.ns(),
-                        value=subdetail.value,value_detail=subdetail.value_detail.ns())
+                    submeta = None
+                  elif isinstance(subdetail, ValueDetail):
+                    submeta = subdetail.detail.ns()
+                  elif isinstance(subdetail, KeyValueDetail):
+                    submeta = SimpleNamespace(
+                        key=subdetail.key,
+                        key_detail=subdetail.key_detail.ns(),
+                        value=subdetail.value,
+                        value_detail=subdetail.value_detail.ns()
+                    )
                   else:
-                    submeta=subdetail
+                    submeta = subdetail
                   meta.append(submeta)
               meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
               setattr(ns, meta_subattr, meta)
@@ -566,20 +569,20 @@ class ExtendedNamespace(SimpleNamespace):
     return value
 
 class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
-    ''' Detail information about a value.
+  ''' Detail information about a value.
         * `ontology`: the reference ontology
         * `ontkey`: the key within the ontology providing the detail
         * `value`: the value
     '''
 
-    @property
-    def detail(self):
-      ''' The detail, the `TagSet` from `ontology[ontkey]`.
+  @property
+  def detail(self):
+    ''' The detail, the `TagSet` from `ontology[ontkey]`.
       '''
-      return self.ontology[self.ontkey]
+    return self.ontology[self.ontkey]
 
 class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
-    ''' Detail information about a value.
+  ''' Detail information about a value.
         * `ontology`: the reference ontology
         * `key_detail`: the detail for the `key`,
           the `TagSet` from `ontology[key_detail.ontkey]`
@@ -588,23 +591,23 @@ class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
           the `TagSet` from `ontology[value_detail.ontkey]`
     '''
 
-    @property
-    def ontology(self):
-      ''' The reference ontology.
+  @property
+  def ontology(self):
+    ''' The reference ontology.
       '''
-      return self.key_detail.ontology
+    return self.key_detail.ontology
 
-    @property
-    def key(self):
-      ''' The key.
+  @property
+  def key(self):
+    ''' The key.
       '''
-      return self.key_detail.value
+    return self.key_detail.value
 
-    @property
-    def value(self):
-      ''' The value.
+  @property
+  def value(self):
+    ''' The value.
       '''
-      return self.value_detail.value
+    return self.value_detail.value
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
@@ -833,17 +836,15 @@ class TagInfo(FormatableMixin):
     ont = self.ontology
     if self.type == 'list':
       member_type = self.member_type
-      return [
-          ont.value_detail(member_type, value)
-          for value in self.value
-      ]
+      return [ont.value_detail(member_type, value) for value in self.value]
     if self.type == 'dict':
       key_type = self.key_type
       member_type = self.member_type
       return [
-          KeyValueDetail(ont.value_detail(key_type, key),
-            ont.value_detail(member_type, value))
-          for key, value in self.value.items()
+          KeyValueDetail(
+              ont.value_detail(key_type, key),
+              ont.value_detail(member_type, value)
+          ) for key, value in self.value.items()
       ]
     return ont.value_detail(self.type, self.value)
 
