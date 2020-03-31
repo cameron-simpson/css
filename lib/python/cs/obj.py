@@ -357,6 +357,6 @@ class SingletonMixin:
       return o
 
     okey = cls._singleton_key(*a, **kw)
-    with registry._lock:
+    with registry._singleton_lock:
       _, instance = singleton(registry, okey, factory, a, kw)
     return instance
