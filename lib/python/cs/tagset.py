@@ -13,7 +13,7 @@ from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
     skipwhite, lc_, titleify_lc, FormatableMixin
 )
-from cs.logutils import info, warning
+from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from icontract import require
@@ -75,14 +75,14 @@ class TagSet(dict, FormatableMixin):
     return "%s:%r" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0):
+  def from_line(cls, line, offset=0, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
     tags = cls()
     offset = skipwhite(line, offset)
     while offset < len(line):
       tag, offset = Tag.parse(line, offset)
-      tags.add(tag)
+      tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
 
@@ -116,13 +116,13 @@ class TagSet(dict, FormatableMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
-  def add(self, tag_name, value=None, *, verbose=False):
+  def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag.from_name_value(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
-  def set(self, tag_name, value, *, verbose=False):
+  def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
@@ -131,7 +131,7 @@ class TagSet(dict, FormatableMixin):
       if tag_name not in self or old_value is not value:
         self.modified = True
       if tag_name not in self or old_value != value:
-        info("+ %s", Tag(tag_name, value))
+        ifverbose(verbose, "+ %s", Tag(tag_name, value))
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -139,7 +139,7 @@ class TagSet(dict, FormatableMixin):
       raise KeyError(tag_name)
     self.discard(tag_name)
 
-  def discard(self, tag_name, value=None, *, verbose=False):
+  def discard(self, tag_name, value=None, *, verbose=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
@@ -157,8 +157,7 @@ class TagSet(dict, FormatableMixin):
         old_value = self.pop(tag_name)
         self.modified = True
         old_tag = Tag(tag_name, old_value)
-        if verbose:
-          info("- %s", old_tag)
+        ifverbose(verbose, "- %s", old_tag)
         return old_tag
     return None
 
