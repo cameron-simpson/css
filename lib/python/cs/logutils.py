@@ -355,7 +355,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       comes from the environment variable `$DEBUG`.
 
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
-      default to logging.INFO.
+      default to TRACK.
 
       Parse the environment variable $DEBUG as a comma separated
       list of flags.
@@ -382,7 +382,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   level = logging.WARNING
   if verbose is None:
     if sys.stderr.isatty():
-      level = logging.INFO
+      level = TRACK
   elif verbose:
     level = logging.INFO
   else:
