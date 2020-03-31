@@ -85,7 +85,7 @@ def O_attrs(o):
       prune callables.
   '''
   for attr in sorted(dir(o)):
-    if attr[0].isalpha() and attr not in omit:
+    if attr[0].isalpha():
       try:
         value = getattr(o, attr)
       except AttributeError:
@@ -242,25 +242,25 @@ class TrackedClassMixin(object):
     return cls.tcm_get_state(self)
 
   @staticmethod
-  def tcm_all_state(cls):
+  def tcm_all_state(klass):
     ''' Generator yielding tracking information
-        for objects of type `cls`
+        for objects of type `klass`
         in the form `(o,state)`
         where `o` if a tracked object
         and `state` is the object's `get_tcm_state` method result.
     '''
-    m = cls.__map
+    m = klass.__map
     for o in m.values():
-      yield o, cls.__state(o, cls)
+      yield o, klass.__state(o, klass)
 
   @staticmethod
-  def tcm_dump(cls, f=None):
-    ''' Dump the tracking information for `cls` to the file `f`
+  def tcm_dump(klass, f=None):
+    ''' Dump the tracking information for `klass` to the file `f`
         (default `sys.stderr`).
     '''
     if f is None:
       f = sys.stderr
-    for o, state in TrackedClassMixin.tcm_all_state(cls):
+    for o, state in TrackedClassMixin.tcm_all_state(klass):
       print(str(type(o)), id(o), repr(state), file=f)
 
 def singleton(registry, key, factory, fargs, fkwargs):
