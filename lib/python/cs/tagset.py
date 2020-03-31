@@ -9,14 +9,15 @@ from json import JSONEncoder, JSONDecoder
 import re
 from time import strptime
 from types import SimpleNamespace
+from icontract import require
+from cs.edit import edit as edit_lines
 from cs.lex import (
     cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
     skipwhite, lc_, titleify_lc, FormatableMixin
 )
-from cs.logutils import info, warning
+from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
-from icontract import require
 
 try:
   date_fromisoformat = date.fromisoformat
@@ -50,8 +51,10 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.edit',
         'cs.lex',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
     ],
 }
@@ -75,14 +78,14 @@ class TagSet(dict, FormatableMixin):
     return "%s:%r" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0):
+  def from_line(cls, line, offset=0, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
     tags = cls()
     offset = skipwhite(line, offset)
     while offset < len(line):
       tag, offset = Tag.parse(line, offset)
-      tags.add(tag)
+      tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
 
@@ -116,22 +119,21 @@ class TagSet(dict, FormatableMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
-  def add(self, tag_name, value=None, *, verbose=False):
+  def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag.from_name_value(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
-  def set(self, tag_name, value, *, verbose=False):
+  def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
-    if verbose:
-      old_value = self.get(tag_name)
-      if tag_name not in self or old_value is not value:
-        self.modified = True
+    old_value = self.get(tag_name)
+    if tag_name not in self or old_value is not value:
+      self.modified = True
       if tag_name not in self or old_value != value:
-        info("+ %s", Tag(tag_name, value))
+        ifverbose(verbose, "+ %s", Tag(tag_name, value))
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -139,7 +141,7 @@ class TagSet(dict, FormatableMixin):
       raise KeyError(tag_name)
     self.discard(tag_name)
 
-  def discard(self, tag_name, value=None, *, verbose=False):
+  def discard(self, tag_name, value=None, *, verbose=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
@@ -157,8 +159,7 @@ class TagSet(dict, FormatableMixin):
         old_value = self.pop(tag_name)
         self.modified = True
         old_tag = Tag(tag_name, old_value)
-        if verbose:
-          info("- %s", old_tag)
+        ifverbose(verbose, "- %s", old_tag)
         return old_tag
     return None
 
@@ -240,15 +241,18 @@ class TagSet(dict, FormatableMixin):
                 meta = []
                 for subdetail in detail:
                   if subdetail is None:
-                    submeta=None
-                  elif isinstance(subdetail,ValueDetail):
-                    submeta=subdetail.detail.ns()
-                  elif isinstance(subdetail,KeyValueDetail):
-                    submeta= SimpleNameSpace(
-                        key=subdetail.key,key_detail=subdetail.key_detail.ns(),
-                        value=subdetail.value,value_detail=subdetail.value_detail.ns())
+                    submeta = None
+                  elif isinstance(subdetail, ValueDetail):
+                    submeta = subdetail.detail.ns()
+                  elif isinstance(subdetail, KeyValueDetail):
+                    submeta = SimpleNamespace(
+                        key=subdetail.key,
+                        key_detail=subdetail.key_detail.ns(),
+                        value=subdetail.value,
+                        value_detail=subdetail.value_detail.ns()
+                    )
                   else:
-                    submeta=subdetail
+                    submeta = subdetail
                   meta.append(submeta)
               meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
               setattr(ns, meta_subattr, meta)
@@ -264,6 +268,25 @@ class TagSet(dict, FormatableMixin):
     fkwargs = self.ns(ontology=ontology)
     fkwargs._return_None_if_missing = True
     return fkwargs
+
+  def edit(self, verbose=None):
+    ''' Edit this `TagSet`.
+    '''
+    lines = [str(tag) for tag in self.as_tags()]
+    new_lines = edit_lines(lines)
+    new_values = {}
+    for lineno, line in enumerate(new_lines):
+      with Pfx("%d: %r", lineno, line):
+        line = line.strip()
+        if not line or line.startswith('#'):
+          continue
+        tag = Tag.from_string(line)
+        new_values[tag.name] = tag.value
+    for name, value in sorted(new_values.items()):
+      self.set(name, value, verbose=verbose)
+    for name in list(self.keys()):
+      if name not in new_values:
+        self.discard(name, verbose=verbose)
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
@@ -546,20 +569,20 @@ class ExtendedNamespace(SimpleNamespace):
     return value
 
 class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
-    ''' Detail information about a value.
+  ''' Detail information about a value.
         * `ontology`: the reference ontology
         * `ontkey`: the key within the ontology providing the detail
         * `value`: the value
     '''
 
-    @property
-    def detail(self):
-      ''' The detail, the `TagSet` from `ontology[ontkey]`.
+  @property
+  def detail(self):
+    ''' The detail, the `TagSet` from `ontology[ontkey]`.
       '''
-      return self.ontology[self.ontkey]
+    return self.ontology[self.ontkey]
 
 class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
-    ''' Detail information about a value.
+  ''' Detail information about a value.
         * `ontology`: the reference ontology
         * `key_detail`: the detail for the `key`,
           the `TagSet` from `ontology[key_detail.ontkey]`
@@ -568,23 +591,23 @@ class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
           the `TagSet` from `ontology[value_detail.ontkey]`
     '''
 
-    @property
-    def ontology(self):
-      ''' The reference ontology.
+  @property
+  def ontology(self):
+    ''' The reference ontology.
       '''
-      return self.key_detail.ontology
+    return self.key_detail.ontology
 
-    @property
-    def key(self):
-      ''' The key.
+  @property
+  def key(self):
+    ''' The key.
       '''
-      return self.key_detail.value
+    return self.key_detail.value
 
-    @property
-    def value(self):
-      ''' The value.
+  @property
+  def value(self):
+    ''' The value.
       '''
-      return self.value_detail.value
+    return self.value_detail.value
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
@@ -813,17 +836,15 @@ class TagInfo(FormatableMixin):
     ont = self.ontology
     if self.type == 'list':
       member_type = self.member_type
-      return [
-          ont.value_detail(member_type, value)
-          for value in self.value
-      ]
+      return [ont.value_detail(member_type, value) for value in self.value]
     if self.type == 'dict':
       key_type = self.key_type
       member_type = self.member_type
       return [
-          KeyValueDetail(ont.value_detail(key_type, key),
-            ont.value_detail(member_type, value))
-          for key, value in self.value.items()
+          KeyValueDetail(
+              ont.value_detail(key_type, key),
+              ont.value_detail(member_type, value)
+          ) for key, value in self.value.items()
       ]
     return ont.value_detail(self.type, self.value)
 

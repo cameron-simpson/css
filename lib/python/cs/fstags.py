@@ -28,19 +28,19 @@
     `/path/to/series-name/season-02/episode-name--s02e03--something.mp4`
     might obtain the tags:
 
-        series.title="Series Full Name"
+        series_title="Series Full Name"
         season=2
         sf
         episode=3
-        episode.title="Full Episode Title"
+        episode_title="Full Episode Title"
 
     from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series.title="Series Full Name"`
+      `series-name sf series_title="Series Full Name"`
     * tag file `/path/to/series-name/.fstags`:
       `season-02 season=2`
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode.title="Full Episode Title"`
+      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
 '''
 
 from collections import defaultdict, namedtuple
@@ -143,6 +143,10 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
+    {cmd} edit [dirpath]
+        Edit the tagsets of dirpath, default: .
+    {cmd} edittags filepath
+        Edit the direct tags of a single filepath.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         -d          treat directories like files (do no recurse).
@@ -280,6 +284,8 @@ class FSTagsCommand(BaseCommand):
   @staticmethod
   def cmd_edit(argv, options):
     ''' Edit filenames and tags in a directory.
+
+        Usage: edit [dirpath]
     '''
     fstags = options.fstags
     xit = 0
@@ -298,6 +304,24 @@ class FSTagsCommand(BaseCommand):
         if not fstags.edit_dirpath(path):
           xit = 1
     return xit
+
+  @staticmethod
+  def cmd_edittags(argv, options):
+    ''' Edit the direct tags of a specific path.
+
+        Usage: edittags path
+    '''
+    fstags = options.fstags
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after path: %r" % (argv,))
+    with Pfx(path):
+      with stackattrs(state, verbose=True):
+        with fstags:
+          tags = fstags[path].direct_tags
+          tags.edit(verbose=state.verbose)
 
   @classmethod
   def cmd_find(cls, argv, options):
@@ -1225,7 +1249,7 @@ class TagFile(SingletonMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset)
+    tags = TagSet.from_line(line, offset, verbose=state.verbose)
     return name, tags
 
   @classmethod
@@ -1233,7 +1257,7 @@ class TagFile(SingletonMixin):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
-    with Pfx("loadtags(%r)", filepath):
+    with Pfx("%r", filepath):
       tagsets = defaultdict(TagSet)
       try:
         with open(filepath) as f:

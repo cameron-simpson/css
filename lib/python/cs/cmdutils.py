@@ -105,12 +105,12 @@ class BaseCommand:
         before any command line options are applied
       * `apply_opts(options,opts)`:
         apply the `opts` to `options`.
-        `opts` is an option value mapping
+        `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
       * `cmd_`*subcmd*`(argv,options)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
-        then method `cmd_`*subcmd*`(argv,options)`
+        then the method `cmd_`*subcmd*`(argv,options)`
         will be called where `argv` contains the command line arguments
         after *subcmd*.
       * `main(argv,options)`:

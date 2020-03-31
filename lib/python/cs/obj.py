@@ -15,6 +15,7 @@ Presents:
 from __future__ import print_function
 from copy import copy as copy0
 import sys
+from threading import Lock
 from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
 
@@ -84,7 +85,7 @@ def O_attrs(o):
       prune callables.
   '''
   for attr in sorted(dir(o)):
-    if attr[0].isalpha() and attr not in omit:
+    if attr[0].isalpha():
       try:
         value = getattr(o, attr)
       except AttributeError:
@@ -241,25 +242,25 @@ class TrackedClassMixin(object):
     return cls.tcm_get_state(self)
 
   @staticmethod
-  def tcm_all_state(cls):
+  def tcm_all_state(klass):
     ''' Generator yielding tracking information
-        for objects of type `cls`
+        for objects of type `klass`
         in the form `(o,state)`
         where `o` if a tracked object
         and `state` is the object's `get_tcm_state` method result.
     '''
-    m = cls.__map
+    m = klass.__map
     for o in m.values():
-      yield o, cls.__state(o, cls)
+      yield o, klass.__state(o, klass)
 
   @staticmethod
-  def tcm_dump(cls, f=None):
-    ''' Dump the tracking information for `cls` to the file `f`
+  def tcm_dump(klass, f=None):
+    ''' Dump the tracking information for `klass` to the file `f`
         (default `sys.stderr`).
     '''
     if f is None:
       f = sys.stderr
-    for o, state in TrackedClassMixin.tcm_all_state(cls):
+    for o, state in TrackedClassMixin.tcm_all_state(klass):
       print(str(type(o)), id(o), repr(state), file=f)
 
 def singleton(registry, key, factory, fargs, fkwargs):
@@ -273,8 +274,12 @@ def singleton(registry, key, factory, fargs, fkwargs):
       but might usually be a `weakref.WeakValueMapping`
       to that object references expire as normal.
 
+      *Note*: this function *is not* thread safe.
+      Multithreaded users should hold a mutex.
+
       See the `SingletonMixin` class for a simple mixin to create
-      singleton classes.
+      singleton classes,
+      which does provide thread safe operations.
   '''
   try:
     instance = registry[key]
@@ -303,6 +308,8 @@ class SingletonMixin:
         This should have the same signature as `_singleton_init`
         (but using `cls` instead of `self`).
 
+      This class is thread safe for the registry operations.
+
       Example:
 
           class Pool(SingletonMixin):
@@ -315,6 +322,12 @@ class SingletonMixin:
                   return foo, bah
   '''
 
+  # This lock is used to control setup of the per-class registry.
+  # It is shared across all subclasses, but that bypasses any need to call an
+  # __init__ for this mixin. In mitigation, the lock is only used if the class
+  # does not yet have a registry.
+  _global_lock = Lock()
+
   def __new__(cls, *a, **kw):
     ''' Prepare a new instance of `cls` if required.
         Return the instance.
@@ -325,7 +338,13 @@ class SingletonMixin:
     try:
       registry = cls._singleton_registry
     except AttributeError:
-      registry = cls._singleton_registry = WeakValueDictionary()
+      with cls._global_lock:
+        try:
+          registry = cls._singleton_registry
+        except AttributeError:
+          # create the registry and give it its own mutex
+          registry = cls._singleton_registry = WeakValueDictionary()
+          registry._singleton_lock = Lock()
 
     def factory(*fargs, **fkwargs):
       ''' Prepare a new object.
@@ -338,5 +357,6 @@ class SingletonMixin:
       return o
 
     okey = cls._singleton_key(*a, **kw)
-    _, instance = singleton(registry, okey, factory, a, kw)
+    with registry._singleton_lock:
+      _, instance = singleton(registry, okey, factory, a, kw)
     return instance
