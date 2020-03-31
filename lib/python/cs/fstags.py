@@ -143,6 +143,10 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
+    {cmd} edit [dirpath]
+        Edit the tagsets of dirpath, default: .
+    {cmd} edittags filepath
+        Edit the direct tags of a single filepath.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         -d          treat directories like files (do no recurse).
