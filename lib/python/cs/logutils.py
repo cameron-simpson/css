@@ -53,8 +53,8 @@ import os.path
 from pprint import pformat
 import stat
 import sys
-import time
 from threading import Lock
+import time
 import traceback
 from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
