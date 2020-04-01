@@ -21,8 +21,10 @@ from os.path import (
     exists as pathexists,
 )
 import sys
+from icontract import require
 from cs.fileutils import shortpath, longpath
 from cs.logutils import debug, warning, error
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.result import Result
 from . import Lock, DEFAULT_CONFIG
@@ -51,7 +53,7 @@ def Store(spec, config, runstate=None, hashclass=None):
   '''
   return config.Store_from_spec(spec, runstate=runstate, hashclass=hashclass)
 
-class Config:
+class Config(SingletonMixin):
   ''' A configuration specification.
 
       This can be driven by any mapping of mappings: {clause_name => {param => value}}.
@@ -64,7 +66,18 @@ class Config:
         Default: `os.environ`
   '''
 
-  def __init__(self, config_map, environ=None, default_config=None):
+  @require(lambda config_map: isinstance(config_map, (str, dict)))
+  @require(
+      lambda default_config:
+      (default_config is None or isinstance(default_config, dict))
+  )
+  def _singleton_key(config_map, environ=None, default_config=None):
+    return (
+        config_map if isinstance(config_map, str) else id(config_map),
+        id(DEFAULT_CONFIG) if default_config is None else id(default_config)
+    )
+
+  def _singleton_init(self, config_map, environ=None, default_config=None):
     if environ is None:
       environ = os.environ
     if default_config is None:
