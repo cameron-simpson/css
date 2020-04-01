@@ -58,6 +58,9 @@ from cs.threads import locked
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.x import X
 
+def main(argv=None):
+  return PilferCommand().run(argv)
+
 # parallelism of jobs
 DEFAULT_JOBS = 4
 
@@ -2062,4 +2065,4 @@ class PilferRC:
     specs[pipename] = pipespec
 
 if __name__ == '__main__':
-  sys.exit(PilferCommand().run(sys.argv))
+  sys.exit(main(sys.argv))
