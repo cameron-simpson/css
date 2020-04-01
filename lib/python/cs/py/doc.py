@@ -8,7 +8,7 @@ import importlib
 from inspect import (getcomments, getmodule, isfunction, isclass, signature)
 from cs.lex import stripped_dedent
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx
+from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
 DISTINFO = {
@@ -21,7 +21,6 @@ DISTINFO = {
     'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],
 }
 
-@pfx
 def module_doc(
     module,
     *,
