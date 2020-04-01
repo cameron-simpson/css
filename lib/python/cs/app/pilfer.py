@@ -17,6 +17,7 @@ from subprocess import Popen, PIPE
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
+from types import SimpleNamespace as NS
 from urllib.parse import quote, unquote
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -1946,6 +1947,11 @@ def action_pipecmd(shcmd):
 class PipeSpec(namedtuple('PipeSpec', 'name argv')):
   ''' A pipeline specification: a name and list of actions.
   '''
+
+  def __init__(self, name, argv):
+    super().__init__()
+    self.name = name
+    self.argv = argv
 
   @logexc
   def pipe_funcs(self, L, action_map, do_trace):

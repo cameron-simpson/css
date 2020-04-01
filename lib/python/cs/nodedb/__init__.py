@@ -25,7 +25,6 @@ DISTINFO = {
         'cs.html',
         'cs.lex',
         'cs.logutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py3',

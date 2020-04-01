@@ -10,15 +10,16 @@
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
-from logging import warning, exception
+from os.path import basename
 import sys
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
+from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
 
-__version__ = '20200229'
+__version__ = '20200318'
 
 DISTINFO = {
     'description':
@@ -104,7 +105,7 @@ class BaseCommand:
         before any command line options are applied
       * `apply_opts(opts,options)`:
         apply the `opts` to `options`.
-        `opts` is an option value mapping
+        `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
       * `hack_postopts_argv(argv,options)`:
         make any adjustments to `argv` after parsing the options,
@@ -114,7 +115,7 @@ class BaseCommand:
       * `cmd_`*subcmd*`(argv,options)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
-        then method `cmd_`*subcmd*`(argv,options)`
+        then the method `cmd_`*subcmd*`(argv,options)`
         will be called where `argv` contains the command line arguments
         after *subcmd*.
       * `main(argv,options)`:
@@ -147,14 +148,15 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
-  def add_usage_to_docstring(cls, **usage_keywords):
+  def add_usage_to_docstring(cls):
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
     '''
-    if 'cmd' not in usage_keywords:
-      usage_keywords['cmd'] = cls.__name__
-    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format(
-        **usage_keywords
+    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+    if 'cmd' not in format_kwargs:
+      format_kwargs['cmd'] = cls.__name__
+    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
+        format_kwargs
     ).replace('\n', '\n    ')
 
   def apply_defaults(self, options):
@@ -163,15 +165,18 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `options`.
     '''
 
-  def run(self, argv, options=None, cmd=None):
+  def run(self, argv=None, options=None, cmd=None):
     ''' Run a command from `argv`.
         Returns the exit status of the command.
         Raises `GetoptError` for unrecognised options.
 
         Parameters:
         * `argv`:
-          the command line arguments
+          optional command line arguments
           including the main command name if `cmd` is not specified.
+          The default is `sys.argv`.
+          The contents of `argv` are copied,
+          permitting desctructive parsing of `argv`.
         * `options`:
           a object for command state and context.
           If not specified a new `SimpleNamespace`
@@ -204,12 +209,23 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if argv is None:
+      argv = list(sys.argv)
+      if cmd is not None:
+        # we consume the first argument anyway
+        argv.pop(0)
+    else:
+      argv = list(argv)
     if cmd is None:
-      cmd = argv.pop(0)
+      cmd = basename(argv.pop(0))
+    setup_logging(cmd)
+    # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
     # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
-      usage = usage_format.format(cmd=cmd)
+      usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
+      usage_kwargs['cmd'] = cmd
+      usage = usage_format.format_map(usage_kwargs)
     else:
       usage = None
     if options is None:
@@ -217,8 +233,10 @@ class BaseCommand:
       self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
-      opts, argv = getopt(argv, self.GETOPT_SPEC)
-      if self.GETOPT_SPEC:
+      getopt_spec = getattr(self, 'GETOPT_SPEC', '')
+      # we do this regardless in order to honour --
+      opts, argv = getopt(argv, getopt_spec, '')
+      if getopt_spec:
         self.apply_opts(opts, options)
 
       argv = self.hack_postopts_argv(argv, options)
@@ -246,6 +264,14 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmd_names))
           )
+        if isinstance(main, BaseCommand):
+
+          def run_main(argv, options):
+            ''' Invoke the run method of an instance of the subcommand class.
+            '''
+            return main().run(argv, options=options, cmd=subcmd)
+
+          main = run_main
       else:
         subcmd = cmd
         try:
@@ -288,6 +314,7 @@ class BaseCommand:
         * `options`: the `options` object
         * `e`: the `GetoptError` exception
         * `usage`: the command usage or `None` if this was not provided
+
         It returns a true value if the exception is considered handled,
         in which case the main `run` method returns 2.
         It returns a false value if the exception is considered unhandled,

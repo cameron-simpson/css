@@ -11,8 +11,8 @@ Wrapper for the ffmpeg command for video conversion.
 from collections import namedtuple
 import os.path
 from subprocess import Popen, PIPE
+from types import SimpleNamespace
 from cs.pfx import Pfx
-from cs.obj import O
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -21,10 +21,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.obj', 'cs.pfx'],
+    'install_requires': ['cs.pfx'],
 }
 
-class MetaData(O):
+class MetaData(SimpleNamespace):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
   '''
 

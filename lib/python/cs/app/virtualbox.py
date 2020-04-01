@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience functions for working with VirtualBox.
 # Many operations are done by invoking VBoxManage.
-#   - Cameron Simpson <cs@cskk.id.au> 23oct2016
+# - Cameron Simpson <cs@cskk.id.au> 23oct2016
 #
 
 from __future__ import print_function

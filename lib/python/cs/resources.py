@@ -13,7 +13,7 @@ import sys
 from threading import Condition, Lock, RLock
 import time
 from cs.logutils import error, warning
-from cs.obj import O, Proxy
+from cs.obj import Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
@@ -285,7 +285,7 @@ class MultiOpen(MultiOpenMixin):
     '''
     self.openable.close()
 
-class Pool(O):
+class Pool(object):
   ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
 
       All the pool objects must be suitable for use, so the
@@ -307,7 +307,6 @@ class Pool(O):
             If 0, no upper limit is applied.
         * `lock`: optional shared Lock; if omitted or `None` a new Lock is allocated
     '''
-    O.__init__(self)
     if max_size is None:
       max_size = 4
     if lock is None:
