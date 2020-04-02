@@ -546,10 +546,7 @@ def pfx(func, message=None, message_args=()):
         return func(*a, **kw)
 
   wrapper.__name__ = "@pfx(%s)" % (fname,)
-  fdoc = func.__doc__
-  wrapper.__doc__ = wrapper.__name__ + ":\n" + wrapper.__doc__
-  if fdoc:
-    wrapper.__doc__ += '\n\n' + fdoc
+  wrapper.__doc__ = func.__doc__
   return wrapper
 
 @decorator
