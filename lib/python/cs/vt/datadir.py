@@ -46,7 +46,7 @@ from os import (
 )
 from os.path import (
     basename, exists as existspath, isdir as isdirpath, isfile as isfilepath,
-    join as joinpath, relpath
+    join as joinpath, realpath, relpath
 )
 import sqlite3
 import stat
@@ -66,6 +66,7 @@ from cs.fileutils import (
     shortpath,
 )
 from cs.logutils import debug, info, warning, error, exception
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
@@ -155,8 +156,8 @@ class DataFileState(SimpleNamespace):
     '''
     yield from self.datadir.scanfrom(self.pathname, offset=offset)
 
-class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
-               Mapping):
+class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
+               RunStateMixin, FlaggedMixin, Mapping):
   ''' Base class indexing locally stored data in files.
       This class is hashclass specific;
       the utilising Store maintains one of these for each supported hashclass.
@@ -172,7 +173,61 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
-  def __init__(
+  @classmethod
+  def _resolve(cls, *, hashclass, indexclass, rollover, flags, flags_prefix):
+    resolved = SimpleNamespace()
+    if indexclass is None:
+      indexclass = choose_indexclass(
+          cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
+      )
+    if rollover is None:
+      rollover = cls.DATA_ROLLOVER
+    elif rollover < 1024:
+      raise ValueError(
+          "rollover < 1024"
+          " (a more normal size would be in megabytes or gigabytes): %r" %
+          (rollover,)
+      )
+    if flags is None:
+      if flags_prefix is None:
+        flags = DummyFlags()
+        flags_prefix = 'DUMMY'
+    else:
+      if flags_prefix is None:
+        raise ValueError("flags provided but no flags_prefix")
+    resolved.indexclass = indexclass
+    resolved.rollover = rollover
+    resolved.flags = flags
+    resolved.flags_prefix = flags_prefix
+    return resolved
+
+  @classmethod
+  def _singleton_key(
+      cls,
+      topdirpath,
+      hashclass,
+      *,
+      indexclass=None,
+      rollover=None,
+      flags=None,
+      flags_prefix=None,
+  ):
+    resolved = cls._resolve(
+        hashclass=hashclass,
+        indexclass=indexclass,
+        rollover=rollover,
+        flags=flags,
+        flags_prefix=flags_prefix
+    )
+    return cls, realpath(
+        topdirpath
+    ), resolved.hashclass, resolved.indexlass, resolved.rollover, id(
+        resolved.flags
+    )
+
+  @require(lambda topdirpath: isinstance(topdirpath, str))
+  @require(lambda hashclass: issubclass(hashclass, HashCode))
+  def _singleton_init(
       self,
       topdirpath,
       hashclass,
@@ -205,38 +260,26 @@ class FilesDir(HashCodeUtilsMixin, MultiOpenMixin, RunStateMixin, FlaggedMixin,
         The monitor thread and runtime state are set up by the `startup` method
         and closed down by the `shutdown` method.
     '''
-    assert isinstance(topdirpath, str)
-    assert issubclass(hashclass, HashCode), "hashclass=%r" % (hashclass,)
+    resolved = self._resolve(
+        hashclass=hashclass,
+        indexclass=indexclass,
+        rollover=rollover,
+        flags=flags,
+        flags_prefix=flags_prefix
+    )
     RunStateMixin.__init__(self)
     MultiOpenMixin.__init__(self)
-    if flags is None:
-      if flags_prefix is None:
-        flags = DummyFlags()
-        flags_prefix = 'DUMMY'
-    else:
-      if flags_prefix is None:
-        raise ValueError("flags provided but no flags_prefix")
-    FlaggedMixin.__init__(self, flags=flags, prefix=flags_prefix)
-    if rollover is None:
-      rollover = self.DATA_ROLLOVER
-    elif rollover < 1024:
-      raise ValueError(
-          "rollover < 1024"
-          " (a more normal size would be in megabytes or gigabytes): %r" %
-          (rollover,)
-      )
-    self.rollover = rollover
+    FlaggedMixin.__init__(
+        self, flags=resolved.flags, prefix=resolved.flags_prefix
+    )
+    self.indexclass = resolved.indexclass
+    self.rollover = resolved.rollover
     self.hashclass = hashclass
     self.hashname = hashclass.HASHNAME
     self.topdirpath = topdirpath
     self.statefilepath = joinpath(
         topdirpath, self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
-    if indexclass is None:
-      indexclass = choose_indexclass(
-          self.INDEX_FILENAME_BASE_FORMAT.format(hashname=self.hashname)
-      )
-    self.indexclass = indexclass
     self._filemap = None
     self._unindexed = None
     self._cache = None
