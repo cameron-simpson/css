@@ -163,6 +163,20 @@ class TagSet(dict, FormatableMixin):
         return old_tag
     return None
 
+  def set_from(self, other, verbose=None):
+    ''' Completely replace the values in `self`
+        with the values from `other`,
+        a `TagSet` or any other `name`=>`value` dict.
+
+        This has the feature of logging changes
+        by calling `.set` and `.discard` to effect the changes.
+    '''
+    for name, value in sorted(other.items()):
+      self.set(name, value, verbose=verbose)
+    for name in list(self.keys()):
+      if name not in other:
+        self.discard(name, verbose=verbose)
+
   def update(self, *others, **kw):
     ''' Update this `TagSet` from `other`,
         a dict or an iterable of taggy things.
@@ -282,11 +296,7 @@ class TagSet(dict, FormatableMixin):
           continue
         tag = Tag.from_string(line)
         new_values[tag.name] = tag.value
-    for name, value in sorted(new_values.items()):
-      self.set(name, value, verbose=verbose)
-    for name in list(self.keys()):
-      if name not in new_values:
-        self.discard(name, verbose=verbose)
+        self.set_from(new_values)
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
