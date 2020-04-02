@@ -24,9 +24,9 @@ import sys
 from icontract import require
 from cs.fileutils import shortpath, longpath
 from cs.logutils import debug, warning, error
-from cs.obj import SingletonMixin
+from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx
-from cs.result import Result
+from cs.result import Result, OnDemandResult
 from . import Lock, DEFAULT_CONFIG
 from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
@@ -103,7 +103,7 @@ class Config(SingletonMixin):
     else:
       config.read_dict(config_map)
     self.map = config
-    self._stores_by_name = {}  # clause_name => Result->Store
+    self._clause_stores = {}  # clause_name => Result->Store
     self._lock = Lock()
 
   def __str__(self):
@@ -122,13 +122,17 @@ class Config(SingletonMixin):
     ''' Return the Store defined by the named clause.
     '''
     with self._lock:
-      R = self._stores_by_name.get(clause_name)
-      if R is not None:
-        return R()
-      R = self._stores_by_name[clause_name] = Result("[%s]" % (clause_name,))
-    # not previously accessed, construct S
-    store_name = "%s[%s]" % (self, clause_name)
-    with Pfx(store_name):
+      is_new, R = singleton(
+          self._clause_stores,
+          clause_name,
+          OnDemandResult,
+          (self._make_clause_store, clause_name),
+          {},
+      )
+    return R()
+
+  def _make_clause_store(self, clause_name):
+    with Pfx("%s._make_clause_store(%r)", self, clause_name):
       clause = dict(self.map[clause_name])
       for discard in 'address', :
         clause.pop(discard, None)
@@ -136,11 +140,11 @@ class Config(SingletonMixin):
         store_type = clause.pop('type')
       except KeyError:
         raise ValueError("missing type field in clause")
+      store_name = "%s[%s]" % (self, clause_name)
       S = self.new_Store(
           store_name, store_type, clause, clause_name=clause_name
       )
-      R.result = S
-    return S
+      return S
 
   def get_default(self, param, default=None):
     ''' Fetch a default parameter from the [GLOBALS] clause.
