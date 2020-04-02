@@ -1092,7 +1092,7 @@ class FSTags(MultiOpenMixin):
           raise ValueError("destination already exists")
       result = attach(srcpath, dstpath)
       old_modified = dst_taggedpath.modified
-      for tag in src_taggedpath.direct_tags:
+      for tag in src_taggedpath.direct_tags.as_tags():
         dst_taggedpath.direct_tags.add(tag)
       try:
         dst_taggedpath.save()
