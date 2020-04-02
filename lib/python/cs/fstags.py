@@ -67,7 +67,7 @@ from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import findup
 from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
-from cs.logutils import error, warning, info, trace
+from cs.logutils import error, warning, info, trace, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -125,8 +125,7 @@ state = _State(verbose=False)
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
   '''
-  if state.verbose:
-    trace(msg, *a)
+  ifverbose(state.verbose, msg, *a)
 
 class FSTagsCommand(BaseCommand):
   ''' `fstags` main command line class.
