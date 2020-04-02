@@ -1297,10 +1297,11 @@ class TagFile(SingletonMixin):
         This method will create the required intermediate directories
         if missing.
     '''
+    verbose("rewrite %r", filepath)
     with Pfx("savetags(%r)", filepath):
-      trace("SAVE %r", filepath)
       dirpath = dirname(filepath)
       if not isdirpath(dirpath):
+        verbose("makedirs(%r)", dirpath)
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
