@@ -11,13 +11,9 @@ git log -r '@^..@' \
 {
   read _commit revision etc
   unhdr \
-  | \
-  { read -r headline
-    dlog_tags=$( fstags ls -d -o '{cs.dlog}' . )
-    [ -z "$dlog_tags" ] || {
-      wdbase=$( basename "$(pwd)" )
-      dlog "$dlog_tags: $wdbase: $revision: $headline" </dev/null
-    }
-    exec buglog "commit $revision: $headline"
+  | {
+    read -r headline
+    wdbase=$( basename "$(pwd)" )
+    buglog -- "$wdbase $revision: $headline" </dev/null
   }
 }
