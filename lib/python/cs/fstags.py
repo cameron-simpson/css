@@ -1321,10 +1321,9 @@ class TagFile(SingletonMixin):
       # TagSets never loaded
       return
     with self._lock:
-      if not any(map(lambda tagset: tagset.modified, self._tagsets.values())):
-        # no modified TagSets
-        return
-      self.save_tagsets(self.filepath, self.tagsets)
+      if any(map(lambda tagset: tagset.modified, self._tagsets.values())):
+        # modified TagSets
+        self.save_tagsets(self.filepath, self.tagsets)
     if self.find_parent and 'parent' in self.__dict__:
       self.parent.save()
 
