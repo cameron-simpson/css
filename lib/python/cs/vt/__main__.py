@@ -35,8 +35,9 @@ from cs.debug import ifdebug, dump_debug_threads, thread_dump
 from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
-from cs.logutils import exception, error, warning, info, upd, debug, \
-                        logTo, loginfo
+from cs.logutils import (
+    exception, error, warning, track, info, upd, debug, logTo, loginfo
+)
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.threads import bg as bg_thread
@@ -65,25 +66,7 @@ from .transcribe import parse
 def main(argv=None):
   ''' Create a VTCmd instance and call its main method.
   '''
-  if argv is None:
-    argv = sys.argv
-  vtcmd = VTCmd()
-
-  # catch signals, flag termination
-  def sig_handler(sig, frame):
-    ''' Signal handler
-    '''
-    warning("received signal %s from %s", sig, frame)
-    if sig == SIGQUIT:
-      thread_dump()
-    vtcmd.runstate.cancel()
-    if sig == SIGQUIT:
-      sys.exit(1)
-
-  signal(SIGHUP, sig_handler)
-  signal(SIGINT, sig_handler)
-  signal(SIGQUIT, sig_handler)
-  return vtcmd.run(argv)
+  return VTCmd().run(argv)
 
 def mount_vtfs(argv=None):
   ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
@@ -222,6 +205,22 @@ class VTCmd(BaseCommand):
     progress = options.progress
     if progress is None:
       progress = Progress(total=0)
+
+    # catch signals, flag termination
+    def sig_handler(sig, frame):
+      ''' Signal handler
+      '''
+      warning("received signal %s from %s", sig, frame)
+      if sig == SIGQUIT:
+        thread_dump()
+      runstate.cancel()
+      if sig == SIGQUIT:
+        sys.exit(1)
+
+    old_sighup = signal(SIGHUP, sig_handler)
+    old_sigint = signal(SIGINT, sig_handler)
+    old_sigquit = signal(SIGQUIT, sig_handler)
+
     ticker = options.ticker
     if False and ticker is None and sys.stderr.isatty():
       _, cols = ttysize(2)
@@ -293,6 +292,9 @@ class VTCmd(BaseCommand):
     runstate.cancel()
     if ticker:
       ticker.join()
+    signal(SIGHUP, old_sighup)
+    signal(SIGINT, old_sigint)
+    signal(SIGQUIT, old_sigquit)
     if ifdebug():
       dump_debug_threads()
 
@@ -927,11 +929,13 @@ class VTCmd(BaseCommand):
               exports[''] = namedS
     runstate = options.runstate
     if address == '-':
+      track("dispatch StreamStore(%r,stdin,stdout,..)", address)
       from .stream import StreamStore
       remoteS = StreamStore("serve -", sys.stdin, sys.stdout, exports=exports)
       remoteS.join()
     elif '/' in address:
       # path/to/socket
+      track("dispatch serve_socket(%r,...)", socket_path)
       socket_path = expand_path(address)
       with defaults.S:
         srv = serve_socket(
@@ -940,6 +944,7 @@ class VTCmd(BaseCommand):
       srv.join()
     else:
       # [host]:port
+      track("dispatch serve_tcp(%r,...)", address)
       cpos = address.rfind(':')
       if cpos >= 0:
         host = address[:cpos]
