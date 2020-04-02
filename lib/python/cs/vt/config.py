@@ -66,6 +66,7 @@ class Config(SingletonMixin):
         Default: `os.environ`
   '''
 
+  @staticmethod
   @require(lambda config_map: isinstance(config_map, (str, dict)))
   @require(
       lambda default_config:
