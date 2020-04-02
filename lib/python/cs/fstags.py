@@ -990,8 +990,9 @@ class FSTags(MultiOpenMixin):
     lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
     changed = edit_strings(lines)
     for old_line, new_line in changed:
-      old_name, _ = tagfile.parse_tags_line(old_line)
-      new_name, new_tags = tagfile.parse_tags_line(new_line)
+      with stackattrs(state, verbose=False):
+        old_name, _ = tagfile.parse_tags_line(old_line)
+        new_name, new_tags = tagfile.parse_tags_line(new_line)
       with Pfx(old_name):
         if old_name != new_name:
           if new_name in tagsets:
