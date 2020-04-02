@@ -298,8 +298,6 @@ class SingletonMixin:
 
       A subclass should:
       * *not* provide an `__init__` method.
-      * provide a `_singleton_init` method in place of the normal `__init__`
-        with the usual signature `(self,*args,**kwargs)`.
       * provide a `_singleton_key(cls,*args,**kwargs)` class method
         returning a key for the single registry
         computed from the positional and keyword arguments
@@ -307,6 +305,8 @@ class SingletonMixin:
         i.e. those which `__init__` would normally receive.
         This should have the same signature as `_singleton_init`
         (but using `cls` instead of `self`).
+      * provide a `_singleton_init` method in place of the normal `__init__`
+        with the usual signature `(self,*args,**kwargs)`.
 
       This class is thread safe for the registry operations.
 
@@ -314,12 +314,12 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              def _singleton_init(self, foo, bah=3):
-                 ... normal __init__ stuff here ...
-
               @classmethod
               def _singleton_key(cls, foo, bah=3):
                   return foo, bah
+
+              def _singleton_init(self, foo, bah=3):
+                 ... normal __init__ stuff here ...
   '''
 
   # This lock is used to control setup of the per-class registry.
