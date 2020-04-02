@@ -990,29 +990,36 @@ class FSTags(MultiOpenMixin):
     changed = edit_strings(lines)
     for old_line, new_line in changed:
       with stackattrs(state, verbose=False):
-        old_name, _ = tagfile.parse_tags_line(old_line)
+        old_name, old_tags = tagfile.parse_tags_line(old_line)
         new_name, new_tags = tagfile.parse_tags_line(new_line)
       with Pfx(old_name):
+        tags = tagsets[old_name]
+        tags.set_from(new_tags, verbose=state.verbose)
         if old_name != new_name:
           if new_name in tagsets:
             warning("new name %r already exists", new_name)
+            new_name = old_name
             ok = False
-            continue
-          del tagsets[old_name]
-          old_path = joinpath(dirpath, old_name)
-          if existspath(old_path):
-            new_path = joinpath(dirpath, new_name)
-            if not existspath(new_path):
-              with Pfx("rename => %r", new_path):
-                try:
-                  os.rename(old_path, new_path)
-                except OSError as e:
-                  warning("%s", e)
-                  ok = False
-                  continue
-                info("renamed")
-        tagsets[new_name] = new_tags
-    tagfile.save()
+          else:
+            old_path = joinpath(dirpath, old_name)
+            if existspath(old_path):
+              new_path = joinpath(dirpath, new_name)
+              if existspath(new_path):
+                warning("new path exists, not renaming to %r", new_path)
+                ok = False
+                new_name = old_name
+              else:
+                verbose("=> %r", new_name)
+                with Pfx("rename => %r", new_path):
+                  try:
+                    os.rename(old_path, new_path)
+                  except OSError as e:
+                    warning("%s", e)
+                    ok = False
+                    new_name = old_name
+                  else:
+                    del tagsets[old_name]
+                    tagsets[new_name] = tags
     return ok
 
   def scrub(self, path):
