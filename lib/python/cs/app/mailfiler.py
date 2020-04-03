@@ -410,7 +410,7 @@ class MailFiler(NS):
     watcher_key = os.path.realpath(folderpath), os.path.realpath(rules_path)
     watchers = self._maildir_watchers
     with self._lock:
-      wmdir = singleton(
+      _, wmdir = singleton(
           watchers, watcher_key, WatchedMaildir, (folderpath, self),
           {'rules_path': rules_path}
       )
