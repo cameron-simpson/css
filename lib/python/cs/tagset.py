@@ -319,7 +319,7 @@ class Tag(namedtuple('Tag', 'name value')):
   ]
 
   @classmethod
-  def with_prefix(cls, name, value, prefix=None):
+  def with_prefix(cls, name, value, *, prefix):
     # prefix the tag with `prefix` if set
     if prefix:
       name=prefix+'.'+name
