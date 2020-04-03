@@ -1,4 +1,3 @@
-TagSet: make iter yield Tags, not keys
 fstags: accept 'single quoted string', transcribe as JSON dq string
 fstags: sqlite fast index of tag values to aid lookups
 fstags: update com.apple.metadata:_kMDItemUserTags with binary plist in xattr export

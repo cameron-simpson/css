@@ -61,6 +61,11 @@ DISTINFO = {
 
 class TagSet(dict, FormatableMixin):
   ''' A setlike class associating a set of tag names with values.
+
+      This actually subclasses `dict`, so a `TagSet` is a direct
+      mapping of tag names to values.
+
+      *NOTE*: iteration yields `Tag`s, not dict keys.
   '''
 
   def __init__(self):
@@ -110,6 +115,8 @@ class TagSet(dict, FormatableMixin):
     '''
     for tag_name, value in self.items():
       yield Tag(prefix + '.' + tag_name if prefix else tag_name, value)
+
+  __iter__ = as_tags
 
   def as_dict(self):
     ''' Return a `dict` mapping tag name to value.
