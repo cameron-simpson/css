@@ -1625,6 +1625,17 @@ class RegexpTagRule:
             value = datetime.strptime(value, strptime_format)
             tag_value_queue.insert(0, (tag_name,value))
             continue
+          # special case prefix_strptime_strptimeformat
+          try:
+            prefix, strptime_format_tplt = tag_name.split('_strpdatetime_', 1)
+          except ValueError:
+            pass
+          else:
+            tag_name = prefix+'_datetime'
+            strptime_format = ' '.join('%'+letter for letter in strptime_format_tplt.split('_'))
+            value = datetime.strptime(value, strptime_format)
+            tag_value_queue.insert(0, (tag_name,value))
+            continue
           # special case *_n
           tag_name_prefix = cutsuffix(tag_name, '_n')
           if tag_name is not tag_name_prefix:
