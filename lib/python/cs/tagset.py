@@ -177,7 +177,7 @@ class TagSet(dict, FormatableMixin):
       if name not in other:
         self.discard(name, verbose=verbose)
 
-  def update(self, *others, **kw):
+  def update(self, other, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
         a dict or an iterable of taggy things.
     '''
