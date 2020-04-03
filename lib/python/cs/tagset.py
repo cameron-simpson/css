@@ -286,7 +286,10 @@ class TagSet(dict, FormatableMixin):
   def edit(self, verbose=None):
     ''' Edit this `TagSet`.
     '''
-    lines = [str(tag) for tag in self.as_tags()]
+    lines = (
+        ["# Edit TagSet.", "# One tag per line."] +
+        [str(tag) for tag in self.as_tags()]
+    )
     new_lines = edit_lines(lines)
     new_values = {}
     for lineno, line in enumerate(new_lines):
@@ -296,7 +299,7 @@ class TagSet(dict, FormatableMixin):
           continue
         tag = Tag.from_string(line)
         new_values[tag.name] = tag.value
-        self.set_from(new_values)
+        self.set_from(new_values, verbose=verbose)
 
 class Tag(namedtuple('Tag', 'name value')):
   ''' A Tag has a `.name` (`str`) and a `.value`.
