@@ -1621,7 +1621,7 @@ class Target_SetFlag(NS):
     self.flag_attr = flag_attr
 
   def __str__(self):
-    return f'flag={flag_attr}'
+    return f'flag={self.flag_attr}'
 
   def apply(self, filer):
     ''' Apply this target:
