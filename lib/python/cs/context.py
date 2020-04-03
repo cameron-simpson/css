@@ -17,6 +17,38 @@ DISTINFO = {
     'install_requires': [],
 }
 
+def pushattrs(o, **attr_values):
+  ''' The "push" part of stackattrs.
+      Push `attr_values` onto `o` as attributes,
+      return the previous attribute values in a dict.
+  '''
+  old_values = {}
+  for attr, value in attr_values.items():
+    try:
+      old_value = getattr(o, attr)
+    except AttributeError:
+      pass
+    else:
+      old_values[attr] = old_value
+    setattr(o, attr, value)
+  return old_values
+
+def popattrs(o,  attr_names, old_values):
+  ''' The "pop" part of stackattrs.
+      Restore previous attributes of `o`
+      named by `attr_names` with previous state in `old_values`.
+  '''
+  for attr in attr_names:
+    try:
+      old_value = old_values[attr]
+    except KeyError:
+      try:
+        delattr(o, attr)
+      except AttributeError:
+        pass
+    else:
+      setattr(o, attr, old_value)
+
 @contextmanager
 def stackattrs(o, **attr_values):
   ''' Context manager to push new values for the attributes of `o`
@@ -76,25 +108,8 @@ def stackattrs(o, **attr_values):
             File "<stdin>", line 1, in <module>
           AttributeError: 'O' object has no attribute 'b'
   '''
-  old_values = {}
-  for attr, value in attr_values.items():
-    try:
-      old_value = getattr(o, attr)
-    except AttributeError:
-      pass
-    else:
-      old_values[attr] = old_value
-    setattr(o, attr, value)
+  old_values = pushattrs(o, **attr_values)
   try:
     yield old_values
   finally:
-    for attr in attr_values:
-      try:
-        old_value = old_values[attr]
-      except KeyError:
-        try:
-          delattr(o, attr)
-        except AttributeError:
-          pass
-      else:
-        setattr(o, attr, old_value)
+    popattrs(o, attr_values.keys(), old_values)

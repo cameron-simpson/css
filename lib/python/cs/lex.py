@@ -19,9 +19,10 @@ import os
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
+from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200229'
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 unhexify = binascii.unhexlify
@@ -905,10 +906,14 @@ def cutsuffix(s, suffix):
   return s
 
 class FormatAsError(LookupError):
-  ''' Special flavour of `LookupError` for use by `format_as`.
+  ''' Subclass of `LookupError` for use by `format_as`.
   '''
 
-  def __init__(self, key, format_s, format_mapping, error_sep):
+  DEFAULT_SEPARATOR = '; '
+
+  def __init__(self, key, format_s, format_mapping, error_sep=None):
+    if error_sep is None:
+      error_sep = self.DEFAULT_SEPARATOR
     LookupError.__init__(self, key)
     self.args = (key, format_s, format_mapping, error_sep)
 
@@ -922,24 +927,24 @@ class FormatAsError(LookupError):
         )
     )
 
+@fmtdoc
 def format_as(format_s, format_mapping, error_sep=None):
   ''' Format the string `format_s` using `format_mapping`,
       return the formatted result.
       This is a wrapper for `str.format_map`
-      which produces a more informative `KeyError` exception on failure.
+      which raises a more informative `FormatAsError` exception on failure.
 
       Parameters:
       * `format_s`: the format string to use as the template
       * `format_mapping`: the mapping of available replacement fields
-      * `error_sep`: the separator for the multipart error message string,
-        default `'; '`
+      * `error_sep`: optional separator for the multipart error message,
+        default from FormatAsError.DEFAULT_SEPARATOR:
+        `'{FormatAsError.DEFAULT_SEPARATOR}'`
   '''
-  if error_sep is None:
-    error_sep = '; '
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
-    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep)
+    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep=error_sep)
   return formatted
 
 _format_as = format_as

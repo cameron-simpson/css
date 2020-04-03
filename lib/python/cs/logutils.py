@@ -53,8 +53,8 @@ import os.path
 from pprint import pformat
 import stat
 import sys
-import time
 from threading import Lock
+import time
 import traceback
 from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
@@ -355,7 +355,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       comes from the environment variable `$DEBUG`.
 
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
-      default to logging.INFO.
+      default to TRACK.
 
       Parse the environment variable $DEBUG as a comma separated
       list of flags.
@@ -382,7 +382,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   level = logging.WARNING
   if verbose is None:
     if sys.stderr.isatty():
-      level = logging.INFO
+      level = TRACK
   elif verbose:
     level = logging.INFO
   else:
@@ -605,6 +605,19 @@ def track(msg, *args, **kwargs):
   ''' Emit a log at `TRACK` `level` with the current Pfx prefix.
   '''
   log(TRACK, msg, *args, **kwargs)
+
+def ifverbose(verbose, msg, *args, **kwargs):
+  ''' Conditionally log a message.
+      If verbose is `None`
+      then the caller has not indicated a specific verbosity
+      and we use the `track` function.
+      If verbose is true
+      then we use the `info` function.
+  '''
+  if verbose is None:
+    info(msg, *args, **kwargs)
+  elif verbose:
+    track(msg, *args, **kwargs)
 
 def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` `level` with the current Pfx prefix.
