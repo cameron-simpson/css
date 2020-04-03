@@ -411,8 +411,9 @@ class MailFiler(NS):
     watchers = self._maildir_watchers
     with self._lock:
       wmdir = singleton(
-          watchers, watcher_key, WatchedMaildir,
-          (folderpath, self), {'rules_path':rules_path})
+          watchers, watcher_key, WatchedMaildir, (folderpath, self),
+          {'rules_path': rules_path}
+      )
     return wmdir
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
