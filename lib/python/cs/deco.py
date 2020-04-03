@@ -89,16 +89,19 @@ def decorator(deco):
     if len(da) == 1 and callable(da[0]) and not dkw:
       func = da[0]
       decorated = deco(func)
-      decorated.__doc__ = getattr(func, '__doc__', '')
+      if not getattr(decorated, '__doc__', None):
+        decorated.__doc__ = getattr(func, '__doc__', '')
       func_module = getattr(func, '__module__', None)
       try:
         decorated.__module__ = func_module
       except AttributeError:
         pass
       return decorated
+
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
     # and returns deco(func, *da, **kw).
+
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')

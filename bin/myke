@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # myke - my make programme.
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-exec python3 -m cs.app.myke ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.myke.__main__ import main
+sys.exit(main(sys.argv))
