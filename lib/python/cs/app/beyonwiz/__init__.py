@@ -25,7 +25,7 @@ from cs.deco import strable
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
 
@@ -80,6 +80,7 @@ class RecordingMetaData(NS):
   ''' Base class for recording metadata.
   '''
 
+  @pfx_method
   def __init__(self, raw):
     self.raw = raw
     self.episodeinfo = EpisodeInfo()
@@ -103,14 +104,20 @@ class RecordingMetaData(NS):
     '''
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
+  @pfx_method
   def as_tags(self):
     ''' Generator yielding the metadata as `Tag`s.
     '''
     yield from (Tag(tag, None) for tag in self.tags)
     yield from self.episodeinfo.as_tags()
     for rawkey, rawvalue in self.raw.items():
-      for field, value in rawvalue.items():
-        yield Tag(rawkey + '.' + field, value)
+      try:
+        value_items = rawvalue.items
+      except AttributeError:
+        yield Tag(rawkey, rawvalue)
+      else:
+        for field, value in rawvalue.items():
+          yield Tag(rawkey + '.' + field, value)
 
   @property
   def start_dt(self):
