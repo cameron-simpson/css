@@ -143,13 +143,14 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
-    {cmd} edit [dirpath]
-        Edit the tagsets of dirpath, default: .
-    {cmd} edittags filepath
-        Edit the direct tags of a single filepath.
+    {cmd} edit [-d] [path]
+        Edit the direct tagsets of path, default: '.'
+        If path is a directory, provide the tags of its entries.
+        Otherwise edit just the tags for path.
+        -d          Treat directories like files: edit just its tags.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
-        -d          treat directories like files (do no recurse).
+        -d          Treat directories like files (do not recurse).
         --direct    Use direct tags instead of all tags.
         --for-rsync Instead of listing matching paths, emit a
                     sequence of rsync(1) patterns suitable for use with
@@ -264,7 +265,7 @@ class FSTagsCommand(BaseCommand):
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules).as_tags():
+                for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
                     direct_tags.add(autotag, verbose=state.verbose)
@@ -285,43 +286,31 @@ class FSTagsCommand(BaseCommand):
   def cmd_edit(argv, options):
     ''' Edit filenames and tags in a directory.
 
-        Usage: edit [dirpath]
+        Usage: edit [-d] [dirpath]
     '''
     fstags = options.fstags
+    directories_like_files = False
     xit = 0
+    options, argv = getopt(argv, 'd')
+    for option, value in options:
+      with Pfx(option):
+        if option == '-d':
+          directories_like_files = True
     if not argv:
       path = '.'
     else:
       path = argv.pop(0)
       if argv:
         raise GetoptError("extra arguments after path: %r" % (argv,))
-    with Pfx(path):
-      if not isdirpath(path):
-        error("not a directory")
-        return 1
     with stackattrs(state, verbose=True):
       with fstags:
-        if not fstags.edit_dirpath(path):
-          xit = 1
+        with Pfx(path):
+          if directories_like_files or not isdirpath(path):
+            tags = fstags[path].direct_tags
+            tags.edit(verbose=state.verbose)
+          elif not fstags.edit_dirpath(path):
+            xit = 1
     return xit
-
-  @staticmethod
-  def cmd_edittags(argv, options):
-    ''' Edit the direct tags of a specific path.
-
-        Usage: edittags path
-    '''
-    fstags = options.fstags
-    if not argv:
-      raise GetoptError("missing path")
-    path = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments after path: %r" % (argv,))
-    with Pfx(path):
-      with stackattrs(state, verbose=True):
-        with fstags:
-          tags = fstags[path].direct_tags
-          tags.edit(verbose=state.verbose)
 
   @classmethod
   def cmd_find(cls, argv, options):
@@ -1100,7 +1089,7 @@ class FSTags(MultiOpenMixin):
           raise ValueError("destination already exists")
       result = attach(srcpath, dstpath)
       old_modified = dst_taggedpath.modified
-      for tag in src_taggedpath.direct_tags.as_tags():
+      for tag in src_taggedpath.direct_tags:
         dst_taggedpath.direct_tags.add(tag)
       try:
         dst_taggedpath.save()
@@ -1284,17 +1273,17 @@ class TagFile(SingletonMixin):
       return tagsets
 
   @classmethod
-  def tags_line(cls, name, tagmap):
-    ''' Transcribe a `name` and its `tagmap` for use as a `.fstags` file line.
+  def tags_line(cls, name, tags):
+    ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     fields = [cls.encode_name(name)]
-    for tag in tagmap.as_tags():
+    for tag in tags:
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
   def save_tagsets(cls, filepath, tagsets):
-    ''' Save a tagmap to `filepath`.
+    ''' Save `tagsets` to `filepath`.
 
         This method will create the required intermediate directories
         if missing.
@@ -1461,7 +1450,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     tags = TagSet()
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_stack:
-        for tag in tagfile[name].as_tags():
+        for tag in tagfile[name]:
           tags.add(tag)
     return tags
 
