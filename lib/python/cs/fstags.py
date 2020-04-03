@@ -68,7 +68,7 @@ from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import findup
 from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
-from cs.logutils import error, warning, info, trace, ifverbose
+from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -1346,6 +1346,8 @@ class TagFile(SingletonMixin):
     ''' Update the tags for `name` from the supplied `tags`
         as for `Tagset.update`.
     '''
+    if prefix:
+      tags = [Tag.with_prefix(tag.name, tag.value, prefix=prefix) for tag in tags]
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
