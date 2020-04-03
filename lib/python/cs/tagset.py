@@ -181,17 +181,16 @@ class TagSet(dict, FormatableMixin):
     ''' Update this `TagSet` from `other`,
         a dict or an iterable of taggy things.
     '''
-    for other in others:
-      try:
-        keys = other.keys
-      except AttributeError:
-        for k, v in other:
-          self[k] = v
-      else:
-        for k in keys():
-          self[k] = other[k]
-    for k, v in kw.items():
-      self[k] = v
+    try:
+      items = other.items
+    except AttributeError:
+      kvs = other
+    else:
+      kvs = items()
+    for k, v in kvs:
+      if prefix:
+        k = prefix + '.' + k
+      self.set(k, v, verbose=verbose)
 
   @pfx_method
   def ns(self, ontology=None):
