@@ -139,11 +139,8 @@ class MP4Command(BaseCommand):
                 for box, tags in top_box.gather_metadata():
                   if tags:
                     for tag in tags:
-                      new_tag = Tag(
-                          (
-                              '.'.join((tag_prefix,
-                                        tag.name)) if tag_prefix else tag.name
-                          ), tag.value
+                      new_tag = Tag.from_prefix(
+                          tag.name, tag.value, prefix=tag_prefix
                       )
                       if no_action:
                         new_tag_s = str(new_tag)
