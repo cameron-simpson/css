@@ -265,7 +265,7 @@ class FSTagsCommand(BaseCommand):
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules).as_tags():
+                for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
                     direct_tags.add(autotag, verbose=state.verbose)
@@ -1089,7 +1089,7 @@ class FSTags(MultiOpenMixin):
           raise ValueError("destination already exists")
       result = attach(srcpath, dstpath)
       old_modified = dst_taggedpath.modified
-      for tag in src_taggedpath.direct_tags.as_tags():
+      for tag in src_taggedpath.direct_tags:
         dst_taggedpath.direct_tags.add(tag)
       try:
         dst_taggedpath.save()
@@ -1273,11 +1273,11 @@ class TagFile(SingletonMixin):
       return tagsets
 
   @classmethod
-  def tags_line(cls, name, tagmap):
-    ''' Transcribe a `name` and its `tagmap` for use as a `.fstags` file line.
+  def tags_line(cls, name, tags):
+    ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
     fields = [cls.encode_name(name)]
-    for tag in tagmap.as_tags():
+    for tag in tags:
       fields.append(str(tag))
     return ' '.join(fields)
 
@@ -1450,7 +1450,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     tags = TagSet()
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_stack:
-        for tag in tagfile[name].as_tags():
+        for tag in tagfile[name]:
           tags.add(tag)
     return tags
 

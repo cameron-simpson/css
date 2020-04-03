@@ -77,7 +77,7 @@ class TagSet(dict, FormatableMixin):
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
     '''
-    return ' '.join(sorted(str(T) for T in self.as_tags()))
+    return ' '.join(map(str, sorted(self)))
 
   def __repr__(self):
     return "%s:%r" % (type(self).__name__, dict.__repr__(self))
@@ -105,7 +105,7 @@ class TagSet(dict, FormatableMixin):
   def __contains__(self, tag):
     if isinstance(tag, str):
       return super().__contains__(tag)
-    for mytag in self.as_tags():
+    for mytag in self:
       if mytag.matches(tag):
         return True
     return False
@@ -222,7 +222,7 @@ class TagSet(dict, FormatableMixin):
         effect in the namespace - the first found is used.
     '''
     ns0 = ExtendedNamespace()
-    for tag in sorted(self.as_tags(), reverse=True):
+    for tag in sorted(self, reverse=True):
       with Pfx(tag):
         tag_name = tag.name
         subnames = [subname for subname in tag_name.split('.') if subname]
@@ -294,7 +294,7 @@ class TagSet(dict, FormatableMixin):
     '''
     lines = (
         ["# Edit TagSet.", "# One tag per line."] +
-        [str(tag) for tag in self.as_tags()]
+        list(map(str, sorted(self)))
     )
     new_lines = edit_lines(lines)
     new_values = {}
@@ -331,7 +331,7 @@ class Tag(namedtuple('Tag', 'name value')):
   def with_prefix(cls, name, value, *, prefix):
     # prefix the tag with `prefix` if set
     if prefix:
-      name=prefix+'.'+name
+      name = prefix + '.' + name
     return cls(name, value)
 
   def __eq__(self, other):
