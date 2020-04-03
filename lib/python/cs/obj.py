@@ -287,6 +287,7 @@ class TrackedClassMixin(object):
 
 def singleton(registry, key, factory, fargs, fkwargs):
   ''' Obtain an object for `key` via `registry` (a mapping of `key`=>`object`.
+      Return `(is_new,instance)`.
 
       If the `key` exists in the registry, return the associated object.
       Otherwise create a new object by calling `factory(*fargs,**fkwargs)`
