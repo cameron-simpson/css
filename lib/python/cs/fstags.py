@@ -573,6 +573,7 @@ class FSTagsCommand(BaseCommand):
             print(" ", repr(taginfo.detail))
       else:
         raise GetoptError("unrecognised subcommand")
+    return 0
 
   @staticmethod
   def cmd_rename(argv, options):
