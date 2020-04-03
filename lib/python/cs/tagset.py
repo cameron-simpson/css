@@ -105,11 +105,11 @@ class TagSet(dict, FormatableMixin):
         return True
     return False
 
-  def as_tags(self):
+  def as_tags(self, prefix=None):
     ''' Yield the tag data as `Tag`s.
     '''
     for tag_name, value in self.items():
-      yield Tag(tag_name, value)
+      yield Tag(prefix + '.' + tag_name if prefix else tag_name, value)
 
   def as_dict(self):
     ''' Return a `dict` mapping tag name to value.
@@ -177,21 +177,20 @@ class TagSet(dict, FormatableMixin):
       if name not in other:
         self.discard(name, verbose=verbose)
 
-  def update(self, *others, **kw):
+  def update(self, other, *, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
         a dict or an iterable of taggy things.
     '''
-    for other in others:
-      try:
-        keys = other.keys
-      except AttributeError:
-        for k, v in other:
-          self[k] = v
-      else:
-        for k in keys():
-          self[k] = other[k]
-    for k, v in kw.items():
-      self[k] = v
+    try:
+      items = other.items
+    except AttributeError:
+      kvs = other
+    else:
+      kvs = items()
+    for k, v in kvs:
+      if prefix:
+        k = prefix + '.' + k
+      self.set(k, v, verbose=verbose)
 
   @pfx_method
   def ns(self, ontology=None):
@@ -320,6 +319,13 @@ class Tag(namedtuple('Tag', 'name value')):
       (date, date_fromisoformat, date.isoformat),
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
+
+  @classmethod
+  def with_prefix(cls, name, value, *, prefix):
+    # prefix the tag with `prefix` if set
+    if prefix:
+      name=prefix+'.'+name
+    return cls(name, value)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
