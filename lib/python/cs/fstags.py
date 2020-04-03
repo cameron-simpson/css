@@ -143,13 +143,14 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
-    {cmd} edit [dirpath]
-        Edit the tagsets of dirpath, default: .
-    {cmd} edittags filepath
-        Edit the direct tags of a single filepath.
+    {cmd} edit [-d] [path]
+        Edit the direct tagsets of path, default: '.'
+        If path is a directory, provide the tags of its entries.
+        Otherwise edit just the tags for path.
+        -d          Treat directories like files: edit just its tags.
     {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
-        -d          treat directories like files (do no recurse).
+        -d          Treat directories like files (do not recurse).
         --direct    Use direct tags instead of all tags.
         --for-rsync Instead of listing matching paths, emit a
                     sequence of rsync(1) patterns suitable for use with
@@ -285,43 +286,31 @@ class FSTagsCommand(BaseCommand):
   def cmd_edit(argv, options):
     ''' Edit filenames and tags in a directory.
 
-        Usage: edit [dirpath]
+        Usage: edit [-d] [dirpath]
     '''
     fstags = options.fstags
+    directories_like_files = False
     xit = 0
+    options, argv = getopt(argv, 'd')
+    for option, value in options:
+      with Pfx(option):
+        if option == '-d':
+          directories_like_files = True
     if not argv:
       path = '.'
     else:
       path = argv.pop(0)
       if argv:
         raise GetoptError("extra arguments after path: %r" % (argv,))
-    with Pfx(path):
-      if not isdirpath(path):
-        error("not a directory")
-        return 1
     with stackattrs(state, verbose=True):
       with fstags:
-        if not fstags.edit_dirpath(path):
-          xit = 1
+        with Pfx(path):
+          if directories_like_files or not isdirpath(path):
+            tags = fstags[path].direct_tags
+            tags.edit(verbose=state.verbose)
+          elif not fstags.edit_dirpath(path):
+            xit = 1
     return xit
-
-  @staticmethod
-  def cmd_edittags(argv, options):
-    ''' Edit the direct tags of a specific path.
-
-        Usage: edittags path
-    '''
-    fstags = options.fstags
-    if not argv:
-      raise GetoptError("missing path")
-    path = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments after path: %r" % (argv,))
-    with Pfx(path):
-      with stackattrs(state, verbose=True):
-        with fstags:
-          tags = fstags[path].direct_tags
-          tags.edit(verbose=state.verbose)
 
   @classmethod
   def cmd_find(cls, argv, options):
