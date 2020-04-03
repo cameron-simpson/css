@@ -105,19 +105,19 @@ class RecordingMetaData(NS):
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
 
   @pfx_method
-  def as_tags(self):
+  def as_tags(self, prefix=None):
     ''' Generator yielding the metadata as `Tag`s.
     '''
-    yield from (Tag(tag, None) for tag in self.tags)
-    yield from self.episodeinfo.as_tags()
+    yield from (Tag.with_prefix(tag, None, prefix=prefix) for tag in self.tags)
+    yield from self.episodeinfo.as_tags(prefix=prefix)
     for rawkey, rawvalue in self.raw.items():
       try:
         value_items = rawvalue.items
       except AttributeError:
-        yield Tag(rawkey, rawvalue)
+        yield Tag.with_prefix(rawkey, rawvalue, prefix=prefix)
       else:
-        for field, value in rawvalue.items():
-          yield Tag(rawkey + '.' + field, value)
+        for field, value in value_items():
+          yield Tag.with_prefix(rawkey + '.' + field, value, prefix=prefix)
 
   @property
   def start_dt(self):
@@ -278,7 +278,7 @@ class _Recording(ABC, HasFSTagsMixin):
         dstfmt = ext[1:]
       fstags = self.fstags
       with fstags:
-        fstags[dstpath].update(self.metadata.as_tags(), prefix='beyonwiz')
+        fstags[dstpath].update(self.metadata.as_tags(prefix='beyonwiz'))
       ffmeta = self.ffmpeg_metadata(dstfmt)
       sources = []
       for start_s, end_s in timespans:
