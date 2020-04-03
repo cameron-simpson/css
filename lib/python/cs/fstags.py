@@ -45,6 +45,7 @@
 
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
+from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -263,7 +264,7 @@ class FSTagsCommand(BaseCommand):
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules):
+                for autotag in tagged_path.infer_from_basename(filename_rules).as_tags():
                   U.out(path + ' ' + str(autotag))
                   if autotag not in all_tags:
                     direct_tags.add(autotag, verbose=state.verbose)
@@ -1598,15 +1599,33 @@ class RegexpTagRule:
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
 
+  @pfx_method
   def infer_tags(self, s):
     ''' Apply the rule to the string `s`, return a list of `Tag`s.
     '''
+    # TODO: honour the JSON decode strings
     tags = []
     m = self.regexp.search(s)
     if m:
-      for tag_name, value in m.groupdict().items():
-        if value is not None:
-          # TODO: honour the JSON decode strings
+      tag_value_queue = list( m.groupdict().items())
+      while tag_value_queue:
+        tag_name, value = tag_value_queue.pop(0)
+        with Pfx(tag_name):
+          if value is None:
+            warning("value=None, skipped")
+            continue
+          # special case prefix_strpdate_strptimeformat
+          try:
+            prefix, strptime_format_tplt = tag_name.split('_strpdate_', 1)
+          except ValueError:
+            pass
+          else:
+            tag_name = prefix+'_date'
+            strptime_format = ' '.join('%'+letter for letter in strptime_format_tplt.split('_'))
+            value = datetime.strptime(value, strptime_format)
+            tag_value_queue.insert(0, (tag_name,value))
+            continue
+          # special case *_n
           tag_name_prefix = cutsuffix(tag_name, '_n')
           if tag_name is not tag_name_prefix:
             # numeric rule
@@ -1616,7 +1635,8 @@ class RegexpTagRule:
               pass
             else:
               tag_name = tag_name_prefix
-          tags.append(Tag(tag_name, value))
+          tag = Tag(tag_name, value)
+          tags.append(tag)
     return tags
 
 def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
