@@ -129,7 +129,8 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get((cs.pfx.cmd + 'rc').upper())
+      makerc_envvar = (os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc').upper()
+      makerc = os.environ.get(makerc_envvar)
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
       makefile = os.path.basename(cs.pfx.cmd).title() + 'file'

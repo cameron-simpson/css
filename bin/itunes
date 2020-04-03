@@ -130,13 +130,8 @@ download(){
 
 case "$op" in
   dl|download)
-    if [ $# = 0 ]
-    then
-      echo "$cmd: $op: missing download items" >&2
-      badopts=1
-    else
-      download "$@"
-    fi
+    [ $# -gt 0 ] || set selected
+    download "$@"
     ;;
   selected)
     if [ $# -gt 0 ]

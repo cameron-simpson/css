@@ -70,6 +70,7 @@ from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
     ismaildir, make_maildir
 )
+from cs.obj import singleton
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.py.modules import import_module_name
@@ -405,15 +406,15 @@ class MailFiler(NS):
     ''' Return the singleton WatchedMaildir indicated by the `folderspec`.
     '''
     folderpath = self.maildir_from_folderspec(folderspec)
+    rules_path = envsub(self.rules_pattern.format(maildir=folderpath))
+    watcher_key = os.path.realpath(folderpath), os.path.realpath(rules_path)
     watchers = self._maildir_watchers
     with self._lock:
-      if folderpath not in watchers:
-        watchers[folderpath] = WatchedMaildir(
-            folderpath,
-            self,
-            rules_path=envsub(self.rules_pattern.format(maildir=folderpath))
-        )
-    return watchers[folderpath]
+      _, wmdir = singleton(
+          watchers, watcher_key, WatchedMaildir, (folderpath, self),
+          {'rules_path': rules_path}
+      )
+    return wmdir
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
     ''' Monitor the specified `folders`, a list of folder spcifications.
@@ -780,9 +781,9 @@ class MessageFiler(NS):
       # leaks privacy
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
-
       for R in self.matched_rules:
         info("    MATCH %s", R)
+
       return self.save_message()
 
   def save_message(self):
@@ -1621,7 +1622,7 @@ class Target_SetFlag(NS):
     self.flag_attr = flag_attr
 
   def __str__(self):
-    return f'flag={flag_attr}'
+    return f'flag={self.flag_attr}'
 
   def apply(self, filer):
     ''' Apply this target:

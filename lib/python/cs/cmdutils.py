@@ -10,11 +10,12 @@
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
+from os.path import basename
 import sys
 from types import SimpleNamespace as NS
 from cs.context import stackattrs
 from cs.lex import cutprefix
-from cs.logutils import setup_logging, warning, error, exception
+from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.resources import RunState
 
@@ -104,12 +105,12 @@ class BaseCommand:
         before any command line options are applied
       * `apply_opts(options,opts)`:
         apply the `opts` to `options`.
-        `opts` is an option value mapping
+        `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
       * `cmd_`*subcmd*`(argv,options)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
-        then method `cmd_`*subcmd*`(argv,options)`
+        then the method `cmd_`*subcmd*`(argv,options)`
         will be called where `argv` contains the command line arguments
         after *subcmd*.
       * `main(argv,options)`:
@@ -146,7 +147,7 @@ class BaseCommand:
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
     '''
-    format_kwargs=dict(getattr(cls,'USAGE_KEYWORDS',{}))
+    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     if 'cmd' not in format_kwargs:
       format_kwargs['cmd'] = cls.__name__
     cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
@@ -168,7 +169,9 @@ class BaseCommand:
         * `argv`:
           optional command line arguments
           including the main command name if `cmd` is not specified.
-          The default is copied from `sys.argv`.
+          The default is `sys.argv`.
+          The contents of `argv` are copied,
+          permitting desctructive parsing of `argv`.
         * `options`:
           a object for command state and context.
           If not specified a new `SimpleNamespace`
@@ -206,8 +209,10 @@ class BaseCommand:
       if cmd is not None:
         # we consume the first argument anyway
         argv.pop(0)
+    else:
+      argv = list(argv)
     if cmd is None:
-      cmd = argv.pop(0)
+      cmd = basename(argv.pop(0))
     setup_logging(cmd)
     # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
@@ -223,7 +228,7 @@ class BaseCommand:
       self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
-      getopt_spec = getattr(self,'GETOPT_SPEC','')
+      getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # we do this regardless in order to honour --
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
@@ -252,6 +257,14 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmd_names))
           )
+        if isinstance(main, BaseCommand):
+
+          def run_main(argv, options):
+            ''' Invoke the run method of an instance of the subcommand class.
+            '''
+            return main().run(argv, options=options, cmd=subcmd)
+
+          main = run_main
       else:
         subcmd = cmd
         try:
