@@ -1283,7 +1283,7 @@ class TagFile(SingletonMixin):
 
   @classmethod
   def save_tagsets(cls, filepath, tagsets):
-    ''' Save a tagmap to `filepath`.
+    ''' Save `tagsets` to `filepath`.
 
         This method will create the required intermediate directories
         if missing.
