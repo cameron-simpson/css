@@ -1,3 +1,5 @@
+bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
+resolve bin/maildb vs bin-cs/cs-maildb
 include .meta.blah for tags with ontology info in ns()
 upgrade the distinfo stuff with a mode to emit all the docstrings so that a modul automatic README.md describes everything
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
