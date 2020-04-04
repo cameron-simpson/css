@@ -952,10 +952,11 @@ class Box(Packet):
     ''' Return a `TagSet` containing metadata for this box.
     '''
     with Pfx("metatags(%r)", self.box_type):
+      box_prefix = self.box_type_s
       tags = TagSet()
       meta_box = self.META0
       if meta_box:
-        tags.update(meta_box.tagset())
+        tags.update(meta_box.tagset(), prefix=box_prefix + '.meta')
       else:
         pass  # X("NO .META0")
       udta_box = self.UDTA0
@@ -965,7 +966,7 @@ class Box(Packet):
         if udta_meta_box:
           ilst_box = udta_meta_box.ILST0
           if ilst_box:
-            tags.update(ilst_box.tags)
+            tags.update(ilst_box.tags, prefix=box_prefix + '.udta.meta.ilst')
       else:
         pass  # X("NO UDTA")
       ##dump_box(self, crop_length=None)
