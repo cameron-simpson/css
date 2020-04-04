@@ -553,6 +553,12 @@ class ExtendedNamespace(SimpleNamespace):
       This also presents attributes as `[]` elements via `__getitem__`.
   '''
 
+  def __missing__(self, attr):
+    ''' Value to return on a missing attribute.
+        This version is premised on use with `str.format_map`.
+    '''
+    return '{' + attr + '}'
+
   def __getattr__(self, attr):
     ''' Look up an indirect attribute, whose value is inferred from another.
     '''
@@ -590,8 +596,9 @@ class ExtendedNamespace(SimpleNamespace):
       value = getattr(self, attr)
     except AttributeError as e:
       if getattr(self, '_return_None_if_missing', False):
-        warning("no %r, returning None", attr)
-        return None
+        default = self.__missing__(attr)
+        warning("no %r, returning %r", attr, default)
+        return default
       raise KeyError(attr) from e
     return value
 
