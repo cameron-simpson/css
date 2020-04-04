@@ -67,7 +67,10 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import findup
-from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
+from cs.lex import (
+    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
+    FormatAsError
+)
 from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -337,7 +340,7 @@ class FSTagsCommand(BaseCommand):
         elif option == '--for-rsync':
           as_rsync_includes = True
         elif option == '-o':
-          output_format = value
+          output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
     if not argv:
@@ -454,7 +457,7 @@ class FSTagsCommand(BaseCommand):
         elif option == '--direct':
           use_direct_tags = True
         elif option == '-o':
-          output_format = value
+          output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
     xit = 0
@@ -848,6 +851,23 @@ class FSTags(MultiOpenMixin):
     if tagged_path is None:
       tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
     return tagged_path
+
+  def resolve_format_string(self, format_string):
+    ''' See if `format_string` looks like `[`*clausename*`]`*entryname*.
+        if so, return the corresponding config entry string,
+        otherwise return `format_string` unchanged.
+    '''
+    try:
+      clausename, entryname, offset = get_ini_clause_entryname(format_string)
+    except ValueError:
+      pass
+    else:
+      if offset == len(format_string):
+        try:
+          format_string = self.config[clausename][entryname]
+        except KeyError as e:
+          warning("config clause entry %r not found: %s", format_string, e)
+    return format_string
 
   @locked
   def ontology(self, path):
