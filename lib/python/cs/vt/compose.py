@@ -14,21 +14,9 @@ from cs.lex import (
     get_qstr,
     get_qstr_or_identifier,
 )
-from cs.lex import get_ini_clausename
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.pfx import Pfx
 from .convert import get_integer
-
-def get_clause_archive(s, offset=0):
-  ''' Match `[`*clause_name*`]`*archive_name* at `offset`,
-      return `(`*clause_name*`,`*archive_name*`,`*new_offset*`)`.
-  '''
-  clause_name, offset = get_ini_clausename(s, offset)
-  archive_name, offset = get_identifier(s, offset)
-  if not archive_name:
-    raise ValueError(
-        "missing archive name identifier at position %d" % (offset,)
-    )
-  return clause_name, archive_name, offset
 
 def parse_store_specs(s, offset=0):
   ''' Parse the string `s` for a list of Store specifications.

@@ -22,7 +22,7 @@ from os.path import (
 )
 import sys
 from cs.fileutils import shortpath, longpath
-from cs.lex import get_ini_clausename
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.result import Result
@@ -32,7 +32,6 @@ from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
     parse_store_specs,
     get_archive_path,
-    get_clause_archive,
 )
 from .convert import (
     get_integer,
@@ -201,7 +200,7 @@ class Config:
         # expect "[clause]archive"
         # TODO: just pass to Archive(special,config=self)?
         # what about special_basename then?
-        clause_name, archive_name, offset = get_clause_archive(special)
+        clause_name, archive_name, offset = get_ini_clause_entryname(special)
         special_basename = archive_name
       if offset < len(special):
         raise ValueError("unparsed text: %r" % (special[offset:],))
