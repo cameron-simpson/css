@@ -1,3 +1,4 @@
+ont: findup from realpath(dirpath) - cache the realpath result
 ont: type=int, type=str etc - consult type during autotag to promote str to int etc
 fstags: accept 'single quoted string', transcribe as JSON dq string
 fstags: sqlite fast index of tag values to aid lookups
