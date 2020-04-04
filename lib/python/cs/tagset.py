@@ -80,7 +80,7 @@ class TagSet(dict, FormatableMixin):
     return ' '.join(map(str, sorted(self)))
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, dict.__repr__(self))
+    return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
   def from_line(cls, line, offset=0, verbose=None):
