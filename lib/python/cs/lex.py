@@ -905,6 +905,22 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
+def get_ini_clausename(s, offset=0):
+  ''' Parse a `[`*clausename*`]` strip from `s` at `offset` (default `0`).
+      Return `(clausename,new_offset)`.
+  '''
+  if not s.startswith('[', offset):
+    raise ValueError("missing opening '[' at position %d" % (offset,))
+  offset += 1
+  clausename, offset = get_qstr_or_identifier(s, offset)
+  if not clausename:
+    raise ValueError(
+        "missing clausename identifier at position %d" % (offset,)
+    )
+  if not s.startswith(']', offset):
+    raise ValueError("missing closing ']' at position %d" % (offset,))
+  return clausename, offset + 1
+
 class FormatAsError(LookupError):
   ''' Subclass of `LookupError` for use by `format_as`.
   '''
@@ -944,7 +960,9 @@ def format_as(format_s, format_mapping, error_sep=None):
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
-    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep=error_sep)
+    raise FormatAsError(
+        e.args[0], format_s, format_mapping, error_sep=error_sep
+    )
   return formatted
 
 _format_as = format_as

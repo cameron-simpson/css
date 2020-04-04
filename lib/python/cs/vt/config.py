@@ -22,6 +22,7 @@ from os.path import (
 )
 import sys
 from cs.fileutils import shortpath, longpath
+from cs.lex import get_ini_clausename
 from cs.logutils import debug, warning, error
 from cs.pfx import Pfx
 from cs.result import Result
@@ -32,7 +33,6 @@ from .compose import (
     parse_store_specs,
     get_archive_path,
     get_clause_archive,
-    get_clause_spec,
 )
 from .convert import (
     get_integer,
@@ -194,7 +194,7 @@ class Config:
     elif special.startswith('['):
       if special.endswith(']'):
         # expect "[clause]"
-        clause_name, offset = get_clause_spec(special)
+        clause_name, offset = get_ini_clausename(special)
         archive_name = ''
         special_basename = clause_name
       else:

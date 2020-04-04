@@ -140,7 +140,7 @@ class TagSet(dict, FormatableMixin):
     if tag_name not in self or old_value is not value:
       self.modified = True
       if tag_name not in self or old_value != value:
-        ifverbose(verbose, "+ %s", Tag(tag_name, value))
+        ifverbose(verbose, "+ %s (was %s)", Tag(tag_name, value), old_value)
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):

@@ -14,29 +14,15 @@ from cs.lex import (
     get_qstr,
     get_qstr_or_identifier,
 )
+from cs.lex import get_ini_clausename
 from cs.pfx import Pfx
 from .convert import get_integer
-
-def get_clause_spec(s, offset=0):
-  ''' Match `[`*clause_name*`]` at `offset`, return *clause_name*`,`*new_offset*.
-  '''
-  if not s.startswith('[', offset):
-    raise ValueError("missing opening '[' at position %d" % (offset,))
-  offset += 1
-  clause_name, offset = get_qstr_or_identifier(s, offset)
-  if not clause_name:
-    raise ValueError(
-        "missing clause_name identifier at position %d" % (offset,)
-    )
-  if not s.startswith(']', offset):
-    raise ValueError("missing closing ']' at position %d" % (offset,))
-  return clause_name, offset + 1
 
 def get_clause_archive(s, offset=0):
   ''' Match `[`*clause_name*`]`*archive_name* at `offset`,
       return `(`*clause_name*`,`*archive_name*`,`*new_offset*`)`.
   '''
-  clause_name, offset = get_clause_spec(s, offset)
+  clause_name, offset = get_ini_clausename(s, offset)
   archive_name, offset = get_identifier(s, offset)
   if not archive_name:
     raise ValueError(
@@ -78,7 +64,7 @@ def get_archive_path_entry(s, offset=0, stopchars=None):
     stopchars = ' \t\t\n'
   if not s.startswith('[', offset):
     raise ValueError("missing clause")
-  clause_name, offset = get_clause_spec(s, offset)
+  clause_name, offset = get_ini_clausename(s, offset)
   ptn, offset = get_other_chars(s, offset=offset, stopchars=stopchars)
   if not ptn:
     raise ValueError("missing pattern")
@@ -155,7 +141,7 @@ def get_store_spec(s, offset=0):
   elif s.startswith('[', offset):
     # [clause_name]
     store_type = 'config'
-    clause_name, offset = get_clause_spec(s, offset)
+    clause_name, offset = get_ini_clausename(s, offset)
     params = {'clause_name': clause_name}
   elif s.startswith('/', offset) or s.startswith('./', offset):
     path = s[offset:]
