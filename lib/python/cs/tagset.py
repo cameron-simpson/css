@@ -129,7 +129,7 @@ class TagSet(dict, FormatableMixin):
   def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
   def set(self, tag_name, value, *, verbose=None):
@@ -158,7 +158,7 @@ class TagSet(dict, FormatableMixin):
         Otherwise the tag is only discarded
         if its value matches.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     tag_name = tag.name
     if tag_name in self:
       value = tag.value
@@ -307,13 +307,68 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
         self.set_from(new_values, verbose=verbose)
 
-class Tag(namedtuple('Tag', 'name value')):
-  ''' A Tag has a `.name` (`str`) and a `.value`.
+class Tag(namedtuple('Tag', 'name value ontology')):
+  ''' A Tag has a `.name` (`str`) and a `.value`
+      and an optional `.ontology`.
 
       The `name` must be a dotted identifier.
 
       A "bare" `Tag` has a `value` of `None`.
+
+      A "naive" `Tag` has an `ontology` of `None`.
+
+      The constructor for a `Tag` is unusual:
+      * both the `value` and `ontology` are optional,
+        defaulting to `None`
+      * if `name` is a `str` then we always construct a new `Tag`
+        with the suppplied values
+      * if `name` is not a `str`
+        it should be a `Tag`like object to promote;
+        it is an error if the `value` parameter is not `None`
+        in this case
+
+      The promotion process is as follows:
+      * if `name` is a `Tag` subinstance
+        then if the supplied `ontology` is not `None`
+        and is not the ontology associated with `name`
+        then a new `Tag` is made,
+        otherwise `name` is returned unchanged
+      * otherwise a new `Tag` is made from `name`
+        using its `.value`
+        and overriding its `.ontology`
+        if the `ontology` parameter is not `None`
   '''
+
+  def __new__(cls, name, value=None, *, ontology=None):
+    # simple case: name is a str: make a new Tag
+    if isinstance(name, str):
+      # (name[,value[,ontology]]) => Tag
+      return super().__new__(cls, name, value, ontology)
+    # name should be taglike
+    if value is not None:
+      raise ValueError(
+          "name(%s) is not a str, value must be None" % (type(name).__name__)
+      )
+    tag = name
+    if not hasattr(tag, 'name'):
+      raise ValueError("tag has no .name attribute")
+    if not hasattr(tag, 'value'):
+      raise ValueError("tag has no .value attribute")
+    if isinstance(tag, Tag):
+      # already a Tag subtype, see if the ontology needs updating
+      if ontology is not None and tag.ontology is not ontology:
+        # new Tag with supplied ontology
+        tag = super().__new__(cls, tag.name, tag.value, ontology)
+    else:
+      # not a Tag subtype, construct a new instance,
+      # overriding .ontology if the supplied ontology is not None
+      tag = super().__new__(
+          cls, tag.name, tag.value, (
+              ontology
+              if ontology is not None else getattr(tag, 'ontology', None)
+          )
+      )
+    return tag
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -328,11 +383,11 @@ class Tag(namedtuple('Tag', 'name value')):
   ]
 
   @classmethod
-  def with_prefix(cls, name, value, *, prefix):
+  def with_prefix(cls, name, value, *, ontology=None, prefix):
     # prefix the tag with `prefix` if set
     if prefix:
       name = prefix + '.' + name
-    return cls(name, value)
+    return cls(name, value, ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -345,12 +400,12 @@ class Tag(namedtuple('Tag', 'name value')):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r)" % (
-        type(self).__name__, self.name, self.value
+    return "%s(name=%r,value=%r,ontology=%r)" % (
+        type(self).__name__, self.name, self.value, self.ontology
     )
 
   def __str__(self):
-    ''' Encode `tag_name` and `value`.
+    ''' Encode `name` and `value`.
     '''
     name = self.name
     value = self.value
@@ -364,9 +419,10 @@ class Tag(namedtuple('Tag', 'name value')):
         If `prefix` is `None` or empty, return this `Tag`.
         Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
     '''
-    return (
-        self.from_name_value('.'.join((prefix, self.name)), self.value)
-        if prefix else self
+    if not prefix:
+      return self
+    return type(self)(
+        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
     )
 
   @classmethod
@@ -392,49 +448,10 @@ class Tag(namedtuple('Tag', 'name value')):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_name_value(cls, name, value):
-    ''' Support method for functions accepting either a tag or a name and value.
-
-        If `name` is a str make a new Tag from `name` and `value`.
-        Otherwise check that `value is `None`
-        and that `name` has a `.name` and `.value`
-        and return directly as a tag ducktype.
-
-        This supports functions of the form:
-
-            def f(x, y, tag_name, value=None):
-              tag = Tag.from_name_value(tag_name, value)
-
-        so that that may accept a `Tag` or a tag name or a tag name and value.
-
-        Exanples:
-
-            >>> Tag.from_name_value('a', 3)
-            Tag(name='a',value=3)
-            >>> T = Tag('b', None)
-            >>> Tag.from_name_value(T, None)
-            Tag(name='b',value=None)
-    '''
-    with Pfx("%s.from_name_value(name=%r,value=%r)", cls.__name__, name,
-             value):
-      if isinstance(name, str):
-        # (name,value) => Tag
-        return cls(name, value)
-      if value is not None:
-        raise ValueError("name is not a str, value must be None")
-      tag = name
-      if not hasattr(tag, 'name'):
-        raise ValueError("tag has no .name attribute")
-      if not hasattr(tag, 'value'):
-        raise ValueError("tag has no .value attribute")
-      # Tag ducktype
-      return tag
-
-  @classmethod
-  def from_string(cls, s, offset=0):
+  def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset)
+    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
     if post_offset < len(s):
       raise ValueError(
           "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
@@ -456,13 +473,13 @@ class Tag(namedtuple('Tag', 'name value')):
   def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
-    other_tag = self.from_name_value(tag_name, value)
+    other_tag = type(self)(tag_name, value)
     if self.name != other_tag.name:
       return False
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0):
+  def parse(cls, s, offset=0, ontology=None):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
@@ -482,7 +499,7 @@ class Tag(namedtuple('Tag', 'name value')):
             ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
         else:
           value = None
-      return cls(name, value), offset
+      return cls(name, value, ontology=ontology), offset
 
   @classmethod
   def parse_value(cls, s, offset=0):
