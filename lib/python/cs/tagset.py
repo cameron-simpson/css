@@ -754,6 +754,34 @@ class TagsOntology(SingletonMixin):
     if typename not in self.BASE_TYPES:
       typename = 'str'
     return typename
+
+  def convert_tag(self, tag):
+    ''' Convert a `Tag`'s value accord to the ontology.
+        Return a new `Tag` with the converted value
+        or the original `Tag` unchanged.
+
+        This is primarily aimed at things like regexp based autotagging,
+        where the matches are all strings
+        but various fields have special types,
+        commonly `int`s or `date`s.
+    '''
+    basetype = TagInfo(tag, ontology=self).basetype
+    try:
+      converter = {
+          'date': date_fromisoformat,
+          'datetime': datetime_fromisoformat,
+      }[basetype]
+    except KeyError:
+      converter = self.BASE_TYPES.get(basetype)
+    if converter:
+      try:
+        converted = converter(tag.value)
+      except (ValueError, TypeError):
+        pass
+      else:
+        tag = Tag(tag.name, converted)
+    return tag
+
 class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
       providing associated detail about a `Tag`.
