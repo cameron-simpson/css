@@ -854,6 +854,14 @@ class TagInfo(FormatableMixin):
     return type_name
 
   @property
+  def basetype(self):
+    ''' The base type name for this tag.
+
+        This calls `TagsOntology.basetype(self.type)`.
+    '''
+    return self.ontology.basetype(self.type)
+
+  @property
   @require(lambda self: isinstance(self.type, str))
   def detail(self):
     ''' The detailed information about this specific tag value,
