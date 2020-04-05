@@ -767,7 +767,7 @@ class FSTags(MultiOpenMixin):
     self.config.ontologyfile = ontologyfile
     self._tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
-    self._ontologies = {}  # cache of per abspath `TagsOntology`
+    self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
     # cache of per ontologypath `TagOntologies`
     self._lock = RLock()
 
@@ -820,18 +820,24 @@ class FSTags(MultiOpenMixin):
     ''' Return the `TagsOntology` associated with `path`.
         Raises `ValueError` if an ontology cannot be found.
     '''
+    cache = self._dirpath_ontologies
     path = abspath(path)
-    ont = self._ontologies.get(path)
+    dirpath = dirname(path)
+    ont = cache.get(dirpath)
     if ont is None:
       # locate the ancestor directory containing the first ontology file
       ontbase = self.ontologyfile
       ontdirpath = next(
-          findup(path, lambda p: isfilepath(joinpath(p, ontbase)), first=True)
+          findup(
+              realpath(dirpath),
+              lambda p: isfilepath(joinpath(p, ontbase)),
+              first=True
+          )
       )
       if ontdirpath is not None:
         ontpath = joinpath(ontdirpath, ontbase)
         ont = TagsOntology(self._tagfile(ontpath, find_parent=True))
-        self._ontologies[path] = ont
+        cache[dirpath] = ont
     return ont
 
   def path_tagfiles(self, filepath):
