@@ -1319,7 +1319,9 @@ class TagFile(SingletonMixin):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
     if self.find_parent and 'parent' in self.__dict__:
-      self.parent.save()
+      parent = self.parent
+      if parent:
+        self.parent.save()
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
