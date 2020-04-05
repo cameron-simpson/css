@@ -267,6 +267,9 @@ class FSTagsCommand(BaseCommand):
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
+                  ont = fstags.ontology(path)
+                  if ont:
+                    autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
                     direct_tags.add(autotag, verbose=state.verbose)
                 if not isdir:
