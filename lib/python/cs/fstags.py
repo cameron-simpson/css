@@ -267,6 +267,9 @@ class FSTagsCommand(BaseCommand):
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
+                  ont = fstags.ontology(path)
+                  if ont:
+                    autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
                     direct_tags.add(autotag, verbose=state.verbose)
                 if not isdir:
@@ -1316,7 +1319,9 @@ class TagFile(SingletonMixin):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
     if self.find_parent and 'parent' in self.__dict__:
-      self.parent.save()
+      parent = self.parent
+      if parent:
+        self.parent.save()
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
@@ -1336,7 +1341,9 @@ class TagFile(SingletonMixin):
         as for `Tagset.update`.
     '''
     if prefix:
-      tags = [Tag.with_prefix(tag.name, tag.value, prefix=prefix) for tag in tags]
+      tags = [
+          Tag.with_prefix(tag.name, tag.value, prefix=prefix) for tag in tags
+      ]
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
 TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
@@ -1599,11 +1606,12 @@ class RegexpTagRule:
     tags = []
     m = self.regexp.search(s)
     if m:
-      tag_value_queue = list( m.groupdict().items())
+      tag_value_queue = list(m.groupdict().items())
       while tag_value_queue:
         tag_name, value = tag_value_queue.pop(0)
         with Pfx(tag_name):
           if value is None:
+            # unused branch of the regexp?
             warning("value=None, skipped")
             continue
           # special case prefix_strpdate_strptimeformat
@@ -1612,10 +1620,12 @@ class RegexpTagRule:
           except ValueError:
             pass
           else:
-            tag_name = prefix+'_date'
-            strptime_format = ' '.join('%'+letter for letter in strptime_format_tplt.split('_'))
+            tag_name = prefix + '_date'
+            strptime_format = ' '.join(
+                '%' + letter for letter in strptime_format_tplt.split('_')
+            )
             value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name,value))
+            tag_value_queue.insert(0, (tag_name, value))
             continue
           # special case prefix_strptime_strptimeformat
           try:
@@ -1623,10 +1633,12 @@ class RegexpTagRule:
           except ValueError:
             pass
           else:
-            tag_name = prefix+'_datetime'
-            strptime_format = ' '.join('%'+letter for letter in strptime_format_tplt.split('_'))
+            tag_name = prefix + '_datetime'
+            strptime_format = ' '.join(
+                '%' + letter for letter in strptime_format_tplt.split('_')
+            )
             value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name,value))
+            tag_value_queue.insert(0, (tag_name, value))
             continue
           # special case *_n
           tag_name_prefix = cutsuffix(tag_name, '_n')

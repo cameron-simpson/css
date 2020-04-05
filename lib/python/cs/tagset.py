@@ -645,6 +645,12 @@ class TagsOntology(SingletonMixin):
       containing ontology mappings.
   '''
 
+  # A mapping of base type named to Python types.
+  BASE_TYPES = {
+      t.__name__: t
+      for t in (int, float, str, list, dict, date, datetime)
+  }
+
   @classmethod
   def _singleton_key(cls, tagset_mapping):
     return id(tagset_mapping)
@@ -730,6 +736,51 @@ class TagsOntology(SingletonMixin):
       ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
       return ValueDetail(self, ontkey, value)
     return None
+
+  def basetype(self, typename):
+    ''' Infer the base type from a type name.
+        The default type is `'str'`,
+        but any type which resolves to one in `BASE_TYPES`
+        may be returned.
+    '''
+    typename0=typename
+    typeinfo = self[typename]
+    seen = set((typename,))
+    while 'type' in typeinfo:
+      typename = typeinfo['type']
+      if typename in seen:
+        warning("circular type definitions involving %r", seen)
+        break
+    if typename not in self.BASE_TYPES:
+      typename = 'str'
+    return typename
+
+  def convert_tag(self, tag):
+    ''' Convert a `Tag`'s value accord to the ontology.
+        Return a new `Tag` with the converted value
+        or the original `Tag` unchanged.
+
+        This is primarily aimed at things like regexp based autotagging,
+        where the matches are all strings
+        but various fields have special types,
+        commonly `int`s or `date`s.
+    '''
+    basetype = TagInfo(tag, ontology=self).basetype
+    try:
+      converter = {
+          'date': date_fromisoformat,
+          'datetime': datetime_fromisoformat,
+      }[basetype]
+    except KeyError:
+      converter = self.BASE_TYPES.get(basetype)
+    if converter:
+      try:
+        converted = converter(tag.value)
+      except (ValueError, TypeError):
+        pass
+      else:
+        tag = Tag(tag.name, converted)
+    return tag
 
 class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
@@ -829,6 +880,14 @@ class TagInfo(FormatableMixin):
     if type_name is None:
       type_name = self.ontology.value_to_tag_name(self.name)
     return type_name
+
+  @property
+  def basetype(self):
+    ''' The base type name for this tag.
+
+        This calls `TagsOntology.basetype(self.type)`.
+    '''
+    return self.ontology.basetype(self.type)
 
   @property
   @require(lambda self: isinstance(self.type, str))
