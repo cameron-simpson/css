@@ -645,6 +645,12 @@ class TagsOntology(SingletonMixin):
       containing ontology mappings.
   '''
 
+  # A mapping of base type named to Python types.
+  BASE_TYPES = {
+      t.__name__: t
+      for t in (int, float, str, list, dict, date, datetime)
+  }
+
   @classmethod
   def _singleton_key(cls, tagset_mapping):
     return id(tagset_mapping)
@@ -731,6 +737,23 @@ class TagsOntology(SingletonMixin):
       return ValueDetail(self, ontkey, value)
     return None
 
+  def basetype(self, typename):
+    ''' Infer the base type from a type name.
+        The default type is `'str'`,
+        but any type which resolves to one in `BASE_TYPES`
+        may be returned.
+    '''
+    typename0=typename
+    typeinfo = self[typename]
+    seen = set((typename,))
+    while 'type' in typeinfo:
+      typename = typeinfo['type']
+      if typename in seen:
+        warning("circular type definitions involving %r", seen)
+        break
+    if typename not in self.BASE_TYPES:
+      typename = 'str'
+    return typename
 class TagInfo(FormatableMixin):
   ''' A `Tag`like object linked to a `TagOntology`,
       providing associated detail about a `Tag`.
