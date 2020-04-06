@@ -559,10 +559,10 @@ class FSTagsCommand(BaseCommand):
         for tag_arg in argv:
           with Pfx(tag_arg):
             tag = Tag.from_string(tag_arg, ontology=ont)
-            defn = tag.defn
-            print(" ", defn)
+            typedata = tag.typedata
+            print(" ", typedata)
             print(" ", repr(tag.value))
-            print(" ", repr(tag.detail))
+            print(" ", repr(tag.metadata))
       else:
         raise GetoptError("unrecognised subcommand")
     return 0

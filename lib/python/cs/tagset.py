@@ -281,27 +281,27 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
         self.set_from(new_values, verbose=verbose)
 
-class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
-  ''' Detail information about a value.
+class ValueMetadata(namedtuple('ValueMetadata', 'ontology ontkey value')):
+  ''' Metadata information about a value.
         * `ontology`: the reference ontology
-        * `ontkey`: the key within the ontology providing the detail
+        * `ontkey`: the key within the ontology providing the metadata
         * `value`: the value
     '''
 
   @property
-  def detail(self):
-    ''' The detail, the `TagSet` from `ontology[ontkey]`.
+  def metadata(self):
+    ''' The metadata, the `TagSet` from `ontology[ontkey]`.
       '''
     return self.ontology[self.ontkey]
 
-class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
-  ''' Detail information about a `(key,value)` pair.
+class KeyValueMetadata(namedtuple('KeyValueMetadata', 'key_metadata value_metadata')):
+  ''' Metadata information about a `(key,value)` pair.
       * `ontology`: the reference ontology
-      * `key_detail`: the detail for the `key`,
-        the `TagSet` from `ontology[key_detail.ontkey]`
+      * `key_metadata`: the metadata for the `key`,
+        the `TagSet` from `ontology[key_metadata.ontkey]`
       * `value`: the value
-      * `value_detail`: the detail for the `value`,
-        the `TagSet` from `ontology[value_detail.ontkey]`
+      * `value_metadata`: the metadata for the `value`,
+        the `TagSet` from `ontology[value_metadata.ontkey]`
   '''
 
 class Tag(namedtuple('Tag', 'name value ontology')):
@@ -537,12 +537,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return value, offset
 
   @property
-  def defn(self):
+  def typedata(self):
     ''' The defining `TagSet` for this tag's name.
 
         This is how its type is defined,
         and is obtained from:
-        `self.ontology.defn_tagset(self.name)`
+        `self.ontology.typedata_tagset(self.name)`
     '''
     return self.ontology[self.name]
 
@@ -559,7 +559,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         would default to `series`
         which is what would be returned.
 
-        The corresponding detail `TagSet` for that tag
+        The corresponding metadata `TagSet` for that tag
         would have the name `series.marvel.avengers`.
 
         By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
@@ -575,12 +575,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         the definition also has `key_type` and `member_type` tags
         identifying the type names for the keys and values
         of the `cast=` tag.
-        As such, the corresponding detail `TagSet`s
+        As such, the corresponding metadata `TagSet`s
         in this example would be named
         `person.scarlett_johasson`
         and `character.marvel.black_widow` respectively.
     '''
-    type_name = self.defn.get('type')
+    type_name = self.typedata.get('type')
     if type_name is None:
       type_name = self.ontology.value_to_tag_name(self.name)
     return type_name
@@ -595,48 +595,48 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
   @property
   @require(lambda self: isinstance(self.type, str))
-  def detail(self):
-    ''' The detailed information about this specific tag value,
+  def metadata(self):
+    ''' The metadataed information about this specific tag value,
         derived through the ontology from the tag name and value.
 
-        For a scalar type this is a `ValueDetail`
+        For a scalar type this is a `ValueMetadata`
         with the following attributes:
         * `ontology`: the reference ontology
-        * `ontkey`: the ontology key providing the detail for the `value`
+        * `ontkey`: the ontology key providing the metadata for the `value`
         * `value`: the value `self.value`
-        * `detail`: the detail, a `TagSet`
+        * `metadata`: the metadata, a `TagSet`
 
         However, note that the types `'list'` and `'dict'` are special,
         indicating that the value is a sequence or mapping respectively.
 
         For `'list'` types
-        this property is a list of `ValueDetail` instances
+        this property is a list of `ValueMetadata` instances
         for each element of the sequence.
 
         For `'dict'` types
-        this property is a list of `KeyValueDetail` instances
+        this property is a list of `KeyValueMetadata` instances
         with the following attributes:
         * `ontology`: the reference ontology
         * `key`: the key
-        * `key_detail`: a `ValueDetail` for the key
+        * `key_metadata`: a `ValueMetadata` for the key
         * `value`: the value
-        * `value_detail`: a `ValueDetail` for the value
+        * `value_metadata`: a `ValueMetadata` for the value
     '''
     ont = self.ontology
     basetype = self.basetype
     if basetype == 'list':
       member_type = self.member_type
-      return [ont.value_detail(member_type, value) for value in self.value]
+      return [ont.value_metadata(member_type, value) for value in self.value]
     if basetype == 'dict':
       key_type = self.key_type
       member_type = self.member_type
       return [
-          KeyValueDetail(
-              ont.value_detail(key_type, key),
-              ont.value_detail(member_type, value)
+          KeyValueMetadata(
+              ont.value_metadata(key_type, key),
+              ont.value_metadata(member_type, value)
           ) for key, value in self.value.items()
       ]
-    return ont.value_detail(self.type, self.value)
+    return ont.value_metadata(self.type, self.value)
 
   @property
   def key_type(self):
@@ -645,7 +645,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         This is required if `.value` is a mapping.
     '''
     try:
-      return self.defn['key_type']
+      return self.typedata['key_type']
     except KeyError:
       raise AttributeError('key_type')
 
@@ -656,7 +656,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         This is required if `.value` is a sequence or mapping.
     '''
     try:
-      return self.defn['member_type']
+      return self.typedata['member_type']
     except KeyError:
       raise AttributeError('member_type')
 
@@ -739,19 +739,19 @@ class ExtendedNamespace(SimpleNamespace):
   def ontology(self):
     ''' The reference ontology.
       '''
-    return self.key_detail.ontology
+    return self.key_metadata.ontology
 
   @property
   def key(self):
     ''' The key.
       '''
-    return self.key_detail.value
+    return self.key_metadata.value
 
   @property
   def value(self):
     ''' The value.
       '''
-    return self.value_detail.value
+    return self.value_metadata.value
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
@@ -816,8 +816,8 @@ class TagsOntology(SingletonMixin):
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_detail(self, type_name, value):
-    ''' Return a `ValueDetail` for `type_name` and `value`.
+  def value_metadata(self, type_name, value):
+    ''' Return a `ValueMetadata` for `type_name` and `value`.
         This provides the mapping between a type's value and its semantics.
 
         For example,
@@ -829,12 +829,12 @@ class TagsOntology(SingletonMixin):
         `character.marvel.captain_america`
         and `character.marvel.black_widow` respectively,
         ready for lookup in the ontology
-        to obtain the "detail" `TagSet` for each specific value.
+        to obtain the "metadata" `TagSet` for each specific value.
     '''
     if isinstance(value, str):
       value_tag_name = self.value_to_tag_name(value)
       ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
-      return ValueDetail(self, ontkey, value)
+      return ValueMetadata(self, ontkey, value)
     return None
 
   def basetype(self, typename):
