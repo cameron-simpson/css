@@ -393,6 +393,8 @@ class FSTagsCommand(BaseCommand):
     '''
     fstags = options.fstags
     tag_prefix = None
+    path = None
+    json_path = None
     badopts = False
     options, argv = getopt(argv, '', longopts=['prefix='])
     for option, value in options:
@@ -402,7 +404,7 @@ class FSTagsCommand(BaseCommand):
         else:
           raise RuntimeError("unsupported option")
     if tag_prefix is None:
-      warning("missing require --prefix")
+      warning("missing required --prefix option")
       badopts = True
     if not argv:
       warning("missing path")
@@ -441,7 +443,7 @@ class FSTagsCommand(BaseCommand):
             tagged_path = fstags[path]
             for key, value in data.items():
               tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
-              tagged_path.direct_tags.add(Tag(tag_name, value))
+              tagged_path.direct_tags.add(Tag(tag_name, value), verbose=verbose)
     return 0
 
   @staticmethod
@@ -596,13 +598,11 @@ class FSTagsCommand(BaseCommand):
           raise GetoptError("missing tags")
         for tag_arg in argv:
           with Pfx(tag_arg):
-            tag = Tag.from_string(tag_arg)
-            taginfo = ont[tag]
-            print(tag, taginfo)
-            defn = taginfo.defn
+            tag = Tag.from_string(tag_arg, ontology=ont)
+            defn = tag.defn
             print(" ", defn)
-            print(" ", repr(taginfo.value))
-            print(" ", repr(taginfo.detail))
+            print(" ", repr(tag.value))
+            print(" ", repr(tag.detail))
       else:
         raise GetoptError("unrecognised subcommand")
     return 0
@@ -807,7 +807,7 @@ class FSTags(MultiOpenMixin):
     self.config.ontologyfile = ontologyfile
     self._tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
-    self._ontologies = {}  # cache of per abspath `TagsOntology`
+    self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
     # cache of per ontologypath `TagOntologies`
     self._lock = RLock()
 
@@ -824,10 +824,13 @@ class FSTags(MultiOpenMixin):
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
 
-  def _tagfile(self, path, *, find_parent=False):
+  def _tagfile(self, path, *, find_parent=False, no_ontology=False):
     ''' Obtain and cache the `TagFile` at `path`.
     '''
-    tagfile = self._tagfiles[path] = TagFile(path, find_parent=find_parent)
+    ontology = None if no_ontology else self.ontology(path)
+    tagfile = self._tagfiles[path] = TagFile(
+        path, find_parent=find_parent, ontology=ontology
+    )
     return tagfile
 
   @property
@@ -877,18 +880,26 @@ class FSTags(MultiOpenMixin):
     ''' Return the `TagsOntology` associated with `path`.
         Raises `ValueError` if an ontology cannot be found.
     '''
+    cache = self._dirpath_ontologies
     path = abspath(path)
-    ont = self._ontologies.get(path)
+    dirpath = path if isdirpath(path) else dirname(path)
+    ont = cache.get(dirpath)
     if ont is None:
       # locate the ancestor directory containing the first ontology file
       ontbase = self.ontologyfile
       ontdirpath = next(
-          findup(path, lambda p: isfilepath(joinpath(p, ontbase)), first=True)
+          findup(
+              realpath(dirpath),
+              lambda p: isfilepath(joinpath(p, ontbase)),
+              first=True
+          )
       )
       if ontdirpath is not None:
         ontpath = joinpath(ontdirpath, ontbase)
-        ont = TagsOntology(self._tagfile(ontpath, find_parent=True))
-        self._ontologies[path] = ont
+        ont = TagsOntology(
+            self._tagfile(ontpath, find_parent=True, no_ontology=True)
+        )
+        cache[dirpath] = ont
     return ont
 
   def path_tagfiles(self, filepath):
@@ -1193,12 +1204,13 @@ class TagFile(SingletonMixin):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, *, find_parent=False):
-    return filepath, find_parent
+  def _singleton_key(cls, filepath, *, ontology=None, find_parent=False):
+    return filepath, ontology, find_parent
 
   @require(lambda filepath: isinstance(filepath, str))
-  def _singleton_init(self, filepath, find_parent=False):
+  def _singleton_init(self, filepath, *, ontology=None, find_parent=False):
     self.filepath = filepath
+    self.ontology = ontology
     self.find_parent = find_parent
     self._lock = Lock()
 
@@ -1254,7 +1266,7 @@ class TagFile(SingletonMixin):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
     '''
-    return self.load_tagsets(self.filepath)
+    return self.load_tagsets(self.filepath, self.ontology)
 
   @property
   def names(self):
@@ -1293,7 +1305,7 @@ class TagFile(SingletonMixin):
     return name, offset
 
   @classmethod
-  def parse_tags_line(cls, line):
+  def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
@@ -1307,11 +1319,13 @@ class TagFile(SingletonMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, verbose=state.verbose)
+    tags = TagSet.from_line(
+        line, offset, ontology=ontology, verbose=state.verbose
+    )
     return name, tags
 
   @classmethod
-  def load_tagsets(cls, filepath):
+  def load_tagsets(cls, filepath, ontology):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
@@ -1325,7 +1339,7 @@ class TagFile(SingletonMixin):
                 line = line.strip()
                 if not line or line.startswith('#'):
                   continue
-                name, tags = cls.parse_tags_line(line)
+                name, tags = cls.parse_tags_line(line, ontology=ontology)
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -1375,7 +1389,7 @@ class TagFile(SingletonMixin):
       if any(map(lambda tagset: tagset.modified, self._tagsets.values())):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
-    if self.find_parent and 'parent' in self.__dict__:
+    if self.find_parent:
       parent = self.parent
       if parent:
         self.parent.save()

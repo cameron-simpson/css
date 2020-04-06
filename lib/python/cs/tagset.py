@@ -83,13 +83,13 @@ class TagSet(dict, FormatableMixin):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0, verbose=None):
+  def from_line(cls, line, offset=0, ontology=None, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
     tags = cls()
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.parse(line, offset)
+      tag, offset = Tag.parse(line, offset, ontology=ontology)
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
@@ -129,7 +129,7 @@ class TagSet(dict, FormatableMixin):
   def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
   def set(self, tag_name, value, *, verbose=None):
@@ -158,7 +158,7 @@ class TagSet(dict, FormatableMixin):
         Otherwise the tag is only discarded
         if its value matches.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     tag_name = tag.name
     if tag_name in self:
       value = tag.value
@@ -244,38 +244,12 @@ class TagSet(dict, FormatableMixin):
             ns = subns
         subname, = subnames
         subpath.append(subname)
-        with Pfx('.'.join(subpath)):
+        dotted_subpath = '.'.join(subpath)
+        with Pfx(dotted_subpath):
+          ns._tag = tag
+          ns._tag_path = dotted_subpath
           subattr = '_' if hasattr(ns, subname) else subname
           setattr(ns, subattr, tag.value)
-          if ontology:
-            # add defn and meta information
-            taginfo = ontology[tag]
-            defn_ns = taginfo.defn.ns()
-            defn_subattr = '_defn' if subattr == '_' else subattr + '__defn'
-            setattr(ns, defn_subattr, defn_ns)
-            detail = taginfo.detail
-            if detail is not None:
-              if isinstance(detail, ValueDetail):
-                meta = detail.detail.ns()
-              else:
-                meta = []
-                for subdetail in detail:
-                  if subdetail is None:
-                    submeta = None
-                  elif isinstance(subdetail, ValueDetail):
-                    submeta = subdetail.detail.ns()
-                  elif isinstance(subdetail, KeyValueDetail):
-                    submeta = SimpleNamespace(
-                        key=subdetail.key,
-                        key_detail=subdetail.key_detail.ns(),
-                        value=subdetail.value,
-                        value_detail=subdetail.value_detail.ns()
-                    )
-                  else:
-                    submeta = subdetail
-                  meta.append(submeta)
-              meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
-              setattr(ns, meta_subattr, meta)
     return ns0
 
   def format_kwargs(self, ontology=None):
@@ -307,13 +281,68 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
         self.set_from(new_values, verbose=verbose)
 
-class Tag(namedtuple('Tag', 'name value')):
-  ''' A Tag has a `.name` (`str`) and a `.value`.
+class Tag(namedtuple('Tag', 'name value ontology')):
+  ''' A Tag has a `.name` (`str`) and a `.value`
+      and an optional `.ontology`.
 
       The `name` must be a dotted identifier.
 
       A "bare" `Tag` has a `value` of `None`.
+
+      A "naive" `Tag` has an `ontology` of `None`.
+
+      The constructor for a `Tag` is unusual:
+      * both the `value` and `ontology` are optional,
+        defaulting to `None`
+      * if `name` is a `str` then we always construct a new `Tag`
+        with the suppplied values
+      * if `name` is not a `str`
+        it should be a `Tag`like object to promote;
+        it is an error if the `value` parameter is not `None`
+        in this case
+
+      The promotion process is as follows:
+      * if `name` is a `Tag` subinstance
+        then if the supplied `ontology` is not `None`
+        and is not the ontology associated with `name`
+        then a new `Tag` is made,
+        otherwise `name` is returned unchanged
+      * otherwise a new `Tag` is made from `name`
+        using its `.value`
+        and overriding its `.ontology`
+        if the `ontology` parameter is not `None`
   '''
+
+  def __new__(cls, name, value=None, *, ontology=None):
+    # simple case: name is a str: make a new Tag
+    if isinstance(name, str):
+      # (name[,value[,ontology]]) => Tag
+      return super().__new__(cls, name, value, ontology)
+    # name should be taglike
+    if value is not None:
+      raise ValueError(
+          "name(%s) is not a str, value must be None" % (type(name).__name__)
+      )
+    tag = name
+    if not hasattr(tag, 'name'):
+      raise ValueError("tag has no .name attribute")
+    if not hasattr(tag, 'value'):
+      raise ValueError("tag has no .value attribute")
+    if isinstance(tag, Tag):
+      # already a Tag subtype, see if the ontology needs updating
+      if ontology is not None and tag.ontology is not ontology:
+        # new Tag with supplied ontology
+        tag = super().__new__(cls, tag.name, tag.value, ontology)
+    else:
+      # not a Tag subtype, construct a new instance,
+      # overriding .ontology if the supplied ontology is not None
+      tag = super().__new__(
+          cls, tag.name, tag.value, (
+              ontology
+              if ontology is not None else getattr(tag, 'ontology', None)
+          )
+      )
+    return tag
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -328,11 +357,11 @@ class Tag(namedtuple('Tag', 'name value')):
   ]
 
   @classmethod
-  def with_prefix(cls, name, value, *, prefix):
+  def with_prefix(cls, name, value, *, ontology=None, prefix):
     # prefix the tag with `prefix` if set
     if prefix:
       name = prefix + '.' + name
-    return cls(name, value)
+    return cls(name, value, ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -345,12 +374,12 @@ class Tag(namedtuple('Tag', 'name value')):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r)" % (
-        type(self).__name__, self.name, self.value
+    return "%s(name=%r,value=%r,ontology=%r)" % (
+        type(self).__name__, self.name, self.value, self.ontology
     )
 
   def __str__(self):
-    ''' Encode `tag_name` and `value`.
+    ''' Encode `name` and `value`.
     '''
     name = self.name
     value = self.value
@@ -364,9 +393,10 @@ class Tag(namedtuple('Tag', 'name value')):
         If `prefix` is `None` or empty, return this `Tag`.
         Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
     '''
-    return (
-        self.from_name_value('.'.join((prefix, self.name)), self.value)
-        if prefix else self
+    if not prefix:
+      return self
+    return type(self)(
+        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
     )
 
   @classmethod
@@ -392,49 +422,10 @@ class Tag(namedtuple('Tag', 'name value')):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_name_value(cls, name, value):
-    ''' Support method for functions accepting either a tag or a name and value.
-
-        If `name` is a str make a new Tag from `name` and `value`.
-        Otherwise check that `value is `None`
-        and that `name` has a `.name` and `.value`
-        and return directly as a tag ducktype.
-
-        This supports functions of the form:
-
-            def f(x, y, tag_name, value=None):
-              tag = Tag.from_name_value(tag_name, value)
-
-        so that that may accept a `Tag` or a tag name or a tag name and value.
-
-        Exanples:
-
-            >>> Tag.from_name_value('a', 3)
-            Tag(name='a',value=3)
-            >>> T = Tag('b', None)
-            >>> Tag.from_name_value(T, None)
-            Tag(name='b',value=None)
-    '''
-    with Pfx("%s.from_name_value(name=%r,value=%r)", cls.__name__, name,
-             value):
-      if isinstance(name, str):
-        # (name,value) => Tag
-        return cls(name, value)
-      if value is not None:
-        raise ValueError("name is not a str, value must be None")
-      tag = name
-      if not hasattr(tag, 'name'):
-        raise ValueError("tag has no .name attribute")
-      if not hasattr(tag, 'value'):
-        raise ValueError("tag has no .value attribute")
-      # Tag ducktype
-      return tag
-
-  @classmethod
-  def from_string(cls, s, offset=0):
+  def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset)
+    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
     if post_offset < len(s):
       raise ValueError(
           "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
@@ -456,13 +447,13 @@ class Tag(namedtuple('Tag', 'name value')):
   def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
-    other_tag = self.from_name_value(tag_name, value)
+    other_tag = type(self)(tag_name, value)
     if self.name != other_tag.name:
       return False
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0):
+  def parse(cls, s, offset=0, *, ontology=None):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
@@ -482,7 +473,7 @@ class Tag(namedtuple('Tag', 'name value')):
             ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
         else:
           value = None
-      return cls(name, value), offset
+      return cls(name, value, ontology=ontology), offset
 
   @classmethod
   def parse_value(cls, s, offset=0):
@@ -521,6 +512,130 @@ class Tag(namedtuple('Tag', 'name value')):
           value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
           offset += suboffset
     return value, offset
+
+  @property
+  def defn(self):
+    ''' The defining `TagSet` for this tag's name.
+
+        This is how its type is defined,
+        and is obtained from:
+        `self.ontology.defn_tagset(self.name)`
+    '''
+    return self.ontology[self.name]
+
+  @property
+  def type(self):
+    ''' The type name for this tag.
+
+        Unless the definition for `self.name` has a `type` tag,
+        the type is `self.ontology.value_to_tag_name(self.name)`.
+
+        For example, the tag `series="Avengers (Marvel)"`
+        would look up the definition for `series`.
+        If that had no `type=` tag, then the type
+        would default to `series`
+        which is what would be returned.
+
+        The corresponding detail `TagSet` for that tag
+        would have the name `series.marvel.avengers`.
+
+        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
+        would look up the definition for `cast`
+        which might look like this:
+
+            cast type=dict key_type=person member_type=character
+
+        That says that the type name is `dict`,
+        which is what would be returned.
+
+        Because the type is `dict`
+        the definition also has `key_type` and `member_type` tags
+        identifying the type names for the keys and values
+        of the `cast=` tag.
+        As such, the corresponding detail `TagSet`s
+        in this example would be named
+        `person.scarlett_johasson`
+        and `character.marvel.black_widow` respectively.
+    '''
+    type_name = self.defn.get('type')
+    if type_name is None:
+      type_name = self.ontology.value_to_tag_name(self.name)
+    return type_name
+
+  @property
+  def basetype(self):
+    ''' The base type name for this tag.
+
+        This calls `TagsOntology.basetype(self.type)`.
+    '''
+    return self.ontology.basetype(self.type)
+
+  @property
+  @require(lambda self: isinstance(self.type, str))
+  def detail(self):
+    ''' The detailed information about this specific tag value,
+        derived through the ontology from the tag name and value.
+
+        For a scalar type this is a `ValueDetail`
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `ontkey`: the ontology key providing the detail for the `value`
+        * `value`: the value `self.value`
+        * `detail`: the detail, a `TagSet`
+
+        However, note that the types `'list'` and `'dict'` are special,
+        indicating that the value is a sequence or mapping respectively.
+
+        For `'list'` types
+        this property is a list of `ValueDetail` instances
+        for each element of the sequence.
+
+        For `'dict'` types
+        this property is a list of `KeyValueDetail` instances
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `key`: the key
+        * `key_detail`: a `ValueDetail` for the key
+        * `value`: the value
+        * `value_detail`: a `ValueDetail` for the value
+    '''
+    ont = self.ontology
+    basetype = self.basetype
+    if basetype == 'list':
+      member_type = self.member_type
+      return [ont.value_detail(member_type, value) for value in self.value]
+    if basetype == 'dict':
+      key_type = self.key_type
+      member_type = self.member_type
+      return [
+          KeyValueDetail(
+              ont.value_detail(key_type, key),
+              ont.value_detail(member_type, value)
+          ) for key, value in self.value.items()
+      ]
+    return ont.value_detail(self.type, self.value)
+
+  @property
+  def key_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a mapping.
+    '''
+    try:
+      return self.defn['key_type']
+    except KeyError:
+      raise AttributeError('key_type')
+
+  @property
+  def member_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a sequence or mapping.
+    '''
+    try:
+      return self.defn['member_type']
+    except KeyError:
+      raise AttributeError('member_type')
 
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
@@ -773,7 +888,7 @@ class TagsOntology(SingletonMixin):
         but various fields have special types,
         commonly `int`s or `date`s.
     '''
-    basetype = TagInfo(tag, ontology=self).basetype
+    basetype = Tag(tag, ontology=self).basetype
     try:
       converter = {
           'date': date_fromisoformat,
@@ -789,183 +904,3 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
-
-class TagInfo(FormatableMixin):
-  ''' A `Tag`like object linked to a `TagOntology`,
-      providing associated detail about a `Tag`.
-
-      Like `Tag`, this has a `.name` and `.value`.
-
-      Additionally it has the following attributes:
-      * `ontology`: the supporting `TagsOntology`
-      * `tag`: the originating `Tag`
-        (computed from the `(name,value)` tuple if supplied)
-      * `defn`: the `TagSet` from the ontology
-        which defines this `TagInfo`'s metadata
-      * `type`: `self.defn['type']`
-      * `member_type`: `self.defn['member_type']` if present;
-        we expect `type` to be a list or mapping type name
-
-      Indexing a `TagInfo` indexes its `.value`
-      and returns a tuple `(element,TagSet)`
-      where the `TagSet` is information from the ontology
-      about the element's value (if `element` is a `str`).
-
-      If the `.value` looks like a mapping
-      .ie. it has a `.keys()` method
-      then a `TagInfo` has `.keys()` and `.items()` methods.
-      The `.keys()` call returns `.value.keys()`.
-      The `.items()` call yields `(key,self[key])`
-      for each of `self.keys()`.
-
-      Iterating over a `TagInfo`
-      yields its keys if it has a `.keys()` method,
-      otherwise values from `range(len(self.value))`.
-  '''
-
-  def __init__(self, name, value=None, *, ontology):
-    ''' Prepare the `TagInfo` from a `Tag` or `(name,value)` tuple.
-    '''
-    tag = Tag.from_name_value(name, value)
-    self.tag = tag
-    self.name = tag.name
-    self.value = tag.value
-    self.ontology = ontology
-
-  def __str__(self):
-    return "%s(%s:%s,%s)" % (
-        type(self).__name__, self.type, self.tag, self.ontology
-    )
-
-  def __repr__(self):
-    return "%s[tag=%s]" % (type(self).__name__, self.tag)
-
-  @property
-  def defn(self):
-    ''' The defining `TagSet` for this tag name.
-
-        This is how its type is defined,
-        and is obtained from:
-        `self.ontology.defn_tagset(self.name)`
-    '''
-    return self.ontology.defn_tagset(self.name)
-
-  @property
-  def type(self):
-    ''' The type name for this tag.
-
-        Unless the definition for `self.name` has a `type` tag,
-        the type is `self.ontology.value_to_tag_name(self.name)`.
-
-        For example, the tag `series="Avengers (Marvel)"`
-        would look up the definition for `series`.
-        If that had no `type=` tag, then the type
-        would default to `series`
-        which is what would be returned.
-
-        The corresponding detail `TagSet`
-        would have the the name `series.marvel.avengers`.
-
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
-        would look up the definition for `cast`
-        which might look like this:
-
-            cast type=dict key_type=person member_type=character
-
-        That says that the type name is `dict`,
-        which is what would be returned.
-
-        Because the type is `dict`
-        the definition also has `key_type` and `member_type` tags
-        identifying the type names for the keys and values
-        of the `cast=` tag.
-        As such, the corresponding detail `TagSet`s
-        in this example would be named
-        `person.scarlett_johasson`
-        and `character.marvel.black_widow` respectively.
-    '''
-    type_name = self.defn.get('type')
-    if type_name is None:
-      type_name = self.ontology.value_to_tag_name(self.name)
-    return type_name
-
-  @property
-  def basetype(self):
-    ''' The base type name for this tag.
-
-        This calls `TagsOntology.basetype(self.type)`.
-    '''
-    return self.ontology.basetype(self.type)
-
-  @property
-  @require(lambda self: isinstance(self.type, str))
-  def detail(self):
-    ''' The detailed information about this specific tag value,
-        derived through the ontology from the tag name and value.
-
-        For a scalar type this is a `ValueDetail`
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `ontkey`: the ontology key providing the detail for the `value`
-        * `value`: the value `self.value`
-        * `detail`: the detail, a `TagSet`
-
-        However, note that the types `'list'` and `'dict'` are special,
-        indicating that the value is a sequence or mapping respectively.
-
-        For `'list'` types
-        this property is a list of `ValueDetail` instances
-        for each element of the sequence.
-
-        For `'dict'` types
-        this property is a list of `KeyValueDetail` instances
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `key`: the key
-        * `key_detail`: a `ValueDetail` for the key
-        * `value`: the value
-        * `value_detail`: a `ValueDetail` for the value
-    '''
-    ont = self.ontology
-    if self.type == 'list':
-      member_type = self.member_type
-      return [ont.value_detail(member_type, value) for value in self.value]
-    if self.type == 'dict':
-      key_type = self.key_type
-      member_type = self.member_type
-      return [
-          KeyValueDetail(
-              ont.value_detail(key_type, key),
-              ont.value_detail(member_type, value)
-          ) for key, value in self.value.items()
-      ]
-    return ont.value_detail(self.type, self.value)
-
-  @property
-  def key_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a mapping.
-    '''
-    try:
-      return self.defn['key_type']
-    except KeyError:
-      raise AttributeError('key_type')
-
-  @property
-  def member_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a sequence or mapping.
-    '''
-    try:
-      return self.defn['member_type']
-    except KeyError:
-      raise AttributeError('member_type')
-
-  def ns(self):
-    ''' Return an `ExtendedNamespace` derived from `self.defn.ns()`.
-    '''
-    return self.defn.ns()
-
-  format_kwargs = ns
