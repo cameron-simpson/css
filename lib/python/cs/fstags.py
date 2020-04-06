@@ -393,7 +393,7 @@ class FSTagsCommand(BaseCommand):
         else:
           raise RuntimeError("unsupported option")
     if tag_prefix is None:
-      warning("missing require --prefix")
+      warning("missing required --prefix option")
       badopts = True
     if not argv:
       warning("missing path")
