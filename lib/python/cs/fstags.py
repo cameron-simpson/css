@@ -1324,7 +1324,7 @@ class TagFile(SingletonMixin):
       if any(map(lambda tagset: tagset.modified, self._tagsets.values())):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
-    if self.find_parent and 'parent' in self.__dict__:
+    if self.find_parent:
       parent = self.parent
       if parent:
         self.parent.save()
