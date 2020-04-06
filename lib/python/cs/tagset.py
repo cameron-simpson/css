@@ -244,38 +244,12 @@ class TagSet(dict, FormatableMixin):
             ns = subns
         subname, = subnames
         subpath.append(subname)
-        with Pfx('.'.join(subpath)):
+        dotted_subpath = '.'.join(subpath)
+        with Pfx(dotted_subpath):
+          ns._tag = tag
+          ns._tag_path = dotted_subpath
           subattr = '_' if hasattr(ns, subname) else subname
           setattr(ns, subattr, tag.value)
-          if ontology:
-            # add defn and meta information
-            taginfo = ontology[tag]
-            defn_ns = taginfo.defn.ns()
-            defn_subattr = '_defn' if subattr == '_' else subattr + '__defn'
-            setattr(ns, defn_subattr, defn_ns)
-            detail = taginfo.detail
-            if detail is not None:
-              if isinstance(detail, ValueDetail):
-                meta = detail.detail.ns()
-              else:
-                meta = []
-                for subdetail in detail:
-                  if subdetail is None:
-                    submeta = None
-                  elif isinstance(subdetail, ValueDetail):
-                    submeta = subdetail.detail.ns()
-                  elif isinstance(subdetail, KeyValueDetail):
-                    submeta = SimpleNamespace(
-                        key=subdetail.key,
-                        key_detail=subdetail.key_detail.ns(),
-                        value=subdetail.value,
-                        value_detail=subdetail.value_detail.ns()
-                    )
-                  else:
-                    submeta = subdetail
-                  meta.append(submeta)
-              meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
-              setattr(ns, meta_subattr, meta)
     return ns0
 
   def format_kwargs(self, ontology=None):
