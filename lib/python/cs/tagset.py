@@ -281,6 +281,29 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
         self.set_from(new_values, verbose=verbose)
 
+class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
+  ''' Detail information about a value.
+        * `ontology`: the reference ontology
+        * `ontkey`: the key within the ontology providing the detail
+        * `value`: the value
+    '''
+
+  @property
+  def detail(self):
+    ''' The detail, the `TagSet` from `ontology[ontkey]`.
+      '''
+    return self.ontology[self.ontkey]
+
+class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
+  ''' Detail information about a `(key,value)` pair.
+      * `ontology`: the reference ontology
+      * `key_detail`: the detail for the `key`,
+        the `TagSet` from `ontology[key_detail.ontkey]`
+      * `value`: the value
+      * `value_detail`: the detail for the `value`,
+        the `TagSet` from `ontology[value_detail.ontkey]`
+  '''
+
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
@@ -708,29 +731,6 @@ class ExtendedNamespace(SimpleNamespace):
         return None
       raise KeyError(attr) from e
     return value
-
-class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
-  ''' Detail information about a value.
-        * `ontology`: the reference ontology
-        * `ontkey`: the key within the ontology providing the detail
-        * `value`: the value
-    '''
-
-  @property
-  def detail(self):
-    ''' The detail, the `TagSet` from `ontology[ontkey]`.
-      '''
-    return self.ontology[self.ontkey]
-
-class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
-  ''' Detail information about a value.
-        * `ontology`: the reference ontology
-        * `key_detail`: the detail for the `key`,
-          the `TagSet` from `ontology[key_detail.ontkey]`
-        * `value`: the value
-        * `value_detail`: the detail for the `value`,
-          the `TagSet` from `ontology[value_detail.ontkey]`
-    '''
 
   @property
   def ontology(self):
