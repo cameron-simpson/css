@@ -782,10 +782,13 @@ class FSTags(MultiOpenMixin):
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
 
-  def _tagfile(self, path, *, find_parent=False):
+  def _tagfile(self, path, *, find_parent=False, no_ontology=False):
     ''' Obtain and cache the `TagFile` at `path`.
     '''
-    tagfile = self._tagfiles[path] = TagFile(path, find_parent=find_parent)
+    ontology = None if no_ontology else self.ontology(path)
+    tagfile = self._tagfiles[path] = TagFile(
+        path, find_parent=find_parent, ontology=ontology
+    )
     return tagfile
 
   @property
@@ -834,7 +837,9 @@ class FSTags(MultiOpenMixin):
       )
       if ontdirpath is not None:
         ontpath = joinpath(ontdirpath, ontbase)
-        ont = TagsOntology(self._tagfile(ontpath, find_parent=True))
+        ont = TagsOntology(
+            self._tagfile(ontpath, find_parent=True, no_ontology=True)
+        )
         cache[dirpath] = ont
     return ont
 
