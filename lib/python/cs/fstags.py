@@ -556,7 +556,7 @@ class FSTagsCommand(BaseCommand):
           raise GetoptError("missing tags")
         for tag_arg in argv:
           with Pfx(tag_arg):
-            tag = Tag.from_string(tag_arg)
+            tag = Tag.from_string(tag_arg, ontology=ont)
             defn = tag.defn
             print(" ", defn)
             print(" ", repr(tag.value))
