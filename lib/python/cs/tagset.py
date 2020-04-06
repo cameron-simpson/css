@@ -843,13 +843,15 @@ class TagsOntology(SingletonMixin):
         but any type which resolves to one in `BASE_TYPES`
         may be returned.
     '''
-    typename0=typename
+    typename0 = typename
     typeinfo = self[typename]
     seen = set((typename,))
     while 'type' in typeinfo:
       typename = typeinfo['type']
       if typename in seen:
-        warning("circular type definitions involving %r", seen)
+        warning(
+            "type %r: circular type definitions involving %r", typename0, seen
+        )
         break
     if typename not in self.BASE_TYPES:
       typename = 'str'
