@@ -539,6 +539,130 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           offset += suboffset
     return value, offset
 
+  @property
+  def defn(self):
+    ''' The defining `TagSet` for this tag's name.
+
+        This is how its type is defined,
+        and is obtained from:
+        `self.ontology.defn_tagset(self.name)`
+    '''
+    return self.ontology[self.name]
+
+  @property
+  def type(self):
+    ''' The type name for this tag.
+
+        Unless the definition for `self.name` has a `type` tag,
+        the type is `self.ontology.value_to_tag_name(self.name)`.
+
+        For example, the tag `series="Avengers (Marvel)"`
+        would look up the definition for `series`.
+        If that had no `type=` tag, then the type
+        would default to `series`
+        which is what would be returned.
+
+        The corresponding detail `TagSet` for that tag
+        would have the name `series.marvel.avengers`.
+
+        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
+        would look up the definition for `cast`
+        which might look like this:
+
+            cast type=dict key_type=person member_type=character
+
+        That says that the type name is `dict`,
+        which is what would be returned.
+
+        Because the type is `dict`
+        the definition also has `key_type` and `member_type` tags
+        identifying the type names for the keys and values
+        of the `cast=` tag.
+        As such, the corresponding detail `TagSet`s
+        in this example would be named
+        `person.scarlett_johasson`
+        and `character.marvel.black_widow` respectively.
+    '''
+    type_name = self.defn.get('type')
+    if type_name is None:
+      type_name = self.ontology.value_to_tag_name(self.name)
+    return type_name
+
+  @property
+  def basetype(self):
+    ''' The base type name for this tag.
+
+        This calls `TagsOntology.basetype(self.type)`.
+    '''
+    return self.ontology.basetype(self.type)
+
+  @property
+  @require(lambda self: isinstance(self.type, str))
+  def detail(self):
+    ''' The detailed information about this specific tag value,
+        derived through the ontology from the tag name and value.
+
+        For a scalar type this is a `ValueDetail`
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `ontkey`: the ontology key providing the detail for the `value`
+        * `value`: the value `self.value`
+        * `detail`: the detail, a `TagSet`
+
+        However, note that the types `'list'` and `'dict'` are special,
+        indicating that the value is a sequence or mapping respectively.
+
+        For `'list'` types
+        this property is a list of `ValueDetail` instances
+        for each element of the sequence.
+
+        For `'dict'` types
+        this property is a list of `KeyValueDetail` instances
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `key`: the key
+        * `key_detail`: a `ValueDetail` for the key
+        * `value`: the value
+        * `value_detail`: a `ValueDetail` for the value
+    '''
+    ont = self.ontology
+    basetype = self.basetype
+    if basetype == 'list':
+      member_type = self.member_type
+      return [ont.value_detail(member_type, value) for value in self.value]
+    if basetype == 'dict':
+      key_type = self.key_type
+      member_type = self.member_type
+      return [
+          KeyValueDetail(
+              ont.value_detail(key_type, key),
+              ont.value_detail(member_type, value)
+          ) for key, value in self.value.items()
+      ]
+    return ont.value_detail(self.type, self.value)
+
+  @property
+  def key_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a mapping.
+    '''
+    try:
+      return self.defn['key_type']
+    except KeyError:
+      raise AttributeError('key_type')
+
+  @property
+  def member_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a sequence or mapping.
+    '''
+    try:
+      return self.defn['member_type']
+    except KeyError:
+      raise AttributeError('member_type')
+
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
       used to apply changes to a `TagSet`
@@ -782,7 +906,7 @@ class TagsOntology(SingletonMixin):
         but various fields have special types,
         commonly `int`s or `date`s.
     '''
-    basetype = TagInfo(tag, ontology=self).basetype
+    basetype = Tag(tag, ontology=self).basetype
     try:
       converter = {
           'date': date_fromisoformat,
@@ -798,183 +922,3 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
-
-class TagInfo(FormatableMixin):
-  ''' A `Tag`like object linked to a `TagOntology`,
-      providing associated detail about a `Tag`.
-
-      Like `Tag`, this has a `.name` and `.value`.
-
-      Additionally it has the following attributes:
-      * `ontology`: the supporting `TagsOntology`
-      * `tag`: the originating `Tag`
-        (computed from the `(name,value)` tuple if supplied)
-      * `defn`: the `TagSet` from the ontology
-        which defines this `TagInfo`'s metadata
-      * `type`: `self.defn['type']`
-      * `member_type`: `self.defn['member_type']` if present;
-        we expect `type` to be a list or mapping type name
-
-      Indexing a `TagInfo` indexes its `.value`
-      and returns a tuple `(element,TagSet)`
-      where the `TagSet` is information from the ontology
-      about the element's value (if `element` is a `str`).
-
-      If the `.value` looks like a mapping
-      .ie. it has a `.keys()` method
-      then a `TagInfo` has `.keys()` and `.items()` methods.
-      The `.keys()` call returns `.value.keys()`.
-      The `.items()` call yields `(key,self[key])`
-      for each of `self.keys()`.
-
-      Iterating over a `TagInfo`
-      yields its keys if it has a `.keys()` method,
-      otherwise values from `range(len(self.value))`.
-  '''
-
-  def __init__(self, name, value=None, *, ontology):
-    ''' Prepare the `TagInfo` from a `Tag` or `(name,value)` tuple.
-    '''
-    tag = Tag.from_name_value(name, value)
-    self.tag = tag
-    self.name = tag.name
-    self.value = tag.value
-    self.ontology = ontology
-
-  def __str__(self):
-    return "%s(%s:%s,%s)" % (
-        type(self).__name__, self.type, self.tag, self.ontology
-    )
-
-  def __repr__(self):
-    return "%s[tag=%s]" % (type(self).__name__, self.tag)
-
-  @property
-  def defn(self):
-    ''' The defining `TagSet` for this tag name.
-
-        This is how its type is defined,
-        and is obtained from:
-        `self.ontology.defn_tagset(self.name)`
-    '''
-    return self.ontology.defn_tagset(self.name)
-
-  @property
-  def type(self):
-    ''' The type name for this tag.
-
-        Unless the definition for `self.name` has a `type` tag,
-        the type is `self.ontology.value_to_tag_name(self.name)`.
-
-        For example, the tag `series="Avengers (Marvel)"`
-        would look up the definition for `series`.
-        If that had no `type=` tag, then the type
-        would default to `series`
-        which is what would be returned.
-
-        The corresponding detail `TagSet`
-        would have the the name `series.marvel.avengers`.
-
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
-        would look up the definition for `cast`
-        which might look like this:
-
-            cast type=dict key_type=person member_type=character
-
-        That says that the type name is `dict`,
-        which is what would be returned.
-
-        Because the type is `dict`
-        the definition also has `key_type` and `member_type` tags
-        identifying the type names for the keys and values
-        of the `cast=` tag.
-        As such, the corresponding detail `TagSet`s
-        in this example would be named
-        `person.scarlett_johasson`
-        and `character.marvel.black_widow` respectively.
-    '''
-    type_name = self.defn.get('type')
-    if type_name is None:
-      type_name = self.ontology.value_to_tag_name(self.name)
-    return type_name
-
-  @property
-  def basetype(self):
-    ''' The base type name for this tag.
-
-        This calls `TagsOntology.basetype(self.type)`.
-    '''
-    return self.ontology.basetype(self.type)
-
-  @property
-  @require(lambda self: isinstance(self.type, str))
-  def detail(self):
-    ''' The detailed information about this specific tag value,
-        derived through the ontology from the tag name and value.
-
-        For a scalar type this is a `ValueDetail`
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `ontkey`: the ontology key providing the detail for the `value`
-        * `value`: the value `self.value`
-        * `detail`: the detail, a `TagSet`
-
-        However, note that the types `'list'` and `'dict'` are special,
-        indicating that the value is a sequence or mapping respectively.
-
-        For `'list'` types
-        this property is a list of `ValueDetail` instances
-        for each element of the sequence.
-
-        For `'dict'` types
-        this property is a list of `KeyValueDetail` instances
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `key`: the key
-        * `key_detail`: a `ValueDetail` for the key
-        * `value`: the value
-        * `value_detail`: a `ValueDetail` for the value
-    '''
-    ont = self.ontology
-    if self.type == 'list':
-      member_type = self.member_type
-      return [ont.value_detail(member_type, value) for value in self.value]
-    if self.type == 'dict':
-      key_type = self.key_type
-      member_type = self.member_type
-      return [
-          KeyValueDetail(
-              ont.value_detail(key_type, key),
-              ont.value_detail(member_type, value)
-          ) for key, value in self.value.items()
-      ]
-    return ont.value_detail(self.type, self.value)
-
-  @property
-  def key_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a mapping.
-    '''
-    try:
-      return self.defn['key_type']
-    except KeyError:
-      raise AttributeError('key_type')
-
-  @property
-  def member_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a sequence or mapping.
-    '''
-    try:
-      return self.defn['member_type']
-    except KeyError:
-      raise AttributeError('member_type')
-
-  def ns(self):
-    ''' Return an `ExtendedNamespace` derived from `self.defn.ns()`.
-    '''
-    return self.defn.ns()
-
-  format_kwargs = ns
