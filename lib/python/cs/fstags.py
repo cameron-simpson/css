@@ -382,6 +382,8 @@ class FSTagsCommand(BaseCommand):
     '''
     fstags = options.fstags
     tag_prefix = None
+    path = None
+    json_path = None
     badopts = False
     options, argv = getopt(argv, '', longopts=['prefix='])
     for option, value in options:
