@@ -691,6 +691,9 @@ class ExtendedNamespace(SimpleNamespace):
       This also presents attributes as `[]` elements via `__getitem__`.
   '''
 
+  def __len__(self):
+    return len(self.keys())
+
   def __getattr__(self, attr):
     ''' Look up an indirect attribute, whose value is inferred from another.
     '''
