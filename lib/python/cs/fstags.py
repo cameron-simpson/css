@@ -432,7 +432,7 @@ class FSTagsCommand(BaseCommand):
             tagged_path = fstags[path]
             for key, value in data.items():
               tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
-              tagged_path.direct_tags.add(Tag(tag_name, value))
+              tagged_path.direct_tags.add(Tag(tag_name, value), verbose=verbose)
     return 0
 
   @staticmethod
