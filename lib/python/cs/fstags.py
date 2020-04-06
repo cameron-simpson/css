@@ -1145,12 +1145,13 @@ class TagFile(SingletonMixin):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, *, find_parent=False):
-    return filepath, find_parent
+  def _singleton_key(cls, filepath, *, ontology=None, find_parent=False):
+    return filepath, ontology, find_parent
 
   @require(lambda filepath: isinstance(filepath, str))
-  def _singleton_init(self, filepath, find_parent=False):
+  def _singleton_init(self, filepath, *, ontology=None, find_parent=False):
     self.filepath = filepath
+    self.ontology = ontology
     self.find_parent = find_parent
     self._lock = Lock()
 
