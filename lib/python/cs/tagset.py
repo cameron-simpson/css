@@ -83,13 +83,13 @@ class TagSet(dict, FormatableMixin):
     return "%s:%r" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0, verbose=None):
+  def from_line(cls, line, offset=0, ontology=None, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
     tags = cls()
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.parse(line, offset)
+      tag, offset = Tag.parse(line, offset, ontology=ontology)
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
@@ -479,7 +479,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0, ontology=None):
+  def parse(cls, s, offset=0, *, ontology=None):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
