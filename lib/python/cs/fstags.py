@@ -823,7 +823,7 @@ class FSTags(MultiOpenMixin):
     '''
     cache = self._dirpath_ontologies
     path = abspath(path)
-    dirpath = dirname(path)
+    dirpath = path if isdirpath(path) else dirname(path)
     ont = cache.get(dirpath)
     if ont is None:
       # locate the ancestor directory containing the first ontology file
