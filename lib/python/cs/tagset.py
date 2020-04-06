@@ -782,26 +782,8 @@ class TagsOntology(SingletonMixin):
   __repr__ = __str__
 
   def __getitem__(self, index):
-    ''' If `index` is a `str`
-        presume it is a `Tag.name`
-        and return the defining `TagSet`.
-        Otherwise presume `index` is `Tag`like
-        and return a `TagInfo` for the index
-        (a `Tag`like object with type information).
-    '''
-    return (
-        self.defn_tagset(index)
-        if isinstance(index, str) else TagInfo(index, ontology=self)
-    )
-
-  def defn_tagset(self, tag):
-    ''' Return the `TagSet` defining ontology entry specified by `tag`.
-
-        `tag` may be a `str` (a tag name) or a `Tag` like thing
-        in which case `tag.name` is used.
-    '''
-    tagset_name = tag if isinstance(tag, str) else tag.name
-    return self.tagsets[tagset_name]
+    assert isinstance(index, str)
+    return self.tagsets[index]
 
   @staticmethod
   @pfx
