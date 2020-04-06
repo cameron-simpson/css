@@ -1207,7 +1207,7 @@ class TagFile(SingletonMixin):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
     '''
-    return self.load_tagsets(self.filepath)
+    return self.load_tagsets(self.filepath, self.ontology)
 
   @property
   def names(self):
@@ -1246,7 +1246,7 @@ class TagFile(SingletonMixin):
     return name, offset
 
   @classmethod
-  def parse_tags_line(cls, line):
+  def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
@@ -1260,11 +1260,13 @@ class TagFile(SingletonMixin):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, verbose=state.verbose)
+    tags = TagSet.from_line(
+        line, offset, ontology=ontology, verbose=state.verbose
+    )
     return name, tags
 
   @classmethod
-  def load_tagsets(cls, filepath):
+  def load_tagsets(cls, filepath, ontology):
     ''' Load `filepath` and return
         a mapping of `name`=>`tag_name`=>`value`.
     '''
@@ -1278,7 +1280,7 @@ class TagFile(SingletonMixin):
                 line = line.strip()
                 if not line or line.startswith('#'):
                   continue
-                name, tags = cls.parse_tags_line(line)
+                name, tags = cls.parse_tags_line(line, ontology=ontology)
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
