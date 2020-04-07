@@ -57,9 +57,9 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-wd=$( pwd )
-wdbase=$( basename "$wd" )
-primary_container=${wdbase}_${DK_PRIMARY_SERVICE}_1
+ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
+base=$( basename "$ymlbasedir" )
+primary_container=${base}_${DK_PRIMARY_SERVICE}_1
 
 case "$op" in
   exec)
