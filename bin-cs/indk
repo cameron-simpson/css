@@ -6,16 +6,18 @@
 
 set -ue
 
+: ${DK_PRIMARY_SERVICE:=''}
+export DK_PRIMARY_SERVICE
+
 cmd=$0
 usage="Usage: $cmd [servicename]"
 
 badopts=
 
-if [ $# -gt 1 ]
+if [ $# -gt 0 ]
 then
-  service=$1
+  DK_PRIMARY_SERVICE=$1
   shift
-  set -- -n "$service" ${1+"$@"}
 fi
 
 [ $# = 0 ] || {
@@ -26,4 +28,4 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -x
-exec dk ${1+"$@"} exec
+exec dk exec
