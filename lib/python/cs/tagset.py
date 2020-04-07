@@ -80,7 +80,7 @@ class TagSet(dict, FormatableMixin):
     return ' '.join(map(str, sorted(self)))
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, dict.__repr__(self))
+    return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
   def from_line(cls, line, offset=0, ontology=None, verbose=None):
@@ -140,7 +140,7 @@ class TagSet(dict, FormatableMixin):
     if tag_name not in self or old_value is not value:
       self.modified = True
       if tag_name not in self or old_value != value:
-        ifverbose(verbose, "+ %s", Tag(tag_name, value))
+        ifverbose(verbose, "+ %s (was %s)", Tag(tag_name, value), old_value)
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -694,6 +694,12 @@ class ExtendedNamespace(SimpleNamespace):
   def __len__(self):
     return len(self.keys())
 
+  def __missing__(self, attr):
+    ''' Value to return on a missing attribute.
+        This version is premised on use with `str.format_map`.
+    '''
+    return '{' + attr + '}'
+
   def __getattr__(self, attr):
     ''' Look up an indirect attribute, whose value is inferred from another.
     '''
@@ -731,7 +737,9 @@ class ExtendedNamespace(SimpleNamespace):
       value = getattr(self, attr)
     except AttributeError as e:
       if getattr(self, '_return_None_if_missing', False):
-        return None
+        default = self.__missing__(attr)
+        warning("no %r, returning %r", attr, default)
+        return default
       raise KeyError(attr) from e
     return value
 

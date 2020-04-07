@@ -67,7 +67,10 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import findup
-from cs.lex import get_nonwhite, cutsuffix, FormatableMixin, FormatAsError
+from cs.lex import (
+    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
+    FormatAsError
+)
 from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -176,8 +179,9 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show linked files.
-    {cmd} ls [--direct] [-o output_format] [paths...]
+    {cmd} ls [-d] [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
+        -d          Treat directories like files, do not recurse.
         --direct    List direct tags instead of all tags.
         -o output_format
                     Use output_format as a Python format string to lay out
@@ -194,6 +198,13 @@ class FSTagsCommand(BaseCommand):
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
+    {cmd} ns [-d] [--direct] [paths...]
+        Report on the available primary namespace fields for formatting.
+        Note that because the namespace used for formatting has
+        inferred field names there are also unshown secondary field
+        names available in format strings.
+        -d          Treat directories like files, do not recurse.
+        --direct    List direct tags instead of all tags.
     {cmd} ont
         Locate the ontology.
     {cmd} ont tags tag[=value]...
@@ -332,7 +343,7 @@ class FSTagsCommand(BaseCommand):
         elif option == '--for-rsync':
           as_rsync_includes = True
         elif option == '-o':
-          output_format = value
+          output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
     if not argv:
@@ -451,7 +462,7 @@ class FSTagsCommand(BaseCommand):
         elif option == '--direct':
           use_direct_tags = True
         elif option == '-o':
-          output_format = value
+          output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
     xit = 0
@@ -541,6 +552,35 @@ class FSTagsCommand(BaseCommand):
           else:
             if cmd_verbose:
               print(srcpath, '->', dstpath)
+    return xit
+
+  @staticmethod
+  def cmd_ns(argv, options):
+    ''' List paths and their namespace primary values.
+    '''
+    fstags = options.fstags
+    directories_like_files = False
+    use_direct_tags = False
+    options, argv = getopt(argv, 'd', longopts=['direct'])
+    for option, _ in options:
+      with Pfx(option):
+        if option == '-d':
+          directories_like_files = True
+        elif option == '--direct':
+          use_direct_tags = True
+        else:
+          raise RuntimeError("unsupported option")
+    xit = 0
+    paths = argv or ['.']
+    for path in paths:
+      fullpath = realpath(path)
+      for filepath in ((fullpath,)
+                       if directories_like_files else rfilepaths(fullpath)):
+        with Pfx(filepath):
+          tags = fstags[filepath].format_tagset(direct=use_direct_tags)
+          print(filepath)
+          for tag in sorted(tags.as_tags()):
+            print(" ", tag)
     return xit
 
   @staticmethod
@@ -817,6 +857,23 @@ class FSTags(MultiOpenMixin):
     if tagged_path is None:
       tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
     return tagged_path
+
+  def resolve_format_string(self, format_string):
+    ''' See if `format_string` looks like `[`*clausename*`]`*entryname*.
+        if so, return the corresponding config entry string,
+        otherwise return `format_string` unchanged.
+    '''
+    try:
+      clausename, entryname, offset = get_ini_clause_entryname(format_string)
+    except ValueError:
+      pass
+    else:
+      if offset == len(format_string):
+        try:
+          format_string = self.config[clausename][entryname]
+        except KeyError as e:
+          warning("config clause entry %r not found: %s", format_string, e)
+    return format_string
 
   @locked
   def ontology(self, path):
@@ -1395,11 +1452,13 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     except ValueError:
       return None
 
-  def format_kwargs(self, *, direct=False):
-    ''' Format arguments suitable for `str.format`.
+  def format_tagset(self, *, direct=False):
+    ''' Compute a `TagSet` from this file's tags
+        with additional derived tags.
 
-        This returns an `ExtendedNamespace` from `TagSet.ns()`
-        for a computed `TagSet`.
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        vai the `TagSet`'s `.ns()` method.
 
         In addition to the normal `TagSet.ns()` names
         the following additional names are available:
@@ -1407,7 +1466,6 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         * `filepath.ext`: the fileextension of the basename of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
-        * `tags`: the `TagSet` as a string
     '''
     kwtags = TagSet()
     kwtags.update(self.direct_tags if direct else self.all_tags)
@@ -1425,6 +1483,22 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
+    return kwtags
+
+  def format_kwargs(self, *, direct=False):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.pathname`: the `TaggedPath.filepath`
+        * `filepath.encoded`: the JSON encoded filepath
+        * `tags`: the `TagSet` as a string
+    '''
+    kwtags = self.format_tagset(direct=direct)
     kwtags['tags'] = str(kwtags)
     # convert the TagSet to an ExtendedNamespace
     return kwtags.format_kwargs(ontology=self.ontology)
