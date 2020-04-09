@@ -273,12 +273,12 @@ class FSTagsCommand(BaseCommand):
             for isdir, path in rpaths(top_path, yield_dirs=True):
               U.out(path)
               with Pfx(path):
+                ont = fstags.ontology(path)
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
                   U.out(path + ' ' + str(autotag))
-                  ont = fstags.ontology(path)
                   if ont:
                     autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
