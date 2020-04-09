@@ -845,6 +845,25 @@ class TagSetNamespace(ExtendedNamespace):
       return format(tag.value, spec)
     return super().__format__(spec)
 
+  @pfx_method
+  def __getitem__(self, key):
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      value = tag.value
+      try:
+        element = value[key]
+      except TypeError as e:
+        warning("[%r]: %s", key, e)
+        pass
+      except KeyError:
+        return self._path + '[' + repr(key) + ']'
+      else:
+        member_metadata = tag.member_metadata(key)
+        if member_metadata is None:
+          return element
+        return member_metadata.ns()
+    return super().__getitem__(key)
+
   def __getattr__(self, attr):
     ''' Look up an indirect attribute, whose value is inferred from another.
     '''
