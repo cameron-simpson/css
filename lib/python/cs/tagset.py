@@ -447,7 +447,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0, *, ontology=None):
+  def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
