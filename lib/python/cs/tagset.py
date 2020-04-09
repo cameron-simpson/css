@@ -618,7 +618,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
               ont.value_metadata(member_type, value)
           ) for key, value in self.value.items()
       ]
-    return ont.value_metadata(self.type, self.value)
+    return ont.value_metadata(self.name, self.value)
 
   @property
   def key_type(self):
