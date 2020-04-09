@@ -524,6 +524,19 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     return ont[self.name]
 
+  @pfx_method(use_str=True)
+  def member_metadata(self, member_key):
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    member_type = typedata.get('member_type')
+    if member_type is None:
+      return None
+    ont = self.ontology
+    value=self.value[member_key]
+    member_metadata_name= member_type+'.'+ont.value_to_tag_name(value)
+    return ont[member_metadata_name]
+
   @property
   @pfx_method(use_str=True)
   def type(self):
