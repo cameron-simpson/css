@@ -289,7 +289,7 @@ class FSTagsCommand(BaseCommand):
                   except OSError:
                     pass
                   else:
-                    direct_tags.add('filesize', S.st_size)
+                    direct_tags.add('filesize', S.st_size, ontology=ont)
                 # update the
                 all_tags = tagged_path.merged_tags()
                 for tag in fstags.cascade_tags(all_tags):
@@ -1509,7 +1509,9 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     kwtags = self.format_tagset(direct=direct)
     kwtags['tags'] = str(kwtags)
     # convert the TagSet to an ExtendedNamespace
-    return kwtags.format_kwargs(ontology=self.ontology)
+    kwargs = kwtags.format_kwargs()
+    ##XP("format_kwargs=%s", kwargs)
+    return kwargs
 
   @property
   def basename(self):
