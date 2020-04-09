@@ -797,6 +797,29 @@ class TagSetNamespace(ExtendedNamespace):
         return self._tag.typedata.ns()
       if attr == '_meta':
         return self._tag.metadata.ns()
+      if attr == '_keys':
+        tag = getns('_tag')
+        if tag is not None:
+          value = tag.value
+          try:
+            keys = value.keys
+          except AttributeError:
+            pass
+          else:
+            return list(keys())
+      if attr == '_values':
+        tag = getns('_tag')
+        if tag is not None:
+          value = tag.value
+          try:
+            values = value.values
+          except AttributeError:
+            pass
+          else:
+            return list(values())
+      # end of private/special attributes
+      if attr.startswith('_'):
+        raise AttributeError(attr)
       # attr vs attr_lc
       title_attr = cutsuffix(attr, '_lc')
       if title_attr is not attr:
