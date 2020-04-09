@@ -73,7 +73,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import TagSet, Tag, TagChoice, TagsOntology
 from cs.threads import locked, locked_property

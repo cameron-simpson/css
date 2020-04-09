@@ -17,7 +17,7 @@ from cs.lex import (
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method, XP
 
 try:
   date_fromisoformat = date.fromisoformat
