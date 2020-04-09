@@ -440,10 +440,13 @@ class FSTagsCommand(BaseCommand):
       with fstags:
         for path in paths:
           with Pfx(path):
+            ont = fstags.ontology(path)
             tagged_path = fstags[path]
             for key, value in data.items():
               tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
-              tagged_path.direct_tags.add(Tag(tag_name, value), verbose=verbose)
+              tagged_path.direct_tags.add(
+                  Tag(tag_name, value, ontology=ont), verbose=verbose
+              )
     return 0
 
   @staticmethod
@@ -899,6 +902,8 @@ class FSTags(MultiOpenMixin):
         ont = TagsOntology(
             self._tagfile(ontpath, find_parent=True, no_ontology=True)
         )
+        ont = TagsOntology(ont_tagfile)
+        ont_tagfile.ontology = ont
         cache[dirpath] = ont
     return ont
 
@@ -1332,7 +1337,7 @@ class TagFile(SingletonMixin):
         a mapping of `name`=>`tag_name`=>`value`.
     '''
     with Pfx("%r", filepath):
-      tagsets = defaultdict(TagSet)
+      tagsets = defaultdict(lambda: TagSet(ontology=ontology))
       try:
         with open(filepath) as f:
           with stackattrs(state, verbose=False):
@@ -1469,7 +1474,8 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
     '''
-    kwtags = TagSet()
+    ont = self.ontology
+    kwtags = TagSet(ontology=ont)
     kwtags.update(self.direct_tags if direct else self.all_tags)
     # add in cascaded values
     for tag in list(self.fstags.cascade_tags(kwtags)):
@@ -1478,10 +1484,10 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     # tags based on the filepath
     filepath = self.filepath
     for pathtag in (
-        Tag('filepath.basename', basename(filepath)),
-        Tag('filepath.ext', splitext(basename(filepath))[1]),
-        Tag('filepath.pathname', filepath),
-        Tag('filepath.encoded', TagFile.encode_name(filepath)),
+        Tag('filepath.basename', basename(filepath), ontology=ont),
+        Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
+        Tag('filepath.pathname', filepath, ontology=ont),
+        Tag('filepath.encoded', TagFile.encode_name(filepath), ontology=ont),
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
@@ -1544,7 +1550,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
-    tags = TagSet()
+    tags = TagSet(ontology=self.ontology)
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_stack:
         for tag in tagfile[name]:
@@ -1600,7 +1606,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     if rules is None:
       rules = self.fstags.config.filename_rules
     name = self.basename
-    tagset = TagSet()
+    tagset = TagSet(ontology=self.ontology)
     with stackattrs(state, verbose=False):
       for rule in rules:
         for tag in rule.infer_tags(name):
@@ -1618,7 +1624,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       xattr_name = XATTR_B
     xattr_s = get_xattr_value(self.filepath, xattr_name)
     if xattr_s is None:
-      return TagSet()
+      return TagSet(ontolog=self.ontology)
     return TagSet.from_line(xattr_s)
 
   def import_xattrs(self):
