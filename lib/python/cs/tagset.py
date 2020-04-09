@@ -217,14 +217,14 @@ class TagSet(dict, FormatableMixin):
     '''
     return TagSetNamespace.from_tagset(self)
 
-  def format_kwargs(self, ontology=None):
+  def format_kwargs(self):
     ''' Return an `ExtendedNamespace` as from `self.ns()`
         with a special mode activated
 
         where a missing attribute returns the value `None`.
         This is to support use in `str.formap_map`
     '''
-    fkwargs = self.ns(ontology=ontology)
+    fkwargs = self.ns()
     fkwargs._return_None_if_missing = True
     return fkwargs
 
