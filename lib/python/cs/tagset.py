@@ -431,15 +431,15 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
   @staticmethod
   def is_valid_name(name):
-    ''' Test whether a tag name is valid: a dotted identifier including dash.
+    ''' Test whether a tag name is valid: a dotted identifier.
     '''
-    return is_dotted_identifier(name, extras='_-')
+    return is_dotted_identifier(name)
 
   @staticmethod
   def parse_name(s, offset=0):
-    ''' Parse a tag name from `s` at `offset`: a dotted identifier including dash.
+    ''' Parse a tag name from `s` at `offset`: a dotted identifier.
     '''
-    return get_dotted_identifier(s, offset=offset, extras='_-')
+    return get_dotted_identifier(s, offset=offset)
 
   def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
