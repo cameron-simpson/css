@@ -72,7 +72,7 @@ class TagSet(dict, FormatableMixin):
   '''
 
   @pfx_method
-  def __init__(self, *, ontology):
+  def __init__(self, *, ontology=None):
     ''' Initialise the `TagSet`.
     '''
     super().__init__()
