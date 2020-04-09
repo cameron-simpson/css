@@ -899,8 +899,8 @@ class FSTags(MultiOpenMixin):
       )
       if ontdirpath is not None:
         ontpath = joinpath(ontdirpath, ontbase)
-        ont = TagsOntology(
-            self._tagfile(ontpath, find_parent=True, no_ontology=True)
+        ont_tagfile = self._tagfile(
+            ontpath, find_parent=True, no_ontology=True
         )
         ont = TagsOntology(ont_tagfile)
         ont_tagfile.ontology = ont
@@ -1257,18 +1257,20 @@ class TagFile(SingletonMixin):
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
     '''
-    tagfile = self
-    while tagfile is not None:
-      if name in tagfile.tagsets:
-        break
-      tagfile = tagfile.parent if tagfile.find_parent else None
-    if tagfile is None:
-      # not available in parents, use self
-      # this will autocreate an empty TagSet in self
+    with Pfx("%s.__getitem__[%r]", self, name):
       tagfile = self
-    return tagfile.tagsets[name]
+      while tagfile is not None:
+        if name in tagfile.tagsets:
+          break
+        tagfile = tagfile.parent if tagfile.find_parent else None
+      if tagfile is None:
+        # not available in parents, use self
+        # this will autocreate an empty TagSet in self
+        tagfile = self
+      return tagfile.tagsets[name]
 
   @locked_property
+  @pfx_method
   def tagsets(self):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
@@ -1369,7 +1371,6 @@ class TagFile(SingletonMixin):
         This method will create the required intermediate directories
         if missing.
     '''
-    verbose("rewrite %r", filepath)
     with Pfx("savetags(%r)", filepath):
       dirpath = dirname(filepath)
       if not isdirpath(dirpath):

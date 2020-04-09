@@ -135,12 +135,14 @@ class TagSet(dict, FormatableMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
+  @pfx_method
   def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
+  @pfx_method
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
@@ -508,6 +510,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return value, offset
 
   @property
+  @pfx_method(use_str=True)
   def typedata(self):
     ''' The defining `TagSet` for this tag's name.
 
@@ -522,6 +525,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return ont[self.name]
 
   @property
+  @pfx_method(use_str=True)
   def type(self):
     ''' The type name for this tag.
 
@@ -564,6 +568,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return type_name
 
   @property
+  @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
 
@@ -632,6 +637,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       raise AttributeError('key_type')
 
   @property
+  @pfx_method
   def member_type(self):
     ''' The type name for members of this tag.
 
