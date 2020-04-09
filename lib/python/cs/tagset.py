@@ -515,7 +515,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         and is obtained from:
         `self.ontology.typedata_tagset(self.name)`
     '''
-    return self.ontology[self.name]
+    ont = self.ontology
+    if ont is None:
+      warning("%s:%r: no ontology, returning None", type(self), self)
+      return None
+    return ont[self.name]
 
   @property
   def type(self):
@@ -551,7 +555,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         `person.scarlett_johasson`
         and `character.marvel.black_widow` respectively.
     '''
-    type_name = self.typedata.get('type')
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    type_name = typedata.get('type')
     if type_name is None:
       type_name = self.ontology.value_to_tag_name(self.name)
     return type_name
@@ -562,7 +569,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
         This calls `TagsOntology.basetype(self.type)`.
     '''
-    return self.ontology.basetype(self.type)
+    ont = self.ontology
+    if ont is None:
+      warning("no ontology, returning None")
+      return None
+    return ont.basetype(self.type)
 
   @property
   @require(lambda self: isinstance(self.type, str))
