@@ -354,10 +354,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
   @classmethod
   def with_prefix(cls, name, value, *, ontology=None, prefix):
-    # prefix the tag with `prefix` if set
+    ''' Make a new `Tag` whose `name` is prefixed with `prefix+'.'`.
+    '''
     if prefix:
       name = prefix + '.' + name
-    return cls(name, value, ontology)
+    return cls(name, value, ontology=ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -780,6 +781,8 @@ class ExtendedNamespace(SimpleNamespace):
       return value
 
 class TagSetNamespace(ExtendedNamespace):
+  ''' A formattable namespace for a `TagSet`.
+  '''
 
   @classmethod
   @pfx_method
@@ -824,7 +827,9 @@ class TagSetNamespace(ExtendedNamespace):
             with Pfx(dotted_subpath):
               subns = ns.__dict__.get(subname)
               if subns is None:
-                subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(None, subpath)
+                subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(
+                    None, subpath
+                )
               ns = subns
             ns._tag = tag
     return ns0
@@ -963,10 +968,12 @@ class ValueMetadataNamespace(TagSetNamespace):
         If there's a `Tag` on the node, format its value.
         Otherwise use the superclass format.
     '''
-    XP("XNS%s.__FORMAT__(spec=%r): self=%s, %r", type(self), spec, self, self.__dict__)
+    XP(
+        "XNS%s.__FORMAT__(spec=%r): self=%s, %r", type(self), spec, self,
+        self.__dict__
+    )
     return (
-        "{%s:%r[%s]}" %
-        (self._ontkey, self._value, self._public_keys_str())
+        "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
     ).__format__(spec)
 
 class TagsOntology(SingletonMixin):
