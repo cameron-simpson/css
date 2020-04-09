@@ -703,6 +703,20 @@ class ExtendedNamespace(SimpleNamespace):
       This also presents attributes as `[]` elements via `__getitem__`.
   '''
 
+  def _public_keys(self):
+    return (k for k in self.__dict__.keys() if k and k[0].isalpha())
+
+  def _public_keys_str(self):
+    return ','.join(sorted(self._public_keys()))
+
+  def _public_items(self):
+    return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
+
+  def __str__(self):
+    return '{' + type(self).__name__ + ':' + ','.join(
+        str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
+    ) + '}'
+
   def __len__(self):
     return len(self.keys())
 
