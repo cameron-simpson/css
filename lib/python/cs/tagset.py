@@ -66,12 +66,17 @@ class TagSet(dict, FormatableMixin):
       mapping of tag names to values.
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
+
+      Also note that all these `Tags` from `TagSet`
+      share its ontology.
   '''
 
-  def __init__(self):
+  @pfx_method
+  def __init__(self, *, ontology):
     ''' Initialise the `TagSet`.
     '''
     super().__init__()
+    self.ontology = ontology
     self.modified = False
 
   def __str__(self):
@@ -83,10 +88,10 @@ class TagSet(dict, FormatableMixin):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0, ontology=None, verbose=None):
+  def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
-    tags = cls()
+    tags = cls(ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
       tag, offset = Tag.parse(line, offset, ontology=ontology)
@@ -95,12 +100,12 @@ class TagSet(dict, FormatableMixin):
     return tags
 
   @classmethod
-  def from_bytes(cls, bs):
+  def from_bytes(cls, bs, ontology=None):
     ''' Create a new `TagSet` from the bytes `bs`,
         a UTF-8 encoding of a `TagSet` line.
     '''
     line = bs.decode(errors='replace')
-    return cls.from_line(line)
+    return cls.from_line(line, ontology=ontology)
 
   def __contains__(self, tag):
     if isinstance(tag, str):
@@ -114,7 +119,11 @@ class TagSet(dict, FormatableMixin):
     ''' Yield the tag data as `Tag`s.
     '''
     for tag_name, value in self.items():
-      yield Tag(prefix + '.' + tag_name if prefix else tag_name, value)
+      yield Tag(
+          prefix + '.' + tag_name if prefix else tag_name,
+          value,
+          ontology=self.ontology
+      )
 
   __iter__ = as_tags
 
@@ -140,7 +149,10 @@ class TagSet(dict, FormatableMixin):
     if tag_name not in self or old_value is not value:
       self.modified = True
       if tag_name not in self or old_value != value:
-        ifverbose(verbose, "+ %s (was %s)", Tag(tag_name, value), old_value)
+        ifverbose(
+            verbose, "+ %s (was %s)",
+            Tag(tag_name, value, ontology=self.ontology), old_value
+        )
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -683,7 +695,7 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       offset += 1
     else:
       choice = True
-    tag, offset = Tag.parse(s, offset=offset)
+    tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
 class ExtendedNamespace(SimpleNamespace):
