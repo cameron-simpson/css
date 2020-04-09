@@ -66,7 +66,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.fileutils import findup
+from cs.fileutils import findup, shortpath
 from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
@@ -878,7 +878,7 @@ class FSTags(MultiOpenMixin):
   @locked
   def ontology(self, path):
     ''' Return the `TagsOntology` associated with `path`.
-        Raises `ValueError` if an ontology cannot be found.
+        Returns `None` if an ontology cannot be found.
     '''
     cache = self._dirpath_ontologies
     path = abspath(path)
@@ -1215,7 +1215,9 @@ class TagFile(SingletonMixin):
     self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r,%s)" % (type(self).__name__, self.filepath, self.find_parent)
+    return "%s(%r,%s)" % (
+        type(self).__name__, shortpath(self.filepath), self.find_parent
+    )
 
   def __repr__(self):
     return "%s(%r,find_parent=%r)" % (
