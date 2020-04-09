@@ -212,57 +212,10 @@ class TagSet(dict, FormatableMixin):
       self.set(k, v, verbose=verbose)
 
   @pfx_method
-  def ns(self, ontology=None):
-    ''' Compute and return a presentation of this `TagSet` as a
-        nested `ExtendedNamespace`.
-
-        `ExtendedNamespaces` provide a number of convenience attibutes
-        derived from the concrete attributes. They are also usable
-        as mapping in `str.format_map` and the like as they implement
-        the `keys` and `__getitem__` methods.
-
-        Note that if the `TagSet` includes tags named `'a.b'` and
-        also `'a.b.c'` then the `'a.b'` value will be reflected as
-        `'a.b._'` in order to keep `'a.b.c'` available.
-
-        Also note that multiple dots in `Tag` names are collapsed;
-        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
-        `'..a.b'` will all map to the namespace entry `a.b`.
-
-        `Tag`s are processed in reverse lexical order by name, which
-        dictates which of the conflicting multidot names takes
-        effect in the namespace - the first found is used.
+  def ns(self):
+    ''' Return a `TagSetNamespace` for this `TagSet`.
     '''
-    ns0 = ExtendedNamespace()
-    for tag in sorted(self, reverse=True):
-      with Pfx(tag):
-        tag_name = tag.name
-        subnames = [subname for subname in tag_name.split('.') if subname]
-        if not subnames:
-          warning("skipping weirdly named tag")
-          continue
-        ns = ns0
-        subpath = []
-        while len(subnames) > 1:
-          subname = subnames.pop(0)
-          subpath.append(subname)
-          with Pfx('.'.join(subpath)):
-            try:
-              subns = getattr(ns, subname)
-            except AttributeError:
-              subns = ExtendedNamespace()
-              subns._return_None_if_missing = True
-              setattr(ns, subname, subns)
-            ns = subns
-        subname, = subnames
-        subpath.append(subname)
-        dotted_subpath = '.'.join(subpath)
-        with Pfx(dotted_subpath):
-          ns._tag = tag
-          ns._tag_path = dotted_subpath
-          subattr = '_' if hasattr(ns, subname) else subname
-          setattr(ns, subattr, tag.value)
-    return ns0
+    return TagSetNamespace.from_tagset(self)
 
   def format_kwargs(self, ontology=None):
     ''' Return an `ExtendedNamespace` as from `self.ns()`
@@ -306,7 +259,13 @@ class ValueMetadata(namedtuple('ValueMetadata', 'ontology ontkey value')):
       '''
     return self.ontology[self.ontkey]
 
-class KeyValueMetadata(namedtuple('KeyValueMetadata', 'key_metadata value_metadata')):
+  def ns(self):
+    ''' Return a `ValueMetadataNamespace` for this `ValueMetadata`.
+    '''
+    return ValueMetadataNamespace.from_metadata(self)
+
+class KeyValueMetadata(namedtuple('KeyValueMetadata',
+                                  'key_metadata value_metadata')):
   ''' Metadata information about a `(key,value)` pair.
       * `ontology`: the reference ontology
       * `key_metadata`: the metadata for the `key`,
@@ -720,19 +679,107 @@ class ExtendedNamespace(SimpleNamespace):
   def __len__(self):
     return len(self.keys())
 
-  def __missing__(self, attr):
-    ''' Value to return on a missing attribute.
-        This version is premised on use with `str.format_map`.
+  @pfx_method
+  def __format__(self, spec):
+    return ("{%s%s}" % (type(self).__name__, sorted(self._public_keys()
+                                                    ))).__format__(spec)
+
+  @pfx_method
+  def __getitem__(self, attr):
+    with Pfx("%s[%r]", self._path, attr):
+      try:
+        value = getattr(self, attr)
+      except AttributeError:
+        format_placeholder = '{' + attr + '}'
+        if attr and attr[0].isalpha():
+          subns = type(self)()
+          subns._pathnames = self._pathnames + (attr,)
+          subns._path = '.'.join(subns._pathnames)
+          overtag = self.__dict__.get('_tag')
+          subns._tag = Tag(
+              attr,
+              format_placeholder,
+              ontology=overtag.ontology if overtag else None
+          )
+          format_placeholder = subns
+        return format_placeholder
+      return value
+
+class TagSetNamespace(ExtendedNamespace):
+
+  @classmethod
+  @pfx_method
+  def from_tagset(cls, tags, pathnames=None):
+    ''' Compute and return a presentation of this `TagSet` as a
+        nested `ExtendedNamespace`.
+
+        `ExtendedNamespaces` provide a number of convenience attibutes
+        derived from the concrete attributes. They are also usable
+        as mapping in `str.format_map` and the like as they implement
+        the `keys` and `__getitem__` methods.
+
+        Note that multiple dots in `Tag` names are collapsed;
+        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
+        `'..a.b'` will all map to the namespace entry `a.b`.
+
+        `Tag`s are processed in reverse lexical order by name, which
+        dictates which of the conflicting multidot names takes
+        effect in the namespace - the first found is used.
     '''
-    return '{' + attr + '}'
+    if pathnames is None:
+      pathnames = []
+    ns0 = cls(
+        _path='.'.join(pathnames) if pathnames else '.',
+        _pathnames=tuple(pathnames)
+    )
+    if tags:
+      ns0._ontology = tags.ontology
+      for tag in sorted(tags, reverse=True):
+        with Pfx(tag):
+          tag_name = tag.name
+          subnames = [subname for subname in tag_name.split('.') if subname]
+          if not subnames:
+            warning("skipping weirdly named tag")
+            continue
+          ns = ns0
+          subpath = []
+          while subnames:
+            subname = subnames.pop(0)
+            subpath.append(subname)
+            dotted_subpath = '.'.join(subpath)
+            with Pfx(dotted_subpath):
+              subns = ns.__dict__.get(subname)
+              if subns is None:
+                subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(None, subpath)
+              ns = subns
+            ns._tag = tag
+    return ns0
+
+  @pfx_method
+  def __format__(self, spec):
+    ''' Format this node.
+        If there's a `Tag` on the node, format its value.
+        Otherwise use the superclass format.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return format(tag.value, spec)
+    return super().__format__(spec)
 
   def __getattr__(self, attr):
     ''' Look up an indirect attribute, whose value is inferred from another.
     '''
-    if attr == 'keys':
-      return self.__dict__.keys
-    with Pfx("%s(%r)", type(self).__name__, attr):
+    path = self.__dict__.get('_path')
+    with Pfx("%s:%s.%s", type(self).__name__, path, attr):
+      if attr == 'cover':
+        raise RuntimeError("BANG")
+      if attr == 'keys':
+        return self.__dict__.keys
       getns = self.__dict__.get
+      if attr == '_type':
+        return self._tag.typedata.ns()
+      if attr == '_meta':
+        return self._tag.metadata.ns()
       # attr vs attr_lc
       title_attr = cutsuffix(attr, '_lc')
       if title_attr is not attr:
@@ -756,18 +803,21 @@ class ExtendedNamespace(SimpleNamespace):
         value = getns(plural_attr)
         if isinstance(value, list) and value:
           return value[0]
+      if attr and attr[0].isalpha():
+        subns = self._factory(self._pathnames + (attr,))
+        XP(
+            "placeholder for {%s}: self._factory=%s, subns.ontology=%s", attr,
+            self._factory, subns.ontology
+        )
+        format_placeholder = '{' + subns._path + '}'
+        subns._tag = Tag(
+            attr,
+            format_placeholder,
+            ontology=subns._ontology,
+        )
+        setattr(self, attr, subns)
+        return subns
       raise AttributeError(attr)
-
-  def __getitem__(self, attr):
-    try:
-      value = getattr(self, attr)
-    except AttributeError as e:
-      if getattr(self, '_return_None_if_missing', False):
-        default = self.__missing__(attr)
-        warning("no %r, returning %r", attr, default)
-        return default
-      raise KeyError(attr) from e
-    return value
 
   @property
   def ontology(self):
@@ -786,6 +836,41 @@ class ExtendedNamespace(SimpleNamespace):
     ''' The value.
       '''
     return self.value_metadata.value
+
+class ValueMetadataNamespace(TagSetNamespace):
+  ''' A subclass of `TagSetNamespace` for a `Tag`'s metadata.
+
+      The reference `TagSet` is the defining `TagSet`
+      for the metadata of a particular `Tag` value
+      as defined by a `ValueMetadata`
+      (the return value of `Tag.metadata`).
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_metadata(cls, meta, pathnames=None):
+    ''' Construct a new `ValueMetadataNamespace` from `meta` (a `ValueMetadata`).
+    '''
+    ont = meta.ontology
+    ontkey = meta.ontkey
+    tags = ont[ontkey]
+    ns0 = cls.from_tagset(tags, pathnames=pathnames)
+    ns0._ontology = ont
+    ns0._ontkey = ontkey
+    ns0._value = meta.value
+    return ns0
+
+  @pfx_method
+  def __format__(self, spec):
+    ''' Format this node.
+        If there's a `Tag` on the node, format its value.
+        Otherwise use the superclass format.
+    '''
+    XP("XNS%s.__FORMAT__(spec=%r): self=%s, %r", type(self), spec, self, self.__dict__)
+    return (
+        "{%s:%r[%s]}" %
+        (self._ontkey, self._value, self._public_keys_str())
+    ).__format__(spec)
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
