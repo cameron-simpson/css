@@ -821,7 +821,12 @@ class ExtendedNamespace(SimpleNamespace):
       return value
 
 class TagSetNamespace(ExtendedNamespace):
-  ''' A formattable namespace for a `TagSet`.
+  ''' A formattable nested namespace for a `TagSet`,
+      subclassing `ExtendedNamespace`.
+
+      Where the node paths of this namespace tree match
+      the name of a `Tag` from the `TagSet`
+      that node has the following direct attributes:
   '''
 
   @classmethod
@@ -905,14 +910,38 @@ class TagSetNamespace(ExtendedNamespace):
     return super().__getitem__(key)
 
   def __getattr__(self, attr):
-    ''' Look up an indirect attribute, whose value is inferred from another.
+    ''' Look up an indirect node attribute,
+        whose value is inferred from another.
+
+        The following attribute names and forms are supported:
+        * `_keys`: the keys of the value
+          for the `Tag` associated with this node;
+          meaningful if `self._tag.value` has a `keys` method
+        * `_meta`: a namespace containing the meta information
+          for the `Tag` associated with this node
+        * `_type`: a namespace containing the type definition
+          for the `Tag` associated with this node
+        * `_values`: the values within the `Tag.value`
+          for the `Tag` associated with this node
+        * *baseattr*`_lc`: lowercase and titled forms.
+          If *baseattr* exists,
+          return its value lowercased via `cs.lex.lc_()`.
+          Conversely, if *baseattr* is required
+          and does not directly exists
+          but its *baseattr*`_lc` form does,
+          return the value of *baseattr*`_lc`
+          titlelified using `cs.lex.titleify_lc()`.
+        * *baseattr*`s`, *baseattr*`es`: singular/plural.
+          If *baseattr* exists
+          return `[self.`*baseattr*`]`.
+          Conversely,
+          if *baseattr* does not exist but one of its plural attributes does,
+          return the first element from the plural attribute.
     '''
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
       if attr == 'cover':
         raise RuntimeError("BANG")
-      if attr == 'keys':
-        return self.__dict__.keys
       getns = self.__dict__.get
       if attr == '_type':
         return self._tag.typedata.ns()
@@ -962,23 +991,11 @@ class TagSetNamespace(ExtendedNamespace):
       for pl_suffix in 's', 'es':
         plural_attr = attr + pl_suffix
         value = getns(plural_attr)
-        if isinstance(value, list) and value:
-          return value[0]
-      if attr and attr[0].isalpha():
-        subns = self._factory(self._pathnames + (attr,))
-        XP(
-            "placeholder for {%s}: self._factory=%s, subns.ontology=%s", attr,
-            self._factory, subns.ontology
-        )
-        format_placeholder = '{' + subns._path + '}'
-        subns._tag = Tag(
-            attr,
-            format_placeholder,
-            ontology=subns._ontology,
-        )
-        setattr(self, attr, subns)
-        return subns
-      raise AttributeError(attr)
+        if value is None:
+          continue
+        value0 = value[0]
+        return value0
+      return super().__getattr__(attr)
 
   @property
   def ontology(self):
