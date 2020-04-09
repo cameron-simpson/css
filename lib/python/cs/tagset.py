@@ -733,8 +733,13 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     return cls(s[offset0:offset], choice, tag), offset
 
 class ExtendedNamespace(SimpleNamespace):
-  ''' Subclass `SimpleNamespace` with inferred attributes.
-      This also presents attributes as `[]` elements via `__getitem__`.
+  ''' Subclass `SimpleNamespace` with inferred attributes
+      intended primarily for use in format strings.
+      As such it also presents attributes as `[]` elements via `__getitem__`.
+
+      Because [:alpha:]* attribute names
+      are reserved for :public" keys/attributes,
+      most methods commence with an underscore (`'_'`).
   '''
 
   def _public_keys(self):
@@ -752,12 +757,59 @@ class ExtendedNamespace(SimpleNamespace):
     ) + '}'
 
   def __len__(self):
-    return len(self.keys())
+    ''' The number of public keys.
+    '''
+    return len(self._public_keys())
 
   @pfx_method
   def __format__(self, spec):
-    return ("{%s%s}" % (type(self).__name__, sorted(self._public_keys()
-                                                    ))).__format__(spec)
+    ''' The default formatted form of this node.
+        The value to format is `'{`*type*':'*path*'['*public_keys*']'`.
+    '''
+    return (
+        "{%s:%s%s}" %
+        (type(self).__name__, self._path, sorted(self._public_keys()))
+    ).__format__(spec)
+
+  @property
+  def _path(self):
+    ''' The path to this node as a dotted string.
+    '''
+    pathnames = getattr(self, '_pathnames', ())
+    return '.'.join(pathnames)
+
+  def _subns(self, subname):
+    ''' Create and attache a new subnamespace named `subname`
+        of the same type as `self`.
+        Return the new subnamespace.
+
+        It is an error if `subname` is already present in `self.__dict__`.
+    '''
+    if subname in self.__dict__:
+      raise ValueError(
+          "%s: attribute %r already exists" % (self._path, subname)
+      )
+    subns = type(self)(_pathnames=self._pathnames + (subname,))
+    setattr(self, subname, subns)
+    return subns
+
+  def __getattr__(self, attr):
+    ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
+        contaiining a `Tag` for the attribute with a placeholder string.
+    '''
+    if attr and attr[0].isalpha():
+      # no such attribute, create a placeholder `Tag`
+      # for [:alpha:]* names
+      format_placeholder = '{' + self._path + '.' + attr + '}'
+      subns = self._subns(attr)
+      overtag = self.__dict__.get('_tag')
+      subns._tag = Tag(
+          attr,
+          format_placeholder,
+          ontology=overtag.ontology if overtag else None
+      )
+      return subns
+    raise AttributeError("%s: %s" % (self._path, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -765,19 +817,7 @@ class ExtendedNamespace(SimpleNamespace):
       try:
         value = getattr(self, attr)
       except AttributeError:
-        format_placeholder = '{' + attr + '}'
-        if attr and attr[0].isalpha():
-          subns = type(self)()
-          subns._pathnames = self._pathnames + (attr,)
-          subns._path = '.'.join(subns._pathnames)
-          overtag = self.__dict__.get('_tag')
-          subns._tag = Tag(
-              attr,
-              format_placeholder,
-              ontology=overtag.ontology if overtag else None
-          )
-          format_placeholder = subns
-        return format_placeholder
+        raise KeyError(attr)
       return value
 
 class TagSetNamespace(ExtendedNamespace):
