@@ -1,0 +1,6 @@
+cs.distinfo: port to BaseCommand
+upgrade the distinfo stuff with a mode to emit all the docstrings so that a module automatic README.md describes everything
+cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
+distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose
+make cs.distinfo just do a Package class, split out PyPI stuff into cs.app.pypi.PyPI(PKG, base urls...)
+cs-release: generate and commit cs/module_README.md files (does markdown have a comment syntax?) so I can point to them as the module homepage
