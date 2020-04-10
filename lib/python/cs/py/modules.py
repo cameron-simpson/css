@@ -13,8 +13,6 @@ import sys
 from cs.context import stackattrs
 
 DISTINFO = {
-    'description':
-    "module/import related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
