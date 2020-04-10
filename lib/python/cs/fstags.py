@@ -223,6 +223,8 @@ class FSTagsCommand(BaseCommand):
         With the form "-tag", remove the tag from the immediate tags.
         A path named "-" indicates that paths should be read from the
         standard input.
+    tagfile tagfile_path tag tag_name {{tag[=value]|-tag}}...
+        Directly modify tag_name within the tag file tagfile_path.
     tagpaths {{tag[=value]|-tag}} {{-|paths...}}
         Associate a tag with multiple paths.
         With the form "-tag", remove the tag from the immediate tags.
@@ -704,6 +706,55 @@ class FSTagsCommand(BaseCommand):
     with stackattrs(state, verbose=True):
       with fstags:
         fstags.apply_tag_choices(tag_choices, paths)
+
+  @classmethod
+  def cmd_tagfile(cls, argv, options):
+    ''' Usage: tagfile tagfile_path [subcommand ...]
+          Subcommands:
+            tag tagset_name tag_choices...
+    '''
+    fstags = options.fstags
+    try:
+      tagfilepath = argv.pop(0)
+    except IndexError:
+      raise GetoptError("missing tagfile_path")
+    with Pfx(tagfilepath):
+      try:
+        subcmd = argv.pop(0)
+      except IndexError:
+        raise GetoptError("missing subcommand")
+      with Pfx(subcmd):
+        if subcmd == 'tag':
+          try:
+            tagset_name = argv.pop(0)
+          except IndexError:
+            raise GetoptError("missing tagset_name")
+          with Pfx(tagset_name):
+            if not argv:
+              raise GetoptError("missing tags")
+            badopts = False
+            try:
+              tag_choices = cls.parse_tag_choices(argv)
+            except ValueError as e:
+              warning("bad tag specifications: %s", e)
+              badopts = True
+            if badopts:
+              raise GetoptError("bad arguments")
+            with stackattrs(state, verbose=True):
+              with fstags:
+                path = abspath(tagfilepath)
+                tagfile = fstags._tagfile(path)
+                tags = tagfile[tagset_name]
+                for choice in tag_choices:
+                  with Pfx(choice.spec):
+                    if choice.choice:
+                      # add tag
+                      tags.add(choice.tag, verbose=state.verbose)
+                    else:
+                      # delete tag
+                      tags.discard(choice.tag, verbose=state.verbose)
+        else:
+          raise GetoptError("unrecognised subcommand")
 
   @classmethod
   def cmd_tagpaths(cls, argv, options):
