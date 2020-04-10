@@ -285,19 +285,12 @@ class TagSet(dict, FormatableMixin):
   @pfx_method
   def ns(self):
     ''' Return a `TagSetNamespace` for this `TagSet`.
+
+        This has many convenience facilities for use in format strings.
     '''
     return TagSetNamespace.from_tagset(self)
 
-  def format_kwargs(self):
-    ''' Return an `ExtendedNamespace` as from `self.ns()`
-        with a special mode activated
-
-        where a missing attribute returns the value `None`.
-        This is to support use in `str.formap_map`
-    '''
-    fkwargs = self.ns()
-    fkwargs._return_None_if_missing = True
-    return fkwargs
+  format_kwargs = ns
 
   def edit(self, verbose=None):
     ''' Edit this `TagSet`.

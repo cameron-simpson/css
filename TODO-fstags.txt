@@ -1,8 +1,6 @@
 module docstring: nice dotted tag name example, particularly in format strings
 module docstring: nice ontology example
 support tags files being directories, new TagDir type named after entry prefix, files named entry suffix, contents one tag per line
-drop _return_None_if_missing
-drop _return_None_if_missing
 maybe "ont tag ent-entry [-]tags..."
 convenient ontology editing, something like "add cast_member name detail-tags"
 fstags: accept 'single quoted string', transcribe as JSON dq string
