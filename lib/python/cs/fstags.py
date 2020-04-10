@@ -136,22 +136,23 @@ class FSTagsCommand(BaseCommand):
   '''
 
   GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage:
-    {cmd} autotag paths...
+  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]
+  Subcommands:
+    autotag paths...
         Tag paths based on rules from the rc file.
-    {cmd} cp [-fnv] srcpath dstpath
-    {cmd} cp [-fnv] srcpaths... dstdirpath
+    cp [-fnv] srcpath dstpath
+    cp [-fnv] srcpaths... dstdirpath
         Copy files and their tags into targetdir.
         -f  Force: remove destination if it exists.
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show copied files.
-    {cmd} edit [-d] [path]
+    edit [-d] [path]
         Edit the direct tagsets of path, default: '.'
         If path is a directory, provide the tags of its entries.
         Otherwise edit just the tags for path.
         -d          Treat directories like files: edit just its tags.
-    {cmd} find [--for-rsync] path {{tag[=value]|-tag}}...
+    find [--for-rsync] path {{tag[=value]|-tag}}...
         List files from path matching all the constraints.
         -d          Treat directories like files (do not recurse).
         --direct    Use direct tags instead of all tags.
@@ -165,21 +166,21 @@ class FSTagsCommand(BaseCommand):
                     Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
       '{', '{{'
   ).replace('}', '}}') + '''
-    {cmd} json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
+    json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
         Apply JSON data to path.
         A path named "-" indicates that paths should be read from
         the standard input.
         The JSON tag data come from the file "tags.json"; the name
         "-" indicates that the JSON data should be read from the
         standard input.
-    {cmd} ln [-fnv] srcpath dstpath
-    {cmd} ln [-fnv] srcpaths... dstdirpath
+    ln [-fnv] srcpath dstpath
+    ln [-fnv] srcpaths... dstdirpath
         Link files and their tags into targetdir.
         -f  Force: remove destination if it exists.
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show linked files.
-    {cmd} ls [-d] [--direct] [-o output_format] [paths...]
+    ls [-d] [--direct] [-o output_format] [paths...]
         List files from paths and their tags.
         -d          Treat directories like files, do not recurse.
         --direct    List direct tags instead of all tags.
@@ -191,48 +192,48 @@ class FSTagsCommand(BaseCommand):
   ).replace(
       '}', '}}'
   ) + '''
-    {cmd} mv [-fnv] srcpath dstpath
-    {cmd} mv [-fnv] srcpaths... dstdirpath
+    mv [-fnv] srcpath dstpath
+    mv [-fnv] srcpaths... dstdirpath
         Move files and their tags into targetdir.
         -f  Force: remove destination if it exists.
         -i  Interactive: fail if the destination exists.
         -n  No remove: fail if the destination exists.
         -v  Verbose: show moved files.
-    {cmd} ns [-d] [--direct] [paths...]
+    ns [-d] [--direct] [paths...]
         Report on the available primary namespace fields for formatting.
         Note that because the namespace used for formatting has
         inferred field names there are also unshown secondary field
         names available in format strings.
         -d          Treat directories like files, do not recurse.
         --direct    List direct tags instead of all tags.
-    {cmd} ont
+    ont
         Locate the ontology.
-    {cmd} ont tags tag[=value]...
+    ont tags tag[=value]...
         Query ontology information for the specified tags.
-    {cmd} rename -n newbasename_format paths...
+    rename -n newbasename_format paths...
         Rename paths according to a format string.
         -n newbasename_format
             Use newbasename_format as a Python format string to
             compute the new basename for each path.
-    {cmd} scrub paths...
+    scrub paths...
         Remove all tags for missing paths.
         If a path is a directory, scrub the immediate paths in the directory.
-    {cmd} tag {{-|path}} {{tag[=value]|-tag}}...
+    tag {{-|path}} {{tag[=value]|-tag}}...
         Associate tags with a path.
         With the form "-tag", remove the tag from the immediate tags.
         A path named "-" indicates that paths should be read from the
         standard input.
-    {cmd} tagpaths {{tag[=value]|-tag}} {{-|paths...}}
+    tagpaths {{tag[=value]|-tag}} {{-|paths...}}
         Associate a tag with multiple paths.
         With the form "-tag", remove the tag from the immediate tags.
         A single path named "-" indicates that paths should be read
         from the standard input.
-    {cmd} test [--direct] path {{tag[=value]|-tag}}...
+    test [--direct] path {{tag[=value]|-tag}}...
         Test whether the path matches all the constraints.
         --direct    Use direct tags instead of all tags.
-    {cmd} xattr_import {{-|paths...}}
+    xattr_import {{-|paths...}}
         Import tag information from extended attributes.
-    {cmd} xattr_export {{-|paths...}}
+    xattr_export {{-|paths...}}
         Update extended attributes from tags.
   '''
 
