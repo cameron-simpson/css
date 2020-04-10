@@ -981,7 +981,7 @@ class FSTags(MultiOpenMixin):
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
-    return self._tagfile(joinpath(dirpath, self.tagsfile))
+    return self._tagfile(joinpath(abspath(dirpath), self.tagsfile))
 
   def apply_tag_choices(self, tag_choices, paths):
     ''' Apply the `tag_choices` to `paths`.
