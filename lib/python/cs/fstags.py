@@ -1004,14 +1004,14 @@ class FSTags(MultiOpenMixin):
       for path in paths:
         with Pfx(path):
           tagged_path = self[path]
-          for spec, choice, tag in tag_choices:
-            with Pfx(spec):
-              if choice:
+          for choice in tag_choices:
+            with Pfx(choice.spec):
+              if choice.choice:
                 # add tag
-                tagged_path.add(tag)
+                tagged_path.add(choice.tag)
               else:
                 # delete tag
-                tagged_path.discard(tag)
+                tagged_path.discard(choice.tag)
 
   def cascade_tags(self, tags, cascade_rules=None):
     ''' Yield `Tag`s
