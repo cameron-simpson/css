@@ -26,7 +26,7 @@ from types import SimpleNamespace as NS
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.py.doc import module_doc
-import cs.sh
+from cs.sh import quotestr as shq, quote as shqv
 from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
@@ -225,84 +225,58 @@ def test_is_package(libdir, package_name):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
-<<<<<<< working copy
-def get_md_doc(
-    M,
-    *,
-    sort_key=lambda key: key.lower(),
-    filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
-    preamble_md='',
-    postamble_md='',
-):
-  ''' Fetch the docstrings from a module and assemble a MarkDown document.
-  '''
-  if isinstance(M, str):
-    M = importlib.import_module(M)
-  Mname_prefix = M.__name__ + '.'
-  full_doc = M.__doc__
-  if full_doc:
-    full_doc = stripped_dedent(full_doc.strip())
-  else:
-    full_doc = ''
-  try:
-    doc_head, _ = full_doc.split('\n\n', 1)
-  except ValueError:
-    doc_head = full_doc
-  for Mname in sorted(dir(M), key=sort_key):
-    if not filter_key(Mname):
-      continue
-    o = getattr(M, Mname, None)
-    oM = getmodule(o)
-    if oM and oM is not M:
-      # name imported from another module
-      continue
-    if not isclass(o) and not isfunction(o):
-      continue
-    odoc = o.__doc__
-    if odoc is None:
-      continue
-    odoc = stripped_dedent(odoc)
-    if isfunction(o):
-      sig = signature(o)
-      full_doc += f'\n\n## Function `{Mname}{sig}`\n\n{odoc}'
-    elif isclass(o):
-      classname_etc = Mname
-      mro_names = []
-      for superclass in o.__mro__:
-        if (superclass is not object and superclass is not o
-            and superclass is not abc.ABC):
-          name = superclass.__name__
-          supermod = getmodule(superclass)
-          if supermod is not M:
-            name = supermod.__name__ + '.' + name
-          mro_names.append(name)
-      if mro_names:
-        classname_etc += '(' + ','.join(mro_names) + ')'
-        ##odoc = 'MRO: ' + ', '.join(mro_names) + '  \n' + odoc
-      init_method = o.__dict__.get('__init__', None)
-      if init_method:
-        init_doc = getattr(init_method, '__doc__', None)
-        if init_doc:
-          init_doc = stripped_dedent(init_doc)
-          msig = signature(init_method)
-          odoc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
-      full_doc += f'\n\n## Class `{classname_etc}`\n\n{odoc}'
-    else:
-      X("UNHANDLED %r, neither function nor class", Mname)
-  if preamble_md:
-    full_doc = preamble_md.rstrip() + '\n\n' + full_doc
-  if postamble_md:
-    full_doc = full_doc.rstrip() + '\n\n' + postamble_md
-  return doc_head, full_doc
+class PackageInstance(NS):
 
-class Packageversion(NS):
-
-  def __init__(self, package_name):
-    super().__init__(name=package_name)
+  def __init__(self, package, version, vcs=None):
+    ##if vcs is None:
+    ##  vcs = VCS_Hg()
+    self.package = package
+    self.version = version
+    ##self.vcs = vcs
 
   @property
-  def hg_tag(self):
+  def name(self):
+    return self.package.name
+
+  @property
+  def vcs_tag(self):
+    ''' The tag used in the VCS for this version of the package.
+    '''
     return self.name + '-' + self.version
+
+  def copyin(self, dstdir):
+    ''' Write the contents of this release into `dstdir`.
+        Return the subpaths of `dstdir` created.
+    '''
+    included = []
+    hgargv = [
+        'set-x',
+        'hg',
+        'archive',
+        '-r',
+        '"%s"' % self.vcs_tag,
+    ]
+    first = True
+    package_parts = self.package_name.split('.')
+    while package_parts:
+      superpackage_name = '.'.join(package_parts)
+      base = self.package_base(superpackage_name)
+      if first:
+        # collect entire package contents
+        for subpath in self.package_paths(superpackage_name, self.libdir):
+          incpath = joinpath(self.libdir, subpath)
+          hgargv.extend(['-I', incpath])
+          included.append(incpath)
+      else:
+        # just collecting required __init__.py files
+        incpath = joinpath(base, '__init__.py')
+        hgargv.extend(['-I', incpath])
+        included.append(incpath)
+      package_parts.pop()
+      first = False
+    hgargv.append(dstdir)
+    runcmd(hgargv)
+    return included
 
 class PyPI_Package(NS):
   ''' Operations for a package at PyPI.
@@ -338,8 +312,7 @@ class PyPI_Package(NS):
       else:
         defaults['author_email'] = author_email
     self.pypi_url = pypi_url
-    self.package = PackageVersion(package_name)
-    self.package.version = package_version
+    self.package_instance = PackageInstance(package_name, package_version)
     self._pypi_package_name = pypi_package_name
     self._pypi_package_version = pypi_package_version
     self.defaults = defaults
@@ -348,7 +321,7 @@ class PyPI_Package(NS):
 
   @property
   def package_name(self):
-    return self.package.name
+    return self.package_instance.name
 
   @property
   def pypi_package_name(self):
@@ -361,12 +334,12 @@ class PyPI_Package(NS):
   def pypi_package_version(self):
     version = self._pypi_package_version
     if version is None:
-      version = self.package.version
+      version = self.package_instance.version
     return version
 
   @property
-  def hg_tag(self):
-    return self.package.hg_tag
+  def vcs_tag(self):
+    return self.package_instance.vcs_tag
 
   def _prep_distinfo(self, preamble_md, postamble_md):
     ''' Compute the distutils info for this package.
@@ -458,10 +431,11 @@ class PyPI_Package(NS):
 
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
+
         If `pkg_dir` is not supplied, create a temporary directory.
     '''
     if pkg_dir is None:
-      pkg_dir = mkdtemp(prefix='pkg-' + self.pypi_package_name + '-', dir='.')
+      pkg_dir = mkdtemp(prefix='pkg--' + self.pypi_package_name + '--', dir='.')
 
     distinfo = self.distinfo
 
@@ -590,53 +564,19 @@ class PyPI_Package(NS):
             continue
           warning("skipping %s", joinpath(dirpath, filename))
 
-  def copyin(self, dstdir):
-    ''' Write the contents of the tagged release into `dstdir`.
-        Return the subpaths of dstdir created.
-    '''
-    included = []
-    hgargv = [
-        'set-x',
-        'hg',
-        'archive',
-        '-r',
-        '"%s"' % self.hg_tag,
-    ]
-    first = True
-    package_parts = self.package_name.split('.')
-    while package_parts:
-      superpackage_name = '.'.join(package_parts)
-      base = self.package_base(superpackage_name)
-      if first:
-        # collect entire package contents
-        for subpath in self.package_paths(superpackage_name, self.libdir):
-          incpath = joinpath(self.libdir, subpath)
-          hgargv.extend(['-I', incpath])
-          included.append(incpath)
-      else:
-        # just collecting required __init__.py files
-        incpath = joinpath(base, '__init__.py')
-        hgargv.extend(['-I', incpath])
-        included.append(incpath)
-      package_parts.pop()
-      first = False
-    hgargv.append(dstdir)
-    runcmd(hgargv)
-    return included
-
 class PyPI_PackageCheckout(NS):
   ''' Facilities available with a checkout of a package.
   '''
 
-  def __init__(self, pkg):
-    self.package = pkg
+  def __init__(self, pkg_instance):
+    self.package_instance = pkg_instance
 
   def __enter__(self):
     ''' Prep the package in a temporary directory, return self.
     '''
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
-    self.pkg_dir = self.package.make_package()
+    self.pkg_dir = self.package_instance.make_package()
     self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
     return self
 
@@ -649,12 +589,12 @@ class PyPI_PackageCheckout(NS):
 
   @property
   def pypi_url(self):
-    return self.package.pypi_url
+    return self.package_instance.pypi_url
 
   def inpkg(self, shcmd):
     ''' Run a command supplied as a sh(1) command string.
     '''
-    qpkg_dir = cs.sh.quotestr(self.pkg_dir)
+    qpkg_dir = shq(self.pkg_dir)
     xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
     if xit != 0:
       raise ValueError("command failed, exit status %d: %r" % (xit, shcmd))
@@ -664,7 +604,7 @@ class PyPI_PackageCheckout(NS):
   def inpkg_argv(self, argv):
     ''' Run a command supplied as an argument list.
     '''
-    shcmd = ' '.join(cs.sh.quote(argv))
+    shcmd = ' '.join(shqv(argv))
     return self.inpkg(shcmd)
 
   def setup_py(self, *argv):
