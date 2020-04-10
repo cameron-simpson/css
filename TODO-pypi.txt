@@ -1,3 +1,4 @@
+move lastvalues into repo maintained "pkg_tags" file
 cs.distinfo: port to BaseCommand
 upgrade the distinfo stuff with a mode to emit all the docstrings so that a module automatic README.md describes everything
 cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
