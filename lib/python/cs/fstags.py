@@ -1476,7 +1476,19 @@ class TagFile(SingletonMixin):
       ]
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
-TagFileEntry = namedtuple('TagFileEntry', 'tagfile name')
+class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
+  ''' An entry withing a `TagFile`.
+
+      Attributes:
+      * `name`: the name of the `TagSet` entry within `tagfile`
+      * `tagfile`: the `TagFile` containing `name`
+  '''
+
+  @property
+  def tagset(self):
+    ''' The `TagSet` from `tagfile`.
+    '''
+    return self.tagfile[self.name]
 
 class TaggedPath(HasFSTagsMixin, FormatableMixin):
   ''' Class to manipulate the tags for a specific path.
