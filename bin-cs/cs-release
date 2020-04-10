@@ -304,7 +304,7 @@ class Packages(defaultdict):
   '''
 
   def __missing__(self, pkg_name):
-    P = Package(pkg_name, self.state)
+    P = Package(pkg_name, self.options)
     self[pkg_name] = P
     return P
 
@@ -312,14 +312,14 @@ class Package:
   ''' Facilities to work with a package.
   '''
 
-  def __init__(self, name, state):
+  def __init__(self, name, options):
     if name.endswith('_tests'):
       raise ValueError("Package(%r): unexpected _tests package" % (name,))
     self.name = name
-    self.state = state  # shared state
-    self.vcs = state.vcs  # convenience
-    self.modules = state.modules  # convenience
-    self.packages = state.packages  # convenience
+    self.options = options  # shared state
+    self.vcs = options.vcs  # convenience
+    self.modules = options.modules  # convenience
+    self.packages = options.packages  # convenience
 
   def __str__(self):
     return "%s[%r]" % (type(self).__name__, self.name)
@@ -379,7 +379,7 @@ class Package:
 
   def last_upload_suffix(self, target='pypi'):
     lastvalue_key = self.last_upload_key(target=target)
-    return self.state.last_values.get(lastvalue_key, None)
+    return self.options.last_values.get(lastvalue_key, None)
 
   def submit_pypi(self, force=False):
     return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
@@ -407,7 +407,7 @@ class Package:
                latest_suffix):
         PKG = pypipkg(self.name, self.vcs)
         PKG.upload()
-        self.state.last_values[self.last_upload_key()] = latest_suffix
+        self.options.last_values[self.last_upload_key()] = latest_suffix
 
   def export(self):
     tag = self.latest_release_tag()
@@ -486,7 +486,7 @@ class Package:
       if pathexists(dirpath):
         raise ValueError("already exists")
       hg_argv = ['archive', '-r', revision]
-      hg_argv.extend(vcs.hg_include(self.paths()))
+      hg_argv.extend(self.vcs.hg_include(self.paths()))
       hg_argv.extend(['--', dirpath])
       return self.vcs.hg_cmd(*hg_argv)
 
@@ -665,7 +665,7 @@ class Modules(defaultdict):
   '''
 
   def __missing__(self, mod_name):
-    M = Module(mod_name, self.state)
+    M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
 
@@ -673,11 +673,11 @@ class Module(object):
   ''' Metadata about a Python module.
   '''
 
-  def __init__(self, name, state):
+  def __init__(self, name, options):
     self.name = name
-    self.state = state
-    self.modules = state.modules
-    self.packages = state.packages
+    self.options = options
+    self.modules = options.modules
+    self.packages = options.packages
     self._distinfo = None
     self._checking = False
     self._check_status = None
