@@ -301,9 +301,9 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_edit(argv, options):
-    ''' Edit filenames and tags in a directory.
+    ''' Edit filenames and tags in a directory or the direct tags of a file.
 
-        Usage: edit [-d] [dirpath]
+        Usage: edit [-d] [path]
     '''
     fstags = options.fstags
     directories_like_files = False
@@ -863,7 +863,6 @@ class FSTags(MultiOpenMixin):
     self._tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
-    # cache of per ontologypath `TagOntologies`
     self._lock = RLock()
 
   def startup(self):
@@ -1518,12 +1517,13 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
 
         This can be converted into an `ExtendedNamespace`
         suitable for use with `str.format_map`
-        vai the `TagSet`'s `.ns()` method.
+        via the `TagSet`'s `.format_kwargs()` method.
 
         In addition to the normal `TagSet.ns()` names
         the following additional names are available:
         * `filepath.basename`: basename of the `TaggedPath.filepath`
-        * `filepath.ext`: the fileextension of the basename of the `TaggedPath.filepath`
+        * `filepath.ext`: the file extension of the basename
+          of the `TaggedPath.filepath`
         * `filepath.pathname`: the `TaggedPath.filepath`
         * `filepath.encoded`: the JSON encoded filepath
     '''
