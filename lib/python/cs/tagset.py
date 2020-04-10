@@ -204,14 +204,12 @@ class TagSet(dict, FormatableMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
-  @pfx_method
   def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
-  @pfx_method
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
