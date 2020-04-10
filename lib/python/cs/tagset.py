@@ -1,6 +1,75 @@
 #!/usr/bin/env python3
 
-''' Tags and sets of tags.
+''' Tags and sets of tags
+    with __format__ support and optional ontology information.
+
+    Note: see `cs.fstags` for support for applying these to filesystem objects
+    such as directories and files.
+
+    All of the available complexity is optional:
+    you can use `Tag`s without bothering with `TagSet`s
+    or `TagsOntology`s.
+
+    This module contains the following main classes:
+    * `Tag`: an object with a `.name` and optional `.value` (default `None`)
+      and also an optional reference `.ontology`
+      for associating semantics with tag values.
+      The `.value` (if not `None`) will often be a string,
+      but may be any Python object.
+      If you're using these via `cs.fstags`,
+      the object will need to be JSON transcribeable.
+    * `TagSet`: a `dict` subclass representing a set of `Tag`s
+      to associate with something;
+      it also has setlike `.add` and `.discard` methods.
+      As such it only supports a single `Tag` for a given tag name,
+      but that tag value can of course be a sequence or mapping
+      for more elaborate tag values.
+    * `TagsOntology`:
+      a mapping of type names to `TagSet`s defining the type.
+      This mapping also contains entries for the metadata
+      for specific type values.
+
+    Here's a simple example with some `Tags` and a `TagSet`.
+
+        >>> tags = TagSet()
+        >>> # add a "bare" Tag named 'blue' with no value
+        >>> tags.add('blue')
+        >>> # add a "topic=tagging" Tag
+        >>> tags.add('topic','tagging')
+        >>> # make a "subtopic" Tag and add it
+        >>> subtopic = Tag('subtopic', 'ontologies')
+        >>> # Tags have nice repr() and str()
+        >>> subtopic
+        Tag(name='subtopic',value='ontologies',ontology=None)
+        >>> print(subtopic)
+        subtopic=ontologies
+        >>> # you can add a Tag directly
+        >>> tags.add(subtopic)
+        >>> # TagSets also have nice repr() and str()
+        >>> tags
+        TagSet:{'blue': None, 'topic': 'tagging', 'subtopic': 'ontologies'}
+        >>> print(tags)
+        blue subtopic=ontologies topic=tagging
+        >>> # because TagSets are dicts you can format strings with them
+        >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
+        topic:tagging subtopic:ontologies
+        >>> # TagSets have convenient membership tests
+        >>> # test for blueness
+        >>> 'blue' in tags
+        True
+        >>> # test for redness
+        >>> 'red' in tags
+        False
+        >>> # test for any "subtopic" tag
+        >>> 'subtopic' in tags
+        True
+        >>> # test for subtopic=ontologies
+        >>> subtopic in tags
+        True
+        >>> subtopic2 = Tag('subtopic', 'libraries')
+        >>> # test for subtopic=libraries
+        >>> subtopic2 in tags
+        False
 '''
 
 from collections import namedtuple
@@ -67,7 +136,7 @@ class TagSet(dict, FormatableMixin):
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
 
-      Also note that all these `Tags` from `TagSet`
+      Also note that all the `Tags` from `TagSet`
       share its ontology.
   '''
 
@@ -283,9 +352,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
       The `name` must be a dotted identifier.
 
-      A "bare" `Tag` has a `value` of `None`.
-
-      A "naive" `Tag` has an `ontology` of `None`.
+      Terminology:
+      * A "bare" `Tag` has a `value` of `None`.
+      * A "naive" `Tag` has an `ontology` of `None`.
 
       The constructor for a `Tag` is unusual:
       * both the `value` and `ontology` are optional,
@@ -738,7 +807,7 @@ class ExtendedNamespace(SimpleNamespace):
       As such it also presents attributes as `[]` elements via `__getitem__`.
 
       Because [:alpha:]* attribute names
-      are reserved for :public" keys/attributes,
+      are reserved for "public" keys/attributes,
       most methods commence with an underscore (`'_'`).
   '''
 
