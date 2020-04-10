@@ -28,7 +28,7 @@ def import_module_name(module_name, name, path=None, lock=None):
       Parameters:
       * `module_name`: the module name to import.
       * `name`: the name within the module whose value is returned;
-        if `name` is None, return the module itself.
+        if `name` is `None`, return the module itself.
       * `path`: an array of paths to use as sys.path during the import.
       * `lock`: a lock to hold during the import (recommended).
   '''
@@ -80,7 +80,7 @@ def import_module_from_file(module_name, source_file, sys_path=None):
   return M
 
 def module_files(M):
-  ''' Generator yielding .py pathnames involved in a module.
+  ''' Generator yielding `.py` pathnames involved in a module.
   '''
   initpath = M.__file__
   moddir = os.path.dirname(initpath)

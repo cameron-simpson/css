@@ -18,6 +18,7 @@ from os.path import abspath, dirname
 import stat
 import subprocess
 import sys
+from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.logutils import warning, error, exception, DEFAULT_BASE_FORMAT, LogTime
 from cs.pfx import Pfx, PfxThread, XP
@@ -147,7 +148,7 @@ def handler(method):
         X("CALL %s(%s)", syscall, arg_desc)
       fs = self._vtfs
       try:
-        with defaults.stack(fs=fs):
+        with stackattrs(defaults, fs=fs):
           with fs.S:
             with LogTime("SLOW SYSCALL", threshold=5.0):
               result = method(self, *a, **kw)
@@ -297,7 +298,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
       def mainloop():
         ''' Worker main loop to run the filesystem then tidy up.
         '''
-        with defaults.stack(fs=fs):
+        with stackattrs(defaults, fs=fs):
           with S:
             llfuse.main(workers=32)
             llfuse.close()
@@ -787,7 +788,7 @@ class StoreFS_LLFUSE(llfuse.Operations):
           if EA is None:
             if E is not None:
               # yield name, attributes and next offset
-              with defaults.stack(fs=fs):
+              with stackattrs(defaults, fs=fs):
                 with S:
                   try:
                     EA = self._vt_EntryAttributes(E)

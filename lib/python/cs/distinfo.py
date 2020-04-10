@@ -1,17 +1,16 @@
 #!/usr/bin/python
 #
-# Default distutils info for all packages in cs.* and utility
-# functions to prep and release packages to PyPI.
-#   - Cameron Simpson <cs@cskk.id.au> 01jan2015
-#
+
+''' Default distutils info for all packages in cs.* and utility
+    functions to prep and release packages to PyPI.
+    - Cameron Simpson <cs@cskk.id.au> 01jan2015
+'''
 
 from __future__ import print_function
-import abc
 from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
 import importlib
-from inspect import (cleandoc, getmodule, isfunction, isclass, signature)
 import os
 import os.path
 from os.path import (
@@ -23,11 +22,10 @@ from subprocess import Popen, PIPE
 import shutil
 import sys
 from tempfile import mkdtemp
-from textwrap import dedent
-from cs.lex import stripped_dedent
+from types import SimpleNamespace as NS
 from cs.logutils import setup_logging, info, warning, error
-from cs.obj import O
 from cs.pfx import Pfx
+from cs.py.doc import module_doc
 import cs.sh
 from cs.x import X
 
@@ -227,6 +225,7 @@ def test_is_package(libdir, package_name):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
+<<<<<<< working copy
 def get_md_doc(
     M,
     *,
@@ -296,7 +295,7 @@ def get_md_doc(
     full_doc = full_doc.rstrip() + '\n\n' + postamble_md
   return doc_head, full_doc
 
-class PackageVersion(O):
+class Packageversion(NS):
 
   def __init__(self, package_name):
     super().__init__(name=package_name)
@@ -305,7 +304,7 @@ class PackageVersion(O):
   def hg_tag(self):
     return self.name + '-' + self.version
 
-class PyPI_Package(O):
+class PyPI_Package(NS):
   ''' Operations for a package at PyPI.
   '''
 
@@ -376,11 +375,13 @@ class PyPI_Package(O):
     global DISTINFO_CLASSIFICATION
 
     dinfo = dict(self.defaults)
-    M = importlib.import_module(self.package_name)
-    dinfo.update(M.DISTINFO)
-    doc_head, full_doc = get_md_doc(
-        M, preamble_md=preamble_md, postamble_md=postamble_md
-    )
+    module = importlib.import_module(self.package_name)
+    dinfo.update(module.DISTINFO)
+    full_doc = module_doc(module)
+    try:
+      doc_head, _ = full_doc.split('\n\n', 1)
+    except ValueError:
+      doc_head = full_doc
 
     # fill in some missing info if it can be inferred
     for field in 'description', 'long_description', 'include_package_data':
@@ -390,7 +391,12 @@ class PyPI_Package(O):
         if doc_head:
           dinfo[field] = doc_head.replace('\n', ' ')
       elif field == 'long_description':
-        dinfo[field] = full_doc
+        long_desc = full_doc
+        if preamble_md:
+          long_desc = preamble_md.rstrip() + '\n\n' + long_desc
+        if postamble_md:
+          long_desc = long_desc.rstrip() + '\n\n' + postamble_md
+        dinfo[field] = long_desc
         if 'long_description_content_type' not in dinfo:
           dinfo['long_description_content_type'] = 'text/markdown'
       elif field == 'include_package_data':
@@ -618,7 +624,7 @@ class PyPI_Package(O):
     runcmd(hgargv)
     return included
 
-class PyPI_PackageCheckout(O):
+class PyPI_PackageCheckout(NS):
   ''' Facilities available with a checkout of a package.
   '''
 

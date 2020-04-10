@@ -24,8 +24,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     branches    Report all branch names.
     diff        Run the VCS diff command.
     glog        Report a graphical change log.
-    get-branches [remote]
-                Fetch all remote branches.
+    get-branches [remote [remote-branch-names...]]
+                Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
     remote      Report remote paths.
@@ -100,7 +100,7 @@ else    op=$1; shift
 fi
 
 hg(){   $trace hg -R "$vcs_top" ${1+"$@"}; }
-git(){  $trace git --git-dir "$vcs_top/.git" ${1+"$@"}; }
+git(){  $trace git ${1+"$@"}; }
 
 # Compute working directory VCS type.
 # All other commands are split on type below.
@@ -140,9 +140,18 @@ case "$op" in
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
       get-branches,git)
-                    remote=${1:-origin}
-                    git branch -r \
-                    | sed "s/^  //;/^$remote\\//!d; / /d" \
+                    if [ $# = 0 ]
+                    then  remote=origin
+                    else  remote=$1; shift
+                    fi
+                    if [ $# = 0 ]
+                    then
+                      git branch -r | sed "s/^  //;/^$remote\\//!d; / /d"
+                    else
+                      for rbr
+                      do  echo "$rbr"
+                      done
+                    fi \
                     | while read -r rbr
                       do
                         lbr=${rbr##$remote/}

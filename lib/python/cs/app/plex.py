@@ -13,7 +13,7 @@ from os.path import (
 import sys
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, loadrc as fstags_loadrc, rfilepaths, TaggedPath
-from cs.logutils import setup_logging, Pfx, warning, error
+from cs.logutils import Pfx, warning, error
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -48,7 +48,6 @@ class PlexCommand(BaseCommand):
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    setup_logging(options.cmd)
     options.fstags = FSTags()
 
   @staticmethod

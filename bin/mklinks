@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Hard link identical files.
 #       - Cameron Simpson <cs@cskk.id.au> 01dec2011
 #
 
-exec python -m cs.app.mklinks ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.mklinks import main
+sys.exit(main(sys.argv))

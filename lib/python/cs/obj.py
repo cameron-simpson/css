@@ -8,15 +8,20 @@ Convenience facilities for objects.
 
 Presents:
 * flavour, for deciding whether an object resembles a mapping or sequence.
-* O, an object subclass with a nice __str__ and convenient __init__.
-* Some O_* functions for working with objects, particularly O subclasses.
+* Some O_* functions for working with objects
 * Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
 from __future__ import print_function
 from copy import copy as copy0
 import sys
+import traceback
+from types import SimpleNamespace
+from threading import Lock
+from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
+
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -49,12 +54,26 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
-# Assorted functions for working with O instances.
-# These are not methods because I don't want to pollute O subclasses
-# with lots of extra method noise.
-#
+class O(SimpleNamespace):
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  '''
+
+  callers = set()
+
+  def __init__(self, **kw):
+    frame = traceback.extract_stack(None, 2)[0]
+    caller=(frame[0], frame[1])
+    if caller not in self.callers:
+      self.callers.add(caller)
+      print(
+          "WARNING: %s:%d %s: obsolete use of cs.obj.O, please shift to types.SimpleNamespace."
+          % (frame[0], frame[1], frame[2]),
+          file=sys.stderr
+      )
+    SimpleNamespace.__init__(self, **kw)
+
 def O_merge(o, _conflict=None, _overwrite=False, **kw):
-  ''' Merge key:value pairs from a mapping into an O as attributes.
+  ''' Merge key:value pairs from a mapping into an object.
 
       Ignore keys that do not start with a letter.
       New attributes or attributes whose values compare equal are
@@ -67,9 +86,6 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
   '''
   for attr, value in kw.items():
     if attr or not attr[0].isalpha():
-      if not attr.startswith('_O_'):
-        ##warning(".%s: ignoring, does not start with a letter", attr)
-        pass
       continue
     try:
       ovalue = getattr(o, attr)
@@ -90,9 +106,8 @@ def O_attrs(o):
       Note: this calls `getattr(o,attr)` to inspect it in order to
       prune callables.
   '''
-  omit = getattr(o, '_O_omit', ())
   for attr in sorted(dir(o)):
-    if attr[0].isalpha() and attr not in omit:
+    if attr[0].isalpha():
       try:
         value = getattr(o, attr)
       except AttributeError:
@@ -152,57 +167,6 @@ def O_str(o, no_recurse=False, seen=None):
   s = "<%s %s>" % (o.__class__.__name__, ",".join(attrdesc_strs))
   seen.remove(id(o))
   return s
-
-class O(object):
-  ''' A bare object subclass to allow storing arbitrary attributes.
-
-      It also has a nice default `__str__`
-      and `__eq__` and `__ne__` based on the `O_attrs` of the object.
-  '''
-
-  _O_recurse = True
-
-  def __init__(self, **kw):
-    ''' Initialise this O.
-
-        Fill in attributes from any keyword arguments if supplied.
-        This call can be omitted in subclasses if desired.
-    '''
-    self._O_omit = []
-    for k in kw:
-      setattr(self, k, kw[k])
-
-  def __str__(self):
-    recurse = self._O_recurse
-    self._O_recurse = False
-    s = O_str(self, no_recurse=not recurse)
-    self._O_recurse = recurse
-    return s
-
-  def __eq__(self, other):
-    attrs = tuple(O_attrs(self))
-    oattrs = tuple(O_attrs(other))
-    if attrs != oattrs:
-      return False
-    for attr in O_attrs(self):
-      if getattr(self, attr) != getattr(other, attr):
-        return False
-    return True
-
-  __hash__ = object.__hash__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def D(self, msg, *a):
-    ''' Call cs.logutils.D() if this object is being traced.
-    '''
-    if getattr(self, '_O_trace', False):
-      from cs.logutils import D as dlog
-      if a:
-        dlog("%s: " + msg, self, *a)
-      else:
-        dlog(': '.join((str(self), msg)))
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
@@ -300,23 +264,122 @@ class TrackedClassMixin(object):
     return cls.tcm_get_state(self)
 
   @staticmethod
-  def tcm_all_state(cls):
+  def tcm_all_state(klass):
     ''' Generator yielding tracking information
-        for objects of type `cls`
+        for objects of type `klass`
         in the form `(o,state)`
         where `o` if a tracked object
         and `state` is the object's `get_tcm_state` method result.
     '''
-    m = cls.__map
+    m = klass.__map
     for o in m.values():
-      yield o, cls.__state(o, cls)
+      yield o, klass.__state(o, klass)
 
   @staticmethod
-  def tcm_dump(cls, f=None):
-    ''' Dump the tracking information for `cls` to the file `f`
+  def tcm_dump(klass, f=None):
+    ''' Dump the tracking information for `klass` to the file `f`
         (default `sys.stderr`).
     '''
     if f is None:
       f = sys.stderr
-    for o, state in TrackedClassMixin.tcm_all_state(cls):
+    for o, state in TrackedClassMixin.tcm_all_state(klass):
       print(str(type(o)), id(o), repr(state), file=f)
+
+def singleton(registry, key, factory, fargs, fkwargs):
+  ''' Obtain an object for `key` via `registry` (a mapping of `key`=>`object`.
+      Return `(is_new,instance)`.
+
+      If the `key` exists in the registry, return the associated object.
+      Otherwise create a new object by calling `factory(*fargs,**fkwargs)`
+      and store it as `key` in the `registry`.
+
+      The `registry` may be any mapping of `key`s to objects
+      but might usually be a `weakref.WeakValueMapping`
+      to that object references expire as normal.
+
+      *Note*: this function *is not* thread safe.
+      Multithreaded users should hold a mutex.
+
+      See the `SingletonMixin` class for a simple mixin to create
+      singleton classes,
+      which does provide thread safe operations.
+  '''
+  try:
+    instance = registry[key]
+    is_new = False
+  except KeyError:
+    instance = factory(*fargs, **fkwargs)
+    registry[key] = instance
+    is_new = True
+  return is_new, instance
+
+class SingletonMixin:
+  ''' A mixin turning a subclass into a singleton factory.
+
+      *Note*: this should be the *first* superclass of the subclass
+      in order to intercept `__new__` and `__init__`.
+
+      A subclass should:
+      * *not* provide an `__init__` method.
+      * provide a `_singleton_init` method in place of the normal `__init__`
+        with the usual signature `(self,*args,**kwargs)`.
+      * provide a `_singleton_key(cls,*args,**kwargs)` class method
+        returning a key for the single registry
+        computed from the positional and keyword arguments
+        supplied on instance creation
+        i.e. those which `__init__` would normally receive.
+        This should have the same signature as `_singleton_init`
+        (but using `cls` instead of `self`).
+
+      This class is thread safe for the registry operations.
+
+      Example:
+
+          class Pool(SingletonMixin):
+
+              def _singleton_init(self, foo, bah=3):
+                 ... normal __init__ stuff here ...
+
+              @classmethod
+              def _singleton_key(cls, foo, bah=3):
+                  return foo, bah
+  '''
+
+  # This lock is used to control setup of the per-class registry.
+  # It is shared across all subclasses, but that bypasses any need to call an
+  # __init__ for this mixin. In mitigation, the lock is only used if the class
+  # does not yet have a registry.
+  _global_lock = Lock()
+
+  def __new__(cls, *a, **kw):
+    ''' Prepare a new instance of `cls` if required.
+        Return the instance.
+
+        This creates the class registry if missing,
+        and then
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      with cls._global_lock:
+        try:
+          registry = cls._singleton_registry
+        except AttributeError:
+          # create the registry and give it its own mutex
+          registry = cls._singleton_registry = WeakValueDictionary()
+          registry._singleton_lock = Lock()
+
+    def factory(*fargs, **fkwargs):
+      ''' Prepare a new object.
+
+          Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
+          on the new object.
+      '''
+      o = object.__new__(cls)
+      o._singleton_init(*fargs, **fkwargs)
+      return o
+
+    okey = cls._singleton_key(*a, **kw)
+    with registry._singleton_lock:
+      _, instance = singleton(registry, okey, factory, a, kw)
+    return instance
