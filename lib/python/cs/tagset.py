@@ -269,7 +269,7 @@ class TagSet(dict, FormatableMixin):
 
   def update(self, other, *, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
-        a dict or an iterable of taggy things.
+        a dict or an iterable of `(name,value)` things.
     '''
     try:
       items = other.items
