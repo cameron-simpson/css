@@ -786,9 +786,9 @@ class Module(object):
     else:
       moddir = os.path.dirname(filename)
       for dirpath, dirnames, filenames in os.walk(moddir):
-        for basename in filenames:
-          if basename.endswith('.py'):
-            yield joinpath(dirpath, basename)
+        for filename in filenames:
+          if filename.endswith('.py'):
+            yield joinpath(dirpath, filename)
 
   @prop
   def DISTINFO(self):
