@@ -1,3 +1,4 @@
+module docstring: nice ontology example
 support tags files being directories, new TagDir type named after entry prefix, files named entry suffix, contents one tag per line
 drop _return_None_if_missing
 drop _return_None_if_missing
