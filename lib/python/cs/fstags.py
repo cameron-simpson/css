@@ -713,7 +713,6 @@ class FSTagsCommand(BaseCommand):
           Subcommands:
             tag tagset_name tag_choices...
     '''
-    fstags = options.fstags
     try:
       tagfilepath = argv.pop(0)
     except IndexError:
@@ -741,9 +740,7 @@ class FSTagsCommand(BaseCommand):
             if badopts:
               raise GetoptError("bad arguments")
             with stackattrs(state, verbose=True):
-              with fstags:
-                path = abspath(tagfilepath)
-                tagfile = fstags._tagfile(path)
+              with TagFile(tagfilepath) as tagfile:
                 tags = tagfile[tagset_name]
                 for choice in tag_choices:
                   with Pfx(choice.spec):
