@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
-from os.path import exists as existspath, join as joinpath, realpath
-from cs.fileutils import findup
-from cs.psutils import pipefrom
+''' Mercurial support for the cs.vcs package.
+'''
+
+from cs.pfx import Pfx
 from . import VCS
 
 class VCS_Hg(VCS):
+  ''' Mercurial implementation of cs.vcs.VCS.
+  '''
 
   COMMAND_NAME = 'hg'
 
@@ -22,7 +25,7 @@ class VCS_Hg(VCS):
     ''' Generator yielding the current tags.
     '''
     with self._pipefrom('tags') as f:
-      yield from map(lambda line: line.split(None, 1)[0])
+      yield from map(lambda line: line.split(None, 1)[0], f)
 
   def tag(self, tag_name, revision=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
@@ -64,10 +67,11 @@ class VCS_Hg(VCS):
         if s != '?':
           yield path
 
-  def hg_include(self, paths):
+  @staticmethod
+  def hg_include(paths):
     ''' Generator yielding hg(1) -I/-X option strings to include the `paths`.
     '''
-    for subpath in self.paths():
+    for subpath in paths:
       yield '-I'
       yield 'path:' + subpath
 
@@ -83,7 +87,6 @@ class VCS_Hg(VCS):
         of `package_name` in reverse tag order (most recent first).
     '''
     tag_prefix = package_name + '-'
-    for tag in sorted(
-        [tag for tag in self.tags() if tag.startswith(tag_prefix)],
-        reverse=True):
+    for tag in sorted(filter(lambda tag: tag.startswith(tag_prefix),
+                             self.tags()), reverse=True):
       yield tag, self.log_entry(tag)
