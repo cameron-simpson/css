@@ -63,6 +63,11 @@ DISTINFO_DEFAULTS = {
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
 }
 
+re_RELEASE_TAG = re.compile(
+    #  name       - YYYYMMDD                            [.n]
+    r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$'
+)
+
 class CSReleaseCommand(BaseCommand):
 
   GETOPT_SPEC = 'fqv'
