@@ -143,7 +143,7 @@ class CSReleaseCommand(BaseCommand):
         status = 'NEVER RELEASED'
       else:
         rel_pfx, rel_suffix = rel_tag.split('-', 1)
-        upload_suffix = pkg.last_upload_suffix()
+        upload_suffix = pkg.latest_pypi_version
         if rel_suffix != upload_suffix:
           status = (
               'RELEASE:%s DOES NOT MATCH UPLOAD:%s' %
@@ -361,12 +361,18 @@ class Package:
   def __str__(self):
     return "%s[%r]" % (type(self).__name__, self.name)
 
+  @property
+  def pkg_tags(self):
+    ''' The `TagSet` for this package.
+    '''
+    return self.options.pkg_tagsets[self.name]
+
   @cachedmethod
   def release_tags(self):
     ''' Return the release tags for this package.
     '''
     prefix = self.name + '-'
-    return [tag for tag in self.vcs.release_tags() if tag.startswith(prefix)]
+    return [tag for tag in release_tags(self.vcs) if tag.startswith(prefix)]
 
   def release_log(self):
     ''' Generator yeilding `(tag,log_entry)` for our release tags
@@ -375,48 +381,55 @@ class Package:
     return self.vcs.release_log(self.name)
 
   def latest_release_tag(self):
-    ''' Return the latest release tag or None.
+    ''' Return the latest release tag or `None`.
     '''
     tags = self.release_tags()
     if not tags:
       return None
     return max(tags)
 
+  def latest_release_version(self):
+    vcs_tag = self.lastest_release_tag()
+    if vcs_tag is None:
+      return None
+    return vcs_tag.split('-', 1)[1]
+
   def next_release_tag(self):
     ''' Compute the next release suffix.
     '''
-    last_tag = self.latest_release_tag()
+    vcs_tag = self.latest_release_tag()
     today = isodate(dashed=False)
-    if last_tag:
-      with Pfx(last_tag):
-        prefix, suffix = last_tag.split('-')
+    if vcs_tag:
+      with Pfx(vcs_tag):
+        prefix, current_version = vcs_tag.split('-')
         assert prefix == self.name, (
-            "last_tag %r prefix does not match package name %r" %
+            "vcs_tag %r prefix does not match package name %r" %
             (prefix, self.name)
         )
-        if suffix == today:
-          next_suffix = today + '.1'
-        elif suffix < today:
-          next_suffix = today
+        if current_version == today:
+          next_version = today + '.1'
+        elif current_version < today:
+          next_version = today
         else:
-          # suffix > today: compute next .n extension
-          base_suffix, numerator = suffix.split('.')
-          if base_suffix > today:
+          # current_version > today: compute next .n extension
+          base_version, numerator = current_version.split('.')
+          if base_version > today:
             warning(
-                "issuing a future suffix: today=%r, base suffix=%r", today,
-                base_suffix
+                "issuing a future version: today=%r, base version=%r", today,
+                base_version
             )
-          next_suffix = base_suffix + '.' + str(int(numerator) + 1)
+          next_version = base_version + '.' + str(int(numerator) + 1)
     else:
-      next_suffix = today + '.1'
-    return self.name + '-' + next_suffix
+      next_version = today + '.1'
+    return self.name + '-' + next_version
 
-  def last_upload_key(self, target='pypi'):
-    return "%s-css-%s" % (target, self.name)
+  @property
+  def latest_pypi_version(self):
+    return self.pkg_tags.get(TAG_PYPI_RELEASE)
 
-  def last_upload_suffix(self, target='pypi'):
-    lastvalue_key = self.last_upload_key(target=target)
-    return self.options.last_values.get(lastvalue_key, None)
+  @latest_pypi_version.setter
+  def latest_pypi_version(self, new_suffix):
+    self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
 
   def submit_pypi(self, force=False):
     return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
@@ -431,25 +444,23 @@ class Package:
       else:
         return
     with Pfx(pypi_flavour):
-      tag = self.latest_release_tag()
-      latest_prefix, latest_suffix = tag.split('-', 1)
-      last_pypi_suffix = self.last_upload_suffix(pypi_flavour)
-      if latest_suffix == last_pypi_suffix:
-        info("already released %r", last_pypi_suffix)
+      latest_version = self.latest_release_version()
+      pypi_version = self.latest_pypi_version
+      if latest_version == pypi_version:
+        info("already released %r", pypi_version)
         if force:
           warning("submitting anyway")
         else:
           return
-      with Pfx("%s->%r", repr(last_pypi_suffix) if last_pypi_suffix else '',
-               latest_suffix):
+      with Pfx("%s->%r", repr(pypi_version) if pypi_version else '',
+               latest_version):
         PKG = pypipkg(self.name, self.vcs)
         PKG.upload()
-        self.options.last_values[self.last_upload_key()] = latest_suffix
+        self.latest_pypi_version = latest_version
 
   def export(self):
-    tag = self.latest_release_tag()
-    latest_prefix, latest_suffix = tag.split('-', 1)
-    pkg_dir = "%s-%s" % (self.name, latest_suffix)
+    latest_version = self.latest_release_version()
+    pkg_dir = "%s-%s" % (self.name, latest_version)
     print('create %s ...' % (pkg_dir,))
     with Pfx("mkdir(%s)", pkg_dir):
       os.mkdir(pkg_dir)
