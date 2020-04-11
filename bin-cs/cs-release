@@ -37,6 +37,7 @@ from cs.logutils import setup_logging, error, warning, info
 from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.func import prop
+from cs.vcs.hg import VCS_Hg
 from cs.x import X
 
 def main(argv=None, cmd=None):
@@ -263,6 +264,23 @@ class CSReleaseCommand(BaseCommand):
         )
         vcs.tag(next_tag)
     return xit
+
+def release_tags(vcs):
+  ''' Generator yielding the current release tags.
+  '''
+  for tag in vcs.tags():
+    m = re_RELEASE_TAG.match(tag)
+    if m:
+      yield tag
+
+def release_prefixes(vcs):
+  ''' Return a set of the existing release prefixes.
+  '''
+  tagpfxs = set()
+  for tag in release_tags(vcs):
+    tagpfx, _ = tag.split('-', 1)
+    tagpfxs.add(tagpfx)
+  return tagpfxs
 
 def clean_release_entry(entry):
   lines = entry.strip().split('\n')
@@ -981,86 +999,6 @@ class VCS(object):
       tagpfx, _ = tag.split('-', 1)
       tagpfxs.add(tagpfx)
     return tagpfxs
-
-class VCS_Hg(VCS):
-
-  def _pipefrom(self, *hgargs):
-    hgargv = ['hg'] + list(hgargs) + ['|']
-    return pipefrom('hg', *hgargs)
-
-  def hg_cmd(self, *hgargs):
-    print('hg', *hgargs, file=sys.stderr)
-    check_call(['hg'] + list(hgargs))
-
-  def hg_include(self, paths):
-    ''' Generator yielding hg(1) -I/-X option strings to include the `paths`.
-    '''
-    for subpath in self.paths():
-      yield '-I'
-      yield 'path:' + subpath
-
-  @cachedmethod
-  def tags(self):
-    ''' Generator yielding the current tags.
-    '''
-    with self._pipefrom('tags') as hgfp:
-      tags = set()
-      for tagline in hgfp:
-        tag, _ = tagline.split(None, 1)
-        tags.add(tag)
-    return tags
-
-  def tag(self, tag_name, revision=None):
-    ''' Tag a revision with the supplied `tag`, by default revision "tip".
-    '''
-    if revision is None:
-      revision = 'tip'
-    self.hg_cmd('tag', '-r', revision, '--', tag_name)
-
-  def log_entry(self, rev):
-    ''' Return the log entry for the specified revision `rev`.
-    '''
-    with self._pipefrom('log', '-r', rev, '--template', '{desc}\n',
-                        '--') as piped:
-      return ''.join(piped)
-
-  def release_log(self, package_name):
-    ''' Generator yeilding `(tag,log_entry)` for the release tags
-        of `package_name` in reverse tag order (most recent first).
-    '''
-    tag_prefix = package_name + '-'
-    for tag in sorted(
-        [tag for tag in self.tags() if tag.startswith(tag_prefix)],
-        reverse=True):
-      yield tag, self.log_entry(tag)
-
-  def log_since(self, tag, paths):
-    with self._pipefrom('log', '-r', tag + ':', '--template',
-                        '{files}\t{desc|firstline}\n', '--', *paths) as hgfp:
-      for hgline in hgfp:
-        files, firstline = hgline.split('\t', 1)
-        files = files.split()
-        firstline = firstline.strip()
-        yield files, firstline
-
-  def add_files(self, *paths):
-    ''' Add the specified paths to the repository.
-    '''
-    self.hg_cmd('add', *paths)
-
-  def commit(self, message, *paths):
-    ''' Commit the specified `paths` with the specified `message`.
-    '''
-    self.hg_cmd('commit', '-m', message, '--', *paths)
-
-  def uncommitted(self, paths=()):
-    ''' Generator yielding uncommitted but tracked paths.
-    '''
-    with self._pipefrom('status', '--', *paths) as hgfp:
-      for hgline in hgfp:
-        s, path = hgline.rstrip().split(' ', 1)
-        if s != '?':
-          yield path
 
 class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
