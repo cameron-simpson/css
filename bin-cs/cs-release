@@ -38,6 +38,7 @@ from cs.logutils import setup_logging, error, warning, info
 from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.func import prop
+from cs.py.modules import direct_imports
 from cs.vcs.hg import VCS_Hg
 from cs.x import X
 
@@ -930,13 +931,13 @@ class Module(object):
   @prop
   @cachedmethod
   def imported_names(self):
-    ''' Return a set containing the modules names imported by this module
+    ''' Return a set containing the module names imported by this module
         both directly and indirectly.
     '''
     subnames = set()
     for path in self.paths():
-      for name in self.directly_imported_names(self.name, path):
-        subnames.add(name)
+      subimports = direct_imports(path, self.name)
+      subnames.update(subimports)
     return subnames
 
   def imported_modules(self, prefix=MODULE_PREFIX):
@@ -945,73 +946,6 @@ class Module(object):
     for name in sorted(self.imported_names):
       if name.startswith(prefix) and name != self.name:
         yield self.modules[name]
-
-  def directly_imported_names(self, module_name, filename, silent=False):
-    ''' Yield the module names mentioned by "import" statements
-        in the given file.
-    '''
-    with Pfx(filename):
-      with open(filename) as codefp:
-        for lineno, line in enumerate(codefp, 1):
-          with Pfx(lineno):
-            if line.startswith('import ') or line.startswith('from '):
-              line = line.strip()
-              # quick hack to strip trailing "; second-statement"
-              try:
-                line, _ = line.split(';', 1)
-              except ValueError:
-                pass
-              words = line.split()
-              if not words:
-                continue
-              if words[0] == 'import' or words[0] == 'from':
-                if len(words) < 2:
-                  silent or warning("missing module name")
-                  continue
-                subimport = words[1]
-                if subimport == '.':
-                  # don't recurse into ourself
-                  pkg_name = self.package_name
-                  if pkg_name is None:
-                    silent or warning("import of '.' from non-package")
-                    continue
-                  subimport = pkg_name
-                elif subimport.startswith('.'):
-                  # resolve relative import name
-                  preparts = module_name.split('.')
-                  subimport = subimport[1:]
-                  while subimport.startswith('.'):
-                    preparts.pop(-1)
-                    subimport = subimport[1:]
-                  if preparts:
-                    if subimport:
-                      preparts.append(subimport)
-                  subimport = '.'.join(preparts)
-                yield subimport
-
-class VCS(object):
-
-  re_RELEASE_TAG = re.compile(
-      #  name       - YYYYMMDD                            [.n]
-      r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$'
-  )
-
-  @cachedmethod
-  def release_tags(self):
-    ''' Generator yielding the current release tags.
-    '''
-    regexp = self.re_RELEASE_TAG
-    release_tags = [tag for tag in self.tags() if regexp.match(tag)]
-    return release_tags
-
-  def release_prefixes(self):
-    ''' Return a set of the existing release prefixes.
-    '''
-    tagpfxs = set()
-    for tag in self.release_tags():
-      tagpfx, _ = tag.split('-', 1)
-      tagpfxs.add(tagpfx)
-    return tagpfxs
 
 class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
