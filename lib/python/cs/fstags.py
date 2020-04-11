@@ -309,7 +309,7 @@ class FSTagsCommand(BaseCommand):
     directories_like_files = False
     xit = 0
     options, argv = getopt(argv, 'd')
-    for option, value in options:
+    for option, _ in options:
       with Pfx(option):
         if option == '-d':
           directories_like_files = True
@@ -1105,7 +1105,7 @@ class FSTags(MultiOpenMixin):
     changed = edit_strings(lines)
     for old_line, new_line in changed:
       with stackattrs(state, verbose=False):
-        old_name, old_tags = tagfile.parse_tags_line(old_line)
+        old_name, _ = tagfile.parse_tags_line(old_line)
         new_name, new_tags = tagfile.parse_tags_line(new_line)
       with Pfx(old_name):
         tags = tagsets[old_name]
@@ -1291,7 +1291,7 @@ class TagFile(SingletonMixin):
   def keys(self):
     ''' `tagsets.keys`
     '''
-    ks= self.tagsets.keys()
+    ks = self.tagsets.keys()
     return ks
 
   def values(self):
@@ -1352,12 +1352,14 @@ class TagFile(SingletonMixin):
   def tagsets(self):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
+
+        This is loaded on demand.
     '''
     return self.load_tagsets(self.filepath, self.ontology)
 
   @property
   def names(self):
-    ''' The names from this `TagFile`.
+    ''' The names from this `TagFile` as a list.
     '''
     return list(self.tagsets.keys())
 
