@@ -11,6 +11,8 @@ from inspect import getmodule
 import os.path
 import sys
 from cs.context import stackattrs
+from cs.logutils import warning
+from cs.pfx import Pfx
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,6 +71,9 @@ def import_module_from_file(module_name, source_file, sys_path=None):
 
       Note that this is a "bare" import;
       the module instance is not inserted into `sys.modules`.
+
+      *Warning*: `sys.path` is modified for the duration of this function,
+      which may affect multithreaded applications.
   '''
   if sys_path is None:
     sys_path = sys.path
@@ -104,3 +109,51 @@ def module_names(M):
       defined in the module.
   '''
   return [attr for attr, value in module_attributes(M)]
+
+def direct_imports(src_filename, module_name=None):
+  ''' Crudely parse `src_filename` for `import` statements.
+      Return the set of directly imported module names.
+
+      If `module_name` is not `None`,
+      resolve relative imports against it.
+      Otherwise, relative import names are returned unresolved.
+
+      This is a simple minded source parse.
+  '''
+  subnames = set()
+  with Pfx(src_filename):
+    with open(src_filename) as codefp:
+      for lineno, line in enumerate(codefp, 1):
+        with Pfx(lineno):
+          if line.startswith('import ') or line.startswith('from '):
+            line = line.strip()
+            # quick hack to strip trailing "; second-statement"
+            try:
+              line, _ = line.split(';', 1)
+            except ValueError:
+              pass
+            words = line.split()
+            if not words:
+              continue
+            if words[0] not in ('from', 'import'):
+              continue
+            if len(words) < 2:
+              warning("missing module name")
+              continue
+            subimport = words[1]
+            if module_name and subimport.startswith('.'):
+              if subimport == '.':
+                subimport = module_name
+              else:
+                # resolve relative import name
+                preparts = module_name.split('.')
+                subimport = subimport[1:]
+                while subimport.startswith('.'):
+                  preparts.pop(-1)
+                  subimport = subimport[1:]
+                if preparts:
+                  if subimport:
+                    preparts.append(subimport)
+                subimport = '.'.join(preparts)
+            subnames.add(subimport)
+  return subnames
