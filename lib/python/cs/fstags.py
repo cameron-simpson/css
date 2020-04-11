@@ -1277,6 +1277,15 @@ class TagFile(SingletonMixin):
         type(self).__name__, self.filepath, self.find_parent
     )
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, exc_traceback):
+    ''' Save the tagsets if modified.
+        Do not save if there's an exception pending.
+    '''
+    if exc_type is None:
+      self.save()
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self):
