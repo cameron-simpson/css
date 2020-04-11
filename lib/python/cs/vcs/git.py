@@ -5,44 +5,42 @@ from cs.fileutils import findup
 from cs.psutils import pipefrom
 from . import VCS
 
-class VCS_Hg(VCS):
+from cs.x import X
+X("__file__ = %r",__file__)
 
-  COMMAND_NAME = 'hg'
+class VCS_Git(VCS):
 
-  TOPDIR_MARKER_ENTRY = '.hg'
+  COMMAND_NAME = 'git'
+
+  TOPDIR_MARKER_ENTRY = '.git'
 
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
     '''
-    with self._pipefrom('-i', '-r', rev_spec) as f:
+    with self._pipefrom('rev-parse', rev_spec) as f:
       rev_hash = f.readline().rstrip()
     return rev_hash
 
   def tags(self):
     ''' Generator yielding the current tags.
     '''
-    with self._pipefrom('tags') as f:
-      yield from map(lambda line: line.split(None, 1)[0])
+    with self._pipefrom('tag') as f:
+      yield from map(lambda line: line.rstrip(), f)
 
   def tag(self, tag_name, revision=None):
-    ''' Tag a revision with the supplied `tag`, by default revision "tip".
+    ''' Tag a revision with the supplied `tag`, by default revision "HEAD".
     '''
     if revision is None:
-      revision = 'tip'
-    self._cmd('tag', '-r', revision, '--', tag_name)
+      revision = 'HEAD'
+    self._cmd('tag', tag_name, revision)
 
   def log_since(self, tag, paths):
-    ''' Generator yielding `(commit_files,commit_firstline)`
-        for commit log entries since `tag`
-        involving `paths` (a list of `str`).
-    '''
     with self._pipefrom('log', '-r', tag + ':', '--template',
                         '{files}\t{desc|firstline}\n', '--', *paths) as f:
-      for lineno, line in enumerate(f, 1):
-        with Pfx("line %d", lineno):
-          files, firstline = line.split('\t', 1)
-          files = files.split()
-          firstline = firstline.strip()
+      for hgline in f:
+        files, firstline = hgline.split('\t', 1)
+        files = files.split()
+        firstline = firstline.strip()
         yield files, firstline
 
   def add_files(self, *paths):
@@ -59,8 +57,8 @@ class VCS_Hg(VCS):
     ''' Generator yielding uncommited but tracked paths.
     '''
     with self._pipefrom('status') as f:
-      for line in f:
-        s, path = line.rstrip().split(' ', 1)
+      for hgline in f:
+        s, path = hgline.rstrip().split(' ', 1)
         if s != '?':
           yield path
 

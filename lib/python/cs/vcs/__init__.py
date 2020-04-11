@@ -1,20 +1,55 @@
 #!/usr/bin/env python3
 
-class VCS(object):
+''' Simplistic version control system (VCS) support.
 
-  def release_tags(self):
-    ''' Generator yielding the current release tags.
-    '''
-    for tag in self.tags():
-      m = re_RELEASE_TAG.match(tag)
-      if m:
-        yield tag
+    Initially support for Mercurial (`hg`) and Git,
+    all done with callouts to the command line tools.
+'''
 
-  def release_prefixes(self):
-    ''' Return a set of the existing release prefixes.
+from abc import ABC, abstractmethod
+from os.path import exists as existspath, join as joinpath, realpath
+from cs.fileutils import findup
+from cs.logutils import debug
+from cs.pfx import pfx_method
+
+class VCS(ABC):
+  ''' Abstract base class for version control system implementations.
+  '''
+
+  def _pipefrom(self, *vcscmd_args):
+    hgargv = [self.COMMAND_NAME] + list(vcscmd_args) + ['|']
+    return pipefrom(self.COMMAND_NAME, *vcscmd_args)
+
+  def _cmd(self, *vcscmd_args):
+    print(self.COMMAND_NAME, *vcscmd_args, file=sys.stderr)
+    check_call([self.COMMAND_NAME] + list(vcscmd_args))
+
+  @pfx_method
+  def get_topdir(self, path=None):
+    ''' Locate the top of the repository from `path` (default `'.'`).
+        Return the directory realpath or `None`.
     '''
-    tagpfxs = set()
-    for tag in self.release_tags():
-      tagpfx, _ = tag.split('-', 1)
-      tagpfxs.add(tagpfx)
-    return tagpfxs
+    def testfunc(testpath):
+      probe_path=joinpath(testpath, self.TOPDIR_MARKER_ENTRY)
+      debug("probe %r", probe_path)
+      return existspath(probe_path)
+    path0 = path
+    if path is None:
+      path = '.'
+    path = realpath(path)
+    topdirpath = next(
+        findup(
+            path,
+            testfunc,
+            first=True
+        )
+    )
+    if topdirpath is None:
+      warning("no top dir found from %r (originally %r)", path, path0)
+    return topdirpath
+
+  @abstractmethod
+  def resolve_revision(self, rev_spec):
+    ''' Resolve a revision specification to the commit hash (a `str`).
+    '''
+    raise NotImplementedError()
