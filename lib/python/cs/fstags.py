@@ -1280,6 +1280,42 @@ class TagFile(SingletonMixin):
         type(self).__name__, self.filepath, self.find_parent
     )
 
+
+  # Mapping mathods, proxying through to .tagsets.
+  def keys(self):
+    ''' `tagsets.keys`
+    '''
+    ks= self.tagsets.keys()
+    return ks
+
+  def values(self):
+    ''' `tagsets.values`
+    '''
+    return self.tagsets.values()
+
+  def items(self):
+    ''' `tagsets.items`
+    '''
+    return self.tagsets.items()
+
+  def __getitem__(self, name):
+    ''' Return the `TagSet` associated with `name`.
+    '''
+    with Pfx("%s.__getitem__[%r]", self, name):
+      tagfile = self
+      while tagfile is not None:
+        if name in tagfile.tagsets:
+          break
+        tagfile = tagfile.parent if tagfile.find_parent else None
+      if tagfile is None:
+        # not available in parents, use self
+        # this will autocreate an empty TagSet in self
+        tagfile = self
+      return tagfile.tagsets[name]
+
+  def __delitem__(self, name):
+    del self.tagsets[name]
+
   def __getattr__(self, attr):
     if attr == 'parent':
       # locate parent TagFile
@@ -1304,21 +1340,6 @@ class TagFile(SingletonMixin):
       self.parent = parent
       return parent
     raise AttributeError(attr)
-
-  def __getitem__(self, name):
-    ''' Return the `TagSet` associated with `name`.
-    '''
-    with Pfx("%s.__getitem__[%r]", self, name):
-      tagfile = self
-      while tagfile is not None:
-        if name in tagfile.tagsets:
-          break
-        tagfile = tagfile.parent if tagfile.find_parent else None
-      if tagfile is None:
-        # not available in parents, use self
-        # this will autocreate an empty TagSet in self
-        tagfile = self
-      return tagfile.tagsets[name]
 
   @locked_property
   @pfx_method
