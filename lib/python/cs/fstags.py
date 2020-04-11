@@ -1470,13 +1470,16 @@ class TagFile(SingletonMixin):
   def save(self):
     ''' Save the tag map to the tag file.
     '''
-    if getattr(self, '_tagsets', None) is None:
+    tagsets = getattr(self, '_tagsets', None)
+    if tagsets is None:
       # TagSets never loaded
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, self._tagsets.values())):
+      if any(map(lambda tagset: tagset.modified, tagsets.values())):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
+        for tagset in tagsets.values():
+          tagset.modified = False
     if self.find_parent:
       parent = self.parent
       if parent:
