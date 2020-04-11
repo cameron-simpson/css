@@ -7,18 +7,42 @@
 '''
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from subprocess import check_call
+import sys
 from os.path import exists as existspath, join as joinpath, realpath
 from cs.fileutils import findup
-from cs.logutils import debug
+from cs.logutils import debug, warning
 from cs.pfx import pfx_method
+from cs.psutils import pipefrom
+
+@contextmanager
+def pipef(*argv, **kw):
+  ''' Context manager returning the standard output of a command.
+  '''
+  P = pipefrom(argv, **kw)
+  yield P.stdout
+  if P.wait() != 0:
+    pipecmd = ' '.join(argv)
+    raise ValueError("%s: exit status %d" % (
+        pipecmd,
+        P.returncode,
+    ))
 
 class VCS(ABC):
   ''' Abstract base class for version control system implementations.
   '''
 
+  # this needs definition by subclasses, eg 'hg' or 'git'
+  COMMAND_NAME = None
+
+  # this needs definition by subclasses, eg '.hg' or '.git'
+  TOPDIR_MARKER_ENTRY = None
+
   def _pipefrom(self, *vcscmd_args):
-    hgargv = [self.COMMAND_NAME] + list(vcscmd_args) + ['|']
-    return pipefrom(self.COMMAND_NAME, *vcscmd_args)
+    ''' Context manager return the stdout of a VCS command.
+    '''
+    return pipef(self.COMMAND_NAME, *vcscmd_args)
 
   def _cmd(self, *vcscmd_args):
     print(self.COMMAND_NAME, *vcscmd_args, file=sys.stderr)
@@ -30,7 +54,7 @@ class VCS(ABC):
         Return the directory realpath or `None`.
     '''
     def testfunc(testpath):
-      probe_path=joinpath(testpath, self.TOPDIR_MARKER_ENTRY)
+      probe_path = joinpath(testpath, self.TOPDIR_MARKER_ENTRY)
       debug("probe %r", probe_path)
       return existspath(probe_path)
     path0 = path
