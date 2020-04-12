@@ -130,6 +130,8 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
+  if 'DEBUG' not in os.environ:
+    os.environ['DEBUG'] = 'INFO'
   return MailFilerCommand().run(argv, options=NS(stdin=stdin))
 
 class MailFilerCommand(BaseCommand):
