@@ -1,3 +1,4 @@
+BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
 resolve bin/maildb vs bin-cs/cs-maildb
