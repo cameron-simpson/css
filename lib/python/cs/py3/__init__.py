@@ -30,6 +30,7 @@ try:
 except ImportError:
   DEVNULL = os.open(os.devnull, os.O_RDWR)
 import sys
+from time import strptime
 try:
   from types import StringTypes # type: ignore
 except ImportError:
