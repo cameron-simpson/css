@@ -103,7 +103,11 @@ class Enigma2(_Recording):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
-        fmeta['datetime'] = datetime_fromisoformat(ymd + 'T' + hhmm + ':00')
+        isodate = (
+            ymd[:4] + '-' + ymd[4:6] + '-' + ymd[6:8] + 'T' + hhmm[:2] + ':' +
+            hhmm[2:4] + ':00'
+        )
+        fmeta['datetime'] = datetime_fromisoformat(isodate)
         fmeta['start_time'] = ':'.join((hhmm[:2], hhmm[2:4]))
     return fmeta
 
