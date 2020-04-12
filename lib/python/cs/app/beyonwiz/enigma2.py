@@ -4,6 +4,9 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Beyonwiz Enigma2 support, their modern recording format.
+'''
+
 import errno
 from collections import namedtuple
 import datetime
@@ -11,12 +14,14 @@ import os.path
 import struct
 from cs.logutils import warning
 from cs.pfx import Pfx
-from cs.py.func import prop
+from cs.py3 import datetime_fromisoformat
 from cs.threads import locked_property
 from cs.x import X
 from . import _Recording, RecordingMetaData
 
 class Enigma2MetaData(RecordingMetaData):
+  ''' Metadata for an Enigma2 recording.
+  '''
 
   def __init__(self, raw):
     RecordingMetaData.__init__(self, raw)
@@ -143,6 +148,8 @@ class Enigma2(_Recording):
       return apdata
 
   def read_cuts(self):
+    ''' Read the edit cuts and return a list of `Enigma2.CutInfo`s.
+    '''
     path = self.cutpath
     cuts = []
     with Pfx("read_cuts %r", path):
