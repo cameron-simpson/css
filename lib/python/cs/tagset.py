@@ -76,7 +76,6 @@ from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 import re
-from time import strptime
 from types import SimpleNamespace
 from icontract import require
 from cs.edit import edit as edit_lines
@@ -87,29 +86,7 @@ from cs.lex import (
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
-
-try:
-  date_fromisoformat = date.fromisoformat
-except AttributeError:
-
-  def date_fromisoformat(datestr):
-    ''' Placeholder for `date.fromisoformat`.
-    '''
-    parsed = strptime(datestr, '%Y-%m-%d')
-    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
-
-try:
-  datetime_fromisoformat = datetime.fromisoformat
-except AttributeError:
-
-  def datetime_fromisoformat(datestr):
-    ''' Placeholder for `datetime.fromisoformat`.
-    '''
-    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
-    return datetime(
-        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
-        parsed.tm_min, parsed.tm_sec
-    )
+from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
 __version__ = '20200318'
 
@@ -267,18 +244,24 @@ class TagSet(dict, FormatableMixin):
 
   def update(self, other, *, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
-        a dict or an iterable of `(name,value)` things.
+        a dict of `{name:value}`
+        or an iterable of `Tag`like or `(name,value)` things.
     '''
     try:
-      items = other.items
+      # produce (name,value) from dict
+      items_attr = other.items
     except AttributeError:
-      kvs = other
+      items = other
     else:
-      kvs = items()
-    for k, v in kvs:
+      items = items_attr()
+    for item in items:
+      try:
+        name, value = item
+      except ValueError:
+        name, value = item.name, item.value
       if prefix:
-        k = prefix + '.' + k
-      self.set(k, v, verbose=verbose)
+        name = prefix + '.' + name
+      self.set(name, value, verbose=verbose)
 
   @pfx_method
   def ns(self):
