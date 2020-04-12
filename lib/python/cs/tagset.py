@@ -244,18 +244,24 @@ class TagSet(dict, FormatableMixin):
 
   def update(self, other, *, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
-        a dict or an iterable of `(name,value)` things.
+        a dict of `{name:value}`
+        or an iterable of `Tag`like or `(name,value)` things.
     '''
     try:
-      items = other.items
+      # produce (name,value) from dict
+      items_attr = other.items
     except AttributeError:
-      kvs = other
+      items = other
     else:
-      kvs = items()
-    for k, v in kvs:
+      items = items_attr()
+    for item in items:
+      try:
+        name, value = item
+      except ValueError:
+        name, value = item.name, item.value
       if prefix:
-        k = prefix + '.' + k
-      self.set(k, v, verbose=verbose)
+        name = prefix + '.' + name
+      self.set(name, value, verbose=verbose)
 
   @pfx_method
   def ns(self):
