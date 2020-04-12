@@ -83,15 +83,13 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 TRACK = logging.INFO + 5  # over INFO, under WARNING
 
 loginfo = NS(upd_mode=None)
-logging_level = logging.INFO
-trace_level = logging.DEBUG
 D_mode = False
 
 def ifdebug():
-  ''' Test the `logging_level` against `logging.DEBUG`.
+  ''' Test the `loginfo.level` against `logging.DEBUG`.
   '''
-  global logging_level
-  return logging_level <= logging.DEBUG
+  global loginfo
+  return loginfo.level <= logging.DEBUG
 
 def setup_logging(
     cmd_name=None,
@@ -144,40 +142,34 @@ def setup_logging(
         using ANSI terminal sequences (currently only if `cs.upd` is used).
       * `trace_mode`: if `None`, set it according to the presence of
         'TRACE' in flags. Otherwise if `trace_mode` is true, set the
-        global `trace_level` to `logging_level`; otherwise it defaults
+        global `loginfo.trace_level` to `loginfo.level`; otherwise it defaults
         to `logging.DEBUG`.
       * `verbose`: if `None`, then if stderr is a tty then the log
         level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
         true then the log level is `INFO` otherwise `WARNING`.
   '''
-  global logging_level, trace_level, D_mode, loginfo
+  global D_mode, loginfo
   import cs.pfx
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level(verbose=verbose)
   if level is None:
     level = inferred.level
-  loginfo.level = level
   if flags is None:
     flags = inferred.flags
-  loginfo.flags = flags
   if module_names is None:
     module_names = inferred.module_names
-  loginfo.module_names = module_names
   if function_names is None:
     function_names = inferred.function_names
-  loginfo.function_names = function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
   cs.pfx.cmd = cmd_name
-  loginfo.cmd = cmd_name
 
   if main_log is None:
     main_log = sys.stderr
   elif isinstance(main_log, str):
     main_log = open(main_log, "a")
-  loginfo.main_log_file = main_log
 
   # determine some attributes of main_log
   try:
@@ -208,18 +200,15 @@ def setup_logging(
       upd_mode = False
     else:
       upd_mode = is_tty
-  loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
     ansi_mode = is_tty
-  loginfo.ansi_mode = ansi_mode
 
   if format is None:
     if is_tty or is_fifo:
       format = DEFAULT_PFX_FORMAT_TTY
     else:
       format = DEFAULT_PFX_FORMAT
-  loginfo.format = format
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
@@ -232,22 +221,23 @@ def setup_logging(
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, logging_level, ansi_mode=ansi_mode)
-    loginfo.upd = main_handler.upd
+    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    upd = main_handler.upd
   else:
-    loginfo.upd = None
     main_handler = logging.StreamHandler(main_log)
+    upd = None
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
   main_handler.setFormatter(PfxFormatter(format))
   root_logger.addHandler(main_handler)
 
-  logging_level = level
   if trace_mode:
     # enable tracing in the thread that called setup_logging
     Pfx._state.trace = info
-    trace_level = logging_level
+    trace_level = level
+  else:
+    trace_level = logging.DEBUG
 
   if module_names or function_names:
     if importlib is None:
@@ -282,6 +272,17 @@ def setup_logging(
           warning("no %s.%s() found", module_name, func_name)
         else:
           setattr(M, funcpart, _ftrace(F))
+
+  loginfo.level = level
+  loginfo.trace_level = trace_level
+  loginfo.flags = flags
+  loginfo.module_names = module_names
+  loginfo.function_names = function_names
+  loginfo.cmd = cmd_name
+  loginfo.upd_mode = upd_mode
+  loginfo.ansi_mode = ansi_mode
+  loginfo.format = format
+  loginfo.upd = upd
 
   return loginfo
 
@@ -379,10 +380,11 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     if environ is None:
       environ = os.environ
     env_debug = os.environ.get('DEBUG', '')
-  level = logging.WARNING
   if verbose is None:
     if sys.stderr.isatty():
       level = TRACK
+    else:
+      level = logging.WARNING
   elif verbose:
     level = logging.INFO
   else:
@@ -635,9 +637,9 @@ def critical(msg, *args, **kwargs):
   log(logging.CRITICAL, msg, *args, **kwargs)
 
 def trace(msg, *args, **kwargs):
-  ''' Emit a log message at `trace_level` with the current Pfx prefix.
+  ''' Emit a log message at `loginfo.trace_level` with the current Pfx prefix.
   '''
-  log(trace_level, msg, *args, **kwargs)
+  log(loginfo.trace_level, msg, *args, **kwargs)
 
 def upd(msg, *args):
   ''' If we're using an UpdHandler,
