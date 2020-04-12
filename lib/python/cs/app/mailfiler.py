@@ -32,13 +32,14 @@
 
 from __future__ import print_function
 from collections import namedtuple
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
-from logging import DEBUG
+from logging import DEBUG, INFO
 import os
 import os.path
 import re
@@ -52,6 +53,7 @@ from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
+from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
@@ -64,7 +66,7 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, info, warning, error, exception, LogTime
+    loginfo, with_log, debug, info, track, warning, error, exception, LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
@@ -175,6 +177,14 @@ class MailFilerCommand(BaseCommand):
         options.rules_pattern = val
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+
+  @contextmanager
+  def run_context(self, argv, options):
+    ''' Run commands at INFO logging level (or lower if already lower).
+    '''
+    with super().run_context(argv, options):
+      with stackattrs(loginfo, level=min(loginfo.level, INFO)):
+        yield
 
   def cmd_monitor(self, argv, options):
     ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
@@ -348,7 +358,7 @@ class MailFiler(NS):
     ''' The email address database.
     '''
     path = self.maildb_path
-    info("MailFiler: reload maildb %s", shortpath(path))
+    track("MailFiler: reload maildb %s", shortpath(path))
     return MailDB(path, readonly=False)
 
   @property
@@ -432,6 +442,7 @@ class MailFiler(NS):
         if not these_folders:
           these_folders = op_cfg.get('folders', '').split()
         for folder in these_folders:
+          info("scan %s", folder)
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
             try:
