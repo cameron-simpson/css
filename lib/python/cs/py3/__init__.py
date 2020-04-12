@@ -15,6 +15,7 @@ try:
   from configparser import ConfigParser
 except ImportError:
   from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
+from datetime import date, datetime
 import os
 try:
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
@@ -139,6 +140,29 @@ except AttributeError:
     os.lseek(fd, offset0, SEEK_SET)
     data = b''.join(chunks)
     return data
+
+try:
+  date_fromisoformat = date.fromisoformat
+except AttributeError:
+
+  def date_fromisoformat(datestr):
+    ''' Placeholder for `date.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%d')
+    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
+
+try:
+  datetime_fromisoformat = datetime.fromisoformat
+except AttributeError:
+
+  def datetime_fromisoformat(datestr):
+    ''' Placeholder for `datetime.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
+    return datetime(
+        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
+        parsed.tm_min, parsed.tm_sec
+    )
 
 if __name__ == '__main__':
   import cs.py3.tests # type: ignore
