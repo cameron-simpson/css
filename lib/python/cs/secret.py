@@ -2,7 +2,7 @@ import os
 import os.path
 import cs.hier
 import logging
-import cs.logutils
+from cs.logutils import ifdebug
 from cs.mixin.ucattrs import UCdict
 
 def get(secret,path=None):
@@ -79,7 +79,7 @@ def sqlAlchemy(secret,scheme,login,password,host,database):
                                  secret.PASSWORD,
                                  secret.HOST,
                                  secret.DATABASE),
-           echo=(lcs.logutils.logging_level <= logging.DEBUG))
+           echo=ifdebug())
 
 def mssql(secret, db=None):
   import pymssql
