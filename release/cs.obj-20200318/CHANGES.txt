@@ -1,0 +1,5 @@
+lib/python/cs/obj.py: cs.obj: reformat using yapf via new format command
+lib/python/cs/obj.py: cs.obj: new singleton() generic factory function and SingletonMixin mixin class for making singleton classes
+lib/python/cs/obj.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/obj.py: further cs.obj.O and related _O_* removal
+lib/python/cs/obj.py: cs.obj: compatability class for obsolete O base class, now subclasses SimpleNamespace and issues a warning

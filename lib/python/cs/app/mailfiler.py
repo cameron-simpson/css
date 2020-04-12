@@ -410,7 +410,7 @@ class MailFiler(NS):
     watcher_key = os.path.realpath(folderpath), os.path.realpath(rules_path)
     watchers = self._maildir_watchers
     with self._lock:
-      wmdir = singleton(
+      _, wmdir = singleton(
           watchers, watcher_key, WatchedMaildir, (folderpath, self),
           {'rules_path': rules_path}
       )
@@ -781,9 +781,9 @@ class MessageFiler(NS):
       # leaks privacy
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
-
       for R in self.matched_rules:
         info("    MATCH %s", R)
+
       return self.save_message()
 
   def save_message(self):
