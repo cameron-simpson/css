@@ -20,9 +20,9 @@ import os
 try:
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
 except ImportError:
-  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty # type: ignore
+  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty  # type: ignore
   try:
-    from Queue import PriorityQueue # type: ignore
+    from Queue import PriorityQueue  # type: ignore
   except ImportError:
     pass
 try:
@@ -32,7 +32,7 @@ except ImportError:
 import sys
 from time import strptime
 try:
-  from types import StringTypes # type: ignore
+  from types import StringTypes  # type: ignore
 except ImportError:
   StringTypes = (str,)
 
@@ -49,7 +49,7 @@ DISTINFO = {
 }
 
 try:
-  raw_input # type: ignore
+  raw_input  # type: ignore
 except NameError:
   raw_input = input
 try:
@@ -99,7 +99,7 @@ else:
     return _sorted(iterable, None, key, reverse)
 
   input = raw_input
-  from itertools import ifilter as filter, ifilterfalse as filterfalse # type: ignore
+  from itertools import ifilter as filter, ifilterfalse as filterfalse  # type: ignore
   from ._for2 import raise3, raise_from, exec_code, ustr, \
                         bytes, BytesFile, joinbytes, \
                         pack, unpack # type: ignore
@@ -166,5 +166,5 @@ except AttributeError:
     )
 
 if __name__ == '__main__':
-  import cs.py3.tests # type: ignore
+  import cs.py3.tests  # type: ignore
   cs.py3.tests.selftest(sys.argv)
