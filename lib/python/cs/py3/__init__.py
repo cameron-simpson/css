@@ -96,6 +96,8 @@ else:
   _sorted = sorted
 
   def sorted(iterable, key=None, reverse=False):
+    ''' Adaptor for Python 2 `sorted()` providing Python 3 API.
+    '''
     return _sorted(iterable, None, key, reverse)
 
   input = raw_input
@@ -110,6 +112,8 @@ except ImportError:
   from struct import calcsize
 
   def iter_unpack(fmt, buffer):
+    ''' Drop in for `struct.iter_unpack`.
+    '''
     chunk_size = calcsize(fmt)
     if chunk_size < 1:
       raise ValueError(
@@ -129,6 +133,10 @@ except AttributeError:
   from os import SEEK_CUR, SEEK_SET
 
   def pread(fd, size, offset):
+    ''' Positional read from file descriptor, does not adjust the offset.
+
+        This is a racy drop in for when `os.pread` is not provided.
+    '''
     offset0 = os.lseek(fd, 0, SEEK_CUR)
     os.lseek(fd, offset, SEEK_SET)
     chunks = []
