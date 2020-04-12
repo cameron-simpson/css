@@ -22,11 +22,10 @@ from icontract import require
 from cs.binary import PacketField, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
-from cs.lex import unctrl
+from cs.lex import unctrl, get_ini_clause_entryname
 from cs.logutils import warning, exception, debug
 from cs.pfx import Pfx, gen as pfxgen
 from cs.py.func import prop
-from .compose import get_clause_archive
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
@@ -79,7 +78,7 @@ def Archive(path, missing_ok=False, weird_ok=False, config=None):
   '''
   if path.startswith('['):
     # expect "[clausename]name"
-    clause_name, archive_name, offset = get_clause_archive(path)
+    clause_name, archive_name, offset = get_ini_clause_entryname(path)
     if offset < len(path):
       raise ValueError(
           "unparsed text after archive name: %r" % (path[offset:],)

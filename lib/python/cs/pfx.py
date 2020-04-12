@@ -572,7 +572,7 @@ def pfx_method(method, use_str=False):
       return method(self, *a, **kw)
 
   wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = "@pfx_method(%s)" % (fname,)
+  wrapper.__name__ = fname
   return wrapper
 
 def XP(msg, *args, **kwargs):
