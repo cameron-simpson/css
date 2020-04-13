@@ -1,3 +1,4 @@
+cs.deco: contextual docstring looks very wrong, see PyPI page
 mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
 BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
