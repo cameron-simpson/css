@@ -955,10 +955,9 @@ class TagSetNamespace(ExtendedNamespace):
   def _tag_value(self):
     ''' Fetch the value if this node's `Tag`, or `None`.
     '''
-    try:
-      tag = self._tag
-    except AttributeError as e:
-      warning("%s: no ._tag: %s", self, e)
+    tag = self.__dict__.get('_tag')
+    if tag is None:
+      warning("%s: no ._tag", self)
       return None
     return tag.value
 
@@ -966,10 +965,9 @@ class TagSetNamespace(ExtendedNamespace):
     ''' Fetch the value of the `Tag` at `attr` (a namespace with a `._tag`).
         Returns `None` if required attributes are not present.
     '''
-    try:
-      attr_value = getattr(self, attr)
-    except AttributeError as e:
-      warning("%s: no .%r: %s", self, attr, e)
+    attr_value = self.__dict__.get(attr)
+    if attr_value is None:
+      warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
