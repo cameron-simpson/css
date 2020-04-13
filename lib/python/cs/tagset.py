@@ -952,6 +952,28 @@ class TagSetNamespace(ExtendedNamespace):
         return member_metadata.ns()
     return super().__getitem__(key)
 
+  def _tag_value(self):
+    ''' Fetch the value if this node's `Tag`, or `None`.
+    '''
+    try:
+      tag = self._tag
+    except AttributeError as e:
+      warning("%s.%r: no ._tag: %s", self, attr, e)
+      return None
+    return tag.value
+
+  def _attr_tag_value(self, attr):
+    ''' Fetch the value of the `Tag` at `attr` (a namespace with a `._tag`).
+        Returns `None` if required attributes are not present.
+    '''
+    try:
+      attr_value = getattr(self, attr)
+    except AttributeValue as e:
+      warning("%s: no .%r: %s", self, attr, e)
+      return None
+    return attr_value._tag_value()
+
+  @pfx_method
   def __getattr__(self, attr):
     ''' Look up an indirect node attribute,
         whose value is inferred from another.
@@ -1016,27 +1038,28 @@ class TagSetNamespace(ExtendedNamespace):
       # attr vs attr_lc
       title_attr = cutsuffix(attr, '_lc')
       if title_attr is not attr:
-        value = getns(title_attr)
-        if value is not None:
-          return lc_(value)
+        title_value = self._attr_tag_value(title_attr)
+        if title_value is not None:
+          value_lc= lc_(title_value)
+          return value_lc
       else:
-        value = getns(attr + '_lc')
-        if value is not None:
+        attr_lc_value =  getns(attr+'_lc')
+        if attr_lc_value is not None:
           return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
         if single_attr is not attr:
-          value = getns(single_attr)
-          if value is not None:
-            return [value]
+          single_value = self._attr_tag_value(single_attr)
+          if single_value is not None:
+            return [single_value]
       # singular from plural
       for pl_suffix in 's', 'es':
         plural_attr = attr + pl_suffix
-        value = getns(plural_attr)
-        if value is None:
+        plural_value = self._attr_tag_value(plural_attr)
+        if plural_value is None:
           continue
-        value0 = value[0]
+        value0 = plural_value[0]
         return value0
       return super().__getattr__(attr)
 
