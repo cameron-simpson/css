@@ -663,7 +663,7 @@ class FSTagsCommand(BaseCommand):
             if base == newbase:
               continue
             dstpath = joinpath(dirpath, newbase)
-            verbose("-> %s", filepath, dstpath)
+            verbose("-> %s", dstpath)
             try:
               options.fstags.move(filepath, dstpath)
             except OSError as e:
