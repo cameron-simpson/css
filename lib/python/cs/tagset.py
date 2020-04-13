@@ -958,7 +958,7 @@ class TagSetNamespace(ExtendedNamespace):
     try:
       tag = self._tag
     except AttributeError as e:
-      warning("%s.%r: no ._tag: %s", self, attr, e)
+      warning("%s: no ._tag: %s", self, e)
       return None
     return tag.value
 
@@ -968,7 +968,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     try:
       attr_value = getattr(self, attr)
-    except AttributeValue as e:
+    except AttributeError as e:
       warning("%s: no .%r: %s", self, attr, e)
       return None
     return attr_value._tag_value()
@@ -1040,10 +1040,10 @@ class TagSetNamespace(ExtendedNamespace):
       if title_attr is not attr:
         title_value = self._attr_tag_value(title_attr)
         if title_value is not None:
-          value_lc= lc_(title_value)
+          value_lc = lc_(title_value)
           return value_lc
       else:
-        attr_lc_value =  getns(attr+'_lc')
+        attr_lc_value = getns(attr + '_lc')
         if attr_lc_value is not None:
           return titleify_lc(value)
       # plural from singular
