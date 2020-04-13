@@ -1692,7 +1692,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       xattr_name = XATTR_B
     xattr_s = get_xattr_value(self.filepath, xattr_name)
     if xattr_s is None:
-      return TagSet(ontolog=self.ontology)
+      return TagSet(ontology=self.ontology)
     return TagSet.from_line(xattr_s)
 
   def import_xattrs(self):
