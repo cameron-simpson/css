@@ -290,13 +290,16 @@ cached = OBSOLETE(cachedmethod)
 def contextual(func):
   ''' Wrap a simple function as a context manager.
 
-      This was written to support `@strable`,
-      which requires its `open_func` to be a context manager.
+      This was written to support users of `@strable`,
+      which requires its `open_func` to be a context manager;
+      this turns an arbitrary function into a context manager.
 
-      >>> f = lambda: 3
-      >>> cf = contextual(f)
-      >>> with cf() as x: print(x)
-      3
+      Example promoting a trivial function:
+
+          >>> f = lambda: 3
+          >>> cf = contextual(f)
+          >>> with cf() as x: print(x)
+          3
   '''
 
   @contextmanager

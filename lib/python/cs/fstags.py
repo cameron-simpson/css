@@ -623,7 +623,7 @@ class FSTagsCommand(BaseCommand):
     subopts, argv = getopt(argv, 'n:')
     for subopt, value in subopts:
       if subopt == '-n':
-        name_format = value
+        name_format = fstags.resolve_format_string(value)
       else:
         raise RuntimeError("unhandled subopt: %r" % (subopt,))
     if name_format is None:
@@ -663,8 +663,12 @@ class FSTagsCommand(BaseCommand):
             if base == newbase:
               continue
             dstpath = joinpath(dirpath, newbase)
-            info("%s -> %s", filepath, dstpath)
-            options.fstags.move(filepath, dstpath)
+            verbose("-> %s", dstpath)
+            try:
+              options.fstags.move(filepath, dstpath)
+            except OSError as e:
+              error("-> %s: %s", dstpath, e)
+              xit = 1
     if U:
       U.out(oldU)
     return xit
@@ -912,6 +916,7 @@ class FSTags(MultiOpenMixin):
       tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
     return tagged_path
 
+  @pfx_method
   def resolve_format_string(self, format_string):
     ''' See if `format_string` looks like `[`*clausename*`]`*entryname*.
         if so, return the corresponding config entry string,
@@ -1691,7 +1696,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       xattr_name = XATTR_B
     xattr_s = get_xattr_value(self.filepath, xattr_name)
     if xattr_s is None:
-      return TagSet(ontolog=self.ontology)
+      return TagSet(ontology=self.ontology)
     return TagSet.from_line(xattr_s)
 
   def import_xattrs(self):
