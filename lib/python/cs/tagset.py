@@ -1,13 +1,81 @@
 #!/usr/bin/env python3
 
-''' Tags and sets of tags.
+''' Tags and sets of tags
+    with __format__ support and optional ontology information.
+
+    Note: see `cs.fstags` for support for applying these to filesystem objects
+    such as directories and files.
+
+    All of the available complexity is optional:
+    you can use `Tag`s without bothering with `TagSet`s
+    or `TagsOntology`s.
+
+    This module contains the following main classes:
+    * `Tag`: an object with a `.name` and optional `.value` (default `None`)
+      and also an optional reference `.ontology`
+      for associating semantics with tag values.
+      The `.value` (if not `None`) will often be a string,
+      but may be any Python object.
+      If you're using these via `cs.fstags`,
+      the object will need to be JSON transcribeable.
+    * `TagSet`: a `dict` subclass representing a set of `Tag`s
+      to associate with something;
+      it also has setlike `.add` and `.discard` methods.
+      As such it only supports a single `Tag` for a given tag name,
+      but that tag value can of course be a sequence or mapping
+      for more elaborate tag values.
+    * `TagsOntology`:
+      a mapping of type names to `TagSet`s defining the type.
+      This mapping also contains entries for the metadata
+      for specific type values.
+
+    Here's a simple example with some `Tags` and a `TagSet`.
+
+        >>> tags = TagSet()
+        >>> # add a "bare" Tag named 'blue' with no value
+        >>> tags.add('blue')
+        >>> # add a "topic=tagging" Tag
+        >>> tags.add('topic','tagging')
+        >>> # make a "subtopic" Tag and add it
+        >>> subtopic = Tag('subtopic', 'ontologies')
+        >>> # Tags have nice repr() and str()
+        >>> subtopic
+        Tag(name='subtopic',value='ontologies',ontology=None)
+        >>> print(subtopic)
+        subtopic=ontologies
+        >>> # you can add a Tag directly
+        >>> tags.add(subtopic)
+        >>> # TagSets also have nice repr() and str()
+        >>> tags
+        TagSet:{'blue': None, 'topic': 'tagging', 'subtopic': 'ontologies'}
+        >>> print(tags)
+        blue subtopic=ontologies topic=tagging
+        >>> # because TagSets are dicts you can format strings with them
+        >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
+        topic:tagging subtopic:ontologies
+        >>> # TagSets have convenient membership tests
+        >>> # test for blueness
+        >>> 'blue' in tags
+        True
+        >>> # test for redness
+        >>> 'red' in tags
+        False
+        >>> # test for any "subtopic" tag
+        >>> 'subtopic' in tags
+        True
+        >>> # test for subtopic=ontologies
+        >>> subtopic in tags
+        True
+        >>> subtopic2 = Tag('subtopic', 'libraries')
+        >>> # test for subtopic=libraries
+        >>> subtopic2 in tags
+        False
 '''
 
 from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 import re
-from time import strptime
 from types import SimpleNamespace
 from icontract import require
 from cs.edit import edit as edit_lines
@@ -17,30 +85,8 @@ from cs.lex import (
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method
-
-try:
-  date_fromisoformat = date.fromisoformat
-except AttributeError:
-
-  def date_fromisoformat(datestr):
-    ''' Placeholder for `date.fromisoformat`.
-    '''
-    parsed = strptime(datestr, '%Y-%m-%d')
-    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
-
-try:
-  datetime_fromisoformat = datetime.fromisoformat
-except AttributeError:
-
-  def datetime_fromisoformat(datestr):
-    ''' Placeholder for `datetime.fromisoformat`.
-    '''
-    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
-    return datetime(
-        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
-        parsed.tm_min, parsed.tm_sec
-    )
+from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
 __version__ = '20200318'
 
@@ -66,12 +112,17 @@ class TagSet(dict, FormatableMixin):
       mapping of tag names to values.
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
+
+      Also note that all the `Tags` from `TagSet`
+      share its ontology.
   '''
 
-  def __init__(self):
+  @pfx_method
+  def __init__(self, *, ontology=None):
     ''' Initialise the `TagSet`.
     '''
     super().__init__()
+    self.ontology = ontology
     self.modified = False
 
   def __str__(self):
@@ -83,24 +134,24 @@ class TagSet(dict, FormatableMixin):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   @classmethod
-  def from_line(cls, line, offset=0, verbose=None):
+  def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
-    tags = cls()
+    tags = cls(ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.parse(line, offset)
+      tag, offset = Tag.parse(line, offset, ontology=ontology)
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
 
   @classmethod
-  def from_bytes(cls, bs):
+  def from_bytes(cls, bs, ontology=None):
     ''' Create a new `TagSet` from the bytes `bs`,
         a UTF-8 encoding of a `TagSet` line.
     '''
     line = bs.decode(errors='replace')
-    return cls.from_line(line)
+    return cls.from_line(line, ontology=ontology)
 
   def __contains__(self, tag):
     if isinstance(tag, str):
@@ -114,7 +165,11 @@ class TagSet(dict, FormatableMixin):
     ''' Yield the tag data as `Tag`s.
     '''
     for tag_name, value in self.items():
-      yield Tag(prefix + '.' + tag_name if prefix else tag_name, value)
+      yield Tag(
+          prefix + '.' + tag_name if prefix else tag_name,
+          value,
+          ontology=self.ontology
+      )
 
   __iter__ = as_tags
 
@@ -129,7 +184,7 @@ class TagSet(dict, FormatableMixin):
   def add(self, tag_name, value=None, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     self.set(tag.name, tag.value, verbose=verbose)
 
   def set(self, tag_name, value, *, verbose=None):
@@ -140,7 +195,10 @@ class TagSet(dict, FormatableMixin):
     if tag_name not in self or old_value is not value:
       self.modified = True
       if tag_name not in self or old_value != value:
-        ifverbose(verbose, "+ %s (was %s)", Tag(tag_name, value), old_value)
+        ifverbose(
+            verbose, "+ %s (was %s)",
+            Tag(tag_name, value, ontology=self.ontology), old_value
+        )
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -158,7 +216,7 @@ class TagSet(dict, FormatableMixin):
         Otherwise the tag is only discarded
         if its value matches.
     '''
-    tag = Tag.from_name_value(tag_name, value)
+    tag = Tag(tag_name, value)
     tag_name = tag.name
     if tag_name in self:
       value = tag.value
@@ -186,108 +244,34 @@ class TagSet(dict, FormatableMixin):
 
   def update(self, other, *, prefix=None, verbose=None):
     ''' Update this `TagSet` from `other`,
-        a dict or an iterable of taggy things.
+        a dict of `{name:value}`
+        or an iterable of `Tag`like or `(name,value)` things.
     '''
     try:
-      items = other.items
+      # produce (name,value) from dict
+      items_attr = other.items
     except AttributeError:
-      kvs = other
+      items = other
     else:
-      kvs = items()
-    for k, v in kvs:
+      items = items_attr()
+    for item in items:
+      try:
+        name, value = item
+      except ValueError:
+        name, value = item.name, item.value
       if prefix:
-        k = prefix + '.' + k
-      self.set(k, v, verbose=verbose)
+        name = prefix + '.' + name
+      self.set(name, value, verbose=verbose)
 
   @pfx_method
-  def ns(self, ontology=None):
-    ''' Compute and return a presentation of this `TagSet` as a
-        nested `ExtendedNamespace`.
+  def ns(self):
+    ''' Return a `TagSetNamespace` for this `TagSet`.
 
-        `ExtendedNamespaces` provide a number of convenience attibutes
-        derived from the concrete attributes. They are also usable
-        as mapping in `str.format_map` and the like as they implement
-        the `keys` and `__getitem__` methods.
-
-        Note that if the `TagSet` includes tags named `'a.b'` and
-        also `'a.b.c'` then the `'a.b'` value will be reflected as
-        `'a.b._'` in order to keep `'a.b.c'` available.
-
-        Also note that multiple dots in `Tag` names are collapsed;
-        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
-        `'..a.b'` will all map to the namespace entry `a.b`.
-
-        `Tag`s are processed in reverse lexical order by name, which
-        dictates which of the conflicting multidot names takes
-        effect in the namespace - the first found is used.
+        This has many convenience facilities for use in format strings.
     '''
-    ns0 = ExtendedNamespace()
-    for tag in sorted(self, reverse=True):
-      with Pfx(tag):
-        tag_name = tag.name
-        subnames = [subname for subname in tag_name.split('.') if subname]
-        if not subnames:
-          warning("skipping weirdly named tag")
-          continue
-        ns = ns0
-        subpath = []
-        while len(subnames) > 1:
-          subname = subnames.pop(0)
-          subpath.append(subname)
-          with Pfx('.'.join(subpath)):
-            try:
-              subns = getattr(ns, subname)
-            except AttributeError:
-              subns = ExtendedNamespace()
-              subns._return_None_if_missing = True
-              setattr(ns, subname, subns)
-            ns = subns
-        subname, = subnames
-        subpath.append(subname)
-        with Pfx('.'.join(subpath)):
-          subattr = '_' if hasattr(ns, subname) else subname
-          setattr(ns, subattr, tag.value)
-          if ontology:
-            # add defn and meta information
-            taginfo = ontology[tag]
-            defn_ns = taginfo.defn.ns()
-            defn_subattr = '_defn' if subattr == '_' else subattr + '__defn'
-            setattr(ns, defn_subattr, defn_ns)
-            detail = taginfo.detail
-            if detail is not None:
-              if isinstance(detail, ValueDetail):
-                meta = detail.detail.ns()
-              else:
-                meta = []
-                for subdetail in detail:
-                  if subdetail is None:
-                    submeta = None
-                  elif isinstance(subdetail, ValueDetail):
-                    submeta = subdetail.detail.ns()
-                  elif isinstance(subdetail, KeyValueDetail):
-                    submeta = SimpleNamespace(
-                        key=subdetail.key,
-                        key_detail=subdetail.key_detail.ns(),
-                        value=subdetail.value,
-                        value_detail=subdetail.value_detail.ns()
-                    )
-                  else:
-                    submeta = subdetail
-                  meta.append(submeta)
-              meta_subattr = '_meta' if subattr == '_' else subattr + '__meta'
-              setattr(ns, meta_subattr, meta)
-    return ns0
+    return TagSetNamespace.from_tagset(self)
 
-  def format_kwargs(self, ontology=None):
-    ''' Return an `ExtendedNamespace` as from `self.ns()`
-        with a special mode activated
-
-        where a missing attribute returns the value `None`.
-        This is to support use in `str.formap_map`
-    '''
-    fkwargs = self.ns(ontology=ontology)
-    fkwargs._return_None_if_missing = True
-    return fkwargs
+  format_kwargs = ns
 
   def edit(self, verbose=None):
     ''' Edit this `TagSet`.
@@ -307,13 +291,97 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
         self.set_from(new_values, verbose=verbose)
 
-class Tag(namedtuple('Tag', 'name value')):
-  ''' A Tag has a `.name` (`str`) and a `.value`.
+class ValueMetadata(namedtuple('ValueMetadata', 'ontology ontkey value')):
+  ''' Metadata information about a value.
+        * `ontology`: the reference ontology
+        * `ontkey`: the key within the ontology providing the metadata
+        * `value`: the value
+    '''
+
+  @property
+  def metadata(self):
+    ''' The metadata, the `TagSet` from `ontology[ontkey]`.
+      '''
+    return self.ontology[self.ontkey]
+
+  def ns(self):
+    ''' Return a `ValueMetadataNamespace` for this `ValueMetadata`.
+    '''
+    return ValueMetadataNamespace.from_metadata(self)
+
+class KeyValueMetadata(namedtuple('KeyValueMetadata',
+                                  'key_metadata value_metadata')):
+  ''' Metadata information about a `(key,value)` pair.
+      * `ontology`: the reference ontology
+      * `key_metadata`: the metadata for the `key`,
+        the `TagSet` from `ontology[key_metadata.ontkey]`
+      * `value`: the value
+      * `value_metadata`: the metadata for the `value`,
+        the `TagSet` from `ontology[value_metadata.ontkey]`
+  '''
+
+class Tag(namedtuple('Tag', 'name value ontology')):
+  ''' A Tag has a `.name` (`str`) and a `.value`
+      and an optional `.ontology`.
 
       The `name` must be a dotted identifier.
 
-      A "bare" `Tag` has a `value` of `None`.
+      Terminology:
+      * A "bare" `Tag` has a `value` of `None`.
+      * A "naive" `Tag` has an `ontology` of `None`.
+
+      The constructor for a `Tag` is unusual:
+      * both the `value` and `ontology` are optional,
+        defaulting to `None`
+      * if `name` is a `str` then we always construct a new `Tag`
+        with the suppplied values
+      * if `name` is not a `str`
+        it should be a `Tag`like object to promote;
+        it is an error if the `value` parameter is not `None`
+        in this case
+
+      The promotion process is as follows:
+      * if `name` is a `Tag` subinstance
+        then if the supplied `ontology` is not `None`
+        and is not the ontology associated with `name`
+        then a new `Tag` is made,
+        otherwise `name` is returned unchanged
+      * otherwise a new `Tag` is made from `name`
+        using its `.value`
+        and overriding its `.ontology`
+        if the `ontology` parameter is not `None`
   '''
+
+  def __new__(cls, name, value=None, *, ontology=None):
+    # simple case: name is a str: make a new Tag
+    if isinstance(name, str):
+      # (name[,value[,ontology]]) => Tag
+      return super().__new__(cls, name, value, ontology)
+    # name should be taglike
+    if value is not None:
+      raise ValueError(
+          "name(%s) is not a str, value must be None" % (type(name).__name__)
+      )
+    tag = name
+    if not hasattr(tag, 'name'):
+      raise ValueError("tag has no .name attribute")
+    if not hasattr(tag, 'value'):
+      raise ValueError("tag has no .value attribute")
+    if isinstance(tag, Tag):
+      # already a Tag subtype, see if the ontology needs updating
+      if ontology is not None and tag.ontology is not ontology:
+        # new Tag with supplied ontology
+        tag = super().__new__(cls, tag.name, tag.value, ontology)
+    else:
+      # not a Tag subtype, construct a new instance,
+      # overriding .ontology if the supplied ontology is not None
+      tag = super().__new__(
+          cls, tag.name, tag.value, (
+              ontology
+              if ontology is not None else getattr(tag, 'ontology', None)
+          )
+      )
+    return tag
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -328,11 +396,12 @@ class Tag(namedtuple('Tag', 'name value')):
   ]
 
   @classmethod
-  def with_prefix(cls, name, value, *, prefix):
-    # prefix the tag with `prefix` if set
+  def with_prefix(cls, name, value, *, ontology=None, prefix):
+    ''' Make a new `Tag` whose `name` is prefixed with `prefix+'.'`.
+    '''
     if prefix:
       name = prefix + '.' + name
-    return cls(name, value)
+    return cls(name, value, ontology=ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -345,12 +414,12 @@ class Tag(namedtuple('Tag', 'name value')):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r)" % (
-        type(self).__name__, self.name, self.value
+    return "%s(name=%r,value=%r,ontology=%r)" % (
+        type(self).__name__, self.name, self.value, self.ontology
     )
 
   def __str__(self):
-    ''' Encode `tag_name` and `value`.
+    ''' Encode `name` and `value`.
     '''
     name = self.name
     value = self.value
@@ -364,9 +433,10 @@ class Tag(namedtuple('Tag', 'name value')):
         If `prefix` is `None` or empty, return this `Tag`.
         Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
     '''
-    return (
-        self.from_name_value('.'.join((prefix, self.name)), self.value)
-        if prefix else self
+    if not prefix:
+      return self
+    return type(self)(
+        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
     )
 
   @classmethod
@@ -392,49 +462,10 @@ class Tag(namedtuple('Tag', 'name value')):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_name_value(cls, name, value):
-    ''' Support method for functions accepting either a tag or a name and value.
-
-        If `name` is a str make a new Tag from `name` and `value`.
-        Otherwise check that `value is `None`
-        and that `name` has a `.name` and `.value`
-        and return directly as a tag ducktype.
-
-        This supports functions of the form:
-
-            def f(x, y, tag_name, value=None):
-              tag = Tag.from_name_value(tag_name, value)
-
-        so that that may accept a `Tag` or a tag name or a tag name and value.
-
-        Exanples:
-
-            >>> Tag.from_name_value('a', 3)
-            Tag(name='a',value=3)
-            >>> T = Tag('b', None)
-            >>> Tag.from_name_value(T, None)
-            Tag(name='b',value=None)
-    '''
-    with Pfx("%s.from_name_value(name=%r,value=%r)", cls.__name__, name,
-             value):
-      if isinstance(name, str):
-        # (name,value) => Tag
-        return cls(name, value)
-      if value is not None:
-        raise ValueError("name is not a str, value must be None")
-      tag = name
-      if not hasattr(tag, 'name'):
-        raise ValueError("tag has no .name attribute")
-      if not hasattr(tag, 'value'):
-        raise ValueError("tag has no .value attribute")
-      # Tag ducktype
-      return tag
-
-  @classmethod
-  def from_string(cls, s, offset=0):
+  def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset)
+    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
     if post_offset < len(s):
       raise ValueError(
           "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
@@ -443,26 +474,26 @@ class Tag(namedtuple('Tag', 'name value')):
 
   @staticmethod
   def is_valid_name(name):
-    ''' Test whether a tag name is valid: a dotted identifier including dash.
+    ''' Test whether a tag name is valid: a dotted identifier.
     '''
-    return is_dotted_identifier(name, extras='_-')
+    return is_dotted_identifier(name)
 
   @staticmethod
   def parse_name(s, offset=0):
-    ''' Parse a tag name from `s` at `offset`: a dotted identifier including dash.
+    ''' Parse a tag name from `s` at `offset`: a dotted identifier.
     '''
-    return get_dotted_identifier(s, offset=offset, extras='_-')
+    return get_dotted_identifier(s, offset=offset)
 
   def matches(self, tag_name, value=None):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
-    other_tag = self.from_name_value(tag_name, value)
+    other_tag = type(self)(tag_name, value)
     if self.name != other_tag.name:
       return False
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0):
+  def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
@@ -482,7 +513,7 @@ class Tag(namedtuple('Tag', 'name value')):
             ##warning("bad separator %r, adjusting tag to %r" % (sep, name))
         else:
           value = None
-      return cls(name, value), offset
+      return cls(name, value, ontology=ontology), offset
 
   @classmethod
   def parse_value(cls, s, offset=0):
@@ -522,6 +553,202 @@ class Tag(namedtuple('Tag', 'name value')):
           offset += suboffset
     return value, offset
 
+  @property
+  @pfx_method(use_str=True)
+  def typedata(self):
+    ''' The defining `TagSet` for this tag's name.
+
+        This is how its type is defined,
+        and is obtained from:
+        `self.ontology.typedata_tagset(self.name)`
+    '''
+    ont = self.ontology
+    if ont is None:
+      warning("%s:%r: no ontology, returning None", type(self), self)
+      return None
+    return ont[self.name]
+
+  @property
+  @pfx_method(use_str=True)
+  def key_typedata(self):
+    ''' Return the typedata definition for this `Tag`'s keys.
+    '''
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    key_type = typedata.get('key_type')
+    if key_type is None:
+      return None
+    ont = self.ontology
+    return ont[key_type]
+
+  @pfx_method(use_str=True)
+  def key_metadata(self, key):
+    ''' Return the metadata definition for `key`.
+    '''
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    key_type = typedata.get('key_type')
+    if key_type is None:
+      return None
+    ont = self.ontology
+    key_metadata_name = key_type + '.' + ont.value_to_tag_name(key)
+    return ont[key_metadata_name]
+
+  @property
+  @pfx_method(use_str=True)
+  def member_typedata(self):
+    ''' Return the typedata definition for this `Tag`'s members.
+    '''
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    member_type = typedata.get('member_type')
+    if member_type is None:
+      return None
+    ont = self.ontology
+    return ont[member_type]
+
+  @pfx_method(use_str=True)
+  def member_metadata(self, member_key):
+    ''' Return the metadata definition for self[member_key].
+    '''
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    member_type = typedata.get('member_type')
+    if member_type is None:
+      return None
+    ont = self.ontology
+    value = self.value[member_key]
+    member_metadata_name = member_type + '.' + ont.value_to_tag_name(value)
+    return ont[member_metadata_name]
+
+  @property
+  @pfx_method(use_str=True)
+  def type(self):
+    ''' The type name for this tag.
+
+        Unless the definition for `self.name` has a `type` tag,
+        the type is `self.ontology.value_to_tag_name(self.name)`.
+
+        For example, the tag `series="Avengers (Marvel)"`
+        would look up the definition for `series`.
+        If that had no `type=` tag, then the type
+        would default to `series`
+        which is what would be returned.
+
+        The corresponding metadata `TagSet` for that tag
+        would have the name `series.marvel.avengers`.
+
+        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
+        would look up the definition for `cast`
+        which might look like this:
+
+            cast type=dict key_type=person member_type=character
+
+        That says that the type name is `dict`,
+        which is what would be returned.
+
+        Because the type is `dict`
+        the definition also has `key_type` and `member_type` tags
+        identifying the type names for the keys and values
+        of the `cast=` tag.
+        As such, the corresponding metadata `TagSet`s
+        in this example would be named
+        `person.scarlett_johasson`
+        and `character.marvel.black_widow` respectively.
+    '''
+    typedata = self.typedata
+    if typedata is None:
+      return None
+    type_name = typedata.get('type')
+    if type_name is None:
+      type_name = self.ontology.value_to_tag_name(self.name)
+    return type_name
+
+  @property
+  @pfx_method(use_str=True)
+  def basetype(self):
+    ''' The base type name for this tag.
+
+        This calls `TagsOntology.basetype(self.type)`.
+    '''
+    ont = self.ontology
+    if ont is None:
+      warning("no ontology, returning None")
+      return None
+    return ont.basetype(self.type)
+
+  @property
+  @require(lambda self: isinstance(self.type, str))
+  def metadata(self):
+    ''' The metadataed information about this specific tag value,
+        derived through the ontology from the tag name and value.
+
+        For a scalar type this is a `ValueMetadata`
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `ontkey`: the ontology key providing the metadata for the `value`
+        * `value`: the value `self.value`
+        * `metadata`: the metadata, a `TagSet`
+
+        However, note that the types `'list'` and `'dict'` are special,
+        indicating that the value is a sequence or mapping respectively.
+
+        For `'list'` types
+        this property is a list of `ValueMetadata` instances
+        for each element of the sequence.
+
+        For `'dict'` types
+        this property is a list of `KeyValueMetadata` instances
+        with the following attributes:
+        * `ontology`: the reference ontology
+        * `key`: the key
+        * `key_metadata`: a `ValueMetadata` for the key
+        * `value`: the value
+        * `value_metadata`: a `ValueMetadata` for the value
+    '''
+    ont = self.ontology
+    basetype = self.basetype
+    if basetype == 'list':
+      member_type = self.member_type
+      return [ont.value_metadata(member_type, value) for value in self.value]
+    if basetype == 'dict':
+      key_type = self.key_type
+      member_type = self.member_type
+      return [
+          KeyValueMetadata(
+              ont.value_metadata(key_type, key),
+              ont.value_metadata(member_type, value)
+          ) for key, value in self.value.items()
+      ]
+    return ont.value_metadata(self.name, self.value)
+
+  @property
+  def key_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a mapping.
+    '''
+    try:
+      return self.typedata['key_type']
+    except KeyError:
+      raise AttributeError('key_type')
+
+  @property
+  @pfx_method
+  def member_type(self):
+    ''' The type name for members of this tag.
+
+        This is required if `.value` is a sequence or mapping.
+    '''
+    try:
+      return self.typedata['member_type']
+    except KeyError:
+      raise AttributeError('member_type')
+
 class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
       used to apply changes to a `TagSet`
@@ -545,103 +772,349 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       offset += 1
     else:
       choice = True
-    tag, offset = Tag.parse(s, offset=offset)
+    tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
 class ExtendedNamespace(SimpleNamespace):
-  ''' Subclass `SimpleNamespace` with inferred attributes.
-      This also presents attributes as `[]` elements via `__getitem__`.
+  ''' Subclass `SimpleNamespace` with inferred attributes
+      intended primarily for use in format strings.
+      As such it also presents attributes as `[]` elements via `__getitem__`.
+
+      Because [:alpha:]* attribute names
+      are reserved for "public" keys/attributes,
+      most methods commence with an underscore (`'_'`).
   '''
 
-  def __missing__(self, attr):
-    ''' Value to return on a missing attribute.
-        This version is premised on use with `str.format_map`.
+  def _public_keys(self):
+    return (k for k in self.__dict__.keys() if k and k[0].isalpha())
+
+  def _public_keys_str(self):
+    return ','.join(sorted(self._public_keys()))
+
+  def _public_items(self):
+    return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
+
+  def __str__(self):
+    return '{' + type(self).__name__ + ':' + ','.join(
+        str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
+    ) + '}'
+
+  def __len__(self):
+    ''' The number of public keys.
     '''
-    return '{' + attr + '}'
+    return len(self._public_keys())
+
+  @pfx_method
+  def __format__(self, spec):
+    ''' The default formatted form of this node.
+        The value to format is `'{`*type*':'*path*'['*public_keys*']'`.
+    '''
+    return (
+        "{%s:%s%s}" %
+        (type(self).__name__, self._path, sorted(self._public_keys()))
+    ).__format__(spec)
+
+  @property
+  def _path(self):
+    ''' The path to this node as a dotted string.
+    '''
+    pathnames = getattr(self, '_pathnames', ())
+    return '.'.join(pathnames)
+
+  def _subns(self, subname):
+    ''' Create and attache a new subnamespace named `subname`
+        of the same type as `self`.
+        Return the new subnamespace.
+
+        It is an error if `subname` is already present in `self.__dict__`.
+    '''
+    if subname in self.__dict__:
+      raise ValueError(
+          "%s: attribute %r already exists" % (self._path, subname)
+      )
+    subns = type(self)(_pathnames=self._pathnames + (subname,))
+    setattr(self, subname, subns)
+    return subns
 
   def __getattr__(self, attr):
-    ''' Look up an indirect attribute, whose value is inferred from another.
+    ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
+        contaiining a `Tag` for the attribute with a placeholder string.
     '''
-    if attr == 'keys':
-      return self.__dict__.keys
-    with Pfx("%s(%r)", type(self).__name__, attr):
+    if attr and attr[0].isalpha():
+      # no such attribute, create a placeholder `Tag`
+      # for [:alpha:]* names
+      format_placeholder = '{' + self._path + '.' + attr + '}'
+      subns = self._subns(attr)
+      overtag = self.__dict__.get('_tag')
+      subns._tag = Tag(
+          attr,
+          format_placeholder,
+          ontology=overtag.ontology if overtag else None
+      )
+      return subns
+    raise AttributeError("%s: %s" % (self._path, attr))
+
+  @pfx_method
+  def __getitem__(self, attr):
+    with Pfx("%s[%r]", self._path, attr):
+      try:
+        value = getattr(self, attr)
+      except AttributeError:
+        raise KeyError(attr)
+      return value
+
+class TagSetNamespace(ExtendedNamespace):
+  ''' A formattable nested namespace for a `TagSet`,
+      subclassing `ExtendedNamespace`.
+
+      Where the node paths of this namespace tree match
+      the name of a `Tag` from the `TagSet`
+      that node has the following direct attributes:
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_tagset(cls, tags, pathnames=None):
+    ''' Compute and return a presentation of this `TagSet` as a
+        nested `ExtendedNamespace`.
+
+        `ExtendedNamespaces` provide a number of convenience attibutes
+        derived from the concrete attributes. They are also usable
+        as mapping in `str.format_map` and the like as they implement
+        the `keys` and `__getitem__` methods.
+
+        Note that multiple dots in `Tag` names are collapsed;
+        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
+        `'..a.b'` will all map to the namespace entry `a.b`.
+
+        `Tag`s are processed in reverse lexical order by name, which
+        dictates which of the conflicting multidot names takes
+        effect in the namespace - the first found is used.
+    '''
+    if pathnames is None:
+      pathnames = []
+    ns0 = cls(
+        _path='.'.join(pathnames) if pathnames else '.',
+        _pathnames=tuple(pathnames)
+    )
+    if tags:
+      ns0._ontology = tags.ontology
+      for tag in sorted(tags, reverse=True):
+        with Pfx(tag):
+          tag_name = tag.name
+          subnames = [subname for subname in tag_name.split('.') if subname]
+          if not subnames:
+            warning("skipping weirdly named tag")
+            continue
+          ns = ns0
+          subpath = []
+          while subnames:
+            subname = subnames.pop(0)
+            subpath.append(subname)
+            dotted_subpath = '.'.join(subpath)
+            with Pfx(dotted_subpath):
+              subns = ns.__dict__.get(subname)
+              if subns is None:
+                subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(
+                    None, subpath
+                )
+              ns = subns
+            ns._tag = tag
+    return ns0
+
+  @pfx_method
+  def __format__(self, spec):
+    ''' Format this node.
+        If there's a `Tag` on the node, format its value.
+        Otherwise use the superclass format.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return format(tag.value, spec)
+    return super().__format__(spec)
+
+  @pfx_method
+  def __getitem__(self, key):
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      value = tag.value
+      try:
+        element = value[key]
+      except TypeError as e:
+        warning("[%r]: %s", key, e)
+        pass
+      except KeyError:
+        return self._path + '[' + repr(key) + ']'
+      else:
+        member_metadata = tag.member_metadata(key)
+        if member_metadata is None:
+          return element
+        return member_metadata.ns()
+    return super().__getitem__(key)
+
+  def _tag_value(self):
+    ''' Fetch the value if this node's `Tag`, or `None`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is None:
+      warning("%s: no ._tag", self)
+      return None
+    return tag.value
+
+  def _attr_tag_value(self, attr):
+    ''' Fetch the value of the `Tag` at `attr` (a namespace with a `._tag`).
+        Returns `None` if required attributes are not present.
+    '''
+    attr_value = self.__dict__.get(attr)
+    if attr_value is None:
+      warning("%s: no .%r", self, attr)
+      return None
+    return attr_value._tag_value()
+
+  @pfx_method
+  def __getattr__(self, attr):
+    ''' Look up an indirect node attribute,
+        whose value is inferred from another.
+
+        The following attribute names and forms are supported:
+        * `_keys`: the keys of the value
+          for the `Tag` associated with this node;
+          meaningful if `self._tag.value` has a `keys` method
+        * `_meta`: a namespace containing the meta information
+          for the `Tag` associated with this node
+        * `_type`: a namespace containing the type definition
+          for the `Tag` associated with this node
+        * `_values`: the values within the `Tag.value`
+          for the `Tag` associated with this node
+        * *baseattr*`_lc`: lowercase and titled forms.
+          If *baseattr* exists,
+          return its value lowercased via `cs.lex.lc_()`.
+          Conversely, if *baseattr* is required
+          and does not directly exists
+          but its *baseattr*`_lc` form does,
+          return the value of *baseattr*`_lc`
+          titlelified using `cs.lex.titleify_lc()`.
+        * *baseattr*`s`, *baseattr*`es`: singular/plural.
+          If *baseattr* exists
+          return `[self.`*baseattr*`]`.
+          Conversely,
+          if *baseattr* does not exist but one of its plural attributes does,
+          return the first element from the plural attribute.
+    '''
+    path = self.__dict__.get('_path')
+    with Pfx("%s:%s.%s", type(self).__name__, path, attr):
+      if attr == 'cover':
+        raise RuntimeError("BANG")
       getns = self.__dict__.get
+      if attr == '_type':
+        return self._tag.typedata.ns()
+      if attr == '_meta':
+        return self._tag.metadata.ns()
+      if attr == '_keys':
+        tag = getns('_tag')
+        if tag is not None:
+          value = tag.value
+          try:
+            keys = value.keys
+          except AttributeError:
+            pass
+          else:
+            return list(keys())
+      if attr == '_values':
+        tag = getns('_tag')
+        if tag is not None:
+          value = tag.value
+          try:
+            values = value.values
+          except AttributeError:
+            pass
+          else:
+            return list(values())
+      # end of private/special attributes
+      if attr.startswith('_'):
+        raise AttributeError(attr)
       # attr vs attr_lc
       title_attr = cutsuffix(attr, '_lc')
       if title_attr is not attr:
-        value = getns(title_attr)
-        if value is not None:
-          return lc_(value)
+        title_value = self._attr_tag_value(title_attr)
+        if title_value is not None:
+          value_lc = lc_(title_value)
+          return value_lc
       else:
-        value = getns(attr + '_lc')
-        if value is not None:
+        attr_lc_value = getns(attr + '_lc')
+        if attr_lc_value is not None:
           return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
         if single_attr is not attr:
-          value = getns(single_attr)
-          if value is not None:
-            return [value]
+          single_value = self._attr_tag_value(single_attr)
+          if single_value is not None:
+            return [single_value]
       # singular from plural
       for pl_suffix in 's', 'es':
         plural_attr = attr + pl_suffix
-        value = getns(plural_attr)
-        if isinstance(value, list) and value:
-          return value[0]
-      raise AttributeError(attr)
-
-  def __getitem__(self, attr):
-    try:
-      value = getattr(self, attr)
-    except AttributeError as e:
-      if getattr(self, '_return_None_if_missing', False):
-        default = self.__missing__(attr)
-        warning("no %r, returning %r", attr, default)
-        return default
-      raise KeyError(attr) from e
-    return value
-
-class ValueDetail(namedtuple('ValueDetail', 'ontology ontkey value')):
-  ''' Detail information about a value.
-        * `ontology`: the reference ontology
-        * `ontkey`: the key within the ontology providing the detail
-        * `value`: the value
-    '''
-
-  @property
-  def detail(self):
-    ''' The detail, the `TagSet` from `ontology[ontkey]`.
-      '''
-    return self.ontology[self.ontkey]
-
-class KeyValueDetail(namedtuple('KeyValueDetail', 'key_detail value_detail')):
-  ''' Detail information about a value.
-        * `ontology`: the reference ontology
-        * `key_detail`: the detail for the `key`,
-          the `TagSet` from `ontology[key_detail.ontkey]`
-        * `value`: the value
-        * `value_detail`: the detail for the `value`,
-          the `TagSet` from `ontology[value_detail.ontkey]`
-    '''
+        plural_value = self._attr_tag_value(plural_attr)
+        if plural_value is None:
+          continue
+        value0 = plural_value[0]
+        return value0
+      return super().__getattr__(attr)
 
   @property
   def ontology(self):
     ''' The reference ontology.
       '''
-    return self.key_detail.ontology
+    return self.key_metadata.ontology
 
   @property
   def key(self):
     ''' The key.
       '''
-    return self.key_detail.value
+    return self.key_metadata.value
 
   @property
   def value(self):
     ''' The value.
       '''
-    return self.value_detail.value
+    return self.value_metadata.value
+
+class ValueMetadataNamespace(TagSetNamespace):
+  ''' A subclass of `TagSetNamespace` for a `Tag`'s metadata.
+
+      The reference `TagSet` is the defining `TagSet`
+      for the metadata of a particular `Tag` value
+      as defined by a `ValueMetadata`
+      (the return value of `Tag.metadata`).
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_metadata(cls, meta, pathnames=None):
+    ''' Construct a new `ValueMetadataNamespace` from `meta` (a `ValueMetadata`).
+    '''
+    ont = meta.ontology
+    ontkey = meta.ontkey
+    tags = ont[ontkey]
+    ns0 = cls.from_tagset(tags, pathnames=pathnames)
+    ns0._ontology = ont
+    ns0._ontkey = ontkey
+    ns0._value = meta.value
+    return ns0
+
+  @pfx_method
+  def __format__(self, spec):
+    ''' Format this node.
+        If there's a `Tag` on the node, format its value.
+        Otherwise use the superclass format.
+    '''
+    XP(
+        "XNS%s.__FORMAT__(spec=%r): self=%s, %r", type(self), spec, self,
+        self.__dict__
+    )
+    return (
+        "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
+    ).__format__(spec)
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
@@ -652,6 +1125,12 @@ class TagsOntology(SingletonMixin):
       A `cs.fstags.FSTags` uses ontologies initialised from `TagFile`s
       containing ontology mappings.
   '''
+
+  # A mapping of base type named to Python types.
+  BASE_TYPES = {
+      t.__name__: t
+      for t in (int, float, str, list, dict, date, datetime)
+  }
 
   @classmethod
   def _singleton_key(cls, tagset_mapping):
@@ -666,26 +1145,8 @@ class TagsOntology(SingletonMixin):
   __repr__ = __str__
 
   def __getitem__(self, index):
-    ''' If `index` is a `str`
-        presume it is a `Tag.name`
-        and return the defining `TagSet`.
-        Otherwise presume `index` is `Tag`like
-        and return a `TagInfo` for the index
-        (a `Tag`like object with type information).
-    '''
-    return (
-        self.defn_tagset(index)
-        if isinstance(index, str) else TagInfo(index, ontology=self)
-    )
-
-  def defn_tagset(self, tag):
-    ''' Return the `TagSet` defining ontology entry specified by `tag`.
-
-        `tag` may be a `str` (a tag name) or a `Tag` like thing
-        in which case `tag.name` is used.
-    '''
-    tagset_name = tag if isinstance(tag, str) else tag.name
-    return self.tagsets[tagset_name]
+    assert isinstance(index, str)
+    return self.tagsets[index]
 
   @staticmethod
   @pfx
@@ -718,8 +1179,8 @@ class TagsOntology(SingletonMixin):
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_detail(self, type_name, value):
-    ''' Return a `ValueDetail` for `type_name` and `value`.
+  def value_metadata(self, type_name, value):
+    ''' Return a `ValueMetadata` for `type_name` and `value`.
         This provides the mapping between a type's value and its semantics.
 
         For example,
@@ -731,182 +1192,57 @@ class TagsOntology(SingletonMixin):
         `character.marvel.captain_america`
         and `character.marvel.black_widow` respectively,
         ready for lookup in the ontology
-        to obtain the "detail" `TagSet` for each specific value.
+        to obtain the "metadata" `TagSet` for each specific value.
     '''
     if isinstance(value, str):
       value_tag_name = self.value_to_tag_name(value)
       ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
-      return ValueDetail(self, ontkey, value)
+      return ValueMetadata(self, ontkey, value)
     return None
 
-class TagInfo(FormatableMixin):
-  ''' A `Tag`like object linked to a `TagOntology`,
-      providing associated detail about a `Tag`.
-
-      Like `Tag`, this has a `.name` and `.value`.
-
-      Additionally it has the following attributes:
-      * `ontology`: the supporting `TagsOntology`
-      * `tag`: the originating `Tag`
-        (computed from the `(name,value)` tuple if supplied)
-      * `defn`: the `TagSet` from the ontology
-        which defines this `TagInfo`'s metadata
-      * `type`: `self.defn['type']`
-      * `member_type`: `self.defn['member_type']` if present;
-        we expect `type` to be a list or mapping type name
-
-      Indexing a `TagInfo` indexes its `.value`
-      and returns a tuple `(element,TagSet)`
-      where the `TagSet` is information from the ontology
-      about the element's value (if `element` is a `str`).
-
-      If the `.value` looks like a mapping
-      .ie. it has a `.keys()` method
-      then a `TagInfo` has `.keys()` and `.items()` methods.
-      The `.keys()` call returns `.value.keys()`.
-      The `.items()` call yields `(key,self[key])`
-      for each of `self.keys()`.
-
-      Iterating over a `TagInfo`
-      yields its keys if it has a `.keys()` method,
-      otherwise values from `range(len(self.value))`.
-  '''
-
-  def __init__(self, name, value=None, *, ontology):
-    ''' Prepare the `TagInfo` from a `Tag` or `(name,value)` tuple.
+  def basetype(self, typename):
+    ''' Infer the base type from a type name.
+        The default type is `'str'`,
+        but any type which resolves to one in `BASE_TYPES`
+        may be returned.
     '''
-    tag = Tag.from_name_value(name, value)
-    self.tag = tag
-    self.name = tag.name
-    self.value = tag.value
-    self.ontology = ontology
+    typename0 = typename
+    typeinfo = self[typename]
+    seen = set((typename,))
+    while 'type' in typeinfo:
+      typename = typeinfo['type']
+      if typename in seen:
+        warning(
+            "type %r: circular type definitions involving %r", typename0, seen
+        )
+        break
+    if typename not in self.BASE_TYPES:
+      typename = 'str'
+    return typename
 
-  def __str__(self):
-    return "%s(%s:%s,%s)" % (
-        type(self).__name__, self.type, self.tag, self.ontology
-    )
+  def convert_tag(self, tag):
+    ''' Convert a `Tag`'s value accord to the ontology.
+        Return a new `Tag` with the converted value
+        or the original `Tag` unchanged.
 
-  def __repr__(self):
-    return "%s[tag=%s]" % (type(self).__name__, self.tag)
-
-  @property
-  def defn(self):
-    ''' The defining `TagSet` for this tag name.
-
-        This is how its type is defined,
-        and is obtained from:
-        `self.ontology.defn_tagset(self.name)`
+        This is primarily aimed at things like regexp based autotagging,
+        where the matches are all strings
+        but various fields have special types,
+        commonly `int`s or `date`s.
     '''
-    return self.ontology.defn_tagset(self.name)
-
-  @property
-  def type(self):
-    ''' The type name for this tag.
-
-        Unless the definition for `self.name` has a `type` tag,
-        the type is `self.ontology.value_to_tag_name(self.name)`.
-
-        For example, the tag `series="Avengers (Marvel)"`
-        would look up the definition for `series`.
-        If that had no `type=` tag, then the type
-        would default to `series`
-        which is what would be returned.
-
-        The corresponding detail `TagSet`
-        would have the the name `series.marvel.avengers`.
-
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
-        would look up the definition for `cast`
-        which might look like this:
-
-            cast type=dict key_type=person member_type=character
-
-        That says that the type name is `dict`,
-        which is what would be returned.
-
-        Because the type is `dict`
-        the definition also has `key_type` and `member_type` tags
-        identifying the type names for the keys and values
-        of the `cast=` tag.
-        As such, the corresponding detail `TagSet`s
-        in this example would be named
-        `person.scarlett_johasson`
-        and `character.marvel.black_widow` respectively.
-    '''
-    type_name = self.defn.get('type')
-    if type_name is None:
-      type_name = self.ontology.value_to_tag_name(self.name)
-    return type_name
-
-  @property
-  @require(lambda self: isinstance(self.type, str))
-  def detail(self):
-    ''' The detailed information about this specific tag value,
-        derived through the ontology from the tag name and value.
-
-        For a scalar type this is a `ValueDetail`
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `ontkey`: the ontology key providing the detail for the `value`
-        * `value`: the value `self.value`
-        * `detail`: the detail, a `TagSet`
-
-        However, note that the types `'list'` and `'dict'` are special,
-        indicating that the value is a sequence or mapping respectively.
-
-        For `'list'` types
-        this property is a list of `ValueDetail` instances
-        for each element of the sequence.
-
-        For `'dict'` types
-        this property is a list of `KeyValueDetail` instances
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `key`: the key
-        * `key_detail`: a `ValueDetail` for the key
-        * `value`: the value
-        * `value_detail`: a `ValueDetail` for the value
-    '''
-    ont = self.ontology
-    if self.type == 'list':
-      member_type = self.member_type
-      return [ont.value_detail(member_type, value) for value in self.value]
-    if self.type == 'dict':
-      key_type = self.key_type
-      member_type = self.member_type
-      return [
-          KeyValueDetail(
-              ont.value_detail(key_type, key),
-              ont.value_detail(member_type, value)
-          ) for key, value in self.value.items()
-      ]
-    return ont.value_detail(self.type, self.value)
-
-  @property
-  def key_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a mapping.
-    '''
+    basetype = Tag(tag, ontology=self).basetype
     try:
-      return self.defn['key_type']
+      converter = {
+          'date': date_fromisoformat,
+          'datetime': datetime_fromisoformat,
+      }[basetype]
     except KeyError:
-      raise AttributeError('key_type')
-
-  @property
-  def member_type(self):
-    ''' The type name for members of this tag.
-
-        This is required if `.value` is a sequence or mapping.
-    '''
-    try:
-      return self.defn['member_type']
-    except KeyError:
-      raise AttributeError('member_type')
-
-  def ns(self):
-    ''' Return an `ExtendedNamespace` derived from `self.defn.ns()`.
-    '''
-    return self.defn.ns()
-
-  format_kwargs = ns
+      converter = self.BASE_TYPES.get(basetype)
+    if converter:
+      try:
+        converted = converter(tag.value)
+      except (ValueError, TypeError):
+        pass
+      else:
+        tag = Tag(tag.name, converted)
+    return tag
