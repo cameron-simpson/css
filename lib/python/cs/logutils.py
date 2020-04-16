@@ -80,7 +80,8 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
-TRACK = logging.INFO + 5  # over INFO, under WARNING
+TRACK = logging.INFO + 5    # over INFO, under WARNING
+STATUS = TRACK - 1          # over INFO, under TRACK
 
 loginfo = NS(upd_mode=None)
 D_mode = False
@@ -221,7 +222,7 @@ def setup_logging(
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, ansi_mode=ansi_mode)
     upd = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
@@ -366,7 +367,9 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       * `numeric >= 1 and < 2`: `logging.INFO`
       * `numeric >= 2`: `logging.DEBUG`
       * `"DEBUG"`: `logging.DEBUG`
-      * `"INFO"`: ` logging.INFO`
+      * `"STATUS"`: `STATUS`
+      * `"INFO"`: `logging.INFO`
+      * `"TRACK"`: `TRACK`
       * `"WARNING"`: `logging.WARNING`
       * `"ERROR"`: `logging.ERROR`
 
@@ -386,7 +389,10 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     else:
       level = logging.WARNING
   elif verbose:
-    level = logging.INFO
+    if sys.stderr.isatty():
+      level = STATUS
+    else:
+      level = logging.INFO
   else:
     level = logging.WARNING
   flags = [F.upper() for F in env_debug.split(',') if len(F)]
@@ -416,8 +422,12 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       uc_flag = flag.upper()
       if uc_flag == 'DEBUG':
         level = logging.DEBUG
+      elif uc_flag == 'STATUS':
+        level = STATUS
       elif uc_flag == 'INFO':
         level = logging.INFO
+      elif uc_flag == 'TRACK':
+        level = TRACK
       elif uc_flag == 'WARN' or uc_flag == 'WARNING':
         level = logging.WARNING
       elif uc_flag == 'ERROR':
@@ -603,6 +613,11 @@ def info(msg, *args, **kwargs):
   '''
   log(logging.INFO, msg, *args, **kwargs)
 
+def status(msg, *args, **kwargs):
+  ''' Emit a log at `STATUS` `level` with the current Pfx prefix.
+  '''
+  log(STATUS, msg, *args, **kwargs)
+
 def track(msg, *args, **kwargs):
   ''' Emit a log at `TRACK` `level` with the current Pfx prefix.
   '''
@@ -709,50 +724,48 @@ class UpdHandler(StreamHandler):
       uses a `cs.upd.Upd` for transcription.
   '''
 
-  def __init__(self, strm=None, nl_level=None, ansi_mode=None):
-    ''' Initialise the UpdHandler.
+  def __init__(self, strm=None, upd_level=None, ansi_mode=None):
+    ''' Initialise the `UpdHandler`.
 
         Parameters:
         * `strm`: the output stream, default `sys.stderr`.
-        * `nl_level`: the logging level at which conventional line-of-text
-          output is written; log messages of a lower level go via the
-          update-the-current-line method.
-          Default: `logging.WARNING`.
+        * `upd_level`: the magic logging level which updates the status line
+          via `Upd`. Default: `STATUS`.
         * `ansi_mode`: if `None`, set from `strm.isatty()`.
           A true value causes the handler to colour certain logging levels
           using ANSI terminal sequences.
     '''
     if strm is None:
       strm = sys.stderr
-    if nl_level is None:
-      nl_level = logging.INFO
+    if upd_level is None:
+      upd_level = STATUS
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
     self.upd = Upd(strm)
-    self.nl_level = nl_level
+    self.upd_level = upd_level
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
-    ''' Emit a LogRecord `logrec`.
+    ''' Emit a `LogRecord` `logrec`.
 
-        For log levels at or above `self.nl_level` write a distinct line
+        For the log level `self.upd_level` update the status line.
+        For other levels write a distinct line
         to the output stream, possibly colourised.
-
-        For log levels below `self.nl_level` update the status text.
     '''
-    if logrec.levelno >= self.nl_level:
+    line = self.format(logrec)
+    if logrec.levelno == self.upd_level:
+      with self.__lock:
+        self.upd.out(line)
+    else:
       if self.__ansi_mode:
         if logrec.levelno >= logging.ERROR:
           logrec.msg = colourise(logrec.msg, 'red')
-        elif logrec.levelno >= logging.WARN:
+        elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
       with self.__lock:
-        self.upd.nl(self.format(logrec))
-    else:
-      with self.__lock:
-        self.upd.out(logrec.getMessage())
+        self.upd.nl(line)
 
   def flush(self):
     ''' Flush the update status.
