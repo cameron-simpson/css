@@ -182,7 +182,7 @@ class Upd(SingletonMixin):
 
         The former method is used if the terminal supports the
         `il1` (insert one line) capability;
-        this are probed for on the first use and remembered.
+        this is probed for on the first use and remembered.
     '''
     if a:
       txt = txt % a
