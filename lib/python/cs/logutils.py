@@ -599,8 +599,12 @@ def trace(msg, *args, **kwargs):
   log(loginfo.trace_level, msg, *args, **kwargs)
 
 def upd(msg, *args):
-  ''' If we're using an UpdHandler,
+  ''' If we're using an `UpdHandler`,
       update the status line otherwise write an info message.
+
+      Note that this calls `Upd.out` directly with `msg%args`
+      and thus does not include the current `Pfx` prefix.
+      You may well want to use the `status()` function instead.
   '''
   _upd = loginfo.upd
   if _upd:
