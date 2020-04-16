@@ -58,7 +58,7 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, logging_wrapper
 from cs.lex import is_dotted_identifier
 import cs.pfx
 from cs.pfx import Pfx, XP
@@ -540,31 +540,37 @@ def exception(msg, *args):
   '''
   Pfx._state.cur.exception(msg, *args)
 
+@logging_wrapper
 def log(level, msg, *args, **kwargs):
   ''' Emit a log at the specified `level` with the current Pfx prefix.
   '''
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def debug(msg, *args, **kwargs):
   ''' Emit a log at `logging.DEBUG` `level` with the current Pfx prefix.
   '''
   log(logging.DEBUG, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def info(msg, *args, **kwargs):
   ''' Emit a log at `logging.INFO` `level` with the current Pfx prefix.
   '''
   log(logging.INFO, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def status(msg, *args, **kwargs):
   ''' Emit a log at `STATUS` `level` with the current Pfx prefix.
   '''
   log(STATUS, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def track(msg, *args, **kwargs):
   ''' Emit a log at `TRACK` `level` with the current Pfx prefix.
   '''
   log(TRACK, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def ifverbose(verbose, msg, *args, **kwargs):
   ''' Conditionally log a message.
       If verbose is `None`
@@ -578,27 +584,32 @@ def ifverbose(verbose, msg, *args, **kwargs):
   elif verbose:
     track(msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def warning(msg, *args, **kwargs):
   ''' Emit a log at `logging.WARNING` `level` with the current Pfx prefix.
   '''
   log(logging.WARNING, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def error(msg, *args, **kwargs):
   ''' Emit a log at `logging.ERROR` `level` with the current Pfx prefix.
   '''
   log(logging.ERROR, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def critical(msg, *args, **kwargs):
   ''' Emit a log at `logging.CRITICAL` `level` with the current Pfx prefix.
   '''
   log(logging.CRITICAL, msg, *args, **kwargs)
 
+@logging_wrapper(stacklevel_increment=1)
 def trace(msg, *args, **kwargs):
   ''' Emit a log message at `loginfo.trace_level` with the current Pfx prefix.
   '''
   log(loginfo.trace_level, msg, *args, **kwargs)
 
-def upd(msg, *args):
+@logging_wrapper(stacklevel_increment=1)
+def upd(msg, *args, **kwargs):
   ''' If we're using an `UpdHandler`,
       update the status line otherwise write an info message.
 
@@ -610,7 +621,7 @@ def upd(msg, *args):
   if _upd:
     _upd.out(msg, *args)
   else:
-    info(msg, *args)
+    info(msg, *args, **kwargs)
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
@@ -719,4 +730,13 @@ class UpdHandler(StreamHandler):
     return self.upd.flush()
 
 if __name__ == '__main__':
-  setup_logging(sys.argv[0])
+
+  @logging_wrapper
+  def test_warning(msg, *a, **kw):
+    warning(msg, *a, **kw)
+
+  setup_logging(
+      sys.argv[0],
+      format='%(pfx)s: from %(funcName)s:%(filename)s:%(lineno)d: %(message)s'
+  )
+  test_warning("test warning")
