@@ -14,7 +14,7 @@ import sys
 import time
 import traceback
 
-__version__ = '20200318.1'
+__version__ = '20200417'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
