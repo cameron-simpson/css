@@ -58,7 +58,9 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise
+from cs.deco import fmtdoc
 from cs.lex import is_dotted_identifier
+import cs.pfx
 from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
@@ -73,7 +75,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.ansi_colour', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
+    ['cs.ansi_colour', 'cs.deco', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -326,24 +328,32 @@ def _ftrace(func):
   return traced_func
 
 class PfxFormatter(Formatter):
-  ''' A Formatter subclass that has access to the program's cmd and Pfx state.
+  ''' A Formatter subclass that has access to the program's cmd and `Pfx` state.
   '''
 
+  @fmtdoc
   def __init__(self, fmt=None, datefmt=None, cmd=None):
-    ''' Initialise the PfxFormatter.
+    ''' Initialise the `PfxFormatter`.
 
-        `fmt` and `datefmt` are passed to Formatter.
-        If `fmt` is None, DEFAULT_PFX_FORMAT is used.
-        If `cmd` is not None, the message is prefixed with the string `cmd`.
+        Parameters:
+        * `fmt`: format template,
+          default from `DEFAULT_PFX_FORMAT` `{DEFAULT_PFX_FORMAT!r}`.
+          Passed through to `Formatter.__init__`.
+        * `datefmt`:
+          Passed through to `Formatter.__init__`.
+        * `cmd`: the "command prefix" made available to format strings.
+          If not set, `cs.pfx.cmd` is presented.
     '''
+    if fmt is None:
+      fmt = DEFAULT_PFX_FORMAT
     self.cmd = cmd
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
-    ''' Set .cmd and .pfx to the global cmd and Pfx context prefix
-        respectively, then call Formatter.format.
+    ''' Set `record.cmd` and `record.pfx`
+        to the global cmd and Pfx context prefix respectively,
+        then call `Formatter.format`.
     '''
-    import cs.pfx
     record.cmd = self.cmd if self.cmd else cs.pfx.cmd
     record.pfx = Pfx._state.prefix
     try:
