@@ -22,6 +22,7 @@ import atexit
 from contextlib import contextmanager
 from threading import RLock
 from cs.lex import unctrl
+from cs.obj import SingletonMixin
 from cs.tty import ttysize
 
 __version__ = '20200229'
@@ -33,29 +34,30 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.lex', 'cs.tty'],
+    'install_requires': ['cs.lex', 'cs.obj', 'cs.tty'],
 }
 
 instances = []
-instances_by_id = {}
 
 def cleanupAtExit():
   ''' Cleanup function called at programme exit to clear the status line.
   '''
   global instances
-  global instances_by_id
   for i in instances:
     i.close()
   instances = ()
-  instances_by_id = {}
 
 atexit.register(cleanupAtExit)
 
-class Upd(object):
-  ''' A class for maintaining a regularly updated status line.
+class Upd(SingletonMixin):
+  ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
   '''
 
-  def __init__(self, backend, columns=None):
+  @classmethod
+  def _singleton_key(cls, backend, columns=None):
+    return id(backend)
+
+  def _singleton_init(self, backend, columns=None):
     assert backend is not None
     if columns is None:
       columns = 80
@@ -232,18 +234,3 @@ class Upd(object):
         yield old
       finally:
         self.out(old)
-
-# make Upd the singleton factory
-_Upd = Upd
-
-def Upd(stream):
-  ''' Factory for `Upd` singletons keyed by the id of their backend.
-  '''
-  global instances_by_id
-  U = instances_by_id.get(id(stream))
-  if not U:
-    U = _Upd(stream)
-    instances_by_id[id(stream)] = U
-  return U
-
-upd_for = Upd
