@@ -453,55 +453,6 @@ def D(msg, *args):
   if D_mode:
     XP(msg, *args)
 
-def status(msg, *args, **kwargs):
-  ''' Write a message to the terminal's status line.
-
-      Parameters:
-      * `msg`: message string
-      * `args`: if not empty, the message is %-formatted with `args`
-      * `file`: optional keyword argument specifying the output file.
-        Default: `sys.stderr`.
-
-      Hack: if there is no status line use the xterm title bar sequence :-(
-  '''
-  if args:
-    msg = msg % args
-  f = kwargs.pop('file', None)
-  if kwargs:
-    raise ValueError("unexpected keyword arguments: %r" % (kwargs,))
-  if f is None:
-    f = sys.stderr
-  try:
-    has_ansi_status = f.has_ansi_status
-  except AttributeError:
-    try:
-      import curses
-    except ImportError:
-      has_ansi_status = None
-    else:
-      curses.setupterm()
-      has_status = curses.tigetflag('hs')
-      if has_status == -1:
-        warning(
-            'status: curses.tigetflag(hs): not a Boolean capability, presuming false'
-        )
-        has_ansi_status = None
-      elif has_status > 0:
-        has_ansi_status = (
-            curses.tigetstr('to_status_line'),
-            curses.tigetstr('from_status_line')
-        )
-      else:
-        warning('status: hs=%s, presuming false', has_status)
-        has_ansi_status = None
-    f.has_ansi_status = has_ansi_status
-  if has_ansi_status:
-    msg = has_ansi_status[0] + msg + has_ansi_status[1]
-  else:
-    msg = '\033]0;' + msg + '\007'
-  f.write(msg)
-  f.flush()
-
 def add_logfile(
     filename,
     logger=None,
