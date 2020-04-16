@@ -124,6 +124,27 @@ def decorator(deco):
   return metadeco
 
 @decorator
+def logging_wrapper(log_call, stacklevel_increment=1):
+  ''' Decorator for logging call shims
+      which bumps the `stacklevel` keyword argument so that the logging system
+      chooses the correct frame to cite in messages.
+
+      Note: has no effect on Python < 3.8 because `stacklevel` only
+      appeared in that version.
+  '''
+  if (sys.version_info.major < 3
+      or sys.version_info.major == 3 and sys.version_info.minor < 8):
+    return log_call
+
+  def wrapper(*a, **kw):
+    stacklevel = kw.pop('stacklevel', 1)
+    return log_call(*a, stacklevel=stacklevel + stacklevel_increment + 1, **kw)
+
+  wrapper.__name__ = log_call.__name__
+  wrapper.__doc__ = log_call.__doc__
+  return wrapper
+
+@decorator
 def cachedmethod(
     method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
