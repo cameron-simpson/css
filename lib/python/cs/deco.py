@@ -299,15 +299,17 @@ def OBSOLETE(func, suggestion=None):
       callers.add(caller)
       warning(
           "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-          func.__code__.co_filename, func.__code__.co_firstlineno, func.__name__,
-          frame[0], frame[1], frame[2]
+          func.__code__.co_filename, func.__code__.co_firstlineno,
+          func.__name__, frame[0], frame[1], frame[2]
       )
     return func(*args, **kwargs)
 
   wrapped.__name__ = '@OBSOLETE(%s)' % (getattr(func, '__name__', str(func)),)
   wrapped.__doc__ = (
-      (wrapped.__name__ + ': ' + suggestion if suggestion else wrapped.__name__)
-      + '\n\n' + (getattr(func, '__doc__', None) or '')
+      (
+          wrapped.__name__ + ': ' +
+          suggestion if suggestion else wrapped.__name__
+      ) + '\n\n' + (getattr(func, '__doc__', None) or '')
   )
   return wrapped
 
