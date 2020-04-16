@@ -3,6 +3,9 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
+    Many basic tasks can be performed with the `fstags` commandline utility,
+    documented under the `FSTagsCommand` class below.
+
     Why `fstags`?
     By storing the tags in a separate file we:
     * can store tags without modifying a file
@@ -26,7 +29,7 @@
 
     For example, a media file for a television episode with the pathname
     `/path/to/series-name/season-02/episode-name--s02e03--something.mp4`
-    might obtain the tags:
+    might have the tags:
 
         series_title="Series Full Name"
         season=2
@@ -34,13 +37,31 @@
         episode=3
         episode_title="Full Episode Title"
 
-    from the following `.fstags` entries:
+    obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
       `series-name sf series_title="Series Full Name"`
     * tag file `/path/to/series-name/.fstags`:
       `season-02 season=2`
     * tag file `/path/to/series-name/season-02/.fstags`:
       `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+    ## `fstags` Examples ##
+
+    ### Backing up a media tree too big for the removable drives ###
+
+    Walk the media tree for files tagged for backup to `archive2`:
+
+        find /path/to/media backup=archive2
+
+    Walk the media tree for files not assigned to a backup archive:
+
+        find /path/to/media -backup
+
+    Backup the `archive2` files using `rsync`:
+
+        fstags find --for-rsync /path/to/media backup=archive2 \
+        | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
+
 '''
 
 from collections import defaultdict, namedtuple
@@ -132,7 +153,7 @@ def verbose(msg, *a):
   ifverbose(state.verbose, msg, *a)
 
 class FSTagsCommand(BaseCommand):
-  ''' `fstags` main command line class.
+  ''' `fstags` main command line utility.
   '''
 
   GETOPT_SPEC = ''
