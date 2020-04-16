@@ -80,8 +80,13 @@ DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(asctime)s %(levelname)s %(pfx)s: %(message)s'
 DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
-TRACK = logging.INFO + 5    # over INFO, under WARNING
-STATUS = TRACK - 1          # over INFO, under TRACK
+# High level action tracking, above INFO and below WARNING.
+TRACK = logging.INFO + 5
+assert TRACK < logging.WARNING
+
+# Special status line tracking, above INFO and below TRACK and WARNING
+STATUS = TRACK - 1
+assert STATUS > logging.INFO and STATUS < logging.WARNING
 
 loginfo = NS(upd_mode=None)
 D_mode = False

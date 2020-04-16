@@ -1,4 +1,3 @@
-cs.logutils: some asserts below TRACK and STATUS to verify their positions relative to the other logging levels
 cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
 cs.upd: some kind of ANSI escape support so that we can mbed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
 cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
