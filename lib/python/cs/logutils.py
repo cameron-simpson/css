@@ -573,30 +573,6 @@ def logException(exc_type, exc_value, exc_tb):
       exception("EXCEPTION> " + line)
     sys.excepthook = curhook
 
-def OBSOLETE(func):
-  ''' Decorator for obsolete functions.
-
-      Use:
-
-          @OBSOLETE
-          def f(...):
-
-      This emits a warning log message before calling the decorated function.
-  '''
-
-  def wrapped(*args, **kwargs):
-    ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
-    '''
-    frame = traceback.extract_stack(None, 2)[0]
-    warning(
-        "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-        func.__code__.co_filename, func.__code__.co_firstlineno, func.__name__,
-        frame[0], frame[1], frame[2]
-    )
-    return func(*args, **kwargs)
-
-  return wrapped
-
 # Logger public functions
 def exception(msg, *args):
   ''' Emit an exception log with the current Pfx prefix.
