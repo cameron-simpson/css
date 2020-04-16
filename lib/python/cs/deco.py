@@ -13,10 +13,6 @@ from contextlib import contextmanager
 import sys
 import time
 import traceback
-try:
-  from cs.logutils import warning
-except ImportError:
-  from logging import warning
 
 __version__ = '20200318.1'
 
@@ -29,6 +25,15 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
+
+def warning(msg, *args, **kw):
+  ''' Issue a warning message.
+  '''
+  try:
+    from cs.logutils import warning as _warning
+  except ImportError:
+    from logging import warning as _warning
+  return _warning(msg, *args, **kw)
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
