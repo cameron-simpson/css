@@ -13,6 +13,7 @@ import os
 import re
 from subprocess import Popen, PIPE
 import sys
+from cs.gimmicks import warning
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -24,17 +25,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Terminals",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
-
-def warning(msg, *args, **kw):
-  ''' Issue a warning message.
-  '''
-  try:
-    from cs.logutils import warning as _warning
-  except ImportError:
-    from logging import warning as _warning
-  return _warning(msg, *args, **kw)
 
 WinSize = namedtuple('WinSize', 'rows columns')
 
