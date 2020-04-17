@@ -13,6 +13,7 @@ from contextlib import contextmanager
 import sys
 import time
 import traceback
+from cs.gimmicks import warning
 
 __version__ = '20200417'
 
@@ -23,17 +24,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
-
-def warning(msg, *args, **kw):
-  ''' Issue a warning message.
-  '''
-  try:
-    from cs.logutils import warning as _warning
-  except ImportError:
-    from logging import warning as _warning
-  return _warning(msg, *args, **kw)
 
 def fmtdoc(func):
   ''' Decorator to replace a function's docstring with that string
@@ -132,17 +124,17 @@ def logging_wrapper(log_call, stacklevel_increment=1):
       Note: has no effect on Python < 3.8 because `stacklevel` only
       appeared in that version.
   '''
-  if (sys.version_info.major < 3
-      or sys.version_info.major == 3 and sys.version_info.minor < 8):
+  if (sys.version_info.major, sys.version_info.minor) < (3, 8):
+    # do not wrap older Python log calls, no stacklevel keyword argument
     return log_call
 
-  def wrapper(*a, **kw):
+  def log_func_wrapper(*a, **kw):
     stacklevel = kw.pop('stacklevel', 1)
     return log_call(*a, stacklevel=stacklevel + stacklevel_increment + 1, **kw)
 
-  wrapper.__name__ = log_call.__name__
-  wrapper.__doc__ = log_call.__doc__
-  return wrapper
+  log_func_wrapper.__name__ = log_call.__name__
+  log_func_wrapper.__doc__ = log_call.__doc__
+  return log_func_wrapper
 
 @decorator
 def cachedmethod(
