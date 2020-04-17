@@ -8,6 +8,8 @@ less demanding of others.
 
 import sys
 
+__version__ = '20200418.1'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
