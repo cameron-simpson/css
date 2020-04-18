@@ -74,9 +74,10 @@ class Upd(SingletonMixin):
           columns = rc.columns
     self._backend = backend
     self.columns = columns
-    self._state = ''
     self._ti_ready = False
     self._ti_strs = {}
+    self._slot_text = ['']
+    self._current_slot = 0
     self._above = None
     self._lock = RLock()
     global instances
@@ -92,9 +93,10 @@ class Upd(SingletonMixin):
         line is not empty, output a newline to preserve the status
         line on the screen.  Otherwise just clear the status line.
     '''
-    if self._state:
+    if self._slot_text[0]:
       if exc_type:
         self._backend.write('\n')
+        self._backend.flush()
       else:
         self.out('')
 
@@ -129,8 +131,8 @@ class Upd(SingletonMixin):
       return s
 
   @staticmethod
-  def adjust_text(oldtxt, newtxt, columns):
-    ''' Compute the text sequence required to update `oldtxt` to `newtxt`
+  def adjust_text_v(oldtxt, newtxt, columns, raw_text=False):
+    ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
@@ -138,8 +140,8 @@ class Upd(SingletonMixin):
         `oldtxt` is presumed to be already normalised.
     '''
     # normalise text
-    newtxt = newtxt.rstrip()
-    newtxt = unctrl(newtxt)
+    if not raw_text:
+      newtxt = unctrl(newtxt.rstrip())
     # crop for terminal width
     newlen = len(newtxt)
     if newlen >= columns:
@@ -161,7 +163,7 @@ class Upd(SingletonMixin):
     #
     if oldlen - pfxlen < 1 + pfxlen:
       # backspace and partial overwrite
-      difftxts = [ '\b' * (oldlen - pfxlen), newtxt[pfxlen:]]
+      difftxts = ['\b' * (oldlen - pfxlen), newtxt[pfxlen:]]
     else:
       # carriage return and complete overwrite
       difftxts = ['\r', newtxt]
@@ -171,9 +173,38 @@ class Upd(SingletonMixin):
       # old line was longer - write spaces over the old tail
       difftxts.append(' ' * extlen)
       difftxts.append('\b' * extlen)
-    return ''.join(difftxts)
+    return difftxts
 
-  def out(self, txt, *a):
+  def move_to_slot_v(self, from_slot, to_slot):
+    ''' Compute the text sequences required to move our cursor
+        to the end of `to_slot` from `from_slot`.
+    '''
+    if from_slot is None:
+      from_slot = self._current_slot
+    movetxts = []
+    oldtxt = self._slot_text[to_slot]
+    from_slot = self._current_slot
+    if to_slot != from_slot:
+      # move cursor to end of target slot
+      if to_slot < from_slot:
+        # emit VT
+        movetxts.append('\v' * (from_slot - to_slot))
+      else:
+        # emit cursor_up
+        cuu1 = self.ti_str('cuu1')
+        movetxts.append(cuu1 * (from_slot - to_slot))
+      # adjust horizontal position
+      vpos_cur = len(self._slot_text[from_slot])
+      vpos_slot = len(oldtxt)
+      if vpos_cur > vpos_slot:
+        # backspace
+        movetxts.append('\b' * (vpos_cur - vpos_slot))
+      elif vpos_cur < vpos_slot:
+        # overwrite to advance cursor
+        movetxts.append(oldtxt[vpos_cur:])
+    return movetxts
+
+  def out(self, txt, *a, slot=0, raw_text=False):
     ''' Update the status line to `txt`.
         Return the previous status line content.
 
@@ -181,17 +212,29 @@ class Upd(SingletonMixin):
         * `txt`: the status line text.
         * `a`: optional positional parameters;
           if not empty, `txt` is percent formatted against this list.
+        * `slot`: which slot to update; default is `0`, the bottom slot
+        * `raw_text`: if true (default `False`), do not normalise the text
     '''
     if a:
       txt = txt % a
+    if not raw_text:
+      txt = unctrl(txt.rstrip())
     backend = self._backend
     with self._lock:
-      oldtxt = self._state
-      adjusttxt = self.adjust_text(oldtxt, txt, self.columns)
-      backend.write(adjusttxt)
+      current_slot = self._current_slot
+      # move to target slot and collect reference text
+      txts = self.move_to_slot_v(current_slot, slot)
+      # now adjust slot display
+      txts.extend(
+          self.adjust_text_v(
+              self._slot_text[current_slot], txt, self.columns, raw_text=True
+          )
+      )
+      backend.write(''.join(txts))
       backend.flush()
-      self._state = txt
-    return oldtxt
+      self._current_slot = slot
+      self._slot_text[slot] = txt
+    return txt
 
   def nl(self, txt, *a, raw=False):
     ''' Write `txt` to the backend followed by a newline.
@@ -231,7 +274,8 @@ class Upd(SingletonMixin):
         self._above = above
     if above:
       with self._lock:
-        self._backend.write(above[0] + txt + above[1] + self._state)
+        # TODO:
+        self._backend.write(above[0] + txt + above[1] + self._slot_text[0])
         self._backend.flush()
     else:
       with self.without():
