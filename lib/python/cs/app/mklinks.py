@@ -116,9 +116,9 @@ class FileInfo(object):
 
   @prop
   def path(self):
-    ''' The primary path for this file.
+    ''' The primary path for this file, or `None` if we have no paths.
     '''
-    return sorted(self.paths)[0]
+    return sorted(self.paths)[0] if self.paths else None
 
   @prop
   def checksum(self):
