@@ -222,12 +222,15 @@ class Upd(SingletonMixin):
     backend = self._backend
     with self._lock:
       current_slot = self._current_slot
+      oldtxt = self._slot_text[current_slot]
+      if oldtxt == txt:
+        return
       # move to target slot and collect reference text
       txts = self.move_to_slot_v(current_slot, slot)
       # now adjust slot display
       txts.extend(
           self.adjust_text_v(
-              self._slot_text[current_slot], txt, self.columns, raw_text=True
+              oldtxt, txt, self.columns, raw_text=True
           )
       )
       backend.write(''.join(txts))
