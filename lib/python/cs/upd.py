@@ -21,9 +21,16 @@ from __future__ import with_statement
 import atexit
 from contextlib import contextmanager
 from threading import RLock
+from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
 from cs.tty import ttysize
+
+try:
+  import curses
+except ImportError as e:
+  warning("cannot import curses: %s", e)
+  curses = None
 
 __version__ = '20200229'
 
@@ -202,17 +209,11 @@ class Upd(SingletonMixin):
       # try to insert the output above the status line
       above = self._above
       if above is None:
-        try:
-          import curses
-        except ImportError:
-          above = False
+        il1 = self.ti_str('il1')
+        if il1:
+          above = ((il1 + b'\r').decode(), '\n')
         else:
-          curses.setupterm()
-          il1 = curses.tigetstr('il1')
-          if il1:
-            above = ((il1 + b'\r').decode(), '\n')
-          else:
-            above = False
+          above = False
         self._above = above
     if above:
       with self._lock:
