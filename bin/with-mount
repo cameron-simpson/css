@@ -29,11 +29,11 @@ fi
 
 $trace mount "$mountpoint" || exit $?
 
+xit=0
 ( set -uex
   cd "$mountpoint"
   "$@"
-)
-xit=$?
+) || xit=$?
 
 $trace umount "$mountpoint"
 
