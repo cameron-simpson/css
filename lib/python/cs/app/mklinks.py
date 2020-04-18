@@ -30,7 +30,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from cs.cmdutils import BaseCommand
 from cs.fileutils import read_from
-from cs.logutils import info, status, warning, error
+from cs.logutils import info, status, track, warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 
@@ -251,7 +251,7 @@ class Linker(object):
             # different content, skip
             continue
           # FI2 is the younger, keep it
-          info("link %r => %r", FI2.path, FI.paths)
+          track("link %r => %r", FI2.path, FI.paths)
           FI.assimilate(FI2)
 
 if __name__ == '__main__':
