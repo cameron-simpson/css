@@ -107,6 +107,51 @@ class Upd(SingletonMixin):
     '''
     return self._state
 
+  @staticmethod
+  def adjust_text(oldtxt, newtxt, columns):
+    ''' Compute the text sequence required to update `oldtxt` to `newtxt`
+        presuming the cursor is at the right hand end of `oldtxt`.
+        The available area is specified by `columns`.
+
+        We normalise `newtxt` as `unctrl(newtxt.rstrip())`.
+        `oldtxt` is presumed to be already normalised.
+    '''
+    # normalise text
+    newtxt = newtxt.rstrip()
+    newtxt = unctrl(newtxt)
+    # crop for terminal width
+    newlen = len(newtxt)
+    if newlen >= columns:
+      newtxt = newtxt[:columns - 1]
+      newlen = len(newtxt)
+    oldlen = len(oldtxt)
+    pfxlen = min(newlen, oldlen)
+    # compute length of common prefix
+    for i in range(pfxlen):
+      if newtxt[i] != oldtxt[i]:
+        pfxlen = i
+        break
+    # Rewrites take one of two forms:
+    #   Backspace to end of common prefix, overwrite with the differing tail
+    #     of the new string, erase trailing extent if any.
+    #   Return to start of line with carriage return, overwrite with new
+    #    string, erase trailing extent if any.
+    # Therefore compare backspaces against cr+pfxlen.
+    #
+    if oldlen - pfxlen < 1 + pfxlen:
+      # backspace and partial overwrite
+      difftxts = [ '\b' * (oldlen - pfxlen), newtxt[pfxlen:]]
+    else:
+      # carriage return and complete overwrite
+      difftxts = ['\r', newtxt]
+    # trailing text to overwrite with spaces?
+    extlen = oldlen - newlen
+    if extlen > 0:
+      # old line was longer - write spaces over the old tail
+      difftxts.append(' ' * extlen)
+      difftxts.append('\b' * extlen)
+    return ''.join(difftxts)
+
   def out(self, txt, *a):
     ''' Update the status line to `txt`.
         Return the previous status line content.
@@ -118,50 +163,14 @@ class Upd(SingletonMixin):
     '''
     if a:
       txt = txt % a
-    # normalise text
-    txt = txt.rstrip()
-    txt = unctrl(txt)
-    # crop for terminal width
-    txtlen = len(txt)
-    if txtlen >= self.columns:
-      txt = txt[:self.columns - 1]
-      txtlen = len(txt)
+    backend = self._backend
     with self._lock:
-      old = self._state
-      buflen = len(old)
-      pfxlen = min(txtlen, buflen)
-      # compute length of common prefix
-      for i in range(pfxlen):
-        if txt[i] != old[i]:
-          pfxlen = i
-          break
-
-      # Rewrites take one of two forms:
-      #   Backspace to end of common prefix, overwrite with the differing tail
-      #     of the new string, erase trailing extent if any.
-      #   Return to start of line with carriage return, overwrite with new
-      #    string, erase trailing extent if any.
-      # Therefore compare backspaces against cr+pfxlen.
-      #
-      if buflen - pfxlen < 1 + pfxlen:
-        # backspace and partial overwrite
-        self._backend.write('\b' * (buflen - pfxlen))
-        self._backend.write(txt[pfxlen:])
-      else:
-        # carriage return and complete overwrite
-        self._backend.write('\r')
-        self._backend.write(txt)
-      # trailing text to overwrite with spaces?
-      extlen = buflen - txtlen
-      if extlen > 0:
-        # old line was longer - write spaces over the old tail
-        self._backend.write(' ' * extlen)
-        self._backend.write('\b' * extlen)
-
-      self._backend.flush()
+      oldtxt = self._state
+      adjusttxt = self.adjust_text(oldtxt, txt, self.columns)
+      backend.write(adjusttxt)
+      backend.flush()
       self._state = txt
-
-    return old
+    return oldtxt
 
   def nl(self, txt, *a, raw=False):
     ''' Write `txt` to the backend followed by a newline.
