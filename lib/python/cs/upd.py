@@ -41,7 +41,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.lex', 'cs.obj', 'cs.tty'],
+    'install_requires': ['cs.gimmicks', 'cs.lex', 'cs.obj', 'cs.tty'],
 }
 
 instances = []
