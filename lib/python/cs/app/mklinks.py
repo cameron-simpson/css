@@ -230,32 +230,29 @@ class Linker(object):
     ''' Merge files with equivalent content.
     '''
     for size in reversed(sorted(self.sizemap.keys())):
-      with Pfx("size=%s", size):
-        FIs = sorted(
-            self.sizemap[size].values(),
-            key=lambda FI: (FI.size, FI.mtime, FI.path),
-            reverse=True
-        )
-        for i, FI in enumerate(FIs):
-          with Pfx(FI):
-            # skip FileInfos with no paths
-            if not FI.paths:
-              continue
-            status("compare...")
-            for FI2 in FIs[i + 1:]:
-              with Pfx(FI2):
-                assert FI.size == FI2.size
-                assert FI.mtime >= FI2.mtime
-                assert not FI.same_file(FI2)
-                if not FI.same_dev(FI2):
-                  # different filesystems, cannot link
-                  continue
-                if FI.checksum != FI2.checksum:
-                  # different content, skip
-                  continue
-                # FI2 is the younger, keep it
-                info("link %r => %r", FI2.path, FI.paths)
-                FI.assimilate(FI2)
+      FIs = sorted(
+          self.sizemap[size].values(),
+          key=lambda FI: (FI.size, FI.mtime, FI.path),
+          reverse=True
+      )
+      for i, FI in enumerate(FIs):
+        # skip FileInfos with no paths
+        if not FI.paths:
+          continue
+        for FI2 in FIs[i + 1:]:
+          status(FI2.path)
+          assert FI.size == FI2.size
+          assert FI.mtime >= FI2.mtime
+          assert not FI.same_file(FI2)
+          if not FI.same_dev(FI2):
+            # different filesystems, cannot link
+            continue
+          if FI.checksum != FI2.checksum:
+            # different content, skip
+            continue
+          # FI2 is the younger, keep it
+          info("link %r => %r", FI2.path, FI.paths)
+          FI.assimilate(FI2)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
