@@ -21,15 +21,17 @@ partially hardlinked tree is processed efficiently and correctly.
 
 from __future__ import print_function
 from collections import defaultdict
+from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
 from os.path import basename, dirname, isdir, isfile, join as joinpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
+from cs.cmdutils import BaseCommand
 from cs.fileutils import read_from
-from cs.logutils import setup_logging, info, warning, error
-from cs.pfx import Pfx
+from cs.logutils import setup_logging, info, status, warning, error, loginfo
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 
 DISTINFO = {
@@ -41,6 +43,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.cmdutils',
         'cs.fileutils',
         'cs.logutils',
         'cs.pfx',
@@ -53,26 +56,29 @@ DISTINFO = {
     },
 }
 
-USAGE = "Usage: %s paths..."
-
 def main(argv=None):
-  ''' Usage: mklinks paths...
+  ''' Main command line programme.
   '''
   if argv is None:
     argv = sys.argv
-  cmd = basename(argv[0])
-  setup_logging(cmd)
-  usage = USAGE % (cmd,)
-  paths = argv[1:]
-  if not paths:
-    warning("missing paths")
-    print(usage, file=sys.stderr)
-    return 2
-  linker = Linker()
-  # scan the supplied paths
-  for path in paths:
-    linker.scan(path)
-  linker.merge()
+  return MKLinksCmd().run(argv)
+
+class MKLinksCmd(BaseCommand):
+
+  USAGE_FORMAT = 'Usage: {cmd} paths...'
+
+  @staticmethod
+  def main(argv, options):
+    ''' Usage: mklinks paths...
+    '''
+    if not argv:
+      raise GetoptError("missing paths")
+    linker = Linker()
+    # scan the supplied paths
+    for path in argv:
+      with Pfx(path):
+        linker.scan(path)
+    linker.merge()
 
 class FileInfo(object):
 
@@ -85,8 +91,8 @@ class FileInfo(object):
     self._checksum = None
 
   def __str__(self):
-    return "%d:%d:size=%d:mtime=%d:paths=%r" \
-           % (self.dev, self.ino, self.size, self.mtime, self.paths)
+    return ( "%d:%d:size=%d:mtime=%d"
+           % (self.dev, self.ino, self.size, self.mtime))
 
   def __repr__(self):
     return "FileInfo(%d,%d,%d,%d,paths=%r)" \
@@ -174,11 +180,13 @@ class Linker(object):
     self.sizemap = defaultdict(dict)    # file_size => FileInfo.key => FileInfo
     self.keymap = {}                    # FileInfo.key => FileInfo
 
+  @pfx_method
   def scan(self, path):
     if isdir(path):
       for dirpath, dirnames, filenames in os.walk(path):
         for filename in sorted(filenames):
           path = joinpath(dirpath, filename)
+          status(path)
           if isfile(path):
             self.addpath(path)
         dirnames[:] = sorted(dirnames)
@@ -187,7 +195,8 @@ class Linker(object):
 
   def addpath(self, path):
     with Pfx(path):
-      S = os.lstat(path)
+      with Pfx("lstat"):
+        S = os.lstat(path)
       if not S_ISREG(S.st_mode):
         return
       key = FileInfo.stat_key(S)
@@ -199,29 +208,34 @@ class Linker(object):
         self.keymap[key] = FI
         self.sizemap[S.st_size][key] = FI
 
+  @pfx_method
   def merge(self):
     for size in reversed(sorted(self.sizemap.keys())):
-      FIs = sorted(
-          self.sizemap[size].values(),
-          key=lambda FI: (FI.size, FI.mtime, FI.path),
-          reverse=True)
-      for i, FI in enumerate(FIs):
-        # skip FileInfos with no paths
-        if not FI.paths:
-          continue
-        for FI2 in FIs[i + 1:]:
-          assert FI.size == FI2.size
-          assert FI.mtime >= FI2.mtime
-          assert not FI.same_file(FI2)
-          if not FI.same_dev(FI2):
-            # different filesystems, cannot link
-            continue
-          if FI.checksum != FI2.checksum:
-            # different content, skip
-            continue
-          # FI2 is the younger, keep it
-          info("link %r => %r", FI2.path, FI.paths)
-          FI.assimilate(FI2)
+      with Pfx("size=%s", size):
+        FIs = sorted(
+            self.sizemap[size].values(),
+            key=lambda FI: (FI.size, FI.mtime, FI.path),
+            reverse=True)
+        for i, FI in enumerate(FIs):
+          with Pfx(FI):
+            # skip FileInfos with no paths
+            if not FI.paths:
+              continue
+            status("compare...")
+            for FI2 in FIs[i + 1:]:
+              with Pfx(FI2):
+                assert FI.size == FI2.size
+                assert FI.mtime >= FI2.mtime
+                assert not FI.same_file(FI2)
+                if not FI.same_dev(FI2):
+                  # different filesystems, cannot link
+                  continue
+                if FI.checksum != FI2.checksum:
+                  # different content, skip
+                  continue
+                # FI2 is the younger, keep it
+                info("link %r => %r", FI2.path, FI.paths)
+                FI.assimilate(FI2)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
