@@ -32,6 +32,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from email import message_from_file
@@ -52,6 +53,7 @@ from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
+from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
@@ -64,7 +66,8 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, info, warning, error, exception, LogTime
+    loginfo, with_log, debug, status, STATUS, info, track, warning, error,
+    exception, LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
@@ -78,6 +81,7 @@ from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
+from cs.upd import Upd
 
 DISTINFO = {
     'description':
@@ -108,6 +112,7 @@ DISTINFO = {
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
+        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': [
@@ -128,6 +133,8 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
+  if 'DEBUG' not in os.environ:
+    os.environ['DEBUG'] = 'INFO'
   return MailFilerCommand().run(argv, options=NS(stdin=stdin))
 
 class MailFilerCommand(BaseCommand):
@@ -176,9 +183,18 @@ class MailFilerCommand(BaseCommand):
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
+  @contextmanager
+  def run_context(self, argv, options):
+    ''' Run commands at STATUS logging level (or lower if already lower).
+    '''
+    with super().run_context(argv, options):
+      with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
+        yield
+
   def cmd_monitor(self, argv, options):
     ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
     '''
+    warning("test warning")
     justone = False
     delay = None
     no_remove = False
@@ -208,9 +224,10 @@ class MailFilerCommand(BaseCommand):
       raise GetoptError("invalid arguments")
     if not mdirpaths:
       mdirpaths = None
-    return self.mailfiler(options).monitor(
-        mdirpaths, delay=delay, justone=justone, no_remove=no_remove
-    )
+    with Upd(sys.stderr) as U:
+      return self.mailfiler(options).monitor(
+          mdirpaths, delay=delay, justone=justone, no_remove=no_remove, upd=U
+      )
 
   def cmd_save(self, argv, options):
     ''' Usage: save targets < message
@@ -348,7 +365,7 @@ class MailFiler(NS):
     ''' The email address database.
     '''
     path = self.maildb_path
-    info("MailFiler: reload maildb %s", shortpath(path))
+    track("MailFiler: reload maildb %s", shortpath(path))
     return MailDB(path, readonly=False)
 
   @property
@@ -416,7 +433,9 @@ class MailFiler(NS):
       )
     return wmdir
 
-  def monitor(self, folders, delay=None, justone=False, no_remove=False):
+  def monitor(
+      self, folders, *, delay=None, justone=False, no_remove=False, upd=None
+  ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
@@ -426,24 +445,37 @@ class MailFiler(NS):
     debug("msgiddb_path=%r", self.msgiddb_path)
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
+    idle = 0
     try:
       while True:
         these_folders = folders
         if not these_folders:
           these_folders = op_cfg.get('folders', '').split()
+        nmsgs = 0
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
+            if upd:
+              status("scan...")
             try:
-              self.sweep(wmdir, justone=justone, no_remove=no_remove)
+              nmsgs += self.sweep(
+                  wmdir, justone=justone, no_remove=no_remove, upd=upd
+              )
             except KeyboardInterrupt:
               raise
             except Exception as e:
               exception("exception during sweep: %s", e)
+        if nmsgs > 0:
+          idle = 0
         if delay is None:
           break
-        debug("sleep %ds", delay)
+        if upd:
+          if idle > 0:
+            status("sleep %ds; idle %ds", delay, idle)
+          else:
+            status("sleep %ds", delay)
         sleep(delay)
+        idle += delay
     except KeyboardInterrupt:
       watchers = self._maildir_watchers
       with self._lock:
@@ -467,8 +499,12 @@ class MailFiler(NS):
         self.logdir, '%s.log' % (os.path.basename(folder_path))
     )
 
-  def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
+  def sweep(
+      self, wmdir, *, justone=False, no_remove=False, logfile=None, upd=None
+  ):
     ''' Scan a WatchedMaildir for messages to filter.
+        Return the number of messages processed.
+
         Update the set of lurkers with any keys not removed to prevent
         filtering on subsequent calls.
         If `justone`, return after filing the first message.
@@ -481,6 +517,8 @@ class MailFiler(NS):
       skipped = 0
       with LogTime("all keys") as all_keys_time:
         for key in list(wmdir.keys(flush=True)):
+          if upd:
+            status(key)
           if key in wmdir.lurking:
             info("skip lurking key %r", key)
             skipped += 1
@@ -513,6 +551,7 @@ class MailFiler(NS):
             "filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped,
             all_keys_time.elapsed
         )
+    return nmsgs
 
   def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.

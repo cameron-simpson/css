@@ -11,7 +11,7 @@ from types import SimpleNamespace as NS
 import unittest
 from cs.debug import RLock, Thread
 from cs.excutils import unimplemented
-from cs.logutils import D, OBSOLETE, debug, error
+from cs.logutils import D, debug, error
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 from cs.threads import locked, locked_property
 from cs.timeutils import sleep
