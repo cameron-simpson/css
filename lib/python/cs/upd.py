@@ -75,6 +75,8 @@ class Upd(SingletonMixin):
     self._backend = backend
     self.columns = columns
     self._state = ''
+    self._ti_ready = False
+    self._ti_strs = {}
     self._above = None
     self._lock = RLock()
     global instances
@@ -108,11 +110,23 @@ class Upd(SingletonMixin):
     '''
     return self._backend is None
 
-  @property
-  def state(self):
-    ''' The current status line text value.
+  def ti_str(self, ti_name):
+    ''' Fetch the terminfo capability string named `ti_name`.
+        Return the string or `None` if not available.
     '''
-    return self._state
+    try:
+      return self._ti_strs[ti_name]
+    except KeyError:
+      with self._lock:
+        if curses is None:
+          s = None
+        else:
+          if not self._ti_ready:
+            curses.setupterm()
+            self._ti_ready = True
+          s = curses.tigetstr(ti_name)
+        self._ti_strs[ti_name] = s
+      return s
 
   @staticmethod
   def adjust_text(oldtxt, newtxt, columns):
