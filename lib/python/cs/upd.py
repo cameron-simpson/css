@@ -263,28 +263,56 @@ class Upd(SingletonMixin):
     '''
     if a:
       txt = txt % a
-    if raw or len(txt) >= self.columns:
-      # force a clear-newline-restore method
-      above = False
-    else:
-      # try to insert the output above the status line
-      above = self._above
-      if above is None:
-        il1 = self.ti_str('il1')
-        if il1:
-          above = ((il1 + b'\r').decode(), '\n')
+    txts = []
+    with self._lock:
+      if raw or len(txt) >= self.columns:
+        # force a clear-newline-restore method
+        above = False
+      else:
+        # see if we have an "insert line above" capability
+        above = self._above
+        if above is None:
+          il1 = self.ti_str('il1')
+          if il1:
+            above = ((il1 + b'\r').decode(), '\v\r')
+          else:
+            above = False
+          self._above = above
+      # move to the top slot
+      top_slot = len(self._slot_text) - 1
+      txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+      if above:
+        txts.append(above[0])     # insert line above
+        txts.append(txt)
+        txts.append(above[1])     # move back to top line, at start
+      else:
+        # overwrite top line instead
+        txts.append('\r')         # to start of top line
+        txts.append(txt)
+        clr_eol = self.ti_str('clr_eol')
+        if clr_eol:
+          txts.append(clr_eol)
         else:
-          above = False
-        self._above = above
-    if above:
-      with self._lock:
-        # TODO:
-        self._backend.write(above[0] + txt + above[1] + self._slot_text[0])
-        self._backend.flush()
-    else:
-      with self.without():
-        with self._lock:
-          self._backend.write(txt + '\n')
+          top_txt = self._slot_text[top_slot]
+          ext_len = len(top_txt) - len(txt)
+          if ext_len > 0:
+            txts.append(' ' * ext_len)
+            txts.append('\b' * ext_len)
+      # now rewrite all the slots
+      for slot in range(top_slot, -1, -1):
+        txts.append('\v\r')
+        txts.append(self._slot_text[slot])
+        if clr_eol:
+          txts.append(clr_eol)
+        else:
+          slot_txt = self._slot_text[slot]
+          pad_len = self.columns - len(slot_txt) - 1
+          if pad_len > 0:
+            txts.append(' ' * pad_len)
+            txts.append('\b' * pad_len)
+      self._backend.write(''.join(txts))
+      self._backend.flush()
+      self._current_slot = 0
 
   def flush(self):
     ''' Flush the output stream.
