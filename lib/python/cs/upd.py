@@ -179,6 +179,8 @@ class Upd(SingletonMixin):
     ''' Compute the text sequences required to move our cursor
         to the end of `to_slot` from `from_slot`.
     '''
+    assert from_slot >= 0
+    assert to_slot >= 0
     if from_slot is None:
       from_slot = self._current_slot
     movetxts = []
@@ -223,20 +225,19 @@ class Upd(SingletonMixin):
     with self._lock:
       current_slot = self._current_slot
       oldtxt = self._slot_text[current_slot]
-      if oldtxt == txt:
-        return
-      # move to target slot and collect reference text
-      txts = self.move_to_slot_v(current_slot, slot)
-      # now adjust slot display
-      txts.extend(
-          self.adjust_text_v(
-              oldtxt, txt, self.columns, raw_text=True
-          )
-      )
-      backend.write(''.join(txts))
-      backend.flush()
-      self._current_slot = slot
-      self._slot_text[slot] = txt
+      if oldtxt != txt:
+        # move to target slot and collect reference text
+        txts = self.move_to_slot_v(current_slot, slot)
+        # now adjust slot display
+        txts.extend(
+            self.adjust_text_v(
+                oldtxt, txt, self.columns, raw_text=True
+            )
+        )
+        backend.write(''.join(txts))
+        backend.flush()
+        self._current_slot = slot
+        self._slot_text[slot] = txt
     return txt
 
   def nl(self, txt, *a, raw=False):
