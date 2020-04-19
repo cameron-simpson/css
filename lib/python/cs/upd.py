@@ -314,14 +314,8 @@ class Upd(SingletonMixin):
       self._backend.flush()
       self._current_slot = 0
 
-  def flush(self):
-    ''' Flush the output stream.
-    '''
-    if self._backend:
-      self._backend.flush()
-
   @contextmanager
-  def without(self, temp_state=''):
+  def without(self, temp_state='', slot=0):
     ''' Context manager to clear the status line around a suite.
         Returns the status line text as it was outside the suite.
 
@@ -329,8 +323,8 @@ class Upd(SingletonMixin):
         content if a value other than `''` is desired.
     '''
     with self._lock:
-      old = self.out(temp_state)
+      old = self.out(temp_state, slot=slot)
       try:
         yield old
       finally:
-        self.out(old)
+        self.out(old, slot=slot)
