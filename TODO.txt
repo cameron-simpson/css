@@ -1,3 +1,4 @@
+cs.upd: some kind of UpdSlot token or proxy so that an issued slot can be updated even if moved by a subsequent insert/delete
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
 cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
