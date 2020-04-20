@@ -189,14 +189,14 @@ class Upd(SingletonMixin):
     oldtxt = self._slot_text[to_slot]
     from_slot = self._current_slot
     if to_slot != from_slot:
-      # move cursor to end of target slot
+      # move cursor to target slot
       if to_slot < from_slot:
         # emit VT
         movetxts.append('\v' * (from_slot - to_slot))
       else:
         # emit cursor_up
         cuu1 = self.ti_str('cuu1')
-        movetxts.append(cuu1 * (from_slot - to_slot))
+        movetxts.append(cuu1 * (to_slot - from_slot))
       # adjust horizontal position
       vpos_cur = len(self._slot_text[from_slot])
       vpos_slot = len(oldtxt)
