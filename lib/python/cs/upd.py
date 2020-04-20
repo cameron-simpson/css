@@ -127,6 +127,8 @@ class Upd(SingletonMixin):
             curses.setupterm()
             self._ti_ready = True
           s = curses.tigetstr(ti_name)
+          if s is not None:
+            s = s.decode('ascii')
         self._ti_strs[ti_name] = s
       return s
 
