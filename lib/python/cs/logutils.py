@@ -174,6 +174,7 @@ def setup_logging(
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
+  import cs.pfx
   cs.pfx.cmd = cmd_name
 
   if main_log is None:
@@ -283,16 +284,18 @@ def setup_logging(
         else:
           setattr(M, funcpart, _ftrace(F))
 
-  loginfo.level = level
-  loginfo.trace_level = trace_level
-  loginfo.flags = flags
-  loginfo.module_names = module_names
-  loginfo.function_names = function_names
-  loginfo.cmd = cmd_name
-  loginfo.upd_mode = upd_mode
-  loginfo.ansi_mode = ansi_mode
-  loginfo.format = format
-  loginfo.upd = upd
+  loginfo = NS(
+      level=level,
+      trace_level=trace_level,
+      flags=flags,
+      module_names=module_names,
+      function_names=function_names,
+      cmd=cmd_name,
+      upd_mode=upd_mode,
+      ansi_mode=ansi_mode,
+      format=format,
+      upd=upd,
+  )
 
   return loginfo
 
