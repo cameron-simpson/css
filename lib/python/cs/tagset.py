@@ -919,7 +919,7 @@ class TagSetNamespace(ExtendedNamespace):
                     None, subpath
                 )
               ns = subns
-            ns._tag = tag
+          ns._tag = tag
     return ns0
 
   @pfx_method
