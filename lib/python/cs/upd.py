@@ -231,7 +231,7 @@ class Upd(SingletonMixin):
     '''
     return self.redraw_line_v(self._slot_text[slot])
 
-  def redraw_trailing_slots_v(self, upper_slot):
+  def redraw_trailing_slots_v(self, upper_slot, skip_first_vt=False):
     ''' Compute text sequences to redraw the slots from `upper_slot` downward,
         leaving the cursor at the end of the lowest slot.
 
@@ -240,9 +240,12 @@ class Upd(SingletonMixin):
         as the sequences commence with `'\v'` (`VT`).
     '''
     txts = []
+    first = True
     for slot in range(upper_slot, -1, -1):
-      txts.append('\v')
+      if not first or not skip_first_vt:
+        txts.append('\v')
       txts.extend(self.redraw_slot_v(slot))
+      first = False
     return txts
 
   def flush(self):
