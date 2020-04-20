@@ -256,7 +256,7 @@ class Upd(SingletonMixin):
       backend.flush()
 
   def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
-    ''' Update the status line to `txt`.
+    ''' Update the status line at `slot` to `txt`.
         Return the previous status line content.
 
         Parameters:
@@ -289,7 +289,7 @@ class Upd(SingletonMixin):
         backend.flush()
         self._current_slot = slot
         self._slot_text[slot] = txt
-    return txt
+    return oldtxt
 
   def nl(self, txt, *a, raw=False):
     ''' Write `txt` to the backend followed by a newline.
