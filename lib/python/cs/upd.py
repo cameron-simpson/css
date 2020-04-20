@@ -283,9 +283,7 @@ class Upd(SingletonMixin):
           txts.extend(self.redraw_slot_v(slot))
         else:
           txts.extend(
-              self.adjust_text_v(
-                  oldtxt, txt, self.columns, raw_text=True
-              )
+              self.adjust_text_v(oldtxt, txt, self.columns, raw_text=True)
           )
         backend.write(''.join(txts))
         backend.flush()
@@ -337,10 +335,10 @@ class Upd(SingletonMixin):
       txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
       if above:
         # insert blank line, write `txt`, move down to start of top slot
-        txts.append(above[0])           # insert line above
+        txts.append(above[0])  # insert line above
         txts.append(txt)
-        txts.append(above[1])           # move back to top line, at start
-        txts.append(slots[top_slot])    # advance cursor to end of top slot
+        txts.append(above[1])  # move back to top line, at start
+        txts.append(slots[top_slot])  # advance cursor to end of top slot
       else:
         # overwrite the top line instead,
         txts.extend(self.redraw_line_v(txt))
