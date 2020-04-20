@@ -90,13 +90,15 @@ assert TRACK < logging.WARNING
 STATUS = TRACK - 1
 assert STATUS > logging.INFO and STATUS < logging.WARNING
 
-loginfo = NS(upd_mode=None)
+loginfo = None
 D_mode = False
 
 def ifdebug():
   ''' Test the `loginfo.level` against `logging.DEBUG`.
   '''
   global loginfo
+  if loginfo is None:
+    loginfo = setup_logging()
   return loginfo.level <= logging.DEBUG
 
 def setup_logging(
@@ -114,6 +116,7 @@ def setup_logging(
 ):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
+      That object is also available as the global `cs.lgutils.loginfo`.
 
       Parameters:
       * `cmd_name`: program name, default from `basename(sys.argv[0])`.
@@ -157,7 +160,6 @@ def setup_logging(
         true then the log level is `INFO` otherwise `WARNING`.
   '''
   global D_mode, loginfo
-  import cs.pfx
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level(verbose=verbose)
