@@ -362,3 +362,42 @@ class Upd(SingletonMixin):
         yield old
       finally:
         self.out(old, slot=slot)
+
+  def insert(self, index, txt=''):
+    ''' Insert a new status line at `index`.
+        Return the index of the new status line.
+    '''
+    index0 = index
+    with self._lock:
+      slots = self._slot_text
+      if index < 0:
+        index = len(slots) + index
+        if index < 0:
+          raise IndexError("index %s too low" % (index0,))
+      elif index > len(slots):
+        raise IndexError("index %s too high" % (index0,))
+      assert 0 <= index <= len(slots)
+      il1 = self.ti_str('il1')
+      if index == 0:
+        # move to bottom slot, add line below
+        txts = self.move_to_slot_v(self._current_slot, 0)
+        txts.append('\v\r')
+        if il1:
+          txts.append(il1)
+        txts.extend(self.redraw_line_v(txt))
+        slots.insert(index, txt)
+        self._current_slot = 0
+      else:
+        # move to line to be below the inserted line
+        txts = self.move_to_slot_v(self._current_slot, index - 1)
+        slots.insert(index, txt)
+        if il1:
+          txts.append(il1)
+          txts.extend(self.redraw_line_v(txt))
+          self._current_slot = index
+        else:
+          txts.extend(self.redraw_trailing_slots_v(index, skip_first_vt=True))
+          self._current_slot = 0
+      self._backend.write(''.join(txts))
+      self._backend.flush()
+    return index
