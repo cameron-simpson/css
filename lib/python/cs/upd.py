@@ -275,7 +275,7 @@ class Upd(SingletonMixin):
       oldtxt = self._slot_text[slot]
       if oldtxt != txt:
         # move to target slot and collect reference text
-        txts = self.move_to_slot_v(current_slot, slot)
+        txts = self.move_to_slot_v(self._current_slot, slot)
         if redraw:
           txts.extend(self.redraw_slot_v(slot))
         else:
