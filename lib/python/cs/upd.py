@@ -206,7 +206,51 @@ class Upd(SingletonMixin):
         movetxts.append(oldtxt[vpos_cur:])
     return movetxts
 
-  def out(self, txt, *a, slot=0, raw_text=False):
+  def redraw_line_v(self, txt):
+    ''' Compute the text sequences to redraw the specified slot,
+        being `CR`, slot text, clear to end of line.
+    '''
+    txts = ['\r', txt]
+    clr_eol = self.ti_str('clr_eol')
+    if clr_eol:
+      txts.append(clr_eol)
+    else:
+      pad_len = self.columns - len(txt) - 1
+      if pad_len > 0:
+        txts.append(' ' * pad_len)
+        txts.append('\b' * pad_len)
+    return txts
+
+  def redraw_slot_v(self, slot):
+    ''' Compute the text sequences to redraw the specified slot,
+        being `CR`, slot text, clear to end of line.
+
+        This presumes the cursor is on the requisite line.
+    '''
+    return self.redraw_line_v(self._slot_text[slot])
+
+  def redraw_trailing_slots_v(self, upper_slot):
+    ''' Compute text sequences to redraw the slots from `upper_slot` downward,
+        leaving the cursor at the end of the lowest slot.
+
+        This presumes the cursor is on the line _above_
+        the uppermost slot to redraw,
+        as the sequences commence with `'\v'` (`VT`).
+    '''
+    txts = []
+    for slot in range(upper_slot, -1, -1):
+      txts.append('\v')
+      txts.extend(self.redraw_slot_v(slot))
+    return txts
+
+  def flush(self):
+    ''' Flush the backend stream.
+    '''
+    backend = self._backend
+    if backend is not None:
+      backend.flush()
+
+  def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
     ''' Update the status line to `txt`.
         Return the previous status line content.
 
@@ -216,6 +260,9 @@ class Upd(SingletonMixin):
           if not empty, `txt` is percent formatted against this list.
         * `slot`: which slot to update; default is `0`, the bottom slot
         * `raw_text`: if true (default `False`), do not normalise the text
+        * `redraw`: if true (default `False`), redraw the whole line
+          instead of doing the minimal and less visually annoying
+          incremental change
     '''
     if a:
       txt = txt % a
@@ -228,12 +275,14 @@ class Upd(SingletonMixin):
       if oldtxt != txt:
         # move to target slot and collect reference text
         txts = self.move_to_slot_v(current_slot, slot)
-        # now adjust slot display
-        txts.extend(
-            self.adjust_text_v(
-                oldtxt, txt, self.columns, raw_text=True
-            )
-        )
+        if redraw:
+          txts.extend(self.redraw_slot_v(slot))
+        else:
+          txts.extend(
+              self.adjust_text_v(
+                  oldtxt, txt, self.columns, raw_text=True
+              )
+          )
         backend.write(''.join(txts))
         backend.flush()
         self._current_slot = slot
@@ -278,38 +327,21 @@ class Upd(SingletonMixin):
           else:
             above = False
           self._above = above
+      slots = self._slot_text
       # move to the top slot
-      top_slot = len(self._slot_text) - 1
+      top_slot = len(slots) - 1
       txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
       if above:
-        txts.append(above[0])     # insert line above
+        # insert blank line, write `txt`, move down to start of top slot
+        txts.append(above[0])           # insert line above
         txts.append(txt)
-        txts.append(above[1])     # move back to top line, at start
+        txts.append(above[1])           # move back to top line, at start
+        txts.append(slots[top_slot])    # advance cursor to end of top slot
       else:
-        # overwrite top line instead
-        txts.append('\r')         # to start of top line
-        txts.append(txt)
-        clr_eol = self.ti_str('clr_eol')
-        if clr_eol:
-          txts.append(clr_eol)
-        else:
-          top_txt = self._slot_text[top_slot]
-          ext_len = len(top_txt) - len(txt)
-          if ext_len > 0:
-            txts.append(' ' * ext_len)
-            txts.append('\b' * ext_len)
-      # now rewrite all the slots
-      for slot in range(top_slot, -1, -1):
-        txts.append('\v\r')
-        txts.append(self._slot_text[slot])
-        if clr_eol:
-          txts.append(clr_eol)
-        else:
-          slot_txt = self._slot_text[slot]
-          pad_len = self.columns - len(slot_txt) - 1
-          if pad_len > 0:
-            txts.append(' ' * pad_len)
-            txts.append('\b' * pad_len)
+        # overwrite the top line instead,
+        txts.extend(self.redraw_line_v(txt))
+        # then rewrite all the slots below that
+        txts.extend(self.redraw_trailing_slots_v(top_slot))
       self._backend.write(''.join(txts))
       self._backend.flush()
       self._current_slot = 0
