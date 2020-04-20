@@ -272,8 +272,7 @@ class Upd(SingletonMixin):
       txt = unctrl(txt.rstrip())
     backend = self._backend
     with self._lock:
-      current_slot = self._current_slot
-      oldtxt = self._slot_text[current_slot]
+      oldtxt = self._slot_text[slot]
       if oldtxt != txt:
         # move to target slot and collect reference text
         txts = self.move_to_slot_v(current_slot, slot)
