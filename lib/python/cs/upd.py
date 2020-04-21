@@ -83,6 +83,11 @@ class Upd(SingletonMixin):
     global instances
     instances.append(self)
 
+  def __len__(self):
+    ''' The length of an `Upd` is the number of slots.
+    '''
+    return len(self._slot_text)
+
   def __enter__(self):
     return self
 
