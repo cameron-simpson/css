@@ -127,6 +127,11 @@ class Upd(SingletonMixin):
       else:
         self[0] = ''
 
+  def proxy(self, index):
+    ''' Return the `UpdProxy` for `index`.
+    '''
+    return self._proxies[index]
+
   def _update_proxies(self):
     ''' Update the `UpdProxy` indices.
     '''
@@ -559,3 +564,10 @@ class UpdProxy(object):
     index = self.index
     if index is not None:
       self.upd[index] = txt
+
+  def delete(self):
+    ''' Delete this proxy from its parent `Upd`.
+    '''
+    index = self.index
+    if index is not None:
+      self.upd.delete(index)
