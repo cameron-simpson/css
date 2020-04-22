@@ -299,14 +299,9 @@ class Upd(SingletonMixin):
     with self._lock:
       oldtxt = self._slot_text[slot]
       if oldtxt != txt:
-        # move to target slot and collect reference text
-        txts = self.move_to_slot_v(self._current_slot, slot)
-        if redraw:
-          txts.extend(self.redraw_slot_v(slot))
-        else:
-          txts.extend(
-              self.adjust_text_v(oldtxt, txt, self.columns, raw_text=True)
-          )
+        txts = self.update_slot_v(slot, txt, raw_text=True, redraw=redraw)
+        self._current_slot = slot
+        self._slot_text[slot] = txt
         backend.write(''.join(txts))
         backend.flush()
         self._current_slot = slot
