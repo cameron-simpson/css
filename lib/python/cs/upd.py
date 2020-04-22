@@ -20,6 +20,7 @@ Example:
 from __future__ import with_statement
 import atexit
 from contextlib import contextmanager
+import os
 from threading import RLock
 from cs.gimmicks import warning
 from cs.lex import unctrl
@@ -392,8 +393,6 @@ class Upd(SingletonMixin):
         txts.append('\v\r')
         txts.append(slots[top_slot])
         self._current_slot = top_slot
-      ##X("nl(%r): txts=%r",txt,txts)
-      ##sys.exit(0)
       self._backend.write(''.join(txts))
       self._backend.flush()
 
