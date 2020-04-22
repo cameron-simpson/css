@@ -218,7 +218,7 @@ class Upd(SingletonMixin):
         being `CR`, slot text, clear to end of line.
     '''
     txts = ['\r', txt]
-    clr_eol = self.ti_str('clr_eol')
+    clr_eol = self.ti_str('el')
     if clr_eol:
       txts.append(clr_eol)
     else:
