@@ -110,22 +110,29 @@ class Upd(SingletonMixin):
   def __enter__(self):
     return self
 
-  def __exit__(self, exc_type, *_):
+  def __exit__(self, exc_type, exc_val, _):
     ''' Tidy up on exiting the context.
 
-        If we are exiting because of an exception and the status
-        line is not empty, output a newline to preserve the status
-        line on the screen.  Otherwise just clear the status line.
+        If we are exiting because of an exception
+        which is not a `SystemExit` with a `code` of `None` or `0`
+        then we preserve the status lines one screen.
+        Otherwise we clean up the status lines.
     '''
     slots = self._slot_text
-    while len(slots) > 1:
-      del self[len(slots) - 1]
-    if slots[0]:
-      if exc_type:
-        self._backend.write('\n')
-        self._backend.flush()
-      else:
-        self[0] = ''
+    if (exc_type
+        and not (issubclass(exc_type, SystemExit) and
+                 (exc_val.code is None or
+                  (isinstance(exc_val.code, int) and exc_val.code == 0)))):
+      # move to the bottom and emit a newline
+      txts = self.move_to_slot_v(self._current_slot, 0)
+      txts.append('\n')
+      self._backend.write(''.join(txts))
+      self._backend.flush()
+    else:
+      # remove the Upd display
+      while len(slots) > 1:
+        del self[len(slots) - 1]
+      self[0] = ''
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
