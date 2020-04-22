@@ -417,7 +417,6 @@ class Upd(SingletonMixin):
 
         Return the `UpdProxy` for the new status line.
     '''
-    index0 = index
     slots = self._slot_text
     proxies = self._proxies
     cuu1 = self.ti_str('cuu1')
@@ -478,7 +477,6 @@ class Upd(SingletonMixin):
 
         Return the `UpdProxy` of the deleted status line.
     '''
-    index0 = index
     slots = self._slot_text
     proxies = self._proxies
     with self._lock:
@@ -528,6 +526,13 @@ class Upd(SingletonMixin):
       return proxy
 
 class UpdProxy(object):
+  ''' A proxy for a status line of a multiline  `Upd`.
+
+      This provides a stable reference to a status line after it has been
+      instantiated by `Upd.insert`.
+
+      The status line can be accessed and set via the `.text` property.
+  '''
 
   __slots__ = ('upd', 'index')
 
@@ -550,6 +555,8 @@ class UpdProxy(object):
 
   @text.setter
   def text(self, txt):
+    ''' Set the text of the status line.
+    '''
     index = self.index
     if index is not None:
       self.upd[index] = txt
