@@ -434,3 +434,52 @@ class Upd(SingletonMixin):
           self._current_slot = 0
       self._backend.write(''.join(txts))
       self._backend.flush()
+
+  def delete(self, index):
+    ''' Delete the status line at `index`.
+        Return the text of the deleted slot.
+    '''
+    index0 = index
+    slots = self._slot_text
+    with self._lock:
+      if index < 0 or index >= len(self):
+        raise ValueError(
+            "index should be in the range 0..%d inclusive: got %s" %
+            (len(self), index)
+        )
+      if len(slots) == 1:
+        raise ValueError("cannot delete the last slot")
+      dl1 = self.ti_str('dl1')
+      cuu1 = self.ti_str('cuu1')
+      txts = self.move_to_slot_v(self._current_slot, index)
+      oldtxt = slots[index]
+      del slots[index]
+      if index == 0:
+        if dl1:
+          # erase bottom line and move up and then to the end of that slot
+          txts.append(dl1)
+        else:
+          # clear the bottom lone
+          txts.extend(self.redraw_line_v, '')
+        # move up and to the end of that slot
+        txts.append(cuu1)
+        txts.append('\r')
+        txts.append(slots[index])
+      else:
+        # the effectiove index has now moved down
+        index -= 1
+        if dl1:
+          # delete line and advance to the end of the new current line
+          txts.extend((dl1, '\r', slots[index]))
+          self._current_slot = index
+        else:
+          # no delete line: redraw from here on down then clear the line below
+          txts.extend(self.redraw_trailing_slots_v(index, skip_first_vt=True))
+          txts.append('\v')
+          txts.extend(self.redraw_line_v(''))
+          txts.append(cuu1)
+          txts.append(slots[0])
+          self._current_slot = 0
+      self._backend.write(''.join(txts))
+      self._backend.flush()
+      return oldtxt
