@@ -388,20 +388,27 @@ class Upd(SingletonMixin):
     '''
     index0 = index
     slots = self._slot_text
+    cuu1 = self.ti_str('cuu1')
+    if not cuu1:
+      raise IndexError(
+          "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+          % (os.environ.get('TERM'),)
+      )
+    il1 = self.ti_str('il1')
+    txts = []
     with self._lock:
       if index < 0 or index > len(self):
-        raise ValueError("index should be in the range 0..%d inclusive: got %s" % (len(self),index))
-      txts = []
-      il1 = self.ti_str('il1')
+        raise ValueError(
+            "index should be in the range 0..%d inclusive: got %s" %
+            (len(self), index)
+        )
       if il1:
         # make sure insert line does not push the bottom line off the screen
         # by forcing a scroll
-        cuu1 = self.ti_str('cuu1')
-        if cuu1:
-          txts.extend(self.move_to_slot_v(self._current_slot, 0))
-          self._current_slot = 0
-          txts.append('\v')
-          txts.append(cuu1)
+        txts.extend(self.move_to_slot_v(self._current_slot, 0))
+        self._current_slot = 0
+        txts.append('\v')
+        txts.append(cuu1)
       if index == 0:
         # move to bottom slot, add line below
         txts.extend(self.move_to_slot_v(self._current_slot, 0))
