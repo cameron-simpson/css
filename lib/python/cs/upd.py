@@ -260,6 +260,23 @@ class Upd(SingletonMixin):
     if backend is not None:
       backend.flush()
 
+  def update_slot_v(self, slot, newtxt, raw_text=False, redraw=False):
+    ''' Compute the text sequences to update the status line at `slot` to `newtxt`.
+    '''
+    # move to target slot and collect reference text
+    txts = self.move_to_slot_v(self._current_slot, slot)
+    txts.extend(
+        (
+            self.redraw_slot_v(slot) if redraw else self.adjust_text_v(
+                self._slot_text[slot],
+                newtxt,
+                self.columns,
+                raw_text=raw_text,
+            )
+        )
+    )
+    return txts
+
   def out(self, txt, *a, slot=0, raw_text=False, redraw=False):
     ''' Update the status line at `slot` to `txt`.
         Return the previous status line content.
