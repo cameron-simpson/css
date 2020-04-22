@@ -306,62 +306,67 @@ class Upd(SingletonMixin):
         backend.flush()
     return oldtxt
 
-  def nl(self, txt, *a, raw=False):
+  def nl(self, txt, *a, redraw=False):
     ''' Write `txt` to the backend followed by a newline.
 
         Parameters:
         * `txt`: the message to write.
         * `a`: optional positional parameters;
           if not empty, `txt` is percent formatted against this list.
-        * `raw`: if true (default `False`) use the "clear, newline,
-          restore" method.
+        * `redraw`: if true (default `False`) use the "redraw" method.
 
         This uses one of two methods:
         * insert above:
-          insert a line above the status line and write the message there.
-        * clear, newline, restore:
-          clears the status line, writes the text line, restores
-          the status line.
+          insert a line above the tip status line and write the message there.
+        * redraw:
+          clear the top slot, write txt and a newline,
+          redraw all the slots below.
 
-        The former method is used if the terminal supports the
-        `il1` (insert one line) capability;
-        this is probed for on the first use and remembered.
+        The latter method is used if `redraw` is true
+        or if `txt` is wider than `self.columns`
+        or if there is no "insert line" capability.
     '''
     if a:
       txt = txt % a
     txts = []
     with self._lock:
-      if raw or len(txt) >= self.columns:
-        # force a clear-newline-restore method
-        above = False
-      else:
-        # see if we have an "insert line above" capability
-        above = self._above
-        if above is None:
-          il1 = self.ti_str('il1')
-          if il1:
-            above = ((il1 + b'\r').decode(), '\v\r')
-          else:
-            above = False
-          self._above = above
       slots = self._slot_text
+      if len(txt) >= self.columns:
+        # the line will overflow, force a complete redraw approach
+        redraw = True
+      il1 = self.ti_str('il1')
+      cuu1 = self.ti_str('cuu1')
+      if not il1 or not cuu1:
+        redraw = True
       # move to the top slot
       top_slot = len(slots) - 1
-      txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
-      if above:
-        # insert blank line, write `txt`, move down to start of top slot
-        txts.append(above[0])  # insert line above
+      if redraw:
+        # go to the top slot, overwrite it and then rewrite the slots below
+        txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+        txts.extend(self.redraw_line_v(''))
         txts.append(txt)
-        txts.append(above[1])  # move back to top line, at start
-        txts.append(slots[top_slot])  # advance cursor to end of top slot
-      else:
-        # overwrite the top line instead,
-        txts.extend(self.redraw_line_v(txt))
-        # then rewrite all the slots below that
+        txts.append('\n')
         txts.extend(self.redraw_trailing_slots_v(top_slot))
+        self._current_slot = 0
+      else:
+        # make sure insert line does not push the bottom line off the screen
+        # by forcing a scroll
+        txts.extend(self.move_to_slot_v(self._current_slot, 0))
+        self._current_slot = 0
+        txts.append('\v')
+        txts.append(cuu1)
+        # insert the output line above the top slot
+        txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+        txts.append('\r')
+        txts.append(il1)
+        txts.append(txt)
+        txts.append('\v\r')
+        txts.append(slots[top_slot])
+        self._current_slot = top_slot
+      ##X("nl(%r): txts=%r",txt,txts)
+      ##sys.exit(0)
       self._backend.write(''.join(txts))
       self._backend.flush()
-      self._current_slot = 0
 
   @contextmanager
   def without(self, temp_state='', slot=0):
