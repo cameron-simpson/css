@@ -385,39 +385,45 @@ class Upd(SingletonMixin):
 
   def insert(self, index, txt=''):
     ''' Insert a new status line at `index`.
-        Return the index of the new status line.
     '''
     index0 = index
+    slots = self._slot_text
     with self._lock:
-      slots = self._slot_text
-      if index < 0:
-        index = len(slots) + index
-        if index < 0:
-          raise IndexError("index %s too low" % (index0,))
-      elif index > len(slots):
-        raise IndexError("index %s too high" % (index0,))
-      assert 0 <= index <= len(slots)
+      if index < 0 or index > len(self):
+        raise ValueError("index should be in the range 0..%d inclusive: got %s" % (len(self),index))
+      txts = []
       il1 = self.ti_str('il1')
+      if il1:
+        # make sure insert line does not push the bottom line off the screen
+        # by forcing a scroll
+        cuu1 = self.ti_str('cuu1')
+        if cuu1:
+          txts.extend(self.move_to_slot_v(self._current_slot, 0))
+          self._current_slot = 0
+          txts.append('\v')
+          txts.append(cuu1)
       if index == 0:
         # move to bottom slot, add line below
-        txts = self.move_to_slot_v(self._current_slot, 0)
+        txts.extend(self.move_to_slot_v(self._current_slot, 0))
         txts.append('\v\r')
         if il1:
           txts.append(il1)
-        txts.extend(self.redraw_line_v(txt))
+          txts.append(txt)
+        else:
+          txts.extend(self.redraw_line_v(txt))
         slots.insert(index, txt)
         self._current_slot = 0
       else:
-        # move to line to be below the inserted line
-        txts = self.move_to_slot_v(self._current_slot, index - 1)
+        # move to the line which is to be below the inserted line
+        txts.extend(self.move_to_slot_v(self._current_slot, index - 1))
         slots.insert(index, txt)
         if il1:
           txts.append(il1)
-          txts.extend(self.redraw_line_v(txt))
+          txts.append('\r')
+          txts.append(txt)
           self._current_slot = index
         else:
           txts.extend(self.redraw_trailing_slots_v(index, skip_first_vt=True))
           self._current_slot = 0
       self._backend.write(''.join(txts))
       self._backend.flush()
-    return index
