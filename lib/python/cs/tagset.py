@@ -80,8 +80,8 @@ from types import SimpleNamespace
 from icontract import require
 from cs.edit import edit as edit_lines
 from cs.lex import (
-    cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
-    skipwhite, lc_, titleify_lc, FormatableMixin
+    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
@@ -496,7 +496,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
