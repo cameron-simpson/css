@@ -304,8 +304,6 @@ class Upd(SingletonMixin):
         self._slot_text[slot] = txt
         backend.write(''.join(txts))
         backend.flush()
-        self._current_slot = slot
-        self._slot_text[slot] = txt
     return oldtxt
 
   def nl(self, txt, *a, raw=False):
