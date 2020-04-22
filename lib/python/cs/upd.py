@@ -83,10 +83,27 @@ class Upd(SingletonMixin):
     global instances
     instances.append(self)
 
+  ############################################################
+  # Sequence methods.
+  #
+
   def __len__(self):
     ''' The length of an `Upd` is the number of slots.
     '''
     return len(self._slot_text)
+
+  def __getitem__(self, index):
+    return self._slot_text[index]
+
+  def __setitem__(self, index, txt):
+    self.out(txt, slot=index)
+
+  def __delitem__(self, index):
+    self.delete(index)
+
+  ############################################################
+  # Context manager methods.
+  #
 
   def __enter__(self):
     return self
@@ -98,12 +115,15 @@ class Upd(SingletonMixin):
         line is not empty, output a newline to preserve the status
         line on the screen.  Otherwise just clear the status line.
     '''
-    if self._slot_text[0]:
+    slots = self._slot_text
+    while len(slots) > 1:
+      del self[len(slots) - 1]
+    if slots[0]:
       if exc_type:
         self._backend.write('\n')
         self._backend.flush()
       else:
-        self.out('')
+        self[0] = ''
 
   def close(self):
     ''' Close this Upd.
