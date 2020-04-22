@@ -77,6 +77,7 @@ class Upd(SingletonMixin):
     self._ti_ready = False
     self._ti_strs = {}
     self._slot_text = ['']
+    self._proxies = [UpdProxy(self, 0)]
     self._current_slot = 0
     self._above = None
     self._lock = RLock()
@@ -124,6 +125,14 @@ class Upd(SingletonMixin):
         self._backend.flush()
       else:
         self[0] = ''
+
+  def _update_proxies(self):
+    ''' Update the `UpdProxy` indices.
+    '''
+    proxies = self._proxies
+    with self._lock:
+      for index in range(len(self._slot_text)):
+        proxies[index].index = index
 
   def close(self):
     ''' Close this Upd.
@@ -405,9 +414,12 @@ class Upd(SingletonMixin):
 
   def insert(self, index, txt=''):
     ''' Insert a new status line at `index`.
+
+        Return the `UpdProxy` for the new status line.
     '''
     index0 = index
     slots = self._slot_text
+    proxies = self._proxies
     cuu1 = self.ti_str('cuu1')
     if not cuu1:
       raise IndexError(
@@ -422,6 +434,7 @@ class Upd(SingletonMixin):
             "index should be in the range 0..%d inclusive: got %s" %
             (len(self), index)
         )
+      proxy = UpdProxy(self, index)
       if il1:
         # make sure insert line does not push the bottom line off the screen
         # by forcing a scroll
@@ -439,11 +452,15 @@ class Upd(SingletonMixin):
         else:
           txts.extend(self.redraw_line_v(txt))
         slots.insert(index, txt)
+        proxies.insert(index, proxy)
+        self._update_proxies()
         self._current_slot = 0
       else:
         # move to the line which is to be below the inserted line
         txts.extend(self.move_to_slot_v(self._current_slot, index - 1))
         slots.insert(index, txt)
+        proxies.insert(index, proxy)
+        self._update_proxies()
         if il1:
           txts.append(il1)
           txts.append('\r')
@@ -454,13 +471,16 @@ class Upd(SingletonMixin):
           self._current_slot = 0
       self._backend.write(''.join(txts))
       self._backend.flush()
+    return proxy
 
   def delete(self, index):
     ''' Delete the status line at `index`.
-        Return the text of the deleted slot.
+
+        Return the `UpdProxy` of the deleted status line.
     '''
     index0 = index
     slots = self._slot_text
+    proxies = self._proxies
     with self._lock:
       if index < 0 or index >= len(self):
         raise ValueError(
@@ -472,8 +492,11 @@ class Upd(SingletonMixin):
       dl1 = self.ti_str('dl1')
       cuu1 = self.ti_str('cuu1')
       txts = self.move_to_slot_v(self._current_slot, index)
-      oldtxt = slots[index]
       del slots[index]
+      proxy = proxies[index]
+      proxy.index = None
+      del proxies[index]
+      self._update_proxies()
       if index == 0:
         if dl1:
           # erase bottom line and move up and then to the end of that slot
@@ -502,4 +525,31 @@ class Upd(SingletonMixin):
           self._current_slot = 0
       self._backend.write(''.join(txts))
       self._backend.flush()
-      return oldtxt
+      return proxy
+
+class UpdProxy(object):
+
+  __slots__ = ('upd', 'index')
+
+  def __init__(self, upd, index):
+    self.upd = upd
+    self.index = index
+
+  def __str__(self):
+    return (
+        "%s(upd=%s,index=%d:%r)" %
+        (type(self).__name__, self.upd, self.index, self.text)
+    )
+
+  @property
+  def text(self):
+    ''' The text of this proxy's slot.
+    '''
+    index = self.index
+    return '' if index is None else self.upd[index]
+
+  @text.setter
+  def text(self, txt):
+    index = self.index
+    if index is not None:
+      self.upd[index] = txt
