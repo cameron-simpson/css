@@ -224,8 +224,11 @@ class BaseCommand:
     else:
       usage = None
     if options is None:
-      options = NS(cmd=cmd, usage=usage, loginfo=loginfo)
-      self.apply_defaults(options)
+      options = NS()
+    options.cmd=cmd
+    options.usage=usage
+    options.loginfo=loginfo
+    self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
