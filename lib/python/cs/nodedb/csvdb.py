@@ -81,7 +81,8 @@ class Backend_CSVFile(Backend):
       # initial scan of the database
       for row in self.csv:
         self._import_foreign_row(row)
-      self._monitor = PfxThread(name="monitor", target=self._monitor_foreign_updates)
+      self._monitor = PfxThread(
+          name="monitor", target=self._monitor_foreign_updates, daemon=True)
       self._monitor.start()
 
   def close(self):
