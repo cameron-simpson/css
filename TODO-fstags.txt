@@ -1,10 +1,8 @@
-fstags rename: handle ENAMETOOLONG on rename: if over 255 crop before file ext and retry, else raise
-cmd_rename: handle filename too long - preemptively crop?
 TagFile: TagFile.modified flag tracking new or deleted TagSets to compliment the per-tagset modified flags
 module docstring: nice dotted tag name example, particularly in format strings
 module docstring: nice ontology example
 support tags files being directories, new TagDir type named after entry prefix, files named entry suffix, contents one tag per line
-maybe "ont tag ent-entry [-]tags..."
+maybe "ont tag ont-entry [-]tags..."
 convenient ontology editing, something like "add cast_member name detail-tags"
 fstags: accept 'single quoted string', transcribe as JSON dq string
 fstags: sqlite fast index of tag values to aid lookups
