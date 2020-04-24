@@ -87,7 +87,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.fileutils import findup, shortpath
+from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
@@ -555,7 +555,7 @@ class FSTagsCommand(BaseCommand):
           for srcpath in argv:
             dstpath = joinpath(dirpath, basename(srcpath))
             try:
-              attach(srcpath, dstpath, force=cmd_force)
+              attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
             except (ValueError, OSError) as e:
               print(e, file=sys.stderr)
               xit = 1
@@ -572,7 +572,7 @@ class FSTagsCommand(BaseCommand):
         with fstags:
           srcpath, dstpath = argv
           try:
-            attach(srcpath, dstpath, force=cmd_force)
+            attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
           except (ValueError, OSError) as e:
             print(e, file=sys.stderr)
             xit = 1
@@ -686,7 +686,7 @@ class FSTagsCommand(BaseCommand):
             dstpath = joinpath(dirpath, newbase)
             verbose("-> %s", dstpath)
             try:
-              options.fstags.move(filepath, dstpath)
+              options.fstags.move(filepath, dstpath, crop_ok=True)
             except OSError as e:
               error("-> %s: %s", dstpath, e)
               xit = 1
@@ -1194,24 +1194,26 @@ class FSTags(MultiOpenMixin):
           tagfile.save()
 
   @pfx_method
-  def copy(self, srcpath, dstpath, force=False):
+  def copy(self, srcpath, dstpath, **kw):
     ''' Copy `srcpath` to `dstpath`.
     '''
-    return self.attach_path(shutil.copy2, srcpath, dstpath, force=force)
+    return self.attach_path(shutil.copy2, srcpath, dstpath, **kw)
 
   @pfx_method
-  def link(self, srcpath, dstpath, force=False):
+  def link(self, srcpath, dstpath, **kw):
     ''' Link `srcpath` to `dstpath`.
     '''
-    return self.attach_path(os.link, srcpath, dstpath, force=force)
+    return self.attach_path(os.link, srcpath, dstpath, **kw)
 
   @pfx_method
-  def move(self, srcpath, dstpath, force=False):
+  def move(self, srcpath, dstpath, **kw):
     ''' Move `srcpath` to `dstpath`.
     '''
-    return self.attach_path(shutil.move, srcpath, dstpath, force=force)
+    return self.attach_path(shutil.move, srcpath, dstpath, **kw)
 
-  def attach_path(self, attach, srcpath, dstpath, *, force=False):
+  def attach_path(
+      self, attach, srcpath, dstpath, *, force=False, crop_ok=False
+  ):
     ''' Attach `srcpath` to `dstpath` using the `attach` callable.
 
         Parameters:
@@ -1220,6 +1222,8 @@ class FSTags(MultiOpenMixin):
           such as a copy, link or move
         * `srcpath`: the source filesystem object
         * `dstpath`: the destination filesystem object
+        * `crop_ok`: if true and the OS raises `OSError(ENAMETOOLONG)`
+          attempt to crop the name before the file extension and retry
         * `force`: default `False`.
           If true and the destination exists
           try to remove it before calling `attach`.
@@ -1240,7 +1244,23 @@ class FSTags(MultiOpenMixin):
             os.remove(dstpath)
         else:
           raise ValueError("destination already exists")
-      result = attach(srcpath, dstpath)
+      try:
+        result = attach(srcpath, dstpath)
+      except OSError as e:
+        if e.errno == errno.ENAMETOOLONG and crop_ok:
+          dstdirpath = dirname(dstpath)
+          dstbasename = basename(dstpath)
+          newbasename = crop_name(dstbasename)
+          if newbasename != dstbasename:
+            return self.attach_path(
+                attach,
+                srcpath,
+                joinpath(dstdirpath, newbasename),
+                force=force,
+                crop_ok=False
+            )
+        else:
+          raise
       old_modified = dst_taggedpath.modified
       for tag in src_taggedpath.direct_tags:
         dst_taggedpath.direct_tags.add(tag)
