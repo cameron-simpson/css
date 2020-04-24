@@ -225,9 +225,9 @@ class BaseCommand:
       usage = None
     if options is None:
       options = NS()
-    options.cmd=cmd
-    options.usage=usage
-    options.loginfo=loginfo
+    options.cmd = cmd
+    options.usage = usage
+    options.loginfo = loginfo
     self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
