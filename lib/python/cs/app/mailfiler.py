@@ -66,7 +66,7 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    loginfo, with_log, debug, status, STATUS, info, track, warning, error,
+    with_log, debug, status, STATUS, info, track, warning, error,
     exception, LogTime
 )
 from cs.mailutils import (
@@ -188,6 +188,7 @@ class MailFilerCommand(BaseCommand):
     ''' Run commands at STATUS logging level (or lower if already lower).
     '''
     with super().run_context(argv, options):
+      loginfo = options.loginfo
       with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
         yield
 
