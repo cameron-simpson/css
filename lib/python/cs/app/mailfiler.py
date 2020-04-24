@@ -66,8 +66,8 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, status, STATUS, info, track, warning, error,
-    exception, LogTime
+    with_log, debug, status, STATUS, info, track, warning, error, exception,
+    LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
@@ -81,7 +81,6 @@ from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
-from cs.upd import Upd
 
 DISTINFO = {
     'description':
@@ -112,7 +111,6 @@ DISTINFO = {
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
-        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': [
@@ -225,10 +223,13 @@ class MailFilerCommand(BaseCommand):
       raise GetoptError("invalid arguments")
     if not mdirpaths:
       mdirpaths = None
-    with Upd(sys.stderr) as U:
-      return self.mailfiler(options).monitor(
-          mdirpaths, delay=delay, justone=justone, no_remove=no_remove, upd=U
-      )
+    return self.mailfiler(options).monitor(
+        mdirpaths,
+        delay=delay,
+        justone=justone,
+        no_remove=no_remove,
+        upd=options.loginfo.upd
+    )
 
   def cmd_save(self, argv, options):
     ''' Usage: save targets < message
