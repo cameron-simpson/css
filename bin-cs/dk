@@ -57,6 +57,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 base=$( basename "$ymlbasedir" )
 primary_container=${base}_${DK_PRIMARY_SERVICE}_1

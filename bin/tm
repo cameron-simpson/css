@@ -63,6 +63,7 @@ usage="Usage: $cmd [options...] [op [args...]]
     start [session-names...]
       Start the named sessions using the configuration from \$HOME/.tmrc.
       If no session-names are supplied, start everything named in the .tmrc.
+      These sessions are started from the \$HOME directory.
     up
       Short for \"tmux select-pane -U\".
     use-session session-name [tmux-new-session-options...]
@@ -401,6 +402,7 @@ case "$op" in
   start)
     # start initial screen sessions; just the named ones of names specified
     # obtains definitions from $HOME/.tmrc
+    cd
     tmrc=$HOME/.tmrc
     if [ ! -f "$tmrc" ]
     then

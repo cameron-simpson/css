@@ -8,7 +8,7 @@
 '''
 
 from __future__ import print_function, absolute_import
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
@@ -213,7 +213,7 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    setup_logging(cmd)
+    loginfo = setup_logging(cmd)
     # post: argv is list of arguments after the command name
     usage_format = getattr(self, 'USAGE_FORMAT')
     # TODO: is this valid in the case of an already formatted usage string
@@ -224,8 +224,11 @@ class BaseCommand:
     else:
       usage = None
     if options is None:
-      options = NS(cmd=cmd, usage=usage)
-      self.apply_defaults(options)
+      options = NS()
+    options.cmd = cmd
+    options.usage = usage
+    options.loginfo = loginfo
+    self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
@@ -274,11 +277,15 @@ class BaseCommand:
               "no main method and no %s* subcommand methods" %
               (subcmd_prefix,)
           )
+      upd_context = options.loginfo.upd
+      if upd_context is None:
+        upd_context = nullcontext()
       with RunState(cmd) as runstate:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
-          with self.run_context(argv, options):
-            with Pfx(subcmd):
-              return main(argv, options)
+          with upd_context:
+            with self.run_context(argv, options):
+              with Pfx(subcmd):
+                return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, options, e, usage):
