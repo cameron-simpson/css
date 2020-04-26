@@ -1,3 +1,4 @@
+pull first paragraph to to above "latest release"
 render release log lines as markdown lists
 module check code: produce nested {imported_name=>[errors]}, each error is either a str or another {import=>errors} mapping; nice printout to go with it for cmd_check
 move lastvalues into repo maintained "pkg_tags" file
