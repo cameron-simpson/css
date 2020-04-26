@@ -1,3 +1,4 @@
+MRO: "builtins.*" should get the "builtins." stripped eg builtins.dict
 can we put anchors on class and function headings?
 if second and following paragraphs exists, maybe give them an Overview header?
 pull first paragraph to to above "latest release"
