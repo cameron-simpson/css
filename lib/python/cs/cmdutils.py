@@ -8,7 +8,7 @@
 '''
 
 from __future__ import print_function, absolute_import
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
@@ -17,6 +17,7 @@ from cs.context import stackattrs
 from cs.lex import cutprefix
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
+from cs.py3 import nullcontext
 from cs.resources import RunState
 
 __version__ = '20200318'
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.resources'],
+    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.py3', 'cs.resources'],
 }
 
 def docmd(dofunc):
