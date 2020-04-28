@@ -49,6 +49,7 @@ fi
 if [ $# = 0 ]
 then
   echo "$cmd: missing op" >&2
+  set | grep '^DK_' | sort
   op=help
 else
   op=$1
@@ -77,7 +78,10 @@ case "$op" in
       set -x
       exec docker exec -it "$primary_container" $DK_EXEC_PREFIX "$@"
       ;;
-  up) [ -z "$DK_PRIMARY_SERVICE" ] || set -- --exit-code-from "$DK_PRIMARY_SERVICE" ${1+"$@"} ;;
+  up)
+      [ $# -gt 0 ] || [ -z "$DK_PRIMARY_SERVICE" ] \
+      || set -- --exit-code-from "$DK_PRIMARY_SERVICE" ${1+"$@"}
+      ;;
 esac
 
 
