@@ -537,7 +537,7 @@ class Upd(SingletonMixin):
       return proxy
 
 class UpdProxy(object):
-  ''' A proxy for a status line of a multiline  `Upd`.
+  ''' A proxy for a status line of a multiline `Upd`.
 
       This provides a stable reference to a status line after it has been
       instantiated by `Upd.insert`.
@@ -545,7 +545,10 @@ class UpdProxy(object):
       The status line can be accessed and set via the `.text` property.
   '''
 
-  __slots__ = ('upd', 'index')
+  __slots__ = {
+      'upd': 'The parent Upd instance.',
+      'index': 'The index of this slot within the parent Upd.'
+  }
 
   def __init__(self, upd, index):
     self.upd = upd
