@@ -15,13 +15,6 @@ try:
   from configparser import ConfigParser
 except ImportError:
   from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
-from contextlib import contextmanager
-try:
-  from contextlib import nullcontext
-except ImportError:
-  @contextmanager
-  def nullcontext():
-    yield None
 from datetime import date, datetime
 import os
 try:
