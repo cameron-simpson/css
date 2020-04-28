@@ -29,7 +29,7 @@
       This mapping also contains entries for the metadata
       for specific type values.
 
-    Here's a simple example with some `Tags` and a `TagSet`.
+    Here's a simple example with some `Tag`s and a `TagSet`.
 
         >>> tags = TagSet()
         >>> # add a "bare" Tag named 'blue' with no value
@@ -838,7 +838,7 @@ class ExtendedNamespace(SimpleNamespace):
 
   def __getattr__(self, attr):
     ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        contaiining a `Tag` for the attribute with a placeholder string.
+        containing a `Tag` for the attribute with a placeholder string.
     '''
     if attr and attr[0].isalpha():
       # no such attribute, create a placeholder `Tag`
