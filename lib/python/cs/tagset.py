@@ -29,7 +29,7 @@
       This mapping also contains entries for the metadata
       for specific type values.
 
-    Here's a simple example with some `Tags` and a `TagSet`.
+    Here's a simple example with some `Tag`s and a `TagSet`.
 
         >>> tags = TagSet()
         >>> # add a "bare" Tag named 'blue' with no value
@@ -80,8 +80,8 @@ from types import SimpleNamespace
 from icontract import require
 from cs.edit import edit as edit_lines
 from cs.lex import (
-    cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
-    skipwhite, lc_, titleify_lc, FormatableMixin
+    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
@@ -496,7 +496,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -838,7 +838,7 @@ class ExtendedNamespace(SimpleNamespace):
 
   def __getattr__(self, attr):
     ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        contaiining a `Tag` for the attribute with a placeholder string.
+        containing a `Tag` for the attribute with a placeholder string.
     '''
     if attr and attr[0].isalpha():
       # no such attribute, create a placeholder `Tag`
@@ -919,7 +919,7 @@ class TagSetNamespace(ExtendedNamespace):
                     None, subpath
                 )
               ns = subns
-            ns._tag = tag
+          ns._tag = tag
     return ns0
 
   @pfx_method

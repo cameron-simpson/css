@@ -905,6 +905,19 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
+def cropped_repr(s, max_length=32, offset=0):
+  ''' If the length of the sequence `s` after `offset (default `0`)
+      exceeds `max_length` (default 32)
+      return the `repr` of the leading 29 characters from `offset`
+      plus `'...'`.
+      Otherwise return the `repr` of `s[offset:]`.
+
+      This is typically used for `str` values.
+  '''
+  if len(s) - offset > max_length:
+    return repr(s[offset:offset+29])+'...'
+  return repr(s[offset:])
+
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
       Return `(clausename,new_offset)`.
