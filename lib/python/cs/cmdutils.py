@@ -215,7 +215,7 @@ class BaseCommand:
       cmd = basename(argv.pop(0))
     setup_logging(cmd)
     # post: argv is list of arguments after the command name
-    usage_format = getattr(self, 'USAGE_FORMAT')
+    usage_format = getattr(self, 'USAGE_FORMAT', None)
     # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
       usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
@@ -257,12 +257,13 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmd_names))
           )
-        if isinstance(main, BaseCommand):
-
-          def run_main(argv, options):
-            ''' Invoke the run method of an instance of the subcommand class.
-            '''
-            return main().run(argv, options=options, cmd=subcmd)
+        try:
+          main_is_class = issubclass(main, BaseCommand)
+        except TypeError:
+          main_is_class = False
+        if main_is_class:
+          cls = main
+          main = lambda argv, options: cls().run(argv, options=options, cmd=subcmd)
 
           main = run_main
       else:
