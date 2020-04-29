@@ -10,6 +10,8 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
+: ${VCS_FORMAT_TSLOG_GIT:='%ci %ae %s'}
+: ${VCS_FORMAT_TSLOG_HG:='{date|isodate} {author|email} {desc|firstline}\n'}
 : ${VCS_FORMAT_GLOG_GIT:='%<(25)%ae %s%n%ci %h<-%p%d%n'}
 : ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(activebookmark,"","","@{activebookmark}")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
 
@@ -33,6 +35,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     status      Report tree status.
     tags        Report tag names.
     top         Report top of tree.
+    tslog       Report a timesheet suitable change log:
+                  date time zone author headline
     type        Report type of tree."
 
 wd=.
@@ -193,6 +197,14 @@ case "$op" in
       # report tags
       tags,git)     [ $# -gt 0 ] || set -- -l; git tag "$@" ;;
       tags,hg)      hg tags ${1+"$@"} ;;
+      # timesheet suitable log: timestampts, author, headline
+      tslog,git)     git log \
+                      "--format=tformat:$VCS_FORMAT_TSLOG_GIT" \
+                      ${1+"$@"}
+                    ;;
+      tslog,hg)      hg log --template "$VCS_FORMAT_TSLOG_HG" \
+                      ${1+"$@"}
+                    ;;
       # update to revision
       up,git|update,git)
                     if [ $# = 1 ]
